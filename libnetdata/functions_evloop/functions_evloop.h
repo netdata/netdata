@@ -61,6 +61,12 @@ struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, co
 void functions_evloop_add_function(struct functions_evloop_globals *wg, const char *function, functions_evloop_worker_execute_t cb, time_t default_timeout);
 void functions_evloop_cancel_threads(struct functions_evloop_globals *wg);
 
+#define FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT (10 * USEC_PER_SEC)
+static inline void functions_stop_monotonic_update_on_progress(usec_t *stop_monotonic_ut) {
+    usec_t now_ut = now_monotonic_usec();
+    if(now_ut + FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT > *stop_monotonic_ut)
+        __atomic_store_n(stop_monotonic_ut, now_ut + FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT, __ATOMIC_RELAXED);
+}
 
 #define pluginsd_function_result_begin_to_buffer(wb, transaction, code, content_type, expires)      \
     buffer_sprintf(wb                                                                               \

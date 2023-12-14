@@ -19,7 +19,7 @@ typedef void (*rrd_function_progresser_cb_t)(void *data);
 typedef void (*rrd_function_register_progresser_cb_t)(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data);
 
 typedef int (*rrd_function_execute_cb_t)(uuid_t *transaction, BUFFER *wb,
-                                         int timeout, const char *function, void *collector_data,
+                                         usec_t *stop_monotonic_ut, const char *function, void *collector_data,
                                          rrd_function_result_callback_t result_cb, void *result_cb_data,
                                          rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                                          rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
@@ -36,7 +36,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
                       void *execute_cb_data);
 
 // call a function, to be run from anywhere
-int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout, HTTP_ACCESS access, const char *cmd,
+int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCESS access, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
@@ -59,7 +59,7 @@ const char *functions_content_type_to_format(HTTP_CONTENT_TYPE content_type);
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
 int rrdhost_function_progress(uuid_t *transaction, BUFFER *wb,
-                              int timeout, const char *function, void *collector_data,
+                              usec_t *stop_monotonic_ut, const char *function, void *collector_data,
                               rrd_function_result_callback_t result_cb, void *result_cb_data,
                               rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                               rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
@@ -68,7 +68,7 @@ int rrdhost_function_progress(uuid_t *transaction, BUFFER *wb,
                               void *register_progresser_cb_data);
 
 int rrdhost_function_streaming(uuid_t *transaction, BUFFER *wb,
-                               int timeout, const char *function, void *collector_data,
+                               usec_t *stop_monotonic_ut, const char *function, void *collector_data,
                                rrd_function_result_callback_t result_cb, void *result_cb_data,
                                rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                                rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,

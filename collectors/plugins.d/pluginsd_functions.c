@@ -25,13 +25,13 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     snprintfz(buffer, sizeof(buffer) - 1, "%s %s %d \"%s\"\n",
               pf->payload ? PLUGINSD_KEYWORD_FUNCTION_PAYLOAD : PLUGINSD_KEYWORD_FUNCTION,
               transaction,
-              pf->timeout,
+              pf->timeout_s,
               string2str(pf->function));
 
     // send the command to the plugin
     ssize_t ret = send_to_plugin(buffer, parser);
 
-    pf->sent_ut = now_realtime_usec();
+    pf->sent_monotonic_ut = now_monotonic_usec();
 
     if(ret < 0) {
         netdata_log_error("FUNCTION '%s': failed to send it to the plugin, error %zd", string2str(pf->function), ret);
@@ -41,7 +41,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
         internal_error(LOG_FUNCTIONS,
                        "FUNCTION '%s' with transaction '%s' sent to collector (%zd bytes, in %"PRIu64" usec)",
                 string2str(pf->function), dictionary_acquired_item_name(item), ret,
-                pf->sent_ut - pf->started_ut);
+                pf->sent_monotonic_ut - pf->started_monotonic_ut);
     }
 
     if (!pf->payload)
@@ -58,7 +58,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
         internal_error(LOG_FUNCTIONS,
                        "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%zd bytes, in %"PRIu64" usec)",
                 string2str(pf->function), dictionary_acquired_item_name(item), ret,
-                pf->sent_ut - pf->started_ut);
+                pf->sent_monotonic_ut - pf->started_monotonic_ut);
     }
 
     send_to_plugin("\nFUNCTION_PAYLOAD_END\n", parser);
@@ -136,7 +136,7 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
     internal_error(LOG_FUNCTIONS,
                    "FUNCTION '%s' result of transaction '%s' received from collector (%zu bytes, request %"PRIu64" usec, response %"PRIu64" usec)",
             string2str(pf->function), dictionary_acquired_item_name(item),
-            buffer_strlen(pf->result_body_wb), pf->sent_ut - pf->started_ut, now_realtime_usec() - pf->sent_ut);
+            buffer_strlen(pf->result_body_wb), pf->sent_monotonic_ut - pf->started_monotonic_ut, now_realtime_usec() - pf->sent_monotonic_ut);
 
     if (pf->virtual && SERVING_PLUGINSD(parser)) {
         if (pf->payload) {
@@ -167,14 +167,14 @@ void pluginsd_inflight_functions_cleanup(PARSER *parser) {
 
 // ----------------------------------------------------------------------------
 
-void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
-    parser->inflight.smaller_timeout = 0;
+void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut) {
+    parser->inflight.smaller_monotonic_timeout_ut = 0;
     struct inflight_function *pf;
     dfe_start_write(parser->inflight.functions, pf) {
-        if (pf->timeout_ut < now) {
+        if (*pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < now_ut) {
             internal_error(true,
                            "FUNCTION '%s' removing expired transaction '%s', after %"PRIu64" usec.",
-                    string2str(pf->function), pf_dfe.name, now - pf->started_ut);
+                           string2str(pf->function), pf_dfe.name, now_ut - pf->started_monotonic_ut);
 
             if(!buffer_strlen(pf->result_body_wb) || pf->code == HTTP_RESP_OK)
                 pf->code = rrd_call_function_error(pf->result_body_wb,
@@ -184,8 +184,8 @@ void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now) {
             dictionary_del(parser->inflight.functions, pf_dfe.name);
         }
 
-        else if(!parser->inflight.smaller_timeout || pf->timeout_ut < parser->inflight.smaller_timeout)
-            parser->inflight.smaller_timeout = pf->timeout_ut;
+        else if(!parser->inflight.smaller_monotonic_timeout_ut || *pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)
+            parser->inflight.smaller_monotonic_timeout_ut = *pf->stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
     }
     dfe_done(pf);
 }
@@ -255,7 +255,7 @@ static void pluginsd_function_progress_to_plugin(void *data) {
 // this is the function called from
 // rrd_call_function_and_wait() and rrd_call_function_async()
 static int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb,
-                                        int timeout, const char *function,
+                                        usec_t *stop_monotonic_ut, const char *function,
                                         void *execute_cb_data,
                                         rrd_function_result_callback_t result_cb, void *result_cb_data,
                                         rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
@@ -267,13 +267,15 @@ static int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body
                                         void *register_progresser_cb_data) {
     PARSER  *parser = execute_cb_data;
 
-    usec_t now = now_realtime_usec();
+    usec_t now_ut = now_monotonic_usec();
+
+    int timeout_s = (*stop_monotonic_ut - now_ut + USEC_PER_SEC / 2) / USEC_PER_SEC;
 
     struct inflight_function tmp = {
-            .started_ut = now,
-            .timeout_ut = now + timeout * USEC_PER_SEC + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT,
+            .started_monotonic_ut = now_ut,
+            .stop_monotonic_ut = stop_monotonic_ut,
             .result_body_wb = result_body_wb,
-            .timeout = timeout,
+            .timeout_s = timeout_s,
             .function = string_strdupz(function),
             .payload = NULL,
             .parser = parser,
@@ -300,15 +302,16 @@ static int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body
     if(register_canceller_cb)
         register_canceller_cb(register_canceller_cb_data, pluginsd_function_cancel, t);
 
-    if(register_progresser_cb)
+    if(register_progresser_cb && (parser->repertoire == PARSER_INIT_PLUGINSD ||
+        (parser->repertoire == PARSER_INIT_STREAMING && stream_has_capability(&parser->user, STREAM_CAP_PROGRESS))))
         register_progresser_cb(register_progresser_cb_data, pluginsd_function_progress_to_plugin, t);
 
-    if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
-        parser->inflight.smaller_timeout = tmp.timeout_ut;
+    if(!parser->inflight.smaller_monotonic_timeout_ut || *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)
+        parser->inflight.smaller_monotonic_timeout_ut = *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
 
     // garbage collect stale inflight functions
-    if(parser->inflight.smaller_timeout < now)
-        pluginsd_inflight_functions_garbage_collect(parser, now);
+    if(parser->inflight.smaller_monotonic_timeout_ut < now_ut)
+        pluginsd_inflight_functions_garbage_collect(parser, now_ut);
 
     dictionary_write_unlock(parser->inflight.functions);
 

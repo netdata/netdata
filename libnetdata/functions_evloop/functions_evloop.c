@@ -171,9 +171,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             if(acquired) {
                 struct functions_evloop_worker_job *j = dictionary_acquired_item_value(acquired);
 
-                usec_t now_ut = now_monotonic_usec();
-                if(now_ut + 10 * USEC_PER_SEC > j->stop_monotonic_ut)
-                    __atomic_store_n(&j->stop_monotonic_ut, now_ut + 10 * USEC_PER_SEC, __ATOMIC_RELAXED);
+                functions_stop_monotonic_update_on_progress(&j->stop_monotonic_ut);
 
                 dictionary_acquired_item_release(wg->worker_queue, acquired);
             }

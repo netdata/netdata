@@ -1034,7 +1034,7 @@ static void add_labels_to_disk(struct disk *d, RRDSET *st) {
 }
 
 static int diskstats_function_block_devices(uuid_t *transaction __maybe_unused, BUFFER *wb,
-                                            int timeout __maybe_unused, const char *function __maybe_unused,
+                                            usec_t *stop_monotonic_ut __maybe_unused, const char *function __maybe_unused,
                                             void *collector_data __maybe_unused,
                                             rrd_function_result_callback_t result_cb, void *result_cb_data,
                                             rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,

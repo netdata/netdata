@@ -9,12 +9,12 @@ struct inflight_function {
     uuid_t transaction;
 
     int code;
-    int timeout;
+    int timeout_s;
     STRING *function;
     BUFFER *result_body_wb;
-    usec_t timeout_ut;
-    usec_t started_ut;
-    usec_t sent_ut;
+    usec_t *stop_monotonic_ut; // pointer to caller data
+    usec_t started_monotonic_ut;
+    usec_t sent_monotonic_ut;
     const char *payload;
     PARSER *parser;
     bool virtual;
@@ -28,6 +28,10 @@ struct inflight_function {
         rrd_function_progress_cb_t cb;
         void *data;
     } progress;
+
+    struct {
+        usec_t stop_monotonic_ut;
+    } dyncfg;
 };
 
 PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser);
@@ -36,6 +40,6 @@ PARSER_RC pluginsd_function_progress(char **words, size_t num_words, PARSER *par
 
 void pluginsd_inflight_functions_init(PARSER *parser);
 void pluginsd_inflight_functions_cleanup(PARSER *parser);
-void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now);
+void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut);
 
 #endif //NETDATA_PLUGINSD_FUNCTIONS_H

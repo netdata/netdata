@@ -17,7 +17,7 @@ static void virt_fnc_got_data_cb(BUFFER *wb __maybe_unused, int code, void *call
     pthread_mutex_unlock(&ctx->lock);
 }
 
-#define VIRT_FNC_TIMEOUT 1
+#define VIRT_FNC_TIMEOUT_S 10
 #define VIRT_FNC_BUF_SIZE (4096)
 void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, const char *payload, rrd_function_result_callback_t callback, void *callback_data) {
     PARSER *parser = NULL;
@@ -52,22 +52,25 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
     }
     freez(function_with_params);
 
-    usec_t now = now_realtime_usec();
+    usec_t now_ut = now_monotonic_usec();
 
     struct inflight_function tmp = {
-            .started_ut = now,
-            .timeout_ut = now + VIRT_FNC_TIMEOUT + USEC_PER_SEC,
-            .result_body_wb = wb,
-            .timeout = VIRT_FNC_TIMEOUT * 10,
-            .function = string_strdupz(buffer_tostring(function_out)),
-            .payload = payload != NULL ? strdupz(payload) : NULL,
-            .virtual = true,
+        .started_monotonic_ut = now_ut,
+        .result_body_wb = wb,
+        .timeout_s = VIRT_FNC_TIMEOUT_S,
+        .function = string_strdupz(buffer_tostring(function_out)),
+        .payload = payload != NULL ? strdupz(payload) : NULL,
+        .virtual = true,
 
-            .result = {
-                    .cb = callback,
-                    .data = callback_data,
-            }
+        .result = {
+                .cb = callback,
+                .data = callback_data,
+        },
+        .dyncfg = {
+            .stop_monotonic_ut = now_ut + VIRT_FNC_TIMEOUT_S * USEC_PER_SEC,
+        }
     };
+    tmp.stop_monotonic_ut = &tmp.dyncfg.stop_monotonic_ut;
     buffer_free(function_out);
 
     uuid_generate_time(tmp.transaction);
@@ -80,19 +83,19 @@ void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, co
     // the caller about the error - no need for error handling here.
     dictionary_set(parser->inflight.functions, key, &tmp, sizeof(struct inflight_function));
 
-    if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
-        parser->inflight.smaller_timeout = tmp.timeout_ut;
+    if(!parser->inflight.smaller_monotonic_timeout_ut || *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)
+        parser->inflight.smaller_monotonic_timeout_ut = *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
 
     // garbage collect stale inflight functions
-    if(parser->inflight.smaller_timeout < now)
-        pluginsd_inflight_functions_garbage_collect(parser, now);
+    if(parser->inflight.smaller_monotonic_timeout_ut < now_ut)
+        pluginsd_inflight_functions_garbage_collect(parser, now_ut);
 
     dictionary_write_unlock(parser->inflight.functions);
 }
 
 
 dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name, int *rc, const char *payload) {
-    usec_t now = now_realtime_usec();
+    usec_t now_ut = now_monotonic_usec();
     BUFFER *wb = buffer_create(VIRT_FNC_BUF_SIZE, NULL);
 
     struct mutex_cond cond = {
@@ -101,10 +104,9 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
     };
 
     struct inflight_function tmp = {
-            .started_ut = now,
-            .timeout_ut = now + VIRT_FNC_TIMEOUT + USEC_PER_SEC,
+            .started_monotonic_ut = now_ut,
             .result_body_wb = wb,
-            .timeout = VIRT_FNC_TIMEOUT,
+            .timeout_s = VIRT_FNC_TIMEOUT_S,
             .function = string_strdupz(name),
             .payload = payload != NULL ? strdupz(payload) : NULL,
             .virtual = true,
@@ -112,8 +114,12 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
             .result = {
                     .cb = virt_fnc_got_data_cb,
                     .data = &cond,
-            }
+            },
+        .dyncfg = {
+            .stop_monotonic_ut = now_ut + VIRT_FNC_TIMEOUT_S * USEC_PER_SEC,
+        }
     };
+    tmp.stop_monotonic_ut = &tmp.dyncfg.stop_monotonic_ut;
 
     uuid_generate_time(tmp.transaction);
 
@@ -126,18 +132,18 @@ dyncfg_config_t call_virtual_function_blocking(PARSER *parser, const char *name,
     // the caller about the error - no need for error handling here.
     dictionary_set(parser->inflight.functions, key, &tmp, sizeof(struct inflight_function));
 
-    if(!parser->inflight.smaller_timeout || tmp.timeout_ut < parser->inflight.smaller_timeout)
-        parser->inflight.smaller_timeout = tmp.timeout_ut;
+    if(!parser->inflight.smaller_monotonic_timeout_ut || *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)
+        parser->inflight.smaller_monotonic_timeout_ut = *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT;
 
     // garbage collect stale inflight functions
-    if(parser->inflight.smaller_timeout < now)
-        pluginsd_inflight_functions_garbage_collect(parser, now);
+    if(parser->inflight.smaller_monotonic_timeout_ut < now_ut)
+        pluginsd_inflight_functions_garbage_collect(parser, now_ut);
 
     dictionary_write_unlock(parser->inflight.functions);
 
     struct timespec tp;
     clock_gettime(CLOCK_REALTIME, &tp);
-    tp.tv_sec += (time_t)VIRT_FNC_TIMEOUT;
+    tp.tv_sec += (time_t)VIRT_FNC_TIMEOUT_S;
 
     pthread_mutex_lock(&cond.lock);
 

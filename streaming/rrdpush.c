@@ -1410,6 +1410,7 @@ static struct {
     {STREAM_CAP_ZSTD,         "ZSTD" },
     {STREAM_CAP_GZIP,         "GZIP" },
     {STREAM_CAP_BROTLI,       "BROTLI" },
+    {STREAM_CAP_PROGRESS,     "PROGRESS" },
     {0 , NULL },
 };
 
@@ -1485,7 +1486,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_REPLICATION |
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
-            STREAM_CAP_SLOTS |
+            STREAM_CAP_SLOTS | STREAM_CAP_PROGRESS |
             STREAM_CAP_COMPRESSIONS_AVAILABLE |
             #ifdef NETDATA_TEST_DYNCFG
             STREAM_CAP_DYNCFG |

@@ -611,7 +611,7 @@ static inline void netdev_rename_all_lock(void) {
 // ----------------------------------------------------------------------------
 
 int netdev_function_net_interfaces(uuid_t *transaction __maybe_unused, BUFFER *wb,
-                                   int timeout __maybe_unused, const char *function __maybe_unused,
+                                   usec_t *stop_monotonic_ut __maybe_unused, const char *function __maybe_unused,
                                    void *collector_data __maybe_unused,
                                    rrd_function_result_callback_t result_cb, void *result_cb_data,
                                    rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,

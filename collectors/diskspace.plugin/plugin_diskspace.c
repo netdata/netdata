@@ -637,7 +637,7 @@ static void diskspace_main_cleanup(void *ptr) {
 #endif
 
 int diskspace_function_mount_points(uuid_t *transaction __maybe_unused, BUFFER *wb,
-                                    int timeout __maybe_unused, const char *function __maybe_unused,
+                                    usec_t *stop_monotonic_ut __maybe_unused, const char *function __maybe_unused,
                                     void *collector_data __maybe_unused,
                                     rrd_function_result_callback_t result_cb, void *result_cb_data,
                                     rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,

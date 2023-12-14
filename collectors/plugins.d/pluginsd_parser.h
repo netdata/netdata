@@ -123,7 +123,7 @@ typedef struct parser {
 
     struct {
         DICTIONARY *functions;
-        usec_t smaller_timeout;
+        usec_t smaller_monotonic_timeout_ut;
     } inflight;
 
     struct {
