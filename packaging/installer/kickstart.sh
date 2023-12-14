@@ -21,8 +21,8 @@ KICKSTART_SOURCE="$(
 )"
 DEFAULT_PLUGIN_PACKAGES=""
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
-REPOCONFIG_DEB_VERSION="2-1"
-REPOCONFIG_RPM_VERSION="2-1"
+REPOCONFIG_DEB_VERSION="2-2"
+REPOCONFIG_RPM_VERSION="2-2"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
 
@@ -125,6 +125,7 @@ main() {
       ;;
   esac
 
+  handle_existing_install
   set_tmpdir
 
   if [ -n "${INSTALL_VERSION}" ]; then
@@ -2324,9 +2325,5 @@ parse_args $@
 confirm_root_support
 get_system_info
 confirm_install_prefix
-
-if [ -z "${ACTION}" ]; then
-  handle_existing_install
-fi
 
 main

@@ -2371,12 +2371,12 @@ void generate_dbengine_dataset(unsigned history_seconds)
         thread_info[i]->time_max = 0;
         thread_info[i]->done = 0;
         completion_init(&thread_info[i]->charts_initialized);
-        assert(0 == uv_thread_create(&thread_info[i]->thread, generate_dbengine_chart, thread_info[i]));
+        fatal_assert(0 == uv_thread_create(&thread_info[i]->thread, generate_dbengine_chart, thread_info[i]));
         completion_wait_for(&thread_info[i]->charts_initialized);
         completion_destroy(&thread_info[i]->charts_initialized);
     }
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
-        assert(0 == uv_thread_join(&thread_info[i]->thread));
+        fatal_assert(0 == uv_thread_join(&thread_info[i]->thread));
     }
 
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
@@ -2578,7 +2578,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         chart_threads[i]->done = 0;
         chart_threads[i]->errors = chart_threads[i]->stored_metrics_nr = 0;
         completion_init(&chart_threads[i]->charts_initialized);
-        assert(0 == uv_thread_create(&chart_threads[i]->thread, generate_dbengine_chart, chart_threads[i]));
+        fatal_assert(0 == uv_thread_create(&chart_threads[i]->thread, generate_dbengine_chart, chart_threads[i]));
     }
     /* barrier so that subsequent queries can access valid chart data */
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
@@ -2600,7 +2600,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
             query_threads[i]->chart_threads[j] = chart_threads[j];
         }
         query_threads[i]->delete_old_data = DISK_SPACE_MB ? 1 : 0;
-        assert(0 == uv_thread_create(&query_threads[i]->thread, query_dbengine_chart, query_threads[i]));
+        fatal_assert(0 == uv_thread_create(&query_threads[i]->thread, query_dbengine_chart, query_threads[i]));
     }
     sleep(TEST_DURATION_SEC);
     /* stop workload */
