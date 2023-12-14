@@ -1360,7 +1360,7 @@ cleanup_apt_cache() {
     cache_dir="/var/cache/apt/archives"
 
     if [ -d "${cache_dir}" ]; then
-        run_as_root find "${cache_dir}" -t file -name 'netdata*.deb' -delete
+        run_as_root find "${cache_dir}" -type f -name 'netdata*.deb' -delete
     fi
 }
 
