@@ -99,7 +99,8 @@ int init_connectors(struct engine *engine)
         snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "EXPORTING-%zu", instance->index);
         uv_thread_set_name_np(instance->thread, threadname);
 
-        send_statistics("EXPORTING_START", "OK", instance->config.type_name);
+        analytics_statistic_t statistic = { "EXPORTING_START", "OK", instance->config.type_name };
+        analytics_statistic_send(&statistic);
     }
 
     return 0;
