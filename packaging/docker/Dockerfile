@@ -122,6 +122,7 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 freeipmi.plugin \
                 go.d.plugin \
                 perf.plugin \
+                ndsudo \
                 slabinfo.plugin \
                 systemd-journal.plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/usr/libexec/netdata/plugins.d/$name"; \
