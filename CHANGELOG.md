@@ -6,12 +6,18 @@
 
 **Merged pull requests:**
 
+- Allow passing cmake options with NETDATA\_CMAKE\_OPTIONS. [\#16598](https://github.com/netdata/netdata/pull/16598) ([vkalintiris](https://github.com/vkalintiris))
+- Cleanup am files [\#16597](https://github.com/netdata/netdata/pull/16597) ([vkalintiris](https://github.com/vkalintiris))
+- fix: use black version icon for Splunk in order to make it visible [\#16593](https://github.com/netdata/netdata/pull/16593) ([juacker](https://github.com/juacker))
+- systemd-journal: exit if unable to locate journal data directories [\#16592](https://github.com/netdata/netdata/pull/16592) ([ilyam8](https://github.com/ilyam8))
+- Fix coverity issues [\#16589](https://github.com/netdata/netdata/pull/16589) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#16587](https://github.com/netdata/netdata/pull/16587) ([netdatabot](https://github.com/netdatabot))
 - Adds docs for Splunk cloud notifications [\#16586](https://github.com/netdata/netdata/pull/16586) ([juacker](https://github.com/juacker))
 - uninstaller remove log2journal and systemd-cat-native [\#16585](https://github.com/netdata/netdata/pull/16585) ([ilyam8](https://github.com/ilyam8))
 - Handle coverity issues related to Y2K38\_SAFETY [\#16583](https://github.com/netdata/netdata/pull/16583) ([stelfrag](https://github.com/stelfrag))
 - Update categories.yaml to add Logs [\#16582](https://github.com/netdata/netdata/pull/16582) ([sashwathn](https://github.com/sashwathn))
 - Add Alpine Linux 3.19 to CI. [\#16579](https://github.com/netdata/netdata/pull/16579) ([Ferroin](https://github.com/Ferroin))
+- disable cpu per core metrics by default [\#16572](https://github.com/netdata/netdata/pull/16572) ([ilyam8](https://github.com/ilyam8))
 - make debugfs exit on sigpipe [\#16569](https://github.com/netdata/netdata/pull/16569) ([ilyam8](https://github.com/ilyam8))
 - Fix memory leak during host chart label cleanup [\#16568](https://github.com/netdata/netdata/pull/16568) ([stelfrag](https://github.com/stelfrag))
 - fix cpu arch/ram/disk values in buildinfo [\#16567](https://github.com/netdata/netdata/pull/16567) ([ilyam8](https://github.com/ilyam8))
@@ -437,13 +443,6 @@
 - Systemd-Journal: fix crash when the uid or gid do not have names [\#16015](https://github.com/netdata/netdata/pull/16015) ([ktsaou](https://github.com/ktsaou))
 - Avoid duplicate keys in labels [\#16014](https://github.com/netdata/netdata/pull/16014) ([stelfrag](https://github.com/stelfrag))
 - remove the line length limit from pluginsd [\#16013](https://github.com/netdata/netdata/pull/16013) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#16011](https://github.com/netdata/netdata/pull/16011) ([netdatabot](https://github.com/netdatabot))
-- Simplify the script for generating documentation from integrations [\#16009](https://github.com/netdata/netdata/pull/16009) ([Ancairon](https://github.com/Ancairon))
-- some collector metadata improvements [\#16008](https://github.com/netdata/netdata/pull/16008) ([andrewm4894](https://github.com/andrewm4894))
-- Fix compilation warnings [\#16006](https://github.com/netdata/netdata/pull/16006) ([stelfrag](https://github.com/stelfrag))
-- Update CMakeLists.txt [\#16005](https://github.com/netdata/netdata/pull/16005) ([stelfrag](https://github.com/stelfrag))
-- eBPF socket: function with event loop [\#16004](https://github.com/netdata/netdata/pull/16004) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix compilation warnings [\#16001](https://github.com/netdata/netdata/pull/16001) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
