@@ -30,7 +30,6 @@ build_dist() {
       --sysconfdir=/etc \
       --localstatedir=/var \
       --libexecdir=/usr/libexec \
-      --with-zlib \
       --with-math \
       --with-user=netdata \
       --disable-dependency-tracking \

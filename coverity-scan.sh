@@ -171,7 +171,6 @@ installit() {
 }
 
 OTHER_OPTIONS="--disable-lto"
-OTHER_OPTIONS+=" --with-zlib"
 OTHER_OPTIONS+=" --with-math"
 OTHER_OPTIONS+=" --enable-lz4"
 OTHER_OPTIONS+=" --enable-openssl"
