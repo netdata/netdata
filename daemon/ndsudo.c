@@ -1,0 +1,264 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdbool.h>
+
+#define MAX_SEARCH 2
+#define MAX_PARAMETERS 128
+#define ERROR_BUFFER_SIZE 1024
+
+struct command {
+    const char *name;
+    const char *params;
+    const char *search[MAX_SEARCH];
+} allowed_commands[] = {
+    {
+        .name = "nvme-list",
+        .params = "list --output-format=json",
+        .search = {
+            [0] = "nvme",
+            [1] = "nvme",
+        },
+    },
+    {
+        .name = "nvme-smart-log",
+        .params = "smart-log {{device}} --output-format=json",
+        .search = {
+            [0] = "nvme",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "megacli-disk-info",
+        .params = "-LDPDInfo -aAll -NoLog",
+        .search = {
+            [0] = "megacli",
+            [1] = "MegaCLI",
+        },
+    },
+    {
+        .name = "megacli-battery-info",
+        .params = "-AdpBbuCmd -aAll -NoLog",
+        .search = {
+            [0] = "megacli",
+            [1] = "MegaCLI",
+        },
+    },
+    {
+        .name = "arcconf-ld-info",
+        .params = "GETCONFIG 1 LD",
+        .search = {
+            [0] = "arcconf",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "arcconf-pd-info",
+        .params = "GETCONFIG 1 PD",
+        .search = {
+            [0] = "arcconf",
+            [1] = NULL,
+        },
+    }
+};
+
+bool command_exists_in_dir(const char *dir, const char *cmd, char *dst, size_t dst_size) {
+    snprintf(dst, dst_size, "%s/%s", dir, cmd);
+    return access(dst, X_OK) == 0;
+}
+
+bool command_exists_in_PATH(const char *cmd, char *dst, size_t dst_size) {
+    if(!dst || !dst_size)
+        return false;
+
+    char *path = getenv("PATH");
+    if(!path)
+        return false;
+
+    char *path_copy = strdup(path);
+    if (!path_copy)
+        return false;
+
+    char *dir;
+    bool found = false;
+    dir = strtok(path_copy, ":");
+    while(dir && !found) {
+        found = command_exists_in_dir(dir, cmd, dst, dst_size);
+        dir = strtok(NULL, ":");
+    }
+
+    free(path_copy);
+    return found;
+}
+
+struct command *find_command(const char *cmd) {
+    size_t size = sizeof(allowed_commands) / sizeof(allowed_commands[0]);
+    for(size_t i = 0; i < size ;i++) {
+        if(strcmp(cmd, allowed_commands[i].name) == 0)
+            return &allowed_commands[i];
+    }
+
+    return NULL;
+}
+
+bool check_string(const char *str, char *err, size_t err_size) {
+    const char *s = str;
+    while(*s) {
+        char c = *s++;
+        if(!((c >= 'A' && c <= 'Z') ||
+             (c >= 'a' && c <= 'z') ||
+             (c >= '0' && c <= '9') ||
+              c == ' ' || c == '_' || c == '-' || c == '/' || c == '.')) {
+            snprintf(err, err_size, "parameter '%s' includes invalid character '%c'", str, c);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool check_params(int argc, char **argv, char *err, size_t err_size) {
+    for(int i = 0 ; i < argc ;i++)
+        if(!check_string(argv[i], err, err_size))
+            return false;
+
+    return true;
+}
+
+char *find_variable_in_argv(const char *variable, int argc, char **argv, char *err, size_t err_size) {
+    for (int i = 1; i < argc - 1; i++) {
+        if (strcmp(argv[i], variable) == 0)
+            return strdup(argv[i + 1]);
+    }
+
+    snprintf(err, err_size, "variable '%s' is required, but is not found in the command line parameters", variable);
+
+    return NULL;
+}
+
+bool search_and_replace_params(struct command *cmd, char **params, size_t max_params, const char *filename, int argc, char **argv, char *err, size_t err_size) {
+    if (!cmd || !params || !max_params) {
+        snprintf(err, err_size, "search_and_replace_params() internal error");
+        return false;
+    }
+
+    const char *delim = " ";
+    char *token;
+    char *temp_params = strdup(cmd->params);
+    if (!temp_params) {
+        snprintf(err, err_size, "search_and_replace_params() cannot allocate memory");
+        return false;
+    }
+
+    size_t param_count = 0;
+    params[param_count++] = strdup(filename);
+
+    token = strtok(temp_params, delim);
+    while (token && param_count < max_params - 1) {
+        size_t len = strlen(token);
+
+        char *value = NULL;
+
+        if (strncmp(token, "{{", 2) == 0 && strncmp(token + len - 2, "}}", 2) == 0) {
+            token[0] = '-';
+            token[1] = '-';
+            token[len - 2] = '\0';
+
+            value = find_variable_in_argv(token, argc, argv, err, err_size);
+        }
+        else
+            value = strdup(token);
+
+        if(!value)
+            goto cleanup;
+
+        params[param_count++] = value;
+        token = strtok(NULL, delim);
+    }
+
+    params[param_count] = NULL; // Null-terminate the params array
+    free(temp_params);
+    return true;
+
+cleanup:
+    if(!err[0])
+        snprintf(err, err_size, "memory allocation failure");
+
+    free(temp_params);
+    for (size_t i = 0; i < param_count; ++i) {
+        free(params[i]);
+        params[i] = NULL;
+    }
+    return false;
+}
+
+int main(int argc, char *argv[]) {
+    char error_buffer[ERROR_BUFFER_SIZE] = "";
+
+    if (argc < 2) {
+        fprintf(stderr, "at least 2 parameters are needed, but %d are given.\n", argc);
+        return 1;
+    }
+
+    if(!check_params(argc, argv, error_buffer, sizeof(error_buffer))) {
+        fprintf(stderr, "invalid characters in parameters: %s\n", error_buffer);
+        return 2;
+    }
+
+    bool test = false;
+    const char *cmd = argv[1];
+    if(strcmp(cmd, "--test") == 0) {
+        cmd = argv[2];
+        test = true;
+    }
+
+    struct command *command = find_command(cmd);
+    if(!command) {
+        fprintf(stderr, "command is not allowed.\n");
+        return 3;
+    }
+
+    bool found = false;
+    char filename[FILENAME_MAX];
+
+    for(size_t i = 0; i < MAX_SEARCH && !found ;i++) {
+        if(command->search[i]) {
+            found = command_exists_in_PATH(command->search[i], filename, sizeof(filename));
+            if(!found) {
+                size_t len = strlen(error_buffer);
+                snprintf(&error_buffer[len], sizeof(error_buffer) - len, "%s ", command->search[i]);
+            }
+        }
+    }
+
+    if(!found) {
+        fprintf(stderr, "%s: not available in PATH.\n", error_buffer);
+        return 4;
+    }
+    else
+        error_buffer[0] = '\0';
+
+    char *params[MAX_PARAMETERS];
+    if(!search_and_replace_params(command, params, MAX_PARAMETERS, filename, argc, argv, error_buffer, sizeof(error_buffer))) {
+        fprintf(stderr, "command line parameters are not satisfied: %s\n", error_buffer);
+        return 5;
+    }
+
+    if(test) {
+        fprintf(stderr, "Command to run: \n");
+
+        for(size_t i = 0; i < MAX_PARAMETERS && params[i] ;i++)
+            fprintf(stderr, "'%s' ", params[i]);
+
+        fprintf(stderr, "\n");
+
+        exit(0);
+    }
+    else {
+        char *clean_env[] = {NULL};
+        execve(filename, params, clean_env);
+        perror("execvp"); // execvp only returns on error
+        return 6;
+    }
+}
