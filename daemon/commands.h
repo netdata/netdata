@@ -9,7 +9,6 @@
 typedef enum cmd {
     CMD_HELP = 0,
     CMD_RELOAD_HEALTH,
-    CMD_SAVE_DATABASE,
     CMD_REOPEN_LOGS,
     CMD_EXIT,
     CMD_FATAL,

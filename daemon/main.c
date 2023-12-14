@@ -404,10 +404,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
     web_client_cache_destroy();
 
-    delta_shutdown_time("clean rrdhost database");
-
-    rrdhost_cleanup_all();
-
     delta_shutdown_time("stop aclk threads");
 
     timeout = !service_wait_exit(
@@ -1229,7 +1225,7 @@ static void get_netdata_configured_variables() {
 #else
     if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
        error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
-       default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
+       default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
     }
 #endif
 

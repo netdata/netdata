@@ -6,7 +6,6 @@ typedef enum signal_action {
     NETDATA_SIGNAL_END_OF_LIST,
     NETDATA_SIGNAL_IGNORE,
     NETDATA_SIGNAL_EXIT_CLEANLY,
-    NETDATA_SIGNAL_SAVE_DATABASE,
     NETDATA_SIGNAL_REOPEN_LOGS,
     NETDATA_SIGNAL_RELOAD_HEALTH,
     NETDATA_SIGNAL_FATAL,
@@ -24,7 +23,6 @@ static struct {
         { SIGQUIT, "SIGQUIT", 0, NETDATA_SIGNAL_EXIT_CLEANLY  },
         { SIGTERM, "SIGTERM", 0, NETDATA_SIGNAL_EXIT_CLEANLY  },
         { SIGHUP,  "SIGHUP",  0, NETDATA_SIGNAL_REOPEN_LOGS   },
-        { SIGUSR1, "SIGUSR1", 0, NETDATA_SIGNAL_SAVE_DATABASE },
         { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH },
         { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_FATAL         },
         { SIGCHLD, "SIGCHLD", 0, NETDATA_SIGNAL_CHILD         },
@@ -207,13 +205,6 @@ void signals_handle(void) {
                                 netdata_log_info("SIGNAL: Received %s. Reloading HEALTH configuration...", name);
                                 nd_log_limits_reset();
                                 execute_command(CMD_RELOAD_HEALTH, NULL, NULL);
-                                break;
-
-                            case NETDATA_SIGNAL_SAVE_DATABASE:
-                                nd_log_limits_unlimited();
-                                netdata_log_info("SIGNAL: Received %s. Saving databases...", name);
-                                nd_log_limits_reset();
-                                execute_command(CMD_SAVE_DATABASE, NULL, NULL);
                                 break;
 
                             case NETDATA_SIGNAL_REOPEN_LOGS:

@@ -57,8 +57,6 @@ typedef enum __attribute__((packed)) {
     BIB_DB_DBENGINE,
     BIB_DB_ALLOC,
     BIB_DB_RAM,
-    BIB_DB_MAP,
-    BIB_DB_SAVE,
     BIB_DB_NONE,
     BIB_CONNECTIVITY_ACLK,
     BIB_CONNECTIVITY_HTTPD_STATIC,
@@ -552,22 +550,6 @@ static struct {
                 .analytics = NULL,
                 .print = "ram",
                 .json = "ram",
-                .value = NULL,
-        },
-        [BIB_DB_MAP] = {
-                .category = BIC_DATABASE,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "map",
-                .json = "map",
-                .value = NULL,
-        },
-        [BIB_DB_SAVE] = {
-                .category = BIC_DATABASE,
-                .type = BIT_BOOLEAN,
-                .analytics = NULL,
-                .print = "save",
-                .json = "save",
                 .value = NULL,
         },
         [BIB_DB_NONE] = {
@@ -1101,8 +1083,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
     build_info_set_status(BIB_DB_ALLOC, true);
     build_info_set_status(BIB_DB_RAM, true);
-    build_info_set_status(BIB_DB_MAP, true);
-    build_info_set_status(BIB_DB_SAVE, true);
     build_info_set_status(BIB_DB_NONE, true);
 
     build_info_set_status(BIB_CONNECTIVITY_HTTPD_STATIC, true);
