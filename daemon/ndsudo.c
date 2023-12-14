@@ -18,7 +18,7 @@ struct command {
         .params = "list --output-format=json",
         .search = {
             [0] = "nvme",
-            [1] = "nvme",
+            [1] = NULL,
         },
     },
     {
@@ -193,6 +193,43 @@ cleanup:
     return false;
 }
 
+void show_help() {
+    fprintf(stdout, "\n");
+    fprintf(stdout, "ndsudo\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "(C) Netdata Inc.\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "A helper to allow Netdata run privileged commands.\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "  --test\n");
+    fprintf(stdout, "    print the generated command that will be run, without running it.\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "  --help\n");
+    fprintf(stdout, "    print this message.\n");
+    fprintf(stdout, "\n");
+
+    fprintf(stdout, "The following commands are supported:\n\n");
+
+    size_t size = sizeof(allowed_commands) / sizeof(allowed_commands[0]);
+    for(size_t i = 0; i < size ;i++) {
+        fprintf(stdout, "- Command    : %s\n", allowed_commands[i].name);
+        fprintf(stdout, "  Executables: ");
+        for(size_t j = 0; j < MAX_SEARCH && allowed_commands[i].search[j] ;j++) {
+            fprintf(stdout, "%s ", allowed_commands[i].search[j]);
+        }
+        fprintf(stdout, "\n");
+        fprintf(stdout, "  Parameters : %s\n\n", allowed_commands[i].params);
+    }
+
+    fprintf(stdout, "The program searches for executables in the system path.\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "Variables given as {{variable}} are expected on the command line as:\n");
+    fprintf(stdout, "  --variable VALUE\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "VALUE can include A-Z, a-z, 0-9, _, -, /, and .\n");
+    fprintf(stdout, "\n");
+}
+
 int main(int argc, char *argv[]) {
     char error_buffer[ERROR_BUFFER_SIZE] = "";
 
@@ -208,7 +245,11 @@ int main(int argc, char *argv[]) {
 
     bool test = false;
     const char *cmd = argv[1];
-    if(strcmp(cmd, "--test") == 0) {
+    if(strcmp(cmd, "--help") == 0 || strcmp(cmd, "-h") == 0) {
+        show_help();
+        exit(0);
+    }
+    else if(strcmp(cmd, "--test") == 0) {
         cmd = argv[2];
         test = true;
     }
