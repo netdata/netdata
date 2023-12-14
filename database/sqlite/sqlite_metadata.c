@@ -1316,7 +1316,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
 
        __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
        hclt[thread_index].host = host;
-       assert(0 == uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]));
+       fatal_assert(0 == uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]));
     }
     dfe_done(host);
 
