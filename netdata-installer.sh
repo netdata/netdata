@@ -454,6 +454,15 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   fi
 fi
 
+enable_feature() {
+  NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS}" | sed -e "s/-DENABLE_${1}=Off[[:space:]]*//g" -e "s/-DENABLE_${1}=On[[:space:]]*//g")"
+  if [ "${2}" -eq 1 ]; then
+    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS}" | sed "s/$/ -DENABLE_${1}=On/")"
+  else
+    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS}" | sed "s/$/ -DENABLE_${1}=Off/")"
+  fi
+}
+
 # set default make options
 if [ -z "${MAKEOPTS}" ]; then
   MAKEOPTS="-j$(find_processors)"
@@ -977,7 +986,7 @@ bundle_ebpf_co_re() {
         run_failed "Failed to get eBPF CO-RE files. eBPF support will be disabled"
         NETDATA_DISABLE_EBPF=1
         ENABLE_EBPF=0
-        NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')"
+        enable_feature PLUGIN_EBPF 0
       fi
     fi
   else
@@ -987,7 +996,7 @@ bundle_ebpf_co_re() {
       run_failed "Failed to fetch eBPF CO-RE files. eBPF support will be disabled"
       NETDATA_DISABLE_EBPF=1
       ENABLE_EBPF=0
-      NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS%-DENABLE_PLUGIN_EBPF=Off)}" | sed 's/$/ -DENABLE_PLUGIN_EBPF=Off/g')"
+      enable_feature PLUGIN_EBPF 0
     fi
   fi
 
@@ -1106,14 +1115,6 @@ check_for_module() {
   return "${?}"
 }
 
-enable_feature() {
-  if [ "${2}" -eq 1 ]; then
-    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_${1}=On"
-  else
-    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_${1}=Off"
-  fi
-}
-
 check_for_feature() {
   feature_name="${1}"
   feature_state="${2}"
@@ -1165,9 +1166,9 @@ NETDATA_CMAKE_OPTIONS="-S ./ -B ${NETDATA_BUILD_DIR} ${CMAKE_OPTS} -DCMAKE_INSTA
 # Feature autodetection code starts here
 
 if [ "${USE_SYSTEM_PROTOBUF}" -eq 1 ]; then
-  NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_BUNDLED_PROTOBUF=Off"
+  enable_feature BUNDLED_PROTOBUF 0
 else
-  NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DENABLE_BUNDLED_PROTOBUF=On"
+  enable_feature BUNDLED_PROTOBUF 1
 fi
 
 if [ -z "${ENABLE_SYSTEMD_PLUGIN}" ]; then
