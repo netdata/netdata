@@ -1989,25 +1989,6 @@ KSM2
   fi
 fi
 
-# -----------------------------------------------------------------------------
-progress "Check version.txt"
-
-if [ ! -s web/gui/version.txt ]; then
-  cat << VERMSG
-
-${TPUT_BOLD}Version update check warning${TPUT_RESET}
-
-The way you downloaded netdata, we cannot find its version. This means the
-Update check on the dashboard, will not work.
-
-If you want to have version update check, please re-install it
-following the procedure in:
-
-https://docs.netdata.cloud/packaging/installer/
-
-VERMSG
-fi
-
 if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
   # -----------------------------------------------------------------------------
   progress "Check apps.plugin"
