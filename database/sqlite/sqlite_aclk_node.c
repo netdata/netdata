@@ -189,7 +189,7 @@ void aclk_check_node_info_and_collectors(void)
         nd_log_limit(
             &erl,
             NDLS_DAEMON,
-            NDLP_INFO,
+            NDLP_DEBUG,
             "%zu nodes loading contexts, %zu replicating data, %zu pending context post processing",
             context_loading,
             replicating,
