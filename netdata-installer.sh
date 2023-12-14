@@ -427,7 +427,7 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   base=1024
   scale=256
 
-  target_ram="$((base * mega + (scale * mega * (proc_count - 1))))"
+  target_ram="$((base * mega + (scale * mega * (JOBS - 1))))"
   total_ram="$(grep MemTotal /proc/meminfo | cut -d ':' -f 2 | tr -d ' kB')"
   total_ram="$((total_ram * 1024))"
 
