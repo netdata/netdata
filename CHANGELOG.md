@@ -6,8 +6,15 @@
 
 **Merged pull requests:**
 
+- Remove assert [\#16611](https://github.com/netdata/netdata/pull/16611) ([stelfrag](https://github.com/stelfrag))
+- Remove CPack stuff from CMake [\#16608](https://github.com/netdata/netdata/pull/16608) ([vkalintiris](https://github.com/vkalintiris))
+- remove v1 dashboard version check from installer [\#16603](https://github.com/netdata/netdata/pull/16603) ([ilyam8](https://github.com/ilyam8))
+- fix not assigned proc\_count in installer [\#16602](https://github.com/netdata/netdata/pull/16602) ([ilyam8](https://github.com/ilyam8))
+- improve enable\_feature function in the installer [\#16601](https://github.com/netdata/netdata/pull/16601) ([ilyam8](https://github.com/ilyam8))
+- Remove build/ [\#16600](https://github.com/netdata/netdata/pull/16600) ([vkalintiris](https://github.com/vkalintiris))
 - Allow passing cmake options with NETDATA\_CMAKE\_OPTIONS. [\#16598](https://github.com/netdata/netdata/pull/16598) ([vkalintiris](https://github.com/vkalintiris))
 - Cleanup am files [\#16597](https://github.com/netdata/netdata/pull/16597) ([vkalintiris](https://github.com/vkalintiris))
+- Fix coverity issues [\#16596](https://github.com/netdata/netdata/pull/16596) ([stelfrag](https://github.com/stelfrag))
 - fix: use black version icon for Splunk in order to make it visible [\#16593](https://github.com/netdata/netdata/pull/16593) ([juacker](https://github.com/juacker))
 - systemd-journal: exit if unable to locate journal data directories [\#16592](https://github.com/netdata/netdata/pull/16592) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity issues [\#16589](https://github.com/netdata/netdata/pull/16589) ([stelfrag](https://github.com/stelfrag))
@@ -31,6 +38,7 @@
 - Bump new version on the release changelog GHA [\#16551](https://github.com/netdata/netdata/pull/16551) ([tkatsoulas](https://github.com/tkatsoulas))
 - set "HOME" after switching to netdata user [\#16548](https://github.com/netdata/netdata/pull/16548) ([ilyam8](https://github.com/ilyam8))
 - code cleanup [\#16542](https://github.com/netdata/netdata/pull/16542) ([ktsaou](https://github.com/ktsaou))
+- Assorted kickstart script fixes. [\#16537](https://github.com/netdata/netdata/pull/16537) ([Ferroin](https://github.com/Ferroin))
 - wip documentation about functions table [\#16535](https://github.com/netdata/netdata/pull/16535) ([ktsaou](https://github.com/ktsaou))
 - Remove openSUSE 15.4 from CI [\#16449](https://github.com/netdata/netdata/pull/16449) ([tkatsoulas](https://github.com/tkatsoulas))
 - Remove fedora 37 from CI [\#16422](https://github.com/netdata/netdata/pull/16422) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -296,7 +304,6 @@
 - Faster parents [\#16127](https://github.com/netdata/netdata/pull/16127) ([ktsaou](https://github.com/ktsaou))
 - Update info about custom dashboards [\#16121](https://github.com/netdata/netdata/pull/16121) ([elizabyte8](https://github.com/elizabyte8))
 - Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
-- shutdown while waiting for collectors to finish [\#16023](https://github.com/netdata/netdata/pull/16023) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -433,16 +440,6 @@
 - Run health queries from tier 0 [\#16032](https://github.com/netdata/netdata/pull/16032) ([MrZammler](https://github.com/MrZammler))
 - use `status` as units for `anomaly_detection.detector_events` [\#16028](https://github.com/netdata/netdata/pull/16028) ([andrewm4894](https://github.com/andrewm4894))
 - add description for Homebrew on Apple Silicon Mac\(netdata/learn/\#1789\) [\#16027](https://github.com/netdata/netdata/pull/16027) ([theggs](https://github.com/theggs))
-- Fix package builds on Rocky Linux. [\#16026](https://github.com/netdata/netdata/pull/16026) ([Ferroin](https://github.com/Ferroin))
-- Remove family from alerts [\#16025](https://github.com/netdata/netdata/pull/16025) ([MrZammler](https://github.com/MrZammler))
-- add systemd-journal.plugin to apps\_groups.conf [\#16024](https://github.com/netdata/netdata/pull/16024) ([ilyam8](https://github.com/ilyam8))
-- Fix handling of CI skipping. [\#16022](https://github.com/netdata/netdata/pull/16022) ([Ferroin](https://github.com/Ferroin))
-- update bundled UI to v6.39.0 [\#16020](https://github.com/netdata/netdata/pull/16020) ([ilyam8](https://github.com/ilyam8))
-- Update collector metadata for python collectors [\#16019](https://github.com/netdata/netdata/pull/16019) ([tkatsoulas](https://github.com/tkatsoulas))
-- fix crash on setting thread name [\#16016](https://github.com/netdata/netdata/pull/16016) ([ilyam8](https://github.com/ilyam8))
-- Systemd-Journal: fix crash when the uid or gid do not have names [\#16015](https://github.com/netdata/netdata/pull/16015) ([ktsaou](https://github.com/ktsaou))
-- Avoid duplicate keys in labels [\#16014](https://github.com/netdata/netdata/pull/16014) ([stelfrag](https://github.com/stelfrag))
-- remove the line length limit from pluginsd [\#16013](https://github.com/netdata/netdata/pull/16013) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
