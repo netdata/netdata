@@ -63,6 +63,8 @@ It scales nicely from just a single server to thousands of servers, even in comp
   Netdata is a modular platform that can be extended in all possible ways and it also integrates nicely with other monitoring solutions.
 
 ---
+![Energy-efficiency 1 (1)](https://github.com/netdata/netdata/assets/139226121/cc44aa1e-3e96-42ec-87d0-ee10d711ce74)
+
 
 :star: **Netdata is the most energy-efficient monitoring tool for Docker-based systems** :star: <br/>
 
