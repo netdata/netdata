@@ -1220,8 +1220,8 @@ void execute_commands(struct sender_state *s) {
                 int code = rrd_function_run(s->host, wb,
                                             timeout, HTTP_ACCESS_ADMINS, function, false, transaction,
                                             stream_execute_function_callback, tmp,
-                                            stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
-                                            stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,
+                                            /*stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback :*/ NULL,
+                                            /*stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : */ NULL,
                                             NULL, NULL, payload);
 
                 if(code != HTTP_RESP_OK) {
