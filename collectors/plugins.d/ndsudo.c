@@ -132,7 +132,7 @@ char *find_variable_in_argv(const char *variable, int argc, char **argv, char *e
             return strdup(argv[i + 1]);
     }
 
-    snprintf(err, err_size, "variable '%s' is required, but is not found in the command line parameters", variable);
+    snprintf(err, err_size, "variable '%s' is required, but was not provided in the command line parameters", variable);
 
     return NULL;
 }
@@ -226,7 +226,7 @@ void show_help() {
     fprintf(stdout, "Variables given as {{variable}} are expected on the command line as:\n");
     fprintf(stdout, "  --variable VALUE\n");
     fprintf(stdout, "\n");
-    fprintf(stdout, "VALUE can include A-Z, a-z, 0-9, _, -, /, and .\n");
+    fprintf(stdout, "VALUE can include space, A-Z, a-z, 0-9, _, -, /, and .\n");
     fprintf(stdout, "\n");
 }
 
@@ -234,7 +234,7 @@ int main(int argc, char *argv[]) {
     char error_buffer[ERROR_BUFFER_SIZE] = "";
 
     if (argc < 2) {
-        fprintf(stderr, "at least 2 parameters are needed, but %d are given.\n", argc);
+        fprintf(stderr, "at least 2 parameters are needed, but %d were given.\n", argc);
         return 1;
     }
 
@@ -256,7 +256,7 @@ int main(int argc, char *argv[]) {
 
     struct command *command = find_command(cmd);
     if(!command) {
-        fprintf(stderr, "command is not allowed.\n");
+        fprintf(stderr, "command not recognized: %s\n", cmd);
         return 3;
     }
 
@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
     else {
         char *clean_env[] = {NULL};
         execve(filename, params, clean_env);
-        perror("execvp"); // execvp only returns on error
+        perror("execve"); // execve only returns on error
         return 6;
     }
 }
