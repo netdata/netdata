@@ -319,11 +319,11 @@ void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int 
     }
 }
 
-void query_progress_functions_update(void *data, size_t done, size_t all) {
-    if(!data)
-        return;
+void query_progress_functions_update(uuid_t *transaction, size_t done, size_t all) {
+    // functions send to the total 'done', not the increment
 
-    uuid_t *transaction = data;
+    if(!transaction)
+        return;
 
     spinlock_lock(&progress.spinlock);
     query_progress_init_unsafe();
@@ -363,10 +363,10 @@ int web_api_v2_report_progress(uuid_t *transaction, BUFFER *wb) {
     QUERY_PROGRESS *qp = query_progress_find_in_hashtable_unsafe(transaction);
     if(!qp) {
         spinlock_unlock(&progress.spinlock);
-        buffer_json_member_add_uint64(wb, "status", 404);
+        buffer_json_member_add_uint64(wb, "status", HTTP_RESP_NOT_FOUND);
         buffer_json_member_add_string(wb, "message", "Transaction not found");
         buffer_json_finalize(wb);
-        return 404;
+        return HTTP_RESP_NOT_FOUND;
     }
 
     buffer_json_member_add_uint64(wb, "status", 200);

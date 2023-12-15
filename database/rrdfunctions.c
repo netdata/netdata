@@ -918,6 +918,12 @@ cleanup:
     dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
 }
 
+void rrd_function_call_progresser(uuid_t *transaction) {
+    char str[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(*transaction, str);
+    rrd_function_progress(str);
+}
+
 // ----------------------------------------------------------------------------
 
 static void functions2json(DICTIONARY *functions, BUFFER *wb)

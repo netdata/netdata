@@ -1374,13 +1374,17 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
 }
 
 int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_weights(host, w, url, default_metric_correlations_method,
-                                          WEIGHTS_FORMAT_CHARTS, 1);
+    return web_client_api_request_weights(host, w, url, default_metric_correlations_method, WEIGHTS_FORMAT_CHARTS, 1);
 }
 
 int web_client_api_request_v1_weights(RRDHOST *host, struct web_client *w, char *url) {
-    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE,
-                                          WEIGHTS_FORMAT_CONTEXTS, 1);
+    return web_client_api_request_weights(host, w, url, WEIGHTS_METHOD_ANOMALY_RATE, WEIGHTS_FORMAT_CONTEXTS, 1);
+}
+
+static void web_client_progress_functions_update(void *data, size_t done, size_t all) {
+    // handle progress updates from the plugin
+    struct web_client *w = data;
+    query_progress_functions_update(&w->transaction, done, all);
 }
 
 int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char *url) {
@@ -1416,7 +1420,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
 
     return rrd_function_run(host, wb, timeout, w->access, function, true, transaction,
                             NULL, NULL,
-                            query_progress_functions_update, &w->transaction,
+                            web_client_progress_functions_update, w,
                             web_client_interrupt_callback, w, NULL);
 }
 

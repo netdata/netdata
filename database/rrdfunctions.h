@@ -45,6 +45,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 // cancel a running function, to be run from anywhere
 void rrd_function_cancel(const char *transaction);
 void rrd_function_progress(const char *transaction);
+void rrd_function_call_progresser(uuid_t *transaction);
 
 void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
 void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb);

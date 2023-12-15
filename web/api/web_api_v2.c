@@ -684,6 +684,8 @@ static int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, stru
     uuid_t tr;
     uuid_parse_flexi(transaction, tr);
 
+    rrd_function_call_progresser(&tr);
+
     return web_api_v2_report_progress(&tr, w->response.data);
 }
 
