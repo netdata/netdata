@@ -1156,7 +1156,7 @@ static void stream_execute_function_progress_callback(void *data, size_t done, s
     if(rrdhost_can_send_definitions_to_parent(s->host)) {
         BUFFER *wb = sender_start(s);
 
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu",
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu\n",
                        string2str(tmp->transaction), done, all);
 
         sender_commit(s, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
@@ -1220,8 +1220,8 @@ void execute_commands(struct sender_state *s) {
                 int code = rrd_function_run(s->host, wb,
                                             timeout, HTTP_ACCESS_ADMINS, function, false, transaction,
                                             stream_execute_function_callback, tmp,
-                                            /*stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback :*/ NULL,
-                                            /*stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : */ NULL,
+                                            stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
+                                            stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,
                                             NULL, NULL, payload);
 
                 if(code != HTTP_RESP_OK) {
