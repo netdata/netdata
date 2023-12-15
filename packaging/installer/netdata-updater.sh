@@ -366,7 +366,7 @@ _safe_download() {
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    "${curl}" -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
+    "${curl}" -fsSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
     return $?
   elif command -v wget > /dev/null 2>&1; then
     wget -T 15 -O - "${url}" > "${dest}"
@@ -553,6 +553,7 @@ set_tarball_urls() {
     if [ -e /opt/netdata/etc/netdata/.install-type ]; then
       # shellcheck disable=SC1091
       . /opt/netdata/etc/netdata/.install-type
+      [ -z "${PREBUILT_ARCH:-}" ] && PREBUILT_ARCH="$(uname -m)"
       filename="netdata-${PREBUILT_ARCH}-latest.gz.run"
     else
       filename="netdata-x86_64-latest.gz.run"
