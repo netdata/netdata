@@ -193,9 +193,10 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     bool changed = false;
 
     if(rdcf->collector != thread_rrd_collector) {
-        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed collector from %d to %d",
-                         dictionary_acquired_item_name(item), rrdhost_hostname(host),
-                         rrd_collector_tid(rdcf->collector), rrd_collector_tid(thread_rrd_collector));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed collector from %d to %d",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host),
+               rrd_collector_tid(rdcf->collector), rrd_collector_tid(thread_rrd_collector));
 
         struct rrd_collector *old_rdc = rdcf->collector;
         rdcf->collector = rrd_collector_acquire_current_thread();
@@ -204,16 +205,18 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
     }
 
     if(rdcf->execute_cb != new_rdcf->execute_cb) {
-        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed execute callback",
-                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed execute callback",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         rdcf->execute_cb = new_rdcf->execute_cb;
         changed = true;
     }
 
     if(rdcf->help != new_rdcf->help) {
-        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed help text",
-                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed help text",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         STRING *old = rdcf->help;
         rdcf->help = new_rdcf->help;
@@ -224,8 +227,9 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         string_freez(new_rdcf->help);
 
     if(rdcf->tags != new_rdcf->tags) {
-        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed tags",
-                dictionary_acquired_item_name(item), rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed tags",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         STRING *old = rdcf->tags;
         rdcf->tags = new_rdcf->tags;
@@ -236,40 +240,45 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         string_freez(new_rdcf->tags);
 
     if(rdcf->timeout != new_rdcf->timeout) {
-        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed timeout",
-                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed timeout",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         rdcf->timeout = new_rdcf->timeout;
         changed = true;
     }
 
     if(rdcf->priority != new_rdcf->priority) {
-        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed priority",
-                dictionary_acquired_item_name(item), rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed priority",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         rdcf->priority = new_rdcf->priority;
         changed = true;
     }
 
     if(rdcf->access != new_rdcf->access) {
-        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed access level",
-                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed access level",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         rdcf->access = new_rdcf->access;
         changed = true;
     }
 
     if(rdcf->sync != new_rdcf->sync) {
-        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed sync/async mode",
-                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed sync/async mode",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         rdcf->sync = new_rdcf->sync;
         changed = true;
     }
 
     if(rdcf->execute_cb_data != new_rdcf->execute_cb_data) {
-        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed execute callback data",
-                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: function '%s' of host '%s' changed execute callback data",
+               dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
         rdcf->execute_cb_data = new_rdcf->execute_cb_data;
         changed = true;
@@ -819,7 +828,10 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 
     struct rrd_function_inflight *r = dictionary_set(rrd_functions_inflight_requests, transaction, &t, sizeof(t));
     if(r->used) {
-        netdata_log_info("FUNCTIONS: duplicate transaction '%s', function: '%s'", t.transaction, t.cmd);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE,
+               "FUNCTIONS: duplicate transaction '%s', function: '%s'",
+               t.transaction, t.cmd);
+
         code = rrd_call_function_error(result_wb, "duplicate transaction", HTTP_RESP_BAD_REQUEST);
         freez((void *)t.transaction);
         freez((void *)t.cmd);
@@ -857,16 +869,18 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
 
     bool cancelled = __atomic_load_n(&r->cancelled, __ATOMIC_RELAXED);
     if(cancelled) {
-        netdata_log_info("FUNCTIONS: received a CANCEL request for transaction '%s', but it is already cancelled.",
-                         r->transaction);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: received a CANCEL request for transaction '%s', but it is already cancelled.",
+               r->transaction);
         return;
     }
 
     __atomic_store_n(&r->cancelled, true, __ATOMIC_RELAXED);
 
     if(!rrd_collector_dispatcher_acquire(r->rdcf->collector)) {
-        netdata_log_info("FUNCTIONS: received a CANCEL request for transaction '%s', but the collector is not running.",
-                         r->transaction);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: received a CANCEL request for transaction '%s', but the collector is not running.",
+               r->transaction);
         return;
     }
 
@@ -881,8 +895,9 @@ void rrd_function_cancel(const char *transaction) {
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, transaction);
     if(!item) {
-        netdata_log_info("FUNCTIONS: received a CANCEL request for transaction '%s', but the transaction is not running.",
-                         transaction);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: received a CANCEL request for transaction '%s', but the transaction is not running.",
+               transaction);
         return;
     }
 
@@ -894,16 +909,18 @@ void rrd_function_cancel(const char *transaction) {
 void rrd_function_progress(const char *transaction) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, transaction);
     if(!item) {
-        netdata_log_info("FUNCTIONS: received a PROGRESS request for transaction '%s', but the transaction is not running.",
-                         transaction);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: received a PROGRESS request for transaction '%s', but the transaction is not running.",
+               transaction);
         return;
     }
 
     struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
 
     if(!rrd_collector_dispatcher_acquire(r->rdcf->collector)) {
-        netdata_log_info("FUNCTIONS: received a PROGRESS request for transaction '%s', but the collector is not running.",
-                         transaction);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "FUNCTIONS: received a PROGRESS request for transaction '%s', but the collector is not running.",
+               transaction);
         goto cleanup;
     }
 
