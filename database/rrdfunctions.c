@@ -251,6 +251,14 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
+    if(rdcf->access != new_rdcf->access) {
+        netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed access level",
+                         dictionary_acquired_item_name(item), rrdhost_hostname(host));
+
+        rdcf->access = new_rdcf->access;
+        changed = true;
+    }
+
     if(rdcf->sync != new_rdcf->sync) {
         netdata_log_info("FUNCTIONS: function '%s' of host '%s' changed sync/async mode",
                          dictionary_acquired_item_name(item), rrdhost_hostname(host));
