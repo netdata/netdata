@@ -185,7 +185,7 @@ static inline int parser_action(PARSER *parser, char *input) {
                 if(buffer_strlen(parser->defer.response) > PLUGINSD_MAX_DEFERRED_SIZE) {
                     // more than PLUGINSD_MAX_DEFERRED_SIZE of data,
                     // or a bad plugin that did not send the end_keyword
-                    internal_error(true, "PLUGINSD: deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "PLUGINSD: deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
                     return 1;
                 }
             }
