@@ -1478,6 +1478,14 @@ if(ENABLE_PLUGIN_CUPS)
     endif()
 endif()
 
+set(NDSUDO_FILES collectors/plugins.d/ndsudo.c)
+
+add_executable(ndsudo ${NDSUDO_FILES})
+
+install(TARGETS ndsudo
+        COMPONENT ndsudo
+        DESTINATION usr/libexec/netdata/plugins.d)
+
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
     set(CGROUP_NETWORK_FILES collectors/cgroups.plugin/cgroup-network.c)
 

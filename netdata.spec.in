@@ -715,6 +715,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 # local-listeners detects the local processes that are listening for connections
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/local-listeners
 
+# ndsudo a helper to run privileged commands
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/ndsudo
+
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
 %defattr(0644,root,root,0755)
