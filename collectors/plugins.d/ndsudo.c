@@ -102,7 +102,7 @@ struct command *find_command(const char *cmd) {
     return NULL;
 }
 
-bool check_string(const char *str, char *err, size_t err_size) {
+bool check_string(const char *str, size_t index, char *err, size_t err_size) {
     const char *s = str;
     while(*s) {
         char c = *s++;
@@ -110,7 +110,7 @@ bool check_string(const char *str, char *err, size_t err_size) {
              (c >= 'a' && c <= 'z') ||
              (c >= '0' && c <= '9') ||
               c == ' ' || c == '_' || c == '-' || c == '/' || c == '.')) {
-            snprintf(err, err_size, "parameter '%s' includes invalid character '%c'", str, c);
+            snprintf(err, err_size, "command line argument No %zu includes invalid character '%c'", index, c);
             return false;
         }
     }
@@ -120,7 +120,7 @@ bool check_string(const char *str, char *err, size_t err_size) {
 
 bool check_params(int argc, char **argv, char *err, size_t err_size) {
     for(int i = 0 ; i < argc ;i++)
-        if(!check_string(argv[i], err, err_size))
+        if(!check_string(argv[i], i, err, err_size))
             return false;
 
     return true;
