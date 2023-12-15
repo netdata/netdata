@@ -34,7 +34,7 @@ struct command {
         .params = "-LDPDInfo -aAll -NoLog",
         .search = {
             [0] = "megacli",
-            [1] = "MegaCLI",
+            [1] = "MegaCli",
         },
     },
     {
@@ -42,7 +42,7 @@ struct command {
         .params = "-AdpBbuCmd -aAll -NoLog",
         .search = {
             [0] = "megacli",
-            [1] = "MegaCLI",
+            [1] = "MegaCli",
         },
     },
     {
