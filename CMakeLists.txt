@@ -1478,7 +1478,7 @@ if(ENABLE_PLUGIN_CUPS)
     endif()
 endif()
 
-set(NDSUDO_FILES daemon/ndsudo.c)
+set(NDSUDO_FILES collectors/plugins.d/ndsudo.c)
 
 add_executable(ndsudo ${NDSUDO_FILES})
 
