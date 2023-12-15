@@ -389,6 +389,8 @@ set(LIBNETDATA_FILES ${CONFIG_H}
                      libnetdata/popen/popen.h
                      libnetdata/procfile/procfile.c
                      libnetdata/procfile/procfile.h
+                     libnetdata/query_progress/progress.c
+                     libnetdata/query_progress/progress.h
                      libnetdata/required_dummies.h
                      libnetdata/socket/security.c
                      libnetdata/socket/security.h
@@ -411,6 +413,9 @@ set(LIBNETDATA_FILES ${CONFIG_H}
                      libnetdata/string/utf8.h
                      libnetdata/worker_utilization/worker_utilization.c
                      libnetdata/worker_utilization/worker_utilization.h
+                     libnetdata/http/http_access.c
+                     libnetdata/http/http_access.h
+                     libnetdata/http/http_defs.c
                      libnetdata/http/http_defs.h
                      libnetdata/dyn_conf/dyn_conf.c
                      libnetdata/dyn_conf/dyn_conf.h)
@@ -644,8 +649,16 @@ endif()
 
 set(PLUGINSD_PLUGIN_FILES collectors/plugins.d/plugins_d.c
                           collectors/plugins.d/plugins_d.h
+                          collectors/plugins.d/pluginsd_dyncfg.c
+                          collectors/plugins.d/pluginsd_dyncfg.h
+                          collectors/plugins.d/pluginsd_functions.c
+                          collectors/plugins.d/pluginsd_functions.h
+                          collectors/plugins.d/pluginsd_internals.c
+                          collectors/plugins.d/pluginsd_internals.h
                           collectors/plugins.d/pluginsd_parser.c
-                          collectors/plugins.d/pluginsd_parser.h)
+                          collectors/plugins.d/pluginsd_parser.h
+                          collectors/plugins.d/pluginsd_replication.c
+                          collectors/plugins.d/pluginsd_replication.h)
 
 set(RRD_PLUGIN_FILES database/contexts/api_v1.c
                      database/contexts/api_v2.c
@@ -662,6 +675,8 @@ set(RRD_PLUGIN_FILES database/contexts/api_v1.c
                      database/rrdcalc.h
                      database/rrdcalctemplate.c
                      database/rrdcalctemplate.h
+                     database/rrdcollector.c
+                     database/rrdcollector.h
                      database/rrddim.c
                      database/rrddimvar.c
                      database/rrddimvar.h

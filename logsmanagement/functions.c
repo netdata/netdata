@@ -25,8 +25,6 @@
 #define LOGS_MANAG_FUNC_PARAM_DATA_ONLY         "data_only"
 #define LOGS_MANAG_FUNC_PARAM_SOURCE            "source"
 #define LOGS_MANAG_FUNC_PARAM_INFO              "info"
-#define LOGS_MANAG_FUNC_PARAM_ID                "id"
-#define LOGS_MANAG_FUNC_PARAM_PROGRESS          "progress"
 #define LOGS_MANAG_FUNC_PARAM_SLICE             "slice"
 #define LOGS_MANAG_FUNC_PARAM_DELTA             "delta"
 #define LOGS_MANAG_FUNC_PARAM_TAIL              "tail"
@@ -116,9 +114,7 @@ static DICTIONARY *used_hashes_registry = NULL;
 
 typedef struct function_query_status {
     bool *cancelled; // a pointer to the cancelling boolean
-    usec_t stop_monotonic_ut;
-
-    usec_t started_monotonic_ut;
+    usec_t *stop_monotonic_ut;
 
     // request
     STRING *source;
@@ -164,7 +160,7 @@ typedef struct function_query_status {
     "|message"                                  \
     ""
 
-static void logsmanagement_function_facets(const char *transaction, char *function, int timeout, bool *cancelled){
+static void logsmanagement_function_facets(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled){
 
     struct rusage start, end;
     getrusage(RUSAGE_THREAD, &start);
@@ -175,11 +171,9 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
-    usec_t now_monotonic_ut = now_monotonic_usec();
     FUNCTION_QUERY_STATUS tmp_fqs = {
             .cancelled = cancelled,
-            .started_monotonic_ut = now_monotonic_ut,
-            .stop_monotonic_ut = now_monotonic_ut + (timeout * USEC_PER_SEC),
+            .stop_monotonic_ut = stop_monotonic_ut,
     };
     FUNCTION_QUERY_STATUS *fqs = NULL;
     const DICTIONARY_ITEM *fqs_item = NULL;
@@ -201,8 +195,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_HISTOGRAM);
     facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_IF_MODIFIED_SINCE);
     facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_DATA_ONLY);
-    // facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_ID);
-    // facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_PROGRESS);
     facets_accepted_param(facets, LOGS_MANAG_FUNC_PARAM_DELTA);
     // facets_accepted_param(facets, JOURNAL_PARAMETER_TAIL);
 
@@ -235,7 +227,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
 
     bool    info        = false, 
             data_only   = false, 
-            progress    = false, 
             /* slice       = true, */
             delta       = false, 
             tail        = false;
@@ -247,8 +238,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     const char *query = NULL;
     const char *chart = NULL;
     const char *source = NULL;
-    const char *progress_id = NULL;
-    // size_t filters = 0;  
+    // size_t filters = 0;
 
     buffer_json_member_add_object(wb, "_request");
 
@@ -265,19 +255,16 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
 
         
         if(!strcmp(keyword, LOGS_MANAG_FUNC_PARAM_HELP)){
-            BUFFER *wb = buffer_create(0, NULL);
-            buffer_sprintf(wb, FUNCTION_LOGSMANAGEMENT_HELP_LONG);
+            BUFFER *tmp = buffer_create(0, NULL);
+            buffer_sprintf(tmp, FUNCTION_LOGSMANAGEMENT_HELP_LONG);
             netdata_mutex_lock(&stdout_mut);
-            pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
+            pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, tmp);
             netdata_mutex_unlock(&stdout_mut);
-            buffer_free(wb);
+            buffer_free(tmp);
             goto cleanup;
         }
         else if(!strcmp(keyword, LOGS_MANAG_FUNC_PARAM_INFO)){
             info = true;
-        }
-        else if(!strcmp(keyword, LOGS_MANAG_FUNC_PARAM_PROGRESS)){
-            progress = true;
         }
         else if(strncmp(keyword, LOGS_MANAG_FUNC_PARAM_DELTA ":", sizeof(LOGS_MANAG_FUNC_PARAM_DELTA ":") - 1) == 0) {
             char *v = &keyword[sizeof(LOGS_MANAG_FUNC_PARAM_DELTA ":") - 1];
@@ -314,13 +301,6 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
         //     else
         //         slice = true;
         // }
-        else if(strncmp(keyword, LOGS_MANAG_FUNC_PARAM_ID ":", sizeof(LOGS_MANAG_FUNC_PARAM_ID ":") - 1) == 0) {
-            char *id = &keyword[sizeof(LOGS_MANAG_FUNC_PARAM_ID ":") - 1];
-
-            if(*id)
-                progress_id = id;
-        }
-
         else if(strncmp(keyword, LOGS_MANAG_FUNC_PARAM_SOURCE ":", sizeof(LOGS_MANAG_FUNC_PARAM_SOURCE ":") - 1) == 0) {
             source = !strcmp("all", &keyword[sizeof(LOGS_MANAG_FUNC_PARAM_SOURCE ":") - 1]) ? 
                 NULL : &keyword[sizeof(LOGS_MANAG_FUNC_PARAM_SOURCE ":") - 1];
@@ -393,18 +373,8 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
         }
     }
 
-    // ------------------------------------------------------------------------
-    // put this request into the progress db
-
-    if(progress_id && *progress_id) {
-        fqs_item = dictionary_set_and_acquire_item(function_query_status_dict, progress_id, &tmp_fqs, sizeof(tmp_fqs));
-        fqs = dictionary_acquired_item_value(fqs_item);
-    }
-    else {
-        // no progress id given, proceed without registering our progress in the dictionary
-        fqs = &tmp_fqs;
-        fqs_item = NULL;
-    }
+    fqs = &tmp_fqs;
+    fqs_item = NULL;
 
     // ------------------------------------------------------------------------
     // validate parameters
@@ -508,10 +478,8 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     buffer_json_member_add_boolean(wb, LOGS_MANAG_FUNC_PARAM_INFO, false);
     buffer_json_member_add_boolean(wb, LOGS_MANAG_FUNC_PARAM_SLICE, fqs->slice);
     buffer_json_member_add_boolean(wb, LOGS_MANAG_FUNC_PARAM_DATA_ONLY, fqs->data_only);
-    buffer_json_member_add_boolean(wb, LOGS_MANAG_FUNC_PARAM_PROGRESS, false);
     buffer_json_member_add_boolean(wb, LOGS_MANAG_FUNC_PARAM_DELTA, fqs->delta);
     buffer_json_member_add_boolean(wb, LOGS_MANAG_FUNC_PARAM_TAIL, fqs->tail);
-    buffer_json_member_add_string(wb, LOGS_MANAG_FUNC_PARAM_ID, progress_id);
     buffer_json_member_add_string(wb, LOGS_MANAG_FUNC_PARAM_SOURCE, string2str(fqs->source));
     buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_AFTER, fqs->after_ut / USEC_PER_SEC);
     buffer_json_member_add_uint64(wb, LOGS_MANAG_FUNC_PARAM_BEFORE, fqs->before_ut / USEC_PER_SEC);
@@ -556,13 +524,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
         goto output;
     }
     
-    if(progress) {
-        // TODO: Add progress function
-        // function_logsmanagement_progress(wb, transaction, progress_id);
-        goto cleanup;
-    }
-
-    if(!req_quota) 
+    if(!req_quota)
         query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
     else if(req_quota > LOGS_MANAG_QUERY_QUOTA_MAX) 
         query_params.quota = LOGS_MANAG_QUERY_QUOTA_MAX;
@@ -590,7 +552,7 @@ static void logsmanagement_function_facets(const char *transaction, char *functi
     }
     
     query_params.cancelled = cancelled;
-    query_params.stop_monotonic_ut = now_monotonic_usec() + (timeout - 1) * USEC_PER_SEC;
+    query_params.stop_monotonic_ut = stop_monotonic_ut;
     query_params.results_buff = buffer_create(query_params.quota, NULL);
 
     facets_rows_begin(facets);
@@ -736,10 +698,11 @@ struct functions_evloop_globals *logsmanagement_func_facets_init(bool *p_logsman
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     netdata_mutex_lock(&stdout_mut);
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"members\" %d\n",
                     LOGS_MANAG_FUNC_NAME, 
                     LOGS_MANAG_QUERY_TIMEOUT_DEFAULT, 
-                    FUNCTION_LOGSMANAGEMENT_HELP_SHORT);
+                    FUNCTION_LOGSMANAGEMENT_HELP_SHORT,
+                    RRDFUNCTIONS_PRIORITY_DEFAULT + 1);
     netdata_mutex_unlock(&stdout_mut);
 
     struct functions_evloop_globals *wg = functions_evloop_init(1, "LGSMNGM", 

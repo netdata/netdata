@@ -99,10 +99,7 @@ static inline void freez(void *ptr) {
 // hashtable for HASHED_KEY
 
 // cleanup hashtable defines
-#undef SIMPLE_HASHTABLE_SORT_FUNCTION
-#undef SIMPLE_HASHTABLE_VALUE_TYPE
-#undef SIMPLE_HASHTABLE_NAME
-#undef NETDATA_SIMPLE_HASHTABLE_H
+#include "../../libnetdata/simple_hashtable_undef.h"
 
 struct hashed_key;
 static inline int compare_keys(struct hashed_key *k1, struct hashed_key *k2);

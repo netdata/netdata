@@ -102,10 +102,7 @@ static inline bool is_valid_string_hash(const char *s) {
 // hashtable for FACET_VALUE
 
 // cleanup hashtable defines
-#undef SIMPLE_HASHTABLE_SORT_FUNCTION
-#undef SIMPLE_HASHTABLE_VALUE_TYPE
-#undef SIMPLE_HASHTABLE_NAME
-#undef NETDATA_SIMPLE_HASHTABLE_H
+#include "../../libnetdata/simple_hashtable_undef.h"
 
 struct facet_value;
 // #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_value
@@ -117,10 +114,7 @@ struct facet_value;
 // hashtable for FACET_KEY
 
 // cleanup hashtable defines
-#undef SIMPLE_HASHTABLE_SORT_FUNCTION
-#undef SIMPLE_HASHTABLE_VALUE_TYPE
-#undef SIMPLE_HASHTABLE_NAME
-#undef NETDATA_SIMPLE_HASHTABLE_H
+#include "../../libnetdata/simple_hashtable_undef.h"
 
 struct facet_key;
 // #define SIMPLE_HASHTABLE_SORT_FUNCTION compare_facet_key
@@ -439,12 +433,12 @@ static inline void FACET_VALUE_ADD_CONFLICT(FACET_KEY *k, FACET_VALUE *v, const 
 }
 
 static inline FACET_VALUE *FACET_VALUE_GET_FROM_INDEX(FACET_KEY *k, FACETS_HASH hash) {
-    SIMPLE_HASHTABLE_SLOT_VALUE *slot = simple_hashtable_get_slot_VALUE(&k->values.ht, hash, true);
+    SIMPLE_HASHTABLE_SLOT_VALUE *slot = simple_hashtable_get_slot_VALUE(&k->values.ht, hash, NULL, true);
     return SIMPLE_HASHTABLE_SLOT_DATA(slot);
 }
 
 static inline FACET_VALUE *FACET_VALUE_ADD_TO_INDEX(FACET_KEY *k, const FACET_VALUE * const tv) {
-    SIMPLE_HASHTABLE_SLOT_VALUE *slot = simple_hashtable_get_slot_VALUE(&k->values.ht, tv->hash, true);
+    SIMPLE_HASHTABLE_SLOT_VALUE *slot = simple_hashtable_get_slot_VALUE(&k->values.ht, tv->hash, NULL, true);
 
     if(SIMPLE_HASHTABLE_SLOT_DATA(slot)) {
         // already exists
@@ -634,7 +628,7 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
 }
 
 static inline FACET_KEY *FACETS_KEY_GET_FROM_INDEX(FACETS *facets, FACETS_HASH hash) {
-    SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&facets->keys.ht, hash, true);
+    SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&facets->keys.ht, hash, NULL, true);
     return SIMPLE_HASHTABLE_SLOT_DATA(slot);
 }
 
@@ -714,7 +708,7 @@ static inline FACET_KEY *FACETS_KEY_CREATE(FACETS *facets, FACETS_HASH hash, con
 static inline FACET_KEY *FACETS_KEY_ADD_TO_INDEX(FACETS *facets, FACETS_HASH hash, const char *name, size_t name_length, FACET_KEY_OPTIONS options) {
     facets->operations.keys.registered++;
 
-    SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&facets->keys.ht, hash, true);
+    SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&facets->keys.ht, hash, NULL, true);
 
     if(unlikely(!SIMPLE_HASHTABLE_SLOT_DATA(slot))) {
         // we have to add it

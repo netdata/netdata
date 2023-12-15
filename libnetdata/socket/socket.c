@@ -500,7 +500,7 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
  *
  *  @param acl is the acl given by the user.
  */
-WEB_CLIENT_ACL socket_ssl_acl(char *acl) {
+HTTP_ACL socket_ssl_acl(char *acl) {
     char *ssl = strchr(acl,'^');
     if(ssl) {
         //Due the format of the SSL command it is always the last command,
@@ -511,34 +511,34 @@ WEB_CLIENT_ACL socket_ssl_acl(char *acl) {
         if (!strncmp("SSL=",ssl,4)) {
             ssl += 4;
             if (!strcmp(ssl,"optional")) {
-                return WEB_CLIENT_ACL_SSL_OPTIONAL;
+                return HTTP_ACL_SSL_OPTIONAL;
             }
             else if (!strcmp(ssl,"force")) {
-                return WEB_CLIENT_ACL_SSL_FORCE;
+                return HTTP_ACL_SSL_FORCE;
             }
         }
 #endif
     }
 
-    return WEB_CLIENT_ACL_NONE;
+    return HTTP_ACL_NONE;
 }
 
-WEB_CLIENT_ACL read_acl(char *st) {
-    WEB_CLIENT_ACL ret = socket_ssl_acl(st);
+HTTP_ACL read_acl(char *st) {
+    HTTP_ACL ret = socket_ssl_acl(st);
 
-    if (!strcmp(st,"dashboard")) ret |= WEB_CLIENT_ACL_DASHBOARD;
-    if (!strcmp(st,"registry")) ret |= WEB_CLIENT_ACL_REGISTRY;
-    if (!strcmp(st,"badges")) ret |= WEB_CLIENT_ACL_BADGE;
-    if (!strcmp(st,"management")) ret |= WEB_CLIENT_ACL_MGMT;
-    if (!strcmp(st,"streaming")) ret |= WEB_CLIENT_ACL_STREAMING;
-    if (!strcmp(st,"netdata.conf")) ret |= WEB_CLIENT_ACL_NETDATACONF;
+    if (!strcmp(st,"dashboard")) ret |= HTTP_ACL_DASHBOARD;
+    if (!strcmp(st,"registry")) ret |= HTTP_ACL_REGISTRY;
+    if (!strcmp(st,"badges")) ret |= HTTP_ACL_BADGE;
+    if (!strcmp(st,"management")) ret |= HTTP_ACL_MGMT;
+    if (!strcmp(st,"streaming")) ret |= HTTP_ACL_STREAMING;
+    if (!strcmp(st,"netdata.conf")) ret |= HTTP_ACL_NETDATACONF;
 
     return ret;
 }
 
 static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, uint16_t default_port, int listen_backlog) {
     int added = 0;
-    WEB_CLIENT_ACL acl_flags = WEB_CLIENT_ACL_NONE;
+    HTTP_ACL acl_flags = HTTP_ACL_NONE;
 
     struct addrinfo hints;
     struct addrinfo *result = NULL, *rp = NULL;
@@ -578,7 +578,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
 
             sockets->failed++;
         } else {
-            acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_DEFAULT;
+            acl_flags = HTTP_ACL_DASHBOARD | HTTP_ACL_REGISTRY | HTTP_ACL_BADGE | HTTP_ACL_MGMT | HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_SSL_DEFAULT;
             listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
             added++;
         }
@@ -628,13 +628,13 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         }
         acl_flags |= read_acl(portconfig);
     } else {
-        acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_DEFAULT;
+        acl_flags = HTTP_ACL_DASHBOARD | HTTP_ACL_REGISTRY | HTTP_ACL_BADGE | HTTP_ACL_MGMT | HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_SSL_DEFAULT;
     }
 
     //Case the user does not set the option SSL in the "bind to", but he has
     //the certificates, I must redirect, so I am assuming here the default option
-    if(!(acl_flags & WEB_CLIENT_ACL_SSL_OPTIONAL) && !(acl_flags & WEB_CLIENT_ACL_SSL_FORCE)) {
-        acl_flags |= WEB_CLIENT_ACL_SSL_DEFAULT;
+    if(!(acl_flags & HTTP_ACL_SSL_OPTIONAL) && !(acl_flags & HTTP_ACL_SSL_FORCE)) {
+        acl_flags |= HTTP_ACL_SSL_DEFAULT;
     }
 
     uint32_t scope_id = 0;
@@ -1463,7 +1463,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 inline POLLINFO *poll_add_fd(POLLJOB *p
                              , int fd
                              , int socktype
-                             , WEB_CLIENT_ACL port_acl
+                             , HTTP_ACL port_acl
                              , uint32_t flags
                              , const char *client_ip
                              , const char *client_port

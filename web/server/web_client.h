@@ -12,16 +12,6 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
 
-typedef enum web_client_mode {
-    WEB_CLIENT_MODE_GET = 0,
-    WEB_CLIENT_MODE_POST = 1,
-    WEB_CLIENT_MODE_FILECOPY = 2,
-    WEB_CLIENT_MODE_OPTIONS = 3,
-    WEB_CLIENT_MODE_STREAM = 4,
-    WEB_CLIENT_MODE_PUT = 5,
-    WEB_CLIENT_MODE_DELETE = 6,
-} WEB_CLIENT_MODE;
-
 typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
@@ -52,6 +42,7 @@ typedef enum web_client_flags {
     WEB_CLIENT_FLAG_PATH_IS_V2              = (1 << 15), // v2 dashboard found on the path
     WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH = (1 << 16), // the path has a trailing hash
     WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION = (1 << 17), // the path ends with a filename extension
+    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 18), // when set we track the progress of this transaction
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2)
@@ -139,8 +130,9 @@ struct web_client {
     uuid_t transaction;
 
     WEB_CLIENT_FLAGS flags;             // status flags for the client
-    WEB_CLIENT_MODE mode;               // the operational mode of the client
-    WEB_CLIENT_ACL acl;                 // the access list of the client
+    HTTP_REQUEST_MODE mode;             // the operational mode of the client
+    HTTP_ACL acl;                       // the access list of the client
+    HTTP_ACCESS access;                 // the access level of the client
     int port_acl;                       // the operations permitted on the port the client connected to
     size_t header_parse_tries;
     size_t header_parse_last_size;
@@ -160,7 +152,8 @@ struct web_client {
     // THESE NEED TO BE FREED
     char *auth_bearer_token;            // the Bearer auth token (if sent)
     char *server_host;                  // the Host: header
-    char *forwarded_host;               // the X-Forwarded-For: header
+    char *forwarded_host;               // the X-Forwarded-Host: header
+    char *forwarded_for;                // the X-Forwarded-For: header
     char *origin;                       // the Origin: header
     char *user_agent;                   // the User-Agent: header
 

@@ -6,7 +6,9 @@
  *  logs management querying API.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "query.h"
 #include <uv.h>
@@ -107,7 +109,7 @@ bool terminate_logs_manag_query(logs_query_params_t *const p_query_params){
         return true;
     }
 
-    if(now_monotonic_usec() > p_query_params->stop_monotonic_ut)
+    if(now_monotonic_usec() > __atomic_load_n(p_query_params->stop_monotonic_ut, __ATOMIC_RELAXED))
         return true;
 
     return false;
@@ -172,9 +174,6 @@ const logs_qry_res_err_t *execute_logs_manag_query(logs_query_params_t *p_query_
         *p_query_params->keyword && strcmp(p_query_params->keyword, " ")){
         p_query_params->keyword = sanitise_string(p_query_params->keyword); // freez(p_query_params->keyword) in this case
     }
-
-    if(p_query_params->stop_monotonic_ut == 0)
-        p_query_params->stop_monotonic_ut = now_monotonic_usec() + (LOGS_MANAG_QUERY_TIMEOUT_DEFAULT - 1) * USEC_PER_SEC;
 
     struct rusage ru_start, ru_end;
     getrusage(RUSAGE_THREAD, &ru_start);

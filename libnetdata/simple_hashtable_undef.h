@@ -1,0 +1,35 @@
+
+// this file clears the preprocessor defines of simple_hashtable.h
+// allowing simple_hashtable.h to be included multiple times
+// with different configuration each time.
+
+#undef SIMPLE_HASHTABLE_HASH_SECOND_HASH_SHIFTS
+
+#undef simple_hashtable_init_named
+#undef simple_hashtable_destroy_named
+#undef simple_hashtable_slot_named
+#undef SIMPLE_HASHTABLE_SLOT_NAMED
+#undef simple_hashtable_named
+#undef SIMPLE_HASHTABLE_NAMED
+#undef simple_hashtable_resize_named
+#undef simple_hashtable_can_use_slot_named
+#undef simple_hashtable_get_slot_named
+#undef simple_hashtable_del_slot_named
+#undef simple_hashtable_set_slot_named
+#undef simple_hashtable_first_read_only_named
+#undef simple_hashtable_next_read_only_named
+#undef simple_hashtable_sorted_binary_search_named
+#undef simple_hashtable_add_value_sorted_named
+#undef simple_hashtable_del_value_sorted_named
+#undef simple_hashtable_replace_value_sorted_named
+#undef simple_hashtable_sorted_array_first_read_only_named
+#undef simple_hashtable_sorted_array_next_read_only_named
+
+#undef SIMPLE_HASHTABLE_SAMPLE_IMPLEMENTATION
+#undef SIMPLE_HASHTABLE_SORT_FUNCTION
+#undef SIMPLE_HASHTABLE_VALUE_TYPE
+#undef SIMPLE_HASHTABLE_KEY_TYPE
+#undef SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION
+#undef SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION
+#undef SIMPLE_HASHTABLE_NAME
+#undef NETDATA_SIMPLE_HASHTABLE_H

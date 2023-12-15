@@ -639,10 +639,9 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
  */
 static void ebpf_function_socket_manipulation(const char *transaction,
                                               char *function __maybe_unused,
-                                              int timeout __maybe_unused,
+                                              usec_t *stop_monotonic_ut __maybe_unused,
                                               bool *cancelled __maybe_unused)
 {
-    UNUSED(timeout);
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SOCKET_IDX];
 
     char *words[PLUGINSD_MAX_WORDS] = {NULL};

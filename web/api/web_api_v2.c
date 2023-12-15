@@ -580,6 +580,8 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
 
             .interrupt_callback = web_client_interrupt_callback,
             .interrupt_callback_data = w,
+
+            .transaction = &w->transaction,
     };
 
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++)
@@ -662,6 +664,31 @@ static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct
     return webrtc_new_connection(w->post_payload, w->response.data);
 }
 
+static int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    char *transaction = NULL;
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "transaction")) transaction = value;
+    }
+
+    uuid_t tr;
+    uuid_parse_flexi(transaction, tr);
+
+    rrd_function_call_progresser(&tr);
+
+    return web_api_v2_report_progress(&tr, w->response.data);
+}
+
 #define CONFIG_API_V2_URL "/api/v2/config"
 static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct web_client *w, char *query __maybe_unused) {
 
@@ -703,17 +730,11 @@ static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct
     int http_method;
     switch (w->mode)
     {
-        case WEB_CLIENT_MODE_GET:
-            http_method = HTTP_METHOD_GET;
-            break;
-        case WEB_CLIENT_MODE_POST:
-            http_method = HTTP_METHOD_POST;
-            break;
-        case WEB_CLIENT_MODE_PUT:
-            http_method = HTTP_METHOD_PUT;
-            break;
-        case WEB_CLIENT_MODE_DELETE:
-            http_method = HTTP_METHOD_DELETE;
+        case HTTP_REQUEST_MODE_GET:
+        case HTTP_REQUEST_MODE_POST:
+        case HTTP_REQUEST_MODE_PUT:
+        case HTTP_REQUEST_MODE_DELETE:
+            http_method = w->mode;
             break;
         default:
             buffer_sprintf(w->response.data, "Invalid HTTP method");
@@ -839,35 +860,36 @@ static int web_client_api_request_v2_job_statuses(RRDHOST *host __maybe_unused, 
 }
 
 static struct web_api_command api_commands_v2[] = {
-        {"info",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_info, 0},
+        {"info",                0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_info,              0},
 
-        {"data",                0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_data, 0},
-        {"weights",             0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_weights, 0},
+        {"data",                0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_data,              0},
+        {"weights",             0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_weights,           0},
 
-        {"contexts",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_contexts, 0},
-        {"nodes",               0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_nodes, 0},
-        {"node_instances",      0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_node_instances, 0},
-        {"versions",            0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_versions, 0},
-        {"functions",           0, WEB_CLIENT_ACL_ACLK_WEBRTC_DASHBOARD_WITH_BEARER | ACL_DEV_OPEN_ACCESS,     web_client_api_request_v2_functions, 0},
-        {"q",                   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_q, 0},
-        {"alerts",              0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alerts, 0},
+        {"contexts",            0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_contexts,          0},
+        {"nodes",               0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_nodes,             0},
+        {"node_instances",      0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_node_instances,    0},
+        {"versions",            0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_versions,          0},
+        {"functions",           0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC | ACL_DEV_OPEN_ACCESS, web_client_api_request_v2_functions, 0},
+        {"q",                   0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_q,                 0},
+        {"alerts",              0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_alerts,            0},
 
-        {"alert_transitions",   0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_transitions, 0},
-        {"alert_config",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC,                                       web_client_api_request_v2_alert_config, 0},
+        {"alert_transitions",   0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_alert_transitions, 0},
+        {"alert_config",        0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_alert_config,      0},
 
-        {"claim",               0, WEB_CLIENT_ACL_NOCHECK,                                                     web_client_api_request_v2_claim, 0},
+        {"claim",               0, HTTP_ACL_NOCHECK,                    web_client_api_request_v2_claim,             0},
 
-        {"rtc_offer",           0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS,                                  web_client_api_request_v2_webrtc, 0},
-        {"bearer_protection",   0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection, 0},
-        {"bearer_get_token",    0, WEB_CLIENT_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token, 0},
+        {"rtc_offer",           0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v2_webrtc,            0},
+        {"bearer_protection",   0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection,                    0},
+        {"bearer_get_token",    0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token,                         0},
 
-        {"config",        0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_config,       1},
-        {"job_statuses",  0, WEB_CLIENT_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v2_job_statuses, 0},
+        {"config",        0,       HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_config,            1},
+        {"job_statuses",  0,       HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_job_statuses,      0},
 
-        { "ilove.svg",       0, WEB_CLIENT_ACL_NOCHECK, web_client_api_request_v2_ilove, 0 },
+        { "ilove.svg",       0,    HTTP_ACL_NOCHECK,                    web_client_api_request_v2_ilove,             0 },
+        { "progress",        0,    HTTP_ACL_NOCHECK,                    web_client_api_request_v2_progress,          0 },
 
         // terminator
-        {NULL,                  0, WEB_CLIENT_ACL_NONE,                 NULL, 0},
+        {NULL,                  0, HTTP_ACL_NONE,                                        NULL,                       0},
 };
 
 inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {

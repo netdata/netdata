@@ -106,8 +106,8 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     char *start, *end;
 
     struct web_client *w = web_client_get_from_cache();
-    w->acl = WEB_CLIENT_ACL_ACLK;
-    w->mode = WEB_CLIENT_MODE_GET;
+    w->acl = HTTP_ACL_ACLK;
+    w->mode = HTTP_REQUEST_MODE_GET;
     w->timings.tv_in = query->created_tv;
 
     w->interrupt.callback = aclk_web_client_interrupt_cb;

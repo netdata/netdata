@@ -67,7 +67,7 @@ static inline HASHED_KEY *get_key_from_hashtable(LOG_JOB *jb, HASHED_KEY *k) {
 
     if(!k->hashtable_ptr) {
         HASHED_KEY *ht_key;
-        SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&jb->hashtable, k->hash, true);
+        SIMPLE_HASHTABLE_SLOT_KEY *slot = simple_hashtable_get_slot_KEY(&jb->hashtable, k->hash, NULL, true);
         if((ht_key = SIMPLE_HASHTABLE_SLOT_DATA(slot))) {
             if(!(ht_key->flags & HK_COLLISION_CHECKED)) {
                 ht_key->flags |= HK_COLLISION_CHECKED;

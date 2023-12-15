@@ -8,6 +8,7 @@ struct functions_evloop_worker_job {
     bool used;
     bool running;
     bool cancelled;
+    usec_t stop_monotonic_ut;
     char *cmd;
     const char *transaction;
     time_t timeout;
@@ -72,7 +73,7 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
 
             last_acquired = true;
             j = dictionary_acquired_item_value(acquired);
-            j->cb(j->transaction, j->cmd, j->timeout, &j->cancelled);
+            j->cb(j->transaction, j->cmd, &j->stop_monotonic_ut, &j->cancelled);
             dictionary_del(wg->worker_queue, j->transaction);
             dictionary_acquired_item_release(wg->worker_queue, acquired);
             dictionary_garbage_collect(wg->worker_queue);
@@ -102,7 +103,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             char *function = get_word(words, num_words, 3);
 
             if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                netdata_log_error("Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                                   keyword,
                                   transaction?transaction:"(unset)",
                                   timeout_s?timeout_s:"(unset)",
@@ -111,24 +112,30 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             else {
                 int timeout = str2i(timeout_s);
 
+                const char *msg = "No function with this name found";
                 bool found = false;
                 struct rrd_functions_expectation *we;
                 for(we = wg->expectations; we ;we = we->next) {
                     if(strncmp(function, we->function, we->function_length) == 0) {
+                        if(timeout <= 0)
+                            timeout = (int)we->default_timeout;
+
                         struct functions_evloop_worker_job t = {
                                 .cmd = strdupz(function),
                                 .transaction = strdupz(transaction),
                                 .running = false,
                                 .cancelled = false,
-                                .timeout = timeout > 0 ? timeout : we->default_timeout,
+                                .timeout = timeout,
+                                .stop_monotonic_ut = now_monotonic_usec() + (timeout * USEC_PER_SEC),
                                 .used = false,
                                 .cb = we->cb,
                         };
                         struct functions_evloop_worker_job *j = dictionary_set(wg->worker_queue, transaction, &t, sizeof(t));
                         if(j->used) {
-                            netdata_log_error("Received duplicate function transaction '%s'", transaction);
+                            nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Received duplicate function transaction '%s'. Ignoring it.", transaction);
                             freez((void *)t.cmd);
                             freez((void *)t.transaction);
+                            msg = "Duplicate function transaction. Ignoring it.";
                         }
                         else {
                             found = true;
@@ -140,8 +147,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
 
                 if(!found) {
                     netdata_mutex_lock(wg->stdout_mutex);
-                    pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND,
-                                                           "No function with this name found.");
+                    pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND, msg);
                     netdata_mutex_unlock(wg->stdout_mutex);
                 }
             }
@@ -157,15 +163,28 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
                 dictionary_garbage_collect(wg->worker_queue);
             }
             else
-                netdata_log_error("Received CANCEL for transaction '%s', but it not available here", transaction);
+                nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received CANCEL for transaction '%s', but it not available here", transaction);
+        }
+        else if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_PROGRESS) == 0) {
+            char *transaction = get_word(words, num_words, 1);
+            const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(wg->worker_queue, transaction);
+            if(acquired) {
+                struct functions_evloop_worker_job *j = dictionary_acquired_item_value(acquired);
+
+                functions_stop_monotonic_update_on_progress(&j->stop_monotonic_ut);
+
+                dictionary_acquired_item_release(wg->worker_queue, acquired);
+            }
+            else
+                nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received PROGRESS for transaction '%s', but it not available here", transaction);
         }
         else
-            netdata_log_error("Received unknown command: %s", keyword?keyword:"(unset)");
+            nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received unknown command: %s", keyword?keyword:"(unset)");
     }
 
     if(!s || feof(stdin) || ferror(stdin)) {
         *wg->plugin_should_exit = true;
-        netdata_log_error("Received error on stdin.");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Received error on stdin.");
     }
 
     exit(1);

@@ -966,6 +966,7 @@ void rrdset_memory_file_update(RRDSET *st);
 const char *rrdset_cache_filename(RRDSET *st);
 bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
 
+#include "rrdcollector.h"
 #include "rrdfunctions.h"
 
 // ----------------------------------------------------------------------------

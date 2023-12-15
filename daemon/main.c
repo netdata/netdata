@@ -1395,6 +1395,7 @@ void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_rrdpush_compressions(void);
 int uuid_unittest(void);
+int progress_unittest(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1619,6 +1620,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "rrdpush_compressions_test") == 0) {
                             unittest_running = true;
                             return unittest_rrdpush_compressions();
+                        }
+                        else if(strcmp(optarg, "progresstest") == 0) {
+                            unittest_running = true;
+                            return progress_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);

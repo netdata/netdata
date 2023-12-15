@@ -7,6 +7,7 @@
 
 #define PLUGINSD_KEYWORD_CHART                  "CHART"
 #define PLUGINSD_KEYWORD_CHART_DEFINITION_END   "CHART_DEFINITION_END"
+
 #define PLUGINSD_KEYWORD_DIMENSION              "DIMENSION"
 #define PLUGINSD_KEYWORD_BEGIN                  "BEGIN"
 #define PLUGINSD_KEYWORD_SET                    "SET"
@@ -18,8 +19,12 @@
 #define PLUGINSD_KEYWORD_OVERWRITE              "OVERWRITE"
 #define PLUGINSD_KEYWORD_CLABEL                 "CLABEL"
 #define PLUGINSD_KEYWORD_CLABEL_COMMIT          "CLABEL_COMMIT"
+
 #define PLUGINSD_KEYWORD_FUNCTION               "FUNCTION"
+#define PLUGINSD_KEYWORD_FUNCTION_PAYLOAD       "FUNCTION_PAYLOAD"
+#define PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END   "FUNCTION_PAYLOAD_END"
 #define PLUGINSD_KEYWORD_FUNCTION_CANCEL        "FUNCTION_CANCEL"
+#define PLUGINSD_KEYWORD_FUNCTION_PROGRESS      "FUNCTION_PROGRESS"
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN  "FUNCTION_RESULT_BEGIN"
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_END    "FUNCTION_RESULT_END"
 
@@ -50,12 +55,22 @@
 
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
-typedef void (*functions_evloop_worker_execute_t)(const char *transaction, char *function, int timeout, bool *cancelled);
+typedef void (*functions_evloop_worker_execute_t)(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled);
 struct functions_evloop_worker_job;
 struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, const char *tag, netdata_mutex_t *stdout_mutex, bool *plugin_should_exit);
 void functions_evloop_add_function(struct functions_evloop_globals *wg, const char *function, functions_evloop_worker_execute_t cb, time_t default_timeout);
 void functions_evloop_cancel_threads(struct functions_evloop_globals *wg);
 
+#define FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT (10 * USEC_PER_SEC)
+static inline void functions_stop_monotonic_update_on_progress(usec_t *stop_monotonic_ut) {
+    usec_t now_ut = now_monotonic_usec();
+    if(now_ut + FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT > *stop_monotonic_ut) {
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "Extending function timeout due to PROGRESS update...");
+        __atomic_store_n(stop_monotonic_ut, now_ut + FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT, __ATOMIC_RELAXED);
+    }
+    else
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "Received PROGRESS update...");
+}
 
 #define pluginsd_function_result_begin_to_buffer(wb, transaction, code, content_type, expires)      \
     buffer_sprintf(wb                                                                               \
@@ -95,6 +110,12 @@ static inline void pluginsd_function_result_to_stdout(const char *transaction, i
     pluginsd_function_result_begin_to_stdout(transaction, code, content_type, expires);
     fwrite(buffer_tostring(result), buffer_strlen(result), 1, stdout);
     pluginsd_function_result_end_to_stdout();
+    fflush(stdout);
+}
+
+static inline void pluginsd_function_progress_to_stdout(const char *transaction, size_t done, size_t all) {
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu\n",
+            transaction, done, all);
     fflush(stdout);
 }
 

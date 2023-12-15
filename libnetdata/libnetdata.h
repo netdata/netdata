@@ -697,7 +697,7 @@ extern char *netdata_configured_host_prefix;
 #include "xxhash.h"
 
 #include "uuid/uuid.h"
-
+#include "http/http_access.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
 #include "os.h"
@@ -745,6 +745,7 @@ extern char *netdata_configured_host_prefix;
 #include "facets/facets.h"
 #include "dyn_conf/dyn_conf.h"
 #include "functions_evloop/functions_evloop.h"
+#include "query_progress/progress.h"
 
 // BEWARE: this exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://app.netdata.cloud"

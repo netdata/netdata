@@ -5,39 +5,52 @@
 bool netdata_is_protected_by_bearer = false; // this is controlled by cloud, at the point the agent logs in - this should also be saved to /var/lib/netdata
 DICTIONARY *netdata_authorized_bearers = NULL;
 
-static short int web_client_check_acl_and_bearer(struct web_client *w, WEB_CLIENT_ACL endpoint_acl) {
-    if(endpoint_acl == WEB_CLIENT_ACL_NONE || (endpoint_acl & WEB_CLIENT_ACL_NOCHECK))
+static short int web_client_check_acl_and_bearer(struct web_client *w, HTTP_ACL endpoint_acl) {
+    if(endpoint_acl == HTTP_ACL_NONE || (endpoint_acl & HTTP_ACL_NOCHECK)) {
         // the endpoint is totally public
+        w->access = HTTP_ACCESS_ADMINS;
         return HTTP_RESP_OK;
+    }
 
     bool acl_allows = w->acl & endpoint_acl;
     if(!acl_allows)
         // the channel we received the request from (w->acl) is not compatible with the endpoint
         return HTTP_RESP_FORBIDDEN;
 
-    if(!netdata_is_protected_by_bearer && !(endpoint_acl & WEB_CLIENT_ACL_BEARER_REQUIRED))
+    if(!netdata_is_protected_by_bearer && !(endpoint_acl & (HTTP_ACL_BEARER_REQUIRED | HTTP_ACL_BEARER_OPTIONAL))) {
         // bearer protection is not enabled and is not required by the endpoint
+        w->access = HTTP_ACCESS_ANY;
         return HTTP_RESP_OK;
+    }
 
-    if(!(endpoint_acl & (WEB_CLIENT_ACL_BEARER_REQUIRED|WEB_CLIENT_ACL_BEARER_OPTIONAL)))
+    if(!(endpoint_acl & (HTTP_ACL_BEARER_REQUIRED | HTTP_ACL_BEARER_OPTIONAL | HTTP_ACL_BEARER_IF_PROTECTED))) {
         // endpoint does not require a bearer
+        w->access = HTTP_ACCESS_ANY;
         return HTTP_RESP_OK;
+    }
 
-    if((w->acl & (WEB_CLIENT_ACL_ACLK|WEB_CLIENT_ACL_WEBRTC)))
+    if((w->acl & (HTTP_ACL_ACLK | HTTP_ACL_WEBRTC))) {
         // the request is coming from ACLK or WEBRTC (authorized already),
+        w->access = HTTP_ACCESS_MEMBERS;
         return HTTP_RESP_OK;
+    }
 
-    // at this point we need a bearer to serve the request
-    // either because:
-    //
-    // 1. WEB_CLIENT_ACL_BEARER_REQUIRED, or
-    // 2. netdata_is_protected_by_bearer == true
-    //
+    // we now need a bearer to serve the request,
+    // because:
+    //   1. HTTP_ACL_BEARER_REQUIRED, or
+    //   2. netdata_is_protected_by_bearer == true
 
     BEARER_STATUS t = api_check_bearer_token(w);
-    if(t == BEARER_STATUS_AVAILABLE_AND_VALIDATED)
+    if(t == BEARER_STATUS_AVAILABLE_AND_VALIDATED) {
         // we have a valid bearer on the request
+        w->access = HTTP_ACCESS_MEMBERS;
         return HTTP_RESP_OK;
+    }
+
+    if(endpoint_acl & HTTP_ACL_BEARER_OPTIONAL) {
+        w->access = HTTP_ACCESS_ANY;
+        return HTTP_RESP_OK;
+    }
 
     netdata_log_info("BEARER: bearer is required for request: code %d", t);
 
@@ -278,6 +291,8 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
 
             .interrupt_callback = web_client_interrupt_callback,
             .interrupt_callback_data = w,
+
+            .transaction = &w->transaction,
     };
 
     return web_api_v12_weights(wb, &qwr);
