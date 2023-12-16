@@ -352,7 +352,7 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
  * @param timeout      The function timeout
  * @param cancelled    Variable used to store function status.
  */
-static void ebpf_function_socket_manipulation(const char *transaction,
+void ebpf_function_socket_manipulation(const char *transaction,
                                               char *function __maybe_unused,
                                               usec_t *stop_monotonic_ut __maybe_unused,
                                               bool *cancelled __maybe_unused)
@@ -1032,7 +1032,7 @@ static void ebpf_cachestat_read_judy(BUFFER *buf, struct ebpf_module *em)
  */
 void ebpf_function_cachestat_manipulation(const char *transaction,
                                           char *function __maybe_unused,
-                                          int timeout __maybe_unused,
+                                          usec_t *stop_monotonic_ut __maybe_unused,
                                           bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_CACHESTAT_IDX];
@@ -1519,7 +1519,7 @@ static void ebpf_fd_clean_judy_array_unsafe()
  */
 void ebpf_function_fd_manipulation(const char *transaction,
                                    char *function __maybe_unused,
-                                   int timeout __maybe_unused,
+                                   usec_t *stop_monotonic_ut __maybe_unused,
                                    bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_FD_IDX];
@@ -1995,7 +1995,7 @@ static void ebpf_process_clean_judy_array_unsafe()
  */
 void ebpf_function_process_manipulation(const char *transaction,
                                         char *function __maybe_unused,
-                                        int timeout __maybe_unused,
+                                        usec_t *stop_monotonic_ut __maybe_unused,
                                         bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_PROCESS_IDX];
@@ -2486,7 +2486,7 @@ static void ebpf_shm_clean_judy_array_unsafe()
  */
 void ebpf_function_shm_manipulation(const char *transaction,
                                     char *function __maybe_unused,
-                                    int timeout __maybe_unused,
+                                    usec_t *stop_monotonic_ut __maybe_unused,
                                     bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SHM_IDX];
@@ -2935,7 +2935,7 @@ static void ebpf_swap_read_judy(BUFFER *buf, struct ebpf_module *em)
  */
 void ebpf_function_swap_manipulation(const char *transaction,
                                      char *function __maybe_unused,
-                                     int timeout __maybe_unused,
+                                     usec_t *stop_monotonic_ut __maybe_unused,
                                      bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SWAP_IDX];
@@ -3370,9 +3370,9 @@ static void ebpf_dc_read_judy(BUFFER *buf, struct ebpf_module *em)
  * @param cancelled    Variable used to store function status.
  */
 void ebpf_function_dc_manipulation(const char *transaction,
-                                     char *function __maybe_unused,
-                                     int timeout __maybe_unused,
-                                     bool *cancelled __maybe_unused)
+                                   char *function __maybe_unused,
+                                   usec_t *stop_monotonic_ut __maybe_unused,
+                                   bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_DCSTAT_IDX];
     char *words[PLUGINSD_MAX_WORDS] = {NULL};
@@ -3854,7 +3854,7 @@ static void ebpf_vfs_read_judy(BUFFER *buf, struct ebpf_module *em)
  */
 void ebpf_function_vfs_manipulation(const char *transaction,
                                    char *function __maybe_unused,
-                                   int timeout __maybe_unused,
+                                   usec_t *stop_monotonic_ut __maybe_unused,
                                    bool *cancelled __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_DCSTAT_IDX];

@@ -462,11 +462,6 @@ static void ebpf_shm_exit(void *ptr)
 
         ebpf_obsolete_shm_global(em);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_shm_pid)
-            ebpf_statistic_obsolete_aral_chart(em, shm_disable_priority);
-#endif
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }

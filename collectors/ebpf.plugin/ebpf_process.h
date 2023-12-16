@@ -109,6 +109,6 @@ extern struct config process_config;
 
 void ebpf_function_process_manipulation(const char *transaction,
                                         char *function __maybe_unused,
-                                        int timeout __maybe_unused,
+                                        usec_t *stop_monotonic_ut __maybe_unused,
                                         bool *cancelled __maybe_unused);
 #endif /* NETDATA_EBPF_PROCESS_H */

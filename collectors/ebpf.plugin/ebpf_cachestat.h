@@ -98,7 +98,7 @@ typedef struct netdata_publish_cachestat {
 void *ebpf_cachestat_thread(void *ptr);
 void ebpf_function_cachestat_manipulation(const char *transaction,
                                           char *function __maybe_unused,
-                                          int timeout __maybe_unused,
+                                          usec_t *stop_monotonic_ut __maybe_unused,
                                           bool *cancelled __maybe_unused);
 
 extern struct config cachestat_config;

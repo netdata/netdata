@@ -92,7 +92,7 @@ extern ebpf_local_maps_t dcstat_maps[];
 
 void ebpf_function_dc_manipulation(const char *transaction,
                                    char *function __maybe_unused,
-                                   int timeout __maybe_unused,
+                                   usec_t *stop_monotonic_ut __maybe_unused,
                                    bool *cancelled __maybe_unused);
 
 #endif // NETDATA_EBPF_DCSTAT_H

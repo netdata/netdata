@@ -340,7 +340,7 @@ void ebpf_parse_ips_unsafe(char *ptr);
 void ebpf_parse_ports(char *ptr);
 void ebpf_function_socket_manipulation(const char *transaction,
                                        char *function __maybe_unused,
-                                       int timeout __maybe_unused,
+                                       usec_t *stop_monotonic_ut __maybe_unused,
                                        bool *cancelled __maybe_unused);
 
 extern struct config socket_config;

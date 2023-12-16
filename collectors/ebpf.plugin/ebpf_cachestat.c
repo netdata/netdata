@@ -544,11 +544,6 @@ static void ebpf_cachestat_exit(void *ptr)
 
         ebpf_obsolete_cachestat_global(em);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_cachestat_pid)
-            ebpf_statistic_obsolete_aral_chart(em, cachestat_disable_priority);
-#endif
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }

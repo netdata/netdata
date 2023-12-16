@@ -94,7 +94,7 @@ extern struct config fd_config;
 extern netdata_ebpf_targets_t fd_targets[];
 void ebpf_function_fd_manipulation(const char *transaction,
                                    char *function __maybe_unused,
-                                   int timeout __maybe_unused,
+                                   usec_t *stop_monotonic_ut __maybe_unused,
                                    bool *cancelled __maybe_unused);
 
 #endif /* NETDATA_EBPF_FD_H */

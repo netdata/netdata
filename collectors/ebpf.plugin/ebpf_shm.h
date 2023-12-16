@@ -63,7 +63,7 @@ void ebpf_shm_release(netdata_publish_shm_kernel_t *stat);
 extern netdata_ebpf_targets_t shm_targets[];
 void ebpf_function_shm_manipulation(const char *transaction,
                                     char *function __maybe_unused,
-                                    int timeout __maybe_unused,
+                                    usec_t *stop_monotonic_ut __maybe_unused,
                                     bool *cancelled __maybe_unused);
 
 extern struct config shm_config;
