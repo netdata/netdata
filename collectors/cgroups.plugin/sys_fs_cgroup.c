@@ -452,6 +452,7 @@ void read_cgroup_plugin_configuration() {
                        " !/lxc.monitor* "
                        " !/lxc.pivot "
                        " !/lxc.payload "
+                       " !*lxcfs.service/.control"
                        " !/machine "
                        " !/qemu "
                        " !/system "
