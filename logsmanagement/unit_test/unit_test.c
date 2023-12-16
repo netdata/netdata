@@ -7,7 +7,11 @@
 #include "unit_test.h"
 #include <stdlib.h>
 #include <stdio.h>
+
+#ifndef __USE_XOPEN_EXTENDED
 #define __USE_XOPEN_EXTENDED
+#endif
+
 #include <ftw.h>
 #include <unistd.h>
 #include "../circular_buffer.h"

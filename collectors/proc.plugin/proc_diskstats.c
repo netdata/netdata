@@ -1033,12 +1033,16 @@ static void add_labels_to_disk(struct disk *d, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "device_type", get_disk_type_string(d->type), RRDLABEL_SRC_AUTO);
 }
 
-static int diskstats_function_block_devices(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
-        void *collector_data __maybe_unused,
-        rrd_function_result_callback_t result_cb, void *result_cb_data,
-        rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-        rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
-        void *register_canceller_cb_data __maybe_unused) {
+static int diskstats_function_block_devices(uuid_t *transaction __maybe_unused, BUFFER *wb,
+                                            usec_t *stop_monotonic_ut __maybe_unused, const char *function __maybe_unused,
+                                            void *collector_data __maybe_unused,
+                                            rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                            rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
+                                            rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                                            rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                                            void *register_canceller_cb_data __maybe_unused,
+                                            rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
+                                            void *register_progresser_cb_data __maybe_unused) {
 
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -1490,7 +1494,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
     static bool add_func = true;
     if (add_func) {
-        rrd_function_add(localhost, NULL, "block-devices", 10, RRDFUNCTIONS_DISKSTATS_HELP, true, diskstats_function_block_devices, NULL);
+        rrd_function_add(localhost, NULL, "block-devices", 10, RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSTATS_HELP,
+                         "top", HTTP_ACCESS_ANY, true,
+                         diskstats_function_block_devices, NULL);
         add_func = false;
     }
 

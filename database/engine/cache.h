@@ -2,6 +2,7 @@
 #ifndef DBENGINE_CACHE_H
 #define DBENGINE_CACHE_H
 
+#include "datafile.h"
 #include "../rrd.h"
 
 // CACHE COMPILE TIME CONFIGURATION

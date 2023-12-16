@@ -123,7 +123,7 @@ typedef struct parser {
 
     struct {
         DICTIONARY *functions;
-        usec_t smaller_timeout;
+        usec_t smaller_monotonic_timeout_ut;
     } inflight;
 
     struct {
@@ -136,7 +136,6 @@ PARSER *parser_init(struct parser_user_object *user, FILE *fp_input, FILE *fp_ou
 void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);
 void parser_destroy(PARSER *working_parser);
 void pluginsd_cleanup_v2(PARSER *parser);
-void inflight_functions_init(PARSER *parser);
 void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire);
 PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, size_t num_words);
 
@@ -186,7 +185,7 @@ static inline int parser_action(PARSER *parser, char *input) {
                 if(buffer_strlen(parser->defer.response) > PLUGINSD_MAX_DEFERRED_SIZE) {
                     // more than PLUGINSD_MAX_DEFERRED_SIZE of data,
                     // or a bad plugin that did not send the end_keyword
-                    internal_error(true, "PLUGINSD: deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "PLUGINSD: deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
                     return 1;
                 }
             }

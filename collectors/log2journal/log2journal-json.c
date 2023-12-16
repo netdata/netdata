@@ -47,7 +47,7 @@ static inline bool json_expect_char_after_white_space(LOG_JSON_STATE *js, const 
     }
 
     snprintf(js->msg, sizeof(js->msg),
-             "JSON PARSER: character '%c' is not one of the expected characters (%s), at pos %zu",
+             "JSON PARSER: character '%c' is not one of the expected characters (%s), at pos %u",
              *s ? *s : '?', expected, js->pos);
 
     return false;
@@ -62,7 +62,7 @@ static inline bool json_parse_null(LOG_JSON_STATE *js) {
     }
     else {
         snprintf(js->msg, sizeof(js->msg),
-                 "JSON PARSER: expected 'null', found '%.4s' at position %zu", s, js->pos);
+                 "JSON PARSER: expected 'null', found '%.4s' at position %u", s, js->pos);
         return false;
     }
 }
@@ -76,7 +76,7 @@ static inline bool json_parse_true(LOG_JSON_STATE *js) {
     }
     else {
         snprintf(js->msg, sizeof(js->msg),
-                 "JSON PARSER: expected 'true', found '%.4s' at position %zu", s, js->pos);
+                 "JSON PARSER: expected 'true', found '%.4s' at position %u", s, js->pos);
         return false;
     }
 }
@@ -90,7 +90,7 @@ static inline bool json_parse_false(LOG_JSON_STATE *js) {
     }
     else {
         snprintf(js->msg, sizeof(js->msg),
-                 "JSON PARSER: expected 'false', found '%.4s' at position %zu", s, js->pos);
+                 "JSON PARSER: expected 'false', found '%.4s' at position %u", s, js->pos);
         return false;
     }
 }
@@ -112,7 +112,7 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
     // Digits before decimal point
     while (*s >= '0' && *s <= '9') {
         if (remaining < 2) {
-            snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated number value at pos %zu", js->pos);
+            snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated number value at position %u", js->pos);
             return false;
         }
         *d++ = *s++;
@@ -126,7 +126,7 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
 
         while (*s >= '0' && *s <= '9') {
             if (remaining < 2) {
-                snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated fractional part at pos %zu", js->pos);
+                snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated fractional part at position %u", js->pos);
                 return false;
             }
             *d++ = *s++;
@@ -147,7 +147,7 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
 
         while (*s >= '0' && *s <= '9') {
             if (remaining < 2) {
-                snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated exponent at pos %zu", js->pos);
+                snprintf(js->msg, sizeof(js->msg), "JSON PARSER: truncated exponent at position %u", js->pos);
                 return false;
             }
             *d++ = *s++;
@@ -162,7 +162,7 @@ static inline bool json_parse_number(LOG_JSON_STATE *js) {
         json_process_key_value(js, value, d - value);
         return true;
     } else {
-        snprintf(js->msg, sizeof(js->msg), "JSON PARSER: invalid number format at pos %zu", js->pos);
+        snprintf(js->msg, sizeof(js->msg), "JSON PARSER: invalid number format at position %u", js->pos);
         return false;
     }
 }
@@ -334,7 +334,7 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
 
         if(remaining < 2) {
             snprintf(js->msg, sizeof(js->msg),
-                     "JSON PARSER: truncated string value at pos %zu", js->pos);
+                     "JSON PARSER: truncated string value at position %u", js->pos);
             return false;
         }
         else {
@@ -362,7 +362,7 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 
     if(js->depth >= JSON_DEPTH_MAX - 1) {
         snprintf(js->msg, sizeof(js->msg),
-                 "JSON PARSER: object too deep, at pos %zu", js->pos);
+                 "JSON PARSER: object too deep, at position %u", js->pos);
         return false;
     }
 
@@ -392,7 +392,7 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
         else {
             if(remaining < 2) {
                 snprintf(js->msg, sizeof(js->msg),
-                         "JSON PARSER: key buffer full - keys are too long, at pos %zu", js->pos);
+                         "JSON PARSER: key buffer full - keys are too long, at position %u", js->pos);
                 return false;
             }
             *d++ = c;
@@ -417,7 +417,7 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 static inline bool json_key_pop(LOG_JSON_STATE *js) {
     if(js->depth <= 0) {
         snprintf(js->msg, sizeof(js->msg),
-                 "JSON PARSER: cannot pop a key at depth %zu, at pos %zu", js->depth, js->pos);
+                 "JSON PARSER: cannot pop a key at depth %u, at position %u", js->depth, js->pos);
         return false;
     }
 
@@ -465,7 +465,7 @@ static inline bool json_parse_value(LOG_JSON_STATE *js) {
     }
 
     snprintf(js->msg, sizeof(js->msg),
-             "JSON PARSER: unexpected character at pos %zu", js->pos);
+             "JSON PARSER: unexpected character at position %u", js->pos);
     return false;
 }
 
@@ -491,7 +491,7 @@ static inline bool json_key_index_and_push(LOG_JSON_STATE *js, size_t index) {
     while (*t) {
         if(remaining < 2) {
             snprintf(js->msg, sizeof(js->msg),
-                     "JSON PARSER: key buffer full - keys are too long, at pos %zu", js->pos);
+                     "JSON PARSER: key buffer full - keys are too long, at position %u", js->pos);
             return false;
         }
 
@@ -613,7 +613,7 @@ bool json_parse_document(LOG_JSON_STATE *js, const char *txt) {
 
     if(*s) {
         snprintf(js->msg, sizeof(js->msg),
-                 "JSON PARSER: excess characters found after document is finished, at pos %zu", js->pos);
+                 "JSON PARSER: excess characters found after document is finished, at position %u", js->pos);
         return false;
     }
 

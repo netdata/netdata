@@ -134,6 +134,7 @@ Netdata parses lines starting with:
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
 -    `FUNCTION` - define functions
+-    `FUNCTION_PROGRESS` - report the progress of a function execution
 -    `FUNCTION_RESULT_BEGIN` - to initiate the transmission of function results
 -    `FUNCTION_RESULT_END` - to end the transmission of function results
 
@@ -146,6 +147,7 @@ Netdata may send the following commands to the plugin's `stdin`:
 -    `FUNCTION` - to call a specific function, with all parameters inline
 -    `FUNCTION_PAYLOAD` - to call a specific function, with a payload of parameters
 -    `FUNCTION_PAYLOAD_END` - to end the payload of parameters
+-    `FUNCTION_CANCEL` - cancel a running function transaction
 
 ### Command line parameters
 
@@ -466,7 +468,10 @@ The `source` is an integer field that can have the following values:
 
 The plugin can register functions to Netdata, like this:
 
-> FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users"
+> FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users" "tags" "access"
+
+- Tags currently recognized are either `top` or `logs` (or both, space separated).
+- Access is one of `any`, `members`, or `admins`.
 
 A function can be used by users to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
 

@@ -208,14 +208,14 @@ int configured_as_parent() {
 // chart labels
 static int send_clabels_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     BUFFER *wb = (BUFFER *)data;
-    buffer_sprintf(wb, "CLABEL \"%s\" \"%s\" %d\n", name, value, ls & ~(RRDLABEL_FLAG_INTERNAL));
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_CLABEL " \"%s\" \"%s\" %d\n", name, value, ls & ~(RRDLABEL_FLAG_INTERNAL));
     return 1;
 }
 
 static void rrdpush_send_clabels(BUFFER *wb, RRDSET *st) {
     if (st->rrdlabels) {
         if(rrdlabels_walkthrough_read(st->rrdlabels, send_clabels_callback, wb) > 0)
-            buffer_sprintf(wb, "CLABEL_COMMIT\n");
+            buffer_sprintf(wb, PLUGINSD_KEYWORD_CLABEL_COMMIT "\n");
     }
 }
 
@@ -1410,6 +1410,7 @@ static struct {
     {STREAM_CAP_ZSTD,         "ZSTD" },
     {STREAM_CAP_GZIP,         "GZIP" },
     {STREAM_CAP_BROTLI,       "BROTLI" },
+    {STREAM_CAP_PROGRESS,     "PROGRESS" },
     {0 , NULL },
 };
 
@@ -1485,7 +1486,7 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_REPLICATION |
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
-            STREAM_CAP_SLOTS |
+            STREAM_CAP_SLOTS | STREAM_CAP_PROGRESS |
             STREAM_CAP_COMPRESSIONS_AVAILABLE |
             #ifdef NETDATA_TEST_DYNCFG
             STREAM_CAP_DYNCFG |

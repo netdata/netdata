@@ -1596,7 +1596,7 @@ void systemd_units_assign_priority(UnitInfo *base) {
     }
 }
 
-void function_systemd_units(const char *transaction, char *function, int timeout, bool *cancelled) {
+void function_systemd_units(const char *transaction, char *function, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused) {
     char *words[SYSTEMD_UNITS_MAX_PARAMS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, SYSTEMD_UNITS_MAX_PARAMS);
     for(int i = 1; i < SYSTEMD_UNITS_MAX_PARAMS ;i++) {

@@ -10,8 +10,6 @@
 #include "h2o/memory.h"
 #endif
 
-#define WEB_DATA_LENGTH_INCREASE_STEP 1024
-
 #define BUFFER_JSON_MAX_DEPTH 32 // max is 255
 
 extern const char hex_digits[16];
@@ -869,6 +867,26 @@ static inline void buffer_json_add_array_item_string(BUFFER *wb, const char *val
 
     buffer_json_add_string_value(wb, value);
     wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_add_array_item_uuid(BUFFER *wb, uuid_t *value) {
+    if(value && !uuid_is_null(*value)) {
+        char uuid[GUID_LEN + 1];
+        uuid_unparse_lower(*value, uuid);
+        buffer_json_add_array_item_string(wb, uuid);
+    }
+    else
+        buffer_json_add_array_item_string(wb, NULL);
+}
+
+static inline void buffer_json_add_array_item_uuid_compact(BUFFER *wb, uuid_t *value) {
+    if(value && !uuid_is_null(*value)) {
+        char uuid[GUID_LEN + 1];
+        uuid_unparse_lower_compact(*value, uuid);
+        buffer_json_add_array_item_string(wb, uuid);
+    }
+    else
+        buffer_json_add_array_item_string(wb, NULL);
 }
 
 static inline void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE value) {

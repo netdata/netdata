@@ -378,7 +378,7 @@
     link: 'https://splunk.com/'
     categories:
       - notify.cloud
-    icon_filename: 'splunk.svg'
+    icon_filename: 'splunk-black.svg'
   keywords:
     - Splunk
   overview:

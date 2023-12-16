@@ -636,12 +636,16 @@ static void diskspace_main_cleanup(void *ptr) {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
 #endif
 
-int diskspace_function_mount_points(BUFFER *wb, int timeout __maybe_unused, const char *function __maybe_unused,
-        void *collector_data __maybe_unused,
-        rrd_function_result_callback_t result_cb, void *result_cb_data,
-        rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-        rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
-        void *register_canceller_cb_data __maybe_unused) {
+int diskspace_function_mount_points(uuid_t *transaction __maybe_unused, BUFFER *wb,
+                                    usec_t *stop_monotonic_ut __maybe_unused, const char *function __maybe_unused,
+                                    void *collector_data __maybe_unused,
+                                    rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                    rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
+                                    rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                                    rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                                    void *register_canceller_cb_data __maybe_unused,
+                                    rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
+                                    void *register_progresser_cb_data __maybe_unused) {
 
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -865,7 +869,9 @@ void *diskspace_main(void *ptr) {
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
 
     rrd_collector_started();
-    rrd_function_add(localhost, NULL, "mount-points", 10, RRDFUNCTIONS_DISKSPACE_HELP, true, diskspace_function_mount_points, NULL);
+    rrd_function_add(localhost, NULL, "mount-points", 10, RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSPACE_HELP,
+                     "top", HTTP_ACCESS_ANY,
+                     true, diskspace_function_mount_points, NULL);
 
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 

@@ -3468,6 +3468,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
     internal_fatal(released_ops, "QUERY: released_ops should be NULL when the query starts");
 
+    query_progress_set_finish_line(qt->request.transaction, qt->query.used);
+
     QUERY_ENGINE_OPS **ops = NULL;
     if(qt->query.used)
         ops = onewayalloc_callocz(owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
@@ -3639,6 +3641,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
             break;
         }
+        else
+            query_progress_done_step(qt->request.transaction, 1);
     }
 
     // free all resources used by the grouping method

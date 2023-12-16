@@ -199,7 +199,7 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
         if(unlikely(!handle->update_every_ut))
             handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
         else
-            mrg_metric_set_update_every(main_mrg, handle->metric, (time_t)(handle->update_every_ut / USEC_PER_SEC));
+            mrg_metric_set_update_every(main_mrg, handle->metric, (uint32_t)(handle->update_every_ut / USEC_PER_SEC));
     }
 }
 
@@ -811,13 +811,13 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
         }
         else {
             position = (handle->now_s - page_start_time_s) * (entries - 1) / (page_end_time_s - page_start_time_s);
-            time_t point_end_time_s = page_start_time_s + position * page_update_every_s;
+            time_t point_end_time_s = page_start_time_s + position * (time_t) page_update_every_s;
             while(point_end_time_s < handle->now_s && position + 1 < entries) {
                 // https://github.com/netdata/netdata/issues/14411
                 // we really need a while() here, because the delta may be
                 // 2 points at higher tiers
                 position++;
-                point_end_time_s = page_start_time_s + position * page_update_every_s;
+                point_end_time_s = page_start_time_s + position * (time_t) page_update_every_s;
             }
             handle->now_s = point_end_time_s;
         }

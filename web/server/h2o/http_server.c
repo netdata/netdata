@@ -210,7 +210,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     w.response.header = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.url_query_string_decoded = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.url_as_received = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
-    w.acl = WEB_CLIENT_ACL_DASHBOARD;
+    w.acl = HTTP_ACL_DASHBOARD;
 
     char *path_c_str = iovec_to_cstr(&api_command);
     char *path_unescaped = url_unescape(path_c_str);

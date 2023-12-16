@@ -52,6 +52,7 @@ typedef enum {
     STREAM_CAP_ZSTD             = (1 << 19), // ZSTD compression supported
     STREAM_CAP_GZIP             = (1 << 20), // GZIP compression supported
     STREAM_CAP_BROTLI           = (1 << 21), // BROTLI compression supported
+    STREAM_CAP_PROGRESS         = (1 << 22), // Functions PROGRESS support
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit

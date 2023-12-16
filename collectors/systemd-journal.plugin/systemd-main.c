@@ -8,6 +8,15 @@
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
 
+static bool journal_data_direcories_exist() {
+    struct stat st;
+    for (unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES && journal_directories[i].path; i++) {
+        if ((stat(journal_directories[i].path, &st) == 0) && S_ISDIR(st.st_mode))
+            return true;
+    }
+    return false;
+}
+
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     clocks_init();
     netdata_thread_set_tag("SDMAIN");
@@ -20,8 +29,14 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // initialization
 
     netdata_systemd_journal_message_ids_init();
-    journal_init_query_status();
     journal_init_files_and_directories();
+
+    if (!journal_data_direcories_exist()) {
+        nd_log_collector(NDLP_INFO, "unable to locate journal data directories. Exiting...");
+        fprintf(stdout, "DISABLE\n");
+        fflush(stdout);
+        exit(0);
+    }
 
     // ------------------------------------------------------------------------
     // debug
@@ -30,17 +45,19 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         journal_files_registry_update();
 
         bool cancelled = false;
+        usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
         char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true source:all";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
-        function_systemd_journal("123", buf, 600, &cancelled);
+        function_systemd_journal("123", buf, &stop_monotonic_ut, &cancelled);
 //        function_systemd_units("123", "systemd-units", 600, &cancelled);
         exit(1);
     }
 #ifdef ENABLE_SYSTEMD_DBUS
     if(argc == 2 && strcmp(argv[1], "debug-units") == 0) {
         bool cancelled = false;
-        function_systemd_units("123", "systemd-units", 600, &cancelled);
+        usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
+        function_systemd_units("123", "systemd-units", &stop_monotonic_ut, &cancelled);
         exit(1);
     }
 #endif
@@ -71,12 +88,14 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     netdata_mutex_lock(&stdout_mutex);
 
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
-            SYSTEMD_JOURNAL_FUNCTION_NAME, SYSTEMD_JOURNAL_DEFAULT_TIMEOUT, SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION);
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"members\" %d\n",
+            SYSTEMD_JOURNAL_FUNCTION_NAME, SYSTEMD_JOURNAL_DEFAULT_TIMEOUT, SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION,
+            RRDFUNCTIONS_PRIORITY_DEFAULT);
 
 #ifdef ENABLE_SYSTEMD_DBUS
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\"\n",
-            SYSTEMD_UNITS_FUNCTION_NAME, SYSTEMD_UNITS_DEFAULT_TIMEOUT, SYSTEMD_UNITS_FUNCTION_DESCRIPTION);
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" \"members\" %d\n",
+            SYSTEMD_UNITS_FUNCTION_NAME, SYSTEMD_UNITS_DEFAULT_TIMEOUT, SYSTEMD_UNITS_FUNCTION_DESCRIPTION,
+            RRDFUNCTIONS_PRIORITY_DEFAULT);
 #endif
 
     fflush(stdout);

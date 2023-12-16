@@ -26,7 +26,6 @@
 #define HTTP_RESP_FORBIDDEN 403
 #define HTTP_RESP_NOT_FOUND 404
 #define HTTP_RESP_METHOD_NOT_ALLOWED 405
-#define HTTP_RESP_METHOD_NOT_ALLOWED_STR "Method Not Allowed"
 #define HTTP_RESP_CONFLICT 409
 #define HTTP_RESP_PRECOND_FAIL 412
 #define HTTP_RESP_CONTENT_TOO_LONG 413
@@ -34,14 +33,23 @@
 
 // HTTP_CODES 5XX Server Errors
 #define HTTP_RESP_INTERNAL_SERVER_ERROR 500
-#define HTTP_RESP_INTERNAL_SERVER_ERROR_STR "Internal Server Error"
 #define HTTP_RESP_SERVICE_UNAVAILABLE 503
 #define HTTP_RESP_GATEWAY_TIMEOUT 504
 #define HTTP_RESP_BACKEND_RESPONSE_INVALID 591
 
-#define HTTP_METHOD_GET    (1)
-#define HTTP_METHOD_POST   (2)
-#define HTTP_METHOD_PUT    (3)
-#define HTTP_METHOD_DELETE (4)
+typedef enum __attribute__((__packed__)) {
+    HTTP_REQUEST_MODE_NONE      = 0,
+    HTTP_REQUEST_MODE_GET       = 1,
+    HTTP_REQUEST_MODE_POST      = 2,
+    HTTP_REQUEST_MODE_PUT       = 3,
+    HTTP_REQUEST_MODE_DELETE    = 4,
+    HTTP_REQUEST_MODE_FILECOPY  = 5,
+    HTTP_REQUEST_MODE_OPTIONS   = 6,
+    HTTP_REQUEST_MODE_STREAM    = 7,
+} HTTP_REQUEST_MODE;
+
+const char *http_request_method2string(HTTP_REQUEST_MODE mode);
+const char *http_response_code2string(int code);
+HTTP_CONTENT_TYPE contenttype_for_filename(const char *filename);
 
 #endif /* NETDATA_HTTP_DEFS_H */

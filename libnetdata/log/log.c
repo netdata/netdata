@@ -1121,6 +1121,14 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
                 .journal = "ND_SRC_IP",
                 .logfmt = "src_ip",
         },
+        [NDF_SRC_FORWARDED_HOST] = {
+                .journal = "ND_SRC_FORWARDED_HOST",
+                .logfmt = "src_forwarded_host",
+        },
+        [NDF_SRC_FORWARDED_FOR] = {
+                .journal = "ND_SRC_FORWARDED_FOR",
+                .logfmt = "src_forwarded_for",
+        },
         [NDF_SRC_PORT] = {
                 .journal = "ND_SRC_PORT",
                 .logfmt = "src_port",

@@ -299,6 +299,8 @@ typedef struct query_target_request {
 
     qt_interrupt_callback_t interrupt_callback;
     void *interrupt_callback_data;
+
+    uuid_t *transaction;
 } QUERY_TARGET_REQUEST;
 
 #define GROUP_BY_MAX_LABEL_KEYS 10

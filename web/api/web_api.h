@@ -29,7 +29,7 @@ BEARER_STATUS extract_bearer_token_from_request(struct web_client *w, char *dst,
 struct web_api_command {
     const char *command;
     uint32_t hash;
-    WEB_CLIENT_ACL acl;
+    HTTP_ACL acl;
     int (*callback)(RRDHOST *host, struct web_client *w, char *url);
     unsigned int allow_subpaths;
 };

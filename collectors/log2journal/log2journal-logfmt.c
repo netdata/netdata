@@ -98,7 +98,7 @@ static inline bool logftm_parse_value(LOGFMT_STATE *lfs) {
 
         if(remaining < 2) {
             snprintf(lfs->msg, sizeof(lfs->msg),
-                     "LOGFMT PARSER: truncated string value at pos %zu", lfs->pos);
+                     "LOGFMT PARSER: truncated string value at position %u", lfs->pos);
             return false;
         }
         else {
@@ -114,7 +114,7 @@ static inline bool logftm_parse_value(LOGFMT_STATE *lfs) {
     if(quote != '\0') {
         if (*s != quote) {
             snprintf(lfs->msg, sizeof(lfs->msg),
-                     "LOGFMT PARSER: missing quote at pos %zu: '%s'",
+                     "LOGFMT PARSER: missing quote at position %u: '%s'",
                      lfs->pos, s);
             return false;
         }
@@ -150,7 +150,7 @@ static inline bool logfmt_parse_key(LOGFMT_STATE *lfs) {
         else {
             if(remaining < 2) {
                 snprintf(lfs->msg, sizeof(lfs->msg),
-                         "LOGFMT PARSER: key buffer full - keys are too long, at pos %zu", lfs->pos);
+                         "LOGFMT PARSER: key buffer full - keys are too long, at position %u", lfs->pos);
                 return false;
             }
             *d++ = c;
@@ -165,7 +165,7 @@ static inline bool logfmt_parse_key(LOGFMT_STATE *lfs) {
     s = logfmt_current_pos(lfs);
     if(*s != '=') {
         snprintf(lfs->msg, sizeof(lfs->msg),
-                 "LOGFMT PARSER: key is missing the equal sign, at pos %zu", lfs->pos);
+                 "LOGFMT PARSER: key is missing the equal sign, at position %u", lfs->pos);
         return false;
     }
 

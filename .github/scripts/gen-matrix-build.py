@@ -11,6 +11,9 @@ with open('.github/data/distros.yml') as f:
     data = yaml.load(f)
 
 for i, v in enumerate(data['include']):
+    if v['test'].get('skip-local-build', False):
+        continue
+
     e = {
       'artifact_key': v['distro'] + str(v['version']).replace('.', ''),
       'version': v['version'],

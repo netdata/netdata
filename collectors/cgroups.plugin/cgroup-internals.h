@@ -452,15 +452,25 @@ static inline char *cgroup_chart_type(char *buffer, struct cgroup *cg) {
 }
 
 #define RRDFUNCTIONS_CGTOP_HELP "View running containers"
+#define RRDFUNCTIONS_SYSTEMD_SERVICES_HELP "View systemd services"
 
-int cgroup_function_cgroup_top(BUFFER *wb, int timeout, const char *function, void *collector_data,
-        rrd_function_result_callback_t result_cb, void *result_cb_data,
-        rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-        rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data);
-int cgroup_function_systemd_top(BUFFER *wb, int timeout, const char *function, void *collector_data,
-        rrd_function_result_callback_t result_cb, void *result_cb_data,
-        rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-        rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data);
+int cgroup_function_cgroup_top(uuid_t *transaction, BUFFER *wb,
+                               usec_t *stop_monotonic_ut, const char *function, void *collector_data,
+                               rrd_function_result_callback_t result_cb, void *result_cb_data,
+                               rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
+                               rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                               rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data,
+                               rrd_function_register_progresser_cb_t register_progresser_cb,
+                               void *register_progresser_cb_data);
+
+int cgroup_function_systemd_top(uuid_t *transaction, BUFFER *wb,
+                                usec_t *stop_monotonic_ut, const char *function, void *collector_data,
+                                rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
+                                rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                                rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data,
+                                rrd_function_register_progresser_cb_t register_progresser_cb,
+                                void *register_progresser_cb_data);
 
 void cgroup_netdev_link_init(void);
 const DICTIONARY_ITEM *cgroup_netdev_get(struct cgroup *cg);
