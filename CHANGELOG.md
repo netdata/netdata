@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix small coverity issue [\#16616](https://github.com/netdata/netdata/pull/16616) ([stelfrag](https://github.com/stelfrag))
+- ndsudo - a helper to run privileged commands [\#16614](https://github.com/netdata/netdata/pull/16614) ([ktsaou](https://github.com/ktsaou))
+- Robustness improvements to netdata-updater.sh [\#16613](https://github.com/netdata/netdata/pull/16613) ([candlerb](https://github.com/candlerb))
 - Remove assert [\#16611](https://github.com/netdata/netdata/pull/16611) ([stelfrag](https://github.com/stelfrag))
 - Remove CPack stuff from CMake [\#16608](https://github.com/netdata/netdata/pull/16608) ([vkalintiris](https://github.com/vkalintiris))
 - remove v1 dashboard version check from installer [\#16603](https://github.com/netdata/netdata/pull/16603) ([ilyam8](https://github.com/ilyam8))
@@ -24,6 +27,7 @@
 - Handle coverity issues related to Y2K38\_SAFETY [\#16583](https://github.com/netdata/netdata/pull/16583) ([stelfrag](https://github.com/stelfrag))
 - Update categories.yaml to add Logs [\#16582](https://github.com/netdata/netdata/pull/16582) ([sashwathn](https://github.com/sashwathn))
 - Add Alpine Linux 3.19 to CI. [\#16579](https://github.com/netdata/netdata/pull/16579) ([Ferroin](https://github.com/Ferroin))
+- Queries Progress [\#16574](https://github.com/netdata/netdata/pull/16574) ([ktsaou](https://github.com/ktsaou))
 - disable cpu per core metrics by default [\#16572](https://github.com/netdata/netdata/pull/16572) ([ilyam8](https://github.com/ilyam8))
 - make debugfs exit on sigpipe [\#16569](https://github.com/netdata/netdata/pull/16569) ([ilyam8](https://github.com/ilyam8))
 - Fix memory leak during host chart label cleanup [\#16568](https://github.com/netdata/netdata/pull/16568) ([stelfrag](https://github.com/stelfrag))
@@ -435,11 +439,6 @@
 - Have one documentation page about Netdata Charts [\#16042](https://github.com/netdata/netdata/pull/16042) ([Ancairon](https://github.com/Ancairon))
 - Remove discontinued Hangouts and StackPulse notification methods [\#16041](https://github.com/netdata/netdata/pull/16041) ([Ancairon](https://github.com/Ancairon))
 - systemd-Journal by file [\#16038](https://github.com/netdata/netdata/pull/16038) ([ktsaou](https://github.com/ktsaou))
-- health: add upsd alerts [\#16036](https://github.com/netdata/netdata/pull/16036) ([ilyam8](https://github.com/ilyam8))
-- Disable mongodb exporter builds where broken. [\#16033](https://github.com/netdata/netdata/pull/16033) ([Ferroin](https://github.com/Ferroin))
-- Run health queries from tier 0 [\#16032](https://github.com/netdata/netdata/pull/16032) ([MrZammler](https://github.com/MrZammler))
-- use `status` as units for `anomaly_detection.detector_events` [\#16028](https://github.com/netdata/netdata/pull/16028) ([andrewm4894](https://github.com/andrewm4894))
-- add description for Homebrew on Apple Silicon Mac\(netdata/learn/\#1789\) [\#16027](https://github.com/netdata/netdata/pull/16027) ([theggs](https://github.com/theggs))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
