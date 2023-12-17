@@ -1431,10 +1431,7 @@ static int64_t log_field_to_int64(struct log_field *lf) {
             break;
 
         case NDFT_CALLBACK:
-            if(!tmp)
-                tmp = buffer_create(0, NULL);
-            else
-                buffer_flush(tmp);
+            tmp = buffer_create(0, NULL);
 
             if(lf->entry.cb.formatter(tmp, lf->entry.cb.formatter_data))
                 s = buffer_tostring(tmp);
@@ -1495,10 +1492,7 @@ static uint64_t log_field_to_uint64(struct log_field *lf) {
             break;
 
         case NDFT_CALLBACK:
-            if(!tmp)
-                tmp = buffer_create(0, NULL);
-            else
-                buffer_flush(tmp);
+            tmp = buffer_create(0, NULL);
 
             if(lf->entry.cb.formatter(tmp, lf->entry.cb.formatter_data))
                 s = buffer_tostring(tmp);
@@ -1513,7 +1507,7 @@ static uint64_t log_field_to_uint64(struct log_field *lf) {
             return lf->entry.i64;
 
         case NDFT_DBL:
-            return lf->entry.dbl;
+            return (uint64_t) lf->entry.dbl;
     }
 
     if(s && *s)
@@ -1753,31 +1747,32 @@ static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields
 
         const char *key = fields[i].journal;
         char *value = NULL;
+        int rc = 0;
         switch (fields[i].entry.type) {
             case NDFT_TXT:
                 if(*fields[i].entry.txt)
-                    asprintf(&value, "%s=%s", key, fields[i].entry.txt);
+                    rc = asprintf(&value, "%s=%s", key, fields[i].entry.txt);
                 break;
             case NDFT_STR:
-                asprintf(&value, "%s=%s", key, string2str(fields[i].entry.str));
+                rc = asprintf(&value, "%s=%s", key, string2str(fields[i].entry.str));
                 break;
             case NDFT_BFR:
                 if(buffer_strlen(fields[i].entry.bfr))
-                    asprintf(&value, "%s=%s", key, buffer_tostring(fields[i].entry.bfr));
+                    rc = asprintf(&value, "%s=%s", key, buffer_tostring(fields[i].entry.bfr));
                 break;
             case NDFT_U64:
-                asprintf(&value, "%s=%" PRIu64, key, fields[i].entry.u64);
+                rc = asprintf(&value, "%s=%" PRIu64, key, fields[i].entry.u64);
                 break;
             case NDFT_I64:
-                asprintf(&value, "%s=%" PRId64, key, fields[i].entry.i64);
+                rc = asprintf(&value, "%s=%" PRId64, key, fields[i].entry.i64);
                 break;
             case NDFT_DBL:
-                asprintf(&value, "%s=%f", key, fields[i].entry.dbl);
+                rc = asprintf(&value, "%s=%f", key, fields[i].entry.dbl);
                 break;
             case NDFT_UUID: {
                 char u[UUID_COMPACT_STR_LEN];
                 uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
-                asprintf(&value, "%s=%s", key, u);
+                rc = asprintf(&value, "%s=%s", key, u);
             }
                 break;
             case NDFT_CALLBACK: {
@@ -1786,15 +1781,15 @@ static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields
                 else
                     buffer_flush(tmp);
                 if(fields[i].entry.cb.formatter(tmp, fields[i].entry.cb.formatter_data))
-                    asprintf(&value, "%s=%s", key, buffer_tostring(tmp));
+                    rc = asprintf(&value, "%s=%s", key, buffer_tostring(tmp));
             }
                 break;
             default:
-                asprintf(&value, "%s=%s", key, "UNHANDLED");
+                rc = asprintf(&value, "%s=%s", key, "UNHANDLED");
                 break;
         }
 
-        if (value) {
+        if (rc != -1 && value) {
             iov[iov_count].iov_base = value;
             iov[iov_count].iov_len = strlen(value);
             iov_count++;
@@ -1921,7 +1916,7 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
 // ----------------------------------------------------------------------------
 // syslog logger - uses logfmt
 
-static bool nd_logger_syslog(int priority, ND_LOG_FORMAT format, struct log_field *fields, size_t fields_max) {
+static bool nd_logger_syslog(int priority, ND_LOG_FORMAT format __maybe_unused, struct log_field *fields, size_t fields_max) {
     CLEAN_BUFFER *wb = buffer_create(1024, NULL);
 
     nd_logger_logfmt(wb, fields, fields_max);
