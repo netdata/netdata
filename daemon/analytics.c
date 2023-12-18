@@ -985,7 +985,7 @@ void analytics_statistic_send(const analytics_statistic_t *statistic) {
         return;
 
     const char *action_result = statistic->result;
-    const char *action_data = statistic->result;
+    const char *action_data = statistic->action_data;
 
     if (!statistic->result)
         action_result = "";
