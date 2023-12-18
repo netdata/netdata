@@ -561,6 +561,8 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
 
                     yaml_event_delete(&sub_event);
                 }
+                freez(replace_pattern);
+                replace_pattern = NULL;
             }
                 break;
 
