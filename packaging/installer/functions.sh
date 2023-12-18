@@ -290,11 +290,11 @@ prepare_cmake_options() {
 
   enable_feature PLUGIN_APPS "${ENABLE_APPS}"
 
-  check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS:-1}" snappy
-  check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB:-1}" libmongoc-1.0
-  check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI:-1}" libipmimonitoring
-  check_for_feature PLUGIN_NFACCT "${ENABLE_NFACCT:-1}" libnetfilter_acct libnml
-  check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT:-1}" xenstat xenlight
+  check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
+  check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
+  check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
+  check_for_feature PLUGIN_NFACCT "${ENABLE_NFACCT}" libnetfilter_acct libnml
+  check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
 }
 
 # -----------------------------------------------------------------------------
