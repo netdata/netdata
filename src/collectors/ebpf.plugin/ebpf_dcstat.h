@@ -24,10 +24,10 @@
 #define NETDATA_CGROUP_DC_NOT_CACHE_CONTEXT "cgroup.dc_not_cache"
 #define NETDATA_CGROUP_DC_NOT_FOUND_CONTEXT "cgroup.dc_not_found"
 
-#define NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT "services.dc_ratio"
-#define NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT "services.dc_reference"
-#define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "services.dc_not_cache"
-#define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "services.dc_not_found"
+#define NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT "systemd.services.dc_ratio"
+#define NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT "systemd.services.dc_reference"
+#define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "systemd.services.dc_not_cache"
+#define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "systemd.services.dc_not_found"
 
 // ARAL name
 #define NETDATA_EBPF_DCSTAT_ARAL_NAME "ebpf_dcstat"
