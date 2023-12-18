@@ -2206,14 +2206,15 @@ int main(int argc, char **argv) {
     netdata_log_info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
     netdata_ready = true;
 
-
+    analytics_statistic_t start_statistic = { "START", "-",  "-" };
+    analytics_statistic_send(&start_statistic);
     if (crash_detected) {
-        analytics_statistic_t statistic = { "START", "-",  "-" };
-        analytics_statistic_send(&statistic);
+        analytics_statistic_t crash_statistic = { "CRASH", "-",  "-" };
+        analytics_statistic_send(&crash_statistic);
     }
     if (incomplete_shutdown_detected) {
-        analytics_statistic_t statistic = { "INCOMPLETE_SHUTDOWN", "-", "-" };
-        analytics_statistic_send(&statistic);
+        analytics_statistic_t incomplete_shutdown_statistic = { "INCOMPLETE_SHUTDOWN", "-", "-" };
+        analytics_statistic_send(&incomplete_shutdown_statistic);
     }
 
     //check if ANALYTICS needs to start
