@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix coverity issues, logically dead code and error checking [\#16618](https://github.com/netdata/netdata/pull/16618) ([stelfrag](https://github.com/stelfrag))
 - Fix small coverity issue [\#16616](https://github.com/netdata/netdata/pull/16616) ([stelfrag](https://github.com/stelfrag))
 - ndsudo - a helper to run privileged commands [\#16614](https://github.com/netdata/netdata/pull/16614) ([ktsaou](https://github.com/ktsaou))
 - Robustness improvements to netdata-updater.sh [\#16613](https://github.com/netdata/netdata/pull/16613) ([candlerb](https://github.com/candlerb))
@@ -438,7 +439,6 @@
 - Doc about running a local dashboard through Cloudflare \(community\) [\#16043](https://github.com/netdata/netdata/pull/16043) ([Ancairon](https://github.com/Ancairon))
 - Have one documentation page about Netdata Charts [\#16042](https://github.com/netdata/netdata/pull/16042) ([Ancairon](https://github.com/Ancairon))
 - Remove discontinued Hangouts and StackPulse notification methods [\#16041](https://github.com/netdata/netdata/pull/16041) ([Ancairon](https://github.com/Ancairon))
-- systemd-Journal by file [\#16038](https://github.com/netdata/netdata/pull/16038) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
