@@ -113,7 +113,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
@@ -202,7 +202,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: static-archive
           path: artifacts/*.gz.run
@@ -345,7 +345,7 @@ jobs:
           tags: test:${{ matrix.artifact_key }}
       - name: Upload image artifact
         id: upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_key }}-test-env
           path: /tmp/image.tar
@@ -591,7 +591,7 @@ jobs:
       - name: Store Artifacts
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: final-artifacts
           path: artifacts/*
