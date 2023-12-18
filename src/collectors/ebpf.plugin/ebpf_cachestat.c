@@ -328,7 +328,7 @@ static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_services(ebpf_module_t *em, char *id)
+static void ebpf_obsolete_cachestat_services(ebpf_module_t *em, char *id)
 {
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               id,
@@ -388,7 +388,7 @@ static inline void ebpf_obsolete_cachestat_cgroup_charts(ebpf_module_t *em) {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         if (ect->systemd) {
-            ebpf_obsolete_services(em, ect->name);
+            ebpf_obsolete_cachestat_services(em, ect->name);
 
             continue;
         }
@@ -1202,19 +1202,19 @@ static void ebpf_send_systemd_cachestat_charts()
         }
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_CACHESTAT_HIT_RATIO_CHART);
-        write_chart_dimension(ect->name, (long long)ect->publish_cachestat.ratio);
+        write_chart_dimension("percentage", (long long)ect->publish_cachestat.ratio);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_CACHESTAT_DIRTY_CHART);
-        write_chart_dimension(ect->name, (long long)ect->publish_cachestat.dirty);
+        write_chart_dimension("pages", (long long)ect->publish_cachestat.dirty);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_CACHESTAT_HIT_CHART);
-        write_chart_dimension(ect->name, (long long)ect->publish_cachestat.hit);
+        write_chart_dimension("hits", (long long)ect->publish_cachestat.hit);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_CACHESTAT_MISSES_CHART);
-        write_chart_dimension(ect->name, (long long)ect->publish_cachestat.miss);
+        write_chart_dimension("misses", (long long)ect->publish_cachestat.miss);
         ebpf_write_end_chart();
     }
 }
