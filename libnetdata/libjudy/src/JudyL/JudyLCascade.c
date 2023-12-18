@@ -311,6 +311,7 @@ static int j__udyStageJBBtoJBB(
 //
 // NOTE:  Caller must release the Leaf2 that was passed in.
 
+__attribute__((no_sanitize("shift")))
 FUNCTION static Pjlb_t j__udyJLL2toJLB1(
 	uint16_t * Pjll,	// array of 16-bit indexes.
 #ifdef JUDYL
