@@ -4,16 +4,13 @@
 #define NETDATA_LIB_DUMMIES_H 1
 
 // callback required by fatal()
-void netdata_cleanup_and_exit(int ret)
-{
-    exit(ret);
-}
-
-void send_statistics(const char *action, const char *action_result, const char *action_data)
+void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data)
 {
     (void)action;
     (void)action_result;
     (void)action_data;
+
+    exit(ret);
 }
 
 // callbacks required by popen()

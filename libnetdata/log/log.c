@@ -5,7 +5,6 @@
 #define SD_JOURNAL_SUPPRESS_LOCATION
 
 #include "../libnetdata.h"
-#include <daemon/main.h>
 
 #ifdef __FreeBSD__
 #include <sys/endian.h>
@@ -2285,7 +2284,6 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
 
     char action_data[70+1];
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
-    char action_result[60+1];
 
     const char *thread_tag = thread_log_fields[NDF_THREAD_TAG].entry.txt;
     if(!thread_tag)
@@ -2299,8 +2297,8 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
     if(strncmp(thread_tag, THREAD_TAG_STREAM_SENDER, strlen(THREAD_TAG_STREAM_SENDER)) == 0)
         tag_to_send = THREAD_TAG_STREAM_SENDER;
 
+    char action_result[60+1];
     snprintfz(action_result, 60, "%s:%s", program_name, tag_to_send);
-    send_statistics("FATAL", action_result, action_data);
 
 #ifdef HAVE_BACKTRACE
     int fd = nd_log.sources[NDLS_DAEMON].fd;
@@ -2319,7 +2317,7 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
     abort();
 #endif
 
-    netdata_cleanup_and_exit(1);
+    netdata_cleanup_and_exit(1, "FATAL", action_result, action_data);
 }
 
 // ----------------------------------------------------------------------------
