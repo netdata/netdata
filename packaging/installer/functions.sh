@@ -235,7 +235,7 @@ check_for_feature() {
 prepare_cmake_options() {
   NETDATA_CMAKE_OPTIONS="-S ./ -B ${NETDATA_BUILD_DIR} ${CMAKE_OPTS} ${NETDATA_PREFIX:+-DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX}} ${NETDATA_USER:+-DNETDATA_USER=${NETDATA_USER}} ${NETDATA_CMAKE_OPTIONS} "
 
-  if [ "${USE_SYSTEM_PROTOBUF}" -eq 1 ]; then
+  if [ "${USE_SYSTEM_PROTOBUF:-1}" -eq 1 ]; then
     enable_feature BUNDLED_PROTOBUF 0
   else
     enable_feature BUNDLED_PROTOBUF 1
@@ -255,9 +255,6 @@ prepare_cmake_options() {
 
   enable_feature PLUGIN_SYSTEMD_JOURNAL "${ENABLE_SYSTEMD_JOURNAL}"
 
-  [ -z "${NETDATA_ENABLE_ML}" ] && NETDATA_ENABLE_ML=1
-  enable_feature ML "${NETDATA_ENABLE_ML}"
-
   if command -v cups-config >/dev/null 2>&1 || check_for_module libcups || check_for_module cups; then
     ENABLE_CUPS=1
   else
@@ -273,16 +270,17 @@ prepare_cmake_options() {
   enable_feature PLUGIN_SLABINFO "${IS_LINUX}"
   enable_feature PLUGIN_CGROUP_NETWORK "${IS_LINUX}"
   enable_feature PLUGIN_LOCAL_LISTENERS "${IS_LINUX}"
-  enable_feature PLUGIN_LOGS_MANAGEMENT "${ENABLE_LOGS_MANAGEMENT}"
-  enable_feature LOGS_MANAGEMENT_TESTS "${ENABLE_LOGS_MANAGEMENT_TESTS}"
+  enable_feature PLUGIN_EBPF "${ENABLE_EBPF:-0}"
+  enable_feature PLUGIN_LOGS_MANAGEMENT "${ENABLE_LOGS_MANAGEMENT:-0}"
+  enable_feature LOGS_MANAGEMENT_TESTS "${ENABLE_LOGS_MANAGEMENT_TESTS:-0}"
 
-  enable_feature ACLK "${ENABLE_CLOUD}"
-  enable_feature CLOUD "${ENABLE_CLOUD}"
-  enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C}"
-  enable_feature BUNDLED_YAML "${BUNDLE_YAML}"
-  enable_feature DBENGINE "${ENABLE_DBENGINE}"
-  enable_feature H2O "${ENABLE_H2O}"
-  enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
+  enable_feature ACLK "${ENABLE_CLOUD:-1}"
+  enable_feature CLOUD "${ENABLE_CLOUD:-1}"
+  enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C:-0}"
+  enable_feature BUNDLED_YAML "${BUNDLE_YAML:-0}"
+  enable_feature DBENGINE "${ENABLE_DBENGINE:-1}"
+  enable_feature H2O "${ENABLE_H2O:-1}"
+  enable_feature ML "${NETDATA_ENABLE_ML:-1}"
 
   ENABLE_APPS=0
 
@@ -292,11 +290,11 @@ prepare_cmake_options() {
 
   enable_feature PLUGIN_APPS "${ENABLE_APPS}"
 
-  check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
-  check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
-  check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
-  check_for_feature PLUGIN_NFACCT "${ENABLE_NFACCT}" libnetfilter_acct libnml
-  check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
+  check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS:-1}" snappy
+  check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB:-1}" libmongoc-1.0
+  check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI:-1}" libipmimonitoring
+  check_for_feature PLUGIN_NFACCT "${ENABLE_NFACCT:-1}" libnetfilter_acct libnml
+  check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT:-1}" xenstat xenlight
 }
 
 # -----------------------------------------------------------------------------

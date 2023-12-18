@@ -119,7 +119,7 @@ scanit() {
   progress "Configuring netdata source..."
   prepare_cmake_options
 
-  run cmake "${NETDATA_CMAKE_OPTIONS}"
+  run cmake ${NETDATA_CMAKE_OPTIONS}
 
   progress "Analyzing netdata..."
   run "${covbuild}" --dir cov-int cmake --build "${NETDATA_BUILD_DIR}" --parallel ${JOBS} -- ${BUILD_OPTS}
