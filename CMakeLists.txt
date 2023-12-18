@@ -1911,10 +1911,10 @@ install(PROGRAMS system/edit-config DESTINATION etc/netdata)
 # TODO: check the following files for correct substitutions
 #
 configure_file(daemon/anonymous-statistics.sh.in daemon/anonymous-statistics.sh @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/daemon/anonymous-statistics.sh DESTINATION usr/libexec/netdata/plugins.d)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/daemon/anonymous-statistics.sh DESTINATION usr/libexec/netdata/plugins.d)
 
 configure_file(daemon/get-kubernetes-labels.sh.in daemon/get-kubernetes-labels.sh @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/daemon/get-kubernetes-labels.sh DESTINATION usr/libexec/netdata/plugins.d)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/daemon/get-kubernetes-labels.sh DESTINATION usr/libexec/netdata/plugins.d)
 
 install(PROGRAMS daemon/system-info.sh
         DESTINATION usr/libexec/netdata/plugins.d)
@@ -1960,7 +1960,7 @@ install(FILES ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
 #
 
 configure_file(collectors/charts.d.plugin/charts.d.plugin.in collectors/charts.d.plugin/charts.d.plugin @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/collectors/charts.d.plugin/charts.d.plugin
+install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/charts.d.plugin/charts.d.plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES collectors/charts.d.plugin/charts.d.dryrun-helper.sh
@@ -1975,7 +1975,7 @@ install(FILES collectors/charts.d.plugin/charts.d.conf
 #
 
 configure_file(collectors/tc.plugin/tc-qos-helper.sh.in collectors/tc.plugin/tc-qos-helper.sh @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/collectors/tc.plugin/tc-qos-helper.sh
+install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/tc.plugin/tc-qos-helper.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 # scripts
@@ -2031,7 +2031,7 @@ endif()
 #
 
 configure_file(collectors/python.d.plugin/python.d.plugin.in collectors/python.d.plugin/python.d.plugin @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/collectors/python.d.plugin/python.d.plugin
+install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/python.d.plugin/python.d.plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(DIRECTORY collectors/python.d.plugin/python_modules
@@ -2142,7 +2142,7 @@ install(FILES collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
 
 # FIXME: don't install this unconditionally
 configure_file(collectors/ioping.plugin/ioping.plugin.in collectors/ioping.plugin/ioping.plugin @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/collectors/ioping.plugin/ioping.plugin DESTINATION usr/libexec/netdata/plugins.d)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/ioping.plugin/ioping.plugin DESTINATION usr/libexec/netdata/plugins.d)
 
 #
 # logs management
