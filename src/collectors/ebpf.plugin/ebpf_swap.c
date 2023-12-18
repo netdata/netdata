@@ -222,11 +222,11 @@ static void ebpf_obsolete_specific_swap_charts(char *type, int update_every);
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_swap_services(ebpf_module_t *em)
+static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
 {
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              id,
                               NETDATA_MEM_SWAP_READ_CHART,
-                              "",
                               "Calls to function swap_readpage.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
@@ -236,8 +236,8 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em)
                               em->update_every);
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              id,
                               NETDATA_MEM_SWAP_WRITE_CHART,
-                              "",
                               "Calls to function swap_writepage.",
                               EBPF_COMMON_DIMENSION_CALL,
                               NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
@@ -257,12 +257,13 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em)
 static inline void ebpf_obsolete_swap_cgroup_charts(ebpf_module_t *em) {
     pthread_mutex_lock(&mutex_cgroup_shm);
 
-    ebpf_obsolete_swap_services(em);
-
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (ect->systemd)
+        if (ect->systemd) {
+            ebpf_obsolete_swap_services(em, ect->name);
+
             continue;
+        }
 
         ebpf_obsolete_specific_swap_charts(ect->name, em->update_every);
     }
@@ -669,21 +670,19 @@ static void ebpf_swap_sum_cgroup_pids(netdata_publish_swap_t *swap, struct pid_o
 static void ebpf_send_systemd_swap_charts()
 {
     ebpf_cgroup_target_t *ect;
-    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_READ_CHART, "");
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.read);
+        if (unlikely((!ect->systemd && !ect->updated)) ) {
+            continue;
         }
-    }
-    ebpf_write_end_chart();
 
-    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_MEM_SWAP_WRITE_CHART, "");
-    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            write_chart_dimension(ect->name, (long long) ect->publish_systemd_swap.write);
-        }
+        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_MEM_SWAP_READ_CHART);
+        write_chart_dimension("calls", (long long) ect->publish_systemd_swap.read);
+        ebpf_write_end_chart();
+
+        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_MEM_SWAP_WRITE_CHART);
+        write_chart_dimension("calls", (long long) ect->publish_systemd_swap.write);
+        ebpf_write_end_chart();
     }
-    ebpf_write_end_chart();
 }
 
 /**
@@ -763,19 +762,45 @@ static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *val
  **/
 static void ebpf_create_systemd_swap_charts(int update_every)
 {
-    ebpf_create_charts_on_systemd(NETDATA_MEM_SWAP_READ_CHART,
-                                  "Calls to swap_readpage.",
-                                  EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
-                                  NETDATA_EBPF_CHART_TYPE_STACKED, 20191,
-                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_SWAP_READ_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_SWAP, update_every);
+    ebpf_systemd_args_t data_read = {
+        .title = "Calls to swap_readpage.",
+        .units = EBPF_COMMON_DIMENSION_CALL,
+        .family = NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+        .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
+        .order = 20191,
+        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .context = NETDATA_SYSTEMD_SWAP_READ_CONTEXT,
+        .module = NETDATA_EBPF_MODULE_NAME_SWAP,
+        .update_every = update_every,
+        .suffix = NETDATA_MEM_SWAP_READ_CHART,
+        .dimension = "calls"
+    };
 
-    ebpf_create_charts_on_systemd(NETDATA_MEM_SWAP_WRITE_CHART,
-                                  "Calls to function swap_writepage.",
-                                  EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
-                                  NETDATA_EBPF_CHART_TYPE_STACKED, 20192,
-                                  ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX], NETDATA_SYSTEMD_SWAP_WRITE_CONTEXT,
-                                  NETDATA_EBPF_MODULE_NAME_SWAP, update_every);
+    ebpf_systemd_args_t data_write = {
+        .title = "Calls to function swap_writepage.",
+        .units = EBPF_COMMON_DIMENSION_CALL,
+        .family = NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+        .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
+        .order = 20192,
+        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .context = NETDATA_SYSTEMD_SWAP_WRITE_CONTEXT,
+        .module = NETDATA_EBPF_MODULE_NAME_SWAP,
+        .update_every = update_every,
+        .suffix = NETDATA_MEM_SWAP_WRITE_CHART,
+        .dimension = "calls"
+    };
+
+    ebpf_cgroup_target_t *w;
+    for (w = ebpf_cgroup_pids; w ; w = w->next) {
+        if (unlikely((!w->systemd && !w->updated)) ) {
+            continue;
+        }
+
+        data_read.id = data_write.id = w->name;
+        ebpf_create_charts_on_systemd(&data_read);
+
+        ebpf_create_charts_on_systemd(&data_write);
+    }
 }
 
 /**
