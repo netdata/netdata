@@ -1121,7 +1121,7 @@ static void ebpf_send_systemd_dc_charts()
 {
     ebpf_cgroup_target_t *ect;
     collected_number value;
-    if (unlikely(ect->systemd) && unlikely(ect->updated)) {
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         if (unlikely((!ect->systemd && !ect->updated)) ) {
             continue;
         }
