@@ -1150,19 +1150,6 @@ static void ebpf_send_systemd_dc_charts()
         write_chart_dimension("files", (long long) value);
         ebpf_write_end_chart();
     }
-
-
-    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART, "");
-    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
-                (long long)ect->publish_dc.curr.not_found - (long long)ect->publish_dc.prev.not_found;
-
-            ect->publish_dc.prev.not_found = ect->publish_dc.curr.not_found;
-
-            write_chart_dimension(ect->name, (long long) value);
-        }
-    }
 }
 
 /**
