@@ -2503,7 +2503,7 @@ static void ebpf_send_systemd_socket_charts()
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if if (unlikely((!ect->systemd && !ect->updated)) ) {
+        if (unlikely((!ect->systemd && !ect->updated)) ) {
             continue;
         }
 

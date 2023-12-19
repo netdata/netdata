@@ -996,7 +996,7 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
         ebpf_create_charts_on_systemd(&task_exit);
 
         ebpf_create_charts_on_systemd(&task_closed);
-        if (em->mode < MODE_ENTRY) {
+        if (mode < MODE_ENTRY) {
             ebpf_create_charts_on_systemd(&task_error);
         }
     }
