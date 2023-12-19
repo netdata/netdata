@@ -17,15 +17,15 @@ BASEPATH = Path('v1')
 URLTEMPLATE = 'https://github.com/netdata/dashboard/releases/download/{0}/dashboard.tar.gz'
 
 CMAKETEMPLATE = '''
-    install(FILES {0} DESTINATION usr/share/netdata/web)
-    install(FILES {1} DESTINATION usr/share/netdata/web/css)
-    install(FILES {2} DESTINATION usr/share/netdata/web/fonts)
-    install(FILES {3} DESTINATION usr/share/netdata/web/images)
-    install(FILES {4} DESTINATION usr/share/netdata/web/lib)
-    install(FILES {5} DESTINATION usr/share/netdata/web/static/css)
-    install(FILES {6} DESTINATION usr/share/netdata/web/static/js)
-    install(FILES {7} DESTINATION usr/share/netdata/web/static/media)
-    install(FILES web/gui/v1/index.html DESTINATION usr/share/netdata/web/v1)
+    install(FILES {0} DESTINATION var/lib/netdata/www)
+    install(FILES {1} DESTINATION var/lib/netdata/www/css)
+    install(FILES {2} DESTINATION var/lib/netdata/www/fonts)
+    install(FILES {3} DESTINATION var/lib/netdata/www/images)
+    install(FILES {4} DESTINATION var/lib/netdata/www/lib)
+    install(FILES {5} DESTINATION var/lib/netdata/www/static/css)
+    install(FILES {6} DESTINATION var/lib/netdata/www/static/js)
+    install(FILES {7} DESTINATION var/lib/netdata/www/static/media)
+    install(FILES web/gui/v1/index.html DESTINATION var/lib/netdata/www/v1)
 '''
 
 def copy_dashboard(tag):
