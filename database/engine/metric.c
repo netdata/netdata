@@ -106,8 +106,11 @@ static inline void mrg_stats_size_judyhs_removed_uuid(MRG *mrg, size_t partition
 
 static inline size_t uuid_partition(MRG *mrg __maybe_unused, uuid_t *uuid) {
     uint8_t *u = (uint8_t *)uuid;
-    size_t *n = (size_t *)&u[UUID_SZ - sizeof(size_t)];
-    return *n % mrg->partitions;
+
+    size_t n;
+    memcpy(&n, &u[UUID_SZ - sizeof(size_t)], sizeof(size_t));
+
+    return n % mrg->partitions;
 }
 
 static inline time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, METRIC *metric) {

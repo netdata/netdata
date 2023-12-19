@@ -147,6 +147,7 @@ extern Word_t   j__udyLLeaf7ToLeafW(Pjlw_t,     Pjv_t, Pjp_t, Word_t, Pvoid_t);
 
 DBGCODE(uint8_t parentJPtype;)          // parent branch JP type.
 
+__attribute__((no_sanitize("shift")))
 FUNCTION static int j__udyDelWalk(
         Pjp_t   Pjp,            // current JP under which to delete.
         Word_t  Index,          // to delete.

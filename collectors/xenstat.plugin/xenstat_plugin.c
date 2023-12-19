@@ -1032,10 +1032,7 @@ int main(int argc, char **argv) {
         if(unlikely(netdata_exit)) break;
 
         if(unlikely(debug && iteration))
-            fprintf(stderr, "xenstat.plugin: iteration %zu, dt %llu usec\n"
-                    , iteration
-                    , dt
-            );
+            fprintf(stderr, "xenstat.plugin: iteration %zu, dt %lu usec\n", iteration, dt);
 
         if(likely(xhandle)) {
             if(unlikely(debug)) fprintf(stderr, "xenstat.plugin: calling xenstat_collect()\n");
