@@ -106,9 +106,9 @@ web/gui/v2/registry-access.html
 web/gui/v2/registry-alert-redirect.html
 web/gui/v2/registry-hello.html
 web/gui/v2/runtime.74551d83062ac1b566cc.js
-web/gui/v2/sw.js DESTINATION usr/share/netdata/web/v2)
+web/gui/v2/sw.js DESTINATION ${WEB_DEST}/v2)
     install(FILES web/gui/v2/static/apple-app-site-association
-web/gui/v2/static/splash.css DESTINATION usr/share/netdata/web/v2/static)
+web/gui/v2/static/splash.css DESTINATION ${WEB_DEST}/v2/static)
     install(FILES web/gui/v2/static/email/img/clea_badge.png
 web/gui/v2/static/email/img/clea_siren.png
 web/gui/v2/static/email/img/community_icon.png
@@ -124,12 +124,12 @@ web/gui/v2/static/email/img/label_recovered.png
 web/gui/v2/static/email/img/label_warning.png
 web/gui/v2/static/email/img/reachability_siren.png
 web/gui/v2/static/email/img/warn_badge.png
-web/gui/v2/static/email/img/warn_siren.png DESTINATION usr/share/netdata/web/v2/static/email/img)
+web/gui/v2/static/email/img/warn_siren.png DESTINATION ${WEB_DEST}/v2/static/email/img)
     install(FILES web/gui/v2/static/img/list-style-image.svg
 web/gui/v2/static/img/new-dashboard.svg
 web/gui/v2/static/img/no-filter-results.png
 web/gui/v2/static/img/no-nodes-room.svg
-web/gui/v2/static/img/rack.png DESTINATION usr/share/netdata/web/v2/static/img)
+web/gui/v2/static/img/rack.png DESTINATION ${WEB_DEST}/v2/static/img)
     install(FILES web/gui/v2/static/img/logos/os/alpine.svg
 web/gui/v2/static/img/logos/os/arch.svg
 web/gui/v2/static/img/logos/os/centos.svg
@@ -155,7 +155,7 @@ web/gui/v2/static/img/logos/os/raspberry-pi.svg
 web/gui/v2/static/img/logos/os/redhat.svg
 web/gui/v2/static/img/logos/os/rocky.svg
 web/gui/v2/static/img/logos/os/suse.svg
-web/gui/v2/static/img/logos/os/ubuntu.svg DESTINATION usr/share/netdata/web/v2/static/img/logos/os)
+web/gui/v2/static/img/logos/os/ubuntu.svg DESTINATION ${WEB_DEST}/v2/static/img/logos/os)
     install(FILES web/gui/v2/static/img/logos/services/access-point.svg
 web/gui/v2/static/img/logos/services/activemq.svg
 web/gui/v2/static/img/logos/services/adaptec.svg
@@ -282,14 +282,14 @@ web/gui/v2/static/img/logos/services/unbound.svg
 web/gui/v2/static/img/logos/services/uwsgi.svg
 web/gui/v2/static/img/logos/services/varnish.svg
 web/gui/v2/static/img/logos/services/veritas.svg
-web/gui/v2/static/img/logos/services/xen.svg DESTINATION usr/share/netdata/web/v2/static/img/logos/services)
+web/gui/v2/static/img/logos/services/xen.svg DESTINATION ${WEB_DEST}/v2/static/img/logos/services)
     install(FILES web/gui/v2/static/img/mail/isotype.png
 web/gui/v2/static/img/mail/isotype.svg
 web/gui/v2/static/img/mail/logotype.png
-web/gui/v2/static/img/mail/logotype.svg DESTINATION usr/share/netdata/web/v2/static/img/mail)
+web/gui/v2/static/img/mail/logotype.svg DESTINATION ${WEB_DEST}/v2/static/img/mail)
     install(FILES web/gui/v2/static/site/pages/holding-page-503/holding-page-503.css
 web/gui/v2/static/site/pages/holding-page-503/holding-page-503.svg
 web/gui/v2/static/site/pages/holding-page-503/index.html
 web/gui/v2/static/site/pages/holding-page-503/multiple-logos-group.svg
 web/gui/v2/static/site/pages/holding-page-503/netdata-logo-white.svg
-web/gui/v2/static/site/pages/holding-page-503/reset.svg DESTINATION usr/share/netdata/web/v2/static/site/pages/holding-page-503)
+web/gui/v2/static/site/pages/holding-page-503/reset.svg DESTINATION ${WEB_DEST}/v2/static/site/pages/holding-page-503)
