@@ -2337,135 +2337,141 @@ static void ebpf_send_specific_socket_data(char *type, ebpf_socket_publish_apps_
  **/
 static void ebpf_create_systemd_socket_charts(int update_every)
 {
-    ebpf_systemd_args_t data_tcp_v4 = {
+    static ebpf_systemd_args_t data_tcp_v4 = {
         .title = "Calls to tcp_v4_connection",
         .units = EBPF_COMMON_DIMENSION_CONNECTIONS,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20080,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_NET_APPS_CONNECTION_TCP_V4,
         .dimension = "connections"
     };
 
-    ebpf_systemd_args_t data_tcp_v6 = {
+    static ebpf_systemd_args_t data_tcp_v6 = {
         .title = "Calls to tcp_v6_connection",
         .units = EBPF_COMMON_DIMENSION_CONNECTIONS,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20081,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_NET_APPS_CONNECTION_TCP_V6,
         .dimension = "connections"
     };
 
-    ebpf_systemd_args_t data_bandwith_recv = {
+    static ebpf_systemd_args_t data_bandwith_recv = {
         .title = "Bytes received",
         .units = EBPF_COMMON_DIMENSION_BITS,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20082,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_RECV,
         .dimension = "bits"
     };
 
-    ebpf_systemd_args_t data_bandwith_sent = {
+    static ebpf_systemd_args_t data_bandwith_sent = {
         .title = "Bytes sent",
         .units = EBPF_COMMON_DIMENSION_BITS,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20083,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_SENT,
         .dimension = "bits"
     };
 
-    ebpf_systemd_args_t data_tcp_cleanup = {
+    static ebpf_systemd_args_t data_tcp_cleanup = {
         .title = "Calls to tcp_cleanup_rbuf.",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20084,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_tcp_sendmsg = {
+    static ebpf_systemd_args_t data_tcp_sendmsg = {
         .title = "Calls to tcp_sendmsg.",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20085,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_tcp_retransmit = {
+    static ebpf_systemd_args_t data_tcp_retransmit = {
         .title = "Calls to tcp_retransmit",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20086,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_udp_send = {
+    static ebpf_systemd_args_t data_udp_send = {
         .title = "Calls to udp_sendmsg",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20087,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_udp_recv = {
+    static ebpf_systemd_args_t data_udp_recv = {
         .title = "Calls to udp_recvmsg",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_APPS_NET_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20088,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SOCKET,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
         .dimension = "calls"
     };
 
+    if (!data_tcp_v4.update_every)
+        data_tcp_v4.update_every = data_tcp_v6.update_every = data_bandwith_recv.update_every =
+        data_bandwith_sent.update_every = data_tcp_cleanup.update_every = data_tcp_sendmsg.update_every =
+        data_tcp_retransmit.update_every = data_udp_send.update_every = data_udp_recv.update_every = update_every;
+
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w ; w = w->next) {
-        if (unlikely((!w->systemd && !w->updated))) {
+        if (unlikely((!w->systemd && !w->updated)) ||
+            unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART)))) {
             continue;
         }
 
@@ -2490,8 +2496,9 @@ static void ebpf_create_systemd_socket_charts(int update_every)
         ebpf_create_charts_on_systemd(&data_udp_recv);
 
         ebpf_create_charts_on_systemd(&data_udp_send);
-    }
 
+        w->flags |= NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART;
+    }
 }
 
 /**
@@ -2568,17 +2575,13 @@ void ebpf_socket_update_cgroup_algorithm()
 */
 static void ebpf_socket_send_cgroup_data(int update_every)
 {
-    if (!ebpf_cgroup_pids)
-        return;
-
     pthread_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         ebpf_socket_sum_cgroup_pids(&ect->publish_socket, ect->pids);
     }
 
-    int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
-    if (has_systemd) {
+    if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_socket_charts(update_every);
         }
@@ -2655,7 +2658,7 @@ static void socket_collector(ebpf_module_t *em)
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data();
 
-        if (cgroups)
+        if (cgroups && shm_ebpf_cgroup.header && ebpf_cgroup_pids)
             ebpf_socket_send_cgroup_data(update_every);
 
         fflush(stdout);
