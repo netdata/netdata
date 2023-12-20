@@ -1,6 +1,6 @@
 # Creating Alerts with Netdata Alerts Configuration Manager
 
-The Netdata Alerts Configuration Manager enables users with `Business subscriptions` to create alerts from the Netdata Dashboard with an intuitive user interface. 
+The Netdata Alerts Configuration Manager enables users with [Business subscriptions](https://www.netdata.cloud/pricing/) to create alerts from the Netdata Dashboard with an intuitive user interface. 
 
 ## Using Alerts Configuration Manager
 
