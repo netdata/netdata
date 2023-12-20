@@ -12,7 +12,7 @@ The Netdata Alerts Configuration Manager enables users to create alerts from the
 - Alert Configuration Manager will open up with the `default` thresholds. Modify the configuration as required and the alert definition on the right will be updated dynamically.
 ![Alert Configuration Modal](https://github.com/netdata/netdata/assets/96257330/ce39ae64-2ffe-4576-8c92-b7918bb8c91c)
 
-- Use the `Advance Options` for more fine grained definition of the Alerts Configuration
+- If you want more fine grained control or access to more advanced settings, enable `Show advanced` 
 ![Advance Options](https://github.com/netdata/netdata/assets/96257330/b409b31b-6dc7-484c-a2a4-4e5e471d029b)
 
 - Copy the `Alert Configuration` that is generated on the right side of the modal and add it to an existing [health configuration file](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#edit-health-configuration-files) or a new custom file under `<path to netdata install>/etc/netdata/health.d/` on a `Parent Agent` or a `Standalone Child Agent`.
