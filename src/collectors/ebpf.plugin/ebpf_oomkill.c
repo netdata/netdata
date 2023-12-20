@@ -278,7 +278,7 @@ static void ebpf_send_systemd_oomkill_charts()
             continue;
         }
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name,  NETDATA_OOMKILL_CHART);
-        write_chart_dimension(ect->name, (long long) ect->oomkill);
+        write_chart_dimension("oom", (long long) ect->oomkill);
         ect->oomkill = 0;
         ebpf_write_end_chart();
     }
