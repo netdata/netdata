@@ -2515,41 +2515,41 @@ static void ebpf_send_systemd_socket_charts()
         }
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_CONNECTION_TCP_V4);
-        write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_v4_connection);
+        write_chart_dimension("connections", (long long)ect->publish_socket.call_tcp_v4_connection);
         ebpf_write_end_chart();
 
         if (tcp_v6_connect_address.type == 'T') {
             ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_CONNECTION_TCP_V6);
-            write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_v6_connection);
+            write_chart_dimension("connections", (long long)ect->publish_socket.call_tcp_v6_connection);
             ebpf_write_end_chart();
         }
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_SENT);
-        write_chart_dimension(ect->name, (long long)ect->publish_socket.bytes_sent);
+        write_chart_dimension("bits", (long long)ect->publish_socket.bytes_sent);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_RECV);
-        write_chart_dimension(ect->name, (long long)ect->publish_socket.bytes_received);
+        write_chart_dimension("bits", (long long)ect->publish_socket.bytes_received);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS);
-        write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_sent);
+        write_chart_dimension("calls", (long long)ect->publish_socket.call_tcp_sent);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS);
-        write_chart_dimension(ect->name, (long long)ect->publish_socket.call_tcp_received);
+        write_chart_dimension("calls", (long long)ect->publish_socket.call_tcp_received);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT);
-        write_chart_dimension(ect->name, (long long)ect->publish_socket.retransmit);
+        write_chart_dimension("calls", (long long)ect->publish_socket.retransmit);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS);
-        write_chart_dimension(ect->name, (long long)ect->publish_socket.call_udp_sent);
+        write_chart_dimension("calls", (long long)ect->publish_socket.call_udp_sent);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS);
-        write_chart_dimension(ect->name, (long long)ect->publish_socket.call_udp_received);
+        write_chart_dimension("calls", (long long)ect->publish_socket.call_udp_received);
         ebpf_write_end_chart();
     }
 }
