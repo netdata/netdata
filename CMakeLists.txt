@@ -1746,6 +1746,7 @@ set(LOG_DIR "${CMAKE_INSTALL_PREFIX}/var/log/netdata")
 set(PLUGINS_DIR "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d")
 set(VARLIB_DIR "${CMAKE_INSTALL_PREFIX}/var/lib/netdata")
 
+# A non-default value is only used when building Debian packages (/var/lib/netdata/www)
 if(NOT DEFINED WEB_DIR)
   set(WEB_DIR "usr/share/netdata/web")
 else()
