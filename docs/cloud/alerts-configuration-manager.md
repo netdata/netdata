@@ -9,7 +9,7 @@ The Netdata Alerts Configuration Manager enables users to create alerts from the
 - Click the `Alert icon` on the top right corner of the chart.
 ![Alert Icon](https://github.com/netdata/netdata/assets/96257330/88bb4e86-cbc7-4e01-9c84-6b901188c0de)
 
-- Alert Configuration Modal will open up with `default` thresholds. Modify the Configurations as per need and the alert configuration dialog on the right will be updated dynamically.
+- Alert Configuration Manager will open up with the `default` thresholds. Modify the configuration as required and the alert definition on the right will be updated dynamically.
 ![Alert Configuration Modal](https://github.com/netdata/netdata/assets/96257330/ce39ae64-2ffe-4576-8c92-b7918bb8c91c)
 
 - Use the `Advance Options` for more fine grained definition of the Alerts Configuration
