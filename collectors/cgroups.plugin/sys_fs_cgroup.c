@@ -418,6 +418,8 @@ void read_cgroup_plugin_configuration() {
 
                        " !*/init.scope "                      // ignore init.scope
                        " !/system.slice/run-*.scope "         // ignore system.slice/run-XXXX.scope
+                       " *user.slice/docker-*"                // allow docker rootless containers
+                       " !*user.slice*"                       // ignore the rest stuff in user.slice 
                        " *.scope "                            // we need all other *.scope for sure
 
                        // ----------------------------------------------------------------
@@ -475,7 +477,6 @@ void read_cgroup_plugin_configuration() {
                        " !/system "
                        " !/systemd "
                        " !/user "
-                       " !/user.slice "
                        " !/lxc/*/* "                          //  #2161 #2649
                        " !/lxc.monitor "
                        " !/lxc.payload/*/* "
