@@ -1111,7 +1111,7 @@ static void ebpf_send_systemd_fd_charts(ebpf_module_t *em)
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely((!ect->systemd && !ect->updated)) ) {
+        if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_FD_CHART)) ) {
             continue;
         }
 
