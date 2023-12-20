@@ -25,7 +25,7 @@ jobs:
       - name: Update Files
         id: update
         run: |
-          web/gui/bundle_dashboard_v1.py ${{ github.event.inputs.dashboard_version }}
+          web/gui/cmake_dashboard_v1.py ${{ github.event.inputs.dashboard_version }}
       - name: Create Pull Request
         id: pr
         uses: peter-evans/create-pull-request@v5
