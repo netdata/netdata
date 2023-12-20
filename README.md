@@ -64,10 +64,10 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 ---
 <p align="center">
-<a href="https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf#gh-light-mode-only">
+<a href="https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf#gh-dark-mode-only">
   <img src="https://www.netdata.cloud/img/readme-images/Energy-efficiency.jpg" alt="Energy Efficiency" width="850"/>
 </a>
-<a href="https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf#gh-dark-mode-only">
+<a href="https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf#gh-light-mode-only">
   <img src="https://www.netdata.cloud/img/readme-images/Energy-efficiency-light.jpg" alt="Energy efficiency" width="850"/>
 </a>
 </p>
