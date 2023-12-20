@@ -55,6 +55,7 @@ override_dh_auto_configure:
 	fi
 	dh_auto_configure -- -G Ninja \
 		-DCMAKE_INSTALL_PREFIX=/ \
+		-DWEB_DIR=/var/lib/netdata/www \
 		-DENABLE_ACLK=On \
 		-DENABLE_CLOUD=On \
 		-DENABLE_DBENGINE=On \

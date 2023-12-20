@@ -23,14 +23,14 @@ TMPPATH = Path('tmp')
 URLSRC = 'https://app.netdata.cloud/agent.tar.gz'
 
 CMAKETEMPLATE = '''
-    install(FILES {0} DESTINATION usr/share/netdata/web/v2)
-    install(FILES {1} DESTINATION usr/share/netdata/web/v2/static)
-    install(FILES {2} DESTINATION usr/share/netdata/web/v2/static/email/img)
-    install(FILES {3} DESTINATION usr/share/netdata/web/v2/static/img)
-    install(FILES {4} DESTINATION usr/share/netdata/web/v2/static/img/logos/os)
-    install(FILES {5} DESTINATION usr/share/netdata/web/v2/static/img/logos/services)
-    install(FILES {6} DESTINATION usr/share/netdata/web/v2/static/img/mail)
-    install(FILES {7} DESTINATION usr/share/netdata/web/v2/static/site/pages/holding-page-503)
+    install(FILES {0} DESTINATION ${WEB_DEST}/v2)
+    install(FILES {1} DESTINATION ${WEB_DEST}/v2/static)
+    install(FILES {2} DESTINATION ${WEB_DEST}/v2/static/email/img)
+    install(FILES {3} DESTINATION ${WEB_DEST}/v2/static/img)
+    install(FILES {4} DESTINATION ${WEB_DEST}/v2/static/img/logos/os)
+    install(FILES {5} DESTINATION ${WEB_DEST}/v2/static/img/logos/services)
+    install(FILES {6} DESTINATION ${WEB_DEST}/v2/static/img/mail)
+    install(FILES {7} DESTINATION ${WEB_DEST}/v2/static/site/pages/holding-page-503)
 '''
 
 def copy_dashboard():

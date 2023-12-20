@@ -1744,8 +1744,17 @@ set(CONFIG_DIR "${CMAKE_INSTALL_PREFIX}/etc/netdata")
 set(LIBCONFIG_DIR "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/conf.d")
 set(LOG_DIR "${CMAKE_INSTALL_PREFIX}/var/log/netdata")
 set(PLUGINS_DIR "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d")
-set(WEB_DIR "${CMAKE_INSTALL_PREFIX}/usr/share/netdata/web")
 set(VARLIB_DIR "${CMAKE_INSTALL_PREFIX}/var/lib/netdata")
+
+# A non-default value is only used when building Debian packages (/var/lib/netdata/www)
+if(NOT DEFINED WEB_DIR)
+  set(WEB_DIR "usr/share/netdata/web")
+else()
+  string(REGEX REPLACE "^/" "" WEB_DIR "${WEB_DIR}")
+endif()
+set(WEB_DEST "${WEB_DIR}")
+set(WEB_DIR "${CMAKE_INSTALL_PREFIX}/${WEB_DEST}")
+
 
 set(CONFIGURE_COMMAND "dummy-configure-command")
 if (NOT NETDATA_USER)
@@ -1777,7 +1786,7 @@ install(DIRECTORY DESTINATION etc/netdata/ssl)
 install(DIRECTORY DESTINATION etc/netdata/statsd.d)
 install(DIRECTORY DESTINATION usr/lib/netdata/conf.d)
 install(DIRECTORY DESTINATION usr/libexec/netdata/plugins.d)
-install(DIRECTORY DESTINATION usr/share/netdata/web)
+install(DIRECTORY DESTINATION ${WEB_DEST})
 
 set(libsysdir_POST "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/system")
 set(pkglibexecdir_POST "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata")
@@ -1852,7 +1861,7 @@ install(FILES streaming/stream.conf
 #
 install(FILES web/api/netdata-swagger.json
               web/api/netdata-swagger.yaml
-        DESTINATION usr/share/netdata/web)
+        DESTINATION ${WEB_DEST})
 
 #
 # service files
@@ -2175,7 +2184,7 @@ endforeach()
 configure_file(${CMAKE_BINARY_DIR}/dashboard.js.in
                ${CMAKE_BINARY_DIR}/dashboard.js COPYONLY)
 
-install(FILES ${CMAKE_BINARY_DIR}/dashboard.js DESTINATION usr/share/netdata/web)
+install(FILES ${CMAKE_BINARY_DIR}/dashboard.js DESTINATION ${WEB_DEST})
 
 install(FILES web/gui/dashboard_info_custom_example.js
               web/gui/dashboard_info.js
@@ -2187,19 +2196,19 @@ install(FILES web/gui/dashboard_info_custom_example.js
               web/gui/registry-hello.html
               web/gui/switch.html
               web/gui/ilove.html
-        DESTINATION usr/share/netdata/web)
+        DESTINATION ${WEB_DEST})
 
-install(FILES web/gui/old/index.html DESTINATION usr/share/netdata/web/old)
+install(FILES web/gui/old/index.html DESTINATION ${WEB_DEST}/old)
 
-install(FILES web/gui/static/img/netdata-logomark.svg DESTINATION usr/share/netdata/web/static/img)
+install(FILES web/gui/static/img/netdata-logomark.svg DESTINATION ${WEB_DEST}/static/img)
 
 install(FILES web/gui/css/morris-0.5.1.css
               web/gui/css/c3-0.4.18.min.css
-        DESTINATION usr/share/netdata/web/css)
+        DESTINATION ${WEB_DEST}/css)
 
 install(FILES web/gui/.well-known/dnt/cookies
-        DESTINATION usr/share/netdata/web/.well-known/dnt)
+        DESTINATION ${WEB_DEST}/.well-known/dnt)
 
 # v0 dashboard
 install(FILES web/gui/v0/index.html
-        DESTINATION usr/share/netdata/web/v0)
+        DESTINATION ${WEB_DEST}/v0)
