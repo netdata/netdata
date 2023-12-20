@@ -10,14 +10,9 @@
 AutoReqProv: yes
 
 # This is temporary and should eventually be resolved. This bypasses
-# the default rhel __os_install_p,ost which throws a python compile
+# the default rhel __os_install_post which throws a python compile
 # error.
 %global __os_install_post %{nil}
-
-# We don’t want LTO as it has a minimal performance impact at runtime
-# but a huge impact on build times (we want our CI to not take multiple
-# hours to finish).
-%global _lto_cflags %nil
 
 # Use our custom CMake version from our package builders if we can’t find cmake.
 %if 0%{?centos_ver} == 7
@@ -444,48 +439,6 @@ install -m 755 -p packaging/installer/%{name}-updater.sh "${RPM_BUILD_ROOT}%{_li
 # logrotate settings
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
 install -m 644 -p "%{__cmake_builddir}/system/logrotate/%{name}" "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
-
-# ###########################################################
-# Install freeipmi
-#%if 0%{?_have_freeipmi}
-#install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
-#%endif
-
-# ###########################################################
-# Install apps.plugin
-#install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/apps.plugin"
-
-# ###########################################################
-# Install debugfs.plugin
-#install -m 0750 -p debugfs.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/debugfs.plugin"
-
-# ###########################################################
-# Install systemd-journal.plugin
-#install -m 4750 -p systemd-journal.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/systemd-journal.plugin"
-
-# ###########################################################
-# Install logs-management.plugin
-#install -m 4750 -p logs-management.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/logs-management.plugin"
-
-# ###########################################################
-# Install perf.plugin
-#install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
-
-# ###########################################################
-# Install ebpf.plugin
-#%if 0%{?_have_ebpf}
-#install -m 4750 -p ebpf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/ebpf.plugin"
-#%endif
-
-# ###########################################################
-# Install cups.plugin
-#%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
-#install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/cups.plugin"
-#%endif
-
-# ###########################################################
-# Install slabinfo.plugin
-#install -m 4750 -p slabinfo.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/slabinfo.plugin"
 
 # ###########################################################
 # Install cache and log directories
