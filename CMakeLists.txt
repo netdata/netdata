@@ -109,6 +109,40 @@ option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
 #
+# handling of extra compiler flags
+#
+
+include(CheckCCompilerFlag)
+
+option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" False)
+
+set(EXTRA_HARDENING_FLAGS "")
+
+if(NOT ${DISABLE_HARDENING})
+        check_c_compiler_flag("-fstack-protector-strong" HAVE_STACK_PROTECTOR_STRONG_FLAG)
+        if(HAVE_STACK_PROTECTOR_STRONG_FLAG)
+                set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fstack-protector-strong")
+        else()
+                check_c_compiler_flag("-fstack-protector" HAVE_STACK_PROTECTOR)
+                if(HAVE_STACK_PROTECTOR)
+                        set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fstack-protector")
+                endif()
+        endif()
+endif()
+
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${EXTRA_HARDEN_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${EXTRA_HARDEN_FLAGS}")
+
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${EXTRA_HARDEN_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${EXTRA_HARDEN_FLAGS}")
+
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} ${EXTRA_HARDEN_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${EXTRA_HARDEN_FLAGS}")
+
+set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} ${EXTRA_HARDEN_FLAGS}")
+set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} ${EXTRA_HARDEN_FLAGS}")
+
+#
 # detect OS
 #
 
