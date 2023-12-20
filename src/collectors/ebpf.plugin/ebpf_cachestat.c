@@ -1115,65 +1115,70 @@ void ebpf_cachestat_calc_chart_values()
  **/
 static void ebpf_create_systemd_cachestat_charts(int update_every)
 {
-    ebpf_systemd_args_t data_hit_ratio = {
+    static ebpf_systemd_args_t data_hit_ratio = {
         .title = "Hit ratio",
         .units = EBPF_COMMON_DIMENSION_PERCENTAGE,
         .family = NETDATA_CACHESTAT_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21100,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_ABSOLUTE,
         .context = NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_CACHESTAT,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_CACHESTAT_HIT_RATIO_CHART,
         .dimension = "percentage"
     };
 
-    ebpf_systemd_args_t data_dirty = {
+    static ebpf_systemd_args_t data_dirty = {
         .title = "Number of dirty pages",
         .units = EBPF_CACHESTAT_DIMENSION_PAGE,
         .family = NETDATA_CACHESTAT_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21101,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_ABSOLUTE,
         .context = NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_CACHESTAT,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_CACHESTAT_DIRTY_CHART,
         .dimension = "pages"
     };
 
-    ebpf_systemd_args_t data_hit = {
+    static ebpf_systemd_args_t data_hit = {
         .title = "Number of accessed pages",
         .units = EBPF_CACHESTAT_DIMENSION_HITS,
         .family = NETDATA_CACHESTAT_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21102,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_ABSOLUTE,
         .context = NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_CACHESTAT,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_CACHESTAT_HIT_CHART,
         .dimension = "hits"
     };
 
-    ebpf_systemd_args_t data_miss = {
+    static ebpf_systemd_args_t data_miss = {
         .title = "Files out of page cache",
         .units = EBPF_CACHESTAT_DIMENSION_MISSES,
         .family = NETDATA_CACHESTAT_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
         .order = 21103,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_ABSOLUTE,
         .context = NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_CACHESTAT,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_CACHESTAT_MISSES_CHART,
         .dimension = "misses"
     };
 
+    if (!data_miss.update_every)
+        data_hit_ratio.update_every = data_dirty.update_every =
+        data_hit.update_every = data_miss.update_every = update_every;
+
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely((!w->systemd && !w->updated)))
+        if (unlikely((!w->systemd && !w->updated)) ||
+            unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_CACHESTAT_CHART))))
             continue;
 
         data_hit_ratio.id = data_dirty.id = data_hit.id = data_miss.id = w->name;
@@ -1184,6 +1189,8 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
         ebpf_create_charts_on_systemd(&data_hit);
 
         ebpf_create_charts_on_systemd(&data_miss);
+
+        w->flags |= NETDATA_EBPF_SERVICES_HAS_CACHESTAT_CHART;
     }
 }
 
@@ -1197,7 +1204,7 @@ static void ebpf_send_systemd_cachestat_charts()
     ebpf_cgroup_target_t *ect;
 
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (unlikely((!ect->systemd && !ect->updated)) ) {
+        if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_CACHESTAT_CHART)) ) {
             continue;
         }
 
@@ -1335,15 +1342,11 @@ static void ebpf_obsolete_specific_cachestat_charts(char *type, int update_every
 */
 void ebpf_cachestat_send_cgroup_data(int update_every)
 {
-    if (!ebpf_cgroup_pids)
-        return;
-
     pthread_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
     ebpf_cachestat_calc_chart_values();
 
-    int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
-    if (has_systemd) {
+    if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_cachestat_charts(update_every);
         }
