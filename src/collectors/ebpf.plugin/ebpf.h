@@ -341,6 +341,9 @@ void ebpf_pid_file(char *filename, size_t length);
 #define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
 #define EBPF_COMMON_DIMENSION_KILLS "kills"
 
+#define EBPF_CHART_ALGORITHM_ABSOLUTE "absolute"
+#define EBPF_CHART_ALGORITHM_INCREMENTAL "incremental"
+
 // Common variables
 extern int debug_enabled;
 extern struct ebpf_pid_stat *ebpf_root_of_pids;
