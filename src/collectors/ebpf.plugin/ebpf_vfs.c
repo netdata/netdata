@@ -1625,193 +1625,199 @@ static void ebpf_send_specific_vfs_data(char *type, netdata_publish_vfs_t *value
  **/
 static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
 {
-    int update_every = em->update_every;
-
-    ebpf_systemd_args_t data_vfs_unlink = {
+    static ebpf_systemd_args_t data_vfs_unlink = {
         .title = "Files deleted",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20065,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_UNLINK_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_FILE_DELETED,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_write = {
+    static ebpf_systemd_args_t data_vfs_write = {
         .title = "Write to disk",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20066,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_WRITE_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_write_err = {
+    static ebpf_systemd_args_t data_vfs_write_err = {
         .title = "Fails to write",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20067,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_WRITE_ERROR_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_read = {
+    static ebpf_systemd_args_t data_vfs_read = {
         .title = "Read from disk",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20068,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_READ_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_READ_CALLS,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_read_err = {
+    static ebpf_systemd_args_t data_vfs_read_err = {
         .title = "Fails to read",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20069,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_READ_ERROR_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_write_bytes = {
+    static ebpf_systemd_args_t data_vfs_write_bytes = {
         .title = "Bytes written on disk",
         .units = EBPF_COMMON_DIMENSION_BYTES,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20070,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_WRITE_BYTES_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES,
         .dimension = "bytes"
     };
 
-    ebpf_systemd_args_t data_vfs_read_bytes = {
+    static ebpf_systemd_args_t data_vfs_read_bytes = {
         .title = "Bytes read from disk",
         .units = EBPF_COMMON_DIMENSION_BYTES,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20071,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_READ_BYTES_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_READ_BYTES,
         .dimension = "bytes"
     };
 
-    ebpf_systemd_args_t data_vfs_fsync = {
+    static ebpf_systemd_args_t data_vfs_fsync = {
         .title = "Calls to vfs_fsync.",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20072,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_FSYNC_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_FSYNC,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_fsync_err = {
+    static ebpf_systemd_args_t data_vfs_fsync_err = {
         .title = "Sync error",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20073,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_FSYNC_ERROR_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_open = {
+    static ebpf_systemd_args_t data_vfs_open = {
         .title = "Calls to vfs_open.",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20074,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_OPEN_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_OPEN,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_open_err = {
+    static ebpf_systemd_args_t data_vfs_open_err = {
         .title = "Open error",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20075,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_OPEN_ERROR_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_create = {
+    static ebpf_systemd_args_t data_vfs_create = {
         .title = "Calls to vfs_create.",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20076,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_CREATE_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_CREATE,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_vfs_create_err = {
+    static ebpf_systemd_args_t data_vfs_create_err = {
         .title = "Create error",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_VFS_CGROUP_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20077,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_VFS_CREATE_ERROR_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_VFS,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR,
         .dimension = "calls"
     };
 
+    if (!data_vfs_create.update_every)
+        data_vfs_unlink.update_every = data_vfs_write.update_every = data_vfs_write_err.update_every =
+        data_vfs_read.update_every = data_vfs_read_err.update_every = data_vfs_write_bytes.update_every =
+        data_vfs_read_bytes.update_every = data_vfs_fsync.update_every = data_vfs_fsync_err.update_every =
+        data_vfs_open.update_every = data_vfs_open_err.update_every = data_vfs_create.update_every =
+        data_vfs_create_err.update_every = em->update_every;
+
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w ; w = w->next) {
-        if (unlikely((!w->systemd && !w->updated))) {
+        if (unlikely((!w->systemd && !w->updated)) ||
+            unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_VFS_CHART)))) {
             continue;
         }
 
@@ -1848,6 +1854,8 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
         if (em->mode < MODE_ENTRY) {
             ebpf_create_charts_on_systemd(&data_vfs_create_err);
         }
+
+        w->flags |= NETDATA_EBPF_SERVICES_HAS_VFS_CHART;
     }
 }
 
@@ -1862,75 +1870,75 @@ static void ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
 {
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely((!ect->systemd && !ect->updated)) ) {
+        if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_VFS_CHART)) ) {
             continue;
         }
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_FILE_DELETED);
-        write_chart_dimension(ect->name, ect->publish_systemd_vfs.unlink_call);
+        write_chart_dimension("calls", ect->publish_systemd_vfs.unlink_call);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS);
-        write_chart_dimension(ect->name, ect->publish_systemd_vfs.write_call +
+        write_chart_dimension("calls", ect->publish_systemd_vfs.write_call +
                                          ect->publish_systemd_vfs.writev_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS_ERROR);
-            write_chart_dimension(ect->name, ect->publish_systemd_vfs.write_err +
+            write_chart_dimension("calls", ect->publish_systemd_vfs.write_err +
                                              ect->publish_systemd_vfs.writev_err);
             ebpf_write_end_chart();
         }
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_READ_CALLS);
-        write_chart_dimension(ect->name, ect->publish_systemd_vfs.read_call +
+        write_chart_dimension("calls", ect->publish_systemd_vfs.read_call +
                                          ect->publish_systemd_vfs.readv_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_READ_CALLS_ERROR);
-            write_chart_dimension(ect->name, ect->publish_systemd_vfs.read_err +
+            write_chart_dimension("calls", ect->publish_systemd_vfs.read_err +
                                              ect->publish_systemd_vfs.readv_err);
             ebpf_write_end_chart();
         }
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_WRITE_BYTES);
-        write_chart_dimension(ect->name, ect->publish_systemd_vfs.write_bytes +
+        write_chart_dimension("bytes", ect->publish_systemd_vfs.write_bytes +
                                          ect->publish_systemd_vfs.writev_bytes);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_READ_BYTES);
-        write_chart_dimension(ect->name, ect->publish_systemd_vfs.read_bytes +
+        write_chart_dimension("bytes", ect->publish_systemd_vfs.read_bytes +
                                          ect->publish_systemd_vfs.readv_bytes);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_FSYNC);
-        write_chart_dimension(ect->name, ect->publish_systemd_vfs.fsync_call);
+        write_chart_dimension("calls", ect->publish_systemd_vfs.fsync_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_FSYNC_CALLS_ERROR);
-            write_chart_dimension(ect->name, ect->publish_systemd_vfs.fsync_err);
+            write_chart_dimension("calls", ect->publish_systemd_vfs.fsync_err);
             ebpf_write_end_chart();
         }
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_OPEN);
-        write_chart_dimension(ect->name, ect->publish_systemd_vfs.open_call);
+        write_chart_dimension("calls", ect->publish_systemd_vfs.open_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_OPEN_CALLS_ERROR);
-            write_chart_dimension(ect->name, ect->publish_systemd_vfs.open_err);
+            write_chart_dimension("calls", ect->publish_systemd_vfs.open_err);
             ebpf_write_end_chart();
         }
 
         ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_CREATE);
-        write_chart_dimension(ect->name, ect->publish_systemd_vfs.create_call);
+        write_chart_dimension("calls", ect->publish_systemd_vfs.create_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_VFS_CREATE_CALLS_ERROR);
-            write_chart_dimension(ect->name, ect->publish_systemd_vfs.create_err);
+            write_chart_dimension("calls", ect->publish_systemd_vfs.create_err);
             ebpf_write_end_chart();
         }
     }
@@ -1943,17 +1951,13 @@ static void ebpf_send_systemd_vfs_charts(ebpf_module_t *em)
 */
 static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
 {
-    if (!ebpf_cgroup_pids)
-        return;
-
     pthread_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         ebpf_vfs_sum_cgroup_pids(&ect->publish_systemd_vfs, ect->pids);
     }
 
-    int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
-    if (has_systemd) {
+    if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_vfs_charts(em);
         }
@@ -2086,7 +2090,7 @@ static void vfs_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_vfs_send_apps_data(em, apps_groups_root_target);
 
-        if (cgroups)
+        if (cgroups && shm_ebpf_cgroup.header && ebpf_cgroup_pids)
             ebpf_vfs_send_cgroup_data(em);
 
         pthread_mutex_unlock(&lock);
