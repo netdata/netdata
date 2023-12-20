@@ -223,15 +223,6 @@ override_dh_install:
 	#
 	cp -v packaging/installer/netdata-updater.sh $(TOP)/usr/libexec/netdata/netdata-updater.sh
 
-	# Move files that local user shouldn't be editing to /usr/share/netdata
-	#
-	mkdir -p "$(TOP)/usr/share/netdata/www"
-	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type d -printf '%f '); do \
-		echo Relocating $$D; \
-		mv "$(TOP)/var/lib/netdata/www/$$D" "$(TOP)/usr/share/netdata/www/$$D"; \
-		ln -s "/usr/share/netdata/www/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
-	done
-
 	# Handle eBPF code
 	#
 	if [ $(HAVE_EBPF) -eq 1 ]; then \
@@ -271,7 +262,6 @@ override_dh_fixperms:
 
 	# apps.plugin should only be runnable by the netdata user. It will be
 	# given extra capabilities in the postinst script.
-	#
 	chmod 0750 $(TOP)-plugin-apps/usr/libexec/netdata/plugins.d/apps.plugin
 
 	# slabinfo package
