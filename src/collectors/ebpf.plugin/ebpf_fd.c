@@ -1130,7 +1130,7 @@ static void ebpf_send_systemd_fd_charts(ebpf_module_t *em)
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
-            ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR, "");
+            ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR);
             write_chart_dimension("calls", ect->publish_systemd_fd.close_err);
             ebpf_write_end_chart();
         }
