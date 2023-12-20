@@ -762,37 +762,41 @@ static void ebpf_send_specific_swap_data(char *type, netdata_publish_swap_t *val
  **/
 static void ebpf_create_systemd_swap_charts(int update_every)
 {
-    ebpf_systemd_args_t data_read = {
+    static ebpf_systemd_args_t data_read = {
         .title = "Calls to swap_readpage.",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20191,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_SWAP_READ_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SWAP,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_MEM_SWAP_READ_CHART,
         .dimension = "calls"
     };
 
-    ebpf_systemd_args_t data_write = {
+    static ebpf_systemd_args_t data_write = {
         .title = "Calls to function swap_writepage.",
         .units = EBPF_COMMON_DIMENSION_CALL,
         .family = NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20192,
-        .algorithm = ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX],
+        .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
         .context = NETDATA_SYSTEMD_SWAP_WRITE_CONTEXT,
         .module = NETDATA_EBPF_MODULE_NAME_SWAP,
-        .update_every = update_every,
+        .update_every = 0,
         .suffix = NETDATA_MEM_SWAP_WRITE_CHART,
         .dimension = "calls"
     };
 
+    if (!data_write.update_every)
+        data_read.update_every = data_write.update_every = update_every;
+
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w ; w = w->next) {
-        if (unlikely((!w->systemd && !w->updated)) ) {
+        if (unlikely((!w->systemd && !w->updated)) ||
+            unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_SWAP_CHART)))) {
             continue;
         }
 
@@ -800,6 +804,8 @@ static void ebpf_create_systemd_swap_charts(int update_every)
         ebpf_create_charts_on_systemd(&data_read);
 
         ebpf_create_charts_on_systemd(&data_write);
+
+        w->flags |= NETDATA_EBPF_SERVICES_HAS_SWAP_CHART;
     }
 }
 
@@ -810,18 +816,13 @@ static void ebpf_create_systemd_swap_charts(int update_every)
 */
 void ebpf_swap_send_cgroup_data(int update_every)
 {
-    if (!ebpf_cgroup_pids)
-        return;
-
     pthread_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
         ebpf_swap_sum_cgroup_pids(&ect->publish_systemd_swap, ect->pids);
     }
 
-    int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
-
-    if (has_systemd) {
+    if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_swap_charts(update_every);
             fflush(stdout);
@@ -885,7 +886,7 @@ static void swap_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_swap_send_apps_data(apps_groups_root_target);
 
-        if (cgroup)
+        if (cgroup && shm_ebpf_cgroup.header && ebpf_cgroup_pids)
             ebpf_swap_send_cgroup_data(update_every);
 
         pthread_mutex_unlock(&lock);

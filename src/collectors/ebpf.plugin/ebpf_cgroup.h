@@ -9,7 +9,7 @@
 #include "ebpf.h"
 #include "ebpf_apps.h"
 
-#define NETDATA_SERVICE_FAMILY "systemd_"
+#define NETDATA_SERVICE_FAMILY "systemd"
 
 struct pid_on_target2 {
     int32_t pid;
@@ -38,7 +38,8 @@ enum ebpf_cgroup_flags {
     NETDATA_EBPF_CGROUP_HAS_DC_CHART = 1<<8,
     NETDATA_EBPF_CGROUP_HAS_SHM_CHART = 1<<9,
 
-    NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART = 1<<10
+    NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART = 1<<10,
+    NETDATA_EBPF_SERVICES_HAS_SWAP_CHART = 1<<11
 };
 
 typedef struct ebpf_cgroup_target {
