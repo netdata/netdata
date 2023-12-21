@@ -133,6 +133,11 @@ if(NOT ${DISABLE_HARDENING})
         if(HAVE_STACK_CLASH_FLAG)
             set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fstack-clash-protection")
         endif()
+
+        check_c_compiler_flag("-fcf-protection=full" HAVE_CFI_FLAG)
+        if(HAVE_CFI_FLAG)
+            set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fcf-protection=full")
+        endif()
 endif()
 
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${EXTRA_HARDEN_FLAGS}")
