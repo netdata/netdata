@@ -12,7 +12,7 @@ The Netdata Alerts Configuration Manager enables users with [Business subscripti
 - Alert Configuration Manager will open up with the `default` thresholds. Modify the configuration as required and the alert definition on the right will be updated dynamically.
 ![Alert Configuration Modal](https://github.com/netdata/netdata/assets/96257330/ce39ae64-2ffe-4576-8c92-b7918bb8c91c)
 
-- If you want more fine grained control or access to more advanced settings, enable `Show advanced` 
+- If you want more fine-grained control or access to more advanced settings, enable `Show advanced` 
 ![Advance Options](https://github.com/netdata/netdata/assets/96257330/b409b31b-6dc7-484c-a2a4-4e5e471d029b)
 
 - Copy the alert definition that is generated in the code box and add it to an existing [health configuration file](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#edit-health-configuration-files) or a new custom file under `<path to netdata install>/etc/netdata/health.d/` on a `Parent Agent` or a `Standalone Child Agent`.
@@ -27,8 +27,8 @@ The Netdata Alerts Configuration Manager enables users with [Business subscripti
 ![Alert Name, Description and Summary Section](https://github.com/netdata/netdata/assets/96257330/50680344-ccd9-439d-80f7-7f26f217a842)
 
   - **Alert Template Name**: This field uniquely identifies an alert and corresponds to the [template](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-alarm-or-template) field of the Alert configuration. The Alerts Configuration Manager provides a default name for an Alert template but we recommend you to modify this to have a meaningful name for your configured alert.
-  - **Alert Template Description**: This field provides a description to the alert and corresponds to the [info](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-info) line of the Alert configuration.
-  - **Alert Summary**: This field enables the users to customise a title for the Alert Notifications (via [Notification integrations](https://learn.netdata.cloud/docs/alerting/notifications/centralized-cloud-notifications)) and corresponds to the [summary](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-summary) line of the Alert configuration.
+  - **Alert Template Description**: This field describes the alert and corresponds to the [info](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-info) line of the Alert configuration.
+  - **Alert Summary**: This field enables the users to customize a title for the Alert Notifications (via [Notification integrations](https://learn.netdata.cloud/docs/alerting/notifications/centralized-cloud-notifications)) and corresponds to the [summary](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-summary) line of the Alert configuration.
 
 - **Alert Type**
 ![Alert Type](https://github.com/netdata/netdata/assets/96257330/c8d83a65-90e7-4b03-9279-585abb359662)
@@ -48,7 +48,7 @@ The Netdata Alerts Configuration Manager enables users with [Business subscripti
     - DURATION `(the period in time to run the lookup)` and 
     - OPTIONS `(absolute, unaligned, percentage, min2max)`. This field is available in the `Basic Options`.
 
-  - **Alert Filtering**: This field enables the users to filter the alert health checks to be run only for specific components of the infrastructure and helps in fine grained configuration of the alerts. This is only available in the `Advance Options`.
+  - **Alert Filtering**: This field enables the users to filter the alert health checks to be run only for specific components of the infrastructure and helps in fine-grained configuration of the alerts. This is only available in the `Advance Options`.
       - `HOSTS / NODES` - By default all hosts are selected. You can choose / enter a wildcard matching a list of hosts you want this alert health check to run on. This field corresponds to the [hosts](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-hosts) line of the Alert configuration.
       - `INSTANCES` - By default all instances are selected. You can choose / enter a wildcard matching a list of instances you want this alert health check to run on. This field corresponds to the [charts](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-charts) line of the Alert configuration.
       - `CHART LABELS` - By default all chart labels are selected. You can choose a chart label and select or enter a wildcard matching a list of chart label values you want this alert health check to run on. This field corresponds to the [chart labels](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-chart-labels) line of the Alert configuration.
@@ -61,11 +61,11 @@ The Netdata Alerts Configuration Manager enables users with [Business subscripti
   - **Warning and Critical Threshold**: This field enables the users to set a threshold to raise alerts as  `Warning` or `Critical` and corresponds to the [warn](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-lines-warn-and-crit) line of the Alert configuration.
   - **Recovery Thresholds**: This field enables the users to set a different threshold to de-escalate the severity of an alert from `Critical to Warning` or `Warning to Clear`.
   - **Delay Notifications**: This field enables the users to set a delay on notifications for an alert severity `escalation` or `de-escalation` and corresponds to the [delay](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-delay) line of the Alert configuration.
-  - **Check Interval**: This fiels enables the users to define the frequency of the health check for the alert being defined and corresponds to the [every](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-every) line of the Alert configuration.
+  - **Check Interval**: This field enables the users to define the frequency of the health check for the alert being defined and corresponds to the [every](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-every) line of the Alert configuration.
 
 - **Agent Specific Options**
-    These options are only available on the `Netdata Agent` and not honoured on `Netdata Cloud`.
+    These options are only available on the `Netdata Agent` and not honored on `Netdata Cloud`.
 ![Agent Specific Options](https://github.com/netdata/netdata/assets/96257330/d2bab429-1e2e-40d0-a892-79ea83bb5f25)
-  - **Repeat Notifications**: This field allows the users to define if you want to repeat sending the `alert notifications` when the alert is active and corresponds to the [repeat](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-repeat) line of the Alert configuration.
+  - **Repeat Notifications**: This field allows the users to define if they want to repeat sending the `alert notifications` when the alert is active and corresponds to the [repeat](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-repeat) line of the Alert configuration.
   - **Send to**: This field enables the users to define a `user role` to which the alert notifications need to be sent or `silence` the notifications and corresponds to the [to](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-to) line of the Alert configuration.
-  - **Custom Exec Script**: This field enables the users to define a custom script to be executed when the alert is triggered (but needs to be carefully designed as it neads to call the `health_alarm_notify.sh` module) and corresponds to the [exec](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-exec) line of the Alert Configuration.
+  - **Custom Exec Script**: This field enables the users to define a custom script to be executed when the alert is triggered (but needs to be carefully designed as it needs to call the `health_alarm_notify.sh` module) and corresponds to the [exec](https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alert-line-exec) line of the Alert Configuration.
