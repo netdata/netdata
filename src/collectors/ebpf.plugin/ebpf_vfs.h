@@ -39,7 +39,6 @@
 
 // Group used on Dashboard
 #define NETDATA_VFS_GROUP "vfs"
-#define NETDATA_VFS_CGROUP_GROUP "vfs (eBPF)"
 
 // Contexts
 #define NETDATA_CGROUP_VFS_UNLINK_CONTEXT "cgroup.vfs_unlink"

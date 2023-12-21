@@ -821,14 +821,14 @@ static void ebpf_send_specific_process_data(char *type, ebpf_process_stat_t *val
 static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
 {
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_PROCESS, "Process started",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_CGROUP_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP,
                       NETDATA_CGROUP_PROCESS_CREATE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5000,
                       ebpf_create_global_dimension, &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_THREAD, "Threads started",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_CGROUP_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP,
                       NETDATA_CGROUP_THREAD_CREATE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5001,
                       ebpf_create_global_dimension,
@@ -836,7 +836,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_EXIT, "Tasks starts exit process.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_CGROUP_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP,
                       NETDATA_CGROUP_PROCESS_EXIT_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5002,
                       ebpf_create_global_dimension,
@@ -844,7 +844,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_CLOSE, "Tasks closed",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_CGROUP_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP,
                       NETDATA_CGROUP_PROCESS_CLOSE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5003,
                       ebpf_create_global_dimension,
@@ -853,7 +853,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_ERROR, "Errors to create process or threads.",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_CGROUP_GROUP,
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP,
                           NETDATA_CGROUP_PROCESS_ERROR_CONTEXT,
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5004,
                           ebpf_create_global_dimension,

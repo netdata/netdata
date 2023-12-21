@@ -1262,7 +1262,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit ratio",
-                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_CGROUP_SUBMENU,
+                      EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_HIT_RATIO_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200,
                       ebpf_create_global_dimension,
@@ -1270,7 +1270,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages",
-                      EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_CGROUP_SUBMENU,
+                      EBPF_CACHESTAT_DIMENSION_PAGE, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_MODIFIED_CACHE_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5201,
                       ebpf_create_global_dimension,
@@ -1279,7 +1279,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_CHART,
                       "Number of accessed files",
-                      EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_CGROUP_SUBMENU,
+                      EBPF_CACHESTAT_DIMENSION_HITS, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5202,
                       ebpf_create_global_dimension,
@@ -1288,7 +1288,7 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_MISSES_CHART,
                       "Files out of page cache",
-                      EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_CGROUP_SUBMENU,
+                      EBPF_CACHESTAT_DIMENSION_MISSES, NETDATA_CACHESTAT_SUBMENU,
                       NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT,
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5203,
                       ebpf_create_global_dimension,

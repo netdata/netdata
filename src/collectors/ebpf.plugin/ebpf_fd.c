@@ -368,7 +368,7 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
                               NETDATA_SYSCALL_APPS_FILE_OPEN,
                               "Number of open files",
                               EBPF_COMMON_DIMENSION_CALL,
-                              NETDATA_APPS_FILE_CGROUP_GROUP,
+                              NETDATA_APPS_FILE_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NETDATA_CGROUP_FD_OPEN_CONTEXT,
                               20270,
@@ -380,7 +380,7 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
                                   NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
                                   "Fails to open files",
                                   EBPF_COMMON_DIMENSION_CALL,
-                                  NETDATA_APPS_FILE_CGROUP_GROUP,
+                                  NETDATA_APPS_FILE_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   NETDATA_CGROUP_FD_OPEN_ERR_CONTEXT,
                                   20271,
@@ -392,7 +392,7 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
                               NETDATA_SYSCALL_APPS_FILE_CLOSED,
                               "Files closed",
                               EBPF_COMMON_DIMENSION_CALL,
-                              NETDATA_APPS_FILE_CGROUP_GROUP,
+                              NETDATA_APPS_FILE_GROUP,
                               NETDATA_EBPF_CHART_TYPE_STACKED,
                               NETDATA_CGROUP_FD_CLOSE_CONTEXT,
                               20272,
@@ -404,7 +404,7 @@ static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
                                   NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
                                   "Fails to close files",
                                   EBPF_COMMON_DIMENSION_CALL,
-                                  NETDATA_APPS_FILE_CGROUP_GROUP,
+                                  NETDATA_APPS_FILE_GROUP,
                                   NETDATA_EBPF_CHART_TYPE_STACKED,
                                   NETDATA_CGROUP_FD_CLOSE_ERR_CONTEXT,
                                   20273,
@@ -905,7 +905,7 @@ static void ebpf_fd_sum_cgroup_pids(netdata_fd_stat_t *fd, struct pid_on_target2
 static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
 {
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_FILE_OPEN, "Number of open files",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP,
                       NETDATA_CGROUP_FD_OPEN_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5400,
                       ebpf_create_global_dimension,
@@ -914,7 +914,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR, "Fails to open files",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP,
                           NETDATA_CGROUP_FD_OPEN_ERR_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                           NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5401,
                           ebpf_create_global_dimension,
@@ -924,7 +924,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
     }
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_FILE_CLOSED, "Files closed",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP,
                       NETDATA_CGROUP_FD_CLOSE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5402,
                       ebpf_create_global_dimension,
@@ -933,7 +933,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR, "Fails to close files",
-                          EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_CGROUP_GROUP,
+                          EBPF_COMMON_DIMENSION_CALL, NETDATA_APPS_FILE_GROUP,
                           NETDATA_CGROUP_FD_CLOSE_ERR_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                           NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5403,
                           ebpf_create_global_dimension,
@@ -1021,7 +1021,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
     static ebpf_systemd_args_t data_open = {
         .title = "Number of open files",
         .units = EBPF_COMMON_DIMENSION_CALL,
-        .family = NETDATA_APPS_FILE_CGROUP_GROUP,
+        .family = NETDATA_APPS_FILE_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20061,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
@@ -1035,7 +1035,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
     static ebpf_systemd_args_t data_open_error = {
         .title = "Fails to open files",
         .units = EBPF_COMMON_DIMENSION_CALL,
-        .family = NETDATA_APPS_FILE_CGROUP_GROUP,
+        .family = NETDATA_APPS_FILE_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20062,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
@@ -1049,7 +1049,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
     static ebpf_systemd_args_t data_close = {
         .title = "Files closed",
         .units = EBPF_COMMON_DIMENSION_CALL,
-        .family = NETDATA_APPS_FILE_CGROUP_GROUP,
+        .family = NETDATA_APPS_FILE_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20063,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
@@ -1063,7 +1063,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
     static ebpf_systemd_args_t data_close_error = {
         .title = "Fails to close files",
         .units = EBPF_COMMON_DIMENSION_CALL,
-        .family = NETDATA_APPS_FILE_CGROUP_GROUP,
+        .family = NETDATA_APPS_FILE_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20064,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,

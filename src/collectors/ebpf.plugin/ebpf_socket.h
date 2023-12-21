@@ -95,8 +95,7 @@ typedef enum ebpf_socket_idx {
 } ebpf_socket_index_t;
 
 #define NETDATA_SOCKET_KERNEL_FUNCTIONS "kernel"
-#define NETDATA_NETWORK_CONNECTIONS_GROUP "network connections"
-#define NETDATA_CGROUP_NET_GROUP "network (eBPF)"
+#define NETDATA_CGROUP_NET_GROUP "network"
 
 // Global chart name
 #define NETDATA_TCP_OUTBOUND_CONNECTIONS "tcp_outbound_conn"

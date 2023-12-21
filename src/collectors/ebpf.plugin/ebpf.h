@@ -179,7 +179,6 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
 #define NETDATA_EBPF_SYSTEM_GROUP "system"
 #define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
-#define NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU "swap (eBPF)"
 #define NETDATA_SYSTEM_IPC_SHM_SUBMENU "ipc shared memory"
 #define NETDATA_MONITORING_FAMILY "netdata"
 

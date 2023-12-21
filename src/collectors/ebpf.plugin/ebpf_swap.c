@@ -229,7 +229,7 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
                               NETDATA_MEM_SWAP_READ_CHART,
                               "Calls to function swap_readpage.",
                               EBPF_COMMON_DIMENSION_CALL,
-                              NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+                              NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_SWAP_READ_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
@@ -240,7 +240,7 @@ static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
                               NETDATA_MEM_SWAP_WRITE_CHART,
                               "Calls to function swap_writepage.",
                               EBPF_COMMON_DIMENSION_CALL,
-                              NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+                              NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
@@ -697,7 +697,7 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
 {
     ebpf_create_chart(type, NETDATA_MEM_SWAP_READ_CHART,
                       "Calls to function swap_readpage.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NETDATA_CGROUP_SWAP_READ_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
                       ebpf_create_global_dimension,
@@ -705,7 +705,7 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
 
     ebpf_create_chart(type, NETDATA_MEM_SWAP_WRITE_CHART,
                       "Calls to function swap_writepage.",
-                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+                      EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                       NETDATA_CGROUP_SWAP_WRITE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101,
                       ebpf_create_global_dimension,
@@ -724,12 +724,12 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
 static void ebpf_obsolete_specific_swap_charts(char *type, int update_every)
 {
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_READ_CHART, "", "Calls to function swap_readpage.",
-                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_READ_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100, update_every);
 
     ebpf_write_chart_obsolete(type, NETDATA_MEM_SWAP_WRITE_CHART, "",  "Calls to function swap_writepage.",
-                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+                              EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CGROUP_SWAP_WRITE_CONTEXT,
                               NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5101, update_every);
 }
@@ -765,7 +765,7 @@ static void ebpf_create_systemd_swap_charts(int update_every)
     static ebpf_systemd_args_t data_read = {
         .title = "Calls to swap_readpage.",
         .units = EBPF_COMMON_DIMENSION_CALL,
-        .family = NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+        .family = NETDATA_SYSTEM_SWAP_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20191,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
@@ -779,7 +779,7 @@ static void ebpf_create_systemd_swap_charts(int update_every)
     static ebpf_systemd_args_t data_write = {
         .title = "Calls to function swap_writepage.",
         .units = EBPF_COMMON_DIMENSION_CALL,
-        .family = NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU,
+        .family = NETDATA_SYSTEM_SWAP_SUBMENU,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20192,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
