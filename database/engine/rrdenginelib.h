@@ -74,7 +74,8 @@ static inline int crc32cmp(void *crcp, uLong crc)
 
 static inline void crc32set(void *crcp, uLong crc)
 {
-    memcpy(crcp, &crc, sizeof(crc));
+    uint32_t store_crc = (uint32_t) crc;
+    memcpy(crcp, &store_crc, sizeof(store_crc));
 }
 
 int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
