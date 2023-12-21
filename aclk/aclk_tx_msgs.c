@@ -86,7 +86,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish5b, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (rc == MQTT_WSS_ERR_TOO_BIG_FOR_SERVER)
-        return HTTP_RESP_FORBIDDEN;
+        return HTTP_RESP_CONTENT_TOO_LONG;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
@@ -194,7 +194,7 @@ int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_
     int rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
 
     switch (rc) {
-        case HTTP_RESP_FORBIDDEN:
+        case HTTP_RESP_CONTENT_TOO_LONG:
             aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
             break;
         case HTTP_RESP_INTERNAL_SERVER_ERROR:
