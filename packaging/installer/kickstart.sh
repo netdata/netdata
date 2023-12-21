@@ -1357,6 +1357,14 @@ check_special_native_deps() {
   fi
 }
 
+cleanup_apt_cache() {
+    cache_dir="/var/cache/apt/archives"
+
+    if [ -d "${cache_dir}" ]; then
+        run_as_root find "${cache_dir}" -type f -name 'netdata*.deb' -delete
+    fi
+}
+
 common_rpm_opts() {
   pkg_type="rpm"
   pkg_suffix=".noarch"
@@ -1423,6 +1431,7 @@ try_package_install() {
         install_subcmd="install"
       fi
       needs_early_refresh=1
+      needs_apt_cache_cleanup=1
       pm_cmd="apt-get"
       repo_subcmd="update"
       pkg_type="deb"
@@ -1520,6 +1529,10 @@ try_package_install() {
       if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
         warning "${failed_refresh_msg}"
         return 2
+      fi
+
+      if [ -n "${needs_apt_cache_cleanup}" ]; then
+        cleanup_apt_cache
       fi
     fi
 
