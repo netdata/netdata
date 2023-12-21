@@ -6,7 +6,7 @@
 #include "../../web/server/web_client_cache.h"
 
 #define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
-#define ACLK_MAX_WEB_RESPONSE_SIZE (30 * 1024 * 1024)
+#define ACLK_MAX_WEB_RESPONSE_SIZE (100 * 1024 * 1024) // this should match PLUGINSD_MAX_DEFERRED_SIZE
 
 pthread_cond_t query_cond_wait = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
