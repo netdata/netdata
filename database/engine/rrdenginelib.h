@@ -8,15 +8,8 @@
 /* Forward declarations */
 struct rrdengine_instance;
 
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
-
-#define BITS_PER_ULONG (sizeof(unsigned long) * 8)
-
 #define ALIGN_BYTES_FLOOR(x) (((x) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
 #define ALIGN_BYTES_CEILING(x) ((((x) + RRDENG_BLOCK_SIZE - 1) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
-
-#define ROUND_USEC_TO_SEC(x) (((x) + USEC_PER_SEC / 2 - 1) / USEC_PER_SEC)
 
 typedef uintptr_t rrdeng_stats_t;
 
@@ -74,12 +67,15 @@ static inline unsigned long ulong_compare_and_swap(volatile unsigned long *ptr,
 
 static inline int crc32cmp(void *crcp, uLong crc)
 {
-    return (*(uint32_t *)crcp != crc);
+    uint32_t loaded_crc;
+    memcpy(&loaded_crc, crcp, sizeof(loaded_crc));
+    return (loaded_crc != crc);
 }
 
 static inline void crc32set(void *crcp, uLong crc)
 {
-    *(uint32_t *)crcp = crc;
+    uint32_t store_crc = (uint32_t) crc;
+    memcpy(crcp, &store_crc, sizeof(store_crc));
 }
 
 int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
