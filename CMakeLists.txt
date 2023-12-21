@@ -144,6 +144,13 @@ if(NOT ${DISABLE_HARDENING})
                         set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fcf-protection=full")
                 endif()
         endif()
+
+        if(NOT ${CMAKE_C_FLAGS} MATCHES "branch-protection")
+                check_c_compiler_flag("-mbranch-protection=standard" HAVE_BRANCH_PROT_FLAG)
+                if(HAVE_BRANCH_PROT_FLAG)
+                        set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -mbranch-protection=standard")
+                endif()
+        endif()
 endif()
 
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${EXTRA_HARDEN_FLAGS}")
