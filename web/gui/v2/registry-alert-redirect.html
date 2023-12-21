@@ -56,7 +56,7 @@
           return s;
         }
 
-        fetch(originUrl + "/api/v1/registry?action=hello", { cache: "no-cache", credentials: "include" })
+        fetch("api/v1/registry?action=hello", { cache: "no-cache", credentials: "include" })
           .then(function(response) { return response.json() })
           .then(function(helloData) {
             if (helloData.anonymous_statistics !== false) {
@@ -76,11 +76,13 @@
               .then(function(data) {
                 let table = document.getElementById("mynodes");
 
-                if (!token && data.status === "ok") {
-                  if (location.protocol === "https:" && data.urls.some(function(u) {
-                    return (/http:/).test(u)
-                  })) {
-                    return location.replace('http://' + location.href.substring(8) + "#" + localStorage.getItem("registry-netdata-token"))
+                if (data.status === "ok") {
+                  if (!token) {
+                    if (location.protocol === "https:" && data.urls.some(function(u) {
+                      return (/http:/).test(u)
+                    })) {
+                      return location.replace('http://' + location.href.substring(8) + "#" + localStorage.getItem("registry-netdata-token"))
+                    }
                   }
 
                   data.urls.sort(function(a, b) {
