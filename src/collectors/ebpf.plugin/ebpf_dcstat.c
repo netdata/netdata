@@ -1113,7 +1113,7 @@ static void ebpf_create_systemd_dc_charts(int update_every)
 
         ebpf_create_charts_on_systemd(&data_dc_not_cache);
 
-        ebpf_create_charts_on_systemd(&data_dc_not_cache);
+        ebpf_create_charts_on_systemd(&data_dc_references);
 
         w->flags |= NETDATA_EBPF_SERVICES_HAS_DC_CHART;
     }
