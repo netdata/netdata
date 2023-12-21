@@ -1816,7 +1816,7 @@ static void ebpf_create_systemd_vfs_charts(ebpf_module_t *em)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w ; w = w->next) {
-        if (unlikely((!w->systemd && !w->updated)) ||
+        if (unlikely((!w->systemd)) ||
             unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_VFS_CHART)))) {
             continue;
         }

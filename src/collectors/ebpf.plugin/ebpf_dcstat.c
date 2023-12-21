@@ -1102,7 +1102,7 @@ static void ebpf_create_systemd_dc_charts(int update_every)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely((!w->systemd && !w->updated)) ||
+        if (unlikely((!w->systemd)) ||
             unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_DC_CHART))))
             continue;
 
