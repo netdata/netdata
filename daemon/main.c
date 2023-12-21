@@ -1502,11 +1502,11 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
-#endif
 
                         if(strcmp(optarg, "pgd-tests") == 0) {
                             return pgd_test(argc, argv);
                         }
+#endif
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
                             sql_init_database(DB_CHECK_RECOVER, 0);
