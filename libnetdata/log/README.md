@@ -114,7 +114,8 @@ Sending a `SIGHUP` to Netdata, will instruct it to re-open all its log files.
 
 ## Log Fields
 
-Netdata exposes the following fields to its logs:
+<details>
+<summary>All fields exposed by Netdata</summary>
 
 |                journal                 |             logfmt             |              json              |                                                Description                                                |
 |:--------------------------------------:|:------------------------------:|:------------------------------:|:---------------------------------------------------------------------------------------------------------:|
@@ -177,6 +178,7 @@ Netdata exposes the following fields to its logs:
 |              `ND_REQUEST`              |           `request`            |           `request`            |                             the full request during which the event happened                              |
 |               `MESSAGE`                |             `msg`              |             `msg`              |                                             the event message                                             |
 
+</details>
 
 ### Message IDs
 
@@ -204,3 +206,18 @@ journalctl MESSAGE_ID=9ce0cb58ab8b44df82c4bf1ad9ee22de
 journalctl MESSAGE_ID=6db0018e83e34320ae2a659d78019fb7
 ```
 
+## Using journalctl to query Netdata logs
+
+The Netdata service's processes execute within the `netdata` journal namespace. To view the Netdata logs, you should
+specify the `--namespace=netdata` option.
+
+```bash
+# Netdata logs since the last time the service was started
+journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata
+
+# All netdata logs, the oldest entries are displayed first  
+journalctl -u netdata --namespace=netdata
+
+# All netdata logs, the newest entries are displayed first  
+journalctl -u netdata --namespace=netdata -r
+```
