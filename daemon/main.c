@@ -481,6 +481,8 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
             delta_shutdown_time("stop dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
+
+            rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
         }
 #endif
     }
