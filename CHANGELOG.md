@@ -6,7 +6,15 @@
 
 **Merged pull requests:**
 
+- Fix overrun in crc32set [\#16654](https://github.com/netdata/netdata/pull/16654) ([stelfrag](https://github.com/stelfrag))
+- Necessary changes for Learn [\#16651](https://github.com/netdata/netdata/pull/16651) ([Ancairon](https://github.com/Ancairon))
+- docs: add a few examples how to query Netdata logs using journalctl [\#16650](https://github.com/netdata/netdata/pull/16650) ([ilyam8](https://github.com/ilyam8))
+- increase max response size to 100MiB [\#16649](https://github.com/netdata/netdata/pull/16649) ([ktsaou](https://github.com/ktsaou))
+- rename bundle dashboard scripts [\#16648](https://github.com/netdata/netdata/pull/16648) ([ilyam8](https://github.com/ilyam8))
+- update bundled UI to v6.72.0 [\#16647](https://github.com/netdata/netdata/pull/16647) ([ilyam8](https://github.com/ilyam8))
+- Fix compilation error when using --disable-dbengine [\#16645](https://github.com/netdata/netdata/pull/16645) ([stelfrag](https://github.com/stelfrag))
 - Create alerts-configuration-manager.md [\#16642](https://github.com/netdata/netdata/pull/16642) ([sashwathn](https://github.com/sashwathn))
+- Update artifact-handling actions to latest version. [\#16639](https://github.com/netdata/netdata/pull/16639) ([Ferroin](https://github.com/Ferroin))
 - cmake: make WEB\_DIR configurable [\#16638](https://github.com/netdata/netdata/pull/16638) ([ilyam8](https://github.com/ilyam8))
 - Remove code relying on autotools. [\#16634](https://github.com/netdata/netdata/pull/16634) ([vkalintiris](https://github.com/vkalintiris))
 - docs: add "Rootless mode" to Docker install guide [\#16632](https://github.com/netdata/netdata/pull/16632) ([ilyam8](https://github.com/ilyam8))
@@ -43,6 +51,7 @@
 - make debugfs exit on sigpipe [\#16569](https://github.com/netdata/netdata/pull/16569) ([ilyam8](https://github.com/ilyam8))
 - Fix memory leak during host chart label cleanup [\#16568](https://github.com/netdata/netdata/pull/16568) ([stelfrag](https://github.com/stelfrag))
 - fix cpu arch/ram/disk values in buildinfo [\#16567](https://github.com/netdata/netdata/pull/16567) ([ilyam8](https://github.com/ilyam8))
+- Remove Netdata packages from APT cache when attempting to install. [\#16566](https://github.com/netdata/netdata/pull/16566) ([Ferroin](https://github.com/Ferroin))
 - Resolve issue on startup in servers with 1 core [\#16565](https://github.com/netdata/netdata/pull/16565) ([stelfrag](https://github.com/stelfrag))
 - Fix release metadata workflow [\#16563](https://github.com/netdata/netdata/pull/16563) ([tkatsoulas](https://github.com/tkatsoulas))
 - Make  the systemd-journal mandatory package on Centos 7  and Amazon linux 2 [\#16562](https://github.com/netdata/netdata/pull/16562) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -318,7 +327,6 @@
 - Split chars \(eBPF \<-\> Apps integration\) [\#16139](https://github.com/netdata/netdata/pull/16139) ([thiagoftsm](https://github.com/thiagoftsm))
 - Faster parents [\#16127](https://github.com/netdata/netdata/pull/16127) ([ktsaou](https://github.com/ktsaou))
 - Update info about custom dashboards [\#16121](https://github.com/netdata/netdata/pull/16121) ([elizabyte8](https://github.com/elizabyte8))
-- Add info to native packages docs about mirroring our repos. [\#16069](https://github.com/netdata/netdata/pull/16069) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -426,14 +434,6 @@
 - dont use sd\_journal\_open\_files\_fd\(\) that is buggy on older libsystemd [\#16090](https://github.com/netdata/netdata/pull/16090) ([ktsaou](https://github.com/ktsaou))
 - external plugins: respect env NETDATA\_LOG\_SEVERITY\_LEVEL [\#16089](https://github.com/netdata/netdata/pull/16089) ([ilyam8](https://github.com/ilyam8))
 - update UI to v6.42.0 [\#16088](https://github.com/netdata/netdata/pull/16088) ([ilyam8](https://github.com/ilyam8))
-- functions: prevent a busy wait loop [\#16086](https://github.com/netdata/netdata/pull/16086) ([ktsaou](https://github.com/ktsaou))
-- charts.d: respect env NETDATA\_LOG\_SEVERITY\_LEVEL [\#16085](https://github.com/netdata/netdata/pull/16085) ([ilyam8](https://github.com/ilyam8))
-- python.d: respect env NETDATA\_LOG\_SEVERITY\_LEVEL [\#16084](https://github.com/netdata/netdata/pull/16084) ([ilyam8](https://github.com/ilyam8))
-- Address reported socket issue [\#16083](https://github.com/netdata/netdata/pull/16083) ([thiagoftsm](https://github.com/thiagoftsm))
-- Change @linuxnetdata to @netdatahq [\#16082](https://github.com/netdata/netdata/pull/16082) ([ralphm](https://github.com/ralphm))
-- \[Integrations Docs\] Add a badge for either netdata or community maintained [\#16073](https://github.com/netdata/netdata/pull/16073) ([Ancairon](https://github.com/Ancairon))
-- Skip database migration steps in new installation [\#16071](https://github.com/netdata/netdata/pull/16071) ([stelfrag](https://github.com/stelfrag))
-- Improve description about tc.plugin [\#16068](https://github.com/netdata/netdata/pull/16068) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
