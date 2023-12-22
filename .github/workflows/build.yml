@@ -406,6 +406,7 @@ jobs:
           action: actions/download-artifact@v4
           with: |
             name: ${{ matrix.artifact_key }}-test-env
+            path: .
           attempt_limit: 3
           attempt_delay: 2000
       - name: Load test environment
