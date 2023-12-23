@@ -5,9 +5,9 @@
 
 #ifdef NETDATA_DEV_MODE
 // Common
-static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC) {
-    fprintf(stdout, "%s \"%s\" 10 \"%s\" \"top\" \"any\" %d\n",
-            PLUGINSD_KEYWORD_FUNCTION, NAME, DESC, RRDFUNCTIONS_PRIORITY_DEFAULT);
+static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC, int update_every) {
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" \"members\" %d\n",
+            NAME, update_every, DESC, RRDFUNCTIONS_PRIORITY_DEFAULT);
 }
 #endif
 
