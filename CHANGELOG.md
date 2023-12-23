@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- docs: Correct chart\_labels summary [\#16656](https://github.com/netdata/netdata/pull/16656) ([sepek](https://github.com/sepek))
 - Fix overrun in crc32set [\#16654](https://github.com/netdata/netdata/pull/16654) ([stelfrag](https://github.com/stelfrag))
 - Necessary changes for Learn [\#16651](https://github.com/netdata/netdata/pull/16651) ([Ancairon](https://github.com/Ancairon))
 - docs: add a few examples how to query Netdata logs using journalctl [\#16650](https://github.com/netdata/netdata/pull/16650) ([ilyam8](https://github.com/ilyam8))
@@ -431,9 +432,6 @@
 - Regenerate integrations.js [\#16093](https://github.com/netdata/netdata/pull/16093) ([netdatabot](https://github.com/netdatabot))
 - update go.d.plugin to v0.56.1 [\#16092](https://github.com/netdata/netdata/pull/16092) ([ilyam8](https://github.com/ilyam8))
 - update UI to v6.42.1 [\#16091](https://github.com/netdata/netdata/pull/16091) ([ilyam8](https://github.com/ilyam8))
-- dont use sd\_journal\_open\_files\_fd\(\) that is buggy on older libsystemd [\#16090](https://github.com/netdata/netdata/pull/16090) ([ktsaou](https://github.com/ktsaou))
-- external plugins: respect env NETDATA\_LOG\_SEVERITY\_LEVEL [\#16089](https://github.com/netdata/netdata/pull/16089) ([ilyam8](https://github.com/ilyam8))
-- update UI to v6.42.0 [\#16088](https://github.com/netdata/netdata/pull/16088) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
