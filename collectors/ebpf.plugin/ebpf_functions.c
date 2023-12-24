@@ -763,6 +763,17 @@ void *ebpf_function_thread(void *ptr)
                                   ebpf_function_socket_manipulation,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
+    pthread_mutex_lock(&lock);
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *em = &ebpf_modules[i];
+        if (!em->functions.fnct_routine)
+            continue;
+
+        EBPF_PLUGIN_FUNCTIONS(em->functions.fcnt_name, em->functions.fcnt_desc, em->update_every);
+    }
+    pthread_mutex_unlock(&lock);
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!ebpf_plugin_exit) {
