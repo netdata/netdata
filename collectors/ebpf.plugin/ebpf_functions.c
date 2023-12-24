@@ -427,13 +427,13 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_socket_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
+        pthread_mutex_lock(&ebpf_exit_cleanup);
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,
                                 HTTP_RESP_INTERNAL_SERVER_ERROR,
@@ -442,16 +442,14 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             return;
         }
     } else {
-        if (period < 0 && em->lifetime < EBPF_NON_FUNCTION_LIFE_TIME) {
-            em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
-        }
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (period < 0)
+            em->lifetime = (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING) ? EBPF_NON_FUNCTION_LIFE_TIME : EBPF_DEFAULT_LIFETIME;
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    time_t expires = now_realtime_sec() + em->update_every;
-
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", em->update_every);
@@ -475,7 +473,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Process Name", "Process Name", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "PName", "Process Name", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -520,14 +518,14 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Incoming Bandwidth", "Bytes received.", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "IncomingBandwidth", "Bytes received.", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Outgoing Bandwidth", "Bytes sent.", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "OutgoingBandwidth", "Bytes sent.", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -543,97 +541,49 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     }
     buffer_json_object_close(wb); // columns
 
+    buffer_json_member_add_string(wb, "default_sort_column", "IncomingBandwidth");
+
     buffer_json_member_add_object(wb, "charts");
     {
-        // OutBound Connections
-        buffer_json_member_add_object(wb, "IPInboundConn");
+        buffer_json_member_add_object(wb, "IncomingConnections");
         {
             buffer_json_member_add_string(wb, "name", "TCP Inbound Connection");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "connected_tcp");
-                buffer_json_add_array_item_string(wb, "connected_udp");
+                buffer_json_add_array_item_string(wb, "IncomingBandwidth");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // OutBound Connections
-        buffer_json_member_add_object(wb, "IPTCPOutboundConn");
+        buffer_json_member_add_object(wb, "OutgoingConnections");
         {
-            buffer_json_member_add_string(wb, "name", "TCP Outbound Connection");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "name", "TCP Outgoing Connection");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "connected_V4");
-                buffer_json_add_array_item_string(wb, "connected_V6");
+                buffer_json_add_array_item_string(wb, "OutgoingBandwidth");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
-
-        // TCP Functions
-        buffer_json_member_add_object(wb, "TCPFunctions");
-        {
-            buffer_json_member_add_string(wb, "name", "TCPFunctions");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "received");
-                buffer_json_add_array_item_string(wb, "sent");
-                buffer_json_add_array_item_string(wb, "close");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // TCP Bandwidth
-        buffer_json_member_add_object(wb, "TCPBandwidth");
-        {
-            buffer_json_member_add_string(wb, "name", "TCPBandwidth");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "received");
-                buffer_json_add_array_item_string(wb, "sent");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // UDP Functions
-        buffer_json_member_add_object(wb, "UDPFunctions");
-        {
-            buffer_json_member_add_string(wb, "name", "UDPFunctions");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "received");
-                buffer_json_add_array_item_string(wb, "sent");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // UDP Bandwidth
-        buffer_json_member_add_object(wb, "UDPBandwidth");
-        {
-            buffer_json_member_add_string(wb, "name", "UDPBandwidth");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "received");
-                buffer_json_add_array_item_string(wb, "sent");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
     }
     buffer_json_object_close(wb); // charts
 
-    buffer_json_member_add_string(wb, "default_sort_column", "PID");
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "IncomingConnections");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "OutgoingConnections");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
 
     // Do we use only on fields that can be groupped?
     buffer_json_member_add_object(wb, "group_by");
@@ -651,12 +601,12 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         buffer_json_object_close(wb);
 
         // group by Process Name
-        buffer_json_member_add_object(wb, "Process Name");
+        buffer_json_member_add_object(wb, "PName");
         {
             buffer_json_member_add_string(wb, "name", "Process Name");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Process Name");
+                buffer_json_add_array_item_string(wb, "PName");
             }
             buffer_json_array_close(wb);
         }
@@ -724,6 +674,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     }
     buffer_json_object_close(wb); // group_by
 
+    time_t expires = now_realtime_sec() + em->update_every;
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
