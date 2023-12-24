@@ -79,14 +79,11 @@ static inline int web_client_uncork_socket(struct web_client *w __maybe_unused) 
     return 0;
 }
 
-char *strip_control_characters(char *url) {
-    char *s = url;
-    if(!s) return "";
+static inline char *strip_control_characters(char *url) {
+    if(!url) return "";
 
-    if(iscntrl(*s)) *s = ' ';
-    while(*++s) {
+    for(char *s = url; *s ;s++)
         if(iscntrl(*s)) *s = ' ';
-    }
 
     return url;
 }
