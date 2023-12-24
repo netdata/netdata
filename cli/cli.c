@@ -4,7 +4,7 @@
 #include "daemon/common.h"
 #include "libnetdata/required_dummies.h"
 
-void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
+void netdata_logger(ND_LOG_SOURCES source __maybe_unused, ND_LOG_FIELD_PRIORITY priority __maybe_unused, const char *file __maybe_unused, const char *function __maybe_unused, unsigned long line __maybe_unused, const char *fmt, ... ) {
     va_list args;
     va_start(args, fmt);
     vfprintf(stderr, fmt, args );
