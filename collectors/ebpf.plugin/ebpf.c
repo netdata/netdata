@@ -1797,9 +1797,9 @@ static void ebpf_parse_ip_list_unsafe(void **out, char *ip)
             }
         }
 
-        if ((be64toh(*(uint64_t *)&first.addr32[2]) > be64toh(*(uint64_t *)&last.addr32[2]) &&
-             !memcmp(first.addr32, last.addr32, 2*sizeof(uint32_t))) ||
-            (be64toh(*(uint64_t *)&first.addr32) > be64toh(*(uint64_t *)&last.addr32)) ) {
+        if ((be64toh(*(uint64_t *)&first.addr64[1]) > be64toh(*(uint64_t *)&last.addr64[1]) &&
+             !memcmp(first.addr64, last.addr64, sizeof(uint64_t))) ||
+            (be64toh(*(uint64_t *)&first.addr64) > be64toh(*(uint64_t *)&last.addr64)) ) {
             netdata_log_info("The specified range %s is invalid, the second address is smallest than the first, it will be ignored.",
                              ipdup);
             goto cleanipdup;
