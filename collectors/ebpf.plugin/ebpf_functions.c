@@ -50,13 +50,9 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
  * @param code         the error code to show with the message.
  * @param msg          the error message
  */
-static void ebpf_function_error(const char *transaction, int code, const char *msg) {
+static inline void ebpf_function_error(const char *transaction, int code, const char *msg) {
     pluginsd_function_json_error_to_stdout(transaction, code, msg);
 }
-
-/*****************************************************************
- *  EBPF SOCKET FUNCTION
- *****************************************************************/
 
 /**
  * Thread Help
@@ -65,45 +61,17 @@ static void ebpf_function_error(const char *transaction, int code, const char *m
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
-static void ebpf_function_socket_help(const char *transaction) {
+static inline void ebpf_function_help(const char *transaction, const char *message) {
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
-    fprintf(stdout, "%s",
-            "ebpf.plugin / socket\n"
-            "\n"
-            "Function `socket` display information for all open sockets during ebpf.plugin runtime.\n"
-            "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
-            "resets completely the previous table and can show a clean data for the first request before to bring the\n"
-            "modified request.\n"
-            "\n"
-            "The following filters are supported:\n"
-            "\n"
-            "   family:FAMILY\n"
-            "      Shows information for the FAMILY specified. Option accepts IPV4, IPV6 and all, that is the default.\n"
-            "\n"
-            "   period:PERIOD\n"
-            "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
-            "      specified plugin will use the default 300 seconds\n"
-            "\n"
-            "   resolve:BOOL\n"
-            "      Resolve service name, default value is YES.\n"
-            "\n"
-            "   range:CIDR\n"
-            "      Show sockets that have only a specific destination. Default all addresses.\n"
-            "\n"
-            "   port:range\n"
-            "      Show sockets that have only a specific destination.\n"
-            "\n"
-            "   reset\n"
-            "      Send a reset to collector. When a collector receives this command, it uses everything defined in configuration file.\n"
-            "\n"
-            "   interfaces\n"
-            "      When the collector receives this command, it read all available interfaces on host.\n"
-            "\n"
-            "Filters can be combined. Each filter can be given only one time. Default all ports\n"
-    );
+    fprintf(stdout, "%s", message);
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
 }
+
+/*****************************************************************
+ *  EBPF SOCKET FUNCTION
+ *****************************************************************/
+
 
 /**
  * Fill Fake socket
@@ -336,8 +304,42 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
     uint32_t previous;
+    static const char *socket_help = {
+        "ebpf.plugin / socket\n"
+        "\n"
+        "Function `socket` display information for all open sockets during ebpf.plugin runtime.\n"
+        "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
+        "resets completely the previous table and can show a clean data for the first request before to bring the\n"
+        "modified request.\n"
+        "\n"
+        "The following filters are supported:\n"
+        "\n"
+        "   family:FAMILY\n"
+        "      Shows information for the FAMILY specified. Option accepts IPV4, IPV6 and all, that is the default.\n"
+        "\n"
+        "   period:PERIOD\n"
+        "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
+        "      specified plugin will use the default 300 seconds\n"
+        "\n"
+        "   resolve:BOOL\n"
+        "      Resolve service name, default value is YES.\n"
+        "\n"
+        "   range:CIDR\n"
+        "      Show sockets that have only a specific destination. Default all addresses.\n"
+        "\n"
+        "   port:range\n"
+        "      Show sockets that have only a specific destination.\n"
+        "\n"
+        "   reset\n"
+        "      Send a reset to collector. When a collector receives this command, it uses everything defined in configuration file.\n"
+        "\n"
+        "   interfaces\n"
+        "      When the collector receives this command, it read all available interfaces on host.\n"
+        "\n"
+        "Filters can be combined. Each filter can be given only one time. Default all ports\n"
+    };
 
-    for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
+for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
             break;
@@ -420,7 +422,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             ebpf_read_local_addresses_unsafe();
             rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
         } else if (strncmp(keyword, "help", 4) == 0) {
-            ebpf_function_socket_help(transaction);
+            ebpf_function_help(transaction, socket_help);
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             return;
         }
