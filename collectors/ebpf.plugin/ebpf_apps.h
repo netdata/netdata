@@ -143,7 +143,12 @@ struct ebpf_pid_on_target {
 // ----------------------------------------------------------------------------
 // Structures used to read information from kernel ring
 typedef struct ebpf_process_stat {
-    uint64_t pid_tgid; // This cannot be removed, because it is used inside kernel ring.
+    uint64_t ct;
+    uint32_t uid;
+    uint32_t gid;
+    char name[TASK_COMM_LEN];
+
+    uint32_t tgid;
     uint32_t pid;
 
     //Counter
