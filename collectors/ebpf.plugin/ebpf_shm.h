@@ -32,6 +32,9 @@
 #define NETDATA_EBPF_SHM_ARAL_NAME "ebpf_shm"
 
 typedef struct netdata_publish_shm {
+    uint64_t ct;
+    char name[TASK_COMM_LEN];
+
     uint64_t get;
     uint64_t at;
     uint64_t dt;

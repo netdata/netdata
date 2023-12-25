@@ -89,7 +89,6 @@ static void ebpf_disable_probe(struct shm_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_shmat_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_shmdt_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_shmctl_probe, false);
-    bpf_program__set_autoload(obj->progs.netdata_shm_release_task_probe, false);
 }
 
 /*
@@ -105,7 +104,6 @@ static void ebpf_disable_trampoline(struct shm_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_shmat_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_shmdt_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_shmctl_fentry, false);
-    bpf_program__set_autoload(obj->progs.netdata_shm_release_task_fentry, false);
 }
 
 /**
@@ -138,9 +136,6 @@ static void ebpf_set_trampoline_target(struct shm_bpf *obj)
                             shm_targets[NETDATA_KEY_SHMCTL_CALL].name, running_on_kernel);
     bpf_program__set_attach_target(obj->progs.netdata_shmctl_fentry, 0,
                                    syscall);
-
-    bpf_program__set_attach_target(obj->progs.netdata_shm_release_task_fentry, 0,
-                                   EBPF_COMMON_FNCT_CLEAN_UP);
 }
 
 /**
@@ -188,13 +183,6 @@ static int ebpf_shm_attach_probe(struct shm_bpf *obj)
     if (ret)
         return -1;
 
-    obj->links.netdata_shm_release_task_probe = bpf_program__attach_kprobe(obj->progs.netdata_shm_release_task_probe,
-                                                                           false, EBPF_COMMON_FNCT_CLEAN_UP);
-    ret = (int)libbpf_get_error(obj->links.netdata_shm_release_task_probe);
-    if (ret)
-        return -1;
-
-
     return 0;
 }
 
@@ -208,19 +196,6 @@ static void ebpf_shm_set_hash_tables(struct shm_bpf *obj)
     shm_maps[NETDATA_PID_SHM_TABLE].map_fd = bpf_map__fd(obj->maps.tbl_pid_shm);
     shm_maps[NETDATA_SHM_CONTROLLER].map_fd = bpf_map__fd(obj->maps.shm_ctrl);
     shm_maps[NETDATA_SHM_GLOBAL_TABLE].map_fd = bpf_map__fd(obj->maps.tbl_shm);
-}
-
-/**
- *  Disable Release Task
- *
- *  Disable release task when apps is not enabled.
- *
- *  @param obj is the main structure for bpf objects.
- */
-static void ebpf_shm_disable_release_task(struct shm_bpf *obj)
-{
-    bpf_program__set_autoload(obj->progs.netdata_shm_release_task_probe, false);
-    bpf_program__set_autoload(obj->progs.netdata_shm_release_task_fentry, false);
 }
 
 /**
@@ -271,8 +246,6 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
     }
 
     ebpf_shm_adjust_map(obj, em);
-    if (!em->apps_charts && !em->cgroup_charts)
-        ebpf_shm_disable_release_task(obj);
 
     int ret = shm_bpf__load(obj);
     if (!ret) {
