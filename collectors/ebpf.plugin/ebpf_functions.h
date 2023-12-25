@@ -3,13 +3,11 @@
 #ifndef NETDATA_EBPF_FUNCTIONS_H
 #define NETDATA_EBPF_FUNCTIONS_H 1
 
-#ifdef NETDATA_DEV_MODE
 // Common
 static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC, int update_every) {
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" \"members\" %d\n",
             NAME, update_every, DESC, RRDFUNCTIONS_PRIORITY_DEFAULT);
 }
-#endif
 
 // configuration file & description
 #define NETDATA_DIRECTORY_FUNCTIONS_CONFIG_FILE "functions.conf"
