@@ -18,6 +18,10 @@
 #define NETDATA_APPS_NET_GROUP "net"
 #define NETDATA_APPS_IPC_SHM_GROUP "ipc shm"
 
+#ifndef TASK_COMM_LEN
+#define TASK_COMM_LEN 16
+#endif
+
 #include "ebpf_process.h"
 #include "ebpf_dcstat.h"
 #include "ebpf_disk.h"
