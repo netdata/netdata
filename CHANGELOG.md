@@ -431,7 +431,6 @@
 - Fix systemd-journal.plugin README and prepare it for Learn [\#16096](https://github.com/netdata/netdata/pull/16096) ([Ancairon](https://github.com/Ancairon))
 - Split apps charts [\#16095](https://github.com/netdata/netdata/pull/16095) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix querying out of retention [\#16094](https://github.com/netdata/netdata/pull/16094) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#16093](https://github.com/netdata/netdata/pull/16093) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
