@@ -38,66 +38,6 @@ static int ebpf_function_start_thread(ebpf_module_t *em, int period)
 }
 
 /*****************************************************************
- *  EBPF SELECT MODULE
- *****************************************************************/
-
-/**
- * Select Module
- *
- * @param thread_name name of the thread we are looking for.
- *
- * @return it returns a pointer for the module that has thread_name on success or NULL otherwise.
-ebpf_module_t *ebpf_functions_select_module(const char *thread_name) {
-    int i;
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        if (strcmp(ebpf_modules[i].info.thread_name, thread_name) == 0) {
-            return &ebpf_modules[i];
-        }
-    }
-
-    return NULL;
-}
- */
-
-/*****************************************************************
- *  EBPF HELP FUNCTIONS
- *****************************************************************/
-
-/**
- * Thread Help
- *
- * Shows help with all options accepted by thread function.
- *
- * @param transaction  the transaction id that Netdata sent for this function execution
-static void ebpf_function_thread_manipulation_help(const char *transaction) {
-    BUFFER *wb = buffer_create(0, NULL);
-    buffer_sprintf(wb, "%s",
-            "ebpf.plugin / thread\n"
-            "\n"
-            "Function `thread` allows user to control eBPF threads.\n"
-            "\n"
-            "The following filters are supported:\n"
-            "\n"
-            "   thread:NAME\n"
-            "      Shows information for the thread NAME. Names are listed inside `ebpf.d.conf`.\n"
-            "\n"
-            "   enable:NAME:PERIOD\n"
-            "      Enable a specific thread named `NAME` to run a specific PERIOD in seconds. When PERIOD is not\n"
-            "      specified plugin will use the default 300 seconds\n"
-            "\n"
-            "   disable:NAME\n"
-            "      Disable a sp.\n"
-            "\n"
-            "Filters can be combined. Each filter can be given only one time.\n"
-            );
-
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600, wb);
-
-    buffer_free(wb);
-}
-*/
-
-/*****************************************************************
  *  EBPF ERROR FUNCTIONS
  *****************************************************************/
 
@@ -110,268 +50,9 @@ static void ebpf_function_thread_manipulation_help(const char *transaction) {
  * @param code         the error code to show with the message.
  * @param msg          the error message
  */
-static void ebpf_function_error(const char *transaction, int code, const char *msg) {
+static inline void ebpf_function_error(const char *transaction, int code, const char *msg) {
     pluginsd_function_json_error_to_stdout(transaction, code, msg);
 }
-
-/*****************************************************************
- *  EBPF THREAD FUNCTION
- *****************************************************************/
-
-/**
- * Function: thread
- *
- * Enable a specific thread.
- *
- * @param transaction  the transaction id that Netdata sent for this function execution
- * @param function     function name and arguments given to thread.
- * @param line_buffer  buffer used to parse args
- * @param line_max     Number of arguments given
- * @param timeout      The function timeout
- * @param em           The structure with thread information
-static void ebpf_function_thread_manipulation(const char *transaction,
-                                              char *function __maybe_unused,
-                                              char *line_buffer __maybe_unused,
-                                              int line_max __maybe_unused,
-                                              int timeout __maybe_unused,
-                                              ebpf_module_t *em)
-{
-    char *words[PLUGINSD_MAX_WORDS] = { NULL };
-    char message[512];
-    uint32_t show_specific_thread = 0;
-    size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
-    for(int i = 1; i < PLUGINSD_MAX_WORDS ;i++) {
-        const char *keyword = get_word(words, num_words, i);
-        if (!keyword)
-            break;
-
-        ebpf_module_t *lem;
-        if(strncmp(keyword, EBPF_THREADS_ENABLE_CATEGORY, sizeof(EBPF_THREADS_ENABLE_CATEGORY) -1) == 0) {
-            char thread_name[128];
-            int period = -1;
-            const char *name = &keyword[sizeof(EBPF_THREADS_ENABLE_CATEGORY) - 1];
-            char *separator = strchr(name, ':');
-            if (separator) {
-                strncpyz(thread_name, name, separator - name);
-                period = str2i(++separator);
-            } else {
-                strncpyz(thread_name, name, strlen(name));
-            }
-
-            lem = ebpf_functions_select_module(thread_name);
-            if (!lem) {
-                snprintfz(message, sizeof(message) - 1, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
-                ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
-                return;
-            }
-
-            pthread_mutex_lock(&ebpf_exit_cleanup);
-            if (lem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
-                // Load configuration again
-                ebpf_update_module(lem, default_btf, running_on_kernel, isrh);
-
-                if (ebpf_function_start_thread(lem, period)) {
-                    ebpf_function_error(transaction,
-                                        HTTP_RESP_INTERNAL_SERVER_ERROR,
-                                        "Cannot start thread.");
-                    return;
-                }
-            } else {
-                lem->running_time = 0;
-                if (period > 0) // user is modifying period to run
-                    lem->lifetime = period;
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info("Thread %s had lifetime updated for %d", thread_name, period);
-#endif
-            }
-            pthread_mutex_unlock(&ebpf_exit_cleanup);
-        } else if(strncmp(keyword, EBPF_THREADS_DISABLE_CATEGORY, sizeof(EBPF_THREADS_DISABLE_CATEGORY) -1) == 0) {
-            const char *name = &keyword[sizeof(EBPF_THREADS_DISABLE_CATEGORY) - 1];
-            lem = ebpf_functions_select_module(name);
-            if (!lem) {
-                snprintfz(message, sizeof(message) - 1, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
-                ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
-                return;
-            }
-
-            pthread_mutex_lock(&ebpf_exit_cleanup);
-            if (lem->enabled < NETDATA_THREAD_EBPF_STOPPING && lem->thread->thread) {
-                lem->lifetime = 0;
-                lem->running_time = lem->update_every;
-                netdata_thread_cancel(*lem->thread->thread);
-            }
-            pthread_mutex_unlock(&ebpf_exit_cleanup);
-        } else if(strncmp(keyword, EBPF_THREADS_SELECT_THREAD, sizeof(EBPF_THREADS_SELECT_THREAD) -1) == 0) {
-            const char *name = &keyword[sizeof(EBPF_THREADS_SELECT_THREAD) - 1];
-            lem = ebpf_functions_select_module(name);
-            if (!lem) {
-                snprintfz(message, sizeof(message) - 1, "%s%s", EBPF_PLUGIN_THREAD_FUNCTION_ERROR_THREAD_NOT_FOUND, name);
-                ebpf_function_error(transaction, HTTP_RESP_NOT_FOUND, message);
-                return;
-            }
-
-            show_specific_thread |= 1<<lem->thread_id;
-        } else if(strncmp(keyword, "help", 4) == 0) {
-            ebpf_function_thread_manipulation_help(transaction);
-            return;
-        }
-    }
-
-    time_t expires = now_realtime_sec() + em->update_every;
-
-    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
-    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
-    buffer_json_member_add_string(wb, "type", "table");
-    buffer_json_member_add_time_t(wb, "update_every", em->update_every);
-    buffer_json_member_add_string(wb, "help", EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
-
-    // Collect data
-    buffer_json_member_add_array(wb, "data");
-    int i;
-    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
-        if (show_specific_thread && !(show_specific_thread & 1<<i))
-            continue;
-
-        ebpf_module_t *wem = &ebpf_modules[i];
-        buffer_json_add_array_item_array(wb);
-
-        // IMPORTANT!
-        // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
-
-        // thread name
-        buffer_json_add_array_item_string(wb, wem->info.thread_name);
-
-        // description
-        buffer_json_add_array_item_string(wb, wem->info.thread_description);
-        // Either it is not running or received a disabled signal and it is stopping.
-        if (wem->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING ||
-            (!wem->lifetime && (int)wem->running_time == wem->update_every)) {
-            // status
-            buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_STOPPED);
-
-            // Time remaining
-            buffer_json_add_array_item_uint64(wb, 0);
-
-            // action
-            buffer_json_add_array_item_string(wb, "NULL");
-        } else {
-            // status
-            buffer_json_add_array_item_string(wb, EBPF_THREAD_STATUS_RUNNING);
-
-            // Time remaining
-            buffer_json_add_array_item_uint64(wb, (wem->lifetime) ? (wem->lifetime - wem->running_time) : 0);
-
-            // action
-            buffer_json_add_array_item_string(wb, "Enabled/Disabled");
-        }
-
-        buffer_json_array_close(wb);
-    }
-
-    buffer_json_array_close(wb); // data
-
-    buffer_json_member_add_object(wb, "columns");
-    {
-        int fields_id = 0;
-
-        // IMPORTANT!
-        // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
-        buffer_rrdf_table_add_field(wb, fields_id++, "Thread", "Thread Name", RRDF_FIELD_TYPE_STRING,
-                             RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                             RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                             RRDF_FIELD_FILTER_MULTISELECT,
-                             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_UNIQUE_KEY, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Description", "Thread Desc", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Status", "Thread Status", RRDF_FIELD_TYPE_STRING,
-                             RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                             RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                             RRDF_FIELD_FILTER_MULTISELECT,
-                             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Time", "Time Remaining", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL,
-                                    NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Action", "Thread Action", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-    }
-    buffer_json_object_close(wb); // columns
-
-    buffer_json_member_add_string(wb, "default_sort_column", "Thread");
-
-    buffer_json_member_add_object(wb, "charts");
-    {
-        // Threads
-        buffer_json_member_add_object(wb, "eBPFThreads");
-        {
-            buffer_json_member_add_string(wb, "name", "Threads");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Threads");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // Life Time
-        buffer_json_member_add_object(wb, "eBPFLifeTime");
-        {
-            buffer_json_member_add_string(wb, "name", "LifeTime");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Threads");
-                buffer_json_add_array_item_string(wb, "Time");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-    }
-    buffer_json_object_close(wb); // charts
-
-    // Do we use only on fields that can be groupped?
-    buffer_json_member_add_object(wb, "group_by");
-    {
-        // group by Status
-        buffer_json_member_add_object(wb, "Status");
-        {
-            buffer_json_member_add_string(wb, "name", "Thread status");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Status");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-    }
-    buffer_json_object_close(wb); // group_by
-
-    buffer_json_member_add_time_t(wb, "expires", expires);
-    buffer_json_finalize(wb);
-
-    // Lock necessary to avoid race condition
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires, wb);
-
-    buffer_free(wb);
-}
- */
-
-/*****************************************************************
- *  EBPF SOCKET FUNCTION
- *****************************************************************/
 
 /**
  * Thread Help
@@ -380,45 +61,17 @@ static void ebpf_function_thread_manipulation(const char *transaction,
  *
  * @param transaction  the transaction id that Netdata sent for this function execution
 */
-static void ebpf_function_socket_help(const char *transaction) {
+static inline void ebpf_function_help(const char *transaction, const char *message) {
     pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "text/plain", now_realtime_sec() + 3600);
-    fprintf(stdout, "%s",
-            "ebpf.plugin / socket\n"
-            "\n"
-            "Function `socket` display information for all open sockets during ebpf.plugin runtime.\n"
-            "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
-            "resets completely the previous table and can show a clean data for the first request before to bring the\n"
-            "modified request.\n"
-            "\n"
-            "The following filters are supported:\n"
-            "\n"
-            "   family:FAMILY\n"
-            "      Shows information for the FAMILY specified. Option accepts IPV4, IPV6 and all, that is the default.\n"
-            "\n"
-            "   period:PERIOD\n"
-            "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
-            "      specified plugin will use the default 300 seconds\n"
-            "\n"
-            "   resolve:BOOL\n"
-            "      Resolve service name, default value is YES.\n"
-            "\n"
-            "   range:CIDR\n"
-            "      Show sockets that have only a specific destination. Default all addresses.\n"
-            "\n"
-            "   port:range\n"
-            "      Show sockets that have only a specific destination.\n"
-            "\n"
-            "   reset\n"
-            "      Send a reset to collector. When a collector receives this command, it uses everything defined in configuration file.\n"
-            "\n"
-            "   interfaces\n"
-            "      When the collector receives this command, it read all available interfaces on host.\n"
-            "\n"
-            "Filters can be combined. Each filter can be given only one time. Default all ports\n"
-    );
+    fprintf(stdout, "%s", message);
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
 }
+
+/*****************************************************************
+ *  EBPF SOCKET FUNCTION
+ *****************************************************************/
+
 
 /**
  * Fill Fake socket
@@ -651,8 +304,42 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
     uint32_t previous;
+    static const char *socket_help = {
+        "ebpf.plugin / socket\n"
+        "\n"
+        "Function `socket` display information for all open sockets during ebpf.plugin runtime.\n"
+        "During thread runtime the plugin is always collecting data, but when an option is modified, the plugin\n"
+        "resets completely the previous table and can show a clean data for the first request before to bring the\n"
+        "modified request.\n"
+        "\n"
+        "The following filters are supported:\n"
+        "\n"
+        "   family:FAMILY\n"
+        "      Shows information for the FAMILY specified. Option accepts IPV4, IPV6 and all, that is the default.\n"
+        "\n"
+        "   period:PERIOD\n"
+        "      Enable socket to run a specific PERIOD in seconds. When PERIOD is not\n"
+        "      specified plugin will use the default 300 seconds\n"
+        "\n"
+        "   resolve:BOOL\n"
+        "      Resolve service name, default value is YES.\n"
+        "\n"
+        "   range:CIDR\n"
+        "      Show sockets that have only a specific destination. Default all addresses.\n"
+        "\n"
+        "   port:range\n"
+        "      Show sockets that have only a specific destination.\n"
+        "\n"
+        "   reset\n"
+        "      Send a reset to collector. When a collector receives this command, it uses everything defined in configuration file.\n"
+        "\n"
+        "   interfaces\n"
+        "      When the collector receives this command, it read all available interfaces on host.\n"
+        "\n"
+        "Filters can be combined. Each filter can be given only one time. Default all ports\n"
+    };
 
-    for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
+for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         const char *keyword = get_word(words, num_words, i);
         if (!keyword)
             break;
@@ -735,20 +422,20 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             ebpf_read_local_addresses_unsafe();
             rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
         } else if (strncmp(keyword, "help", 4) == 0) {
-            ebpf_function_socket_help(transaction);
+            ebpf_function_help(transaction, socket_help);
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             return;
         }
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
-    pthread_mutex_lock(&ebpf_exit_cleanup);
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         // Cleanup when we already had a thread running
         rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
         ebpf_socket_clean_judy_array_unsafe();
         rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
+        pthread_mutex_lock(&ebpf_exit_cleanup);
         if (ebpf_function_start_thread(em, period)) {
             ebpf_function_error(transaction,
                                 HTTP_RESP_INTERNAL_SERVER_ERROR,
@@ -757,16 +444,14 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             return;
         }
     } else {
-        if (period < 0 && em->lifetime < EBPF_NON_FUNCTION_LIFE_TIME) {
-            em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
-        }
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (period < 0)
+            em->lifetime = (em->enabled != NETDATA_THREAD_EBPF_FUNCTION_RUNNING) ? EBPF_NON_FUNCTION_LIFE_TIME : EBPF_DEFAULT_LIFETIME;
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    time_t expires = now_realtime_sec() + em->update_every;
-
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, false);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", em->update_every);
@@ -790,7 +475,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Process Name", "Process Name", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "PName", "Process Name", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -835,14 +520,14 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Incoming Bandwidth", "Bytes received.", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "IncomingBandwidth", "Bytes received.", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Outgoing Bandwidth", "Bytes sent.", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "OutgoingBandwidth", "Bytes sent.", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -858,97 +543,49 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     }
     buffer_json_object_close(wb); // columns
 
+    buffer_json_member_add_string(wb, "default_sort_column", "IncomingBandwidth");
+
     buffer_json_member_add_object(wb, "charts");
     {
-        // OutBound Connections
-        buffer_json_member_add_object(wb, "IPInboundConn");
+        buffer_json_member_add_object(wb, "IncomingConnections");
         {
             buffer_json_member_add_string(wb, "name", "TCP Inbound Connection");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "connected_tcp");
-                buffer_json_add_array_item_string(wb, "connected_udp");
+                buffer_json_add_array_item_string(wb, "IncomingBandwidth");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // OutBound Connections
-        buffer_json_member_add_object(wb, "IPTCPOutboundConn");
+        buffer_json_member_add_object(wb, "OutgoingConnections");
         {
-            buffer_json_member_add_string(wb, "name", "TCP Outbound Connection");
-            buffer_json_member_add_string(wb, "type", "line");
+            buffer_json_member_add_string(wb, "name", "TCP Outgoing Connection");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "connected_V4");
-                buffer_json_add_array_item_string(wb, "connected_V6");
+                buffer_json_add_array_item_string(wb, "OutgoingBandwidth");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
-
-        // TCP Functions
-        buffer_json_member_add_object(wb, "TCPFunctions");
-        {
-            buffer_json_member_add_string(wb, "name", "TCPFunctions");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "received");
-                buffer_json_add_array_item_string(wb, "sent");
-                buffer_json_add_array_item_string(wb, "close");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // TCP Bandwidth
-        buffer_json_member_add_object(wb, "TCPBandwidth");
-        {
-            buffer_json_member_add_string(wb, "name", "TCPBandwidth");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "received");
-                buffer_json_add_array_item_string(wb, "sent");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // UDP Functions
-        buffer_json_member_add_object(wb, "UDPFunctions");
-        {
-            buffer_json_member_add_string(wb, "name", "UDPFunctions");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "received");
-                buffer_json_add_array_item_string(wb, "sent");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // UDP Bandwidth
-        buffer_json_member_add_object(wb, "UDPBandwidth");
-        {
-            buffer_json_member_add_string(wb, "name", "UDPBandwidth");
-            buffer_json_member_add_string(wb, "type", "line");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "received");
-                buffer_json_add_array_item_string(wb, "sent");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
     }
     buffer_json_object_close(wb); // charts
 
-    buffer_json_member_add_string(wb, "default_sort_column", "PID");
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "IncomingConnections");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "OutgoingConnections");
+        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
 
     // Do we use only on fields that can be groupped?
     buffer_json_member_add_object(wb, "group_by");
@@ -966,12 +603,12 @@ static void ebpf_function_socket_manipulation(const char *transaction,
         buffer_json_object_close(wb);
 
         // group by Process Name
-        buffer_json_member_add_object(wb, "Process Name");
+        buffer_json_member_add_object(wb, "PName");
         {
             buffer_json_member_add_string(wb, "name", "Process Name");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Process Name");
+                buffer_json_add_array_item_string(wb, "PName");
             }
             buffer_json_array_close(wb);
         }
@@ -1039,6 +676,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     }
     buffer_json_object_close(wb); // group_by
 
+    time_t expires = now_realtime_sec() + em->update_every;
     buffer_json_member_add_time_t(wb, "expires", expires);
     buffer_json_finalize(wb);
 
@@ -1077,6 +715,17 @@ void *ebpf_function_thread(void *ptr)
                                   "ebpf_socket",
                                   ebpf_function_socket_manipulation,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+
+    pthread_mutex_lock(&lock);
+    int i;
+    for (i = 0; i < EBPF_MODULE_FUNCTION_IDX; i++) {
+        ebpf_module_t *em = &ebpf_modules[i];
+        if (!em->functions.fnct_routine)
+            continue;
+
+        EBPF_PLUGIN_FUNCTIONS(em->functions.fcnt_name, em->functions.fcnt_desc, em->update_every);
+    }
+    pthread_mutex_unlock(&lock);
 
     heartbeat_t hb;
     heartbeat_init(&hb);
