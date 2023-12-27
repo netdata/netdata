@@ -2,7 +2,6 @@
 
 #include "aclk_rx_msgs.h"
 
-#include "aclk_stats.h"
 #include "aclk_query_queue.h"
 #include "aclk.h"
 #include "aclk_capas.h"
@@ -165,7 +164,7 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
     // it would be strange to get URL from `dedup_id`
     query->data.http_api_v2.query = query->dedup_id;
     query->msg_id = cloud_to_agent->msg_id;
-    aclk_queue_query(query);
+    aclk_execute_query(query);
     return 0;
 
 error:
@@ -301,7 +300,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
 
-    aclk_queue_query(query);
+    aclk_execute_query(query);
     freez(res.node_id);
     freez(res.machine_guid);
     return 0;
@@ -502,11 +501,6 @@ new_cloud_rx_msg_t *find_rx_handler_by_hash(simple_hash_t hash)
     return NULL;
 }
 
-const char *rx_handler_get_name(size_t i)
-{
-    return rx_msgs[i].name;
-}
-
 unsigned int aclk_init_rx_msg_handlers(void)
 {
     int i;
@@ -525,23 +519,12 @@ unsigned int aclk_init_rx_msg_handlers(void)
 
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len, const char *topic __maybe_unused)
 {
-    if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
-        aclk_metrics_per_sample.cloud_req_recvd++;
-        ACLK_STATS_UNLOCK;
-    }
     new_cloud_rx_msg_t *msg_descriptor = find_rx_handler_by_hash(simple_hash(message_type));
     netdata_log_debug(D_ACLK, "Got message named '%s' from cloud", message_type);
     if (unlikely(!msg_descriptor)) {
         netdata_log_error("Do not know how to handle message of type '%s'. Ignoring", message_type);
-        if (aclk_stats_enabled) {
-            ACLK_STATS_LOCK;
-            aclk_metrics_per_sample.cloud_req_err++;
-            ACLK_STATS_UNLOCK;
-        }
         return;
     }
-
 
     if (aclklog_enabled) {
         if (!strncmp(message_type, "cmd", strlen("cmd"))) {
@@ -553,18 +536,8 @@ void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t
         }
     }
 
-    if (aclk_stats_enabled) {
-        ACLK_STATS_LOCK;
-        aclk_proto_rx_msgs_sample[msg_descriptor-rx_msgs]++;
-        ACLK_STATS_UNLOCK;
-    }
     if (msg_descriptor->fnc(msg, msg_len)) {
         netdata_log_error("Error processing message of type '%s'", message_type);
-        if (aclk_stats_enabled) {
-            ACLK_STATS_LOCK;
-            aclk_metrics_per_sample.cloud_req_err++;
-            ACLK_STATS_UNLOCK;
-        }
         return;
     }
 }

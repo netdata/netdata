@@ -4,6 +4,8 @@
 #include "sqlite_aclk.h"
 
 #include "sqlite_aclk_node.h"
+#include "../aclk_query_queue.h"
+#include "../aclk_query.h"
 
 struct aclk_sync_config_s {
     uv_thread_t thread;
@@ -11,6 +13,8 @@ struct aclk_sync_config_s {
     uv_timer_t timer_req;
     uv_async_t async;
     bool initialized;
+    mqtt_wss_client client;
+    int aclk_queries_running;
     SPINLOCK cmd_queue_lock;
     struct aclk_database_cmd *cmd_base;
 } aclk_sync_config = { 0 };
@@ -267,6 +271,44 @@ static void timer_cb(uv_timer_t *handle)
     }
 }
 
+struct aclk_query_payload {
+    uv_work_t request;
+    void *data;
+    struct aclk_sync_config_s *config;
+};
+
+static void after_aclk_run_query_job(uv_work_t *req, int status __maybe_unused)
+{
+    struct aclk_query_payload *payload = req->data;
+    struct aclk_sync_config_s *config = payload->config;
+    config->aclk_queries_running--;
+    freez(payload);
+}
+
+static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t query)
+{
+    if (query->type == UNKNOWN || query->type >= ACLK_QUERY_TYPE_COUNT) {
+        error_report("Unknown query in query queue. %u", query->type);
+        return;
+    }
+
+    if (query->type == HTTP_API_V2) {
+        http_api_v2(config->client, query);
+    } else {
+        send_bin_msg(config->client, query);
+    }
+    aclk_query_free(query);
+}
+
+static void aclk_run_query_job(uv_work_t *req)
+{
+    struct aclk_query_payload *payload =  req->data;
+    struct aclk_sync_config_s *config = payload->config;
+    aclk_query_t query = (aclk_query_t) payload->data;
+
+    aclk_run_query(config, query);
+}
+
 static void aclk_synchronization(void *arg)
 {
     struct aclk_sync_config_s *config = arg;
@@ -278,6 +320,7 @@ static void aclk_synchronization(void *arg)
     worker_register_job_name(ACLK_DATABASE_NODE_STATE,           "node state");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT,           "alert push");
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_CONFIG,    "alert conf push");
+    worker_register_job_name(ACLK_QUERY_EXECUTE,                 "query execute");
     worker_register_job_name(ACLK_DATABASE_TIMER,                "timer");
 
     uv_loop_t *loop = &config->loop;
@@ -294,7 +337,10 @@ static void aclk_synchronization(void *arg)
 
     sql_delete_aclk_table_list();
 
-    while (likely(service_running(SERVICE_ACLKSYNC))) {
+    int query_thread_count = MIN(get_netdata_cpus()/2, 6);
+    query_thread_count = MAX(query_thread_count, 2);
+
+    while (likely(service_running(SERVICE_ACLK))) {
         enum aclk_database_opcode opcode;
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -303,7 +349,7 @@ static void aclk_synchronization(void *arg)
         do {
             struct aclk_database_cmd cmd = aclk_database_deq_cmd();
 
-            if (unlikely(!service_running(SERVICE_ACLKSYNC)))
+            if (unlikely(!service_running(SERVICE_ACLK)))
                 break;
 
             opcode = cmd.opcode;
@@ -312,7 +358,6 @@ static void aclk_synchronization(void *arg)
                 worker_is_busy(opcode);
 
             switch (opcode) {
-                default:
                 case ACLK_DATABASE_NOOP:
                     /* the command queue was empty, do nothing */
                     break;
@@ -335,6 +380,34 @@ static void aclk_synchronization(void *arg)
                     break;
                 case ACLK_DATABASE_PUSH_ALERT:
                     aclk_push_alert_events_for_all_hosts();
+                    break;
+
+                case ACLK_MQTT_WSS_CLIENT:
+                    config->client = (mqtt_wss_client) cmd.param[0];
+                    break;
+
+                case ACLK_QUERY_EXECUTE:;
+                    aclk_query_t query = (aclk_query_t)cmd.param[0];
+
+                    struct aclk_query_payload *payload = NULL;
+                    config->aclk_queries_running++;
+                    bool execute_now = (config->aclk_queries_running > query_thread_count);
+                    if (!execute_now) {
+                        payload = mallocz(sizeof(*payload));
+                        payload->request.data = payload;
+                        payload->config = config;
+                        payload->data = query;
+                        execute_now = uv_queue_work(loop, &payload->request, aclk_run_query_job, after_aclk_run_query_job);
+                    }
+
+                    if (execute_now) {
+                        aclk_run_query(config, query);
+                        freez(payload);
+                        config->aclk_queries_running--;
+                    }
+                    break;
+
+                default:
                     break;
             }
         } while (opcode != ACLK_DATABASE_NOOP);
@@ -444,6 +517,20 @@ void aclk_push_alert_config(const char *node_id, const char *config_hash)
 
     queue_aclk_sync_cmd(ACLK_DATABASE_PUSH_ALERT_CONFIG, strdupz(node_id), strdupz(config_hash));
 }
+
+void aclk_execute_query(aclk_query_t query)
+{
+    if (unlikely(!aclk_sync_config.initialized))
+        return;
+
+    queue_aclk_sync_cmd(ACLK_QUERY_EXECUTE, query, NULL);
+}
+
+void aclk_query_init(mqtt_wss_client client) {
+
+    queue_aclk_sync_cmd(ACLK_MQTT_WSS_CLIENT, client, NULL);
+}
+
 
 void schedule_node_info_update(RRDHOST *host __maybe_unused)
 {

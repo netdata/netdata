@@ -362,7 +362,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
     service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
-                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK | SERVICE_ACLKSYNC);
+                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK);
     watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
 
     service_wait_exit(SERVICE_MAINTENANCE, 3 * USEC_PER_SEC);

@@ -53,12 +53,12 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 
 #define TOPIC_MAX_LEN 512
 #define V2_BIN_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
-static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
+static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_object *msg, const char *topic, const void *payload, size_t payload_len)
 {
     uint16_t packet_id;
     const char *str;
     char *full_msg = NULL;
-    int len;
+    size_t len;
 
     if (unlikely(!topic || topic[0] != '/')) {
         netdata_log_error("Full topic required!");
@@ -78,7 +78,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     json_object_put(msg);
 
     if (payload_len) {
-        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, strlen(V2_BIN_PAYLOAD_SEPARATOR));
+        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1);
         len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
         memcpy(&full_msg[len], payload, payload_len);
     }
@@ -176,7 +176,8 @@ void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char 
     }
 }
 
-int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created, int http_code, const char *payload, size_t payload_len)
+short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_id, usec_t t_exec, usec_t created,
+    short http_code, const char *payload, size_t payload_len)
 {
     json_object *tmp, *msg;
 
@@ -191,7 +192,7 @@ int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_
     tmp = json_object_new_int(http_code);
     json_object_object_add(msg, "http-code", tmp);
 
-    int rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
+    short rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
 
     switch (rc) {
         case HTTP_RESP_CONTENT_TOO_LONG:
@@ -200,12 +201,14 @@ int aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *msg_
         case HTTP_RESP_INTERNAL_SERVER_ERROR:
             aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_FAIL_TOPIC, CLOUD_EMSG_FAIL_TOPIC, payload, payload_len);
             break;
-        case HTTP_RESP_GATEWAY_TIMEOUT:
-        case HTTP_RESP_SERVICE_UNAVAILABLE:
-            aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
+//        case HTTP_RESP_SERVICE_UNAVAILABLE:
+//            aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT, payload, payload_len);
+//            break;
+        default:
+            rc = http_code;
             break;
     }
-    return rc ? rc : http_code;
+    return rc;
 }
 
 uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable) {

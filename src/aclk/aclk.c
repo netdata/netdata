@@ -2,7 +2,6 @@
 
 #include "aclk.h"
 
-#include "aclk_stats.h"
 #include "mqtt_websockets/mqtt_wss_client.h"
 #include "aclk_otp.h"
 #include "aclk_tx_msgs.h"
@@ -54,7 +53,6 @@ bool aclk_online_for_nodes(void) {
 
 int aclk_ctx_based = 0;
 int aclk_disable_runtime = 0;
-int aclk_stats_enabled;
 int aclk_kill_link = 0;
 
 usec_t aclk_session_us = 0;
@@ -69,10 +67,6 @@ float last_backoff_value = 0;
 time_t aclk_block_until = 0;
 
 mqtt_wss_client mqttwss_client;
-
-//netdata_mutex_t aclk_shared_state_mutex = NETDATA_MUTEX_INITIALIZER;
-//#define ACLK_SHARED_STATE_LOCK netdata_mutex_lock(&aclk_shared_state_mutex)
-//#define ACLK_SHARED_STATE_UNLOCK netdata_mutex_unlock(&aclk_shared_state_mutex)
 
 struct aclk_shared_state aclk_shared_state = {
     .mqtt_shutdown_msg_id = -1,
@@ -315,19 +309,6 @@ static void puback_callback(uint16_t packet_id)
     }
 }
 
-static int read_query_thread_count()
-{
-    int threads = MIN(get_netdata_cpus()/2, 6);
-    threads = MAX(threads, 2);
-    threads = config_get_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
-    if(threads < 1) {
-        netdata_log_error("You need at least one query thread. Overriding configured setting of \"%d\"", threads);
-        threads = 1;
-        config_set_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
-    }
-    return threads;
-}
-
 void aclk_graceful_disconnect(mqtt_wss_client client);
 
 /* Keeps connection alive and handles all network communications.
@@ -338,7 +319,6 @@ void aclk_graceful_disconnect(mqtt_wss_client client);
  */
 static int handle_connection(mqtt_wss_client client)
 {
-    time_t last_periodic_query_wakeup = now_monotonic_sec();
     while (service_running(SERVICE_ACLK)) {
         // timeout 1000 to check at least once a second
         // for netdata_exit
@@ -356,20 +336,9 @@ static int handle_connection(mqtt_wss_client client)
             disconnect_req = 0;
             aclk_kill_link = 0;
             aclk_graceful_disconnect(client);
-            aclk_queue_unlock();
             aclk_shared_state.mqtt_shutdown_msg_id = -1;
             aclk_shared_state.mqtt_shutdown_msg_rcvd = 0;
             return 1;
-        }
-
-        // mqtt_wss_service will return faster than in one second
-        // if there is enough work to do
-        time_t now = now_monotonic_sec();
-        if (last_periodic_query_wakeup < now) {
-            // wake up at least one Query Thread at least
-            // once per second
-            last_periodic_query_wakeup = now;
-            QUERY_THREAD_WAKEUP;
         }
     }
     return 0;
@@ -390,7 +359,6 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     else
         mqtt_wss_subscribe(client, topic, 1);
 
-    aclk_stats_upd_online(1);
     aclk_set_connected();
     aclk_pubacks_per_conn = 0;
     aclk_rcvd_cloud_msgs = 0;
@@ -407,9 +375,6 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
 {
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Preparing to gracefully shutdown ACLK connection");
-
-    aclk_queue_lock();
-    aclk_queue_flush();
 
     aclk_shared_state.mqtt_shutdown_msg_id = aclk_send_agent_connection_update(client, 0);
 
@@ -429,7 +394,6 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     nd_log(NDLS_DAEMON, NDLP_WARNING, "ACLK link is down");
     nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK DISCONNECTED");
 
-    aclk_stats_upd_online(0);
     last_disconnect_time = now_realtime_sec();
     aclk_set_disconnected();
 
@@ -806,11 +770,6 @@ void *aclk_main(void *ptr)
 {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
 
-    struct aclk_stats_thread *stats_thread = NULL;
-
-    struct aclk_query_threads query_threads;
-    query_threads.thread_list = NULL;
-
     ACLK_PROXY_TYPE proxy_type;
     aclk_get_proxy(&proxy_type);
     if (proxy_type == PROXY_TYPE_SOCKS5) {
@@ -820,8 +779,6 @@ void *aclk_main(void *ptr)
     }
 
     unsigned int proto_hdl_cnt = aclk_init_rx_msg_handlers();
-
-    query_threads.count = read_query_thread_count();
 
     if (wait_till_agent_claim_ready())
         goto exit;
@@ -848,26 +805,15 @@ void *aclk_main(void *ptr)
     // that send JSON payloads of 10 MB as single messages
     mqtt_wss_set_max_buf_size(mqttwss_client, 25*1024*1024);
 
-    aclk_stats_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "statistics", global_statistics_enabled);
-    if (aclk_stats_enabled) {
-        stats_thread = callocz(1, sizeof(struct aclk_stats_thread));
-        stats_thread->query_thread_count = query_threads.count;
-        stats_thread->client = mqttwss_client;
-        aclk_stats_thread_prepare(query_threads.count, proto_hdl_cnt);
-        stats_thread->thread = nd_thread_create("ACLK_STATS", NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread, stats_thread);
-    }
-
     // Keep reconnecting and talking until our time has come
     // and the Grim Reaper (netdata_exit) calls
+    netdata_log_info("Starting ACLK query event loop");
+    aclk_query_init(mqttwss_client);
     do {
         if (aclk_attempt_to_connect(mqttwss_client))
             goto exit_full;
 
-        if (unlikely(!query_threads.thread_list))
-            aclk_query_threads_start(&query_threads, mqttwss_client);
-
         if (handle_connection(mqttwss_client)) {
-            aclk_stats_upd_online(0);
             last_disconnect_time = now_realtime_sec();
             aclk_set_disconnected();
             nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK DISCONNECTED");
@@ -882,16 +828,6 @@ void *aclk_main(void *ptr)
 #endif
 
 exit_full:
-// Tear Down
-    QUERY_THREAD_WAKEUP_ALL;
-
-    aclk_query_threads_cleanup(&query_threads);
-
-    if (aclk_stats_enabled) {
-        nd_thread_join(stats_thread->thread);
-        aclk_stats_thread_cleanup();
-        freez(stats_thread);
-    }
     free_topic_cache();
     mqtt_wss_destroy(mqttwss_client);
 exit:
@@ -941,7 +877,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
             nd_log(NDLS_DAEMON, NDLP_DEBUG,
                    "Registering host=%s, hops=%u", host->machine_guid, host->system_info->hops);
 
-            aclk_queue_query(create_query);
+            aclk_execute_query(create_query);
             return;
         }
     }
@@ -968,7 +904,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
     freez((void*)node_state_update.node_id);
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-    aclk_queue_query(query);
+    aclk_execute_query(query);
 }
 
 void aclk_send_node_instances()
@@ -1014,7 +950,7 @@ void aclk_send_node_instances()
             freez((void*)node_state_update.node_id);
             query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
             query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
-            aclk_queue_query(query);
+            aclk_execute_query(query);
         } else {
             aclk_query_t create_query;
             create_query = aclk_query_new(REGISTER_NODE);
@@ -1036,7 +972,7 @@ void aclk_send_node_instances()
                    (char*)node_instance_creation.machine_guid, list->hops);
 
             freez((void *)node_instance_creation.machine_guid);
-            aclk_queue_query(create_query);
+            aclk_execute_query(create_query);
         }
         freez(list->hostname);
 
@@ -1105,7 +1041,7 @@ char *aclk_state(void)
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Last Disconnect Time: %s\n", timebuf);
     }
-    if (!aclk_online() && next_connection_attempt && (tmptr = localtime_r(&next_connection_attempt, &tmbuf)) ) {
+    if (!aclk_connected && next_connection_attempt && (tmptr = localtime_r(&next_connection_attempt, &tmbuf)) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Next Connection Attempt At: %s\nLast Backoff: %.3f", timebuf, last_backoff_value);
