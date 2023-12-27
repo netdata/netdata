@@ -1756,7 +1756,7 @@ static void metadata_event_loop(void *arg)
     freez(loop);
     worker_unregister();
 
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down event loop");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down metadata thread");
     completion_mark_complete(&wc->start_stop_complete);
     if (wc->scan_complete) {
         completion_destroy(wc->scan_complete);

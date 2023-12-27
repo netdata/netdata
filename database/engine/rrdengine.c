@@ -40,6 +40,7 @@ struct rrdeng_main {
     uv_async_t async;
     uv_timer_t timer;
     pid_t tid;
+    bool shutdown;
 
     size_t flushes_running;
     size_t evictions_running;
@@ -1686,6 +1687,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_EVICT_INIT,                               "evict init");
     worker_register_job_name(RRDENG_OPCODE_CTX_SHUTDOWN,                             "ctx shutdown");
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
+    worker_register_job_name(RRDENG_OPCODE_SHUTDOWN_EVLOOP,                          "dbengine shutdown");
 
     worker_register_job_name(RRDENG_OPCODE_MAX,                                      "get opcode");
 
@@ -1827,6 +1829,13 @@ void dbengine_event_loop(void* arg) {
                     break;
                 }
 
+                case RRDENG_OPCODE_SHUTDOWN_EVLOOP: {
+                    uv_close((uv_handle_t *)&main->async, NULL);
+                    (void) uv_timer_stop(&main->timer);
+                    uv_close((uv_handle_t *)&main->timer, NULL);
+                    shutdown = true;
+                }
+
                 case RRDENG_OPCODE_NOOP: {
                     /* the command queue was empty, do nothing */
                     break;
@@ -1843,18 +1852,7 @@ void dbengine_event_loop(void* arg) {
         } while (opcode != RRDENG_OPCODE_NOOP);
     }
 
-    /* cleanup operations of the event loop */
-    netdata_log_info("DBENGINE: shutting down dbengine thread");
-
-    /*
-     * uv_async_send after uv_close does not seem to crash in linux at the moment,
-     * it is however undocumented behaviour and we need to be aware if this becomes
-     * an issue in the future.
-     */
-    uv_close((uv_handle_t *)&main->async, NULL);
-    uv_timer_stop(&main->timer);
-    uv_close((uv_handle_t *)&main->timer, NULL);
-    uv_run(&main->loop, UV_RUN_DEFAULT);
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
     uv_loop_close(&main->loop);
     worker_unregister();
 }
