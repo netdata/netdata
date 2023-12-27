@@ -403,6 +403,9 @@ support_list() {
 }
 
 success_banner() {
+  printf >&2 "%s\n" "To view your system's real-time performance metrics, open your web browser and enter http://NODE:19999."
+  printf >&2 "%s\n\n" "Replace NODE with the IP address or hostname of your Netdata server to access the dashboard."
+
   printf >&2 "%s\n\n" "Official documentation can be found online at ${DOCS_URL}."
 
   if [ -z "${CLAIM_TOKEN}" ]; then
