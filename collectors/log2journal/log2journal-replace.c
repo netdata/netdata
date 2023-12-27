@@ -74,6 +74,7 @@ bool replace_pattern_set(REPLACE_PATTERN *rp, const char *pattern) {
                 log2stderr("Error: Failed to add replacement node for variable.");
                 return false;
             }
+            freez(variable_name);
 
             current = end + 1; // Move past the variable
         }
@@ -97,6 +98,7 @@ bool replace_pattern_set(REPLACE_PATTERN *rp, const char *pattern) {
                 log2stderr("Error: Failed to add replacement node for text.");
                 return false;
             }
+            freez(text);
         }
     }
 
