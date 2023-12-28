@@ -187,8 +187,9 @@ include(CheckSymbolExists)
 check_symbol_exists(major sys/sysmacros.h MAJOR_IN_SYSMACROS)
 check_symbol_exists(major sys/mkdev.h MAJOR_IN_MKDEV)
 check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME)
-check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME)
 check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
+check_symbol_exists(finite math.h HAVE_FINITE)
+check_symbol_exists(isfinite math.h HAVE_ISFINITE)
 
 #
 # check source compilation

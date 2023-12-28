@@ -38,6 +38,8 @@
 #cmakedefine MAJOR_IN_MKDEV
 #cmakedefine HAVE_CLOCK_GETTIME
 #cmakedefine HAVE_STRERROR_R
+#cmakedefine HAVE_FINITE
+#cmakedefine HAVE_ISFINITE
 #cmakedefine HAVE_SETNS
 
 #cmakedefine HAVE_SYSTEMD
