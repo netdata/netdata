@@ -28,6 +28,10 @@ extern "C" {
 #define NETDATA_INTERNAL_CHECKS 1
 #endif
 
+#ifndef SIZEOF_VOID_P
+#error SIZEOF_VOID_P is not defined
+#endif
+
 #if SIZEOF_VOID_P == 4
 #define ENV32BIT 1
 #else

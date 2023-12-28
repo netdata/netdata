@@ -6,6 +6,8 @@
 #define __always_unused __attribute__((unused))
 #define __maybe_unused __attribute__((unused))
 
+#cmakedefine SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P}
+
 // platform
 #cmakedefine COMPILED_FOR_FREEBSD
 #cmakedefine COMPILED_FOR_LINUX
