@@ -264,10 +264,75 @@ int main() {
 }
 " HAVE_BUILTIN_ATOMICS)
 
+check_c_source_compiles("
+void my_printf(char const *s, ...) __attribute__((format(printf, 1, 2)));
+int main() { return 0; }
+" HAVE_FUNC_ATTRIBUTE_FORMAT)
+
+check_c_source_compiles("
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+void* my_alloc(size_t size) __attribute__((malloc));
+int main() {
+    void *x = my_alloc(1);
+    free(x);
+    return 0;
+}
+void* my_alloc(size_t size) {
+    void *ret = malloc(size);
+    if(!ret) exit(1);
+    return ret;
+}
+" HAVE_FUNC_ATTRIBUTE_MALLOC)
+
+check_c_source_compiles("
+void my_function() __attribute__((noinline));
+int main() { my_function(); return 0; }
+void my_function() { ; }
+" HAVE_FUNC_ATTRIBUTE_NOINLINE)
+
+check_c_source_compiles("
+void my_exit_function() __attribute__((noreturn));
+int main() {
+        my_exit_function(); // Call the noreturn function
+        return 0;
+}
+void my_exit_function() {
+        exit(1);
+}
+" HAVE_FUNC_ATTRIBUTE_NORETURN)
+
+check_c_source_compiles("
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+void* my_alloc(size_t size) __attribute__((returns_nonnull));
+int main() {
+        void* ptr = my_alloc(10);
+        free(ptr);
+        return 0;
+}
+void* my_alloc(size_t size) {
+        void *ret = malloc(size);
+        if(!ret) exit(1);
+        return ret;
+}
+" HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL)
+
+check_c_source_compiles("
+int my_function() __attribute__((warn_unused_result));
+int main() {
+        return my_function();
+}
+int my_function() {
+        return 1;
+}
+" HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT)
+
 if(FREEBSD OR MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
 endif()
-
 
 # openssl/crypto
 set(ENABLE_OPENSSL True)
