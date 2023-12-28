@@ -844,7 +844,7 @@ static void test_create_main_rusage_chart(void **state)
     expect_string(rrdset_create_custom, id, "exporting_main_thread_cpu");
     expect_value(rrdset_create_custom, name, NULL);
     expect_string(rrdset_create_custom, family, "exporting");
-    expect_string(rrdset_create_custom, context, "exporting_cpu_usage");
+    expect_string(rrdset_create_custom, context, "netdata.exporting_cpu_usage");
     expect_string(rrdset_create_custom, units, "milliseconds/s");
     expect_string(rrdset_create_custom, plugin, "exporting");
     expect_value(rrdset_create_custom, module, NULL);
@@ -912,7 +912,7 @@ static void test_send_internal_metrics(void **state)
     expect_string(rrdset_create_custom, type, "netdata");
     expect_string(rrdset_create_custom, id, "exporting_test_instance_metrics");
     expect_value(rrdset_create_custom, name, NULL);
-    expect_string(rrdset_create_custom, family, "exporting_test_instance");
+    expect_string(rrdset_create_custom, family, "exporting");
     expect_string(rrdset_create_custom, context, "exporting_buffer");
     expect_string(rrdset_create_custom, units, "metrics");
     expect_string(rrdset_create_custom, plugin, "exporting");
@@ -936,7 +936,7 @@ static void test_send_internal_metrics(void **state)
     expect_string(rrdset_create_custom, type, "netdata");
     expect_string(rrdset_create_custom, id, "exporting_test_instance_bytes");
     expect_value(rrdset_create_custom, name, NULL);
-    expect_string(rrdset_create_custom, family, "exporting_test_instance");
+    expect_string(rrdset_create_custom, family, "exporting");
     expect_string(rrdset_create_custom, context, "exporting_data_size");
     expect_string(rrdset_create_custom, units, "KiB");
     expect_string(rrdset_create_custom, plugin, "exporting");
@@ -960,7 +960,7 @@ static void test_send_internal_metrics(void **state)
     expect_string(rrdset_create_custom, type, "netdata");
     expect_string(rrdset_create_custom, id, "exporting_test_instance_ops");
     expect_value(rrdset_create_custom, name, NULL);
-    expect_string(rrdset_create_custom, family, "exporting_test_instance");
+    expect_string(rrdset_create_custom, family, "exporting");
     expect_string(rrdset_create_custom, context, "exporting_operations");
     expect_string(rrdset_create_custom, units, "operations");
     expect_string(rrdset_create_custom, plugin, "exporting");
@@ -984,7 +984,7 @@ static void test_send_internal_metrics(void **state)
     expect_string(rrdset_create_custom, type, "netdata");
     expect_string(rrdset_create_custom, id, "exporting_test_instance_thread_cpu");
     expect_value(rrdset_create_custom, name, NULL);
-    expect_string(rrdset_create_custom, family, "exporting_test_instance");
+    expect_string(rrdset_create_custom, family, "exporting");
     expect_string(rrdset_create_custom, context, "exporting_instance");
     expect_string(rrdset_create_custom, units, "milliseconds/s");
     expect_string(rrdset_create_custom, plugin, "exporting");
