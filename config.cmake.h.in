@@ -48,6 +48,8 @@
 #cmakedefine ENABLE_SYSTEMD_DBUS
 
 // checked source compilation
+
+#cmakedefine HAVE_ACCEPT4
 #cmakedefine STRERROR_R_CHAR_P
 
 // enabled features

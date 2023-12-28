@@ -199,6 +199,16 @@ include(CheckCXXSourceCompiles)
 
 check_c_source_compiles("
 #define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/socket.h>
+int main() {
+        accept4(0, NULL, NULL, 0);
+        return 0;
+}
+" HAVE_ACCEPT4)
+
+check_c_source_compiles("
+#define _GNU_SOURCE
 #include <string.h>
 int main() {
         char x = *strerror_r(0, &x, sizeof(x)); return 0;
