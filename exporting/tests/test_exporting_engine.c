@@ -844,7 +844,7 @@ static void test_create_main_rusage_chart(void **state)
     expect_string(rrdset_create_custom, id, "exporting_main_thread_cpu");
     expect_value(rrdset_create_custom, name, NULL);
     expect_string(rrdset_create_custom, family, "exporting");
-    expect_string(rrdset_create_custom, context, "exporting_cpu_usage");
+    expect_string(rrdset_create_custom, context, "netdata.exporting_cpu_usage");
     expect_string(rrdset_create_custom, units, "milliseconds/s");
     expect_string(rrdset_create_custom, plugin, "exporting");
     expect_value(rrdset_create_custom, module, NULL);
