@@ -45,6 +45,7 @@
 #cmakedefine HAVE_RECVMMSG
 #cmakedefine HAVE_NICE
 #cmakedefine HAVE_GETPRIORITY
+#cmakedefine HAVE_DLSYM
 
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE
