@@ -75,10 +75,6 @@ void send_internal_metrics(struct instance *instance)
 
     if (!stats->initialized) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        BUFFER *family = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
-
-        buffer_sprintf(family, "exporting_%s", instance->config.name);
-
         snprintf(id, RRD_ID_LENGTH_MAX, "exporting_%s_metrics", instance->config.name);
         netdata_fix_chart_id(id);
 
@@ -86,7 +82,7 @@ void send_internal_metrics(struct instance *instance)
             "netdata",
             id,
             NULL,
-            buffer_tostring(family),
+            "exporting",
             "netdata.exporting_buffer",
             "Netdata Buffered Metrics",
             "metrics",
@@ -109,7 +105,7 @@ void send_internal_metrics(struct instance *instance)
             "netdata",
             id,
             NULL,
-            buffer_tostring(family),
+            "exporting",
             "netdata.exporting_data_size",
             "Netdata Exporting Data Size",
             "KiB",
@@ -133,7 +129,7 @@ void send_internal_metrics(struct instance *instance)
             "netdata",
             id,
             NULL,
-            buffer_tostring(family),
+            "exporting",
             "netdata.exporting_operations",
             "Netdata Exporting Operations",
             "operations",
@@ -158,7 +154,7 @@ void send_internal_metrics(struct instance *instance)
             "netdata",
             id,
             NULL,
-            buffer_tostring(family),
+            "exporting",
             "netdata.exporting_instance",
             "Netdata Exporting Instance Thread CPU Usage",
             "milliseconds/s",
@@ -170,8 +166,6 @@ void send_internal_metrics(struct instance *instance)
 
         stats->rd_user   = rrddim_add(stats->st_rusage, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         stats->rd_system = rrddim_add(stats->st_rusage, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-
-        buffer_free(family);
 
         stats->initialized = 1;
     }
