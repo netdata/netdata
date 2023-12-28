@@ -213,6 +213,17 @@ check_function_exists(backtrace HAVE_BACKTRACE)
 include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
 
+set(CMAKE_REQUIRED_LIBRARIES pthread)
+check_c_source_compiles("
+#define _GNU_SOURCE
+#include <pthread.h>
+int main() {
+        char name[16];
+        pthread_t thread = pthread_self();
+        return pthread_getname_np(thread, name, sizeof(name));
+}
+" HAVE_PTHREAD_GETNAME_NP)
+
 check_c_source_compiles("
 #include <stdio.h>
 #define mytype(X) _Generic((X), int: 'i', float: 'f', default: 'u')
