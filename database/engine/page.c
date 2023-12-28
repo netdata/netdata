@@ -612,7 +612,7 @@ void pgdc_reset(PGDC *pgdc, PGD *pgd, uint32_t position)
     pgdc_seek(pgdc, position);
 }
 
-bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position, STORAGE_POINT *sp)
+bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, STORAGE_POINT *sp)
 {
     if (!pgdc->pgd || pgdc->pgd == PGD_EMPTY || pgdc->position >= pgdc->slots)
     {
@@ -668,7 +668,8 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position, STORAGE_POINT *
             static bool logged = false;
             if (!logged)
             {
-                netdata_log_error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", pgd_type(pgdc->pgd));
+                netdata_log_error("DBENGINE: unknown page type %"PRIu32" found. Cannot decode it. Ignoring its metrics.",
+                                  pgd_type(pgdc->pgd));
                 logged = true;
             }
 

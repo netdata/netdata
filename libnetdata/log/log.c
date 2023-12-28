@@ -2112,7 +2112,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         else if(thread_log_fields[NDF_LOG_SOURCE].entry.type == NDFT_U64)
             src = thread_log_fields[NDF_LOG_SOURCE].entry.u64;
 
-        if(src != source && src >= 0 && src < _NDLS_MAX) {
+        if(src != source && src < _NDLS_MAX) {
             source = src;
             output = nd_logger_select_output(source, &fp, &spinlock);
             if(output != NDLM_FILE && output != NDLM_JOURNAL && output != NDLM_SYSLOG)
@@ -2396,7 +2396,8 @@ static bool nd_log_limit_reached(struct nd_log_source *source) {
                     source->limits.logs_per_period,
                     source->limits.throttle_period,
                     program_name,
-                    (int64_t)((source->limits.started_monotonic_ut + (source->limits.throttle_period * USEC_PER_SEC) - now_ut)) / USEC_PER_SEC);
+                    (int64_t)(((source->limits.started_monotonic_ut + (source->limits.throttle_period * USEC_PER_SEC) - now_ut)) / USEC_PER_SEC)
+            );
 
             if(source->pending_msg)
                 freez((void *)source->pending_msg);

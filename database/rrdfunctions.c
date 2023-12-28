@@ -1098,7 +1098,7 @@ int rrdhost_function_streaming(uuid_t *transaction __maybe_unused, BUFFER *wb,
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_HELP);
     buffer_json_member_add_array(wb, "data");
 
-    size_t max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
+    size_t max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX] = { 0 };
     size_t max_db_metrics = 0, max_db_instances = 0, max_db_contexts = 0;
     size_t max_collection_replication_instances = 0, max_streaming_replication_instances = 0;
     size_t max_ml_anomalous = 0, max_ml_normal = 0, max_ml_trained = 0, max_ml_pending = 0, max_ml_silenced = 0;

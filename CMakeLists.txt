@@ -65,6 +65,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED On)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
+set(SIZEOF_VOID_P ${CMAKE_SIZEOF_VOID_P})
+
 if(NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
 endif()
@@ -184,11 +186,25 @@ check_library_exists(snappy snappy_compress "" HAVE_SNAPPY_LIB)
 #
 
 include(CheckSymbolExists)
-check_symbol_exists(major sys/sysmacros.h MAJOR_IN_SYSMACROS)
-check_symbol_exists(major sys/mkdev.h MAJOR_IN_MKDEV)
-check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME)
-check_symbol_exists(clock_gettime time.h HAVE_CLOCK_GETTIME)
-check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
+check_symbol_exists(major "sys/sysmacros.h" MAJOR_IN_SYSMACROS)
+check_symbol_exists(major "sys/mkdev.h" MAJOR_IN_MKDEV)
+check_symbol_exists(clock_gettime "time.h" HAVE_CLOCK_GETTIME)
+check_symbol_exists(strerror_r "string.h" HAVE_STRERROR_R)
+check_symbol_exists(finite "math.h" HAVE_FINITE)
+check_symbol_exists(isfinite "math.h" HAVE_ISFINITE)
+check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
+
+check_function_exists(nice HAVE_NICE)
+check_function_exists(recvmmsg HAVE_RECVMMSG)
+check_function_exists(getpriority HAVE_GETPRIORITY)
+
+check_function_exists(sched_getscheduler HAVE_SCHED_GETSCHEDULER)
+check_function_exists(sched_setscheduler HAVE_SCHED_SETSCHEDULER)
+check_function_exists(sched_get_priority_min HAVE_SCHED_GET_PRIORITY_MIN)
+check_function_exists(sched_get_priority_max HAVE_SCHED_GET_PRIORITY_MAX)
+
+check_function_exists(close_range HAVE_CLOSE_RANGE)
+check_function_exists(backtrace HAVE_BACKTRACE)
 
 #
 # check source compilation
@@ -196,6 +212,45 @@ check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
 
 include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
+
+set(CMAKE_REQUIRED_LIBRARIES pthread)
+check_c_source_compiles("
+#define _GNU_SOURCE
+#include <pthread.h>
+int main() {
+        char name[16];
+        pthread_t thread = pthread_self();
+        return pthread_getname_np(thread, name, sizeof(name));
+}
+" HAVE_PTHREAD_GETNAME_NP)
+
+check_c_source_compiles("
+#include <stdio.h>
+#define mytype(X) _Generic((X), int: 'i', float: 'f', default: 'u')
+int main() {
+        char type = mytype(0);
+        return 0;
+}
+" HAVE_C__GENERIC)
+
+check_c_source_compiles("
+#include <malloc.h>
+int main() {
+        mallopt(M_ARENA_MAX, 1);
+        mallopt(M_PERTURB, 0x5A);
+        return 0;
+}
+" HAVE_C_MALLOPT)
+
+check_c_source_compiles("
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <sys/socket.h>
+int main() {
+        accept4(0, NULL, NULL, 0);
+        return 0;
+}
+" HAVE_ACCEPT4)
 
 check_c_source_compiles("
 #define _GNU_SOURCE
@@ -222,10 +277,75 @@ int main() {
 }
 " HAVE_BUILTIN_ATOMICS)
 
+check_c_source_compiles("
+void my_printf(char const *s, ...) __attribute__((format(printf, 1, 2)));
+int main() { return 0; }
+" HAVE_FUNC_ATTRIBUTE_FORMAT)
+
+check_c_source_compiles("
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+void* my_alloc(size_t size) __attribute__((malloc));
+int main() {
+    void *x = my_alloc(1);
+    free(x);
+    return 0;
+}
+void* my_alloc(size_t size) {
+    void *ret = malloc(size);
+    if(!ret) exit(1);
+    return ret;
+}
+" HAVE_FUNC_ATTRIBUTE_MALLOC)
+
+check_c_source_compiles("
+void my_function() __attribute__((noinline));
+int main() { my_function(); return 0; }
+void my_function() { ; }
+" HAVE_FUNC_ATTRIBUTE_NOINLINE)
+
+check_c_source_compiles("
+void my_exit_function() __attribute__((noreturn));
+int main() {
+        my_exit_function(); // Call the noreturn function
+        return 0;
+}
+void my_exit_function() {
+        exit(1);
+}
+" HAVE_FUNC_ATTRIBUTE_NORETURN)
+
+check_c_source_compiles("
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+void* my_alloc(size_t size) __attribute__((returns_nonnull));
+int main() {
+        void* ptr = my_alloc(10);
+        free(ptr);
+        return 0;
+}
+void* my_alloc(size_t size) {
+        void *ret = malloc(size);
+        if(!ret) exit(1);
+        return ret;
+}
+" HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL)
+
+check_c_source_compiles("
+int my_function() __attribute__((warn_unused_result));
+int main() {
+        return my_function();
+}
+int my_function() {
+        return 1;
+}
+" HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT)
+
 if(FREEBSD OR MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
 endif()
-
 
 # openssl/crypto
 set(ENABLE_OPENSSL True)

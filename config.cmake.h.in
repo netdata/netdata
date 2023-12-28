@@ -6,6 +6,8 @@
 #define __always_unused __attribute__((unused))
 #define __maybe_unused __attribute__((unused))
 
+#cmakedefine SIZEOF_VOID_P ${SIZEOF_VOID_P}
+
 // platform
 #cmakedefine COMPILED_FOR_FREEBSD
 #cmakedefine COMPILED_FOR_LINUX
@@ -38,7 +40,19 @@
 #cmakedefine MAJOR_IN_MKDEV
 #cmakedefine HAVE_CLOCK_GETTIME
 #cmakedefine HAVE_STRERROR_R
-#cmakedefine HAVE_SETNS
+#cmakedefine HAVE_FINITE
+#cmakedefine HAVE_ISFINITE
+#cmakedefine HAVE_RECVMMSG
+#cmakedefine HAVE_NICE
+#cmakedefine HAVE_GETPRIORITY
+#cmakedefine HAVE_DLSYM
+
+#cmakedefine HAVE_BACKTRACE
+#cmakedefine HAVE_CLOSE_RANGE
+#cmakedefine HAVE_SCHED_GETSCHEDULER
+#cmakedefine HAVE_SCHED_SETSCHEDULER
+#cmakedefine HAVE_SCHED_GET_PRIORITY_MIN
+#cmakedefine HAVE_SCHED_GET_PRIORITY_MAX
 
 #cmakedefine HAVE_SYSTEMD
 #cmakedefine HAVE_SD_JOURNAL_OS_ROOT
@@ -48,7 +62,20 @@
 #cmakedefine ENABLE_SYSTEMD_DBUS
 
 // checked source compilation
+
+#cmakedefine HAVE_PTHREAD_GETNAME_NP
+#cmakedefine HAVE_ACCEPT4
 #cmakedefine STRERROR_R_CHAR_P
+#cmakedefine HAVE_C__GENERIC
+#cmakedefine HAVE_C_MALLOPT
+#cmakedefine HAVE_SETNS
+
+#cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT
+#cmakedefine HAVE_FUNC_ATTRIBUTE_MALLOC
+#cmakedefine HAVE_FUNC_ATTRIBUTE_NOINLINE
+#cmakedefine HAVE_FUNC_ATTRIBUTE_NORETURN
+#cmakedefine HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
+#cmakedefine HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT
 
 // enabled features
 
