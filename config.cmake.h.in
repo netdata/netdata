@@ -45,7 +45,6 @@
 #cmakedefine HAVE_RECVMMSG
 #cmakedefine HAVE_NICE
 #cmakedefine HAVE_GETPRIORITY
-#cmakedefine HAVE_SETNS
 
 #cmakedefine HAVE_SYSTEMD
 #cmakedefine HAVE_SD_JOURNAL_OS_ROOT
@@ -59,6 +58,8 @@
 #cmakedefine HAVE_ACCEPT4
 #cmakedefine STRERROR_R_CHAR_P
 #cmakedefine HAVE_C__GENERIC
+#cmakedefine HAVE_C_MALLOPT
+#cmakedefine HAVE_SETNS
 
 // enabled features
 
