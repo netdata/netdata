@@ -58,6 +58,7 @@
 
 #cmakedefine HAVE_ACCEPT4
 #cmakedefine STRERROR_R_CHAR_P
+#cmakedefine HAVE_C__GENERIC
 
 // enabled features
 

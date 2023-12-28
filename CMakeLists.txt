@@ -203,6 +203,15 @@ include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
 
 check_c_source_compiles("
+#include <stdio.h>
+#define mytype(X) _Generic((X), int: 'i', float: 'f', default: 'u')
+int main() {
+        char type = mytype(0); // This should compile if _Generic is supported
+        return 0;
+}
+" HAVE_C__GENERIC)
+
+check_c_source_compiles("
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <sys/socket.h>
