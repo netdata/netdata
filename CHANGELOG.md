@@ -6,9 +6,16 @@
 
 **Merged pull requests:**
 
+- update bundled UI to v6.75.2 [\#16674](https://github.com/netdata/netdata/pull/16674) ([ilyam8](https://github.com/ilyam8))
+- kickstart: add a note on how to access the UI to the success banner [\#16673](https://github.com/netdata/netdata/pull/16673) ([ilyam8](https://github.com/ilyam8))
+- remove contrib/rhel [\#16672](https://github.com/netdata/netdata/pull/16672) ([ilyam8](https://github.com/ilyam8))
+- eBPF socket \(eBPF\) [\#16669](https://github.com/netdata/netdata/pull/16669) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix compiler warnings [\#16665](https://github.com/netdata/netdata/pull/16665) ([ktsaou](https://github.com/ktsaou))
 - dont exceed buffer boundaries, when the buffer is empty [\#16664](https://github.com/netdata/netdata/pull/16664) ([ktsaou](https://github.com/ktsaou))
+- set log level of too-old-data message to debug  [\#16663](https://github.com/netdata/netdata/pull/16663) ([ilyam8](https://github.com/ilyam8))
+- Shutdown dbengine event loop properly [\#16658](https://github.com/netdata/netdata/pull/16658) ([stelfrag](https://github.com/stelfrag))
 - docs: Correct chart\_labels summary [\#16656](https://github.com/netdata/netdata/pull/16656) ([sepek](https://github.com/sepek))
+- Fix coverity issues [\#16655](https://github.com/netdata/netdata/pull/16655) ([stelfrag](https://github.com/stelfrag))
 - Fix overrun in crc32set [\#16654](https://github.com/netdata/netdata/pull/16654) ([stelfrag](https://github.com/stelfrag))
 - Necessary changes for Learn [\#16651](https://github.com/netdata/netdata/pull/16651) ([Ancairon](https://github.com/Ancairon))
 - docs: add a few examples how to query Netdata logs using journalctl [\#16650](https://github.com/netdata/netdata/pull/16650) ([ilyam8](https://github.com/ilyam8))
@@ -416,21 +423,6 @@
 - fix crash on parsing clabel command with no source [\#16114](https://github.com/netdata/netdata/pull/16114) ([ilyam8](https://github.com/ilyam8))
 - update UI to v6.43.0 [\#16112](https://github.com/netdata/netdata/pull/16112) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16111](https://github.com/netdata/netdata/pull/16111) ([netdatabot](https://github.com/netdatabot))
-- journal: respect anchor on non-data-only queries [\#16109](https://github.com/netdata/netdata/pull/16109) ([ktsaou](https://github.com/ktsaou))
-- Fix in generate integrations docs script [\#16108](https://github.com/netdata/netdata/pull/16108) ([Ancairon](https://github.com/Ancairon))
-- journal: go up to stop anchor on data only queries [\#16107](https://github.com/netdata/netdata/pull/16107) ([ktsaou](https://github.com/ktsaou))
-- Update collectors/python.d.plugin/pandas/metadata.yaml [\#16106](https://github.com/netdata/netdata/pull/16106) ([Ancairon](https://github.com/Ancairon))
-- Code improvements [\#16104](https://github.com/netdata/netdata/pull/16104) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#16103](https://github.com/netdata/netdata/pull/16103) ([netdatabot](https://github.com/netdatabot))
-- Add integrations/cloud-notifications to cleanup [\#16102](https://github.com/netdata/netdata/pull/16102) ([Ancairon](https://github.com/Ancairon))
-- better journal logging [\#16101](https://github.com/netdata/netdata/pull/16101) ([ktsaou](https://github.com/ktsaou))
-- update UI to v6.42.2 [\#16100](https://github.com/netdata/netdata/pull/16100) ([ilyam8](https://github.com/ilyam8))
-- a simple journal optimization [\#16099](https://github.com/netdata/netdata/pull/16099) ([ktsaou](https://github.com/ktsaou))
-- journal: fix incremental queries [\#16098](https://github.com/netdata/netdata/pull/16098) ([ktsaou](https://github.com/ktsaou))
-- Update categories.yaml [\#16097](https://github.com/netdata/netdata/pull/16097) ([Ancairon](https://github.com/Ancairon))
-- Fix systemd-journal.plugin README and prepare it for Learn [\#16096](https://github.com/netdata/netdata/pull/16096) ([Ancairon](https://github.com/Ancairon))
-- Split apps charts [\#16095](https://github.com/netdata/netdata/pull/16095) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix querying out of retention [\#16094](https://github.com/netdata/netdata/pull/16094) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
