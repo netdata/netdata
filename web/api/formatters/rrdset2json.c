@@ -2,7 +2,7 @@
 
 #include "rrdset2json.h"
 
-static int process_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
+static int process_label_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
     BUFFER *wb = data;
     buffer_json_member_add_string_or_empty(wb, name,  value);
     return 1;

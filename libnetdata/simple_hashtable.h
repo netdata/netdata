@@ -251,7 +251,7 @@ static void simple_hashtable_init_named(SIMPLE_HASHTABLE_NAMED *ht, size_t size)
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
 }
 
-static void simple_hashtable_destroy_named(SIMPLE_HASHTABLE_NAMED *ht) {
+static inline void simple_hashtable_destroy_named(SIMPLE_HASHTABLE_NAMED *ht) {
 #ifdef SIMPLE_HASHTABLE_SORT_FUNCTION
     freez(ht->sorted.array);
 #endif

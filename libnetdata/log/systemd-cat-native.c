@@ -11,7 +11,7 @@
 #include <machine/endian.h>
 #endif
 
-static void log_message_to_stderr(BUFFER *msg) {
+static inline void log_message_to_stderr(BUFFER *msg) {
     CLEAN_BUFFER *tmp = buffer_create(0, NULL);
 
     for(size_t i = 0; i < msg->len ;i++) {
@@ -594,7 +594,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
             // an empty line - we are done for this message
 
             nd_log(NDLS_HEALTH, priority,
-                   "added %d fields", // if the user supplied a MESSAGE, this will be ignored
+                   "added %zu fields", // if the user supplied a MESSAGE, this will be ignored
                    fields_added);
 
             lgs_reset(lgs);
@@ -627,7 +627,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
 
                     nd_log(NDLS_COLLECTORS, NDLP_ERR,
                            "Field '%.*s' is not a Netdata field. Ignoring it.",
-                           field_len, field);
+                           (int)field_len, field);
 
                     lgs[NDF_MESSAGE] = backup;
                 }
@@ -648,7 +648,7 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
     }
 
     if(fields_added) {
-        nd_log(NDLS_HEALTH, priority, "added %d fields", fields_added);
+        nd_log(NDLS_HEALTH, priority, "added %zu fields", fields_added);
         messages_logged++;
     }
 

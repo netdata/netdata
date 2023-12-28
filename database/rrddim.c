@@ -362,7 +362,7 @@ RRDDIM *rrddim_find_active(RRDSET *st, const char *id) {
 // ----------------------------------------------------------------------------
 // RRDDIM rename a dimension
 
-inline int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name) {
+inline int rrddim_reset_name(RRDSET *st __maybe_unused, RRDDIM *rd, const char *name) {
     if(unlikely(!name || !*name || !strcmp(rrddim_name(rd), name)))
         return 0;
 
