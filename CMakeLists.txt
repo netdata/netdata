@@ -195,6 +195,14 @@ check_function_exists(nice HAVE_NICE)
 check_function_exists(recvmmsg HAVE_RECVMMSG)
 check_function_exists(getpriority HAVE_GETPRIORITY)
 
+check_function_exists(sched_getscheduler HAVE_SCHED_GETSCHEDULER)
+check_function_exists(sched_setscheduler HAVE_SCHED_SETSCHEDULER)
+check_function_exists(sched_get_priority_min HAVE_SCHED_GET_PRIORITY_MIN)
+check_function_exists(sched_get_priority_max HAVE_SCHED_GET_PRIORITY_MAX)
+
+check_function_exists(close_range HAVE_CLOSE_RANGE)
+check_function_exists(backtrace HAVE_BACKTRACE)
+
 #
 # check source compilation
 #
