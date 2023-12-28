@@ -42,6 +42,9 @@
 #cmakedefine HAVE_STRERROR_R
 #cmakedefine HAVE_FINITE
 #cmakedefine HAVE_ISFINITE
+#cmakedefine HAVE_RECVMMSG
+#cmakedefine HAVE_NICE
+#cmakedefine HAVE_GETPRIORITY
 #cmakedefine HAVE_SETNS
 
 #cmakedefine HAVE_SYSTEMD

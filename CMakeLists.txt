@@ -191,6 +191,10 @@ check_symbol_exists(strerror_r string.h HAVE_STRERROR_R)
 check_symbol_exists(finite math.h HAVE_FINITE)
 check_symbol_exists(isfinite math.h HAVE_ISFINITE)
 
+check_function_exists(nice HAVE_NICE)
+check_function_exists(recvmmsg HAVE_RECVMMSG)
+check_function_exists(getpriority HAVE_GETPRIORITY)
+
 #
 # check source compilation
 #
