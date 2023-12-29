@@ -423,6 +423,13 @@ int main(int argc, char **argv) {
         // restart check (14400 seconds)
         if (!now_monotonic_sec() - started_t > 14400)
             break;
+
+        fprintf(stdout, "\n");
+        fflush(stdout);
+        if (ferror(stdout) && errno == EPIPE) {
+            netdata_log_error("error writing to stdout: EPIPE. Exiting...");
+            return 1;
+        }
     }
 
     httpClose(http);
