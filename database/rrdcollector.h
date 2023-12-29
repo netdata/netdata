@@ -5,7 +5,7 @@
 
 #include "rrd.h"
 
-#ifdef NETDATA_RRDCOLLECTOR_INTERNALS
+#ifdef RRD_COLLECTOR_INTERNALS
 
 // ----------------------------------------------------------------------------
 // private API
@@ -19,7 +19,7 @@ pid_t rrd_collector_tid(struct rrd_collector *rdc);
 bool rrd_collector_dispatcher_acquire(struct rrd_collector *rdc);
 void rrd_collector_dispatcher_release(struct rrd_collector *rdc);
 
-#endif // NETDATA_RRDCOLLECTOR_INTERNALS
+#endif // RRD_COLLECTOR_INTERNALS
 
 // ----------------------------------------------------------------------------
 // public API

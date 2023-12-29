@@ -26,9 +26,42 @@ typedef int (*rrd_function_execute_cb_t)(uuid_t *transaction, BUFFER *wb,
                                          rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data,
                                          rrd_function_register_progresser_cb_t register_progresser_cb, void *register_progresser_cb_data);
 
+// ----------------------------------------------------------------------------
+
+#ifdef RRD_FUNCTIONS_INTERNALS
+
+typedef enum __attribute__((packed)) {
+    RRD_FUNCTION_LOCAL  = (1 << 0),
+    RRD_FUNCTION_GLOBAL = (1 << 1),
+
+    // this is 8-bit
+} RRD_FUNCTION_OPTIONS;
+
+struct rrd_host_function {
+    bool sync;                      // when true, the function is called synchronously
+    RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
+    HTTP_ACCESS access;
+    STRING *help;
+    STRING *tags;
+    int timeout;                    // the default timeout of the function
+    int priority;
+
+    rrd_function_execute_cb_t execute_cb;
+    void *execute_cb_data;
+
+    struct rrd_collector *collector;
+};
+
+size_t rrd_functions_sanitize(char *dst, const char *src, size_t dst_len);
+int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item);
+
+#endif // RRD_FUNCTIONS_INTERNALS
+
+// ----------------------------------------------------------------------------
+
 void rrd_functions_inflight_init(void);
-void rrdfunctions_host_init(RRDHOST *host);
-void rrdfunctions_host_destroy(RRDHOST *host);
+void rrd_functions_host_init(RRDHOST *host);
+void rrd_functions_host_destroy(RRDHOST *host);
 
 // add a function, to be run from the collector
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, const char *help, const char *tags,
@@ -58,8 +91,6 @@ void host_functions2json(RRDHOST *host, BUFFER *wb);
 uint8_t functions_format_to_content_type(const char *format);
 const char *functions_content_type_to_format(HTTP_CONTENT_TYPE content_type);
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
-
-#define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
 
 #include "rrdfunctions-inline.h"
 #include "rrdfunctions-streaming.h"

@@ -337,7 +337,7 @@ int is_legacy = 1;
     netdata_mutex_init(&host->receiver_lock);
 
     if (likely(!archived)) {
-        rrdfunctions_host_init(host);
+        rrd_functions_host_init(host);
         host->last_connected = now_realtime_sec();
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush_sender(
@@ -694,7 +694,7 @@ static void rrdhost_update(RRDHOST *host
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
 
-        rrdfunctions_host_init(host);
+        rrd_functions_host_init(host);
 
         if(!host->rrdlabels)
             host->rrdlabels = rrdlabels_create();
@@ -1325,7 +1325,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     freez(host->node_id);
 
     rrdfamily_index_destroy(host);
-    rrdfunctions_host_destroy(host);
+    rrd_functions_host_destroy(host);
     rrdvariables_destroy(host->rrdvars);
     if (host == localhost)
         rrdvariables_destroy(health_rrdvars);

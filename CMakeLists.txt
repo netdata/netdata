@@ -874,6 +874,8 @@ set(RRD_PLUGIN_FILES
         database/sqlite/dbdata.c
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
+        database/rrdfunctions-inflight.c
+        database/rrdfunctions-inflight.h
 )
 
 if(ENABLE_DBENGINE)

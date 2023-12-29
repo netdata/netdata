@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#ifndef NETDATA_RRDFUNCTIONS_INFLIGHT_H
+#define NETDATA_RRDFUNCTIONS_INFLIGHT_H
+
+#include "rrd.h"
+
+#endif //NETDATA_RRDFUNCTIONS_INFLIGHT_H
