@@ -36,6 +36,7 @@ run ./netdata-installer.sh \
   --use-system-protobuf \
   --dont-scrub-cflags-even-though-it-may-break-things \
   --one-time-build \
+  --disable-logsmanagement \
   --enable-lto
 
 # shellcheck disable=SC2015
