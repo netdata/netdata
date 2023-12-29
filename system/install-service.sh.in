@@ -625,7 +625,7 @@ freebsd_cmds() {
 
 install_darwin_service() {
   info "Installing macOS plist file for launchd."
-  if ! install -C -S -p -m 0644 -o 0 -g 0 system/launchd/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist; then
+  if ! install -C -S -p -m 0644 -o 0 -g 0 "${SVC_SOURCE}/launchd/netdata.plist" /Library/LaunchDaemons/com.github.netdata.plist; then
     error "Failed to copy plist file."
     exit 4
   fi
