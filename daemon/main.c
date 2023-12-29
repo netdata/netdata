@@ -2034,6 +2034,15 @@ int main(int argc, char **argv) {
         // setup threads configs
         default_stacksize = netdata_threads_init();
 
+#ifdef NETDATA_INTERNAL_CHECKS
+        config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring", true);
+        config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring extended", true);
+#endif
+
+        if(config_get_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring extended", false))
+            // this has to run before starting any other threads that use workers
+            workers_utilization_enable();
+
         for (i = 0; static_threads[i].name != NULL ; i++) {
             struct netdata_static_thread *st = &static_threads[i];
 

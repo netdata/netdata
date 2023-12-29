@@ -50,13 +50,16 @@ struct workers_workname {                           // this is what we add to Ju
 };
 
 static struct workers_globals {
+    bool enabled;
+
     SPINLOCK spinlock;
     Pvoid_t worknames_JudyHS;
     size_t memory;
 
 } workers_globals = {                               // workers globals, the base of all worknames
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,   // a lock for the worknames index
-        .worknames_JudyHS = NULL,                   // the worknames index
+    .enabled = false,
+    .spinlock = NETDATA_SPINLOCK_INITIALIZER,   // a lock for the worknames index
+    .worknames_JudyHS = NULL,                   // the worknames index
 };
 
 static __thread struct worker *worker = NULL; // the current thread worker
@@ -69,7 +72,14 @@ static inline usec_t worker_now_monotonic_usec(void) {
 #endif
 }
 
+void workers_utilization_enable(void) {
+    workers_globals.enabled = true;
+}
+
 size_t workers_allocated_memory(void) {
+    if(!workers_globals.enabled)
+        return 0;
+
     spinlock_lock(&workers_globals.spinlock);
     size_t memory = workers_globals.memory;
     spinlock_unlock(&workers_globals.spinlock);
@@ -78,7 +88,8 @@ size_t workers_allocated_memory(void) {
 }
 
 void worker_register(const char *name) {
-    if(unlikely(worker)) return;
+    if(unlikely(worker || !workers_globals.enabled))
+        return;
 
     worker = callocz(1, sizeof(struct worker));
     worker->pid = gettid();
@@ -213,6 +224,7 @@ void worker_is_busy(size_t job_id) {
 
 void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
     if(unlikely(!worker)) return;
+
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 
@@ -247,6 +259,9 @@ void workers_foreach(const char *name, void (*callback)(
                                                , NETDATA_DOUBLE *job_custom_values
                                                )
                                                , void *data) {
+    if(!workers_globals.enabled)
+        return;
+
     spinlock_lock(&workers_globals.spinlock);
     usec_t busy_time, delta;
     size_t i, jobs_started, jobs_running;
