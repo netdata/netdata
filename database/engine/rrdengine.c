@@ -1398,6 +1398,14 @@ uint64_t rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
 
 bool rrdeng_ctx_exceeded_disk_quota(struct rrdengine_instance *ctx)
 {
+    if(!ctx->datafiles.first)
+        // no datafiles available
+        return false;
+
+    if(!ctx->datafiles.first->next)
+        // only 1 datafile available
+        return false;
+
     uint64_t estimated_disk_space = ctx_current_disk_space_get(ctx) + rrdeng_target_data_file_size(ctx) -
                                     (ctx->datafiles.first->prev ? ctx->datafiles.first->prev->pos : 0);
 
