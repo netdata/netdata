@@ -113,7 +113,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
@@ -202,9 +202,9 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: static-archive-${{ matrix.arch }}
+          name: static-archive
           path: artifacts/*.gz.run
           retention-days: 30
       - name: Failure Notification
@@ -345,7 +345,7 @@ jobs:
           tags: test:${{ matrix.artifact_key }}
       - name: Upload image artifact
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.artifact_key }}-test-env
           path: /tmp/image.tar
@@ -401,7 +401,7 @@ jobs:
       - name: Fetch test environment
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: ${{ matrix.artifact_key }}-test-env
       - name: Load test environment
@@ -484,7 +484,7 @@ jobs:
       - name: Fetch dist tarball artifacts
         id: fetch-tarball
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: dist-tarball
           path: dist-tarball
@@ -503,7 +503,7 @@ jobs:
       - name: Fetch test environment
         id: fetch-test-environment
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: ${{ matrix.artifact_key }}-test-env
       - name: Load test environment
@@ -565,18 +565,17 @@ jobs:
       - name: Retrieve Dist Tarball
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: dist-tarball
           path: dist-tarball
       - name: Retrieve Static Build Artifacts
         id: fetch-static
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
-          pattern: static-archive-*
+          name: static-archive
           path: static-archive
-          merge-multiple: true
       - name: Prepare Artifacts
         id: consolidate
         if: needs.file-check.outputs.run == 'true'
@@ -592,7 +591,7 @@ jobs:
       - name: Store Artifacts
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: final-artifacts
           path: artifacts/*
@@ -648,7 +647,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: final-artifacts
           path: artifacts
@@ -712,7 +711,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: final-artifacts
           path: artifacts
@@ -761,7 +760,7 @@ jobs:
     steps:
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: final-artifacts
           path: final-artifacts
@@ -826,7 +825,7 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: final-artifacts
           path: final-artifacts
@@ -940,7 +939,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: final-artifacts
           path: final-artifacts
