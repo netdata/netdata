@@ -774,7 +774,14 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
     if(access != HTTP_ACCESS_ADMINS && rdcf->access != HTTP_ACCESS_ANY && access > rdcf->access) {
-        rrd_call_function_error(result_wb, "This function requires a higher access level.", code);
+
+        if(!aclk_connected)
+            rrd_call_function_error(result_wb, "This Netdata must be connected to Netdata Cloud to access this function.", HTTP_RESP_PRECOND_FAIL);
+        else if(access >= HTTP_ACCESS_ANY)
+            rrd_call_function_error(result_wb, "You need to login to the Netdata Cloud space this agent is claimed to, to access this function.", HTTP_RESP_PRECOND_FAIL);
+        else /* if(access < HTTP_ACCESS_ANY && rdcf->access < access) */
+            rrd_call_function_error(result_wb, "To access this function you need to be an admin in this Netdata Cloud space.", HTTP_RESP_PRECOND_FAIL);
+
         dictionary_acquired_item_release(host->functions, host_function_acquired);
         return HTTP_RESP_PRECOND_FAIL;
     }
