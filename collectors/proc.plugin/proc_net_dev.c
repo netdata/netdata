@@ -11,6 +11,8 @@
 
 #define READ_RETRY_PERIOD 60 // seconds
 
+time_t double_linked_device_collect_delay_secs = 120;
+
 void cgroup_netdev_reset_all(void);
 void cgroup_netdev_release(const DICTIONARY_ITEM *link);
 const void *cgroup_netdev_dup(const DICTIONARY_ITEM *link);
@@ -98,6 +100,8 @@ static struct netdev {
     int updated;
 
     bool function_ready;
+
+    bool double_linked; // iflink != ifindex
 
     time_t discover_time;
     
@@ -988,6 +992,7 @@ static struct netdev *get_netdev(const char *name) {
     d->len = strlen(d->name);
     d->chart_labels = rrdlabels_create();
     d->function_ready = false;
+    d->double_linked = false;
 
     d->chart_type_net_bytes      = strdupz("net");
     d->chart_type_net_compressed = strdupz("net_compressed");
@@ -1047,7 +1052,21 @@ static struct netdev *get_netdev(const char *name) {
     return d;
 }
 
-#define NETDEV_VIRTUAL_COLLECT_DELAY 15 // 1 full run of the cgroups discovery thread (10 secs by default)
+static bool is_iface_double_linked(struct netdev *d) {
+    char filename[FILENAME_MAX + 1];
+    unsigned long long iflink = 0;
+    unsigned long long ifindex = 0;
+
+    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/iflink", netdata_configured_host_prefix, d->name);
+    if (read_single_number_file(filename, &iflink))
+        return false;
+
+    snprintfz(filename, FILENAME_MAX, "%s/sys/class/net/%s/ifindex", netdata_configured_host_prefix, d->name);
+    if (read_single_number_file(filename, &ifindex))
+        return false;
+
+    return iflink != ifindex;
+}
 
 int do_proc_net_dev(int update_every, usec_t dt) {
     (void)dt;
@@ -1197,6 +1216,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             if(d->enabled == CONFIG_BOOLEAN_NO)
                 continue;
 
+            d->double_linked = is_iface_double_linked(d);
+
             d->do_bandwidth = do_bandwidth;
             d->do_packets = do_packets;
             d->do_errors = do_errors;
@@ -1243,7 +1264,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         // This is necessary to prevent the creation of charts for virtual interfaces that will later be 
         // recreated as container interfaces (create container) or
         // rediscovered and recreated only to be deleted almost immediately (stop/remove container)
-        if (d->virtual && (now - d->discover_time < NETDEV_VIRTUAL_COLLECT_DELAY)) {
+        if (d->double_linked && d->virtual && (now - d->discover_time < double_linked_device_collect_delay_secs)) {
             continue;
         }
 
@@ -1927,6 +1948,10 @@ void *netdev_main(void *ptr)
 {
     worker_register("NETDEV");
     worker_register_job_name(0, "netdev");
+
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
+        double_linked_device_collect_delay_secs = 300;
+    }
 
     netdata_thread_cleanup_push(netdev_main_cleanup, ptr) {
         rrd_collector_started();
