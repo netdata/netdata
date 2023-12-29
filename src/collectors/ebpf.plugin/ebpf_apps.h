@@ -43,6 +43,8 @@
 #define EBPF_MAX_COMPARE_NAME 100
 #define EBPF_MAX_NAME 100
 
+#define EBPF_CLEANUP_FACTOR 10
+
 // ----------------------------------------------------------------------------
 // pid_stat
 //

@@ -62,6 +62,17 @@ static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_
 int cachestat_disable_priority;
 #endif
 
+struct netdata_static_thread ebpf_read_cachestat = {
+    .name = "EBPF_READ_CACHESTAT",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable probe
@@ -517,6 +528,9 @@ static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    if (ebpf_read_cachestat.thread)
+        netdata_thread_cancel(*ebpf_read_cachestat.thread);
+
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
         if (em->cgroup_charts) {
@@ -784,6 +798,105 @@ static void ebpf_update_cachestat_cgroup(int maps_per_core)
 }
 
 /**
+ * Cachestat sum PIDs
+ *
+ * Sum values for all PIDs associated to a group
+ *
+ * @param publish  output structure.
+ * @param root     structure with listed IPs
+ */
+void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
+{
+    memcpy(&publish->prev, &publish->current,sizeof(publish->current));
+    memset(&publish->current, 0, sizeof(publish->current));
+
+    netdata_cachestat_pid_t *dst = &publish->current;
+    while (root) {
+        int32_t pid = root->pid;
+        netdata_publish_cachestat_t *w = cachestat_pid[pid];
+        if (w) {
+            netdata_cachestat_pid_t *src = &w->current;
+            dst->account_page_dirtied += src->account_page_dirtied;
+            dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
+            dst->mark_buffer_dirty += src->mark_buffer_dirty;
+            dst->mark_page_accessed += src->mark_page_accessed;
+        }
+
+        root = root->next;
+    }
+    }
+
+/**
+ * Resume apps data
+ */
+void ebpf_resume_apps_data()
+{
+    struct ebpf_target *w;
+    collected_number value;
+
+    for (w = apps_groups_root_target; w; w = w->next) {
+        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_CACHESTAT_IDX))))
+            continue;
+
+        ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
+    }
+}
+
+/**
+ * Cachestat thread
+ *
+ * Thread used to generate cachestat charts.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_cachestat_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int cgroups = em->cgroup_charts;
+    int maps_per_core = em->maps_per_core;
+    int update_every = em->update_every;
+    uint64_t max_period = update_every * EBPF_CLEANUP_FACTOR;
+
+    int counter = update_every - 1;
+
+    uint32_t lifetime = em->lifetime;
+    uint32_t running_time = 0;
+    usec_t period = update_every * USEC_PER_SEC;
+    while (!ebpf_plugin_exit && running_time < lifetime) {
+        (void)heartbeat_next(&hb, period);
+        if (ebpf_plugin_exit || ++counter != update_every)
+            continue;
+
+        netdata_thread_disable_cancelability();
+        ebpf_read_cachestat_apps_table(maps_per_core);
+
+        pthread_mutex_lock(&collect_data_mutex);
+        ebpf_resume_apps_data();
+        pthread_mutex_unlock(&collect_data_mutex);
+
+        counter = 0;
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_thread_enable_cancelability();
+    }
+
+    return NULL;
+}
+
+/**
  * Create apps charts
  *
  * Call ebpf_create_chart to create the charts on apps submenu.
@@ -923,35 +1036,6 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
 }
 
 /**
- * Cachestat sum PIDs
- *
- * Sum values for all PIDs associated to a group
- *
- * @param publish  output structure.
- * @param root     structure with listed IPs
- */
-void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
-{
-    memcpy(&publish->prev, &publish->current,sizeof(publish->current));
-    memset(&publish->current, 0, sizeof(publish->current));
-
-    netdata_cachestat_pid_t *dst = &publish->current;
-    while (root) {
-        int32_t pid = root->pid;
-        netdata_publish_cachestat_t *w = cachestat_pid[pid];
-        if (w) {
-            netdata_cachestat_pid_t *src = &w->current;
-            dst->account_page_dirtied += src->account_page_dirtied;
-            dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
-            dst->mark_buffer_dirty += src->mark_buffer_dirty;
-            dst->mark_page_accessed += src->mark_page_accessed;
-        }
-
-        root = root->next;
-    }
-}
-
-/**
  * Send data to Netdata calling auxiliary functions.
  *
  * @param root the target list.
@@ -961,11 +1045,11 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
     struct ebpf_target *w;
     collected_number value;
 
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_CACHESTAT_IDX))))
             continue;
 
-        ebpf_cachestat_sum_pids(&w->cachestat, w->root_pid);
         netdata_cachestat_pid_t *current = &w->cachestat.current;
         netdata_cachestat_pid_t *prev = &w->cachestat.prev;
 
@@ -997,6 +1081,7 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
         write_chart_dimension("misses", value);
         ebpf_write_end_chart();
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -1312,9 +1397,6 @@ static void cachestat_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_cachestat_read_global_tables(stats, maps_per_core);
-        pthread_mutex_lock(&collect_data_mutex);
-        if (apps)
-            ebpf_read_cachestat_apps_table(maps_per_core);
 
         if (cgroups)
             ebpf_update_cachestat_cgroup(maps_per_core);
@@ -1335,7 +1417,6 @@ static void cachestat_collector(ebpf_module_t *em)
             ebpf_cachestat_send_cgroup_data(update_every);
 
         pthread_mutex_unlock(&lock);
-        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
@@ -1548,6 +1629,13 @@ void *ebpf_cachestat_thread(void *ptr)
 #endif
 
     pthread_mutex_unlock(&lock);
+
+    ebpf_read_cachestat.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_cachestat.thread,
+                          ebpf_read_cachestat.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_cachestat_thread,
+                          em);
 
     cachestat_collector(em);
 
