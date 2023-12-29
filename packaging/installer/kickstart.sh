@@ -2031,6 +2031,7 @@ install_on_macos() {
     *)
       SELECTED_INSTALL_METHOD="build"
       INSTALL_TYPE="kickstart-build"
+      NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-logsmanagement"
       try_build_install
 
       case "$?" in
