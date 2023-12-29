@@ -27,8 +27,10 @@ void get_netdata_execution_path(void) {
 
     netdata_exe_file[exepath_size] = '\0';
 
-    strcpy(netdata_exe_path, netdata_exe_file);
-    dirname(netdata_exe_path);
+    // macOS's dirname(3) does not modify passed string
+    char *tmpdir = strdupz(netdata_exe_file);
+    strcpy(netdata_exe_path, dirname(tmpdir));
+    freez(tmpdir);
 }
 
 static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t gid, bool recursive)
