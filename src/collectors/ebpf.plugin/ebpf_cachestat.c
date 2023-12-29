@@ -720,29 +720,25 @@ static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *pu
 static void ebpf_read_cachestat_apps_table(int maps_per_core)
 {
     netdata_cachestat_pid_t *cv = cachestat_vector;
-    uint32_t key;
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_cachestat_pid_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    while (pids) {
-        key = pids->pid;
-
+    uint32_t key = 0, next_key = 0;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
-            pids = pids->next;
-            continue;
+            goto end_cachestat_loop;
         }
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
         cachestat_fill_pid(key, cv);
 
+end_cachestat_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(cv, 0, length);
-
-        pids = pids->next;
+        key = next_key;
     }
 }
 
