@@ -4,7 +4,7 @@
 #define NETDATA_LOG2JOURNAL_H
 
 // only for PACKAGE_VERSION
-#include "config.h"
+#include <config.h>
 
 #include <stdio.h>
 #include <stdlib.h>
