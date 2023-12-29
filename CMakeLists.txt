@@ -876,6 +876,8 @@ set(RRD_PLUGIN_FILES
         database/KolmogorovSmirnovDist.h
         database/rrdfunctions-inflight.c
         database/rrdfunctions-inflight.h
+        database/rrdfunctions-exporters.c
+        database/rrdfunctions-exporters.h
 )
 
 if(ENABLE_DBENGINE)

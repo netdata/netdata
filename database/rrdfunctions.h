@@ -59,7 +59,6 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
 
 // ----------------------------------------------------------------------------
 
-void rrd_functions_inflight_init(void);
 void rrd_functions_host_init(RRDHOST *host);
 void rrd_functions_host_destroy(RRDHOST *host);
 
@@ -75,24 +74,13 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, const char *payload);
 
-// cancel a running function, to be run from anywhere
-void rrd_function_cancel(const char *transaction);
-void rrd_function_progress(const char *transaction);
-void rrd_function_call_progresser(uuid_t *transaction);
-
-void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
-void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb);
-
-void chart_functions2json(RRDSET *st, BUFFER *wb);
-void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst, void *value, size_t value_size);
-void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags, HTTP_ACCESS *access, int *priority);
-void host_functions2json(RRDHOST *host, BUFFER *wb);
-
 uint8_t functions_format_to_content_type(const char *format);
 const char *functions_content_type_to_format(HTTP_CONTENT_TYPE content_type);
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
 #include "rrdfunctions-inline.h"
+#include "rrdfunctions-inflight.h"
+#include "rrdfunctions-exporters.h"
 #include "rrdfunctions-streaming.h"
 #include "rrdfunctions-progress.h"
 
