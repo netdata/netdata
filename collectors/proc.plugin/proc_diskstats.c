@@ -1033,17 +1033,7 @@ static void add_labels_to_disk(struct disk *d, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "device_type", get_disk_type_string(d->type), RRDLABEL_SRC_AUTO);
 }
 
-static int diskstats_function_block_devices(uuid_t *transaction __maybe_unused, BUFFER *wb,
-                                            usec_t *stop_monotonic_ut __maybe_unused, const char *function __maybe_unused,
-                                            void *collector_data __maybe_unused,
-                                            rrd_function_result_callback_t result_cb, void *result_cb_data,
-                                            rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
-                                            rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                                            rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
-                                            void *register_canceller_cb_data __maybe_unused,
-                                            rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
-                                            void *register_progresser_cb_data __maybe_unused) {
-
+static int diskstats_function_block_devices(BUFFER *wb, const char *function __maybe_unused) {
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -1322,16 +1312,7 @@ static int diskstats_function_block_devices(uuid_t *transaction __maybe_unused, 
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
     buffer_json_finalize(wb);
 
-    int response = HTTP_RESP_OK;
-    if(is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data)) {
-        buffer_flush(wb);
-        response = HTTP_RESP_CLIENT_CLOSED_REQUEST;
-    }
-
-    if(result_cb)
-        result_cb(wb, response, result_cb_data);
-
-    return response;
+    return HTTP_RESP_OK;
 }
 
 static void diskstats_cleanup_disks() {
@@ -1478,6 +1459,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         excluded_disks = simple_pattern_create(
                 config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS), NULL,
                 SIMPLE_PATTERN_EXACT, true);
+
+        rrd_function_add_inline(localhost, NULL, "block-devices", 10,
+                                RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSTATS_HELP,
+                                "top", HTTP_ACCESS_ANY, diskstats_function_block_devices);
     }
 
     // --------------------------------------------------------------------------
@@ -1491,14 +1476,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
-
-    static bool add_func = true;
-    if (add_func) {
-        rrd_function_add(localhost, NULL, "block-devices", 10, RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSTATS_HELP,
-                         "top", HTTP_ACCESS_ANY, true,
-                         diskstats_function_block_devices, NULL);
-        add_func = false;
-    }
 
     size_t lines = procfile_lines(ff), l;
 

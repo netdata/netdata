@@ -1117,16 +1117,13 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
     // we register this only on localhost
     // for the other nodes, the origin server should register it
-    rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
-    rrd_function_add(localhost, NULL, "streaming", 10, RRDFUNCTIONS_PRIORITY_DEFAULT + 1,
-                     RRDFUNCTIONS_STREAMING_HELP, "top",
-                     HTTP_ACCESS_MEMBERS, true,
-                     rrdhost_function_streaming, NULL);
+    rrd_function_add_inline(localhost, NULL, "streaming", 10,
+                            RRDFUNCTIONS_PRIORITY_DEFAULT + 1, RRDFUNCTIONS_STREAMING_HELP, "top",
+                            HTTP_ACCESS_MEMBERS, rrdhost_function_streaming);
 
-    rrd_function_add(localhost, NULL, "netdata-api-calls", 10, RRDFUNCTIONS_PRIORITY_DEFAULT + 2,
-                     RRDFUNCTIONS_PROGRESS_HELP, "top",
-                     HTTP_ACCESS_MEMBERS, true,
-                     rrdhost_function_progress, NULL);
+    rrd_function_add_inline(localhost, NULL, "netdata-api-calls", 10,
+                            RRDFUNCTIONS_PRIORITY_DEFAULT + 2, RRDFUNCTIONS_PROGRESS_HELP, "top",
+                            HTTP_ACCESS_MEMBERS, rrdhost_function_progress);
 
     if (likely(system_info)) {
         migrate_localhost(&localhost->host_uuid);

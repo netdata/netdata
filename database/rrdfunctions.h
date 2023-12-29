@@ -61,6 +61,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
 #define RRDFUNCTIONS_STREAMING_HELP "Streaming status for parents and children."
 
+#include "rrdfunctions-inline.h"
 #include "rrdfunctions-streaming.h"
 #include "rrdfunctions-progress.h"
 

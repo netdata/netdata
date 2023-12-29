@@ -832,6 +832,8 @@ set(RRD_PLUGIN_FILES
         database/rrdfamily.c
         database/rrdfunctions.c
         database/rrdfunctions.h
+        database/rrdfunctions-inline.c
+        database/rrdfunctions-inline.h
         database/rrdfunctions-progress.c
         database/rrdfunctions-progress.h
         database/rrdfunctions-streaming.c
