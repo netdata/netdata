@@ -326,7 +326,7 @@ while [ -n "${1}" ]; do
       # TODO: Needs CMake Support
       ;;
     "--enable-exporting-prometheus-remote-write" | "--enable-backend-prometheus-remote-write") EXPORTER_PROMETHEUS=1 ;;
-    "--disable-exporting-prometheus-remote-write" | "--disable-backend-prometheus-remote-write") EXPORTER_PROMETHEUS=1 ;;
+    "--disable-exporting-prometheus-remote-write" | "--disable-backend-prometheus-remote-write") EXPORTER_PROMETHEUS=0 ;;
     "--enable-exporting-mongodb" | "--enable-backend-mongodb") EXPORTER_MONGODB=1 ;;
     "--disable-exporting-mongodb" | "--disable-backend-mongodb") EXPORTER_MONGODB=0 ;;
     "--enable-exporting-pubsub")
