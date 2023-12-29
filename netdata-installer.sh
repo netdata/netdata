@@ -1859,6 +1859,9 @@ progress "eBPF Kernel Collector"
 install_ebpf
 
 should_install_fluentbit() {
+  if [ "$(uname -s)" = "Darwin" ]; then
+    return 1
+  fi
   if [ "${ENABLE_LOGS_MANAGEMENT}" = 0 ]; then
     warning "netdata-installer.sh run with --disable-logsmanagement, Fluent-Bit installation is skipped."
     return 1
