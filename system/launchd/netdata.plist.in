@@ -8,6 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>@sbindir_POST@/netdata</string>
+        <string>-D</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
