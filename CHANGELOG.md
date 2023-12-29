@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- fix exporting internal charts context and family [\#16683](https://github.com/netdata/netdata/pull/16683) ([ilyam8](https://github.com/ilyam8))
+- docs: add "Require Cloud" column to functions table [\#16681](https://github.com/netdata/netdata/pull/16681) ([ilyam8](https://github.com/ilyam8))
+- cmake missing defines [\#16680](https://github.com/netdata/netdata/pull/16680) ([ktsaou](https://github.com/ktsaou))
+- Fix alerts-configuration-manager.md [\#16679](https://github.com/netdata/netdata/pull/16679) ([Ancairon](https://github.com/Ancairon))
 - update bundled UI to v6.75.2 [\#16674](https://github.com/netdata/netdata/pull/16674) ([ilyam8](https://github.com/ilyam8))
 - kickstart: add a note on how to access the UI to the success banner [\#16673](https://github.com/netdata/netdata/pull/16673) ([ilyam8](https://github.com/ilyam8))
 - remove contrib/rhel [\#16672](https://github.com/netdata/netdata/pull/16672) ([ilyam8](https://github.com/ilyam8))
@@ -419,10 +423,6 @@
 - journal: fix the 1 second latency in play mode [\#16123](https://github.com/netdata/netdata/pull/16123) ([ktsaou](https://github.com/ktsaou))
 - fix proc netstat metrics [\#16122](https://github.com/netdata/netdata/pull/16122) ([ilyam8](https://github.com/ilyam8))
 - dont strip newlines when forwarding FUNCTION\_PAYLOAD [\#16120](https://github.com/netdata/netdata/pull/16120) ([underhood](https://github.com/underhood))
-- Do not force OOMKill [\#16115](https://github.com/netdata/netdata/pull/16115) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix crash on parsing clabel command with no source [\#16114](https://github.com/netdata/netdata/pull/16114) ([ilyam8](https://github.com/ilyam8))
-- update UI to v6.43.0 [\#16112](https://github.com/netdata/netdata/pull/16112) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#16111](https://github.com/netdata/netdata/pull/16111) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
