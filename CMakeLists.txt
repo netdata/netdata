@@ -1803,24 +1803,36 @@ install(TARGETS systemd-cat-native
 pkg_check_modules(PCRE2 libpcre2-8)
 
 if(PCRE2_FOUND)
-        set(LOG2JOURNAL_FILES collectors/log2journal/log2journal.h
-                              collectors/log2journal/log2journal.c
-                              collectors/log2journal/log2journal-help.c
-                              collectors/log2journal/log2journal-yaml.c
-                              collectors/log2journal/log2journal-json.c
-                              collectors/log2journal/log2journal-logfmt.c
-                              collectors/log2journal/log2journal-pcre2.c
-                              collectors/log2journal/log2journal-params.c
-                              collectors/log2journal/log2journal-inject.c
-                              collectors/log2journal/log2journal-pattern.c
-                              collectors/log2journal/log2journal-replace.c
-                              collectors/log2journal/log2journal-rename.c
-                              collectors/log2journal/log2journal-rewrite.c)
+        set(LOG2JOURNAL_FILES
+                ${CONFIG_H}
+                collectors/log2journal/log2journal.h
+                collectors/log2journal/log2journal.c
+                collectors/log2journal/log2journal-help.c
+                collectors/log2journal/log2journal-yaml.c
+                collectors/log2journal/log2journal-json.c
+                collectors/log2journal/log2journal-logfmt.c
+                collectors/log2journal/log2journal-pcre2.c
+                collectors/log2journal/log2journal-params.c
+                collectors/log2journal/log2journal-inject.c
+                collectors/log2journal/log2journal-pattern.c
+                collectors/log2journal/log2journal-replace.c
+                collectors/log2journal/log2journal-rename.c
+                collectors/log2journal/log2journal-rewrite.c
+        )
 
         add_executable(log2journal ${LOG2JOURNAL_FILES})
-        target_include_directories(log2journal BEFORE PUBLIC ${PCRE2_INCLUDE_DIRS})
+        target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${PCRE2_INCLUDE_DIRS})
         target_compile_definitions(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
-        target_link_libraries(log2journal libnetdata "${PCRE2_LDFLAGS}")
+        target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
+
+        if(ENABLE_BUNDLED_YAML)
+                target_include_directories(log2journal BEFORE PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/libyaml")
+                target_link_libraries(log2journal PUBLIC yaml)
+        else()
+                target_include_directories(log2journal BEFORE PUBLIC ${YAML_INCLUDE_DIRS})
+                target_compile_definitions(log2journal PUBLIC ${YAML_CFLAGS_OTHER})
+                target_link_libraries(log2journal PUBLIC ${YAML_LDFLAGS})
+        endif()
 
         install(TARGETS log2journal
                 COMPONENT log2journal
