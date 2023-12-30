@@ -6,10 +6,23 @@
 
 **Merged pull requests:**
 
+- delay collecting double linked network interfaces [\#16701](https://github.com/netdata/netdata/pull/16701) ([ilyam8](https://github.com/ilyam8))
+- fix quota calculation when the the db is empty [\#16699](https://github.com/netdata/netdata/pull/16699) ([ktsaou](https://github.com/ktsaou))
+- disable logsmanagement when installing on macOS [\#16697](https://github.com/netdata/netdata/pull/16697) ([ilyam8](https://github.com/ilyam8))
+- fix installing service file and start/stop ND using `launchctl` on macOS [\#16693](https://github.com/netdata/netdata/pull/16693) ([ilyam8](https://github.com/ilyam8))
+- improve the error message when accessing functions [\#16692](https://github.com/netdata/netdata/pull/16692) ([ktsaou](https://github.com/ktsaou))
+- cups exit on sigpipe [\#16691](https://github.com/netdata/netdata/pull/16691) ([ilyam8](https://github.com/ilyam8))
+- fix minor omission on netdata-installers arguments [\#16690](https://github.com/netdata/netdata/pull/16690) ([tkatsoulas](https://github.com/tkatsoulas))
+- Revert "Update artifact-handling actions to latest version." [\#16689](https://github.com/netdata/netdata/pull/16689) ([tkatsoulas](https://github.com/tkatsoulas))
+- cmake log2journal netdatacli [\#16688](https://github.com/netdata/netdata/pull/16688) ([ktsaou](https://github.com/ktsaou))
+- atomically load the metric reference count [\#16687](https://github.com/netdata/netdata/pull/16687) ([ktsaou](https://github.com/ktsaou))
+- fix claiming on macOS [\#16686](https://github.com/netdata/netdata/pull/16686) ([ilyam8](https://github.com/ilyam8))
+- add --disable-logsmanagement when building static [\#16684](https://github.com/netdata/netdata/pull/16684) ([ilyam8](https://github.com/ilyam8))
 - fix exporting internal charts context and family [\#16683](https://github.com/netdata/netdata/pull/16683) ([ilyam8](https://github.com/ilyam8))
 - docs: add "Require Cloud" column to functions table [\#16681](https://github.com/netdata/netdata/pull/16681) ([ilyam8](https://github.com/ilyam8))
 - cmake missing defines [\#16680](https://github.com/netdata/netdata/pull/16680) ([ktsaou](https://github.com/ktsaou))
 - Fix alerts-configuration-manager.md [\#16679](https://github.com/netdata/netdata/pull/16679) ([Ancairon](https://github.com/Ancairon))
+- kickstart: dont run install-required-packages.sh as root on macOS [\#16675](https://github.com/netdata/netdata/pull/16675) ([ilyam8](https://github.com/ilyam8))
 - update bundled UI to v6.75.2 [\#16674](https://github.com/netdata/netdata/pull/16674) ([ilyam8](https://github.com/ilyam8))
 - kickstart: add a note on how to access the UI to the success banner [\#16673](https://github.com/netdata/netdata/pull/16673) ([ilyam8](https://github.com/ilyam8))
 - remove contrib/rhel [\#16672](https://github.com/netdata/netdata/pull/16672) ([ilyam8](https://github.com/ilyam8))
@@ -339,8 +352,6 @@
 - Introduce workflow to always update bundled packages \(static builds\) into their latest release \(part1\) [\#16191](https://github.com/netdata/netdata/pull/16191) ([tkatsoulas](https://github.com/tkatsoulas))
 - Improvements for labels handling [\#16172](https://github.com/netdata/netdata/pull/16172) ([stelfrag](https://github.com/stelfrag))
 - Split chars \(eBPF \<-\> Apps integration\) [\#16139](https://github.com/netdata/netdata/pull/16139) ([thiagoftsm](https://github.com/thiagoftsm))
-- Faster parents [\#16127](https://github.com/netdata/netdata/pull/16127) ([ktsaou](https://github.com/ktsaou))
-- Update info about custom dashboards [\#16121](https://github.com/netdata/netdata/pull/16121) ([elizabyte8](https://github.com/elizabyte8))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -412,17 +423,6 @@
 - Introduce stringify function for integrations [\#16140](https://github.com/netdata/netdata/pull/16140) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#16138](https://github.com/netdata/netdata/pull/16138) ([netdatabot](https://github.com/netdatabot))
 - fix random crashes on pthread\_detach\(\) [\#16137](https://github.com/netdata/netdata/pull/16137) ([ktsaou](https://github.com/ktsaou))
-- fix journal help and mark debug keys in the output [\#16133](https://github.com/netdata/netdata/pull/16133) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#16132](https://github.com/netdata/netdata/pull/16132) ([netdatabot](https://github.com/netdatabot))
-- apps: change user\_group to usergroup [\#16131](https://github.com/netdata/netdata/pull/16131) ([ilyam8](https://github.com/ilyam8))
-- Retain a list structure instead of a set for data collection integrations categories [\#16130](https://github.com/netdata/netdata/pull/16130) ([Ancairon](https://github.com/Ancairon))
-- Add summary to alerts configurations [\#16129](https://github.com/netdata/netdata/pull/16129) ([MrZammler](https://github.com/MrZammler))
-- Remove multiple categories due to bug [\#16126](https://github.com/netdata/netdata/pull/16126) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#16125](https://github.com/netdata/netdata/pull/16125) ([netdatabot](https://github.com/netdatabot))
-- update UI to v6.45.0 [\#16124](https://github.com/netdata/netdata/pull/16124) ([ilyam8](https://github.com/ilyam8))
-- journal: fix the 1 second latency in play mode [\#16123](https://github.com/netdata/netdata/pull/16123) ([ktsaou](https://github.com/ktsaou))
-- fix proc netstat metrics [\#16122](https://github.com/netdata/netdata/pull/16122) ([ilyam8](https://github.com/ilyam8))
-- dont strip newlines when forwarding FUNCTION\_PAYLOAD [\#16120](https://github.com/netdata/netdata/pull/16120) ([underhood](https://github.com/underhood))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
