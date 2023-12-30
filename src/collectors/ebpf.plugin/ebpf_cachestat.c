@@ -674,13 +674,17 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_cachestat_pid_t *total = &out[0];
+    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         netdata_cachestat_pid_t *w = &out[i];
         total->account_page_dirtied += w->account_page_dirtied;
         total->add_to_page_cache_lru += w->add_to_page_cache_lru;
         total->mark_buffer_dirty += w->mark_buffer_dirty;
         total->mark_page_accessed += w->mark_page_accessed;
+        if (w->ct > ct)
+            ct = w->ct;
     }
+    total->ct = ct;
 }
 
 /**
@@ -689,17 +693,19 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
  * Save the current values inside the structure
  *
  * @param out     vector used to plot charts
- * @param publish vector with values read from hash tables.
+ * @param in vector with values read from hash tables.
  */
-static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *publish)
+static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *in)
 {
+    out->ct = in->ct;
+    out->not_updated = 0;
     if (!out->current.mark_page_accessed) {
-        memcpy(&out->current, &publish[0], sizeof(netdata_cachestat_pid_t));
+        memcpy(&out->current, &in[0], sizeof(netdata_cachestat_pid_t));
         return;
     }
 
     memcpy(&out->prev, &out->current, sizeof(netdata_cachestat_pid_t));
-    memcpy(&out->current, &publish[0], sizeof(netdata_cachestat_pid_t));
+    memcpy(&out->current, &in[0], sizeof(netdata_cachestat_pid_t));
 }
 
 /**
@@ -708,20 +714,16 @@ static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, n
  * Fill PID structures
  *
  * @param current_pid pid that we are collecting data
- * @param out         values read from hash tables;
  */
-static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *publish)
+static netdata_publish_cachestat_t *ebpf_cachestat_select_publish(uint32_t current_pid)
 {
     netdata_publish_cachestat_t *curr = cachestat_pid[current_pid];
     if (!curr) {
         curr = ebpf_publish_cachestat_get();
         cachestat_pid[current_pid] = curr;
-
-        cachestat_save_pid_values(curr, publish);
-        return;
     }
 
-    cachestat_save_pid_values(curr, publish);
+    return curr;
 }
 
 /**
@@ -731,7 +733,7 @@ static void cachestat_fill_pid(uint32_t current_pid, netdata_cachestat_pid_t *pu
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_read_cachestat_apps_table(int maps_per_core)
+static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
 {
     netdata_cachestat_pid_t *cv = cachestat_vector;
     int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
@@ -747,7 +749,16 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core)
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
-        cachestat_fill_pid(key, cv);
+        netdata_publish_cachestat_t *publish = ebpf_cachestat_select_publish(key);
+        if (!publish)
+            goto end_cachestat_loop;
+
+        if (!publish->ct || publish->ct != cv->ct)
+            cachestat_save_pid_values(publish, cv);
+        else if (++publish->not_updated >= max_period) {
+            bpf_map_delete_elem(fd, &key);
+            publish->not_updated = 0;
+        }
 
 end_cachestat_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -861,7 +872,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
     int cgroups = em->cgroup_charts;
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
-    uint64_t max_period = update_every * EBPF_CLEANUP_FACTOR;
+    int max_period = update_every * EBPF_CLEANUP_FACTOR;
 
     int counter = update_every - 1;
 
@@ -874,7 +885,7 @@ void *ebpf_read_cachestat_thread(void *ptr)
             continue;
 
         netdata_thread_disable_cancelability();
-        ebpf_read_cachestat_apps_table(maps_per_core);
+        ebpf_read_cachestat_apps_table(maps_per_core, max_period);
 
         pthread_mutex_lock(&collect_data_mutex);
         ebpf_resume_apps_data();
