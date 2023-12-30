@@ -302,7 +302,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
     // send the chart functions
     if(stream_has_capability(host->sender, STREAM_CAP_FUNCTIONS))
-        rrd_functions_expose_rrdpush(st, wb);
+        rrd_chart_functions_expose_rrdpush(st, wb);
 
     // send the chart local custom variables
     rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
@@ -545,7 +545,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
 
     if(unlikely(host_flags & RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
         BUFFER *wb = sender_start(host->sender);
-        rrd_functions_expose_global_rrdpush(host, wb);
+        rrd_global_functions_expose_rrdpush(host, wb);
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
     }
 
@@ -605,7 +605,7 @@ void rrdpush_send_global_functions(RRDHOST *host) {
 
     BUFFER *wb = sender_start(host->sender);
 
-    rrd_functions_expose_global_rrdpush(host, wb);
+    rrd_global_functions_expose_rrdpush(host, wb);
 
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
 

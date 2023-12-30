@@ -5,8 +5,8 @@
 
 #include "rrd.h"
 
-void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
-void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb);
+void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
+void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb);
 
 void chart_functions2json(RRDSET *st, BUFFER *wb);
 void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst, void *value, size_t value_size);

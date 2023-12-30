@@ -6,7 +6,7 @@
 
 #include "rrdfunctions-exporters.h"
 
-void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
+void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     if(!st->functions_view)
         return;
 
@@ -17,15 +17,15 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
                        , tmp_dfe.name
                        , tmp->timeout
                        , string2str(tmp->help)
-                           , string2str(tmp->tags)
-                           , http_id2access(tmp->access)
-                           , tmp->priority
+                       , string2str(tmp->tags)
+                       , http_id2access(tmp->access)
+                       , tmp->priority
         );
     }
     dfe_done(tmp);
 }
 
-void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
+void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     struct rrd_host_function *tmp;
@@ -38,9 +38,9 @@ void rrd_functions_expose_global_rrdpush(RRDHOST *host, BUFFER *wb) {
                        , tmp_dfe.name
                        , tmp->timeout
                        , string2str(tmp->help)
-                           , string2str(tmp->tags)
-                           , http_id2access(tmp->access)
-                           , tmp->priority
+                       , string2str(tmp->tags)
+                       , http_id2access(tmp->access)
+                       , tmp->priority
         );
     }
     dfe_done(tmp);
