@@ -644,29 +644,25 @@ static void dcstat_fill_pid(uint32_t current_pid, netdata_dcstat_pid_t *publish)
 static void read_dc_apps_table(int maps_per_core)
 {
     netdata_dcstat_pid_t *cv = dcstat_vector;
-    uint32_t key;
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_dcstat_pid_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    while (pids) {
-        key = pids->pid;
-
+    uint32_t key = 0, next_key = 0;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
-            pids = pids->next;
-            continue;
+            goto end_dc_loop;
         }
 
         dcstat_apps_accumulator(cv, maps_per_core);
 
         dcstat_fill_pid(key, cv);
 
+end_dc_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(cv, 0, length);
-
-        pids = pids->next;
+        key = next_key;
     }
 }
 
