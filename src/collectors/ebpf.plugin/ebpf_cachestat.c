@@ -466,6 +466,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_CACHESTAT_IDX))))
             continue;
@@ -515,6 +516,7 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
                                   update_every);
         w->charts_created &= ~(1<<EBPF_MODULE_CACHESTAT_IDX);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
