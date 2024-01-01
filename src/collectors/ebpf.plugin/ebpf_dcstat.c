@@ -518,15 +518,14 @@ static void ebpf_dcstat_exit(void *ptr)
  * @param current_pid pid that we are collecting data
  * @param out         values read from hash tables;
  */
-static void dcstat_fill_pid(uint32_t current_pid, netdata_dcstat_pid_t *publish)
+static netdata_publish_dcstat_t *ebpf_dcstat_select_publish(uint32_t current_pid)
 {
     netdata_publish_dcstat_t *lpid = dcstat_pid[current_pid];
     if (!lpid) {
         lpid = ebpf_publish_dcstat_get();
         dcstat_pid[current_pid] = lpid;
     }
-
-    memcpy(&lpid->curr, &publish[0], sizeof(netdata_dcstat_pid_t));
+    return lpid;
 }
 
 
@@ -542,12 +541,17 @@ static void ebpf_dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per
 {
     int i, end = (maps_per_core) ? ebpf_nprocs : 1;
     netdata_dcstat_pid_t *total = &out[0];
+    uint64_t ct = total->ct;
     for (i = 1; i < end; i++) {
         netdata_dcstat_pid_t *w = &out[i];
         total->cache_access += w->cache_access;
         total->file_system += w->file_system;
         total->not_found += w->not_found;
+
+        if (w->ct > ct)
+            ct = w->ct;
     }
+    total->ct = ct;
 }
 
 /**
@@ -557,7 +561,7 @@ static void ebpf_dcstat_apps_accumulator(netdata_dcstat_pid_t *out, int maps_per
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_read_dc_apps_table(int maps_per_core)
+static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
 {
     netdata_dcstat_pid_t *cv = dcstat_vector;
     int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
@@ -573,7 +577,14 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
-        dcstat_fill_pid(key, cv);
+        netdata_publish_dcstat_t *publish = ebpf_dcstat_select_publish(key);
+        if (!publish->ct || publish->ct != cv->ct) {
+            memcpy(&publish->curr, &cv[0], sizeof(netdata_dcstat_pid_t));
+            publish->not_updated = 0;
+        } else if (++publish->not_updated >= max_period) {
+            bpf_map_delete_elem(fd, &key);
+            publish->not_updated = 0;
+        }
 
 end_dc_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -614,7 +625,6 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
 void ebpf_dc_resume_apps_data()
 {
     struct ebpf_target *w;
-    collected_number value;
 
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_DCSTAT_IDX))))
@@ -648,20 +658,20 @@ void *ebpf_read_dcstat_thread(void *ptr)
     int cgroups = em->cgroup_charts;
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
-    uint64_t max_period = update_every * EBPF_CLEANUP_FACTOR;
 
     int counter = update_every - 1;
 
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
+    int max_period = update_every * EBPF_CLEANUP_FACTOR;
     while (!ebpf_plugin_exit && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
         if (ebpf_plugin_exit || ++counter != update_every)
             continue;
 
         netdata_thread_disable_cancelability();
-        ebpf_read_dc_apps_table(maps_per_core);
+        ebpf_read_dc_apps_table(maps_per_core, max_period);
 
         pthread_mutex_lock(&collect_data_mutex);
         ebpf_dc_resume_apps_data();
