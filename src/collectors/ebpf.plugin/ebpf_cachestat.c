@@ -835,7 +835,7 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
 
         root = root->next;
     }
-    }
+}
 
 /**
  * Resume apps data
