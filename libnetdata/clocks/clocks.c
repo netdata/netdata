@@ -356,10 +356,14 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
 }
 
 void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
+    // this is necessary on Xeon i686 running Yggdrasil to avoid wrong cast.
+    time_t req_tv_sec = (time_t)usec;
+    req_tv_sec /= USEC_PER_SEC;
+
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
     struct timespec rem = { 0, 0 }, req = {
-            .tv_sec = (time_t) (usec / USEC_PER_SEC),
+            .tv_sec = req_tv_sec,
             .tv_nsec = (suseconds_t) ((usec % USEC_PER_SEC) * NSEC_PER_USEC)
     };
 
