@@ -684,6 +684,7 @@ jobs:
         run: |
           mkdir -p download/latest
           mv artifacts/* download/latest
+          ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
         if: needs.file-check.outputs.run == 'true'
@@ -752,6 +753,7 @@ jobs:
         run: |
           mkdir -p download/latest
           mv artifacts/* download/latest
+          ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
         if: needs.file-check.outputs.run == 'true'
