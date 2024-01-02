@@ -90,7 +90,7 @@ extern struct ebpf_target *apps_groups_root_target;
 extern struct ebpf_target *users_root_target;
 extern struct ebpf_target *groups_root_target;
 
-struct ebpf_pid_stat {
+typedef struct ebpf_pid_stat {
     int32_t pid;
     char comm[EBPF_MAX_COMPARE_NAME + 1];
     char *cmdline;
@@ -119,6 +119,8 @@ struct ebpf_pid_stat {
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
 
+    netdata_publish_cachestat_t cache;
+
     char *stat_filename;
     char *status_filename;
     char *io_filename;
@@ -127,7 +129,7 @@ struct ebpf_pid_stat {
     struct ebpf_pid_stat *parent;
     struct ebpf_pid_stat *prev;
     struct ebpf_pid_stat *next;
-};
+} ebpf_pid_stat_t;
 
 // ----------------------------------------------------------------------------
 // target
@@ -223,7 +225,7 @@ extern netdata_publish_shm_t **shm_pid;
 
 // ARAL Sectiion
 extern void ebpf_aral_init(void);
-extern struct ebpf_pid_stat *ebpf_get_pid_entry(pid_t pid);
+extern ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid);
 
 extern ebpf_process_stat_t *ebpf_process_stat_get(void);
 extern void ebpf_process_stat_release(ebpf_process_stat_t *stat);
