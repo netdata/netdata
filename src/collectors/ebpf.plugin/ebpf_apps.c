@@ -739,7 +739,7 @@ static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
  *
  * @return It returns the pid entry structure
  */
-static inline struct ebpf_pid_stat *ebpf_get_pid_entry(pid_t pid)
+struct ebpf_pid_stat *ebpf_get_pid_entry(pid_t pid)
 {
     if (unlikely(ebpf_all_pids[pid]))
         return ebpf_all_pids[pid];

@@ -223,6 +223,7 @@ extern netdata_publish_shm_t **shm_pid;
 
 // ARAL Sectiion
 extern void ebpf_aral_init(void);
+extern struct ebpf_pid_stat *ebpf_get_pid_entry(pid_t pid);
 
 extern ebpf_process_stat_t *ebpf_process_stat_get(void);
 extern void ebpf_process_stat_release(ebpf_process_stat_t *stat);
