@@ -33,7 +33,6 @@
       2. Click on the **Notifications** tab
       3. Enable **Mobile App Notifications** if disabled (Enabled by default)
       4. Use the **Show QR Code** Option to login to your mobile device by scanning the **QR Code**
-          
 - id: 'notify-cloud-discord'
   meta:
     name: 'Discord'
