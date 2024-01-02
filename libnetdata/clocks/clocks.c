@@ -360,11 +360,16 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
     time_t req_tv_sec = (time_t)usec;
     req_tv_sec /= USEC_PER_SEC;
 
+    // it was not identified the same issue fixed by previous variable, this variable was added
+    // to have an unique logic.
+    suseconds_t req_tv_nsec = (suseconds_t)usec;
+    req_tv_nsec = ((req_tv_nsec % USEC_PER_SEC) * NSEC_PER_USEC);
+
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
     struct timespec rem = { 0, 0 }, req = {
             .tv_sec = req_tv_sec,
-            .tv_nsec = (suseconds_t) ((usec % USEC_PER_SEC) * NSEC_PER_USEC)
+            .tv_nsec = req_tv_nsec
     };
 
     // make sure errno is not EINTR
