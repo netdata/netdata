@@ -663,6 +663,8 @@ set(DAEMON_FILES
         daemon/pipename.h
         daemon/unit_test.c
         daemon/unit_test.h
+        daemon/config/dyncfg.c
+        daemon/config/dyncfg.h
 )
 
 set(H2O_FILES
