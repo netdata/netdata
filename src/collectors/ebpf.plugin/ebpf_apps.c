@@ -739,7 +739,7 @@ static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
  *
  * @return It returns the pid entry structure
  */
-static inline struct ebpf_pid_stat *get_pid_entry(pid_t pid)
+static inline struct ebpf_pid_stat *ebpf_get_pid_entry(pid_t pid)
 {
     if (unlikely(ebpf_all_pids[pid]))
         return ebpf_all_pids[pid];
@@ -933,14 +933,14 @@ static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
  *
  * @return It returns 1 on success and 0 otherwise
  */
-static inline int collect_data_for_pid(pid_t pid, void *ptr)
+static inline int ebpf_collect_data_for_pid(pid_t pid, void *ptr)
 {
     if (unlikely(pid < 0 || pid > pid_max)) {
         netdata_log_error("Invalid pid %d read (expected %d to %d). Ignoring process.", pid, 0, pid_max);
         return 0;
     }
 
-    struct ebpf_pid_stat *p = get_pid_entry(pid);
+    struct ebpf_pid_stat *p = ebpf_get_pid_entry(pid);
     if (unlikely(!p || p->read))
         return 0;
     p->read = 1;
@@ -1327,7 +1327,7 @@ static inline void read_proc_filesystem()
         if (unlikely(endptr == de->d_name || *endptr != '\0'))
             continue;
 
-        collect_data_for_pid(pid, NULL);
+        ebpf_collect_data_for_pid(pid, NULL);
     }
     closedir(dir);
 }
