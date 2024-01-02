@@ -282,11 +282,6 @@ include:
       <<: *ubuntu_packages
       repo_distro: ubuntu/mantic
   - <<: *ubuntu
-    version: "23.04"
-    packages:
-      <<: *ubuntu_packages
-      repo_distro: ubuntu/lunar
-  - <<: *ubuntu
     version: "20.04"
     packages:
       <<: *ubuntu_packages
