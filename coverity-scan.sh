@@ -117,6 +117,7 @@ scanit() {
   [ -f netdata-coverity-analysis.tgz ] && run rm netdata-coverity-analysis.tgz
 
   progress "Configuring netdata source..."
+  USE_SYSTEM_PROTOBUF=1
   prepare_cmake_options
 
   run cmake ${NETDATA_CMAKE_OPTIONS}

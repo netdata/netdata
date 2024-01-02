@@ -241,7 +241,7 @@ prepare_cmake_options() {
     enable_feature BUNDLED_PROTOBUF 1
   fi
 
-  if [ -z "${ENABLE_SYSTEMD_PLUGIN}" ]; then
+  if [ -z "${ENABLE_SYSTEMD_JOURNAL}" ]; then
       if check_for_module libsystemd; then
           if check_for_module libelogind; then
               ENABLE_SYSTEMD_JOURNAL=0
