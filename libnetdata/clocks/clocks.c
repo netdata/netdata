@@ -7,8 +7,14 @@
 static clockid_t clock_boottime_to_use = CLOCK_MONOTONIC;
 static clockid_t clock_monotonic_to_use = CLOCK_MONOTONIC;
 
-usec_t clock_monotonic_resolution = 1000;
-usec_t clock_realtime_resolution = 1000;
+// the default clock resolution is 1ms
+#define DEFAULT_CLOCK_RESOLUTION_UT ((usec_t)0 * USEC_PER_SEC + (usec_t)1 * USEC_PER_MS)
+
+// the max clock resolution is 100ms
+#define MAX_CLOCK_RESOLUTION_UT ((usec_t)0 * USEC_PER_SEC + (usec_t)100 * USEC_PER_MS)
+
+usec_t clock_monotonic_resolution = DEFAULT_CLOCK_RESOLUTION_UT;
+usec_t clock_realtime_resolution = DEFAULT_CLOCK_RESOLUTION_UT;
 
 #ifndef HAVE_CLOCK_GETTIME
 inline int clock_gettime(clockid_t clk_id __maybe_unused, struct timespec *ts) {
@@ -50,22 +56,19 @@ static void test_clock_boottime(void) {
 }
 
 static usec_t get_clock_resolution(clockid_t clock) {
-    struct timespec ts = {
-        .tv_sec = 0,
-        .tv_nsec = 1 * NSEC_PER_USEC,
-    };
+    struct timespec ts = { 0 };
 
     if(clock_getres(clock, &ts) == 0) {
         usec_t ret = (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)ts.tv_nsec * NSEC_PER_USEC;
-        if(!ret || ret > 100 * USEC_PER_MS) {
+        if(!ret || ret > MAX_CLOCK_RESOLUTION_UT) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned %"PRIu64" usec (zero or more than 100ms), using defaults for clock resolution.", (int)clock, ret);
-            return (usec_t)0 * USEC_PER_SEC + (usec_t)1 * NSEC_PER_USEC;
+            return DEFAULT_CLOCK_RESOLUTION_UT;
         }
         return ret;
     }
     else {
         nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) failed, using defaults for clock resolution.", (int)clock);
-        return (usec_t)0 * USEC_PER_SEC + (usec_t)1 * NSEC_PER_USEC;
+        return DEFAULT_CLOCK_RESOLUTION_UT;
     }
 }
 
