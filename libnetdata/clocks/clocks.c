@@ -357,8 +357,12 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
 
 void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
     // this is necessary on Xeon i686 running Yggdrasil to avoid wrong cast.
+    time_t divisor = (usec > NSEC_PER_SEC) ? NSEC_PER_SEC : USEC_PER_SEC;
     time_t req_tv_sec = (time_t)usec;
-    req_tv_sec /= USEC_PER_SEC;
+    req_tv_sec /= divisor;
+    // Our algorithm does not expect values higher than NSEC_PER_SEC
+    if (divisor == NSEC_PER_SEC)
+        usec /= 1000;
 
     // it was not identified the same issue fixed by previous variable, this variable was added
     // to have an unique logic.
