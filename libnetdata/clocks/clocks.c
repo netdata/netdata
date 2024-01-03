@@ -7,8 +7,14 @@
 static clockid_t clock_boottime_to_use = CLOCK_MONOTONIC;
 static clockid_t clock_monotonic_to_use = CLOCK_MONOTONIC;
 
-usec_t clock_monotonic_resolution = 1000;
-usec_t clock_realtime_resolution = 1000;
+// the default clock resolution is 1ms
+#define DEFAULT_CLOCK_RESOLUTION_UT ((usec_t)0 * USEC_PER_SEC + (usec_t)1 * USEC_PER_MS)
+
+// the max clock resolution is 10ms
+#define MAX_CLOCK_RESOLUTION_UT ((usec_t)0 * USEC_PER_SEC + (usec_t)10 * USEC_PER_MS)
+
+usec_t clock_monotonic_resolution = DEFAULT_CLOCK_RESOLUTION_UT;
+usec_t clock_realtime_resolution = DEFAULT_CLOCK_RESOLUTION_UT;
 
 #ifndef HAVE_CLOCK_GETTIME
 inline int clock_gettime(clockid_t clk_id __maybe_unused, struct timespec *ts) {
@@ -50,9 +56,24 @@ static void test_clock_boottime(void) {
 }
 
 static usec_t get_clock_resolution(clockid_t clock) {
-    struct timespec ts;
-    clock_getres(clock, &ts);
-    return ts.tv_sec * USEC_PER_SEC + ts.tv_nsec * NSEC_PER_USEC;
+    struct timespec ts = { 0 };
+
+    if(clock_getres(clock, &ts) == 0) {
+        usec_t ret = (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)ts.tv_nsec / NSEC_PER_USEC;
+        if(!ret && ts.tv_nsec > 0 && ts.tv_nsec < NSEC_PER_USEC)
+            return (usec_t)1;
+
+        else if(ret > MAX_CLOCK_RESOLUTION_UT) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned %"PRIu64" usec is out of range, using defaults for clock resolution.", (int)clock, ret);
+            return DEFAULT_CLOCK_RESOLUTION_UT;
+        }
+
+        return ret;
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) failed, using defaults for clock resolution.", (int)clock);
+        return DEFAULT_CLOCK_RESOLUTION_UT;
+    }
 }
 
 // perform any initializations required for clocks
@@ -66,14 +87,6 @@ void clocks_init(void) {
 
     clock_monotonic_resolution = get_clock_resolution(clock_monotonic_to_use);
     clock_realtime_resolution = get_clock_resolution(CLOCK_REALTIME);
-
-    // if for any reason these are zero, netdata will crash
-    // since we use them as modulo to calculations
-    if(!clock_realtime_resolution)
-        clock_realtime_resolution = 1000;
-
-    if(!clock_monotonic_resolution)
-        clock_monotonic_resolution = 1000;
 }
 
 inline time_t now_sec(clockid_t clk_id) {
@@ -91,7 +104,7 @@ inline usec_t now_usec(clockid_t clk_id) {
         netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
     }
-    return (usec_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
+    return (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)(ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
 }
 
 inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
@@ -279,7 +292,7 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
 
 inline void heartbeat_init(heartbeat_t *hb) {
     hb->realtime = 0ULL;
-    hb->randomness = 250 * USEC_PER_MS + ((now_realtime_usec() * clock_realtime_resolution) % (250 * USEC_PER_MS));
+    hb->randomness = (usec_t)250 * USEC_PER_MS + ((usec_t)(now_realtime_usec() * clock_realtime_resolution) % (250 * USEC_PER_MS));
     hb->randomness -= (hb->randomness % clock_realtime_resolution);
 
     netdata_mutex_lock(&heartbeat_alignment_mutex);
