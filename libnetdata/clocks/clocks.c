@@ -50,9 +50,23 @@ static void test_clock_boottime(void) {
 }
 
 static usec_t get_clock_resolution(clockid_t clock) {
-    struct timespec ts;
-    clock_getres(clock, &ts);
-    return ts.tv_sec * USEC_PER_SEC + ts.tv_nsec * NSEC_PER_USEC;
+    struct timespec ts = {
+        .tv_sec = 0,
+        .tv_nsec = 1 * NSEC_PER_USEC,
+    };
+
+    if(clock_getres(clock, &ts) == 0) {
+        usec_t ret = ts.tv_sec * USEC_PER_SEC + ts.tv_nsec * NSEC_PER_USEC;
+        if(ret > 100 * USEC_PER_MS) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned more than 100ms, using defaults for clock resolution.", (int)clock);
+            return 0 * USEC_PER_SEC + 1 * NSEC_PER_USEC;
+        }
+        return ret;
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) failed, using defaults for clock resolution.", (int)clock);
+        return 0 * USEC_PER_SEC + 1 * NSEC_PER_USEC;
+    }
 }
 
 // perform any initializations required for clocks
