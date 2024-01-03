@@ -10,8 +10,8 @@ static clockid_t clock_monotonic_to_use = CLOCK_MONOTONIC;
 // the default clock resolution is 1ms
 #define DEFAULT_CLOCK_RESOLUTION_UT ((usec_t)0 * USEC_PER_SEC + (usec_t)1 * USEC_PER_MS)
 
-// the max clock resolution is 100ms
-#define MAX_CLOCK_RESOLUTION_UT ((usec_t)0 * USEC_PER_SEC + (usec_t)100 * USEC_PER_MS)
+// the max clock resolution is 10ms
+#define MAX_CLOCK_RESOLUTION_UT ((usec_t)0 * USEC_PER_SEC + (usec_t)10 * USEC_PER_MS)
 
 usec_t clock_monotonic_resolution = DEFAULT_CLOCK_RESOLUTION_UT;
 usec_t clock_realtime_resolution = DEFAULT_CLOCK_RESOLUTION_UT;
@@ -59,11 +59,15 @@ static usec_t get_clock_resolution(clockid_t clock) {
     struct timespec ts = { 0 };
 
     if(clock_getres(clock, &ts) == 0) {
-        usec_t ret = (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)ts.tv_nsec * NSEC_PER_USEC;
-        if(!ret || ret > MAX_CLOCK_RESOLUTION_UT) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned %"PRIu64" usec (zero or more than 100ms), using defaults for clock resolution.", (int)clock, ret);
+        usec_t ret = (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)ts.tv_nsec / NSEC_PER_USEC;
+        if(!ret && ts.tv_nsec > 0 && ts.tv_nsec < NSEC_PER_USEC)
+            return (usec_t)1;
+
+        else if(ret > MAX_CLOCK_RESOLUTION_UT) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned %"PRIu64" usec is out of range, using defaults for clock resolution.", (int)clock, ret);
             return DEFAULT_CLOCK_RESOLUTION_UT;
         }
+
         return ret;
     }
     else {
