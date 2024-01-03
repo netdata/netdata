@@ -23,13 +23,26 @@ DYNCFG_SOURCE_TYPE dyncfg_source_type2id(const char *source_type);
 const char *dyncfg_id2source_type(DYNCFG_SOURCE_TYPE source_type);
 
 typedef enum __attribute__((packed)) {
-    DYNCFG_STATUS_OK = 0,
+    DYNCFG_STATUS_NONE = 0,
+    DYNCFG_STATUS_OK,
     DYNCFG_STATUS_DISABLED,
     DYNCFG_STATUS_REJECTED,
     DYNCFG_STATUS_ORPHAN,
 } DYNCFG_STATUS;
 DYNCFG_STATUS dyncfg_status2id(const char *status);
 const char *dyncfg_id2status(DYNCFG_STATUS status);
+
+typedef enum __attribute__((packed)) {
+    DYNCFG_CMD_NONE     = 0,
+    DYNCFG_CMD_GET      = (1 << 0),
+    DYNCFG_CMD_SCHEMA   = (1 << 1),
+    DYNCFG_CMD_UPDATE   = (1 << 2),
+    DYNCFG_CMD_ADD      = (1 << 3),
+    DYNCFG_CMD_REMOVE   = (1 << 4),
+    DYNCFG_CMD_ENABLE   = (1 << 5),
+    DYNCFG_CMD_DISABLE  = (1 << 6),
+    DYNCFG_CMD_RESTART  = (1 << 7),
+} DYNCFG_CMDS;
 
 void dyncfg_add(const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, usec_t created_ut, usec_t modified_ut);
 
