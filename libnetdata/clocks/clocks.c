@@ -58,7 +58,7 @@ static usec_t get_clock_resolution(clockid_t clock) {
     if(clock_getres(clock, &ts) == 0) {
         usec_t ret = ts.tv_sec * USEC_PER_SEC + ts.tv_nsec * NSEC_PER_USEC;
         if(ret > 100 * USEC_PER_MS) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned more than 100ms, using defaults for clock resolution.", (int)clock);
+            nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned %"PRIu64" usec (more than 100ms), using defaults for clock resolution.", (int)clock, ret);
             return 0 * USEC_PER_SEC + 1 * NSEC_PER_USEC;
         }
         return ret;
