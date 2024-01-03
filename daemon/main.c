@@ -1893,6 +1893,7 @@ int main(int argc, char **argv) {
 
 
     if(!config_loaded) {
+        dyncfg_init();
         load_netdata_conf(NULL, 0, &user);
         load_cloud_conf(0);
     }

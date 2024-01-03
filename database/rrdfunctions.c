@@ -270,22 +270,23 @@ struct {
     const char *format;
     HTTP_CONTENT_TYPE content_type;
 } function_formats[] = {
-    { .format = "application/json", CT_APPLICATION_JSON },
     { .format = "text/plain",       CT_TEXT_PLAIN },
+    { .format = "text/yaml",        CT_TEXT_YAML },
+    { .format = "text/html",        CT_TEXT_HTML },
+    { .format = "application/json", CT_APPLICATION_JSON },
     { .format = "application/xml",  CT_APPLICATION_XML },
     { .format = "prometheus",       CT_PROMETHEUS },
     { .format = "text",             CT_TEXT_PLAIN },
     { .format = "txt",              CT_TEXT_PLAIN },
     { .format = "json",             CT_APPLICATION_JSON },
     { .format = "html",             CT_TEXT_HTML },
-    { .format = "text/html",        CT_TEXT_HTML },
     { .format = "xml",              CT_APPLICATION_XML },
 
     // terminator
     { .format = NULL,               CT_TEXT_PLAIN },
 };
 
-uint8_t functions_format_to_content_type(const char *format) {
+uint8_t functions_content_type2id(const char *format) {
     if(format && *format) {
         for (int i = 0; function_formats[i].format; i++)
             if (strcmp(function_formats[i].format, format) == 0)
@@ -295,7 +296,7 @@ uint8_t functions_format_to_content_type(const char *format) {
     return CT_TEXT_PLAIN;
 }
 
-const char *functions_content_type_to_format(HTTP_CONTENT_TYPE content_type) {
+const char *functions_id2content_type(HTTP_CONTENT_TYPE content_type) {
     for (int i = 0; function_formats[i].format; i++)
         if (function_formats[i].content_type == content_type)
             return function_formats[i].format;

@@ -421,7 +421,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER 
     struct inflight_function *pf = inflight_function_find(parser, transaction);
     if(pf) {
         if(format && *format)
-            pf->result_body_wb->content_type = functions_format_to_content_type(format);
+            pf->result_body_wb->content_type = functions_content_type2id(format);
 
         pf->code = code;
 

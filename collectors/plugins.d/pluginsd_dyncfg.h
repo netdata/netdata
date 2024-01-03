@@ -5,6 +5,8 @@
 
 #include "pluginsd_internals.h"
 
+PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser);
+
 PARSER_RC pluginsd_register_plugin(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_register_module(char **words, size_t num_words, PARSER *parser);
 PARSER_RC pluginsd_register_job(char **words, size_t num_words, PARSER *parser);

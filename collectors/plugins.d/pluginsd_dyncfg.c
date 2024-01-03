@@ -21,7 +21,7 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
         char *source             = get_word(words, num_words, i++);
         char *supported_cmds_str = get_word(words, num_words, i++);
 
-        DYNCFG_STATUS status = DYNCFG_STATUS_NONE;
+        DYNCFG_STATUS status = DYNCFG_STATUS_OK;
         DYNCFG_TYPE type = dyncfg_type2id(type_str);
         DYNCFG_SOURCE_TYPE source_type = dyncfg_source_type2id(source_type_str);
         DYNCFG_CMDS cmds = dyncfg_cmds2id(supported_cmds_str);

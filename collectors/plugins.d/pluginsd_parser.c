@@ -1356,6 +1356,9 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
         case 99:
             return pluginsd_exit(words, num_words, parser);
 
+        case 100:
+            return pluginsd_config(words, num_words, parser);
+
         case 101:
             return pluginsd_register_plugin(words, num_words, parser);
 

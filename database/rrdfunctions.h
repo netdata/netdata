@@ -76,8 +76,8 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, const char *payload);
 
-uint8_t functions_format_to_content_type(const char *format);
-const char *functions_content_type_to_format(HTTP_CONTENT_TYPE content_type);
+uint8_t functions_content_type2id(const char *format);
+const char *functions_id2content_type(HTTP_CONTENT_TYPE content_type);
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
 #include "rrdfunctions-inline.h"

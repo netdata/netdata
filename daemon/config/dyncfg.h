@@ -50,4 +50,6 @@ DYNCFG_CMDS dyncfg_cmds2id(const char *cmds);
 
 void dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data);
 
+void dyncfg_init(void);
+
 #endif //NETDATA_DYNCFG_H
