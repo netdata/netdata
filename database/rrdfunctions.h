@@ -4,7 +4,7 @@
 
 // ----------------------------------------------------------------------------
 
-#include "rrd.h"
+#include "../libnetdata/libnetdata.h"
 
 #define RRDFUNCTIONS_PRIORITY_DEFAULT 100
 
@@ -58,6 +58,8 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
 #endif // RRD_FUNCTIONS_INTERNALS
 
 // ----------------------------------------------------------------------------
+
+#include "rrd.h"
 
 void rrd_functions_host_init(RRDHOST *host);
 void rrd_functions_host_destroy(RRDHOST *host);
