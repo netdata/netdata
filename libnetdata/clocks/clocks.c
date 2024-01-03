@@ -56,16 +56,16 @@ static usec_t get_clock_resolution(clockid_t clock) {
     };
 
     if(clock_getres(clock, &ts) == 0) {
-        usec_t ret = ts.tv_sec * USEC_PER_SEC + ts.tv_nsec * NSEC_PER_USEC;
-        if(ret > 100 * USEC_PER_MS) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned %"PRIu64" usec (more than 100ms), using defaults for clock resolution.", (int)clock, ret);
-            return 0 * USEC_PER_SEC + 1 * NSEC_PER_USEC;
+        usec_t ret = (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)ts.tv_nsec * NSEC_PER_USEC;
+        if(!ret || ret > 100 * USEC_PER_MS) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned %"PRIu64" usec (zero or more than 100ms), using defaults for clock resolution.", (int)clock, ret);
+            return (usec_t)0 * USEC_PER_SEC + (usec_t)1 * NSEC_PER_USEC;
         }
         return ret;
     }
     else {
         nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) failed, using defaults for clock resolution.", (int)clock);
-        return 0 * USEC_PER_SEC + 1 * NSEC_PER_USEC;
+        return (usec_t)0 * USEC_PER_SEC + (usec_t)1 * NSEC_PER_USEC;
     }
 }
 
@@ -80,14 +80,6 @@ void clocks_init(void) {
 
     clock_monotonic_resolution = get_clock_resolution(clock_monotonic_to_use);
     clock_realtime_resolution = get_clock_resolution(CLOCK_REALTIME);
-
-    // if for any reason these are zero, netdata will crash
-    // since we use them as modulo to calculations
-    if(!clock_realtime_resolution)
-        clock_realtime_resolution = 1000;
-
-    if(!clock_monotonic_resolution)
-        clock_monotonic_resolution = 1000;
 }
 
 inline time_t now_sec(clockid_t clk_id) {
@@ -105,7 +97,7 @@ inline usec_t now_usec(clockid_t clk_id) {
         netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
         return 0;
     }
-    return (usec_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
+    return (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)(ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
 }
 
 inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
@@ -293,7 +285,7 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
 
 inline void heartbeat_init(heartbeat_t *hb) {
     hb->realtime = 0ULL;
-    hb->randomness = 250 * USEC_PER_MS + ((now_realtime_usec() * clock_realtime_resolution) % (250 * USEC_PER_MS));
+    hb->randomness = (usec_t)250 * USEC_PER_MS + ((usec_t)(now_realtime_usec() * clock_realtime_resolution) % (250 * USEC_PER_MS));
     hb->randomness -= (hb->randomness % clock_realtime_resolution);
 
     netdata_mutex_lock(&heartbeat_alignment_mutex);
