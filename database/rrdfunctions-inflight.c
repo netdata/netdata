@@ -343,11 +343,6 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 
     size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, PLUGINSD_LINE_MAX);
 
-    if (is_dyncfg_function(sanitized_cmd, DYNCFG_FUNCTION_TYPE_ALL)) {
-        call_virtual_function_async(result_wb, host, sanitized_cmd, payload, result_cb, result_cb_data);
-        return HTTP_RESP_OK;
-    }
-
     code = rrd_functions_find_by_name(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
     if(code != HTTP_RESP_OK) {
         rrd_call_function_error(result_wb, "not found", code);

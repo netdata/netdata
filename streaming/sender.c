@@ -1697,7 +1697,6 @@ void *rrdpush_sender_thread(void *ptr) {
             rrdpush_send_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
             rrdpush_send_global_functions(s->host);
-            rrdpush_send_dyncfg(s->host);
             s->replication.oldest_request_after_t = 0;
 
             rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);

@@ -544,8 +544,6 @@ set(LIBNETDATA_FILES
         libnetdata/http/http_access.h
         libnetdata/http/http_defs.c
         libnetdata/http/http_defs.h
-        libnetdata/dyn_conf/dyn_conf.c
-        libnetdata/dyn_conf/dyn_conf.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

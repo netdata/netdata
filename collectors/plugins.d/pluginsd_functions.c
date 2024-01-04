@@ -23,7 +23,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
 
     char buffer[2048 + 1];
     snprintfz(buffer, sizeof(buffer) - 1, "%s %s %d \"%s\"\n",
-              pf->payload ? PLUGINSD_KEYWORD_FUNCTION_PAYLOAD : PLUGINSD_KEYWORD_FUNCTION,
+              pf->payload && buffer_strlen(pf->payload) ? PLUGINSD_KEYWORD_FUNCTION_PAYLOAD : PLUGINSD_KEYWORD_FUNCTION,
               transaction,
               pf->timeout_s,
               string2str(pf->function));
@@ -44,11 +44,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
                 pf->sent_monotonic_ut - pf->started_monotonic_ut);
     }
 
-    if (!pf->payload)
+    if (!pf->payload || !buffer_strlen(pf->payload))
         return;
 
     // send the payload to the plugin
-    ret = send_to_plugin(pf->payload, parser);
+    ret = send_to_plugin(buffer_tostring(pf->payload), parser);
 
     if(ret < 0) {
         netdata_log_error("FUNCTION_PAYLOAD '%s': failed to send function to plugin, error %zd", string2str(pf->function), ret);
@@ -57,8 +57,8 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     else {
         internal_error(LOG_FUNCTIONS,
                        "FUNCTION_PAYLOAD '%s' with transaction '%s' sent to collector (%zd bytes, in %"PRIu64" usec)",
-                string2str(pf->function), dictionary_acquired_item_name(item), ret,
-                pf->sent_monotonic_ut - pf->started_monotonic_ut);
+                       string2str(pf->function), dictionary_acquired_item_name(item), ret,
+                       pf->sent_monotonic_ut - pf->started_monotonic_ut);
     }
 
     send_to_plugin("\nFUNCTION_PAYLOAD_END\n", parser);
@@ -75,78 +75,16 @@ static bool inflight_functions_conflict_callback(const DICTIONARY_ITEM *item __m
     return false;
 }
 
-static void delete_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug, const char *fnc_sig, int code) {
-    if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
-        return;
-
-    char *params_local = strdupz(fnc_sig);
-    char *words[DYNCFG_MAX_WORDS];
-    size_t words_c = quoted_strings_splitter(params_local, words, DYNCFG_MAX_WORDS, isspace_map_pluginsd);
-
-    if (words_c != 3) {
-        netdata_log_error("PLUGINSD_PARSER: invalid number of parameters for delete_job");
-        freez(params_local);
-        return;
-    }
-
-    const char *module = words[1];
-    const char *job = words[2];
-
-    delete_job(plug, module, job);
-
-    unlink_job(plug->name, module, job);
-
-    rrdpush_send_job_deleted(localhost, plug->name, module, job);
-
-    freez(params_local);
-}
-
-static void set_job_finalize(struct parser *parser __maybe_unused, struct configurable_plugin *plug __maybe_unused, const char *fnc_sig, int code) {
-    if (code != DYNCFG_VFNC_RET_CFG_ACCEPTED)
-        return;
-
-    char *params_local = strdupz(fnc_sig);
-    char *words[DYNCFG_MAX_WORDS];
-    size_t words_c = quoted_strings_splitter(params_local, words, DYNCFG_MAX_WORDS, isspace_map_pluginsd);
-
-    if (words_c != 3) {
-        netdata_log_error("PLUGINSD_PARSER: invalid number of parameters for set_job_config");
-        freez(params_local);
-        return;
-    }
-
-    const char *module_name = get_word(words, words_c, 1);
-    const char *job_name = get_word(words, words_c, 2);
-
-    if (register_job(parser->user.host->configurable_plugins, parser->user.cd->configuration->name, module_name, job_name, JOB_TYPE_USER, JOB_FLG_USER_CREATED, 1)) {
-        freez(params_local);
-        return;
-    }
-
-    // only send this if it is not existing already (register_job cares for that)
-    rrdpush_send_dyncfg_reg_job(localhost, parser->user.cd->configuration->name, module_name, job_name, JOB_TYPE_USER, JOB_FLG_USER_CREATED);
-
-    freez(params_local);
-}
-
 static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *func, void *parser_ptr) {
     struct inflight_function *pf = func;
-    struct parser *parser = (struct parser *)parser_ptr;
+    struct parser *parser = (struct parser *)parser_ptr; (void)parser;
 
     internal_error(LOG_FUNCTIONS,
-                   "FUNCTION '%s' result of transaction '%s' received from collector (%zu bytes, request %"PRIu64" usec, response %"PRIu64" usec)",
-            string2str(pf->function), dictionary_acquired_item_name(item),
-            buffer_strlen(pf->result_body_wb), pf->sent_monotonic_ut - pf->started_monotonic_ut, now_realtime_usec() - pf->sent_monotonic_ut);
-
-    if (pf->virtual && SERVING_PLUGINSD(parser)) {
-        if (pf->payload) {
-            if (strncmp(string2str(pf->function), FUNCTION_NAME_SET_JOB_CONFIG, strlen(FUNCTION_NAME_SET_JOB_CONFIG)) == 0)
-                set_job_finalize(parser, parser->user.cd->configuration, string2str(pf->function), pf->code);
-            dyn_conf_store_config(string2str(pf->function), pf->payload, parser->user.cd->configuration);
-        } else if (strncmp(string2str(pf->function), FUNCTION_NAME_DELETE_JOB, strlen(FUNCTION_NAME_DELETE_JOB)) == 0) {
-            delete_job_finalize(parser, parser->user.cd->configuration, string2str(pf->function), pf->code);
-        }
-    }
+                   "FUNCTION '%s' result of transaction '%s' received from collector "
+                   "(%zu bytes, request %"PRIu64" usec, response %"PRIu64" usec)",
+                   string2str(pf->function), dictionary_acquired_item_name(item),
+                   buffer_strlen(pf->result_body_wb),
+                   pf->sent_monotonic_ut - pf->started_monotonic_ut, now_realtime_usec() - pf->sent_monotonic_ut);
 
     pf->result.cb(pf->result_body_wb, pf->code, pf->result.data);
 
@@ -277,7 +215,7 @@ int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BU
             .result_body_wb = result_body_wb,
             .timeout_s = timeout_s,
             .function = string_strdupz(function),
-            .payload = NULL,
+            .payload = buffer_dup(payload),
             .parser = parser,
 
             .result = {

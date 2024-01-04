@@ -755,7 +755,6 @@ extern char *netdata_configured_host_prefix;
 #include "http/http_defs.h"
 #include "gorilla/gorilla.h"
 #include "facets/facets.h"
-#include "dyn_conf/dyn_conf.h"
 #include "functions_evloop/functions_evloop.h"
 #include "query_progress/progress.h"
 

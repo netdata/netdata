@@ -11,13 +11,14 @@ struct inflight_function {
     int code;
     int timeout_s;
     STRING *function;
+    BUFFER *payload;
+
     BUFFER *result_body_wb;
+
     usec_t *stop_monotonic_ut; // pointer to caller data
     usec_t started_monotonic_ut;
     usec_t sent_monotonic_ut;
-    const char *payload;
     PARSER *parser;
-    bool virtual;
 
     struct {
         rrd_function_result_callback_t cb;
@@ -28,10 +29,6 @@ struct inflight_function {
         rrd_function_progress_cb_t cb;
         void *data;
     } progress;
-
-    struct {
-        usec_t stop_monotonic_ut;
-    } dyncfg;
 };
 
 PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser);

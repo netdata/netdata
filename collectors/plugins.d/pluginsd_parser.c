@@ -1359,24 +1359,6 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
         case 100:
             return pluginsd_config(words, num_words, parser);
 
-        case 101:
-            return pluginsd_register_plugin(words, num_words, parser);
-
-        case 102:
-            return pluginsd_register_module(words, num_words, parser);
-
-        case 103:
-            return pluginsd_register_job(words, num_words, parser);
-
-        case 104:
-            return pluginsd_dyncfg_reset(words, num_words, parser);
-
-        case 110:
-            return pluginsd_job_status(words, num_words, parser);
-        
-        case 111:
-            return pluginsd_delete_job(words, num_words, parser);
-
         default:
             break;
     }

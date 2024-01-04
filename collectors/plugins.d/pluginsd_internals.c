@@ -94,7 +94,6 @@ void parser_destroy(PARSER *parser) {
     if (unlikely(!parser))
         return;
 
-    pluginsd_dyncfg_cleanup(parser);
     pluginsd_inflight_functions_cleanup(parser);
 
     freez(parser);

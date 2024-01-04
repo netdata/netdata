@@ -2127,7 +2127,6 @@ int main(int argc, char **argv) {
     setenv("HOME", netdata_configured_home_dir, 1);
 
     dyncfg_init();
-    dyn_conf_init();
 
     netdata_log_info("netdata started on pid %d.", getpid());
 

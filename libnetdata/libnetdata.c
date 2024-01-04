@@ -487,7 +487,7 @@ char *strdupz(const char *s) {
 }
 
 char *strndupz(const char *s, size_t len) {
-    char *t = strdup(s, len);
+    char *t = strndup(s, len);
     if (unlikely(!t)) fatal("Cannot strndup() string '%s' of len %zu", s, len);
     return t;
 }
