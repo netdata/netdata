@@ -346,8 +346,14 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
     }
 
     code = rrd_functions_find_by_name(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
-    if(code != HTTP_RESP_OK)
+    if(code != HTTP_RESP_OK) {
+        rrd_call_function_error(result_wb, "not found", code);
+
+        if(result_cb)
+            result_cb(result_wb, code, result_cb_data);
+
         return code;
+    }
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
@@ -361,6 +367,10 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
             rrd_call_function_error(result_wb, "To access this function you need to be an admin in this Netdata Cloud space.", HTTP_RESP_PRECOND_FAIL);
 
         dictionary_acquired_item_release(host->functions, host_function_acquired);
+
+        if(result_cb)
+            result_cb(result_wb, HTTP_RESP_PRECOND_FAIL, result_cb_data);
+
         return HTTP_RESP_PRECOND_FAIL;
     }
 
@@ -422,6 +432,10 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
         freez((void *)t.cmd);
         freez((void *)t.sanitized_cmd);
         dictionary_acquired_item_release(r->host->functions, t.host_function_acquired);
+
+        if(result_cb)
+            result_cb(result_wb, code, result_cb_data);
+
         return code;
     }
     r->used = true;

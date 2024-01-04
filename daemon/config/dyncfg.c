@@ -110,7 +110,6 @@ const char *dyncfg_id2status(DYNCFG_STATUS status) {
 
 // ----------------------------------------------------------------------------
 
-
 static struct {
     DYNCFG_CMDS cmd;
     const char *name;
@@ -119,6 +118,7 @@ static struct {
     { .cmd = DYNCFG_CMD_SCHEMA, .name = "schema" },
     { .cmd = DYNCFG_CMD_UPDATE, .name = "update" },
     { .cmd = DYNCFG_CMD_ADD, .name = "add" },
+    { .cmd = DYNCFG_CMD_TEST, .name = "test" },
     { .cmd = DYNCFG_CMD_REMOVE, .name = "remove" },
     { .cmd = DYNCFG_CMD_ENABLE, .name = "enable" },
     { .cmd = DYNCFG_CMD_DISABLE, .name = "disable" },
@@ -348,7 +348,7 @@ void dyncfg_save(const char *id, DYNCFG *df) {
     fprintf(fp, "id=%s\n", id);
 
     if(df->host)
-        fprintf(fp, "host %s\n", rrdhost_hostname(df->host));
+        fprintf(fp, "host=%s\n", rrdhost_hostname(df->host));
 
     fprintf(fp, "path=%s\n", string2str(df->path));
     fprintf(fp, "type=%s\n", dyncfg_id2type(df->type));
@@ -546,7 +546,7 @@ void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code, void *result_cb_data) {
     if(code != HTTP_RESP_OK) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "Failed to send the first config cmd to '%s', with error code %d",
-               dictionary_acquired_item_name(e->item), code);
+               e->item ? dictionary_acquired_item_name(e->item) : "(null)", code);
 
         e->df->status = DYNCFG_STATUS_REJECTED;
     }
@@ -571,15 +571,12 @@ static void dyncfg_send_echo_status(const DICTIONARY_ITEM *item, DYNCFG *df, con
     char buf[strlen(id) + 100];
     snprintfz(buf, sizeof(buf), "config %s %s", id, df->user_disabled ? "disable" : "enable");
 
-    int rc = rrd_function_run(df->host, e->wb, 10,
-                              HTTP_ACCESS_ADMINS, buf, false, NULL,
-                              dyncfg_echo_cb, e,
-                              NULL, NULL,
-                              NULL, NULL,
-                              NULL);
-
-    if(rc != HTTP_RESP_OK)
-        dyncfg_echo_cb(e->wb, rc, e);
+    rrd_function_run(df->host, e->wb, 10,
+                     HTTP_ACCESS_ADMINS, buf, false, NULL,
+                     dyncfg_echo_cb, e,
+                     NULL, NULL,
+                     NULL, NULL,
+                     NULL);
 }
 
 static void dyncfg_send_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, const char *cmd) {
@@ -594,15 +591,12 @@ static void dyncfg_send_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, co
     char buf[strlen(id) + 100];
     snprintfz(buf, sizeof(buf), "config %s %s", id, cmd);
 
-    int rc = rrd_function_run(df->host, e->wb, 10,
-                              HTTP_ACCESS_ADMINS, buf, false, NULL,
-                              dyncfg_echo_cb, e,
-                              NULL, NULL,
-                              NULL, NULL,
-                              NULL);
-
-    if(rc != HTTP_RESP_OK)
-        dyncfg_echo_cb(e->wb, rc, e);
+    rrd_function_run(df->host, e->wb, 10,
+                     HTTP_ACCESS_ADMINS, buf, false, NULL,
+                     dyncfg_echo_cb, e,
+                     NULL, NULL,
+                     NULL, NULL,
+                     NULL);
 }
 
 static void dyncfg_send_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id) {
@@ -834,4 +828,105 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 
     return true;
+}
+
+// ----------------------------------------------------------------------------
+// unit test
+
+struct dyncfg_unittest {
+    bool enabled;
+    int errors;
+} dyncfg_unittest_data = { 0 };
+
+static int dyncfg_unittest_execute_cb(uuid_t *transaction, BUFFER *result_body_wb,
+                                      usec_t *stop_monotonic_ut, const char *function,
+                                      void *execute_cb_data,
+                                      rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
+                                      rrd_function_is_cancelled_cb_t is_cancelled_cb,
+                                      void *is_cancelled_cb_data,
+                                      rrd_function_register_canceller_cb_t register_canceller_cb,
+                                      void *register_canceller_cb_data,
+                                      rrd_function_register_progresser_cb_t register_progresser_cb,
+                                      void *register_progresser_cb_data) {
+    if(strncmp(function, "config ", 7) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: received function that is not config: %s", function);
+        rrd_call_function_error(result_body_wb, "wrong function", 400);
+        if(result_cb)
+            result_cb(result_body_wb, 400, result_cb_data);
+        return 400;
+    }
+
+    // extract the id
+    const char *id = &function[7];
+    while(*id && isspace(*id)) id++;
+    const char *space = id;
+    while(*space && !isspace(*space)) space++;
+    size_t id_len = space - id;
+
+    char id_copy[id_len + 1];
+    memcpy(id_copy, id, id_len);
+    id_copy[id_len] = '\0';
+
+    // extract the cmd
+    const char *cmd = space;
+    while(*cmd && isspace(*cmd)) cmd++;
+    space = cmd;
+    while(*space && !isspace(*space)) space++;
+    size_t cmd_len = space - cmd;
+
+    char cmd_copy[cmd_len + 1];
+    memcpy(cmd_copy, cmd, cmd_len);
+    cmd_copy[cmd_len] = '\0';
+    DYNCFG_CMDS c = dyncfg_cmds2id(cmd_copy);
+
+    if(c == DYNCFG_CMD_ENABLE)
+        dyncfg_unittest_data.enabled = true;
+    else if(c == DYNCFG_CMD_DISABLE)
+        dyncfg_unittest_data.enabled = false;
+
+    if(result_cb)
+        result_cb(result_body_wb, HTTP_RESP_OK, result_cb_data);
+
+    return HTTP_RESP_OK;
+}
+
+int dyncfg_unittest(void) {
+    rrd_functions_inflight_init();
+    dyncfg_init();
+
+    dyncfg_unittest_data.enabled = false;
+    dyncfg_add(localhost, "unittest:1", "/unittests",
+               DYNCFG_STATUS_OK, DYNCFG_TYPE_SINGLE,
+               DYNCFG_SOURCE_TYPE_DYNCFG, "here and there",
+               DYNCFG_CMD_UPDATE|DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE,
+               0, 0, true,
+               dyncfg_unittest_execute_cb, &dyncfg_unittest_data);
+
+    if(!dyncfg_unittest_data.enabled) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is not set");
+        dyncfg_unittest_data.errors++;
+    }
+
+    BUFFER *wb = buffer_create(0, NULL);
+
+    buffer_flush(wb);
+    const char *cmd = "config unittest:1 disable";
+    int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMINS, cmd,
+                              true, NULL,
+                              NULL, NULL,
+                              NULL, NULL,
+                              NULL, NULL,
+                              NULL);
+    if(rc != HTTP_RESP_OK) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run configuration function");
+        dyncfg_unittest_data.errors++;
+    }
+
+    if(dyncfg_unittest_data.enabled) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is set");
+        dyncfg_unittest_data.errors++;
+    }
+
+    return dyncfg_unittest_data.errors;
 }

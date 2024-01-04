@@ -1404,6 +1404,24 @@ void bearer_tokens_init(void);
 int unittest_rrdpush_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
+int dyncfg_unittest(void);
+
+int unittest_prepare_rrd(char **user) {
+    post_conf_load(user);
+    get_netdata_configured_variables();
+    default_rrd_update_every = 1;
+    default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
+    default_health_enabled = 0;
+    storage_tiers = 1;
+    registry_init();
+    if(rrd_init("unittest", NULL, true)) {
+        fprintf(stderr, "rrd_init failed for unittest\n");
+        return 1;
+    }
+    default_rrdpush_enabled = 0;
+
+    return 0;
+}
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1536,19 +1554,11 @@ int main(int argc, char **argv) {
                                 return 1;
                             if (unit_test_bitmaps())
                                 return 1;
+
                             // No call to load the config file on this code-path
-                            post_conf_load(&user);
-                            get_netdata_configured_variables();
-                            default_rrd_update_every = 1;
-                            default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
-                            default_health_enabled = 0;
-                            storage_tiers = 1;
-                            registry_init();
-                            if(rrd_init("unittest", NULL, true)) {
-                                fprintf(stderr, "rrd_init failed for unittest\n");
+                            if(unittest_prepare_rrd(&user))
                                 return 1;
-                            }
-                            default_rrdpush_enabled = 0;
+
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
 #ifdef ENABLE_DBENGINE
@@ -1632,6 +1642,12 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "progresstest") == 0) {
                             unittest_running = true;
                             return progress_unittest();
+                        }
+                        else if(strcmp(optarg, "dyncfgtest") == 0) {
+                            unittest_running = true;
+                            if(unittest_prepare_rrd(&user))
+                                return 1;
+                            return dyncfg_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -1893,7 +1909,6 @@ int main(int argc, char **argv) {
 
 
     if(!config_loaded) {
-        dyncfg_init();
         load_netdata_conf(NULL, 0, &user);
         load_cloud_conf(0);
     }
@@ -2111,6 +2126,7 @@ int main(int argc, char **argv) {
 
     setenv("HOME", netdata_configured_home_dir, 1);
 
+    dyncfg_init();
     dyn_conf_init();
 
     netdata_log_info("netdata started on pid %d.", getpid());

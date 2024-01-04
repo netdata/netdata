@@ -33,15 +33,16 @@ DYNCFG_STATUS dyncfg_status2id(const char *status);
 const char *dyncfg_id2status(DYNCFG_STATUS status);
 
 typedef enum __attribute__((packed)) {
-    DYNCFG_CMD_NONE     = 0,
-    DYNCFG_CMD_GET      = (1 << 0),
-    DYNCFG_CMD_SCHEMA   = (1 << 1),
-    DYNCFG_CMD_UPDATE   = (1 << 2),
-    DYNCFG_CMD_ADD      = (1 << 3),
-    DYNCFG_CMD_REMOVE   = (1 << 4),
-    DYNCFG_CMD_ENABLE   = (1 << 5),
-    DYNCFG_CMD_DISABLE  = (1 << 6),
-    DYNCFG_CMD_RESTART  = (1 << 7),
+    DYNCFG_CMD_NONE         = 0,
+    DYNCFG_CMD_GET          = (1 << 0),
+    DYNCFG_CMD_SCHEMA       = (1 << 1),
+    DYNCFG_CMD_UPDATE       = (1 << 2),
+    DYNCFG_CMD_ADD          = (1 << 3),
+    DYNCFG_CMD_TEST         = (1 << 4),
+    DYNCFG_CMD_REMOVE       = (1 << 5),
+    DYNCFG_CMD_ENABLE       = (1 << 6),
+    DYNCFG_CMD_DISABLE      = (1 << 7),
+    DYNCFG_CMD_RESTART      = (1 << 8),
 } DYNCFG_CMDS;
 DYNCFG_CMDS dyncfg_cmds2id(const char *cmds);
 
