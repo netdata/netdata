@@ -181,7 +181,7 @@ By default, the agent is sending anonymous telemetry data to help us take identi
   Show what the installer would do, but don’t actually do any of it.
 - `--dont-start-it`
   Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
-- `--override-distro`
+- `--distro-override`
   Override the distro detection logic and assume the system is using a specific Linux distribution and release. Takes a single argument consisting of the values of the `ID`, `VERSION_ID`, and `VERSION_CODENAME` fields from `/etc/os-release` for the desired distribution.
 
 The following options are mutually exclusive and specify special operations other than trying to install Netdata normally or update an existing install:
