@@ -21,12 +21,28 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     if(rc != 0)
         netdata_log_error("FUNCTION: '%s': cannot parse transaction UUID", string2str(pf->function));
 
+    bool has_payload = pf->payload && buffer_strlen(pf->payload);
     char buffer[2048 + 1];
-    snprintfz(buffer, sizeof(buffer) - 1, "%s %s %d \"%s\"\n",
-              pf->payload && buffer_strlen(pf->payload) ? PLUGINSD_KEYWORD_FUNCTION_PAYLOAD : PLUGINSD_KEYWORD_FUNCTION,
-              transaction,
-              pf->timeout_s,
-              string2str(pf->function));
+
+    if(has_payload) {
+        snprintfz(
+            buffer, sizeof(buffer) - 1,
+            PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \"%s\"\n",
+            transaction,
+            pf->timeout_s,
+            string2str(pf->function),
+            functions_id2content_type(pf->payload->content_type)
+            );
+    }
+    else {
+        snprintfz(
+            buffer, sizeof(buffer) - 1,
+            PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\"\n",
+            transaction,
+            pf->timeout_s,
+            string2str(pf->function)
+            );
+    }
 
     // send the command to the plugin
     ssize_t ret = send_to_plugin(buffer, parser);
@@ -40,11 +56,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     else {
         internal_error(LOG_FUNCTIONS,
                        "FUNCTION '%s' with transaction '%s' sent to collector (%zd bytes, in %"PRIu64" usec)",
-                string2str(pf->function), dictionary_acquired_item_name(item), ret,
-                pf->sent_monotonic_ut - pf->started_monotonic_ut);
+                       string2str(pf->function), dictionary_acquired_item_name(item), ret,
+                       pf->sent_monotonic_ut - pf->started_monotonic_ut);
     }
 
-    if (!pf->payload || !buffer_strlen(pf->payload))
+    if (!has_payload)
         return;
 
     // send the payload to the plugin

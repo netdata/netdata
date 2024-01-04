@@ -71,15 +71,24 @@ static void rrd_function_cancel_inflight(struct rrd_function_inflight *r);
 
 // ----------------------------------------------------------------------------
 
+static void rrd_functions_inflight_cleanup(struct rrd_function_inflight *r) {
+    buffer_free(r->payload);
+    freez((void *)r->transaction);
+    freez((void *)r->cmd);
+    freez((void *)r->sanitized_cmd);
+
+    r->payload = NULL;
+    r->transaction = NULL;
+    r->cmd = NULL;
+    r->sanitized_cmd = NULL;
+}
+
 static void rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct rrd_function_inflight *r = value;
 
     // internal_error(true, "FUNCTIONS: transaction '%s' finished", r->transaction);
 
-    buffer_free(r->payload);
-    freez((void *)r->transaction);
-    freez((void *)r->cmd);
-    freez((void *)r->sanitized_cmd);
+    rrd_functions_inflight_cleanup(r);
     dictionary_acquired_item_release(r->host->functions, r->host_function_acquired);
 }
 
@@ -325,14 +334,13 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
 }
 
 
-void call_virtual_function_async(BUFFER *wb, RRDHOST *host, const char *name, const char *payload, rrd_function_result_callback_t callback, void *callback_data);
 // ----------------------------------------------------------------------------
 
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCESS access, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, const char *payload) {
+                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, BUFFER *payload) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
@@ -398,6 +406,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
         .sanitized_cmd = strdupz(sanitized_cmd),
         .sanitized_cmd_length = sanitized_cmd_length,
         .transaction = strdupz(transaction),
+        .payload = buffer_dup(payload),
         .timeout = timeout_s,
         .cancelled = false,
         .stop_monotonic_ut = now_monotonic_usec() + timeout_s * USEC_PER_SEC,
@@ -426,9 +435,8 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
                t.transaction, t.cmd);
 
         code = rrd_call_function_error(result_wb, "duplicate transaction", HTTP_RESP_BAD_REQUEST);
-        freez((void *)t.transaction);
-        freez((void *)t.cmd);
-        freez((void *)t.sanitized_cmd);
+
+        rrd_functions_inflight_cleanup(&t);
         dictionary_acquired_item_release(r->host->functions, t.host_function_acquired);
 
         if(result_cb)

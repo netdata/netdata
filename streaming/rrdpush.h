@@ -199,13 +199,6 @@ typedef enum __attribute__((packed)) {
     SENDER_FLAG_OVERFLOW     = (1 << 0), // The buffer has been overflown
 } SENDER_FLAGS;
 
-struct function_payload_state {
-    BUFFER *payload;
-    char *txid;
-    char *fn_name;
-    char *timeout;
-};
-
 struct sender_state {
     RRDHOST *host;
     pid_t tid;                              // the thread id of the sender, from gettid()
@@ -235,9 +228,6 @@ struct sender_state {
 
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
     int rrdpush_sender_socket;
-
-    int receiving_function_payload;
-    struct function_payload_state function_payload; // state when receiving function with payload
 
     uint16_t hops;
 
@@ -276,6 +266,14 @@ struct sender_state {
         usec_t last_flush_time_ut;              // the last time the sender flushed the sending buffer in USEC
         time_t last_buffer_recreate_s;          // true when the sender buffer should be re-created
     } atomic;
+
+    struct {
+        bool intercept_input;
+        const char *transaction;
+        const char *timeout_s;
+        const char *function;
+        BUFFER *payload;
+    } functions;
 
     int parent_using_h2o;
 };
