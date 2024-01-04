@@ -25,12 +25,16 @@ void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
     dfe_done(tmp);
 }
 
-void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb) {
+void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb, bool dyncfg) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     struct rrd_host_function *tmp;
     dfe_start_read(host->functions, tmp) {
-        if(!(tmp->options & RRD_FUNCTION_GLOBAL))
+        if(tmp->options & RRD_FUNCTION_LOCAL)
+            continue;
+
+        if(!dyncfg && (tmp->options & RRD_FUNCTION_DYNCFG))
+            // we should not send dyncfg to this parent
             continue;
 
         buffer_sprintf(wb
@@ -52,6 +56,9 @@ static void functions2json(DICTIONARY *functions, BUFFER *wb)
     dfe_start_read(functions, t)
     {
         if (!rrd_collector_running(t->collector))
+            continue;
+
+        if(t->options & RRD_FUNCTION_DYNCFG)
             continue;
 
         buffer_json_member_add_object(wb, t_dfe.name);
@@ -91,6 +98,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
     struct rrd_host_function *t;
     dfe_start_read(host->functions, t) {
         if(!rrd_collector_running(t->collector)) continue;
+        if(t->options & RRD_FUNCTION_DYNCFG) continue;
 
         buffer_json_member_add_object(wb, t_dfe.name);
         {

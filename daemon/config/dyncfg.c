@@ -569,7 +569,7 @@ static void dyncfg_send_echo_status(const DICTIONARY_ITEM *item, DYNCFG *df, con
     e->df = df;
 
     char buf[strlen(id) + 100];
-    snprintfz(buf, sizeof(buf), "config %s %s", id, df->user_disabled ? "disable" : "enable");
+    snprintfz(buf, sizeof(buf), PLUGINSD_FUNCTION_CONFIG " %s %s", id, df->user_disabled ? "disable" : "enable");
 
     rrd_function_run(df->host, e->wb, 10,
                      HTTP_ACCESS_ADMINS, buf, false, NULL,
@@ -589,7 +589,7 @@ static void dyncfg_send_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, co
     e->df = df;
 
     char buf[strlen(id) + 100];
-    snprintfz(buf, sizeof(buf), "config %s %s", id, cmd);
+    snprintfz(buf, sizeof(buf), PLUGINSD_FUNCTION_CONFIG " %s %s", id, cmd);
 
     rrd_function_run(df->host, e->wb, 10,
                      HTTP_ACCESS_ADMINS, buf, false, NULL,
@@ -707,8 +707,8 @@ static int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_w
     const DICTIONARY_ITEM *item = NULL;
     const char *add_name = NULL;
     size_t add_name_len = 0;
-    if(strncmp(function, "config ", 7) == 0) {
-        const char *id = &function[7];
+    if(strncmp(function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG) + 1) == 0) {
+        const char *id = &function[sizeof(PLUGINSD_FUNCTION_CONFIG) + 1];
         while(isspace(*id)) id++;
         const char *space = id;
         while(*space && !isspace(*space)) space++;
@@ -816,7 +816,7 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
     DYNCFG *df = dictionary_acquired_item_value(item);
 
     char name[strlen(id) + 20];
-    snprintfz(name, sizeof(name), "config %s", id);
+    snprintfz(name, sizeof(name), PLUGINSD_FUNCTION_CONFIG " %s", id);
 
     rrd_collector_started();
     rrd_function_add(host, NULL, name, 10, 100,
@@ -849,7 +849,7 @@ static int dyncfg_unittest_execute_cb(uuid_t *transaction, BUFFER *result_body_w
                                       void *register_canceller_cb_data,
                                       rrd_function_register_progresser_cb_t register_progresser_cb,
                                       void *register_progresser_cb_data) {
-    if(strncmp(function, "config ", 7) != 0) {
+    if(strncmp(function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG) + 1) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: received function that is not config: %s", function);
         rrd_call_function_error(result_body_wb, "wrong function", 400);
         if(result_cb)
@@ -911,7 +911,7 @@ int dyncfg_unittest(void) {
     BUFFER *wb = buffer_create(0, NULL);
 
     buffer_flush(wb);
-    const char *cmd = "config unittest:1 disable";
+    const char *cmd = PLUGINSD_FUNCTION_CONFIG " unittest:1 disable";
     int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMINS, cmd,
                               true, NULL,
                               NULL, NULL,

@@ -33,6 +33,7 @@ typedef int (*rrd_function_execute_cb_t)(uuid_t *transaction, BUFFER *wb, BUFFER
 typedef enum __attribute__((packed)) {
     RRD_FUNCTION_LOCAL  = (1 << 0),
     RRD_FUNCTION_GLOBAL = (1 << 1),
+    RRD_FUNCTION_DYNCFG = (1 << 2),
 
     // this is 8-bit
 } RRD_FUNCTION_OPTIONS;

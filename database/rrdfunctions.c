@@ -225,9 +225,17 @@ void rrd_functions_host_destroy(RRDHOST *host) {
 
 // ----------------------------------------------------------------------------
 
-void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, const char *help, const char *tags,
-                      HTTP_ACCESS access, bool sync, rrd_function_execute_cb_t execute_cb,
-                      void *execute_cb_data) {
+static inline bool is_function_dyncfg(const char *name) {
+    return (name &&
+            *name &&
+            strncmp(name, PLUGINSD_FUNCTION_CONFIG, sizeof(PLUGINSD_FUNCTION_CONFIG)) == 0 &&
+            (name[sizeof(PLUGINSD_FUNCTION_CONFIG)] == 0 || isspace(name[sizeof(PLUGINSD_FUNCTION_CONFIG)]))
+            );
+}
+
+void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
+                      const char *help, const char *tags, HTTP_ACCESS access, bool sync,
+                      rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
 
     // RRDSET *st may be NULL in this function
     // to create a GLOBAL function
@@ -248,7 +256,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     struct rrd_host_function tmp = {
         .sync = sync,
         .timeout = timeout,
-        .options = (st)?RRD_FUNCTION_LOCAL:RRD_FUNCTION_GLOBAL,
+        .options = st ? RRD_FUNCTION_LOCAL: (is_function_dyncfg(name) ? RRD_FUNCTION_DYNCFG : RRD_FUNCTION_GLOBAL),
         .access = access,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,

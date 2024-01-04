@@ -511,7 +511,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
 
     if(unlikely(host_flags & RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED)) {
         BUFFER *wb = sender_start(host->sender);
-        rrd_global_functions_expose_rrdpush(host, wb);
+        rrd_global_functions_expose_rrdpush(host, wb, stream_has_capability(host->sender, STREAM_CAP_DYNCFG));
         sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
     }
 
@@ -571,7 +571,7 @@ void rrdpush_send_global_functions(RRDHOST *host) {
 
     BUFFER *wb = sender_start(host->sender);
 
-    rrd_global_functions_expose_rrdpush(host, wb);
+    rrd_global_functions_expose_rrdpush(host, wb, stream_has_capability(host->sender, STREAM_CAP_DYNCFG));
 
     sender_commit(host->sender, wb, STREAM_TRAFFIC_TYPE_FUNCTIONS);
 
