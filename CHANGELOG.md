@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- fix clock resolution detection [\#16720](https://github.com/netdata/netdata/pull/16720) ([ktsaou](https://github.com/ktsaou))
+- Add info to distros.yml for handling of legacy platforms. [\#16718](https://github.com/netdata/netdata/pull/16718) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#16716](https://github.com/netdata/netdata/pull/16716) ([netdatabot](https://github.com/netdatabot))
 - Add the Mobile App notification Integration [\#16715](https://github.com/netdata/netdata/pull/16715) ([sashwathn](https://github.com/sashwathn))
 - delay collecting double linked network interfaces [\#16701](https://github.com/netdata/netdata/pull/16701) ([ilyam8](https://github.com/ilyam8))
@@ -417,11 +419,6 @@
 - uninstaller: remove ND systemd preset and tmp dir [\#16148](https://github.com/netdata/netdata/pull/16148) ([ilyam8](https://github.com/ilyam8))
 - fix `test -x` check for uninstaller script [\#16146](https://github.com/netdata/netdata/pull/16146) ([ilyam8](https://github.com/ilyam8))
 - health: don't log an unknown key error for "families" [\#16145](https://github.com/netdata/netdata/pull/16145) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#16144](https://github.com/netdata/netdata/pull/16144) ([netdatabot](https://github.com/netdatabot))
-- Update python.d./varnish/metadata.yaml [\#16143](https://github.com/netdata/netdata/pull/16143) ([Ancairon](https://github.com/Ancairon))
-- Bugfix in integrations/setup/template [\#16142](https://github.com/netdata/netdata/pull/16142) ([Ancairon](https://github.com/Ancairon))
-- Fixes in integration generation script [\#16141](https://github.com/netdata/netdata/pull/16141) ([Ancairon](https://github.com/Ancairon))
-- Introduce stringify function for integrations [\#16140](https://github.com/netdata/netdata/pull/16140) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 

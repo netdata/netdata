@@ -109,6 +109,91 @@ option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
 #
+# handling of extra compiler flags
+#
+
+include(CheckCCompilerFlag)
+
+option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" False)
+
+set(EXTRA_HARDENING_FLAGS "")
+
+if(NOT ${DISABLE_HARDENING})
+        if(NOT ${CMAKE_C_FLAGS} MATCHES "stack-protector")
+                check_c_compiler_flag("-fstack-protector-strong" HAVE_STACK_PROTECTOR_STRONG_FLAG)
+                if(HAVE_STACK_PROTECTOR_STRONG_FLAG)
+                        set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fstack-protector-strong")
+                else()
+                        check_c_compiler_flag("-fstack-protector" HAVE_STACK_PROTECTOR)
+                        if(HAVE_STACK_PROTECTOR)
+                                set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fstack-protector")
+                        endif()
+                endif()
+        endif()
+
+        if(NOT ${CMAKE_C_FLAGS} MATCHES "stack-clash-protection")
+                check_c_compiler_flag("-fstack-clash-protection", HAVE_STACK_CLASH_FLAG)
+                if(HAVE_STACK_CLASH_FLAG)
+                        set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fstack-clash-protection")
+                endif()
+        endif()
+
+        if(NOT ${CMAKE_C_FLAGS} MATCHES "-fcf-protection")
+                check_c_compiler_flag("-fcf-protection=full" HAVE_CFI_FLAG)
+                if(HAVE_CFI_FLAG)
+                        set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fcf-protection=full")
+                endif()
+        endif()
+
+        if(NOT ${CMAKE_C_FLAGS} MATCHES "branch-protection")
+                check_c_compiler_flag("-mbranch-protection=standard" HAVE_BRANCH_PROT_FLAG)
+                if(HAVE_BRANCH_PROT_FLAG)
+                        set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -mbranch-protection=standard")
+                endif()
+        endif()
+
+        if(NOT ${CMAKE_C_FLAGS} MATCHES "_FORTIFY_SOURCE")
+                check_c_compiler_flag("-D_FORTIFY_SOURCE=3" HAVE_FORTIFY_SOURCE_3)
+                if(HAVE_FORTIFY_SOURCE_3)
+                        set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -D_FRTIFY_SOURCE=3")
+                else()
+                        check_c_compiler_flag("-D_FORTIFY_SOURCE=2" HAVE_FORTIFY_SOURCE_2)
+                        if(HAVE_FORTIFY_SOURCE_2)
+                                set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -D_FRTIFY_SOURCE=2")
+                        endif()
+                endif()
+        endif()
+endif()
+
+set(EXTRA_OPT_FLAGS "")
+
+if(NOT ${CMAKE_C_FLAGS} MATCHES "function-sections")
+        check_c_compiler_flag("-ffunction-sections" HAVE_FUNCTION_SECTIONS)
+        if(HAVE_FUNCTION_SECTIONS)
+                set(EXTRA_OPT_FLAGS "${EXTRA_OPT_FLAGS} -ffunction-sections")
+        endif()
+endif()
+
+if(NOT ${CMAKE_C_FLAGS} MATCHES "data-sections")
+        check_c_compiler_flag("-fdata-sections" HAVE_DATA_SECTIONS)
+        if(HAVE_DATA_SECTIONS)
+                set(EXTRA_OPT_FLAGS "${EXTRA_OPT_FLAGS} -fdata-sections")
+        endif()
+endif()
+
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
+
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
+
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
+
+set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
+set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
+
+#
 # detect OS
 #
 

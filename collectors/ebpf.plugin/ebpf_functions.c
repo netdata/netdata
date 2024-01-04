@@ -92,6 +92,10 @@ static inline void ebpf_socket_fill_fake_socket(netdata_socket_plus_t *fake_valu
     fake_values->data.protocol = AF_UNSPEC;
 }
 
+static NETDATA_DOUBLE bytes_to_mb(uint64_t bytes) {
+    return (NETDATA_DOUBLE)bytes / (1024 * 1024);
+}
+
 /**
  * Fill function buffer
  *
@@ -112,10 +116,10 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->pid);
 
     // NAME
-    buffer_json_add_array_item_string(wb, (name) ? name : "not identified");
+    buffer_json_add_array_item_string(wb, (name) ? name : "unknown");
 
     // Origin
-    buffer_json_add_array_item_string(wb, (values->data.external_origin) ? "incoming" : "outgoing");
+    buffer_json_add_array_item_string(wb, (values->data.external_origin) ? "in" : "out");
 
     // Source IP
     buffer_json_add_array_item_string(wb, values->socket_string.src_ip);
@@ -131,39 +135,19 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
 
     uint64_t connections;
     if (values->data.protocol == IPPROTO_TCP) {
-        // Protocol
         buffer_json_add_array_item_string(wb, "TCP");
-
-        // Bytes received
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_received);
-
-        // Bytes sent
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.tcp.tcp_bytes_sent);
-
-        // Connections
+        buffer_json_add_array_item_double(wb, bytes_to_mb(values->data.tcp.tcp_bytes_received));
+        buffer_json_add_array_item_double(wb, bytes_to_mb(values->data.tcp.tcp_bytes_sent));
         connections = values->data.tcp.ipv4_connect + values->data.tcp.ipv6_connect;
     } else if (values->data.protocol == IPPROTO_UDP) {
-        // Protocol
         buffer_json_add_array_item_string(wb, "UDP");
-
-        // Bytes received
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_received);
-
-        // Bytes sent
-        buffer_json_add_array_item_uint64(wb, (uint64_t) values->data.udp.udp_bytes_sent);
-
-        // Connections
+        buffer_json_add_array_item_double(wb, bytes_to_mb(values->data.udp.udp_bytes_received));
+        buffer_json_add_array_item_double(wb, bytes_to_mb(values->data.udp.udp_bytes_sent));
         connections = values->data.udp.call_udp_sent + values->data.udp.call_udp_received;
     } else {
-        // Protocol
         buffer_json_add_array_item_string(wb, "UNSPEC");
-
-        // Bytes received
-        buffer_json_add_array_item_uint64(wb, 0);
-
-        // Bytes sent
-        buffer_json_add_array_item_uint64(wb, 0);
-
+        buffer_json_add_array_item_double(wb, 0);
+        buffer_json_add_array_item_double(wb, 0);
         connections = 1;
     }
 
@@ -475,26 +459,29 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
             RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
             NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "PName", "Process Name", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Name", "Process Name", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_FULL_WIDTH,
+                                    NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Origin", "The connection origin.", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Origin", "Connection Origin", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Request from", "Request from IP", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Src", "Source IP Address", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
 
         /*
-        buffer_rrdf_table_add_field(wb, fields_id++, "SRC PORT", "Source Port", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "SrcPort", "Source Port", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
@@ -502,70 +489,74 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
                                     NULL);
                                     */
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "Destination IP", "Destination IP", RRDF_FIELD_TYPE_STRING,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Dst", "Destination IP Address", RRDF_FIELD_TYPE_STRING,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Destination Port", "Destination Port", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "Protocol", "Communication protocol", RRDF_FIELD_TYPE_STRING,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
-
-        buffer_rrdf_table_add_field(wb, fields_id++, "IncomingBandwidth", "Bytes received.", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
-                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
-                                    RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id++, "OutgoingBandwidth", "Bytes sent.", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+        buffer_rrdf_table_add_field(wb, fields_id++, "DstPort", "Destination Port", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id, "Connections", "Number of calls to tcp_vX_connections and udp_sendmsg, where X is the protocol version.", RRDF_FIELD_TYPE_INTEGER,
-                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, NULL, NAN,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Protocol", "Transport Layer Protocol", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
                                     RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
                                     RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY,
+                                    RRDF_FIELD_OPTS_NONE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, fields_id++, "Rcvd", "Traffic Received", RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 3, "MB", NAN,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_VISIBLE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, fields_id++, "Sent", "Traffic Sent", RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 3, "MB", NAN,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_VISIBLE,
+                                    NULL);
+
+        buffer_rrdf_table_add_field(wb, fields_id, "Conns", "Connections", RRDF_FIELD_TYPE_INTEGER,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, "connections", NAN,
+                                    RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                    RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_VISIBLE,
                                     NULL);
     }
     buffer_json_object_close(wb); // columns
 
-    buffer_json_member_add_string(wb, "default_sort_column", "IncomingBandwidth");
+    buffer_json_member_add_string(wb, "default_sort_column", "Rcvd");
 
     buffer_json_member_add_object(wb, "charts");
     {
-        buffer_json_member_add_object(wb, "IncomingConnections");
+        buffer_json_member_add_object(wb, "Traffic");
         {
-            buffer_json_member_add_string(wb, "name", "TCP Inbound Connection");
+            buffer_json_member_add_string(wb, "name", "Traffic");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "IncomingBandwidth");
+                buffer_json_add_array_item_string(wb, "Rcvd");
+                buffer_json_add_array_item_string(wb, "Sent");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        buffer_json_member_add_object(wb, "OutgoingConnections");
+        buffer_json_member_add_object(wb, "Connections");
         {
-            buffer_json_member_add_string(wb, "name", "TCP Outgoing Connection");
+            buffer_json_member_add_string(wb, "name", "Connections");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "OutgoingBandwidth");
+                buffer_json_add_array_item_string(wb, "Conns");
             }
             buffer_json_array_close(wb);
         }
@@ -576,45 +567,30 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
     buffer_json_member_add_array(wb, "default_charts");
     {
         buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "IncomingConnections");
-        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_add_array_item_string(wb, "Traffic");
+        buffer_json_add_array_item_string(wb, "Name");
         buffer_json_array_close(wb);
 
         buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "OutgoingConnections");
-        buffer_json_add_array_item_string(wb, "PName");
+        buffer_json_add_array_item_string(wb, "Connections");
+        buffer_json_add_array_item_string(wb, "Name");
         buffer_json_array_close(wb);
     }
     buffer_json_array_close(wb);
 
-    // Do we use only on fields that can be groupped?
     buffer_json_member_add_object(wb, "group_by");
     {
-        // group by PID
-        buffer_json_member_add_object(wb, "PID");
-        {
-            buffer_json_member_add_string(wb, "name", "Process ID");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "PID");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        // group by Process Name
-        buffer_json_member_add_object(wb, "PName");
+        buffer_json_member_add_object(wb, "Name");
         {
             buffer_json_member_add_string(wb, "name", "Process Name");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "PName");
+                buffer_json_add_array_item_string(wb, "Name");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // group by Process Name
         buffer_json_member_add_object(wb, "Origin");
         {
             buffer_json_member_add_string(wb, "name", "Origin");
@@ -626,43 +602,39 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
         }
         buffer_json_object_close(wb);
 
-        // group by Request From IP
-        buffer_json_member_add_object(wb, "Request from");
+        buffer_json_member_add_object(wb, "Src");
         {
-            buffer_json_member_add_string(wb, "name", "Request from IP");
+            buffer_json_member_add_string(wb, "name", "Source IP");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Request from");
+                buffer_json_add_array_item_string(wb, "Src");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // group by Destination IP
-        buffer_json_member_add_object(wb, "Destination IP");
+        buffer_json_member_add_object(wb, "Dst");
         {
             buffer_json_member_add_string(wb, "name", "Destination IP");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Destination IP");
+                buffer_json_add_array_item_string(wb, "Dst");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // group by DST Port
-        buffer_json_member_add_object(wb, "Destination Port");
+        buffer_json_member_add_object(wb, "DstPort");
         {
             buffer_json_member_add_string(wb, "name", "Destination Port");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Destination Port");
+                buffer_json_add_array_item_string(wb, "DstPort");
             }
             buffer_json_array_close(wb);
         }
         buffer_json_object_close(wb);
 
-        // group by Protocol
         buffer_json_member_add_object(wb, "Protocol");
         {
             buffer_json_member_add_string(wb, "name", "Protocol");
@@ -711,10 +683,8 @@ void *ebpf_function_thread(void *ptr)
                                                                 &lock,
                                                                 &ebpf_plugin_exit);
 
-    functions_evloop_add_function(wg,
-                                  "ebpf_socket",
-                                  ebpf_function_socket_manipulation,
-                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+    functions_evloop_add_function(
+        wg, EBPF_FUNCTION_SOCKET, ebpf_function_socket_manipulation, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
 
     pthread_mutex_lock(&lock);
     int i;

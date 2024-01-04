@@ -1878,6 +1878,7 @@ should_install_fluentbit() {
 
 install_fluentbit() {
   if ! should_install_fluentbit; then
+    enable_feature PLUGIN_LOGS_MANAGEMENT 0
     return 0
   fi
 
