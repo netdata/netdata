@@ -691,7 +691,7 @@ void dyncfg_function_result_cb(BUFFER *wb, int code, void *result_cb_data) {
     freez(dc);
 }
 
-static int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb,
+static int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFFER *payload,
                                  usec_t *stop_monotonic_ut, const char *function,
                                  void *execute_cb_data __maybe_unused,
                                  rrd_function_result_callback_t result_cb, void *result_cb_data,
@@ -763,11 +763,11 @@ static int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_w
     dc->cmd = c;
     dc->result_cb = result_cb;
     dc->result_cb_data = result_cb_data;
-    dc->payload = buffer_create(0, NULL);
-    // TODO set the payload
+    dc->payload = buffer_dup(payload);
 
     DYNCFG *df = dictionary_acquired_item_value(item);
-    int rc = df->execute_cb(transaction, result_body_wb, stop_monotonic_ut, function, df->execute_cb_data,
+    int rc = df->execute_cb(transaction, result_body_wb, payload,
+                            stop_monotonic_ut, function, df->execute_cb_data,
                             dyncfg_function_result_cb, dc,
                             progress_cb, progress_cb_data,
                             is_cancelled_cb, is_cancelled_cb_data,
@@ -838,7 +838,7 @@ struct dyncfg_unittest {
     int errors;
 } dyncfg_unittest_data = { 0 };
 
-static int dyncfg_unittest_execute_cb(uuid_t *transaction, BUFFER *result_body_wb,
+static int dyncfg_unittest_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFFER *payload,
                                       usec_t *stop_monotonic_ut, const char *function,
                                       void *execute_cb_data,
                                       rrd_function_result_callback_t result_cb, void *result_cb_data,

@@ -1244,4 +1244,20 @@ buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const 
     buffer_json_object_close(wb);
 }
 
+static inline BUFFER *buffer_dup(BUFFER *src) {
+    if(!src)
+        return NULL;
+
+    BUFFER *dst = buffer_create(buffer_strlen(src) + 1, src->statistics);
+    buffer_contents_replace(dst, buffer_tostring(src), buffer_strlen(src));
+
+    dst->content_type = src->content_type;
+    dst->options = src->options;
+    dst->date = src->date;
+    dst->expires = src->expires;
+    dst->json = src->json;
+
+    return dst;
+}
+
 #endif /* NETDATA_WEB_BUFFER_H */

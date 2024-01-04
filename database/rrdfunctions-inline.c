@@ -6,7 +6,7 @@ struct rrd_function_inline {
     rrd_function_execute_inline_cb_t cb;
 };
 
-static int rrd_function_run_inline(uuid_t *transaction __maybe_unused, BUFFER *wb,
+static int rrd_function_run_inline(uuid_t *transaction __maybe_unused, BUFFER *wb, BUFFER *payload __maybe_unused,
                             usec_t *stop_monotonic_ut __maybe_unused, const char *function __maybe_unused,
                             void *execute_cb_data __maybe_unused,
                             rrd_function_result_callback_t result_cb, void *result_cb_data,

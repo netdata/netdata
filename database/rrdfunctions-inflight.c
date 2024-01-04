@@ -18,6 +18,8 @@ struct rrd_function_inflight {
     bool cancelled;
     usec_t stop_monotonic_ut;
 
+    BUFFER *payload;
+
     const DICTIONARY_ITEM *host_function_acquired;
 
     // the collector
@@ -74,6 +76,7 @@ static void rrd_functions_inflight_delete_cb(const DICTIONARY_ITEM *item __maybe
 
     // internal_error(true, "FUNCTIONS: transaction '%s' finished", r->transaction);
 
+    buffer_free(r->payload);
     freez((void *)r->transaction);
     freez((void *)r->cmd);
     freez((void *)r->sanitized_cmd);
@@ -180,7 +183,7 @@ static bool rrd_inflight_async_function_is_cancelled(void *data) {
 }
 
 static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_inflight *r) {
-    int code = r->rdcf->execute_cb(&r->transaction_uuid, r->result.wb,
+    int code = r->rdcf->execute_cb(&r->transaction_uuid, r->result.wb, r->payload,
                                    &r->stop_monotonic_ut, r->sanitized_cmd, r->rdcf->execute_cb_data,
                                    rrd_inflight_async_function_nowait_finished, r,
                                    r->progress.cb, r->progress.data,
@@ -215,8 +218,8 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
     temp_wb->content_type = r->result.wb->content_type;
 
-    int code = r->rdcf->execute_cb(&r->transaction_uuid, temp_wb, &r->stop_monotonic_ut,
-                                   r->sanitized_cmd, r->rdcf->execute_cb_data,
+    int code = r->rdcf->execute_cb(&r->transaction_uuid, temp_wb, r->payload,
+                                   &r->stop_monotonic_ut, r->sanitized_cmd, r->rdcf->execute_cb_data,
                                    // we overwrite the result callbacks,
                                    // so that we can clean up the allocations made
                                    rrd_async_function_signal_when_ready, tmp,
@@ -443,7 +446,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 
     if(r->rdcf->sync) {
         // the caller has to wait
-        code = r->rdcf->execute_cb(&r->transaction_uuid, r->result.wb,
+        code = r->rdcf->execute_cb(&r->transaction_uuid, r->result.wb, r->payload,
                                    &r->stop_monotonic_ut, r->sanitized_cmd, r->rdcf->execute_cb_data,
                                    r->result.cb, r->result.data,
                                    r->progress.cb, r->progress.data,

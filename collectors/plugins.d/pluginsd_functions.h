@@ -42,7 +42,7 @@ void pluginsd_inflight_functions_init(PARSER *parser);
 void pluginsd_inflight_functions_cleanup(PARSER *parser);
 void pluginsd_inflight_functions_garbage_collect(PARSER  *parser, usec_t now_ut);
 
-int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb,
+int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFFER *payload,
                                  usec_t *stop_monotonic_ut, const char *function,
                                  void *execute_cb_data,
                                  rrd_function_result_callback_t result_cb, void *result_cb_data,

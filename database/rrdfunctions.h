@@ -18,7 +18,7 @@ typedef void (*rrd_function_progress_cb_t)(void *data, size_t done, size_t all);
 typedef void (*rrd_function_progresser_cb_t)(void *data);
 typedef void (*rrd_function_register_progresser_cb_t)(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data);
 
-typedef int (*rrd_function_execute_cb_t)(uuid_t *transaction, BUFFER *wb,
+typedef int (*rrd_function_execute_cb_t)(uuid_t *transaction, BUFFER *wb, BUFFER *payload,
                                          usec_t *stop_monotonic_ut, const char *function, void *collector_data,
                                          rrd_function_result_callback_t result_cb, void *result_cb_data,
                                          rrd_function_progress_cb_t progress_cb, void *progress_cb_data,

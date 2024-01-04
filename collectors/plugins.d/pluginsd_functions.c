@@ -254,7 +254,7 @@ static void pluginsd_function_progress_to_plugin(void *data) {
 
 // this is the function called from
 // rrd_call_function_and_wait() and rrd_call_function_async()
-int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb,
+int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFFER *payload,
                                         usec_t *stop_monotonic_ut, const char *function,
                                         void *execute_cb_data,
                                         rrd_function_result_callback_t result_cb, void *result_cb_data,
