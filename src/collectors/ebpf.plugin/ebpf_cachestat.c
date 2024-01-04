@@ -546,12 +546,6 @@ static void ebpf_cachestat_exit(void *ptr)
 
         ebpf_obsolete_cachestat_global(em);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_cachestat_pid)
-            ebpf_statistic_obsolete_aral_chart(em, cachestat_disable_priority);
-#endif
-
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
@@ -711,24 +705,6 @@ static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, n
 }
 
 /**
- * Fill PID
- *
- * Fill PID structures
- *
- * @param current_pid pid that we are collecting data
- */
-static netdata_publish_cachestat_t *ebpf_cachestat_select_publish(uint32_t current_pid)
-{
-    netdata_publish_cachestat_t *curr = cachestat_pid[current_pid];
-    if (!curr) {
-        curr = ebpf_publish_cachestat_get();
-        cachestat_pid[current_pid] = curr;
-    }
-
-    return curr;
-}
-
-/**
  * Read APPS table
  *
  * Read the apps table and store data inside the structure.
@@ -751,10 +727,11 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
 
         cachestat_apps_accumulator(cv, maps_per_core);
 
-        netdata_publish_cachestat_t *publish = ebpf_cachestat_select_publish(key);
-        if (!publish)
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key);
+        if (!local_pid)
             goto end_cachestat_loop;
 
+        netdata_publish_cachestat_t *publish = &local_pid->cachestat;
         if (!publish->ct || publish->ct != cv->ct)
             cachestat_save_pid_values(publish, cv);
         else if (++publish->not_updated >= max_period) {
@@ -791,8 +768,9 @@ static void ebpf_update_cachestat_cgroup(int maps_per_core)
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_cachestat_pid_t *out = &pids->cachestat;
-            if (likely(cachestat_pid) && cachestat_pid[pid]) {
-                netdata_publish_cachestat_t *in = cachestat_pid[pid];
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+            if (local_pid) {
+                netdata_publish_cachestat_t *in = &local_pid->cachestat;
 
                 memcpy(out, &in->current, sizeof(netdata_cachestat_pid_t));
             } else {
@@ -826,8 +804,9 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
     netdata_cachestat_pid_t *dst = &publish->current;
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_cachestat_t *w = cachestat_pid[pid];
-        if (w) {
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+        if (local_pid) {
+            netdata_publish_cachestat_t *w = &local_pid->cachestat;
             netdata_cachestat_pid_t *src = &w->current;
             dst->account_page_dirtied += src->account_page_dirtied;
             dst->add_to_page_cache_lru += src->add_to_page_cache_lru;
@@ -845,7 +824,6 @@ void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_p
 void ebpf_resume_apps_data()
 {
     struct ebpf_target *w;
-    collected_number value;
 
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_CACHESTAT_IDX))))
@@ -871,7 +849,6 @@ void *ebpf_read_cachestat_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    int cgroups = em->cgroup_charts;
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
     int max_period = update_every * EBPF_CLEANUP_FACTOR;
@@ -887,9 +864,9 @@ void *ebpf_read_cachestat_thread(void *ptr)
             continue;
 
         netdata_thread_disable_cancelability();
-        ebpf_read_cachestat_apps_table(maps_per_core, max_period);
 
         pthread_mutex_lock(&collect_data_mutex);
+        ebpf_read_cachestat_apps_table(maps_per_core, max_period);
         ebpf_resume_apps_data();
         pthread_mutex_unlock(&collect_data_mutex);
 
@@ -1421,11 +1398,6 @@ static void cachestat_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_cache_send_apps_data(apps_groups_root_target);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_cachestat_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_cachestat_pid, em);
-#endif
-
         if (cgroups)
             ebpf_cachestat_send_cgroup_data(update_every);
 
@@ -1504,17 +1476,10 @@ static void ebpf_create_memory_charts(ebpf_module_t *em)
  *
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
- *
- * @param apps is apps enabled?
  */
-static void ebpf_cachestat_allocate_global_vectors(int apps)
+static void ebpf_cachestat_allocate_global_vectors()
 {
-    if (apps) {
-        cachestat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_cachestat_t *));
-        ebpf_cachestat_aral_init();
-        cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
-    }
-
+    cachestat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_cachestat_pid_t));
     cachestat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
     memset(cachestat_hash_values, 0, NETDATA_CACHESTAT_END * sizeof(netdata_idx_t));
@@ -1622,7 +1587,7 @@ void *ebpf_cachestat_thread(void *ptr)
         goto endcachestat;
     }
 
-    ebpf_cachestat_allocate_global_vectors(em->apps_charts);
+    ebpf_cachestat_allocate_global_vectors();
 
     int algorithms[NETDATA_CACHESTAT_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX
@@ -1636,10 +1601,6 @@ void *ebpf_cachestat_thread(void *ptr)
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     ebpf_create_memory_charts(em);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_cachestat_pid)
-        cachestat_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_CACHESTAT_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 
