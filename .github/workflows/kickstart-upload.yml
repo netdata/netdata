@@ -1,0 +1,54 @@
+---
+# Upload the kickstart script to the repo server
+name: Upload Kickstart Script
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/kickstart-upload.yml
+      - packaging/installer/kickstart.sh
+  workflow_dispatch: null
+concurrency:
+  group: kickstart-upload
+  cancel-in-progress: true
+jobs:
+  upload:
+    name: Upload Kickstart Script
+    runs-on: ubuntu-latest
+    if: github.repository == 'netdata/netdata'
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: SSH setup
+        id: ssh-setup
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
+          name: id_ecdsa
+          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
+      - name: Upload
+        id: upload
+        run: rsync -vp packaging/installer/kickstart.sh netdatabot@packages.netdata.cloud:/home/netdatabot/incoming/kickstart.sh
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Kickstart upload failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to upload updated kickstart script to repo server.
+              Checkout: ${{ steps.checkout.outcome }}
+              Import SSH Key: ${{ steps.ssh-setup.outcome }}
+              Upload: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+          }}
