@@ -237,7 +237,7 @@ void rrdsetvar_rename_all(RRDSET *st) {
 void rrdsetvar_release_and_delete_all(RRDSET *st) {
     RRDSETVAR *rs;
     dfe_start_write(st->rrdsetvar_root_index, rs) {
-        dictionary_del_advanced(st->rrdsetvar_root_index, string2str(rs->name), (ssize_t)string_strlen(rs->name) + 1);
+        dictionary_del_advanced(st->rrdsetvar_root_index, string2str(rs->name), (ssize_t)string_strlen(rs->name));
     }
     dfe_done(rs);
 }

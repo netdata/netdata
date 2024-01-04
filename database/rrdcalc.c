@@ -190,11 +190,11 @@ const RRDCALC_ACQUIRED *rrdcalc_from_rrdset_get(RRDSET *st, const char *alert_na
     char key[RRDCALC_MAX_KEY_SIZE + 1];
     size_t key_len = rrdcalc_key(key, RRDCALC_MAX_KEY_SIZE, rrdset_id(st), alert_name);
 
-    const RRDCALC_ACQUIRED *rca = (const RRDCALC_ACQUIRED *)dictionary_get_and_acquire_item_advanced(st->rrdhost->rrdcalc_root_index, key, (ssize_t)(key_len + 1));
+    const RRDCALC_ACQUIRED *rca = (const RRDCALC_ACQUIRED *)dictionary_get_and_acquire_item_advanced(st->rrdhost->rrdcalc_root_index, key, (ssize_t)key_len);
 
     if(!rca) {
         key_len = rrdcalc_key(key, RRDCALC_MAX_KEY_SIZE, rrdset_name(st), alert_name);
-        rca = (const RRDCALC_ACQUIRED *)dictionary_get_and_acquire_item_advanced(st->rrdhost->rrdcalc_root_index, key, (ssize_t)(key_len + 1));
+        rca = (const RRDCALC_ACQUIRED *)dictionary_get_and_acquire_item_advanced(st->rrdhost->rrdcalc_root_index, key, (ssize_t)key_len);
     }
 
     return rca;
@@ -727,7 +727,7 @@ void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET
         .existing_from_template = false,
     };
 
-    dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)(key_len + 1), NULL, sizeof(RRDCALC), &tmp);
+    dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)key_len, NULL, sizeof(RRDCALC), &tmp);
     if(tmp.react_action != RRDCALC_REACT_NEW && tmp.existing_from_template == false)
         netdata_log_error("RRDCALC: from template '%s' on chart '%s' with key '%s', failed to be added to host '%s'. It is manually configured.",
               string2str(rt->name), rrdset_id(st), key, rrdhost_hostname(host));
@@ -761,7 +761,7 @@ int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc) {
     };
 
     int ret = 1;
-    RRDCALC *t = dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)(key_len + 1), rc, sizeof(RRDCALC), &tmp);
+    RRDCALC *t = dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)key_len, rc, sizeof(RRDCALC), &tmp);
     if(tmp.react_action == RRDCALC_REACT_NEW) {
         // we copied rc into the dictionary, so we have to free the container here
         freez(rc);
@@ -795,7 +795,7 @@ static void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll
     if(rc->rrdset)
         rrdcalc_unlink_from_rrdset(rc, having_ll_wrlock);
 
-    dictionary_del_advanced(host->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key) + 1);
+    dictionary_del_advanced(host->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key));
 }
 
 

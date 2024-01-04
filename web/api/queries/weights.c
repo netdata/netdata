@@ -113,7 +113,7 @@ static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUI
     // we can use the pointer address or RMA as a unique key for each metric
     char buf[20 + 1];
     ssize_t len = snprintfz(buf, sizeof(buf) - 1, "%p", rma);
-    dictionary_set_advanced(results, buf, len + 1, &t, sizeof(struct register_result), NULL);
+    dictionary_set_advanced(results, buf, len, &t, sizeof(struct register_result), NULL);
 }
 
 // ----------------------------------------------------------------------------

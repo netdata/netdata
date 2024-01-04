@@ -107,7 +107,7 @@ void rrdvariables_destroy(DICTIONARY *dict) {
 }
 
 static inline const RRDVAR_ACQUIRED *rrdvar_get_and_acquire(DICTIONARY *dict, STRING *name) {
-    return (const RRDVAR_ACQUIRED *)dictionary_get_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1);
+    return (const RRDVAR_ACQUIRED *)dictionary_get_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name));
 }
 
 inline void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva) {
@@ -115,7 +115,7 @@ inline void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva)
 
     RRDVAR *rv = dictionary_acquired_item_value((const DICTIONARY_ITEM *)rva);
 
-    dictionary_del_advanced(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name) + 1);
+    dictionary_del_advanced(dict, string2str(rv->name), (ssize_t)string_strlen(rv->name));
 
     dictionary_acquired_item_release(dict, (const DICTIONARY_ITEM *)rva);
 }
@@ -130,7 +130,7 @@ inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_u
         .options = options,
         .react_action = RRDVAR_REACT_NONE,
     };
-    return (const RRDVAR_ACQUIRED *)dictionary_set_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
+    return (const RRDVAR_ACQUIRED *)dictionary_set_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name), NULL, sizeof(RRDVAR), &tmp);
 }
 
 inline void rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_FLAGS options, void *value) {
@@ -143,7 +143,7 @@ inline void rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRIN
         .options = options,
         .react_action = RRDVAR_REACT_NONE,
     };
-    dictionary_set_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
+    dictionary_set_advanced(dict, string2str(name), (ssize_t)string_strlen(name), NULL, sizeof(RRDVAR), &tmp);
 }
 
 void rrdvar_delete_all(DICTIONARY *dict) {

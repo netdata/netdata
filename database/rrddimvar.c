@@ -243,7 +243,7 @@ void rrddimvar_add_and_leave_released(RRDDIM *rd, RRDVAR_TYPE type, const char *
         .value = value,
         .rrddim = rd
     };
-    dictionary_set_advanced(rd->rrdset->rrddimvar_root_index, key, (ssize_t)(key_len + 1), NULL, sizeof(RRDDIMVAR), &tmp);
+    dictionary_set_advanced(rd->rrdset->rrddimvar_root_index, key, (ssize_t)key_len, NULL, sizeof(RRDDIMVAR), &tmp);
 }
 
 void rrddimvar_rename_all(RRDDIM *rd) {

@@ -231,7 +231,7 @@ void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     size_t key_len = snprintfz(key, RRDCALCTEMPLATE_MAX_KEY_SIZE, "%s", rrdcalctemplate_name(rt));
 
     bool added = false;
-    dictionary_set_advanced(host->rrdcalctemplate_root_index, key, (ssize_t)(key_len + 1), rt, sizeof(*rt), &added);
+    dictionary_set_advanced(host->rrdcalctemplate_root_index, key, (ssize_t)key_len, rt, sizeof(*rt), &added);
 
     if(added)
         freez(rt);

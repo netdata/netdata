@@ -1992,7 +1992,7 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
     }
 
     internal_error(
-        name_len > 0 && name_len != (ssize_t)(strlen(name)),
+        name_len > 0 && name_len != (ssize_t)strlen(name),
         "DICTIONARY: attempted to %s() with a name of '%s', having length of %zu, "
         "but the supplied name_len = %ld, on a dictionary created from %s() %zu@%s.",
         function,
