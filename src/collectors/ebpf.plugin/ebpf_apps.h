@@ -112,6 +112,7 @@ typedef struct ebpf_pid_stat {
 
     // each process gets a unique number
     netdata_publish_cachestat_t cachestat;
+    netdata_publish_dcstat_t dc;
 
     struct ebpf_target *target;       // app_groups.conf targets
     struct ebpf_target *user_target;  // uid based targets
@@ -210,7 +211,6 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core);
 void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 
 extern ebpf_process_stat_t **global_process_stats;
-extern netdata_publish_dcstat_t **dcstat_pid;
 extern netdata_publish_swap_t **swap_pid;
 extern netdata_publish_vfs_t **vfs_pid;
 extern netdata_fd_stat_t **fd_pid;
@@ -234,16 +234,6 @@ extern ebpf_process_stat_t *process_stat_vector;
 extern ARAL *ebpf_aral_socket_pid;
 void ebpf_socket_aral_init();
 ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void);
-
-extern ARAL *ebpf_aral_cachestat_pid;
-void ebpf_cachestat_aral_init();
-netdata_publish_cachestat_t *ebpf_publish_cachestat_get(void);
-void ebpf_cachestat_release(netdata_publish_cachestat_t *stat);
-
-extern ARAL *ebpf_aral_dcstat_pid;
-void ebpf_dcstat_aral_init();
-netdata_publish_dcstat_t *ebpf_publish_dcstat_get(void);
-void ebpf_dcstat_release(netdata_publish_dcstat_t *stat);
 
 extern ARAL *ebpf_aral_vfs_pid;
 void ebpf_vfs_aral_init();

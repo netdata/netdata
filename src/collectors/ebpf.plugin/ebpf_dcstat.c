@@ -474,11 +474,6 @@ static void ebpf_dcstat_exit(void *ptr)
 
         ebpf_obsolete_dc_global(em);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_dcstat_pid)
-            ebpf_statistic_obsolete_aral_chart(em, dcstat_disable_priority);
-#endif
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
@@ -509,25 +504,6 @@ static void ebpf_dcstat_exit(void *ptr)
  *  APPS
  *
  *****************************************************************/
-
-/**
- * Fill PID
- *
- * Fill PID structures
- *
- * @param current_pid pid that we are collecting data
- * @param out         values read from hash tables;
- */
-static netdata_publish_dcstat_t *ebpf_dcstat_select_publish(uint32_t current_pid)
-{
-    netdata_publish_dcstat_t *lpid = dcstat_pid[current_pid];
-    if (!lpid) {
-        lpid = ebpf_publish_dcstat_get();
-        dcstat_pid[current_pid] = lpid;
-    }
-    return lpid;
-}
-
 
 /**
  * Apps Accumulator
@@ -577,13 +553,16 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
-        netdata_publish_dcstat_t *publish = ebpf_dcstat_select_publish(key);
-        if (!publish->ct || publish->ct != cv->ct) {
-            memcpy(&publish->curr, &cv[0], sizeof(netdata_dcstat_pid_t));
-            publish->not_updated = 0;
-        } else if (++publish->not_updated >= max_period) {
-            bpf_map_delete_elem(fd, &key);
-            publish->not_updated = 0;
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key);
+        if (pid_stat) {
+            netdata_publish_dcstat_t *publish = &pid_stat->dc;
+            if (!publish->ct || publish->ct != cv->ct) {
+                memcpy(&publish->curr, &cv[0], sizeof(netdata_dcstat_pid_t));
+                publish->not_updated = 0;
+            } else if (++publish->not_updated >= max_period) {
+                bpf_map_delete_elem(fd, &key);
+                publish->not_updated = 0;
+            }
         }
 
 end_dc_loop:
@@ -607,12 +586,15 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
     netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_dcstat_t *w = dcstat_pid[pid];
-        if (w) {
-            netdata_dcstat_pid_t *src = &w->curr;
-            dst->cache_access += src->cache_access;
-            dst->file_system += src->file_system;
-            dst->not_found += src->not_found;
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid);
+        if (pid_stat) {
+            netdata_publish_dcstat_t *w = &pid_stat->dc;
+            if (w) {
+                netdata_dcstat_pid_t *src = &w->curr;
+                dst->cache_access += src->cache_access;
+                dst->file_system += src->file_system;
+                dst->not_found += src->not_found;
+            }
         }
 
         root = root->next;
@@ -655,7 +637,6 @@ void *ebpf_read_dcstat_thread(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    int cgroups = em->cgroup_charts;
     int maps_per_core = em->maps_per_core;
     int update_every = em->update_every;
 
@@ -801,8 +782,9 @@ static void ebpf_update_dc_cgroup(int maps_per_core)
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            if (likely(dcstat_pid) && dcstat_pid[pid]) {
-                netdata_publish_dcstat_t *in = dcstat_pid[pid];
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+            if (local_pid) {
+                netdata_publish_dcstat_t *in = &local_pid->dc;
 
                 memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
             } else {
@@ -1286,11 +1268,6 @@ static void dcstat_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_dcache_send_apps_data(apps_groups_root_target);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_dcstat_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_dcstat_pid, em);
-#endif
-
         if (cgroups)
             ebpf_dc_send_cgroup_data(update_every);
 
@@ -1354,12 +1331,7 @@ static void ebpf_create_dc_global_charts(int update_every)
  */
 static void ebpf_dcstat_allocate_global_vectors(int apps)
 {
-    if (apps) {
-        ebpf_dcstat_aral_init();
-        dcstat_pid = callocz((size_t)pid_max, sizeof(netdata_publish_dcstat_t *));
-        dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
-    }
-
+    dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
     memset(dcstat_counter_aggregated_data, 0, NETDATA_DCSTAT_IDX_END * sizeof(netdata_syscall_stat_t));
@@ -1451,10 +1423,6 @@ void *ebpf_dcstat_thread(void *ptr)
     ebpf_create_dc_global_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_dcstat_pid)
-        dcstat_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_DCSTAT_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 
