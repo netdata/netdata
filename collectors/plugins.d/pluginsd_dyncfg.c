@@ -42,3 +42,7 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
 }
 
 // ----------------------------------------------------------------------------
+
+PARSER_RC pluginsd_dyncfg_noop(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser __maybe_unused) {
+    return PARSER_RC_OK;
+}

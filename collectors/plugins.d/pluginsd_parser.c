@@ -1359,6 +1359,14 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
         case 100:
             return pluginsd_config(words, num_words, parser);
 
+        case 901:
+        case 902:
+        case 903:
+        case 904:
+        case 905:
+        case 906:
+            return pluginsd_dyncfg_noop(words, num_words, parser);
+
         default:
             break;
     }

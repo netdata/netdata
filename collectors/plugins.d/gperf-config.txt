@@ -53,3 +53,12 @@ RDSTATE,                 23, PARSER_INIT_STREAMING,                             
 REND,                    25, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 29
 RSET,                    21, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 30
 RSSTATE,                 24, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 31
+#
+# obsolete - do nothing commands
+#
+DYNCFG_ENABLE,          901, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 32
+DYNCFG_REGISTER_MODULE, 902, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 33
+DYNCFG_REGISTER_JOB,    903, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 34
+DYNCFG_RESET,           904, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 35
+REPORT_JOB_STATUS,      905, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 36
+DELETE_JOB,             906, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 37
