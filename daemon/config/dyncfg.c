@@ -165,13 +165,49 @@ static void dyncfg_cmds2fp(DYNCFG_CMDS cmds, FILE *fp) {
 
 // ----------------------------------------------------------------------------
 
+static bool dyncfg_is_valid_id(const char *id) {
+    const char *s = id;
+
+    while(*s) {
+        if(isspace(*s)) return false;
+        s++;
+    }
+
+    return true;
+}
+
+static char *dyncfg_escape_id(const char *id) {
+    if (id == NULL) return NULL;
+
+    // Allocate memory for the worst case, where every character is escaped.
+    char *escaped = mallocz(strlen(id) * 3 + 1); // Each char can become '%XX', plus '\0'
+    if (!escaped) return NULL;
+
+    const char *src = id;
+    char *dest = escaped;
+
+    while (*src) {
+        if (*src == '/' || isspace(*src) || !isprint(*src)) {
+            sprintf(dest, "%%%02X", (unsigned char)*src);
+            dest += 3;
+        } else {
+            *dest++ = *src;
+        }
+        src++;
+    }
+
+    *dest = '\0';
+    return escaped;
+}
+
+// ----------------------------------------------------------------------------
+
 typedef struct dyncfg {
     RRDHOST *host;
     STRING *path;
     DYNCFG_STATUS status;
     DYNCFG_TYPE type;
     DYNCFG_CMDS cmds;
-    HTTP_CONTENT_TYPE content_type;
     DYNCFG_SOURCE_TYPE source_type;
     STRING *source;
     usec_t created_ut;
@@ -180,6 +216,8 @@ typedef struct dyncfg {
     bool sync;
     bool user_disabled;
     bool restart_required;
+
+    BUFFER *payload;
 
     rrd_function_execute_cb_t execute_cb;
     void *execute_cb_data;
@@ -191,6 +229,9 @@ struct {
 } dyncfg_globals = { 0 };
 
 static void dyncfg_cleanup(DYNCFG *v) {
+    buffer_free(v->payload);
+    v->payload = NULL;
+
     string_freez(v->path);
     v->path = NULL;
 
@@ -227,63 +268,57 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
     dyncfg_normalize(nv);
 
     if(v->host != nv->host) {
-        v->host = nv->host;
+        SWAP(v->host, nv->host);
         changes++;
     }
 
     if(v->path != nv->path) {
-        STRING *old = v->path;
-        v->path = nv->path;
-        nv->path = NULL;
-        string_freez(old);
+        SWAP(v->path, nv->path);
         changes++;
     }
 
     if(v->status != nv->status) {
-        v->status = nv->status;
+        SWAP(v->status, nv->status);
         changes++;
     }
 
     if(v->type != nv->type) {
-        v->type = nv->type;
-        changes++;
-    }
-
-    if(nv->content_type != CT_NONE && v->content_type != nv->content_type) {
-        v->content_type = nv->content_type;
+        SWAP(v->type, nv->type);
         changes++;
     }
 
     if(v->source_type != nv->source_type) {
-        v->source_type = nv->source_type;
+        SWAP(v->source_type, nv->source_type);
         changes++;
     }
 
     if(v->cmds != nv->cmds) {
-        v->cmds = nv->cmds;
+        SWAP(v->cmds, nv->cmds);
         changes++;
     }
 
     if(v->source != nv->source) {
-        STRING *old = v->source;
-        v->source = nv->source;
-        nv->source = NULL;
-        string_freez(old);
+        SWAP(v->source, nv->source);
         changes++;
     }
 
     if(nv->created_ut < v->created_ut) {
-        v->created_ut = nv->created_ut;
+        SWAP(v->created_ut, nv->created_ut);
         changes++;
     }
 
     if(nv->modified_ut > v->modified_ut) {
-        v->modified_ut = nv->modified_ut;
+        SWAP(v->modified_ut, nv->modified_ut);
         changes++;
     }
 
     if(v->sync != nv->sync) {
-        v->sync = nv->sync;
+        SWAP(v->sync, nv->sync);
+        changes++;
+    }
+
+    if(nv->payload) {
+        SWAP(v->payload, nv->payload);
         changes++;
     }
 
@@ -298,55 +333,41 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
     return changes > 0;
 }
 
-void dyncfg_save(const char *id, DYNCFG *df, BUFFER *payload) {
-    if(!payload || buffer_strlen(payload) == 0)
-        payload = NULL;
-
+void dyncfg_save(const char *id, DYNCFG *df) {
+    CLEAN_CHAR_P *escaped_id = dyncfg_escape_id(id);
     char filename[FILENAME_MAX];
-    snprintfz(filename, sizeof(filename), "%s/%s.meta", dyncfg_globals.dir, id);
+    snprintfz(filename, sizeof(filename), "%s/%s.dyncfg", dyncfg_globals.dir, escaped_id);
 
     FILE *fp = fopen(filename, "w");
     if(!fp) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot create metadata file '%s'", filename);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot create file '%s'", filename);
         return;
     }
 
-    fprintf(fp, "version=%zu", DYNCFG_VERSION);
-    fprintf(fp, "id=%s", id);
+    fprintf(fp, "version=%zu\n", DYNCFG_VERSION);
+    fprintf(fp, "id=%s\n", id);
 
     if(df->host)
-        fprintf(fp, "host %s", rrdhost_hostname(df->host));
+        fprintf(fp, "host %s\n", rrdhost_hostname(df->host));
 
-    fprintf(fp, "path=%s", string2str(df->path));
-    fprintf(fp, "type=%s", dyncfg_id2type(df->type));
-    fprintf(fp, "source_type=%s", dyncfg_id2source_type(df->source_type));
-    fprintf(fp, "source=%s", string2str(df->source));
-    fprintf(fp, "created=%"PRIu64, df->created_ut);
-    fprintf(fp, "modified=%"PRIu64, df->modified_ut);
-    fprintf(fp, "sync=%s", df->sync ? "true" : "false");
-    fprintf(fp, "user_disabled=%s", df->user_disabled ? "true" : "false");
-    fprintf(fp, "saves=%zu", df->saves + 1);
-
-    if(payload) {
-        df->content_type = payload->content_type;
-        fprintf(fp, "content_type=%s", functions_id2content_type(df->content_type));
-    }
-
+    fprintf(fp, "path=%s\n", string2str(df->path));
+    fprintf(fp, "type=%s\n", dyncfg_id2type(df->type));
+    fprintf(fp, "source_type=%s\n", dyncfg_id2source_type(df->source_type));
+    fprintf(fp, "source=%s\n", string2str(df->source));
+    fprintf(fp, "created=%"PRIu64"\n", df->created_ut);
+    fprintf(fp, "modified=%"PRIu64"\n", df->modified_ut);
+    fprintf(fp, "sync=%s\n", df->sync ? "true" : "false");
+    fprintf(fp, "user_disabled=%s\n", df->user_disabled ? "true" : "false");
+    fprintf(fp, "saves=%"PRIu32"\n", ++df->saves);
     dyncfg_cmds2fp(df->cmds, fp);
-    fclose(fp);
-    df->saves++;
 
-    if(!payload)
-        return;
-
-    snprintfz(filename, sizeof(filename), "%s/%s.data", dyncfg_globals.dir, id);
-    fp = fopen(filename, "w");
-    if(!fp) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot create data file '%s'", filename);
-        return;
+    if(df->payload && buffer_strlen(df->payload) > 0) {
+        fprintf(fp, "content_type=%s\n", functions_id2content_type(df->payload->content_type));
+        fprintf(fp, "content_length=%zu\n", buffer_strlen(df->payload));
+        fprintf(fp, "---\n");
+        fwrite(buffer_tostring(df->payload), 1, buffer_strlen(df->payload), fp);
     }
 
-    fwrite(buffer_tostring(payload), buffer_strlen(payload), 1, fp);
     fclose(fp);
 }
 
@@ -359,56 +380,81 @@ static void dyncfg_load(const char *filename) {
 
     DYNCFG tmp = {
         .host = NULL,
-        .content_type = CT_NONE,
         .status = DYNCFG_STATUS_ORPHAN,
     };
-    char line[100 + 1 + 4096];
 
-    char *id = NULL, *hostname = NULL;
+    char line[PLUGINSD_LINE_MAX];
+    CLEAN_CHAR_P *id = NULL, *hostname = NULL;
+
+    HTTP_CONTENT_TYPE content_type = CT_NONE;
+    size_t content_length = 0;
+    bool read_payload = false;
 
     while (fgets(line, sizeof(line), fp)) {
-        char key[100], value[4096];
+        if(strcmp(line, "---\n") == 0) {
+            read_payload = true;
+            break;
+        }
 
-        if (sscanf(line, "%99[^=]=%4095s", key, value) == 2) {
-            // Parse key-value pairs
-            if (strcmp(key, "version") == 0) {
-                size_t version = strtoull(value, NULL, 10);
+        char *value = strchr(line, '=');
+        if(!value) continue;
 
-                if(version > DYNCFG_VERSION)
-                    nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                           "DYNCFG: configuration file '%s' has version %zu, which is newer than our version %zu",
-                           filename, version, DYNCFG_VERSION);
+        *value++ = '\0';
 
-            } else if (strcmp(key, "id") == 0) {
-                id = strdupz(value);
-            } else if (strcmp(key, "host") == 0) {
-                hostname = strdupz(value);
-            } else if (strcmp(key, "path") == 0) {
-                tmp.path = string_strdupz(value);
-            } else if (strcmp(key, "type") == 0) {
-                tmp.type = dyncfg_type2id(value);
-            } else if (strcmp(key, "source_type") == 0) {
-                tmp.source_type = dyncfg_source_type2id(value);
-            } else if (strcmp(key, "source") == 0) {
-                tmp.source = string_strdupz(value);
-            } else if (strcmp(key, "created") == 0) {
-                tmp.created_ut = strtoull(value, NULL, 10);
-            } else if (strcmp(key, "modified") == 0) {
-                tmp.modified_ut = strtoull(value, NULL, 10);
-            } else if (strcmp(key, "sync") == 0) {
-                tmp.sync = (strcmp(value, "true") == 0);
-            } else if (strcmp(key, "user_disabled") == 0) {
-                tmp.user_disabled = (strcmp(value, "true") == 0);
-            } else if (strcmp(key, "saves") == 0) {
-                tmp.saves = strtoull(value, NULL, 10);
-            } else if (strcmp(key, "content_type") == 0) {
-                tmp.content_type = functions_content_type2id(value);
-            } else if (strcmp(key, "cmds") == 0) {
-                tmp.cmds = dyncfg_cmds2id(value);
-            }
+        value = trim(value);
+        if(!value) continue;
+
+        char *key = trim(line);
+        if(!key) continue;
+
+        // Parse key-value pairs
+        if (strcmp(key, "version") == 0) {
+            size_t version = strtoull(value, NULL, 10);
+
+            if(version > DYNCFG_VERSION)
+                nd_log(NDLS_DAEMON, NDLP_NOTICE,
+                       "DYNCFG: configuration file '%s' has version %zu, which is newer than our version %zu",
+                       filename, version, DYNCFG_VERSION);
+
+        } else if (strcmp(key, "id") == 0) {
+            id = strdupz(value);
+        } else if (strcmp(key, "host") == 0) {
+            hostname = strdupz(value);
+        } else if (strcmp(key, "path") == 0) {
+            tmp.path = string_strdupz(value);
+        } else if (strcmp(key, "type") == 0) {
+            tmp.type = dyncfg_type2id(value);
+        } else if (strcmp(key, "source_type") == 0) {
+            tmp.source_type = dyncfg_source_type2id(value);
+        } else if (strcmp(key, "source") == 0) {
+            tmp.source = string_strdupz(value);
+        } else if (strcmp(key, "created") == 0) {
+            tmp.created_ut = strtoull(value, NULL, 10);
+        } else if (strcmp(key, "modified") == 0) {
+            tmp.modified_ut = strtoull(value, NULL, 10);
+        } else if (strcmp(key, "sync") == 0) {
+            tmp.sync = (strcmp(value, "true") == 0);
+        } else if (strcmp(key, "user_disabled") == 0) {
+            tmp.user_disabled = (strcmp(value, "true") == 0);
+        } else if (strcmp(key, "saves") == 0) {
+            tmp.saves = strtoull(value, NULL, 10);
+        } else if (strcmp(key, "content_type") == 0) {
+            content_type = functions_content_type2id(value);
+        } else if (strcmp(key, "content_length") == 0) {
+            content_length = strtoull(value, NULL, 10);
+        } else if (strcmp(key, "cmds") == 0) {
+            tmp.cmds = dyncfg_cmds2id(value);
         }
     }
     fclose(fp);
+
+    if(read_payload && content_length) {
+        tmp.payload = buffer_create(content_length, NULL);
+        tmp.payload->content_type = content_type;
+
+        buffer_need_bytes(tmp.payload, content_length);
+        tmp.payload->len = fread(&tmp.payload->buffer, 1, content_length, fp);
+    }
 
     if(!id) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -416,14 +462,12 @@ static void dyncfg_load(const char *filename) {
                filename);
 
         dyncfg_cleanup(&tmp);
-        goto cleanup;
+        return;
     }
 
-    dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp));
+    // FIXME: RRDHOST may not be available when files are loaded
 
-cleanup:
-    freez(id);
-    freez(hostname);
+    dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp));
 }
 
 void dyncfg_scan() {
@@ -436,7 +480,7 @@ void dyncfg_scan() {
     struct dirent *entry;
     char filepath[PATH_MAX];
     while ((entry = readdir(dir)) != NULL) {
-        if (strstr(entry->d_name, ".meta")) {
+        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strendswith(entry->d_name, ".dyncfg")) {
             snprintf(filepath, sizeof(filepath), "%s/%s", dyncfg_globals.dir, entry->d_name);
             dyncfg_load(filepath);
         }
@@ -479,6 +523,7 @@ static const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id,
         .sync = sync,
         .user_disabled = false,
         .restart_required = false,
+        .payload = NULL,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
     };
@@ -517,15 +562,15 @@ void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code, void *result_cb_data) {
     freez(e);
 }
 
-static void dyncfg_send_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id) {
+static void dyncfg_send_echo_status(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id) {
     struct dyncfg_echo *e = callocz(1, sizeof(struct dyncfg_echo));
     e->item = dictionary_acquired_item_dup(dyncfg_globals.nodes, item);
+    e->wb = buffer_create(0, NULL);
     e->df = df;
 
     char buf[strlen(id) + 100];
     snprintfz(buf, sizeof(buf), "config %s %s", id, df->user_disabled ? "disable" : "enable");
 
-    e->wb = buffer_create(0, NULL);
     int rc = rrd_function_run(df->host, e->wb, 10,
                               HTTP_ACCESS_ADMINS, buf, false, NULL,
                               dyncfg_echo_cb, e,
@@ -535,6 +580,39 @@ static void dyncfg_send_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char
 
     if(rc != HTTP_RESP_OK)
         dyncfg_echo_cb(e->wb, rc, e);
+}
+
+static void dyncfg_send_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, const char *cmd) {
+    if(!df->payload)
+        return;
+
+    struct dyncfg_echo *e = callocz(1, sizeof(struct dyncfg_echo));
+    e->item = dictionary_acquired_item_dup(dyncfg_globals.nodes, item);
+    e->wb = buffer_create(0, NULL);
+    e->df = df;
+
+    char buf[strlen(id) + 100];
+    snprintfz(buf, sizeof(buf), "config %s %s", id, cmd);
+
+    int rc = rrd_function_run(df->host, e->wb, 10,
+                              HTTP_ACCESS_ADMINS, buf, false, NULL,
+                              dyncfg_echo_cb, e,
+                              NULL, NULL,
+                              NULL, NULL,
+                              NULL);
+
+    if(rc != HTTP_RESP_OK)
+        dyncfg_echo_cb(e->wb, rc, e);
+}
+
+static void dyncfg_send_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id) {
+    dyncfg_send_echo_payload(item, df, id, "update");
+}
+
+static void dyncfg_send_echo_add(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, const char *job_name) {
+    char buf[strlen(job_name) + 20];
+    snprintfz(buf, sizeof(buf), "add %s", job_name);
+    dyncfg_send_echo_payload(item, df, id, buf);
 }
 
 // ----------------------------------------------------------------------------
@@ -581,25 +659,29 @@ void dyncfg_function_result_cb(BUFFER *wb, int code, void *result_cb_data) {
                                         "dyncfg", df->cmds & ~DYNCFG_CMD_ADD, 0, 0,
                                         df->sync, NULL, NULL);
 
-                dyncfg_save(id, dictionary_acquired_item_value(new_item), dc->payload);
+                DYNCFG *new_df = dictionary_acquired_item_value(new_item);
+                SWAP(new_df->payload, dc->payload);
+
+                dyncfg_save(id, new_df);
                 dictionary_acquired_item_release(dyncfg_globals.nodes, new_item);
             }
             else if(dc->cmd == DYNCFG_CMD_UPDATE) {
-                dyncfg_save(dc->id, df, dc->payload);
+                SWAP(df->payload, dc->payload);
+                dyncfg_save(dc->id, df);
             }
             else if(dc->cmd == DYNCFG_CMD_ENABLE) {
                 bool old = df->user_disabled;
                 df->user_disabled = false;
 
                 if(old != df->user_disabled)
-                    dyncfg_save(dc->id, df, NULL);
+                    dyncfg_save(dc->id, df);
             }
             else if(dc->cmd == DYNCFG_CMD_DISABLE) {
                 bool old = df->user_disabled;
                 df->user_disabled = true;
 
                 if(old != df->user_disabled)
-                    dyncfg_save(dc->id, df, NULL);
+                    dyncfg_save(dc->id, df);
             }
         }
 
@@ -704,16 +786,38 @@ static int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_w
 
 // ----------------------------------------------------------------------------
 
-static void dyncfg_update_plugin(const char *id, DYNCFG_TYPE type) {
-    if(type == DYNCFG_TYPE_SINGLE) {
-        ;
+static void dyncfg_update_plugin(const char *id) {
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_advanced(dyncfg_globals.nodes, id, -1);
+    if(!item) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: asked to update plugin for configuration '%s', but it is not found.", id);
+        return;
     }
-    else if(type == DYNCFG_TYPE_TEMPLATE) {
-        ;
+
+    DYNCFG *df = dictionary_acquired_item_value(item);
+
+    if(df->type == DYNCFG_TYPE_SINGLE)
+        dyncfg_send_echo_update(item, df, id);
+
+    else if(df->type == DYNCFG_TYPE_TEMPLATE) {
+        size_t len = strlen(id);
+        DYNCFG *tf;
+        dfe_start_reentrant(dyncfg_globals.nodes, tf) {
+            const char *t_id = tf_dfe.name;
+            if(tf->type == DYNCFG_TYPE_JOB && strncmp(t_id, id, len) == 0 && t_id[len] == ':' && t_id[len + 1])
+                dyncfg_send_echo_add(tf_dfe.item, tf, id, &t_id[len + 1]);
+        }
+        dfe_done(tf);
     }
+
+    dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 }
 
-void dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
+bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
+    if(!dyncfg_is_valid_id(id)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
+        return false;
+    }
+
     const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds, created_ut, modified_ut, sync, execute_cb, execute_cb_data);
     DYNCFG *df = dictionary_acquired_item_value(item);
 
@@ -725,7 +829,9 @@ void dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
                      "Dynamic configuration function", "config",
                      HTTP_ACCESS_MEMBERS, sync, dyncfg_function_execute_cb, NULL);
 
-    dyncfg_send_echo(item, df, id);
-    dyncfg_update_plugin(id, type);
+    dyncfg_send_echo_status(item, df, id);
+    dyncfg_update_plugin(id);
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+
+    return true;
 }

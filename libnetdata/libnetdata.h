@@ -242,6 +242,11 @@ size_t judy_aral_structures(void);
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#define SWAP(a, b) do { \
+    typeof(a) _tmp = b; \
+    b = a;              \
+    a = _tmp;           \
+} while(0)
 
 #define GUID_LEN 36
 
@@ -903,6 +908,17 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now)
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running);
 
 int netdata_base64_decode(const char *encoded, char *decoded, size_t decoded_size);
+
+static inline void freez_charp(char **p) {
+    freez(*p);
+}
+
+static inline void freez_const_charp(const char **p) {
+    freez((void *)*p);
+}
+
+#define CLEAN_CONST_CHAR_P _cleanup_(freez_const_charp) const char
+#define CLEAN_CHAR_P _cleanup_(freez_charp) char
 
 # ifdef __cplusplus
 }
