@@ -675,12 +675,14 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                 struct cpu_chart *cpu_chart = &all_cpu_charts[core];
 
+                char *id = row_key;
+
                 if(unlikely(!cpu_chart->st)) {
                     if(unlikely(core == 0)) {
                         title = "Total CPU utilization";
                         type = "system";
                         context = "system.cpu";
-                        family = cpu_chart->id;
+                        family = id;
                         priority = NETDATA_CHART_PRIO_SYSTEM_CPU;
                     }
                     else {
@@ -693,7 +695,7 @@ int do_proc_stat(int update_every, usec_t dt) {
 
                     cpu_chart->st = rrdset_create_localhost(
                             type
-                            , cpu_chart->id
+                            , id
                             , NULL
                             , family
                             , context
