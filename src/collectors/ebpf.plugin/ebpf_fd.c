@@ -684,29 +684,25 @@ static void fd_fill_pid(uint32_t current_pid, netdata_fd_stat_t *publish)
 static void read_fd_apps_table(int maps_per_core)
 {
     netdata_fd_stat_t *fv = fd_vector;
-    uint32_t key;
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = fd_maps[NETDATA_FD_PID_STATS].map_fd;
     size_t length = sizeof(netdata_fd_stat_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    while (pids) {
-        key = pids->pid;
-
+    uint32_t key = 0, next_key = 0;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, fv)) {
-            pids = pids->next;
-            continue;
+            goto end_fd_loop;
         }
 
         fd_apps_accumulator(fv, maps_per_core);
 
         fd_fill_pid(key, fv);
 
+end_fd_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(fv, 0, length);
-
-        pids = pids->next;
+        key = next_key;
     }
 }
 
