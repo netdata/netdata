@@ -6,10 +6,18 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#16728](https://github.com/netdata/netdata/pull/16728) ([netdatabot](https://github.com/netdatabot))
+- update ebpf-socket function name and columns [\#16727](https://github.com/netdata/netdata/pull/16727) ([ilyam8](https://github.com/ilyam8))
+- Fix --distro-override parameter name in docs [\#16726](https://github.com/netdata/netdata/pull/16726) ([moschlar](https://github.com/moschlar))
+- update go.d.plugin to v0.58.0 [\#16725](https://github.com/netdata/netdata/pull/16725) ([ilyam8](https://github.com/ilyam8))
+- Add GHA workflow to upload kickstart script to our repo server. [\#16724](https://github.com/netdata/netdata/pull/16724) ([Ferroin](https://github.com/Ferroin))
+- Add Netdata Mobile App to issue template config [\#16723](https://github.com/netdata/netdata/pull/16723) ([ilyam8](https://github.com/ilyam8))
 - fix clock resolution detection [\#16720](https://github.com/netdata/netdata/pull/16720) ([ktsaou](https://github.com/ktsaou))
+- cgroups: don't multiply cgroup\_check\_for\_new\_every by update\_every [\#16719](https://github.com/netdata/netdata/pull/16719) ([ilyam8](https://github.com/ilyam8))
 - Add info to distros.yml for handling of legacy platforms. [\#16718](https://github.com/netdata/netdata/pull/16718) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#16716](https://github.com/netdata/netdata/pull/16716) ([netdatabot](https://github.com/netdatabot))
 - Add the Mobile App notification Integration [\#16715](https://github.com/netdata/netdata/pull/16715) ([sashwathn](https://github.com/sashwathn))
+- disable logsmanagement when installing on macOS [\#16708](https://github.com/netdata/netdata/pull/16708) ([ilyam8](https://github.com/ilyam8))
 - delay collecting double linked network interfaces [\#16701](https://github.com/netdata/netdata/pull/16701) ([ilyam8](https://github.com/ilyam8))
 - fix quota calculation when the the db is empty [\#16699](https://github.com/netdata/netdata/pull/16699) ([ktsaou](https://github.com/ktsaou))
 - disable logsmanagement when installing on macOS [\#16697](https://github.com/netdata/netdata/pull/16697) ([ilyam8](https://github.com/ilyam8))
@@ -45,6 +53,7 @@
 - update bundled UI to v6.72.0 [\#16647](https://github.com/netdata/netdata/pull/16647) ([ilyam8](https://github.com/ilyam8))
 - Fix compilation error when using --disable-dbengine [\#16645](https://github.com/netdata/netdata/pull/16645) ([stelfrag](https://github.com/stelfrag))
 - Create alerts-configuration-manager.md [\#16642](https://github.com/netdata/netdata/pull/16642) ([sashwathn](https://github.com/sashwathn))
+- Add extra build flags to CMakeLists.txt. [\#16641](https://github.com/netdata/netdata/pull/16641) ([Ferroin](https://github.com/Ferroin))
 - Update artifact-handling actions to latest version. [\#16639](https://github.com/netdata/netdata/pull/16639) ([Ferroin](https://github.com/Ferroin))
 - cmake: make WEB\_DIR configurable [\#16638](https://github.com/netdata/netdata/pull/16638) ([ilyam8](https://github.com/ilyam8))
 - Remove code relying on autotools. [\#16634](https://github.com/netdata/netdata/pull/16634) ([vkalintiris](https://github.com/vkalintiris))
@@ -412,13 +421,6 @@
 - Don't queue removed when there is a newer alert [\#16157](https://github.com/netdata/netdata/pull/16157) ([MrZammler](https://github.com/MrZammler))
 - docker: make chmod o+rX /  non fatal [\#16156](https://github.com/netdata/netdata/pull/16156) ([ilyam8](https://github.com/ilyam8))
 - Batch ML model load commands [\#16155](https://github.com/netdata/netdata/pull/16155) ([stelfrag](https://github.com/stelfrag))
-- \[BUGFIX\] MQTT ARM fix [\#16154](https://github.com/netdata/netdata/pull/16154) ([underhood](https://github.com/underhood))
-- Rework guide, add SSL with self-signed certs [\#16153](https://github.com/netdata/netdata/pull/16153) ([tkatsoulas](https://github.com/tkatsoulas))
-- make io charts "write" negative in apps and cgroups \(systemd\) [\#16152](https://github.com/netdata/netdata/pull/16152) ([ilyam8](https://github.com/ilyam8))
-- journal: updates [\#16150](https://github.com/netdata/netdata/pull/16150) ([ktsaou](https://github.com/ktsaou))
-- uninstaller: remove ND systemd preset and tmp dir [\#16148](https://github.com/netdata/netdata/pull/16148) ([ilyam8](https://github.com/ilyam8))
-- fix `test -x` check for uninstaller script [\#16146](https://github.com/netdata/netdata/pull/16146) ([ilyam8](https://github.com/ilyam8))
-- health: don't log an unknown key error for "families" [\#16145](https://github.com/netdata/netdata/pull/16145) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
