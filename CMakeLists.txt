@@ -130,6 +130,7 @@ endif()
 
 set(EXTRA_HARDENING_FLAGS "")
 
+set(CMAKE_REQUIRED_FLAGS "-Werror")
 if(NOT ${DISABLE_HARDENING})
         if(NOT ${CMAKE_C_FLAGS} MATCHES "stack-protector")
                 check_c_compiler_flag("-fstack-protector-strong" HAVE_STACK_PROTECTOR_STRONG_FLAG)
@@ -192,6 +193,7 @@ if(NOT ${CMAKE_C_FLAGS} MATCHES "data-sections")
                 set(EXTRA_OPT_FLAGS "${EXTRA_OPT_FLAGS} -fdata-sections")
         endif()
 endif()
+unset(CMAKE_REQUIRED_FLAGS)
 
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${EXTRA_HARDENING_FLAGS} ${EXTRA_OPT_FLAGS}")
