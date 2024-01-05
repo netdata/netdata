@@ -805,16 +805,19 @@ static void dyncfg_update_plugin(const char *id) {
 
     DYNCFG *df = dictionary_acquired_item_value(item);
 
-    if(df->type == DYNCFG_TYPE_SINGLE || df->type == DYNCFG_TYPE_JOB)
-        dyncfg_send_echo_update(item, df, id);
-
+    if(df->type == DYNCFG_TYPE_SINGLE || df->type == DYNCFG_TYPE_JOB) {
+        if (df->cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
+            dyncfg_send_echo_update(item, df, id);
+    }
     else if(df->type == DYNCFG_TYPE_TEMPLATE) {
         size_t len = strlen(id);
         DYNCFG *tf;
         dfe_start_reentrant(dyncfg_globals.nodes, tf) {
             const char *t_id = tf_dfe.name;
-            if(tf->type == DYNCFG_TYPE_JOB && strncmp(t_id, id, len) == 0 && t_id[len] == ':' && t_id[len + 1])
-                dyncfg_send_echo_add(tf_dfe.item, tf, id, &t_id[len + 1]);
+            if(tf->type == DYNCFG_TYPE_JOB && strncmp(t_id, id, len) == 0 && t_id[len] == ':' && t_id[len + 1]) {
+                if (tf->cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
+                    dyncfg_send_echo_add(tf_dfe.item, tf, id, &t_id[len + 1]);
+            }
         }
         dfe_done(tf);
     }
@@ -826,6 +829,29 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
         return false;
+    }
+
+    // all configurations support schema
+    cmds |= DYNCFG_CMD_SCHEMA;
+
+    // if there is either enable or disable, both are supported
+    if(cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
+        cmds |= DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE;
+
+    if(type == DYNCFG_TYPE_TEMPLATE) {
+        // templates must always support "add"
+        cmds |= DYNCFG_CMD_ADD;
+
+        // templates do not have data
+        cmds &= ~(DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST);
+    }
+    else if(type == DYNCFG_TYPE_JOB) {
+        // jobs cannot support "add"
+        cmds &= ~DYNCFG_CMD_ADD;
+    }
+    else if(type == DYNCFG_TYPE_SINGLE) {
+        // single cannot support "add" or "remove"
+        cmds &= ~(DYNCFG_CMD_ADD | DYNCFG_CMD_REMOVE);
     }
 
     const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds, created_ut, modified_ut, sync, execute_cb, execute_cb_data);

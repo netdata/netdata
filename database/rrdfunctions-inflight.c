@@ -216,7 +216,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     // so we create a new one we guarantee will survive until the collector finishes...
 
     bool we_should_free = false;
-    BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
+    BUFFER *temp_wb  = buffer_create(1024, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
     temp_wb->content_type = r->result.wb->content_type;
 
     netdata_mutex_lock(&tmp->mutex);
@@ -351,7 +351,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
     // ------------------------------------------------------------------------
     // find the function
 
-    size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, PLUGINSD_LINE_MAX);
+    size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, sizeof(sanitized_cmd));
 
     code = rrd_functions_find_by_name(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
     if(code != HTTP_RESP_OK) {

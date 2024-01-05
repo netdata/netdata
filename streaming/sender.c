@@ -1183,7 +1183,7 @@ static void execute_commands_function(struct sender_state *s, const char *comman
         tmp->received_ut = now_realtime_usec();
         tmp->sender = s;
         tmp->transaction = string_strdupz(transaction);
-        BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions);
+        BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_functions);
 
         int code = rrd_function_run(s->host, wb,
                                     timeout, HTTP_ACCESS_ADMINS, function, false, transaction,

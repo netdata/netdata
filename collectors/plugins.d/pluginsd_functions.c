@@ -21,12 +21,12 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     if(rc != 0)
         netdata_log_error("FUNCTION: '%s': cannot parse transaction UUID", string2str(pf->function));
 
-    bool has_payload = pf->payload && buffer_strlen(pf->payload);
-    char buffer[2048 + 1];
+    bool has_payload = pf->payload && buffer_strlen(pf->payload) ? true : false;
+    char buffer[2048];
 
     if(has_payload) {
         snprintfz(
-            buffer, sizeof(buffer) - 1,
+            buffer, sizeof(buffer),
             PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \"%s\"\n",
             transaction,
             pf->timeout_s,
@@ -36,7 +36,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     }
     else {
         snprintfz(
-            buffer, sizeof(buffer) - 1,
+            buffer, sizeof(buffer),
             PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\"\n",
             transaction,
             pf->timeout_s,
@@ -156,10 +156,8 @@ static void pluginsd_function_cancel(void *data) {
 
             internal_error(true, "PLUGINSD: sending function cancellation to plugin for transaction '%s'", transaction);
 
-            char buffer[2048 + 1];
-            snprintfz(buffer, sizeof(buffer) - 1, "%s %s\n",
-                      PLUGINSD_KEYWORD_FUNCTION_CANCEL,
-                      transaction);
+            char buffer[2048];
+            snprintfz(buffer, sizeof(buffer), PLUGINSD_KEYWORD_FUNCTION_CANCEL " %s\n", transaction);
 
             // send the command to the plugin
             ssize_t ret = send_to_plugin(buffer, t->parser);
@@ -186,10 +184,8 @@ static void pluginsd_function_progress_to_plugin(void *data) {
 
             internal_error(true, "PLUGINSD: sending function progress to plugin for transaction '%s'", transaction);
 
-            char buffer[2048 + 1];
-            snprintfz(buffer, sizeof(buffer) - 1, "%s %s\n",
-                    PLUGINSD_KEYWORD_FUNCTION_PROGRESS,
-                    transaction);
+            char buffer[2048];
+            snprintfz(buffer, sizeof(buffer), PLUGINSD_KEYWORD_FUNCTION_PROGRESS " %s\n", transaction);
 
             // send the command to the plugin
             ssize_t ret = send_to_plugin(buffer, t->parser);

@@ -18,7 +18,7 @@ static unsigned char functions_allowed_chars[256] = {
         [30] = '_', [31] = '_',
 
         // symbols
-        [' '] = ' ', ['!'] = '!', ['"'] = '"', ['#'] = '#', ['$'] = '$', ['%'] = '%', ['&'] = '&', ['\''] = '\'',
+        [' '] = ' ', ['!'] = '!', ['"'] = '\'', ['#'] = '#', ['$'] = '$', ['%'] = '%', ['&'] = '&', ['\''] = '\'',
         ['('] = '(', [')'] = ')', ['*'] = '*', ['+'] = '+', [','] = ',', ['-'] = '-', ['.'] = '.', ['/'] = '/',
 
         // numbers
@@ -287,7 +287,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
 
 int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
-    strncpyz(buffer, name, MAX_FUNCTION_LENGTH);
+    strncpyz(buffer, name, sizeof(buffer) - 1);
     char *s = NULL;
 
     bool found = false;

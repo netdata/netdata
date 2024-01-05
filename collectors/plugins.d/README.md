@@ -136,7 +136,8 @@ Netdata parses lines starting with:
 -    `FUNCTION` - define functions
 -    `FUNCTION_PROGRESS` - report the progress of a function execution
 -    `FUNCTION_RESULT_BEGIN` - to initiate the transmission of function results
--    `FUNCTION_RESULT_END` - to end the transmission of function results
+-    `FUNCTION_RESULT_END` - to end the transmission of function result
+-    `CONFIG` - to define dynamic configuration entities
 
 a single program can produce any number of charts with any number of dimensions each.
 
@@ -147,7 +148,8 @@ Netdata may send the following commands to the plugin's `stdin`:
 -    `FUNCTION` - to call a specific function, with all parameters inline
 -    `FUNCTION_PAYLOAD` - to call a specific function, with a payload of parameters
 -    `FUNCTION_PAYLOAD_END` - to end the payload of parameters
--    `FUNCTION_CANCEL` - cancel a running function transaction
+-    `FUNCTION_CANCEL` - to cancel a running function transaction - no response is required
+-    `FUNCTION_PROGRESS` - to report that a user asked the progress of running function call - no response is required
 
 ### Command line parameters
 
@@ -478,36 +480,31 @@ A function can be used by users to ask for more information from the collector. 
 - per node
 - per chart
 
-Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context sensitive menu of functions related to the chart the user is using.
+Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context-sensitive menu of functions related to the chart the user is using.
 
-A function is identified by a string. The allowed characters in the function definition are:
+Users can get a list of all the registered functions using the `/api/v1/functions` endpoint of Netdata and call functions using the `/api/v1/function` API call of Netdata.
 
-| Character         | Symbol | In Functions |
-|-------------------|:------:|:------------:|
-| UTF-8 character   | UTF-8  |     keep     |
-| Lower case letter | [a-z]  |     keep     |
-| Upper case letter | [A-Z]  |     keep     |
-| Digit             | [0-9]  |     keep     |
-| Underscore        |   _    |     keep     |
-| Comma             |   ,    |     keep     |
-| Minus             |   -    |     keep     |
-| Period            |   .    |     keep     |
-| Colon             |   :    |     keep     |
-| Slash             |   /    |     keep     |
-| Space             |  ' '   |     keep     |
-| Semicolon         |   ;    |      :       |
-| Equal             |   =    |      :       |
-| Backslash         |   \    |      /       |
-| Anything else     |        |      _       |
-
-Uses can get a list of all the registered functions using the `/api/v1/functions` end point of Netdata.
-
-Users can call functions using the `/api/v1/function` end point of Netdata.
 Once a function is called, the plugin will receive at its standard input a command that looks like this:
 
-> FUNCTION transaction_id timeout "name and parameters of the function"
+> FUNCTION transaction_id timeout "name and parameters of the function as one quoted parameter"
 
-The plugin is expected to parse and validate `name and parameters of the function`. Netdata allows users to edit this string, append more parameters or even change the ones the plugin originally exposed. To minimize the security risk, Netdata guarantees that only the characters shown above are accepted in function definitions, but still the plugin should carefully inspect the `name and parameters of the function` to ensure that it is valid and not harmful.
+When the function to be called is to receive a payload of parameters, the call looks like this:
+
+> FUNCTION_PAYLOAD transaction_id timeout "name and parameters of the function as one quoted parameter" "content/type"
+> body of the payload, formatted according to content/type
+> FUNCTION PAYLOAD END
+
+In this case, Netdata will send:
+
+- A line starting with `FUNCTION_PAYLOAD` together with the required metadata for the function, like the transaction id, the function name and its parameters, the timeout and the content type. This line ends with a newline.
+- Then, the payload itself (which may or may not have newlines in it). The payload should be parsed according to the content type parameter.
+- Finally, a line starting with `FUNCTION_PAYLOAD_END`, so it is expected like `\nFUNCTION_PAYLOAD_END\n`.
+
+Note 1: The plugins.d protocol allows parameters without single or double quotes if they don't contain spaces. However, the plugin should be able to parse parameters even if they are enclosed in single or double quotes. If the first character of a parameter is a single quote, its last character should also be a single quote too, and similarly for double quotes.
+
+Note 2: Netdata always sends the function and its parameters enclosed in double quotes. If the function command and its parameters contain quotes, they are converted to single quotes.
+
+The plugin is expected to parse and validate `name and parameters of the function as  one quotes parameter`. Netdata allows the user interface to manipulate this string by appending more parameters.
 
 If the plugin rejects the request, it should respond with this:
 
@@ -522,12 +519,12 @@ FUNCTION_RESULT_END
 
 If the plugin prepares a response, it should send (via its standard output, together with the collected data, but not interleaved with them):
 
-> FUNCTION_RESULT_BEGIN transaction_id http_error_code content_type expiration
+> FUNCTION_RESULT_BEGIN transaction_id http_response_code content_type expiration
 
 Where:
 
   - `transaction_id` is the transaction id that Netdata sent for this function execution
-  - `http_error` is the http error code Netdata should respond with, 200 is the "ok" response
+  - `http_response_code` is the http error code Netdata should respond with, 200 is the "ok" response
   - `content_type` is the content type of the response
   - `expiration` is the absolute timestamp (number, unix epoch) this response expires
 
@@ -542,6 +539,118 @@ To terminate the message, Netdata seeks a line with just this:
 This defines the end of the message. `FUNCTION_RESULT_END` should appear in a line alone, without any other text, so it is wise to add `\n` before and after it.
 
 After this line, Netdata resumes processing collected metrics from the plugin.
+
+The maximum uncompressed payload size Netdata will accept is 100MB.
+
+##### Functions cancellation
+
+Netdata is able to detect when a user made an API request, but abandoned it before it was completed. If this happens to an API called for a function served by the plugin, Netdata will generate a `FUNCTION_CANCEL` request to let the plugin know that it can stop processing the query.
+
+After receiving such a command, the plugin **must still send a response for the original function request**, to wake up any waiting threads before they timeout. The http response code is not important, since the response will be discarded, however for auditing reasons we suggest to send back a 499 http response code. This is not a standard response code according to the HTTP protocol, but web servers like `nginx` are using it to indicate that a request was abandoned by a user.
+
+##### Functions progress
+
+When a request takes too long to be processed, Netdata allows the plugin to report progress to Netdata, which in turn will report progress to the caller.
+
+The plugin can send `FUNCTION_PROGRESS` like this:
+
+> FUNCTION_PROGRESS transaction_id done all
+
+Where:
+
+- `transaction_id` is the transaction id of the function request
+- `done` is an integer value indicating the amount of work done
+- `all` is an integer value indicating the total amount of work to be done
+
+Netdata supports two kinds of progress:
+- progress as a percentage, which is calculated as `done * 100 / all`
+- progress without knowing the total amount of work to be done, which is enabled when the plugin reports `all` as zero.
+
+##### Functions timeout
+
+All functions calls specify a timeout, at which all the intermediate routing nodes (parents, web server threads) will time out and abort the call.
+
+However, all intermediate routing nodes are configured to extend the timeout when the caller asks for progress. This works like this:
+
+When a progress request is received, if the expected timeout of the request is less than or equal to 10 seconds, the expected timeout is extended by 10 seconds.
+
+Usually, the user interface asks for a progress every second. So, during the last 10 seconds of the timeout, every progress request made shifts the timeout 10 seconds to the future.
+
+To accomplish this, when Netdata receives a progress request by a user, it generates progress requests to the plugin, updating all the intermediate nodes to extend their timeout if necessary.
+
+The plugin will receive progress requests like this:
+
+> FUNCTION_PROGRESS transaction_id
+
+There is no need to respond to this command. It is only there to let the plugin know that a user is still waiting for the query to finish. 
+
+#### CONFIG
+
+`CONFIG` commands sent from the plugin to Netdata define dynamic configuration entities. These configurable entities are exposed to the user interface, allowing users to change configuration at runtime.
+
+Dynamically configurations made this way are saved to disk by Netdata and are replayed automatically when Netdata or the plugin restarts.
+
+`CONFIG` commands look like this:
+
+> CONFIG id action ...
+
+Where:
+
+- `id` is a unique identifier for the configurable entity. This should by design be unique across Netdata. It should be something like `plugin:module:jobs`, e.g. `go.d:postgresql:jobs:masterdb`. This is assumed to be colon-separated with the last part (`masterdb` in our example), being the one displayed to users when there ano conflicts under the same configuration path.
+- `action` can be:
+  - `add`, to declare the dynamic configuration entity
+  - `remove`, to remove the dynamic configuration entity
+
+When the `action` is `add`, the following additional parameters are expected:
+
+> CONFIG id action type path source_type source supported_commands
+
+Where:
+
+- `action` should be `add`
+- `type` can be `single`, `template` or `job`:
+  - `single` is used when the configurable entity is fixed and users should never be able to add or delete it.
+  - `template` is used to define a template based on which users can add multiple configurations, like adding data collection jobs. So, the plugin defines the template of the jobs and users are presented with a `[+]` button to add such configuration jobs. The plugin can define multiple templates by giving different `id`s to them.
+  - `job` is used to define a job of a template. The plugin should always add all its jobs, independently of the way they have been discovered. It is important to note the relation between `template` and `job` when it comes it the `id`: The `id` of the template should be the prefix of the `job`'s `id`. For example, if the template is `go.d:postgresql:jobs`, then all its jobs be like `go.d:postgresql:jobs:jobname`. 
+- `path` is the absolute path of the configurable entity inside the tree of Netdata configurations. Usually, this is should be `/collectors`.
+- `source` can be `stock`, `user`, `discovered` or `dyncfg`:
+  - `stock` is used for default configurations
+  - `user` is used for user configurations, usually via a configuration file
+  - `discovered` is used for dynamic configurations the plugin discovers by its own
+  - `dyncfg` is used for configuration received via this dynamic configuration mechanism
+- `source` should provide more details about the exact source of the configuration, like `line@file`, or `user@ip`, etc.
+- `supported_commands` is a space separated list of the following keywords, enclosed in single or double quotes. These commands are used by the user interface to determine the actions the users can take:
+  - `schema`, to expose the JSON schema for the user interface. This is mandatory for all configurable entities.
+  - `get`, to expose the current configuration values, according the schema defined. `templates` cannot support `get`, since they don't maintain any data.
+  - `update`, to receive configuration updates for this entity. `templates` cannot support `update`, since they don't maintain any data.
+  - `test`, like `update` but only test the configuration and report success or failure.
+  - `add`, to receive job creation commands for templates. Only `templates` should support this command.
+  - `remove`, to remove a configuration. Only `jobs` should support this command.
+  - `enable` and `disable`, to receive user requests to enable and disable this entity. Adding only one of `enable` or `disable` to the supported commands, Netdata will add both of them. The plugin should expose these commands on `templates` only when it wants to receive `enable` and `disable` commands for all the `jobs` of this `template`.
+
+The plugin receives commands as if it had exposed a `FUNCTION` named `config`. Netdata formats all these calls like this:
+
+> config id command
+
+Where `id` is the unique id of the configurable entity and `command` is one of the supported commands the plugin sent to Netdata. The plugin will receive:
+
+> FUNCTION transaction_id timeout "config id command"
+
+or:
+
+> FUNCTION_PAYLOAD transaction_id timeout "config id command" "content/type"
+> body of the payload formatted according to content/type
+> FUNCTION_PAYLOAD_END
+
+Once received, the plugin should process it and respond accordingly. 
+
+Immediately after the plugin adds a configuration entity, if the commands `enable` and `disable` are supported by it, Netdata will send either `enable` or `disable` for it, based on the last user action, which has been persisted to disk.
+
+Plugin responses follow the same format `FUNCTIONS` do:
+
+> FUNCTION_RESULT_BEGIN transaction_id http_response_code content/type expiration
+> body of the response formatted according to content/type
+> FUNCTION_RESULT_END
 
 ## Data collection
 

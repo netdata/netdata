@@ -4459,8 +4459,8 @@ static void function_processes(const char *transaction, char *function __maybe_u
             return;
         }
         else {
-            char msg[PLUGINSD_LINE_MAX];
-            snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", keyword);
+            char msg[1024];
+            snprintfz(msg, sizeof(msg), "Invalid parameter '%s'", keyword);
             pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, msg);
             return;
         }
@@ -4472,7 +4472,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
     unsigned int memory_divisor = 1024;
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 
-    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    BUFFER *wb = buffer_create(4096, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
