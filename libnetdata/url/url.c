@@ -236,7 +236,8 @@ fail_cleanup:
     return NULL;
 }
 
-inline bool url_is_request_complete(char *begin, char *end, size_t length, char **post_payload, size_t *post_payload_size) {
+inline bool
+url_is_request_complete_and_extract_payload(const char *begin, const char *end, size_t length, BUFFER **post_payload) {
     if (begin == end || length < 4)
         return false;
 
@@ -244,29 +245,42 @@ inline bool url_is_request_complete(char *begin, char *end, size_t length, char 
         return strstr(end - 4, "\r\n\r\n");
     }
     else if(unlikely(strncmp(begin, "POST ", 5) == 0 || strncmp(begin, "PUT ", 4) == 0)) {
-        char *cl = strstr(begin, "Content-Length: ");
+        const char *cl = strcasestr(begin, "Content-Length: ");
         if(!cl) return false;
         cl = &cl[16];
 
         size_t content_length = str2ul(cl);
 
-        char *payload = strstr(cl, "\r\n\r\n");
+        const char *payload = strstr(cl, "\r\n\r\n");
         if(!payload) return false;
         payload += 4;
 
         size_t payload_length = length - (payload - begin);
 
         if(payload_length == content_length) {
-            if(post_payload && post_payload_size) {
-                if (*post_payload)
-                    freez(*post_payload);
+            if(!*post_payload)
+                *post_payload = buffer_create(payload_length + 1, NULL);
 
-                *post_payload = mallocz(payload_length + 1);
-                memcpy(*post_payload, payload, payload_length);
-                (*post_payload)[payload_length] = '\0';
+            buffer_contents_replace(*post_payload, payload, payload_length);
 
-                *post_payload_size = payload_length;
+            // parse the content type
+            const char *ct = strcasestr(begin, "Content-Type: ");
+            if(ct) {
+                ct = &ct[14];
+                while (*ct && isspace(*ct)) ct++;
+                const char *space = ct;
+                while (*space && !isspace(*space) && *space != ';') space++;
+                size_t ct_len = space - ct;
+
+                char ct_copy[ct_len + 1];
+                memcpy(ct_copy, ct, ct_len);
+                ct_copy[ct_len] = '\0';
+
+                (*post_payload)->content_type = content_type_string2id(ct_copy);
             }
+            else
+                (*post_payload)->content_type = CT_TEXT_PLAIN;
+
             return true;
         }
 

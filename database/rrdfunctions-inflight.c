@@ -136,8 +136,7 @@ struct rrd_function_call_wait {
     int code;
 };
 
-static void rrd_inflight_function_cleanup(RRDHOST *host __maybe_unused,
-                                          const char *transaction) {
+static void rrd_inflight_function_cleanup(RRDHOST *host __maybe_unused, const char *transaction) {
     dictionary_del(rrd_functions_inflight_requests, transaction);
     dictionary_garbage_collect(rrd_functions_inflight_requests);
 }
@@ -200,13 +199,6 @@ static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_infl
                                    rrd_inflight_async_function_register_canceller_cb, r,
                                    rrd_inflight_async_function_register_progresser_cb, r);
 
-    if(code != HTTP_RESP_OK) {
-        if (!buffer_strlen(r->result.wb))
-            rrd_call_function_error(r->result.wb, "Failed to send request to the collector.", code);
-
-        rrd_inflight_function_cleanup(r->host, r->transaction);
-    }
-
     return code;
 }
 
@@ -223,9 +215,11 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     // we need a temporary BUFFER, because we may time out and the caller supplied one may vanish,
     // so we create a new one we guarantee will survive until the collector finishes...
 
-    bool we_should_free = true;
+    bool we_should_free = false;
     BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
     temp_wb->content_type = r->result.wb->content_type;
+
+    netdata_mutex_lock(&tmp->mutex);
 
     int code = r->rdcf->execute_cb(&r->transaction_uuid, temp_wb, r->payload,
                                    &r->stop_monotonic_ut, r->sanitized_cmd, r->rdcf->execute_cb_data,
@@ -238,8 +232,6 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
                                    rrd_inflight_async_function_register_progresser_cb, r);
 
     if (code == HTTP_RESP_OK) {
-        netdata_mutex_lock(&tmp->mutex);
-
         bool cancelled = false;
         int rc = 0;
         while (rc == 0 && !cancelled && !tmp->data_are_ready) {
@@ -280,7 +272,8 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
 
         if (tmp->data_are_ready) {
             // we have a response
-            buffer_fast_strcat(r->result.wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
+
+            buffer_contents_replace(r->result.wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
             r->result.wb->content_type = temp_wb->content_type;
             r->result.wb->expires = temp_wb->expires;
 
@@ -290,12 +283,13 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
                 buffer_no_cacheable(r->result.wb);
 
             code = tmp->code;
+
+            tmp->free_with_signal = false;
+            we_should_free = true;
         }
         else if (rc == ETIMEDOUT || cancelled) {
             // timeout
             // we will go away and let the callback free the structure
-            tmp->free_with_signal = true;
-            we_should_free = false;
 
             if(cancelled)
                 code = rrd_call_function_error(r->result.wb,
@@ -305,18 +299,25 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
                 code = rrd_call_function_error(r->result.wb,
                                                "Timeout while waiting for a response from the collector.",
                                                HTTP_RESP_GATEWAY_TIMEOUT);
-        }
-        else
-            code = rrd_call_function_error(r->result.wb,
-                                           "Internal error while communicating with the collector",
-                                           HTTP_RESP_INTERNAL_SERVER_ERROR);
 
-        netdata_mutex_unlock(&tmp->mutex);
+            tmp->free_with_signal = true;
+            we_should_free = false;
+        }
+        else {
+            code = rrd_call_function_error(
+                r->result.wb, "Internal error while communicating with the collector",
+                HTTP_RESP_INTERNAL_SERVER_ERROR);
+
+            tmp->free_with_signal = true;
+            we_should_free = false;
+        }
     }
     else {
-        if(!buffer_strlen(r->result.wb))
-            rrd_call_function_error(r->result.wb, "The collector returned an error.", code);
+        tmp->free_with_signal = true;
+        we_should_free = false;
     }
+
+    netdata_mutex_unlock(&tmp->mutex);
 
     if (we_should_free) {
         rrd_function_call_wait_free(tmp);
@@ -340,7 +341,8 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, BUFFER *payload) {
+                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                     BUFFER *payload) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
@@ -457,9 +459,6 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
                                    NULL, NULL,   // no need to register canceller, we will wait
                                    NULL, NULL    // ?? do we need a progresser in this case?
         );
-
-        if(code != HTTP_RESP_OK && !buffer_strlen(result_wb))
-            rrd_call_function_error(result_wb, "Collector reported error.", code);
 
         rrd_inflight_function_cleanup(host, r->transaction);
         return code;

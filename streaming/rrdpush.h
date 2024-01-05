@@ -657,9 +657,29 @@ static inline const char *rrdhost_health_status_to_string(RRDHOST_HEALTH_STATUS 
     }
 }
 
+typedef enum __attribute__((packed)) {
+    RRDHOST_DYNCFG_STATUS_UNAVAILABLE = 0,
+    RRDHOST_DYNCFG_STATUS_AVAILABLE,
+} RRDHOST_DYNCFG_STATUS;
+
+static inline const char *rrdhost_dyncfg_status_to_string(RRDHOST_DYNCFG_STATUS status) {
+    switch(status) {
+        default:
+        case RRDHOST_DYNCFG_STATUS_UNAVAILABLE:
+            return "unavailable";
+
+        case RRDHOST_DYNCFG_STATUS_AVAILABLE:
+            return "online";
+    }
+}
+
 typedef struct rrdhost_status {
     RRDHOST *host;
     time_t now;
+
+    struct {
+        RRDHOST_DYNCFG_STATUS status;
+    } dyncfg;
 
     struct {
         RRDHOST_DB_STATUS status;

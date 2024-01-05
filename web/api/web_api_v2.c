@@ -661,7 +661,7 @@ cleanup:
 }
 
 static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
-    return webrtc_new_connection(w->post_payload, w->response.data);
+    return webrtc_new_connection(buffer_tostring(w->payload), w->response.data);
 }
 
 static int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
@@ -689,78 +689,6 @@ static int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, stru
     return web_api_v2_report_progress(&tr, w->response.data);
 }
 
-#define CONFIG_API_V2_URL "/api/v2/config"
-static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct web_client *w, char *query __maybe_unused) {
-
-    char *url = strdupz(buffer_tostring(w->url_as_received));
-    char *url_full = url;
-
-    buffer_flush(w->response.data);
-
-    if (strncmp(url, "/host/", strlen("/host/")) == 0) {
-        url += strlen("/host/");
-        char *host_id_end = strchr(url, '/');
-        if (host_id_end == NULL) {
-            buffer_sprintf(w->response.data, "Invalid URL");
-            freez(url_full);
-            return HTTP_RESP_BAD_REQUEST;
-        }
-        url += host_id_end - url;
-    }
-
-    if (strncmp(url, CONFIG_API_V2_URL, strlen(CONFIG_API_V2_URL)) != 0) {
-        buffer_sprintf(w->response.data, "Invalid URL");
-        freez(url_full);
-        return HTTP_RESP_BAD_REQUEST;
-    }
-    url += strlen(CONFIG_API_V2_URL);
-
-    char *save_ptr = NULL;
-    char *plugin = strtok_r(url, "/", &save_ptr);
-    char *module = strtok_r(NULL, "/", &save_ptr);
-    char *job_id = strtok_r(NULL, "/", &save_ptr);
-    char *extra = strtok_r(NULL, "/", &save_ptr);
-
-    if (extra != NULL) {
-        buffer_sprintf(w->response.data, "Invalid URL");
-        freez(url_full);
-        return HTTP_RESP_BAD_REQUEST;
-    }
-
-    int http_method;
-    switch (w->mode)
-    {
-        case HTTP_REQUEST_MODE_GET:
-        case HTTP_REQUEST_MODE_POST:
-        case HTTP_REQUEST_MODE_PUT:
-        case HTTP_REQUEST_MODE_DELETE:
-            http_method = w->mode;
-            break;
-        default:
-            buffer_sprintf(w->response.data, "Invalid HTTP method");
-            freez(url_full);
-            return HTTP_RESP_BAD_REQUEST;
-    }
-
-//    struct uni_http_response resp = dyn_conf_process_http_request(host->configurable_plugins, http_method, plugin, module, job_id, w->post_payload, w->post_payload_size);
-//    if (resp.content[resp.content_length - 1] != '\0') {
-//        char *con = mallocz(resp.content_length + 1);
-//        memcpy(con, resp.content, resp.content_length);
-//        con[resp.content_length] = '\0';
-//        if (resp.content_free)
-//            resp.content_free(resp.content);
-//        resp.content = con;
-//        resp.content_free = freez_dyncfg;
-//    }
-//    buffer_strcat(w->response.data, resp.content);
-//    if (resp.content_free)
-//        resp.content_free(resp.content);
-//    w->response.data->content_type = resp.content_type;
-//    freez(url_full);
-//    return resp.status;
-    return HTTP_RESP_NOT_IMPLEMENTED;
-}
-
 static struct web_api_command api_commands_v2[] = {
         {"info",                0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_info,              0},
 
@@ -783,8 +711,6 @@ static struct web_api_command api_commands_v2[] = {
         {"rtc_offer",           0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v2_webrtc,            0},
         {"bearer_protection",   0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection,                    0},
         {"bearer_get_token",    0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token,                         0},
-
-        {"config",        0,       HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_config,            1},
 
         { "ilove.svg",       0,    HTTP_ACL_NOCHECK,                    web_client_api_request_v2_ilove,             0 },
         { "progress",        0,    HTTP_ACL_NOCHECK,                    web_client_api_request_v2_progress,          0 },

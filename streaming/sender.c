@@ -1128,7 +1128,7 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
         pluginsd_function_result_begin_to_buffer(wb
                                                  , string2str(tmp->transaction)
                                                  , code
-                                                 , functions_id2content_type(func_wb->content_type)
+                                                 , content_type_id2string(func_wb->content_type)
                                                  , func_wb->expires);
 
         buffer_fast_strcat(wb, buffer_tostring(func_wb), buffer_strlen(func_wb));
@@ -1267,7 +1267,7 @@ void execute_commands(struct sender_state *s) {
             s->functions.timeout_s = strdupz(timeout_s);
             s->functions.function = strdupz(function);
             s->functions.payload = buffer_create(0, NULL);
-            s->functions.payload->content_type = functions_content_type2id(content_type);
+            s->functions.payload->content_type = content_type_string2id(content_type);
             s->functions.intercept_input = true;
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {

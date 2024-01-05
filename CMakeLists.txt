@@ -629,6 +629,8 @@ set(LIBNETDATA_FILES
         libnetdata/http/http_access.h
         libnetdata/http/http_defs.c
         libnetdata/http/http_defs.h
+        libnetdata/http/content_type.c
+        libnetdata/http/content_type.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

@@ -274,44 +274,6 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     dictionary_acquired_item_release(host->functions, item);
 }
 
-struct {
-    const char *format;
-    HTTP_CONTENT_TYPE content_type;
-} function_formats[] = {
-    { .format = "text/plain",       CT_TEXT_PLAIN },
-    { .format = "text/yaml",        CT_TEXT_YAML },
-    { .format = "text/html",        CT_TEXT_HTML },
-    { .format = "application/json", CT_APPLICATION_JSON },
-    { .format = "application/xml",  CT_APPLICATION_XML },
-    { .format = "prometheus",       CT_PROMETHEUS },
-    { .format = "text",             CT_TEXT_PLAIN },
-    { .format = "txt",              CT_TEXT_PLAIN },
-    { .format = "json",             CT_APPLICATION_JSON },
-    { .format = "html",             CT_TEXT_HTML },
-    { .format = "xml",              CT_APPLICATION_XML },
-
-    // terminator
-    { .format = NULL,               CT_TEXT_PLAIN },
-};
-
-uint8_t functions_content_type2id(const char *format) {
-    if(format && *format) {
-        for (int i = 0; function_formats[i].format; i++)
-            if (strcmp(function_formats[i].format, format) == 0)
-                return function_formats[i].content_type;
-    }
-
-    return CT_TEXT_PLAIN;
-}
-
-const char *functions_id2content_type(HTTP_CONTENT_TYPE content_type) {
-    for (int i = 0; function_formats[i].format; i++)
-        if (function_formats[i].content_type == content_type)
-            return function_formats[i].format;
-
-    return "text/plain";
-}
-
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
     char buffer[PLUGINSD_LINE_MAX];
     json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
@@ -325,7 +287,6 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
 
 int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item) {
     char buffer[MAX_FUNCTION_LENGTH + 1];
-
     strncpyz(buffer, name, MAX_FUNCTION_LENGTH);
     char *s = NULL;
 

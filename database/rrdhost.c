@@ -1112,6 +1112,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     if (unlikely(!localhost))
         return 1;
 
+    dyncfg_host_init(localhost);
+
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     rrd_function_add_inline(localhost, NULL, "streaming", 10,
@@ -1842,6 +1844,10 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->now = now;
 
     RRDHOST_FLAGS flags = __atomic_load_n(&host->flags, __ATOMIC_RELAXED);
+
+    // --- dyncfg ---
+
+    s->dyncfg.status = dyncfg_available_for_rrdhost(host) ? RRDHOST_DYNCFG_STATUS_AVAILABLE : RRDHOST_DYNCFG_STATUS_UNAVAILABLE;
 
     // --- db ---
 

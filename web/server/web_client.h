@@ -157,9 +157,7 @@ struct web_client {
     char *origin;                       // the Origin: header
     char *user_agent;                   // the User-Agent: header
 
-    char *post_payload;                 // when this request is a POST, this has the payload
-    size_t post_payload_size;           // the size of the buffer allocated for the payload
-                                        // the actual contents may be less than the size
+    BUFFER *payload;                    // when this request is a POST, this has the payload
 
     // STATIC-THREADED WEB SERVER MEMBERS
     size_t pollinfo_slot;               // POLLINFO slot of the web client
@@ -219,7 +217,6 @@ void web_client_free(struct web_client *w);
 
 void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
-const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type);
 void web_client_enable_deflate(struct web_client *w, int gzip);
 int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path);
 

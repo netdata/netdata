@@ -28,14 +28,18 @@ void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
 void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb, bool dyncfg) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
+    size_t configs = 0;
+
     struct rrd_host_function *tmp;
     dfe_start_read(host->functions, tmp) {
         if(tmp->options & RRD_FUNCTION_LOCAL)
             continue;
 
-        if(!dyncfg && (tmp->options & RRD_FUNCTION_DYNCFG))
+        if(tmp->options & RRD_FUNCTION_DYNCFG) {
             // we should not send dyncfg to this parent
+            configs++;
             continue;
+        }
 
         buffer_sprintf(wb
                        , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" \"%s\" %d\n"
@@ -48,6 +52,9 @@ void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb, bool dyncfg)
         );
     }
     dfe_done(tmp);
+
+    if(dyncfg && configs)
+        dyncfg_add_streaming(wb);
 }
 
 static void functions2json(DICTIONARY *functions, BUFFER *wb)

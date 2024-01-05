@@ -31,7 +31,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
             transaction,
             pf->timeout_s,
             string2str(pf->function),
-            functions_id2content_type(pf->payload->content_type)
+            content_type_id2string(pf->payload->content_type)
             );
     }
     else {
@@ -219,6 +219,9 @@ int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BU
                                         void *register_canceller_cb_data,
                                         rrd_function_register_progresser_cb_t register_progresser_cb,
                                         void *register_progresser_cb_data) {
+
+    // IMPORTANT: this function MUST call the result_cb even on failures
+
     PARSER  *parser = execute_cb_data;
 
     usec_t now_ut = now_monotonic_usec();
@@ -375,7 +378,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, PARSER 
     struct inflight_function *pf = inflight_function_find(parser, transaction);
     if(pf) {
         if(format && *format)
-            pf->result_body_wb->content_type = functions_content_type2id(format);
+            pf->result_body_wb->content_type = content_type_string2id(format);
 
         pf->code = code;
 

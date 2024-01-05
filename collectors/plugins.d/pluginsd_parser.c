@@ -202,6 +202,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         false);
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+    dyncfg_host_init(host);
 
     if(host->rrdlabels) {
         rrdlabels_migrate_to_these(host->rrdlabels, parser->user.host_define.rrdlabels);

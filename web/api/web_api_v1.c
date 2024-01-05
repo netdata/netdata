@@ -1440,6 +1440,61 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
     return HTTP_RESP_OK;
 }
 
+static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
+    char *action = NULL;
+    char *path = "/";
+    char *id = NULL;
+    int timeout = 120;
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "action"))
+            action = value;
+        else if(!strcmp(name, "path"))
+            path = value;
+        else if(!strcmp(name, "id"))
+            id = value;
+        else if(!strcmp(name, "timeout")) {
+            timeout = (int)strtol(value, NULL, 10);
+            if(timeout < 10)
+                timeout = 10;
+        }
+    }
+
+    char transaction[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(w->transaction, transaction);
+
+    size_t len = (action ? strlen(action) : 0)
+                 + (id ? strlen(id) : 0)
+                 + (path ? strlen(path) : 0)
+                 + 100;
+
+    char cmd[len];
+    if(strcmp(action, "tree") == 0)
+        snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " tree %s", path);
+    else
+        snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s", id, action);
+
+    buffer_flush(w->response.data);
+    int code = rrd_function_run(host, w->response.data, timeout, w->access, cmd,
+                                true, transaction,
+                                NULL, NULL,
+                                web_client_progress_functions_update, w,
+                                web_client_interrupt_callback, w,
+                                w->payload);
+
+    return code;
+}
+
 #ifndef ENABLE_DBENGINE
 int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url __maybe_unused) {
     return HTTP_RESP_NOT_FOUND;
@@ -1585,6 +1640,8 @@ static struct web_api_command api_commands_v1[] = {
 
         {"function", 0, HTTP_ACL_ACLK_WEBRTC_DASHBOARD_WITH_OPTIONAL_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function, 0 },
         {"functions", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions, 0 },
+
+        {"config", 0, HTTP_ACL_ACLK_WEBRTC_DASHBOARD_WITH_OPTIONAL_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_config, 0 },
 
         {"dbengine_stats", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats, 0 },
 

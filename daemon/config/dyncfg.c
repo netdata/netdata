@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define RRD_COLLECTOR_INTERNALS
+#define RRD_FUNCTIONS_INTERNALS
+
 #include "dyncfg.h"
 
 #define DYNCFG_VERSION (size_t)1
@@ -161,6 +164,15 @@ static void dyncfg_cmds2fp(DYNCFG_CMDS cmds, FILE *fp) {
             fprintf(fp, "%s ", cmd_map[i].name);
     }
     fprintf(fp, "\n");
+}
+
+static void dyncfg_cmds2json_array(DYNCFG_CMDS cmds, const char *key, BUFFER *wb) {
+    buffer_json_member_add_array(wb, key);
+    for (size_t i = 0; i < sizeof(cmd_map) / sizeof(cmd_map[0]); i++) {
+        if(cmds & cmd_map[i].cmd)
+            buffer_json_add_array_item_string(wb, cmd_map[i].name);
+    }
+    buffer_json_array_close(wb);
 }
 
 // ----------------------------------------------------------------------------
@@ -362,7 +374,7 @@ void dyncfg_save(const char *id, DYNCFG *df) {
     dyncfg_cmds2fp(df->cmds, fp);
 
     if(df->payload && buffer_strlen(df->payload) > 0) {
-        fprintf(fp, "content_type=%s\n", functions_id2content_type(df->payload->content_type));
+        fprintf(fp, "content_type=%s\n", content_type_id2string(df->payload->content_type));
         fprintf(fp, "content_length=%zu\n", buffer_strlen(df->payload));
         fprintf(fp, "---\n");
         fwrite(buffer_tostring(df->payload), 1, buffer_strlen(df->payload), fp);
@@ -439,7 +451,7 @@ static void dyncfg_load(const char *filename) {
         } else if (strcmp(key, "saves") == 0) {
             tmp.saves = strtoull(value, NULL, 10);
         } else if (strcmp(key, "content_type") == 0) {
-            content_type = functions_content_type2id(value);
+            content_type = content_type_string2id(value);
         } else if (strcmp(key, "content_length") == 0) {
             content_length = strtoull(value, NULL, 10);
         } else if (strcmp(key, "cmds") == 0) {
@@ -489,7 +501,7 @@ void dyncfg_scan() {
     closedir(dir);
 }
 
-void dyncfg_init(void) {
+void dyncfg_init(bool load_saved) {
     if(!dyncfg_globals.nodes) {
         dyncfg_globals.nodes = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, sizeof(DYNCFG));
         dictionary_register_insert_callback(dyncfg_globals.nodes, dyncfg_insert_cb, NULL);
@@ -505,7 +517,9 @@ void dyncfg_init(void) {
         }
 
         dyncfg_globals.dir = strdupz(path);
-        dyncfg_scan();
+
+        if(load_saved)
+            dyncfg_scan();
     }
 }
 
@@ -703,12 +717,14 @@ static int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_w
                                  rrd_function_register_progresser_cb_t register_progresser_cb,
                                  void *register_progresser_cb_data) {
 
+    // IMPORTANT: this function MUST call the result_cb even on failures
+
     DYNCFG_CMDS c = DYNCFG_CMD_NONE;
     const DICTIONARY_ITEM *item = NULL;
     const char *add_name = NULL;
     size_t add_name_len = 0;
-    if(strncmp(function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG) + 1) == 0) {
-        const char *id = &function[sizeof(PLUGINSD_FUNCTION_CONFIG) + 1];
+    if(strncmp(function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG)) == 0) {
+        const char *id = &function[sizeof(PLUGINSD_FUNCTION_CONFIG)];
         while(isspace(*id)) id++;
         const char *space = id;
         while(*space && !isspace(*space)) space++;
@@ -789,7 +805,7 @@ static void dyncfg_update_plugin(const char *id) {
 
     DYNCFG *df = dictionary_acquired_item_value(item);
 
-    if(df->type == DYNCFG_TYPE_SINGLE)
+    if(df->type == DYNCFG_TYPE_SINGLE || df->type == DYNCFG_TYPE_JOB)
         dyncfg_send_echo_update(item, df, id);
 
     else if(df->type == DYNCFG_TYPE_TEMPLATE) {
@@ -819,9 +835,9 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
     snprintfz(name, sizeof(name), PLUGINSD_FUNCTION_CONFIG " %s", id);
 
     rrd_collector_started();
-    rrd_function_add(host, NULL, name, 10, 100,
-                     "Dynamic configuration function", "config",
-                     HTTP_ACCESS_MEMBERS, sync, dyncfg_function_execute_cb, NULL);
+    rrd_function_add(host, NULL, name, 120, 1000,
+                     "Dynamic configuration", "config", HTTP_ACCESS_MEMBERS,
+                     sync, dyncfg_function_execute_cb, NULL);
 
     dyncfg_send_echo_status(item, df, id);
     dyncfg_update_plugin(id);
@@ -830,8 +846,200 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
     return true;
 }
 
+void dyncfg_add_streaming(BUFFER *wb) {
+    // when sending config functions to parents, we send only 1 function called 'config';
+    // the parent will send the command to the child and the child will validate it;
+    // this way the parent does not need to receive removals of config functions;
+
+    buffer_sprintf(wb
+                   , PLUGINSD_KEYWORD_FUNCTION " GLOBAL " PLUGINSD_FUNCTION_CONFIG " %d \"%s\" \"%s\" \"%s\" %d\n"
+                   , 120
+                   , "Dynamic configuration"
+                   , "config"
+                   , http_id2access(HTTP_ACCESS_MEMBERS)
+                   , 1000
+    );
+}
+
+bool dyncfg_available_for_rrdhost(RRDHOST *host) {
+    if(host == localhost || rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST))
+        return true;
+
+    if(!host->functions)
+        return false;
+
+    bool ret = false;
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions, PLUGINSD_FUNCTION_CONFIG);
+    if(item) {
+        struct rrd_host_function *rdcf = dictionary_acquired_item_value(item);
+        if(rrd_collector_running(rdcf->collector))
+            ret = true;
+
+        dictionary_acquired_item_release(host->functions, item);
+    }
+
+    return ret;
+}
+
+// ----------------------------------------------------------------------------
+
+static int dyncfg_tree_compar(const void *a, const void *b) {
+    const DICTIONARY_ITEM *item1 = *(const DICTIONARY_ITEM **)a;
+    const DICTIONARY_ITEM *item2 = *(const DICTIONARY_ITEM **)b;
+
+    DYNCFG *df1 = dictionary_acquired_item_value(item1);
+    DYNCFG *df2 = dictionary_acquired_item_value(item2);
+
+    int rc = string_cmp(df1->path, df2->path);
+    if(rc == 0)
+        rc = strcmp(dictionary_acquired_item_name(item1), dictionary_acquired_item_name(item2));
+
+    return rc;
+}
+
+static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
+    buffer_json_member_add_object(wb, id);
+    {
+        buffer_json_member_add_string(wb, "type", dyncfg_id2type(df->type));
+        buffer_json_member_add_string(wb, "status", dyncfg_id2status(df->status));
+        dyncfg_cmds2json_array(df->cmds, "cmds", wb);
+        buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(df->source_type));
+        buffer_json_member_add_string(wb, "source", string2str(df->source));
+        buffer_json_member_add_boolean(wb, "sync", df->sync);
+        buffer_json_member_add_boolean(wb, "user_disabled", df->user_disabled);
+        buffer_json_member_add_boolean(wb, "restart_required", df->restart_required);
+        if(df->payload && buffer_strlen(df->payload)) {
+            buffer_json_member_add_object(wb, "payload");
+            buffer_json_member_add_boolean(wb, "content_type", content_type_id2string(df->payload->content_type));
+            buffer_json_member_add_uint64(wb, "content_length", df->payload->len);
+            buffer_json_object_close(wb);
+        }
+        buffer_json_member_add_uint64(wb, "saves", df->saves);
+        buffer_json_member_add_uint64(wb, "created_ut", df->created_ut);
+        buffer_json_member_add_uint64(wb, "modified_ut", df->modified_ut);
+    }
+    buffer_json_object_close(wb);
+}
+
+static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent) {
+    size_t entries = dictionary_entries(dyncfg_globals.nodes);
+    size_t used = 0;
+    const DICTIONARY_ITEM *items[entries];
+
+    size_t parent_len = strlen(parent);
+    DYNCFG *df;
+    dfe_start_read(dyncfg_globals.nodes, df) {
+        if(df->host != host || strncmp(string2str(df->path), parent, parent_len) != 0)
+            continue;
+
+        items[used++] = dictionary_acquired_item_dup(dyncfg_globals.nodes, df_dfe.item);
+    }
+    dfe_done(df);
+
+    qsort(items, used, sizeof(const DICTIONARY_ITEM *), dyncfg_tree_compar);
+
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    STRING *last_path = NULL;
+    for(size_t i = 0; i < used ;i++) {
+        df = dictionary_acquired_item_value(items[i]);
+        if(df->path != last_path) {
+            last_path = df->path;
+
+            if(i)
+                buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, string2str(last_path));
+        }
+
+        dyncfg_to_json(df, dictionary_acquired_item_name(items[i]), wb);
+    }
+
+    if(used)
+        buffer_json_object_close(wb);
+
+    buffer_json_finalize(wb);
+
+    for(size_t i = 0; i < used ;i++)
+        dictionary_acquired_item_release(dyncfg_globals.nodes, items[i]);
+}
+
+static int dyncfg_config_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *result_body_wb, BUFFER *payload __maybe_unused,
+                                    usec_t *stop_monotonic_ut __maybe_unused, const char *function,
+                                    void *execute_cb_data,
+                                    rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                    rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
+                                    rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
+                                    void *is_cancelled_cb_data __maybe_unused,
+                                    rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                                    void *register_canceller_cb_data __maybe_unused,
+                                    rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
+                                    void *register_progresser_cb_data __maybe_unused) {
+    RRDHOST *host = execute_cb_data;
+
+    if(strncmp(function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG)) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: received function that is not config: %s", function);
+        rrd_call_function_error(result_body_wb, "wrong function", 400);
+        if(result_cb)
+            result_cb(result_body_wb, HTTP_RESP_NOT_FOUND, result_cb_data);
+        return HTTP_RESP_NOT_FOUND;
+    }
+
+    // extract the id
+    const char *id = &function[sizeof(PLUGINSD_FUNCTION_CONFIG)];
+    while(*id && isspace(*id)) id++;
+    const char *space = id;
+    while(*space && !isspace(*space)) space++;
+    size_t id_len = space - id;
+
+    char id_copy[id_len + 1];
+    memcpy(id_copy, id, id_len);
+    id_copy[id_len] = '\0';
+
+    // extract the path
+    const char *path = space;
+    while(*path && isspace(*path)) path++;
+    space = path;
+    while(*space && !isspace(*space)) space++;
+    size_t path_len = space - path;
+
+    if(*path || !path_len) {
+        path_len = 1;
+        path = "/";
+    }
+
+    char path_copy[path_len + 1];
+    memcpy(path_copy, path, path_len);
+    path_copy[path_len] = '\0';
+
+    if(strcmp(id_copy, "tree") == 0) {
+        dyncfg_tree_for_host(host, result_body_wb, path_copy);
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unsupported config command '%s' in: %s", id_copy, function);
+        rrd_call_function_error(result_body_wb, "wrong config function", 400);
+        if(result_cb)
+            result_cb(result_body_wb, HTTP_RESP_NOT_FOUND, result_cb_data);
+        return HTTP_RESP_NOT_FOUND;
+    }
+
+    if(result_cb)
+        result_cb(result_body_wb, HTTP_RESP_OK, result_cb_data);
+
+    return HTTP_RESP_OK;
+}
+
+void dyncfg_host_init(RRDHOST *host) {
+    rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120,
+                     1000, "Dynamic configuration", "config", HTTP_ACCESS_MEMBERS,
+                     true, dyncfg_config_execute_cb, host);
+}
+
 // ----------------------------------------------------------------------------
 // unit test
+
+#define LINE_FILE_STR TOSTRING(__LINE__) "@" __FILE__
 
 struct dyncfg_unittest {
     bool enabled;
@@ -849,7 +1057,7 @@ static int dyncfg_unittest_execute_cb(uuid_t *transaction, BUFFER *result_body_w
                                       void *register_canceller_cb_data,
                                       rrd_function_register_progresser_cb_t register_progresser_cb,
                                       void *register_progresser_cb_data) {
-    if(strncmp(function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG) + 1) != 0) {
+    if(strncmp(function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG)) != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: received function that is not config: %s", function);
         rrd_call_function_error(result_body_wb, "wrong function", 400);
         if(result_cb)
@@ -858,7 +1066,7 @@ static int dyncfg_unittest_execute_cb(uuid_t *transaction, BUFFER *result_body_w
     }
 
     // extract the id
-    const char *id = &function[7];
+    const char *id = &function[sizeof(PLUGINSD_FUNCTION_CONFIG)];
     while(*id && isspace(*id)) id++;
     const char *space = id;
     while(*space && !isspace(*space)) space++;
@@ -891,27 +1099,9 @@ static int dyncfg_unittest_execute_cb(uuid_t *transaction, BUFFER *result_body_w
     return HTTP_RESP_OK;
 }
 
-int dyncfg_unittest(void) {
-    rrd_functions_inflight_init();
-    dyncfg_init();
-
-    dyncfg_unittest_data.enabled = false;
-    dyncfg_add(localhost, "unittest:1", "/unittests",
-               DYNCFG_STATUS_OK, DYNCFG_TYPE_SINGLE,
-               DYNCFG_SOURCE_TYPE_DYNCFG, "here and there",
-               DYNCFG_CMD_UPDATE|DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE,
-               0, 0, true,
-               dyncfg_unittest_execute_cb, &dyncfg_unittest_data);
-
-    if(!dyncfg_unittest_data.enabled) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is not set");
-        dyncfg_unittest_data.errors++;
-    }
-
-    BUFFER *wb = buffer_create(0, NULL);
-
+static int dyncfg_unittest_run(const char *cmd, BUFFER *wb) {
     buffer_flush(wb);
-    const char *cmd = PLUGINSD_FUNCTION_CONFIG " unittest:1 disable";
+
     int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMINS, cmd,
                               true, NULL,
                               NULL, NULL,
@@ -919,14 +1109,64 @@ int dyncfg_unittest(void) {
                               NULL, NULL,
                               NULL);
     if(rc != HTTP_RESP_OK) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run configuration function");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s", cmd);
         dyncfg_unittest_data.errors++;
     }
 
-    if(dyncfg_unittest_data.enabled) {
+    return rc;
+}
+
+int dyncfg_unittest(void) {
+    rrd_functions_inflight_init();
+    dyncfg_init(false);
+
+    dyncfg_unittest_data.enabled = false;
+    dyncfg_add(localhost, "unittest:sync:single", "/unittests",
+               DYNCFG_STATUS_OK, DYNCFG_TYPE_SINGLE,
+               DYNCFG_SOURCE_TYPE_DYNCFG, LINE_FILE_STR,
+               DYNCFG_CMD_GET|DYNCFG_CMD_SCHEMA|DYNCFG_CMD_UPDATE|DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE,
+               0, 0, true,
+               dyncfg_unittest_execute_cb, &dyncfg_unittest_data);
+
+    dyncfg_add(localhost, "unittest:sync:jobs", "/unittests",
+               DYNCFG_STATUS_OK, DYNCFG_TYPE_TEMPLATE,
+               DYNCFG_SOURCE_TYPE_DYNCFG, LINE_FILE_STR,
+               DYNCFG_CMD_SCHEMA|DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE|DYNCFG_CMD_ADD|DYNCFG_CMD_RESTART,
+               0, 0, true,
+               dyncfg_unittest_execute_cb, &dyncfg_unittest_data);
+
+    dyncfg_add(localhost, "unittest:sync:jobs:stock", "/unittests",
+               DYNCFG_STATUS_OK, DYNCFG_TYPE_JOB,
+               DYNCFG_SOURCE_TYPE_STOCK, LINE_FILE_STR,
+               DYNCFG_CMD_GET|DYNCFG_CMD_SCHEMA|DYNCFG_CMD_UPDATE|DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE|DYNCFG_CMD_RESTART|DYNCFG_CMD_TEST,
+               0, 0, true,
+               dyncfg_unittest_execute_cb, &dyncfg_unittest_data);
+
+    dyncfg_add(localhost, "unittest:sync:jobs:user", "/unittests",
+               DYNCFG_STATUS_OK, DYNCFG_TYPE_JOB,
+               DYNCFG_SOURCE_TYPE_USER, LINE_FILE_STR,
+               DYNCFG_CMD_GET|DYNCFG_CMD_SCHEMA|DYNCFG_CMD_UPDATE|DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE|DYNCFG_CMD_RESTART|DYNCFG_CMD_TEST,
+               0, 0, true,
+               dyncfg_unittest_execute_cb, &dyncfg_unittest_data);
+
+    int rc;
+    BUFFER *wb = buffer_create(0, NULL);
+
+    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single enable", wb);
+    if(rc == HTTP_RESP_OK && !dyncfg_unittest_data.enabled) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is not set");
+        dyncfg_unittest_data.errors++;
+    }
+
+    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single disable", wb);
+    if(rc == HTTP_RESP_OK && dyncfg_unittest_data.enabled) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is set");
         dyncfg_unittest_data.errors++;
     }
+
+    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " tree", wb);
+    if(rc == HTTP_RESP_OK)
+        fprintf(stderr, "%s\n", buffer_tostring(wb));
 
     return dyncfg_unittest_data.errors;
 }

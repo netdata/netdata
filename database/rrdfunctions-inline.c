@@ -17,6 +17,8 @@ static int rrd_function_run_inline(uuid_t *transaction __maybe_unused, BUFFER *w
                             rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
                             void *register_progresser_cb_data __maybe_unused) {
 
+    // IMPORTANT: this function MUST call the result_cb even on failures
+
     struct rrd_function_inline *fi = execute_cb_data;
 
     int response = fi->cb(wb, function);

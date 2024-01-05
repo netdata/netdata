@@ -111,9 +111,8 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         buffer_free(w->response.data);
         w->response.data = NULL;
 
-        freez(w->post_payload);
-        w->post_payload = NULL;
-        w->post_payload_size = 0;
+        buffer_free(w->payload);
+        w->payload = NULL;
     }
     else {
         // the web client is to be re-used
@@ -126,7 +125,8 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         buffer_reset(w->response.header);
         buffer_reset(w->response.data);
 
-        // leave w->post_payload
+        if(w->payload)
+            buffer_reset(w->payload);
     }
 
     freez(w->server_host);
@@ -661,7 +661,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
         web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
         query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                        buffer_tostring(w->url_as_received),
-                                       w->post_payload,
+                                       w->payload,
                                        w->forwarded_for ? w->forwarded_for : w->client_ip);
     }
 
@@ -684,92 +684,6 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Which API version?");
         return HTTP_RESP_BAD_REQUEST;
-    }
-}
-
-const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type) {
-    switch(content_type) {
-        case CT_TEXT_HTML:
-            return "text/html; charset=utf-8";
-
-        case CT_APPLICATION_XML:
-            return "application/xml; charset=utf-8";
-
-        case CT_APPLICATION_JSON:
-            return "application/json; charset=utf-8";
-
-        case CT_APPLICATION_X_JAVASCRIPT:
-            return "application/javascript; charset=utf-8";
-
-        case CT_TEXT_CSS:
-            return "text/css; charset=utf-8";
-
-        case CT_TEXT_XML:
-            return "text/xml; charset=utf-8";
-
-        case CT_TEXT_XSL:
-            return "text/xsl; charset=utf-8";
-
-        case CT_APPLICATION_OCTET_STREAM:
-            return "application/octet-stream";
-
-        case CT_IMAGE_SVG_XML:
-            return "image/svg+xml";
-
-        case CT_APPLICATION_X_FONT_TRUETYPE:
-            return "application/x-font-truetype";
-
-        case CT_APPLICATION_X_FONT_OPENTYPE:
-            return "application/x-font-opentype";
-
-        case CT_APPLICATION_FONT_WOFF:
-            return "application/font-woff";
-
-        case CT_APPLICATION_FONT_WOFF2:
-            return "application/font-woff2";
-
-        case CT_APPLICATION_VND_MS_FONTOBJ:
-            return "application/vnd.ms-fontobject";
-
-        case CT_IMAGE_PNG:
-            return "image/png";
-
-        case CT_IMAGE_JPG:
-            return "image/jpeg";
-
-        case CT_IMAGE_GIF:
-            return "image/gif";
-
-        case CT_IMAGE_XICON:
-            return "image/x-icon";
-
-        case CT_IMAGE_BMP:
-            return "image/bmp";
-
-        case CT_IMAGE_ICNS:
-            return "image/icns";
-
-        case CT_PROMETHEUS:
-            return "text/plain; version=0.0.4";
-
-        case CT_AUDIO_MPEG:
-            return "audio/mpeg";
-
-        case CT_AUDIO_OGG:
-            return "audio/ogg";
-
-        case CT_VIDEO_MP4:
-            return "video/mp4";
-
-        case CT_APPLICATION_PDF:
-            return "application/pdf";
-
-        case CT_APPLICATION_ZIP:
-            return "application/zip";
-
-        default:
-        case CT_TEXT_PLAIN:
-            return "text/plain; charset=utf-8";
     }
 }
 
@@ -971,7 +885,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         if(w->header_parse_last_size < last_pos)
             last_pos = 0;
 
-        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size, &w->post_payload, &w->post_payload_size);
+        is_it_valid =
+            url_is_request_complete_and_extract_payload(s, &s[last_pos], w->header_parse_last_size, &w->payload);
         if(!is_it_valid) {
             if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
                 netdata_log_info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
@@ -987,7 +902,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         is_it_valid = 1;
     } else {
         last_pos = w->header_parse_last_size;
-        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size, &w->post_payload, &w->post_payload_size);
+        is_it_valid =
+            url_is_request_complete_and_extract_payload(s, &s[last_pos], w->header_parse_last_size, &w->payload);
     }
 
     s = web_client_valid_method(w, s);
@@ -1111,7 +1027,6 @@ void web_client_build_http_header(struct web_client *w) {
     // prepare the HTTP response header
     netdata_log_debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, w->response.code);
 
-    const char *content_type_string = web_content_type_to_string(w->response.data->content_type);
     const char *code_msg = http_response_code2string(w->response.code);
 
     // prepare the last modified and expiration dates
@@ -1135,15 +1050,15 @@ void web_client_build_http_header(struct web_client *w) {
                        "Server: Netdata Embedded HTTP Server %s\r\n"
                        "Access-Control-Allow-Origin: %s\r\n"
                        "Access-Control-Allow-Credentials: true\r\n"
-                       "Content-Type: %s\r\n"
                        "Date: %s\r\n",
                        w->response.code,
                        code_msg,
                        web_client_has_keepalive(w)?"keep-alive":"close",
                        VERSION,
                        w->origin ? w->origin : "*",
-                       content_type_string,
                        rfc7231_date);
+
+        http_header_content_type(w->response.header_output, w->response.data->content_type);
     }
 
     if(unlikely(web_x_frame_options))
@@ -1594,7 +1509,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
                 query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                                buffer_tostring(w->url_as_received),
-                                               w->post_payload,
+                                               w->payload,
                                                w->forwarded_for ? w->forwarded_for : w->client_ip);
             }
 
