@@ -6,6 +6,11 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
     if(!web_client_flags_check_auth(w))
         w->access = HTTP_ACCESS_ANY;
 
+#ifdef NETDATA_GOD_MODE
+    web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_CLOUD);
+    w->access = HTTP_ACCESS_ADMIN;
+#endif
+
     buffer_no_cacheable(w->response.data);
 
     if(unlikely(!url_path_endpoint || !*url_path_endpoint)) {
