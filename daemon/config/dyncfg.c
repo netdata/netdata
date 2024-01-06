@@ -51,7 +51,7 @@ static struct {
     { .source_type = DYNCFG_SOURCE_TYPE_STOCK, .name = "stock" },
     { .source_type = DYNCFG_SOURCE_TYPE_USER, .name = "user" },
     { .source_type = DYNCFG_SOURCE_TYPE_DYNCFG, .name = "dyncfg" },
-    { .source_type = DYNCFG_SOURCE_TYPE_DISCOVERY, .name = "discovered" },
+    { .source_type = DYNCFG_SOURCE_TYPE_DISCOVERED, .name = "discovered" },
 };
 
 DYNCFG_SOURCE_TYPE dyncfg_source_type2id(const char *source_type) {
@@ -858,20 +858,30 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
     if(cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
         cmds |= DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE;
 
+    // add
     if(type == DYNCFG_TYPE_TEMPLATE) {
         // templates must always support "add"
         cmds |= DYNCFG_CMD_ADD;
-
-        // templates do not have data
-        cmds &= ~(DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST);
     }
-    else if(type == DYNCFG_TYPE_JOB) {
-        // jobs cannot support "add"
+    else {
+        // only templates can have "add"
         cmds &= ~DYNCFG_CMD_ADD;
     }
-    else if(type == DYNCFG_TYPE_SINGLE) {
-        // single cannot support "add" or "remove"
-        cmds &= ~(DYNCFG_CMD_ADD | DYNCFG_CMD_REMOVE);
+
+    // remove
+    if(source_type == DYNCFG_SOURCE_TYPE_DYNCFG && type != DYNCFG_TYPE_JOB) {
+        // remove is only available for dyncfg jobs
+        cmds |= DYNCFG_CMD_REMOVE;
+    }
+    else {
+        // remove is only available for dyncfg jobs
+        cmds &= ~DYNCFG_CMD_REMOVE;
+    }
+
+    // data
+    if(type == DYNCFG_TYPE_TEMPLATE) {
+        // templates do not have data
+        cmds &= ~(DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST);
     }
 
     if(cmds != old_cmds) {
@@ -891,8 +901,7 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
 
     rrd_collector_started();
     rrd_function_add(host, NULL, name, 120, 1000,
-                     "Dynamic configuration", "config",
-        HTTP_ACCESS_MEMBER,
+                     "Dynamic configuration", "config",HTTP_ACCESS_MEMBER,
                      sync, dyncfg_function_execute_cb, NULL);
 
     dyncfg_send_echo_status(item, df, id);

@@ -18,7 +18,7 @@ typedef enum __attribute__((packed)) {
     DYNCFG_SOURCE_TYPE_STOCK,
     DYNCFG_SOURCE_TYPE_USER,
     DYNCFG_SOURCE_TYPE_DYNCFG,
-    DYNCFG_SOURCE_TYPE_DISCOVERY,
+    DYNCFG_SOURCE_TYPE_DISCOVERED,
 } DYNCFG_SOURCE_TYPE;
 DYNCFG_SOURCE_TYPE dyncfg_source_type2id(const char *source_type);
 const char *dyncfg_id2source_type(DYNCFG_SOURCE_TYPE source_type);
