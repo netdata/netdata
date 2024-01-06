@@ -230,6 +230,7 @@ static char *dyncfg_escape_id(const char *id) {
 
 typedef struct dyncfg {
     RRDHOST *host;
+    uuid_t host_uuid;
     STRING *path;
     DYNCFG_STATUS status;
     DYNCFG_TYPE type;
@@ -373,8 +374,9 @@ void dyncfg_save(const char *id, DYNCFG *df) {
     fprintf(fp, "version=%zu\n", DYNCFG_VERSION);
     fprintf(fp, "id=%s\n", id);
 
-    if(df->host)
-        fprintf(fp, "host=%s\n", rrdhost_hostname(df->host));
+    char uuid_str[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(df->host_uuid, uuid_str);
+    fprintf(fp, "host=%s\n", uuid_str);
 
     fprintf(fp, "path=%s\n", string2str(df->path));
     fprintf(fp, "type=%s\n", dyncfg_id2type(df->type));
@@ -447,7 +449,7 @@ static void dyncfg_load(const char *filename) {
         } else if (strcmp(key, "id") == 0) {
             id = strdupz(value);
         } else if (strcmp(key, "host") == 0) {
-            hostname = strdupz(value);
+            uuid_parse_flexi(value, tmp.host_uuid);
         } else if (strcmp(key, "path") == 0) {
             tmp.path = string_strdupz(value);
         } else if (strcmp(key, "type") == 0) {
@@ -558,6 +560,7 @@ static const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
     };
+    uuid_copy(tmp.host_uuid, host->host_uuid);
 
     return dictionary_set_and_acquire_item_advanced(dyncfg_globals.nodes, id, -1, &tmp, sizeof(tmp), NULL);
 }
