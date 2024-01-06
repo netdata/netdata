@@ -4,27 +4,13 @@
 #define NETDATA_WEB_API_H 1
 
 #include "daemon/common.h"
+#include "web/api/http_header.h"
+#include "web/api/http_auth.h"
 #include "web/api/badges/web_buffer_svg.h"
 #include "web/api/ilove/ilove.h"
 #include "web/api/formatters/rrd2json.h"
 #include "web/api/health/health_cmdapi.h"
 #include "web/api/queries/weights.h"
-
-extern bool netdata_is_protected_by_bearer;
-extern DICTIONARY *netdata_authorized_bearers;
-typedef enum __attribute__((packed)) {
-    BEARER_STATUS_NO_BEARER_IN_HEADERS,
-    BEARER_STATUS_BEARER_DOES_NOT_FIT,
-    BEARER_STATUS_NOT_PARSABLE,
-    BEARER_STATUS_EXTRACTED_FROM_HEADER,
-    BEARER_STATUS_NO_BEARERS_DICTIONARY,
-    BEARER_STATUS_NOT_FOUND_IN_DICTIONARY,
-    BEARER_STATUS_EXPIRED,
-    BEARER_STATUS_AVAILABLE_AND_VALIDATED,
-} BEARER_STATUS;
-
-BEARER_STATUS api_check_bearer_token(struct web_client *w);
-BEARER_STATUS extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len);
 
 struct web_api_command {
     const char *command;

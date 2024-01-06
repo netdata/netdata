@@ -40,7 +40,8 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
 	w->port_acl = pi->port_acl;
 
     int flag = 1;
-    if(unlikely(web_client_check_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
+    if(unlikely(
+            web_client_check_conn_tcp(w) && setsockopt(w->ifd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
         netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->ifd);
 
     flag = 1;
@@ -205,13 +206,13 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     struct web_client *w = web_client_create_on_fd(pi);
 
     if (!strncmp(pi->client_port, "UNIX", 4)) {
-        web_client_set_unix(w);
+        web_client_set_conn_unix(w);
     } else {
-        web_client_set_tcp(w);
+        web_client_set_conn_tcp(w);
     }
 
 #ifdef ENABLE_HTTPS
-    if ((!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx)) {
+    if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
         sock_delnonblock(w->ifd);
 
         //Read the first 7 bytes from the message, but the message

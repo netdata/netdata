@@ -6,10 +6,10 @@ static struct {
     HTTP_ACCESS access;
     const char *name;
 } rrd_function_access_levels[] = {
-        { .access = HTTP_ACCESS_NONE, .name = "none" },
-        { .access = HTTP_ACCESS_MEMBERS, .name = "members" },
-        { .access = HTTP_ACCESS_ADMINS, .name = "admins" },
-        { .access = HTTP_ACCESS_ANY, .name = "any" },
+    { .access = HTTP_ACCESS_NONE, .name = "none" },
+    { .access = HTTP_ACCESS_MEMBERS, .name = "member" },
+    { .access = HTTP_ACCESS_ADMINS, .name = "admin" },
+    { .access = HTTP_ACCESS_ANY, .name = "any" },
 };
 
 HTTP_ACCESS http_access2id(const char *access) {

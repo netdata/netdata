@@ -108,13 +108,15 @@ static struct {
     uint32_t hash;
     DATASOURCE_FORMAT value;
 } api_v1_data_google_formats[] = {
-        // this is not error - when google requests json, it expects javascript
-        // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source#responseformat
-        {  "json"     , 0    , DATASOURCE_DATATABLE_JSONP}
-        , {"html"     , 0    , DATASOURCE_HTML}
-        , {"csv"      , 0    , DATASOURCE_CSV}
-        , {"tsv-excel", 0    , DATASOURCE_TSV}
-        , {           NULL, 0, 0}
+    // this is not an error - when Google requests json, it expects javascript
+    // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source#responseformat
+      {"json",      0, DATASOURCE_DATATABLE_JSONP}
+    , {"html",      0, DATASOURCE_HTML}
+    , {"csv",       0, DATASOURCE_CSV}
+    , {"tsv-excel", 0, DATASOURCE_TSV}
+
+    // terminator
+    , {NULL,        0, 0}
 };
 
 void web_client_api_v1_init(void) {
@@ -942,7 +944,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
     if(cookie)
         strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], UUID_STR_LEN - 1);
-    else if(extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)) != BEARER_STATUS_EXTRACTED_FROM_HEADER)
+    else if(!extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)))
         person_guid[0] = '\0';
 
     char action = '\0';

@@ -473,7 +473,10 @@ The plugin can register functions to Netdata, like this:
 > FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users" "tags" "access"
 
 - Tags currently recognized are either `top` or `logs` (or both, space separated).
-- Access is one of `any`, `members`, or `admins`.
+- Access is one of `any`, `member`, or `admin`:
+  - `any` to offer the function to all users of Netdata, even if they are not authenticated.
+  - `member` to offer the function to all authenticated members of Netdata.
+  - `admin` to offer the function only to authenticated administrators. 
 
 A function can be used by users to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
 

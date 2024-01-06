@@ -101,7 +101,7 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
     const char *start, *end;
 
     // TODO better check of URL
-    if(strncmp(payload, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX))) {
+    if(strncmp(payload, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX)) != 0) {
         errno = 0;
         netdata_log_error("Only accepting requests that start with \"%s\" from CLOUD.", ACLK_CLOUD_REQ_V2_PREFIX);
         return 1;
@@ -196,7 +196,7 @@ int aclk_handle_cloud_cmd_message(char *payload)
 
     // Originally we were expecting to have multiple types of 'cmd' message,
     // but after the new protocol was designed we will ever only have 'http'
-    if (strcmp(cloud_to_agent.type_id, "http")) {
+    if (strcmp(cloud_to_agent.type_id, "http") != 0) {
         error_report("Only 'http' cmd message is supported");
         goto err_cleanup;
     }

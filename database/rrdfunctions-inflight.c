@@ -365,7 +365,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
-    if(access != HTTP_ACCESS_ADMINS && rdcf->access != HTTP_ACCESS_ANY && access > rdcf->access) {
+    if(!web_client_has_enough_access_level(access, rdcf->access)) {
 
         if(!aclk_connected)
             rrd_call_function_error(result_wb, "This Netdata must be connected to Netdata Cloud to access this function.", HTTP_RESP_PRECOND_FAIL);

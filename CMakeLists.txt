@@ -774,6 +774,10 @@ set(API_PLUGIN_FILES
         web/api/web_api_v1.h
         web/api/web_api_v2.c
         web/api/web_api_v2.h
+        web/api/http_auth.c
+        web/api/http_auth.h
+        web/api/http_header.c
+        web/api/http_header.h
         web/api/badges/web_buffer_svg.c
         web/api/badges/web_buffer_svg.h
         web/api/exporters/allmetrics.c

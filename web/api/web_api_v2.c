@@ -3,112 +3,6 @@
 #include "web_api_v2.h"
 #include "../rtc/webrtc.h"
 
-#define BEARER_TOKEN_EXPIRATION 86400
-
-struct bearer_token {
-    time_t created_s;
-    time_t expires_s;
-};
-
-static void bearer_token_cleanup(void) {
-    static time_t attempts = 0;
-
-    if(++attempts % 1000 != 0)
-        return;
-
-    time_t now_s = now_monotonic_sec();
-
-    struct bearer_token *z;
-    dfe_start_read(netdata_authorized_bearers, z) {
-        if(z->expires_s < now_s)
-            dictionary_del(netdata_authorized_bearers, z_dfe.name);
-    }
-    dfe_done(z);
-
-    dictionary_garbage_collect(netdata_authorized_bearers);
-}
-
-void bearer_tokens_init(void) {
-    netdata_authorized_bearers = dictionary_create_advanced(
-            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(struct bearer_token));
-}
-
-static time_t bearer_get_token(uuid_t *uuid) {
-    char uuid_str[UUID_STR_LEN];
-
-    uuid_generate_random(*uuid);
-    uuid_unparse_lower(*uuid, uuid_str);
-
-    struct bearer_token t = { 0 }, *z;
-    z = dictionary_set(netdata_authorized_bearers, uuid_str, &t, sizeof(t));
-    if(!z->created_s) {
-        z->created_s = now_monotonic_sec();
-        z->expires_s = z->created_s + BEARER_TOKEN_EXPIRATION;
-    }
-
-    bearer_token_cleanup();
-
-    return now_realtime_sec() + BEARER_TOKEN_EXPIRATION;
-}
-
-#define HTTP_REQUEST_AUTHORIZATION_BEARER "\r\nAuthorization: Bearer "
-#define HTTP_REQUEST_X_NETDATA_AUTH_BEARER "\r\nX-Netdata-Auth: Bearer "
-
-BEARER_STATUS extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
-    const char *req = buffer_tostring(w->response.data);
-    size_t req_len = buffer_strlen(w->response.data);
-    const char *bearer = NULL;
-    const char *bearer_end = NULL;
-
-    bearer = strcasestr(req, HTTP_REQUEST_X_NETDATA_AUTH_BEARER);
-    if(bearer)
-        bearer_end = bearer + sizeof(HTTP_REQUEST_X_NETDATA_AUTH_BEARER) - 1;
-    else {
-        bearer = strcasestr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
-        if(bearer)
-            bearer_end = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
-    }
-
-    if(!bearer || !bearer_end)
-        return BEARER_STATUS_NO_BEARER_IN_HEADERS;
-
-    const char *token_start = bearer_end;
-
-    while(isspace(*token_start))
-        token_start++;
-
-    const char *token_end = token_start + UUID_STR_LEN - 1 + 2;
-    if (token_end > req + req_len)
-        return BEARER_STATUS_BEARER_DOES_NOT_FIT;
-
-    strncpyz(dst, token_start, dst_len - 1);
-    uuid_t uuid;
-    if (uuid_parse(dst, uuid) != 0)
-        return BEARER_STATUS_NOT_PARSABLE;
-
-    return BEARER_STATUS_EXTRACTED_FROM_HEADER;
-}
-
-BEARER_STATUS api_check_bearer_token(struct web_client *w) {
-    if(!netdata_authorized_bearers)
-        return BEARER_STATUS_NO_BEARERS_DICTIONARY;
-
-    char token[UUID_STR_LEN];
-    BEARER_STATUS t = extract_bearer_token_from_request(w, token, sizeof(token));
-    if(t != BEARER_STATUS_EXTRACTED_FROM_HEADER)
-        return t;
-
-    struct bearer_token *z = dictionary_get(netdata_authorized_bearers, token);
-    if(!z)
-        return BEARER_STATUS_NOT_FOUND_IN_DICTIONARY;
-
-    if(z->expires_s < now_monotonic_sec())
-        return BEARER_STATUS_EXPIRED;
-
-    return BEARER_STATUS_AVAILABLE_AND_VALIDATED;
-}
-
 static bool verify_agent_uuids(const char *machine_guid, const char *node_id, const char *claim_id) {
     if(!machine_guid || !node_id || !claim_id)
         return false;
@@ -206,7 +100,7 @@ int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __may
     }
 
     uuid_t uuid;
-    time_t expires_s = bearer_get_token(&uuid);
+    time_t expires_s = bearer_create_token(&uuid, w);
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
