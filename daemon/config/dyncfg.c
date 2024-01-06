@@ -1070,8 +1070,8 @@ static int dyncfg_config_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *
         dyncfg_tree_for_host(host, result_body_wb, path_copy);
     }
     else {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unsupported config command '%s' in: %s", id_copy, function);
-        rrd_call_function_error(result_body_wb, "wrong config function", 400);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unknown config id '%s' in call: %s", id_copy, function);
+        rrd_call_function_error(result_body_wb, "unknown config id specified", HTTP_RESP_NOT_FOUND);
         if(result_cb)
             result_cb(result_body_wb, HTTP_RESP_NOT_FOUND, result_cb_data);
         return HTTP_RESP_NOT_FOUND;
