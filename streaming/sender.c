@@ -1186,7 +1186,8 @@ static void execute_commands_function(struct sender_state *s, const char *comman
         BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_functions);
 
         int code = rrd_function_run(s->host, wb,
-                                    timeout, HTTP_ACCESS_ADMINS, function, false, transaction,
+                                    timeout,
+            HTTP_ACCESS_ADMIN, function, false, transaction,
                                     stream_execute_function_callback, tmp,
                                     stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
                                     stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,

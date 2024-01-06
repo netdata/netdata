@@ -107,7 +107,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
     struct web_client *w = web_client_get_from_cache();
     web_client_set_conn_cloud(w);
     w->acl = HTTP_ACL_ACLK;
-    w->access = HTTP_ACCESS_MEMBERS; // the minimum access level for all requests from netdata cloud
+    w->access = HTTP_ACCESS_MEMBER; // the minimum access level for all requests from netdata cloud
     web_client_flags_clear_auth(w);
     web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_CLOUD);
 

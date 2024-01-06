@@ -928,7 +928,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                 .node_ids = &ctl->nodes.ni,
                 .help = NULL,
                 .tags = NULL,
-                .access = HTTP_ACCESS_MEMBERS,
+                .access = HTTP_ACCESS_MEMBER,
                 .priority = RRDFUNCTIONS_PRIORITY_DEFAULT,
         };
         host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.access, &t.priority);

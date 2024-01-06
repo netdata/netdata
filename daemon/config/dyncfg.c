@@ -602,8 +602,7 @@ static void dyncfg_send_echo_status(const DICTIONARY_ITEM *item, DYNCFG *df, con
     char buf[strlen(id) + 100];
     snprintfz(buf, sizeof(buf), PLUGINSD_FUNCTION_CONFIG " %s %s", id, df->user_disabled ? "disable" : "enable");
 
-    rrd_function_run(df->host, e->wb, 10,
-                     HTTP_ACCESS_ADMINS, buf, false, NULL,
+    rrd_function_run(df->host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
                      dyncfg_echo_cb, e,
                      NULL, NULL,
                      NULL, NULL,
@@ -622,8 +621,7 @@ static void dyncfg_send_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, co
     char buf[strlen(id) + 100];
     snprintfz(buf, sizeof(buf), PLUGINSD_FUNCTION_CONFIG " %s %s", id, cmd);
 
-    rrd_function_run(df->host, e->wb, 10,
-                     HTTP_ACCESS_ADMINS, buf, false, NULL,
+    rrd_function_run(df->host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
                      dyncfg_echo_cb, e,
                      NULL, NULL,
                      NULL, NULL,
@@ -875,7 +873,7 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
 
     if(cmds != old_cmds) {
         CLEAN_BUFFER *t = buffer_create(1024, NULL);
-        buffer_sprintf(t, "DYNCFG: id '%s' was declared with cmds: ", t);
+        buffer_sprintf(t, "DYNCFG: id '%s' was declared with cmds: ", id);
         dyncfg_cmds2buffer(old_cmds, t);
         buffer_strcat(t, ", but they have sanitized to: ");
         dyncfg_cmds2buffer(cmds, t);
@@ -890,7 +888,8 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
 
     rrd_collector_started();
     rrd_function_add(host, NULL, name, 120, 1000,
-                     "Dynamic configuration", "config", HTTP_ACCESS_MEMBERS,
+                     "Dynamic configuration", "config",
+        HTTP_ACCESS_MEMBER,
                      sync, dyncfg_function_execute_cb, NULL);
 
     dyncfg_send_echo_status(item, df, id);
@@ -910,7 +909,7 @@ void dyncfg_add_streaming(BUFFER *wb) {
                    , 120
                    , "Dynamic configuration"
                    , "config"
-                   , http_id2access(HTTP_ACCESS_MEMBERS)
+                   , http_id2access(HTTP_ACCESS_MEMBER)
                    , 1000
     );
 }
@@ -1086,7 +1085,8 @@ static int dyncfg_config_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *
 
 void dyncfg_host_init(RRDHOST *host) {
     rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120,
-                     1000, "Dynamic configuration", "config", HTTP_ACCESS_MEMBERS,
+                     1000, "Dynamic configuration", "config",
+        HTTP_ACCESS_MEMBER,
                      true, dyncfg_config_execute_cb, host);
 }
 
@@ -1180,7 +1180,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload)
         buffer_strcat(pld, payload);
     }
 
-    int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMINS, cmd,
+    int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMIN, cmd,
                               true, NULL,
                               NULL, NULL,
                               NULL, NULL,

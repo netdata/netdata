@@ -127,9 +127,9 @@ static void http_header_x_netdata_role(struct web_client *w, const char *v, size
         char buffer[100];
         strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
         if (strcasecmp(buffer, "admin") == 0)
-            w->access = HTTP_ACCESS_ADMINS;
+            w->access = HTTP_ACCESS_ADMIN;
         else if(strcasecmp(buffer, "member") == 0)
-            w->access = HTTP_ACCESS_MEMBERS;
+            w->access = HTTP_ACCESS_MEMBER;
         else
             w->access = HTTP_ACCESS_ANY;
 
