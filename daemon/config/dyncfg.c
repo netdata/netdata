@@ -47,6 +47,7 @@ static struct {
     DYNCFG_SOURCE_TYPE source_type;
     const char *name;
 } dyncfg_source_types[] = {
+    { .source_type = DYNCFG_SOURCE_TYPE_INTERNAL, .name = "internal" },
     { .source_type = DYNCFG_SOURCE_TYPE_STOCK, .name = "stock" },
     { .source_type = DYNCFG_SOURCE_TYPE_USER, .name = "user" },
     { .source_type = DYNCFG_SOURCE_TYPE_DYNCFG, .name = "dyncfg" },
@@ -173,6 +174,19 @@ static void dyncfg_cmds2json_array(DYNCFG_CMDS cmds, const char *key, BUFFER *wb
             buffer_json_add_array_item_string(wb, cmd_map[i].name);
     }
     buffer_json_array_close(wb);
+}
+
+static void dyncfg_cmds2buffer(DYNCFG_CMDS cmds, BUFFER *wb) {
+    size_t added = 0;
+    for (size_t i = 0; i < sizeof(cmd_map) / sizeof(cmd_map[0]); i++) {
+        if(cmds & cmd_map[i].cmd) {
+            if(added)
+                buffer_fast_strcat(wb, " ", 1);
+
+            buffer_strcat(wb, cmd_map[i].name);
+            added++;
+        }
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -364,8 +378,10 @@ void dyncfg_save(const char *id, DYNCFG *df) {
 
     fprintf(fp, "path=%s\n", string2str(df->path));
     fprintf(fp, "type=%s\n", dyncfg_id2type(df->type));
+
     fprintf(fp, "source_type=%s\n", dyncfg_id2source_type(df->source_type));
     fprintf(fp, "source=%s\n", string2str(df->source));
+
     fprintf(fp, "created=%"PRIu64"\n", df->created_ut);
     fprintf(fp, "modified=%"PRIu64"\n", df->modified_ut);
     fprintf(fp, "sync=%s\n", df->sync ? "true" : "false");
@@ -831,6 +847,8 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
         return false;
     }
 
+    DYNCFG_CMDS old_cmds = cmds;
+
     // all configurations support schema
     cmds |= DYNCFG_CMD_SCHEMA;
 
@@ -852,6 +870,15 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
     else if(type == DYNCFG_TYPE_SINGLE) {
         // single cannot support "add" or "remove"
         cmds &= ~(DYNCFG_CMD_ADD | DYNCFG_CMD_REMOVE);
+    }
+
+    if(cmds != old_cmds) {
+        CLEAN_BUFFER *t = buffer_create(1024, NULL);
+        buffer_sprintf(t, "DYNCFG: id '%s' was declared with cmds: ", t);
+        dyncfg_cmds2buffer(old_cmds, t);
+        buffer_strcat(t, ", but they have sanitized to: ");
+        dyncfg_cmds2buffer(cmds, t);
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "%s", buffer_tostring(t));
     }
 
     const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds, created_ut, modified_ut, sync, execute_cb, execute_cb_data);
@@ -1149,14 +1176,14 @@ int dyncfg_unittest(void) {
     dyncfg_unittest_data.enabled = false;
     dyncfg_add(localhost, "unittest:sync:single", "/unittests",
                DYNCFG_STATUS_OK, DYNCFG_TYPE_SINGLE,
-               DYNCFG_SOURCE_TYPE_DYNCFG, LINE_FILE_STR,
+               DYNCFG_SOURCE_TYPE_INTERNAL, LINE_FILE_STR,
                DYNCFG_CMD_GET|DYNCFG_CMD_SCHEMA|DYNCFG_CMD_UPDATE|DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE,
                0, 0, true,
                dyncfg_unittest_execute_cb, &dyncfg_unittest_data);
 
     dyncfg_add(localhost, "unittest:sync:jobs", "/unittests",
                DYNCFG_STATUS_OK, DYNCFG_TYPE_TEMPLATE,
-               DYNCFG_SOURCE_TYPE_DYNCFG, LINE_FILE_STR,
+               DYNCFG_SOURCE_TYPE_INTERNAL, LINE_FILE_STR,
                DYNCFG_CMD_SCHEMA|DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE|DYNCFG_CMD_ADD|DYNCFG_CMD_RESTART,
                0, 0, true,
                dyncfg_unittest_execute_cb, &dyncfg_unittest_data);

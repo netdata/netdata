@@ -616,7 +616,8 @@ Where:
   - `template` is used to define a template based on which users can add multiple configurations, like adding data collection jobs. So, the plugin defines the template of the jobs and users are presented with a `[+]` button to add such configuration jobs. The plugin can define multiple templates by giving different `id`s to them.
   - `job` is used to define a job of a template. The plugin should always add all its jobs, independently of the way they have been discovered. It is important to note the relation between `template` and `job` when it comes it the `id`: The `id` of the template should be the prefix of the `job`'s `id`. For example, if the template is `go.d:postgresql:jobs`, then all its jobs be like `go.d:postgresql:jobs:jobname`. 
 - `path` is the absolute path of the configurable entity inside the tree of Netdata configurations. Usually, this is should be `/collectors`.
-- `source` can be `stock`, `user`, `discovered` or `dyncfg`:
+- `source` can be `internal`, `stock`, `user`, `discovered` or `dyncfg`:
+  - `internal` is used for configurations that are based on internal code settings
   - `stock` is used for default configurations
   - `user` is used for user configurations, usually via a configuration file
   - `discovered` is used for dynamic configurations the plugin discovers by its own

@@ -14,7 +14,8 @@ DYNCFG_TYPE dyncfg_type2id(const char *type);
 const char *dyncfg_id2type(DYNCFG_TYPE type);
 
 typedef enum __attribute__((packed)) {
-    DYNCFG_SOURCE_TYPE_STOCK = 0,
+    DYNCFG_SOURCE_TYPE_INTERNAL = 0,
+    DYNCFG_SOURCE_TYPE_STOCK,
     DYNCFG_SOURCE_TYPE_USER,
     DYNCFG_SOURCE_TYPE_DYNCFG,
     DYNCFG_SOURCE_TYPE_DISCOVERY,
