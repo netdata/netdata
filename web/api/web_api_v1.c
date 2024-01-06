@@ -1443,7 +1443,7 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
 }
 
 static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
-    char *action = NULL;
+    char *action = "tree";
     char *path = "/";
     char *id = NULL;
     int timeout = 120;

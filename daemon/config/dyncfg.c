@@ -474,15 +474,16 @@ static void dyncfg_load(const char *filename) {
             tmp.cmds = dyncfg_cmds2id(value);
         }
     }
-    fclose(fp);
 
     if(read_payload && content_length) {
         tmp.payload = buffer_create(content_length, NULL);
         tmp.payload->content_type = content_type;
 
         buffer_need_bytes(tmp.payload, content_length);
-        tmp.payload->len = fread(&tmp.payload->buffer, 1, content_length, fp);
+        tmp.payload->len = fread(tmp.payload->buffer, 1, content_length, fp);
     }
+
+    fclose(fp);
 
     if(!id) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -1141,28 +1142,52 @@ static int dyncfg_unittest_execute_cb(uuid_t *transaction, BUFFER *result_body_w
     cmd_copy[cmd_len] = '\0';
     DYNCFG_CMDS c = dyncfg_cmds2id(cmd_copy);
 
+    int code = HTTP_RESP_OK;
+
     if(c == DYNCFG_CMD_ENABLE)
         dyncfg_unittest_data.enabled = true;
     else if(c == DYNCFG_CMD_DISABLE)
         dyncfg_unittest_data.enabled = false;
+    else if(c == DYNCFG_CMD_UPDATE) {
+        if(!payload || !buffer_tostring(payload))
+            code = 32763;
+        else
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                   "DYNCFG: received update for '%s' with payload: %s",
+                   id_copy, buffer_tostring(payload));
+    }
+    else if(c == DYNCFG_CMD_ADD) {
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "DYNCFG: received add for '%s' with payload: %s",
+               id_copy, buffer_tostring(payload));
+    }
+    else
+        code = 32764;
 
     if(result_cb)
         result_cb(result_body_wb, HTTP_RESP_OK, result_cb_data);
 
-    return HTTP_RESP_OK;
+    return code;
 }
 
-static int dyncfg_unittest_run(const char *cmd, BUFFER *wb) {
+static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload) {
     buffer_flush(wb);
+
+    CLEAN_BUFFER *pld = NULL;
+
+    if(payload) {
+        pld = buffer_create(1024, NULL);
+        buffer_strcat(pld, payload);
+    }
 
     int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMINS, cmd,
                               true, NULL,
                               NULL, NULL,
                               NULL, NULL,
                               NULL, NULL,
-                              NULL);
+                              pld);
     if(rc != HTTP_RESP_OK) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s", cmd);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s; returned code %d", cmd, rc);
         dyncfg_unittest_data.errors++;
     }
 
@@ -1205,19 +1230,44 @@ int dyncfg_unittest(void) {
     int rc;
     BUFFER *wb = buffer_create(0, NULL);
 
-    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single enable", wb);
+    // ------------------------------------------------------------------------
+
+    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single enable", wb, NULL);
     if(rc == HTTP_RESP_OK && !dyncfg_unittest_data.enabled) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is not set");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is not set, code %d", rc);
         dyncfg_unittest_data.errors++;
     }
 
-    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single disable", wb);
+    // ------------------------------------------------------------------------
+
+    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single disable", wb, NULL);
     if(rc == HTTP_RESP_OK && dyncfg_unittest_data.enabled) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is set");
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is set, code %d", rc);
         dyncfg_unittest_data.errors++;
     }
 
-    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " tree", wb);
+    // ------------------------------------------------------------------------
+    DYNCFG *df;
+
+    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single update", wb, "hello world");
+    df = dictionary_get(dyncfg_globals.nodes, "unittest:sync:single");
+    if(rc == HTTP_RESP_OK && (!df || !df->payload || strcmp(buffer_tostring(df->payload), "hello world") != 0)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to update a single job");
+        dyncfg_unittest_data.errors++;
+    }
+
+    // ------------------------------------------------------------------------
+
+    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:jobs add master-db", wb, "master-db configuration instructions");
+    df = dictionary_get(dyncfg_globals.nodes, "unittest:sync:jobs:master-db");
+    if(rc == HTTP_RESP_OK && (!df || !df->payload || strcmp(buffer_tostring(df->payload), "master-db configuration instructions") != 0)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to test adding a job to an existing template");
+        dyncfg_unittest_data.errors++;
+    }
+
+    // ------------------------------------------------------------------------
+
+    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " tree", wb, NULL);
     if(rc == HTTP_RESP_OK)
         fprintf(stderr, "%s\n", buffer_tostring(wb));
 
