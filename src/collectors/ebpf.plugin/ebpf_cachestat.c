@@ -200,7 +200,7 @@ static int ebpf_cachestat_attach_probe(struct cachestat_bpf *obj)
     obj->links.netdata_add_to_page_cache_lru_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_add_to_page_cache_lru_kprobe,
                                                                                  false,
                                                                                  cachestat_targets[NETDATA_KEY_CALLS_ADD_TO_PAGE_CACHE_LRU].name);
-    int ret = libbpf_get_error(obj->links.netdata_add_to_page_cache_lru_kprobe);
+    long ret = libbpf_get_error(obj->links.netdata_add_to_page_cache_lru_kprobe);
     if (ret)
         return -1;
 
@@ -1015,7 +1015,7 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
 
     ebpf_one_dimension_write_charts(
         NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_DIRTY_CHART, ptr[NETDATA_CACHESTAT_IDX_DIRTY].dimension,
-        cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY]);
+        (long long)cachestat_hash_values[NETDATA_KEY_CALLS_MARK_BUFFER_DIRTY]);
 
     ebpf_one_dimension_write_charts(
         NETDATA_EBPF_MEMORY_GROUP, NETDATA_CACHESTAT_HIT_CHART, ptr[NETDATA_CACHESTAT_IDX_HIT].dimension, publish->hit);
@@ -1045,7 +1045,7 @@ void ebpf_cache_send_apps_data(struct ebpf_target *root)
 
         uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
         uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
-        w->cachestat.dirty = mbd;
+        w->cachestat.dirty = (long long)mbd;
         uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
         uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
 
@@ -1116,7 +1116,7 @@ void ebpf_cachestat_calc_chart_values()
 
         uint64_t mpa = current->mark_page_accessed - prev->mark_page_accessed;
         uint64_t mbd = current->mark_buffer_dirty - prev->mark_buffer_dirty;
-        ect->publish_cachestat.dirty = mbd;
+        ect->publish_cachestat.dirty = (long long)mbd;
         uint64_t apcl = current->add_to_page_cache_lru - prev->add_to_page_cache_lru;
         uint64_t apd = current->account_page_dirtied - prev->account_page_dirtied;
 

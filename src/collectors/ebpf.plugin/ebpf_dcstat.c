@@ -131,7 +131,7 @@ static int ebpf_dc_attach_probes(struct dc_bpf *obj)
     obj->links.netdata_d_lookup_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_d_lookup_kretprobe,
                                                                        true,
                                                                        dc_targets[NETDATA_DC_TARGET_D_LOOKUP].name);
-    int ret = libbpf_get_error(obj->links.netdata_d_lookup_kretprobe);
+    long ret = libbpf_get_error(obj->links.netdata_d_lookup_kretprobe);
     if (ret)
         return -1;
 
