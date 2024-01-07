@@ -113,6 +113,10 @@ typedef struct ebpf_pid_stat {
     // each process gets a unique number
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dc;
+    struct {
+        netdata_fd_stat_t fd;
+        int not_updated;
+    } publish_fd;
 
     struct ebpf_target *target;       // app_groups.conf targets
     struct ebpf_target *user_target;  // uid based targets
@@ -213,7 +217,6 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 extern ebpf_process_stat_t **global_process_stats;
 extern netdata_publish_swap_t **swap_pid;
 extern netdata_publish_vfs_t **vfs_pid;
-extern netdata_fd_stat_t **fd_pid;
 extern netdata_publish_shm_t **shm_pid;
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,

@@ -567,12 +567,6 @@ static void ebpf_fd_exit(void *ptr)
 
         ebpf_obsolete_fd_global(em);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_fd_pid)
-            ebpf_statistic_obsolete_aral_chart(em, fd_disable_priority);
-#endif
-
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
@@ -672,32 +666,13 @@ static void fd_apps_accumulator(netdata_fd_stat_t *out, int maps_per_core)
 }
 
 /**
- * Fill PID
- *
- * Fill PID structures
- *
- * @param current_pid pid that we are collecting data
- * @param out         values read from hash tables;
- */
-static void fd_fill_pid(uint32_t current_pid, netdata_fd_stat_t *publish)
-{
-    netdata_fd_stat_t *curr = fd_pid[current_pid];
-    if (!curr) {
-        curr = ebpf_fd_stat_get();
-        fd_pid[current_pid] = curr;
-    }
-
-    memcpy(curr, &publish[0], sizeof(netdata_fd_stat_t));
-}
-
-/**
  * Read APPS table
  *
  * Read the apps table and store data inside the structure.
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_read_dc_apps_table(int maps_per_core)
+static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
 {
     netdata_fd_stat_t *fv = fd_vector;
     int fd = fd_maps[NETDATA_FD_PID_STATS].map_fd;
@@ -713,7 +688,17 @@ static void ebpf_read_dc_apps_table(int maps_per_core)
 
         fd_apps_accumulator(fv, maps_per_core);
 
-        fd_fill_pid(key, fv);
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key);
+        if (pid_stat) {
+            netdata_fd_stat_t *publish_fd = &pid_stat->publish_fd.fd;
+            if (!publish_fd->ct || publish_fd->ct != fv->ct) {
+                memcpy(publish_fd, &fv[0], sizeof(netdata_fd_stat_t));
+                pid_stat->publish_fd.not_updated = 0;
+            } else if (++pid_stat->publish_fd.not_updated >= max_period) {
+                bpf_map_delete_elem(fd, &key);
+                pid_stat->publish_fd.not_updated = 0;
+            }
+        }
 
 end_fd_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -732,29 +717,21 @@ end_fd_loop:
  */
 static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *root)
 {
-    uint32_t open_call = 0;
-    uint32_t close_call = 0;
-    uint32_t open_err = 0;
-    uint32_t close_err = 0;
+    memset(fd, 0, sizeof(netdata_fd_stat_t));
 
     while (root) {
         int32_t pid = root->pid;
-        netdata_fd_stat_t *w = fd_pid[pid];
-        if (w) {
-            open_call += w->open_call;
-            close_call += w->close_call;
-            open_err += w->open_err;
-            close_err += w->close_err;
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid);
+        if (pid_stat) {
+            netdata_fd_stat_t *w = &pid_stat->publish_fd.fd;
+            fd->open_call += w->open_call;
+            fd->close_call += w->close_call;
+            fd->open_err += w->open_err;
+            fd->close_err += w->close_err;
         }
 
         root = root->next;
     }
-
-    // These conditions were added, because we are using incremental algorithm
-    fd->open_call = (open_call >= fd->open_call) ? open_call : fd->open_call;
-    fd->close_call = (close_call >= fd->close_call) ? close_call : fd->close_call;
-    fd->open_err = (open_err >= fd->open_err) ? open_err : fd->open_err;
-    fd->close_err = (close_err >= fd->close_err) ? close_err : fd->close_err;
 }
 
 /**
@@ -763,14 +740,12 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
 void ebpf_fd_resume_apps_data()
 {
     struct ebpf_target *w;
-    collected_number value;
 
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_FD_IDX))))
             continue;
 
         ebpf_fd_sum_pids(&w->fd, w->root_pid);
-
     }
 }
 
@@ -798,6 +773,7 @@ void *ebpf_read_fd_thread(void *ptr)
     uint32_t lifetime = em->lifetime;
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
+    int max_period = update_every * EBPF_CLEANUP_FACTOR;
     while (!ebpf_plugin_exit && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
         if (ebpf_plugin_exit || ++counter != update_every)
@@ -806,7 +782,7 @@ void *ebpf_read_fd_thread(void *ptr)
         netdata_thread_disable_cancelability();
 
         pthread_mutex_lock(&collect_data_mutex);
-        ebpf_read_dc_apps_table(maps_per_core);
+        ebpf_read_fd_apps_table(maps_per_core, max_period);
         ebpf_fd_resume_apps_data();
         pthread_mutex_unlock(&collect_data_mutex);
 
@@ -833,12 +809,9 @@ void *ebpf_read_fd_thread(void *ptr)
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_fd_cgroup(int maps_per_core)
+static void ebpf_update_fd_cgroup()
 {
     ebpf_cgroup_target_t *ect ;
-    netdata_fd_stat_t *fv = fd_vector;
-    int fd = fd_maps[NETDATA_FD_PID_STATS].map_fd;
-    size_t length = sizeof(netdata_fd_stat_t) * ebpf_nprocs;
 
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -846,17 +819,11 @@ static void ebpf_update_fd_cgroup(int maps_per_core)
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_fd_stat_t *out = &pids->fd;
-            if (likely(fd_pid) && fd_pid[pid]) {
-                netdata_fd_stat_t *in = fd_pid[pid];
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+            if (local_pid) {
+                netdata_fd_stat_t *in = &local_pid->publish_fd.fd;
 
                 memcpy(out, in, sizeof(netdata_fd_stat_t));
-            } else {
-                memset(fv, 0, length);
-                if (!bpf_map_lookup_elem(fd, &pid, fv)) {
-                    fd_apps_accumulator(fv, maps_per_core);
-
-                    memcpy(out, fv, sizeof(netdata_fd_stat_t));
-                }
             }
         }
     }
@@ -1203,14 +1170,9 @@ static void fd_collector(ebpf_module_t *em)
         ebpf_fd_read_global_tables(stats, maps_per_core);
 
         if (cgroups)
-            ebpf_update_fd_cgroup(maps_per_core);
+            ebpf_update_fd_cgroup();
 
         pthread_mutex_lock(&lock);
-
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_fd_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_fd_pid, em);
-#endif
 
         ebpf_fd_send_data(em);
 
@@ -1376,17 +1338,10 @@ static void ebpf_create_fd_global_charts(ebpf_module_t *em)
  *
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
- *
- * @param apps is apps enabled?
  */
-static void ebpf_fd_allocate_global_vectors(int apps)
+static inline void ebpf_fd_allocate_global_vectors()
 {
-    if (apps) {
-        ebpf_fd_aral_init();
-        fd_pid = callocz((size_t)pid_max, sizeof(netdata_fd_stat_t *));
-        fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
-    }
-
+    fd_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_fd_stat_t));
     fd_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 }
 
@@ -1450,7 +1405,7 @@ void *ebpf_fd_thread(void *ptr)
         goto endfd;
     }
 
-    ebpf_fd_allocate_global_vectors(em->apps_charts);
+    ebpf_fd_allocate_global_vectors();
 
     int algorithms[NETDATA_FD_SYSCALL_END] = {
         NETDATA_EBPF_INCREMENTAL_IDX, NETDATA_EBPF_INCREMENTAL_IDX
@@ -1463,13 +1418,8 @@ void *ebpf_fd_thread(void *ptr)
     ebpf_create_fd_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_fd_pid)
-        fd_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_FD_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
-
 
     ebpf_read_fd.thread = mallocz(sizeof(netdata_thread_t));
     netdata_thread_create(ebpf_read_fd.thread,

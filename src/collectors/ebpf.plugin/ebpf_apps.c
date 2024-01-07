@@ -10,7 +10,6 @@ ARAL *ebpf_aral_apps_pid_stat = NULL;
 ARAL *ebpf_aral_process_stat = NULL;
 ARAL *ebpf_aral_socket_pid = NULL;
 ARAL *ebpf_aral_vfs_pid = NULL;
-ARAL *ebpf_aral_fd_pid = NULL;
 ARAL *ebpf_aral_shm_pid = NULL;
 
 // ----------------------------------------------------------------------------
@@ -18,7 +17,6 @@ ARAL *ebpf_aral_shm_pid = NULL;
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 netdata_publish_swap_t **swap_pid = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
-netdata_fd_stat_t **fd_pid = NULL;
 netdata_publish_shm_t **shm_pid = NULL;
 ebpf_process_stat_t **global_process_stats = NULL;
 
@@ -166,46 +164,6 @@ netdata_publish_vfs_t *ebpf_vfs_get(void)
 void ebpf_vfs_release(netdata_publish_vfs_t *stat)
 {
     aral_freez(ebpf_aral_vfs_pid, stat);
-}
-
-/*****************************************************************
- *
- *  FD ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF file descriptor Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-void ebpf_fd_aral_init()
-{
-    ebpf_aral_fd_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_FD_ARAL_NAME, sizeof(netdata_fd_stat_t));
-}
-
-/**
- * eBPF publish file descriptor get
- *
- * Get a netdata_fd_stat_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_fd_stat_t *ebpf_fd_stat_get(void)
-{
-    netdata_fd_stat_t *target = aral_mallocz(ebpf_aral_fd_pid);
-    memset(target, 0, sizeof(netdata_fd_stat_t));
-    return target;
-}
-
-/**
- * eBPF file descriptor release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_fd_release(netdata_fd_stat_t *stat)
-{
-    aral_freez(ebpf_aral_fd_pid, stat);
 }
 
 /*****************************************************************
@@ -1155,12 +1113,6 @@ void cleanup_variables_from_other_threads(uint32_t pid)
     if (vfs_pid) {
         ebpf_vfs_release(vfs_pid[pid]);
         vfs_pid[pid] = NULL;
-    }
-
-    // Clean fd structure
-    if (fd_pid) {
-        ebpf_fd_release(fd_pid[pid]);
-        fd_pid[pid] = NULL;
     }
 
     // Clean shm structure
