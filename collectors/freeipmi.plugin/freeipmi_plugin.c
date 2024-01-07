@@ -1471,7 +1471,9 @@ static const char *get_sensor_function_priority(struct sensor *sn) {
     }
 }
 
-static void freeimi_function_sensors(const char *transaction, char *function __maybe_unused, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused) {
+static void freeimi_function_sensors(const char *transaction, char *function __maybe_unused,
+                                     usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+                                     BUFFER *payload __maybe_unused, void *data __maybe_unused) {
     time_t expires = now_realtime_sec() + update_every;
 
     BUFFER *wb = buffer_create(4096, NULL);
@@ -2045,7 +2047,7 @@ int main (int argc, char **argv) {
             struct functions_evloop_globals *wg =
                 functions_evloop_init(1, "FREEIPMI", &stdout_mutex, &function_plugin_should_exit);
             functions_evloop_add_function(
-                wg, "ipmi-sensors", freeimi_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+                wg, "ipmi-sensors", freeimi_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
             FREEIPMI_GLOBAL_FUNCTION_SENSORS();
         }
 

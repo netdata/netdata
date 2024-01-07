@@ -631,6 +631,8 @@ set(LIBNETDATA_FILES
         libnetdata/http/http_defs.h
         libnetdata/http/content_type.c
         libnetdata/http/content_type.h
+        libnetdata/config/dyncfg.c
+        libnetdata/config/dyncfg.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1026,6 +1028,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         collectors/systemd-journal.plugin/systemd-journal-files.c
         collectors/systemd-journal.plugin/systemd-journal-fstat.c
         collectors/systemd-journal.plugin/systemd-journal-watcher.c
+        collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
 )
 
 set(STREAMING_PLUGIN_FILES

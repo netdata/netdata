@@ -711,6 +711,7 @@ extern char *netdata_configured_host_prefix;
 #include "uuid/uuid.h"
 #include "http/http_access.h"
 #include "http/content_type.h"
+#include "config/dyncfg.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
 #include "os.h"

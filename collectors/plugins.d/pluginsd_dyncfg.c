@@ -9,8 +9,7 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CONFIG);
     if(!host) return PARSER_RC_ERROR;
 
-    size_t i = 0;
-
+    size_t i = 1;
     char *id     = get_word(words, num_words, i++);
     char *action = get_word(words, num_words, i++);
 
