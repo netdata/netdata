@@ -755,6 +755,10 @@ set(DAEMON_FILES
         daemon/config/dyncfg-files.c
         daemon/config/dyncfg-unittest.c
         daemon/config/dyncfg-inline.c
+        daemon/config/dyncfg-echo.c
+        daemon/config/dyncfg-internals.h
+        daemon/config/dyncfg-intercept.c
+        daemon/config/dyncfg-tree.c
 )
 
 set(H2O_FILES

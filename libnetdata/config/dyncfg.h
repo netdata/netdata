@@ -51,7 +51,7 @@ void dyncfg_cmds2json_array(DYNCFG_CMDS cmds, const char *key, struct web_buffer
 void dyncfg_cmds2fp(DYNCFG_CMDS cmds, FILE *fp);
 
 bool dyncfg_is_valid_id(const char *id);
-char *dyncfg_escape_id(const char *id);
+char *dyncfg_escape_id_for_filename(const char *id);
 
 #include "../clocks/clocks.h"
 #include "../buffer/buffer.h"

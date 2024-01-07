@@ -92,7 +92,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     functions_evloop_dyncfg_add(
         wg,
         "systemd-journal:monitored-directories",
-        "/collectors/logs",
+        "/collectors/logs/systemd-journal",
         DYNCFG_TYPE_TEMPLATE,
         DYNCFG_SOURCE_TYPE_INTERNAL,
         "internal",

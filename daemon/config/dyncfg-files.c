@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define DYNCFG_INTERNALS
+#include "dyncfg-internals.h"
 #include "dyncfg.h"
 
-void dyncfg_save(const char *id, DYNCFG *df) {
-    CLEAN_CHAR_P *escaped_id = dyncfg_escape_id(id);
+void dyncfg_file_delete(const char *id) {
+    CLEAN_CHAR_P *escaped_id = dyncfg_escape_id_for_filename(id);
+    char filename[FILENAME_MAX];
+    snprintfz(filename, sizeof(filename), "%s/%s.dyncfg", dyncfg_globals.dir, escaped_id);
+    unlink(filename);
+}
+
+void dyncfg_file_save(const char *id, DYNCFG *df) {
+    CLEAN_CHAR_P *escaped_id = dyncfg_escape_id_for_filename(id);
     char filename[FILENAME_MAX];
     snprintfz(filename, sizeof(filename), "%s/%s.dyncfg", dyncfg_globals.dir, escaped_id);
 
@@ -44,7 +51,7 @@ void dyncfg_save(const char *id, DYNCFG *df) {
     fclose(fp);
 }
 
-void dyncfg_load(const char *filename) {
+void dyncfg_file_load(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot open file '%s'", filename);
@@ -142,6 +149,28 @@ void dyncfg_load(const char *filename) {
     dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp));
 }
 
+void dyncfg_load_all(void) {
+    DIR *dir = opendir(dyncfg_globals.dir);
+    if (!dir) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot open directory '%s'", dyncfg_globals.dir);
+        return;
+    }
+
+    struct dirent *entry;
+    char filepath[PATH_MAX];
+    while ((entry = readdir(dir)) != NULL) {
+        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strendswith(entry->d_name, ".dyncfg")) {
+            snprintf(filepath, sizeof(filepath), "%s/%s", dyncfg_globals.dir, entry->d_name);
+            dyncfg_file_load(filepath);
+        }
+    }
+
+    closedir(dir);
+}
+
+// ----------------------------------------------------------------------------
+// schemas loading
+
 static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
     struct stat st = { 0 };
     if(stat(filename, &st) != 0)
@@ -178,23 +207,4 @@ bool dyncfg_get_schema(const char *id, BUFFER *dst) {
         return true;
 
     return false;
-}
-
-void dyncfg_load_all(void) {
-    DIR *dir = opendir(dyncfg_globals.dir);
-    if (!dir) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot open directory '%s'", dyncfg_globals.dir);
-        return;
-    }
-
-    struct dirent *entry;
-    char filepath[PATH_MAX];
-    while ((entry = readdir(dir)) != NULL) {
-        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strendswith(entry->d_name, ".dyncfg")) {
-            snprintf(filepath, sizeof(filepath), "%s/%s", dyncfg_globals.dir, entry->d_name);
-            dyncfg_load(filepath);
-        }
-    }
-
-    closedir(dir);
 }

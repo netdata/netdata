@@ -81,6 +81,8 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
+bool rrd_function_available(RRDHOST *host, const char *function);
+
 #include "rrdfunctions-inline.h"
 #include "rrdfunctions-inflight.h"
 #include "rrdfunctions-exporters.h"

@@ -347,3 +347,19 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
     return HTTP_RESP_OK;
 }
 
+bool rrd_function_available(RRDHOST *host, const char *function) {
+    if(!host || !host->functions)
+        return false;
+
+    bool ret = false;
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->functions, function);
+    if(item) {
+        struct rrd_host_function *rdcf = dictionary_acquired_item_value(item);
+        if(rrd_collector_running(rdcf->collector))
+            ret = true;
+
+        dictionary_acquired_item_release(host->functions, item);
+    }
+
+    return ret;
+}

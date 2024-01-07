@@ -20,6 +20,8 @@ struct inflight_function {
     usec_t sent_monotonic_ut;
     PARSER *parser;
 
+    bool sent_successfully;
+
     struct {
         rrd_function_result_callback_t cb;
         void *data;

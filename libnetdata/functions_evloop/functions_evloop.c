@@ -340,6 +340,11 @@ static void functions_evloop_config_cb(const char *transaction, char *function, 
 }
 
 void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data) {
+    if(!dyncfg_is_valid_id(id)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
+        return;
+    }
+
     struct dyncfg_node tmp = {
         .cmds = cmds,
         .type = type,
@@ -363,6 +368,11 @@ void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char
 }
 
 void functions_evloop_dyncfg_del(struct functions_evloop_globals *wg, const char *id) {
+    if(!dyncfg_is_valid_id(id)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
+        return;
+    }
+
     dictionary_del(wg->dyncfg.nodes, id);
 
     netdata_mutex_lock(wg->stdout_mutex);

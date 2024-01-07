@@ -197,7 +197,7 @@ bool dyncfg_is_valid_id(const char *id) {
     return true;
 }
 
-char *dyncfg_escape_id(const char *id) {
+char *dyncfg_escape_id_for_filename(const char *id) {
     if (id == NULL) return NULL;
 
     // Allocate memory for the worst case, where every character is escaped.
