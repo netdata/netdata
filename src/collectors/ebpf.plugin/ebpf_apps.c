@@ -1270,18 +1270,15 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 
     read_proc_filesystem();
 
-    uint32_t key;
     pids = ebpf_root_of_pids; // global list of all processes running
-    // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
 
     if (tbl_pid_stats_fd != -1) {
         size_t length =  sizeof(ebpf_process_stat_t);
         if (maps_per_core)
             length *= ebpf_nprocs;
 
-        while (pids) {
-            key = pids->pid;
-
+        uint32_t key = 0, next_key = 0;
+        while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
             ebpf_process_stat_t *w = global_process_stats[key];
             if (!w) {
                 w = ebpf_process_stat_get();
@@ -1289,23 +1286,16 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
             }
 
             if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
-                // Clean Process structures
-                ebpf_process_stat_release(w);
-                global_process_stats[key] = NULL;
-
-                cleanup_variables_from_other_threads(key);
-
-                pids = pids->next;
-                continue;
+                goto end_process_loop;
             }
 
             ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
 
             memcpy(w, process_stat_vector, sizeof(ebpf_process_stat_t));
 
+end_process_loop:
             memset(process_stat_vector, 0, length);
-
-            pids = pids->next;
+            key = next_key;
         }
     }
 
