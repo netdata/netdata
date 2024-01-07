@@ -83,8 +83,8 @@ struct journal_file {
 
 #define ND_SD_JOURNAL_OPEN_FLAGS (0)
 
-#define JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT (5 * USEC_PER_SEC) // assume always 5 seconds latency
-#define JOURNAL_VS_REALTIME_DELTA_MAX_UT (2 * 60 * USEC_PER_SEC) // up to 2 minutes latency
+#define JOURNAL_VS_REALTIME_DELTA_DEFAULT_UT (5 * USEC_PER_SEC) // assume a 5-seconds latency
+#define JOURNAL_VS_REALTIME_DELTA_MAX_UT (2 * 60 * USEC_PER_SEC) // up to 2-minutes latency
 
 extern DICTIONARY *journal_files_registry;
 extern DICTIONARY *used_hashes_registry;

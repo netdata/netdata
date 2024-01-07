@@ -142,6 +142,44 @@ void dyncfg_load(const char *filename) {
     dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp));
 }
 
+static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
+    struct stat st = { 0 };
+    if(stat(filename, &st) != 0)
+        return false;
+
+    buffer_flush(dst);
+    buffer_need_bytes(dst, st.st_size + 1); // +1 for the terminating zero
+
+    int fd = open(filename, O_RDONLY, 0666);
+    if(unlikely(fd == -1))
+        return false;
+
+    ssize_t r = read(fd, (char*)dst->buffer, st.st_size);
+    if(unlikely(r == -1)) {
+        close(fd);
+        return false;
+    }
+    dst->len = r;
+    dst->buffer[dst->len] = '\0';
+
+    close(fd);
+    return true;
+}
+
+bool dyncfg_get_schema(const char *id, BUFFER *dst) {
+    char filename[FILENAME_MAX + 1];
+
+    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", netdata_configured_user_config_dir, id);
+    if(dyncfg_read_file_to_buffer(filename, dst))
+        return true;
+
+    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", netdata_configured_stock_config_dir, id);
+    if(dyncfg_read_file_to_buffer(filename, dst))
+        return true;
+
+    return false;
+}
+
 void dyncfg_load_all(void) {
     DIR *dir = opendir(dyncfg_globals.dir);
     if (!dir) {

@@ -68,6 +68,8 @@ struct dyncfg_node {
 
 #define dyncfg_nodes_dictionary_create() dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dyncfg_node))
 
+int dyncfg_default_response(BUFFER *wb, int code, const char *msg);
+
 int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction, const char *function,
                               usec_t *stop_monotonic_ut, bool *cancelled,
                               BUFFER *payload, BUFFER *result);

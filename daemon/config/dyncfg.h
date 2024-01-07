@@ -42,6 +42,8 @@ void dyncfg_load_all(void);
 void dyncfg_load(const char *filename);
 void dyncfg_save(const char *id, DYNCFG *df);
 
+bool dyncfg_get_schema(const char *id, BUFFER *dst);
+
 void dyncfg_cleanup(DYNCFG *v);
 #endif
 

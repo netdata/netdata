@@ -365,38 +365,68 @@ static int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_w
         item = dictionary_get_and_acquire_item_advanced(dyncfg_globals.nodes, id, (ssize_t)id_len);
     }
 
+    int rc;
+
     if(!item) {
-        rrd_call_function_error(result_body_wb, "not found", HTTP_RESP_NOT_FOUND);
+        rc = HTTP_RESP_NOT_FOUND;
+        dyncfg_default_response(result_body_wb, rc, "dyncfg functions intercept: id is not found");
 
         if(result_cb)
-            result_cb(result_body_wb, HTTP_RESP_NOT_FOUND, result_cb_data);
+            result_cb(result_body_wb, rc, result_cb_data);
 
         return HTTP_RESP_NOT_FOUND;
     }
 
+    DYNCFG *df = dictionary_acquired_item_value(item);
+    const char *id = dictionary_acquired_item_name(item);
+
     if(c == DYNCFG_CMD_ADD && (!add_name || !*add_name || !add_name_len)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: add command does not specify a name: %s", function);
-        dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 
-        rrd_call_function_error(result_body_wb, "bad request, name is missing", HTTP_RESP_BAD_REQUEST);
+        rc = HTTP_RESP_BAD_REQUEST;
+        dyncfg_default_response(result_body_wb, rc, "dyncfg functions intercept: command add requires a name, which is missing");
 
         if(result_cb)
-            result_cb(result_body_wb, HTTP_RESP_BAD_REQUEST, result_cb_data);
+            result_cb(result_body_wb, rc, result_cb_data);
 
-        return HTTP_RESP_BAD_REQUEST;
+        goto cleanup;
+    }
+
+    if(c == DYNCFG_CMD_SCHEMA) {
+        bool loaded = false;
+        if(df->type == DYNCFG_TYPE_JOB) {
+            char template[strlen(id) + 1];
+            memcpy(template, id, sizeof(template));
+            char *colon = strrchr(template, ':');
+            if(colon) *colon = '\0';
+            if(template[0])
+                loaded = dyncfg_get_schema(template, result_body_wb);
+        }
+        else
+            loaded = dyncfg_get_schema(id, result_body_wb);
+
+        if(loaded) {
+            result_body_wb->content_type = CT_APPLICATION_JSON;
+            result_body_wb->expires = now_realtime_sec();
+            rc = HTTP_RESP_OK;
+
+            if(result_cb)
+                result_cb(result_body_wb, rc, result_cb_data);
+
+            goto cleanup;
+        }
     }
 
     struct dyncfg_call *dc = callocz(1, sizeof(*dc));
     dc->function = strdupz(function);
-    dc->id = strdupz(dictionary_acquired_item_name(item));
+    dc->id = strdupz(id);
     dc->add_name = (c == DYNCFG_CMD_ADD) ? strndupz(add_name, add_name_len) : NULL;
     dc->cmd = c;
     dc->result_cb = result_cb;
     dc->result_cb_data = result_cb_data;
     dc->payload = buffer_dup(payload);
 
-    DYNCFG *df = dictionary_acquired_item_value(item);
-    int rc = df->execute_cb(transaction, result_body_wb, payload,
+    rc = df->execute_cb(transaction, result_body_wb, payload,
                             stop_monotonic_ut, function, df->execute_cb_data,
                             dyncfg_function_result_cb, dc,
                             progress_cb, progress_cb_data,
@@ -404,6 +434,7 @@ static int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_w
                             register_canceller_cb, register_canceller_cb_data,
                             register_progresser_cb, register_progresser_cb_data);
 
+cleanup:
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     return rc;
 }

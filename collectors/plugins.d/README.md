@@ -624,7 +624,7 @@ Where:
   - `dyncfg` is used for configuration received via this dynamic configuration mechanism
 - `source` should provide more details about the exact source of the configuration, like `line@file`, or `user@ip`, etc.
 - `supported_commands` is a space separated list of the following keywords, enclosed in single or double quotes. These commands are used by the user interface to determine the actions the users can take:
-  - `schema`, to expose the JSON schema for the user interface. This is mandatory for all configurable entities.
+  - `schema`, to expose the JSON schema for the user interface. This is mandatory for all configurable entities. When `schema` requests are received, Netdata will first attempt to load the schema from `/etc/netdata/schema.d/` and `/var/lib/netdata/conf.d/schema.d`. For jobs, it will serve the schema of their template. If no schema is found for the required `id`, the `schema` request will be forwarded to the plugin, which is expected to send back the relevant schema.
   - `get`, to expose the current configuration values, according the schema defined. `templates` cannot support `get`, since they don't maintain any data.
   - `update`, to receive configuration updates for this entity. `templates` cannot support `update`, since they don't maintain any data.
   - `test`, like `update` but only test the configuration and report success or failure.
@@ -636,15 +636,21 @@ The plugin receives commands as if it had exposed a `FUNCTION` named `config`. N
 
 > config id command
 
-Where `id` is the unique id of the configurable entity and `command` is one of the supported commands the plugin sent to Netdata. The plugin will receive:
+Where `id` is the unique id of the configurable entity and `command` is one of the supported commands the plugin sent to Netdata.
 
-> FUNCTION transaction_id timeout "config id command"
+The plugin will receive (for commands: `schema`, `get`, `remove`, `enable` and `disable`):
 
-or:
+```
+FUNCTION transaction_id timeout "config id command"
+```
 
-> FUNCTION_PAYLOAD transaction_id timeout "config id command" "content/type"
-> body of the payload formatted according to content/type
-> FUNCTION_PAYLOAD_END
+or (for commands: `update`, `add` and `test`):
+
+```
+FUNCTION_PAYLOAD transaction_id timeout "config id command" "content/type"
+body of the payload formatted according to content/type
+FUNCTION_PAYLOAD_END
+```
 
 Once received, the plugin should process it and respond accordingly. 
 
@@ -652,9 +658,23 @@ Immediately after the plugin adds a configuration entity, if the commands `enabl
 
 Plugin responses follow the same format `FUNCTIONS` do:
 
-> FUNCTION_RESULT_BEGIN transaction_id http_response_code content/type expiration
-> body of the response formatted according to content/type
-> FUNCTION_RESULT_END
+```
+FUNCTION_RESULT_BEGIN transaction_id http_response_code content/type expiration
+body of the response formatted according to content/type
+FUNCTION_RESULT_END
+```
+
+Successful responses (HTTP response code 200) to `schema` and `get` should send back the relevant JSON object.
+All other responses should have the following response body:
+
+```json
+{
+  "status" : 404,
+  "message" : "some text"
+}
+```
+
+The user interface presents the message to users, even when the response is successful (HTTP code 200).
 
 ## Data collection
 
