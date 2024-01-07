@@ -753,14 +753,8 @@ end_cachestat_loop:
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_cachestat_cgroup(int maps_per_core)
+static void ebpf_update_cachestat_cgroup()
 {
-    netdata_cachestat_pid_t *cv = cachestat_vector;
-    int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
-    size_t length = sizeof(netdata_cachestat_pid_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
-
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -773,15 +767,6 @@ static void ebpf_update_cachestat_cgroup(int maps_per_core)
                 netdata_publish_cachestat_t *in = &local_pid->cachestat;
 
                 memcpy(out, &in->current, sizeof(netdata_cachestat_pid_t));
-            } else {
-                memset(cv, 0, length);
-                if (bpf_map_lookup_elem(fd, &pid, cv)) {
-                    continue;
-                }
-
-                cachestat_apps_accumulator(cv, maps_per_core);
-
-                memcpy(out, cv, sizeof(netdata_cachestat_pid_t));
             }
         }
     }
@@ -1389,7 +1374,7 @@ static void cachestat_collector(ebpf_module_t *em)
         ebpf_cachestat_read_global_tables(stats, maps_per_core);
 
         if (cgroups)
-            ebpf_update_cachestat_cgroup(maps_per_core);
+            ebpf_update_cachestat_cgroup();
 
         pthread_mutex_lock(&lock);
 

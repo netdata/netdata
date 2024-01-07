@@ -769,12 +769,8 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_dc_cgroup(int maps_per_core)
+static void ebpf_update_dc_cgroup()
 {
-    netdata_dcstat_pid_t *cv = dcstat_vector;
-    int fd = dcstat_maps[NETDATA_DCSTAT_PID_STATS].map_fd;
-    size_t length = sizeof(netdata_dcstat_pid_t)*ebpf_nprocs;
-
     ebpf_cgroup_target_t *ect;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
@@ -787,15 +783,6 @@ static void ebpf_update_dc_cgroup(int maps_per_core)
                 netdata_publish_dcstat_t *in = &local_pid->dc;
 
                 memcpy(out, &in->curr, sizeof(netdata_dcstat_pid_t));
-            } else {
-                memset(cv, 0, length);
-                if (bpf_map_lookup_elem(fd, &pid, cv)) {
-                    continue;
-                }
-
-                ebpf_dcstat_apps_accumulator(cv, maps_per_core);
-
-                memcpy(out, cv, sizeof(netdata_dcstat_pid_t));
             }
         }
     }
@@ -1259,7 +1246,7 @@ static void dcstat_collector(ebpf_module_t *em)
         ebpf_dc_read_global_tables(stats, maps_per_core);
 
         if (cgroups)
-            ebpf_update_dc_cgroup(maps_per_core);
+            ebpf_update_dc_cgroup();
 
         pthread_mutex_lock(&lock);
 
@@ -1326,10 +1313,8 @@ static void ebpf_create_dc_global_charts(int update_every)
  *
  * We are not testing the return, because callocz does this and shutdown the software
  * case it was not possible to allocate.
- *
- * @param apps is apps enabled?
  */
-static void ebpf_dcstat_allocate_global_vectors(int apps)
+static void ebpf_dcstat_allocate_global_vectors()
 {
     dcstat_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_dcstat_pid_t));
     dcstat_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
@@ -1408,7 +1393,7 @@ void *ebpf_dcstat_thread(void *ptr)
         goto enddcstat;
     }
 
-    ebpf_dcstat_allocate_global_vectors(em->apps_charts);
+    ebpf_dcstat_allocate_global_vectors();
 
     int algorithms[NETDATA_DCSTAT_IDX_END] = {
         NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX, NETDATA_EBPF_ABSOLUTE_IDX,
