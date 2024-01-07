@@ -5,6 +5,8 @@
 
 #include "../libnetdata.h"
 
+#define MAX_FUNCTION_PARAMETERS 1024
+
 #define PLUGINSD_KEYWORD_CHART                  "CHART"
 #define PLUGINSD_KEYWORD_CHART_DEFINITION_END   "CHART_DEFINITION_END"
 
@@ -117,8 +119,7 @@ static inline void pluginsd_function_progress_to_stdout(const char *transaction,
     fflush(stdout);
 }
 
-typedef int (*functions_evloop_dyncfg_cb_t)(const char *transaction, const char *id, DYNCFG_CMDS cmd, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, void *data);
-void functions_evloop_add_dyncfg(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, functions_evloop_dyncfg_cb_t cb, void *data);
-void functions_evloop_del_dyncfg(struct functions_evloop_globals *wg, const char *id);
+void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data);
+void functions_evloop_dyncfg_del(struct functions_evloop_globals *wg, const char *id);
 
 #endif //NETDATA_FUNCTIONS_EVLOOP_H

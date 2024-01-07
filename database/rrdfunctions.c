@@ -250,8 +250,8 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     if(st && !st->functions_view)
         st->functions_view = dictionary_create_view(host->functions);
 
-    char key[PLUGINSD_LINE_MAX + 1];
-    rrd_functions_sanitize(key, name, PLUGINSD_LINE_MAX);
+    char key[strlen(name) + 1];
+    rrd_functions_sanitize(key, name, sizeof(key));
 
     struct rrd_host_function tmp = {
         .sync = sync,
@@ -272,6 +272,17 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 
     dictionary_acquired_item_release(host->functions, item);
+}
+
+void rrd_function_del(RRDHOST *host, RRDSET *st, const char *name) {
+    char key[strlen(name) + 1];
+    rrd_functions_sanitize(key, name, sizeof(key));
+    dictionary_del(host->functions, key);
+
+    if(st)
+        dictionary_del(st->functions_view, key);
+    else
+        rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
 }
 
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {

@@ -53,4 +53,23 @@ void dyncfg_cmds2fp(DYNCFG_CMDS cmds, FILE *fp);
 bool dyncfg_is_valid_id(const char *id);
 char *dyncfg_escape_id(const char *id);
 
+#include "../clocks/clocks.h"
+#include "../buffer/buffer.h"
+#include "../dictionary/dictionary.h"
+
+typedef int (*dyncfg_cb_t)(const char *transaction, const char *id, DYNCFG_CMDS cmd, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *result, void *data);
+
+struct dyncfg_node {
+    DYNCFG_TYPE type;
+    DYNCFG_CMDS cmds;
+    dyncfg_cb_t cb;
+    void *data;
+};
+
+#define dyncfg_nodes_dictionary_create() dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dyncfg_node))
+
+int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction, const char *function,
+                              usec_t *stop_monotonic_ut, bool *cancelled,
+                              BUFFER *payload, BUFFER *result);
+
 #endif //LIBNETDATA_DYNCFG_H

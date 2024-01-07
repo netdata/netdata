@@ -21,17 +21,22 @@ static int rrd_function_run_inline(uuid_t *transaction __maybe_unused, BUFFER *w
 
     struct rrd_function_inline *fi = execute_cb_data;
 
-    int response = fi->cb(wb, function);
+    int code;
 
-    if(is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data)) {
+    if(is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data))
+        code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
+    else
+        code = fi->cb(wb, function);
+
+    if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data))) {
         buffer_flush(wb);
-        response = HTTP_RESP_CLIENT_CLOSED_REQUEST;
+        code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     }
 
     if(result_cb)
-        result_cb(wb, response, result_cb_data);
+        result_cb(wb, code, result_cb_data);
 
-    return response;
+    return code;
 }
 
 void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, const char *help, const char *tags,

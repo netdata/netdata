@@ -157,6 +157,6 @@ static inline bool parse_journal_field(const char *data, size_t data_length, con
     return true;
 }
 
-int systemd_journal_directories_dyncfg_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, void *data);
+int systemd_journal_directories_dyncfg_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *result, void *data);
 
 #endif //NETDATA_COLLECTORS_SYSTEMD_INTERNALS_H

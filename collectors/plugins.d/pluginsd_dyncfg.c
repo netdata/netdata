@@ -25,16 +25,27 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
         DYNCFG_SOURCE_TYPE source_type = dyncfg_source_type2id(source_type_str);
         DYNCFG_CMDS cmds = dyncfg_cmds2id(supported_cmds_str);
 
-        if(!dyncfg_add(host, id, path, status, type, source_type, source, cmds, 0, 0,
-                        false, pluginsd_function_execute_cb, parser))
+        if(!dyncfg_add_low_level(
+                host,
+                id,
+                path,
+                status,
+                type,
+                source_type,
+                source,
+                cmds,
+                0,
+                0,
+                false,
+                pluginsd_function_execute_cb,
+                parser))
             return PARSER_RC_ERROR;
     }
     else if(strcmp(action, "remove") == 0) {
-
+        dyncfg_del_low_level(host, id);
     }
-    else if(strcmp(action, "status") == 0) {
-
-    }
+    else
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "DYNCFG: unknown action '%s' received from plugin", action);
 
     parser->user.data_collections_count++;
     return PARSER_RC_OK;

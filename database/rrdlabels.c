@@ -448,7 +448,7 @@ __attribute__((constructor)) void initialize_labels_keys_char_map(void) {
     label_names_char_map[' '] = '_';
     label_names_char_map['\\'] = '/';
 
-    // create the spaces map
+    // create the space map
     for(i = 0; i < 256 ;i++)
         label_spaces_char_map[i] = (isspace(i) || iscntrl(i) || !isprint(i))?1:0;
 
@@ -460,8 +460,8 @@ __attribute__((constructor)) void initialize_label_stats(void) {
     dictionary_stats_category_rrdlabels.memory.values = 0;
 }
 
-size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length) {
-    if(unlikely(!dst_size)) return 0;
+size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_size, const unsigned char *char_map, bool utf, const char *empty, size_t *multibyte_length) {
+    if(unlikely(!src || !dst_size)) return 0;
 
     if(unlikely(!src || !*src)) {
         strncpyz((char *)dst, empty, dst_size);
@@ -476,7 +476,7 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
     // make room for the final string termination
     unsigned char *end = &d[dst_size - 1];
 
-    // copy while converting, but keep only one white space
+    // copy while converting, but keep only one space
     // we start wil last_is_space = 1 to skip leading spaces
     int last_is_space = 1;
 

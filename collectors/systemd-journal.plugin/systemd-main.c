@@ -89,11 +89,16 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
                                   NULL);
 #endif
 
-    functions_evloop_add_dyncfg(wg,
-                                "systemd-journal:monitored-directories", "/collectors/logs",
-                                DYNCFG_TYPE_TEMPLATE, DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
-                                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
-                                systemd_journal_directories_dyncfg_cb, NULL);
+    functions_evloop_dyncfg_add(
+        wg,
+        "systemd-journal:monitored-directories",
+        "/collectors/logs",
+        DYNCFG_TYPE_TEMPLATE,
+        DYNCFG_SOURCE_TYPE_INTERNAL,
+        "internal",
+        DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        systemd_journal_directories_dyncfg_cb,
+        NULL);
 
     // ------------------------------------------------------------------------
     // register functions to netdata

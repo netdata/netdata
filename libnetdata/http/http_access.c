@@ -23,7 +23,7 @@ HTTP_ACCESS http_access2id(const char *access) {
     }
 
     nd_log(NDLS_DAEMON, NDLP_WARNING, "HTTP access level '%s' is not valid", access);
-    return HTTP_ACCESS_MEMBER;
+    return HTTP_ACCESS_NONE;
 }
 
 const char *http_id2access(HTTP_ACCESS access) {
@@ -34,5 +34,5 @@ const char *http_id2access(HTTP_ACCESS access) {
     }
 
     nd_log(NDLS_DAEMON, NDLP_WARNING, "HTTP access level %d is not valid", access);
-    return "members";
+    return "none";
 }

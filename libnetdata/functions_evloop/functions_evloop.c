@@ -2,16 +2,7 @@
 
 #include "functions_evloop.h"
 
-#define MAX_FUNCTION_PARAMETERS 1024
-
 static void functions_evloop_config_cb(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, void *data);
-
-struct functions_evloop_dyncfg_node {
-    DYNCFG_TYPE type;
-    DYNCFG_CMDS cmds;
-    functions_evloop_dyncfg_cb_t cb;
-    void *data;
-};
 
 struct functions_evloop_worker_job {
     bool used;
@@ -183,7 +174,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
                 &reader,
                 fileno((FILE *)stdin),
                 2 * 60 * MSEC_PER_SEC,
-                true
+                false
             );
 
             if(unlikely(ret != BUFFERED_READER_READ_OK && ret != BUFFERED_READER_READ_POLL_TIMEOUT))
@@ -269,6 +260,9 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
         buffer_flush(buffer);
     }
 
+    if(!(*wg->plugin_should_exit))
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Read error on stdin");
+
     *wg->plugin_should_exit = true;
     exit(1);
 }
@@ -284,7 +278,7 @@ struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, co
     wg->worker_queue = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
     dictionary_register_delete_callback(wg->worker_queue, worker_queue_delete_cb, NULL);
 
-    wg->dyncfg.nodes = dictionary_create(DICT_OPTION_NONE);
+    wg->dyncfg.nodes = dyncfg_nodes_dictionary_create();
 
     pthread_mutex_init(&wg->worker_mutex, NULL);
     pthread_cond_init(&wg->worker_cond_var, NULL);
@@ -331,56 +325,22 @@ void functions_evloop_cancel_threads(struct functions_evloop_globals *wg){
 // ----------------------------------------------------------------------------
 
 static void functions_evloop_config_cb(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
-                                       BUFFER *payload __maybe_unused, void *data) {
+                                       BUFFER *payload, void *data) {
     struct functions_evloop_globals *wg = data;
 
-    char buf[strlen(function) + 1];
-    memcpy(buf, function, sizeof(buf));
-
-    char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
-    size_t num_words = quoted_strings_splitter_pluginsd(buf, words, MAX_FUNCTION_PARAMETERS);
-
-    const char *id = get_word(words, num_words, 1);
-    const char *action = get_word(words, num_words, 2);
-
-    if(!id || !*id || !action || !*action) {
-        netdata_mutex_lock(wg->stdout_mutex);
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, "configuration requests require an id and a command");
-        netdata_mutex_unlock(wg->stdout_mutex);
-        return;
-    }
-
-    DYNCFG_CMDS cmd = dyncfg_cmds2id(action);
-    if(cmd == DYNCFG_CMD_NONE) {
-        netdata_mutex_lock(wg->stdout_mutex);
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, "the configuration command is not understood");
-        netdata_mutex_unlock(wg->stdout_mutex);
-        return;
-    }
-
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(wg->dyncfg.nodes, id);
-    if(!item) {
-        netdata_mutex_lock(wg->stdout_mutex);
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_NOT_FOUND, "there is no dynamic configuration with this id");
-        netdata_mutex_unlock(wg->stdout_mutex);
-        return;
-    }
-    struct functions_evloop_dyncfg_node *df = dictionary_acquired_item_value(item);
-
-    int code = df->cb(transaction, id, cmd, payload, stop_monotonic_ut, cancelled, df->data);
+    CLEAN_BUFFER *result = buffer_create(1024, NULL);
+    int code = dyncfg_node_find_and_call(wg->dyncfg.nodes, transaction, function, stop_monotonic_ut, cancelled, payload, result);
 
     netdata_mutex_lock(wg->stdout_mutex);
-    pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
+    pluginsd_function_result_begin_to_stdout(transaction, code, content_type_id2string(result->content_type), result->expires);
+    printf("%s", buffer_tostring(result));
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
     netdata_mutex_unlock(wg->stdout_mutex);
-
-    dictionary_acquired_item_release(wg->dyncfg.nodes, item);
 }
 
-void functions_evloop_add_dyncfg(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, functions_evloop_dyncfg_cb_t cb, void *data) {
-
-    struct functions_evloop_dyncfg_node tmp = {
+void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data) {
+    struct dyncfg_node tmp = {
         .cmds = cmds,
         .type = type,
         .cb = cb,
@@ -402,7 +362,7 @@ void functions_evloop_add_dyncfg(struct functions_evloop_globals *wg, const char
     netdata_mutex_unlock(wg->stdout_mutex);
 }
 
-void functions_evloop_del_dyncfg(struct functions_evloop_globals *wg, const char *id) {
+void functions_evloop_dyncfg_del(struct functions_evloop_globals *wg, const char *id) {
     dictionary_del(wg->dyncfg.nodes, id);
 
     netdata_mutex_lock(wg->stdout_mutex);

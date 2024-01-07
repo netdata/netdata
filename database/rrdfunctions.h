@@ -70,6 +70,8 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
                       HTTP_ACCESS access, bool sync, rrd_function_execute_cb_t execute_cb,
                       void *execute_cb_data);
 
+void rrd_function_del(RRDHOST *host, RRDSET *st, const char *name);
+
 // call a function, to be run from anywhere
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCESS access, const char *cmd,
                      bool wait, const char *transaction,

@@ -223,3 +223,62 @@ char *dyncfg_escape_id(const char *id) {
 
 // ----------------------------------------------------------------------------
 
+int dyncfg_default_response(BUFFER *wb, int code, const char *msg) {
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_realtime_sec();
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    buffer_json_member_add_uint64(wb, "status", code);
+    buffer_json_member_add_string(wb, "message", msg);
+    buffer_json_finalize(wb);
+
+    return code;
+}
+
+int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction, const char *function,
+                              usec_t *stop_monotonic_ut, bool *cancelled,
+                              BUFFER *payload, BUFFER *result) {
+    if(!function || !*function)
+        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "command received is empty");
+
+    char buf[strlen(function) + 1];
+    memcpy(buf, function, sizeof(buf));
+
+    char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
+    size_t num_words = quoted_strings_splitter_pluginsd(buf, words, MAX_FUNCTION_PARAMETERS);
+
+    const char *id = get_word(words, num_words, 1);
+    const char *action = get_word(words, num_words, 2);
+
+    if(!id || !*id)
+        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "dyncfg node: id is missing from the request");
+
+    if(!action || !*action)
+        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "dyncfg node: action is missing from the request");
+
+    DYNCFG_CMDS cmd = dyncfg_cmds2id(action);
+    if(cmd == DYNCFG_CMD_NONE)
+        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "dyncfg node: action given in request is unknown");
+
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_nodes, id);
+    if(!item)
+        return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "dyncfg node: id is not found");
+
+    struct dyncfg_node *df = dictionary_acquired_item_value(item);
+
+    buffer_flush(result);
+    result->content_type = CT_APPLICATION_JSON;
+
+    int code = df->cb(transaction, id, cmd, payload, stop_monotonic_ut, cancelled, result, df->data);
+
+    if(!result->expires)
+        result->expires = now_realtime_sec();
+
+    if(!buffer_tostring(result))
+        dyncfg_default_response(result, code, "");
+
+    dictionary_acquired_item_release(dyncfg_nodes, item);
+
+    return code;
+}

@@ -752,6 +752,9 @@ set(DAEMON_FILES
         daemon/unit_test.h
         daemon/config/dyncfg.c
         daemon/config/dyncfg.h
+        daemon/config/dyncfg-files.c
+        daemon/config/dyncfg-unittest.c
+        daemon/config/dyncfg-inline.c
 )
 
 set(H2O_FILES
