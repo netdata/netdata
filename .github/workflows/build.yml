@@ -204,7 +204,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: static-archive-${{ matrix.arch }}
+          name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
           retention-days: 30
       - name: Failure Notification
@@ -576,26 +576,15 @@ jobs:
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: mkdir -p artifacts
-      - name: Retrieve Dist Tarball
+      - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
         uses: Wandalen/wretry.action@v1
         with:
           action: actions/download-artifact@v4
           with: |
-            name: dist-tarball
-            path: dist-tarball
-          attempt_limit: 3
-          attempt_delay: 2000
-      - name: Retrieve Static Build Artifacts
-        id: fetch-static
-        if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v1
-        with:
-          action: actions/download-artifact@v4
-          with: |
-            pattern: static-archive-*
-            path: static-archive
+            pattern: dist-*
+            path: dist-artifacts
             merge-multiple: true
           attempt_limit: 3
           attempt_delay: 2000
@@ -604,8 +593,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         working-directory: ./artifacts/
         run: |
-          mv ../dist-tarball/* . || exit 1
-          mv ../static-archive/* . || exit 1
+          mv ../dist-artifacts/* . || exit 1
           ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
           cp ../packaging/version ./latest-version.txt || exit 1
           cp ../integrations/integrations.js ./integrations.js || exit 1
