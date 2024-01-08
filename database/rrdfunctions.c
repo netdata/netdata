@@ -228,7 +228,7 @@ void rrd_functions_host_destroy(RRDHOST *host) {
 static inline bool is_function_dyncfg(const char *name) {
     return (name &&
             *name &&
-            strncmp(name, PLUGINSD_FUNCTION_CONFIG, sizeof(PLUGINSD_FUNCTION_CONFIG)) == 0 &&
+            strncmp(name, PLUGINSD_FUNCTION_CONFIG, sizeof(PLUGINSD_FUNCTION_CONFIG) - 1) == 0 &&
             (name[sizeof(PLUGINSD_FUNCTION_CONFIG)] == 0 || isspace(name[sizeof(PLUGINSD_FUNCTION_CONFIG)]))
             );
 }

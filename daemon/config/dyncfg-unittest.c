@@ -404,7 +404,7 @@ int dyncfg_unittest(void) {
     dyncfg_unittest_add(&taj1);
     dyncfg_unittest_check(&taj1, "taj1-1", true);
 
-    
+
 
     
 
