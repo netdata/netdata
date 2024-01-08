@@ -42,7 +42,10 @@ void dyncfg_file_save(const char *id, DYNCFG *df) {
     fprintf(fp, "sync=%s\n", df->sync ? "true" : "false");
     fprintf(fp, "user_disabled=%s\n", df->user_disabled ? "true" : "false");
     fprintf(fp, "saves=%"PRIu32"\n", ++df->saves);
+
+    fprintf(fp, "cmds=");
     dyncfg_cmds2fp(df->cmds, fp);
+    fprintf(fp, "\n");
 
     if(df->payload && buffer_strlen(df->payload) > 0) {
         fprintf(fp, "content_type=%s\n", content_type_id2string(df->payload->content_type));

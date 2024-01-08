@@ -163,12 +163,10 @@ DYNCFG_CMDS dyncfg_cmds2id(const char *cmds) {
 }
 
 void dyncfg_cmds2fp(DYNCFG_CMDS cmds, FILE *fp) {
-    fprintf(fp, "cmds=");
     for (size_t i = 0; i < sizeof(cmd_map) / sizeof(cmd_map[0]); i++) {
         if(cmds & cmd_map[i].cmd)
             fprintf(fp, "%s ", cmd_map[i].name);
     }
-    fprintf(fp, "\n");
 }
 
 void dyncfg_cmds2json_array(DYNCFG_CMDS cmds, const char *key, BUFFER *wb) {

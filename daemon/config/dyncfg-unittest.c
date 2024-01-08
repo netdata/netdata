@@ -29,6 +29,8 @@ typedef struct {
     bool sync;
     DYNCFG_TYPE type;
     DYNCFG_CMDS cmds;
+    DYNCFG_SOURCE_TYPE source_type;
+
     TEST_CFG current;
     TEST_CFG expected;
 
@@ -57,13 +59,13 @@ static int dyncfg_unittest_action(struct dyncfg_unittest_action *a) {
     else if(a->cmd == DYNCFG_CMD_DISABLE)
         t->current.enabled = false;
     else if(a->cmd == DYNCFG_CMD_ADD) {
-
+        // TODO add the node by parsing the json payload
     }
     else if(a->cmd == DYNCFG_CMD_UPDATE) {
-
+        // TODO update the node by parsing the json payload
     }
     else if(a->cmd == DYNCFG_CMD_REMOVE) {
-
+        t->current.removed = true;
     }
 
     a->result_cb(a->result, rc, a->result_cb_data);
@@ -112,38 +114,58 @@ static int dyncfg_unittest_execute_cb(uuid_t *transaction __maybe_unused, BUFFER
     const char *add_name = get_word(words, num_words, 3);
 
     if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0) {
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "did not receive a config call");
+        char *msg = "did not receive a config call";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
         dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     if(!id || !*id) {
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "did not receive an id");
+        char *msg = "did not receive an id";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
         dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     if(strcmp(t->id, id) != 0) {
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "id received is not the expected");
+        char *msg = "id received is not the expected";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
         dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     if(!action || !*action) {
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "did not receive an action");
+        char *msg = "did not receive an action";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
         dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     DYNCFG_CMDS cmd = dyncfg_cmds2id(action);
     if(cmd == DYNCFG_CMD_NONE) {
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "action received is not known");
+        char *msg = "action received is not known";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
         dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     if(!(t->cmds & cmd)) {
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "received a command that is not supported");
+        char *msg = "received a command that is not supported";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+        dyncfg_unittest_data.errors++;
+        goto cleanup;
+    }
+
+    if(t->current.removed && cmd != DYNCFG_CMD_ADD) {
+        char *msg = "received a command for a removed entry";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
         dyncfg_unittest_data.errors++;
         goto cleanup;
     }
@@ -228,7 +250,7 @@ static void dyncfg_unittest_add(TEST *t) {
     dictionary_set(dyncfg_unittest_data.nodes, t->id, &t, sizeof(*t));
 
     if(!dyncfg_add_low_level(localhost, t->id, "/unittests", DYNCFG_STATUS_OK, t->type,
-        DYNCFG_SOURCE_TYPE_INTERNAL, LINE_FILE_STR,
+        t->source_type, LINE_FILE_STR,
         t->cmds, 0, 0, t->sync, dyncfg_unittest_execute_cb, t)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: test '%s' is not accepted", t->id);
         dyncfg_unittest_data.errors++;
@@ -287,6 +309,20 @@ static void dyncfg_unittest_check(TEST *t, const char *name, bool received) {
         errors++;
     }
 
+    DYNCFG *df = dictionary_get(dyncfg_globals.nodes, t->id);
+    if(!df) {
+        fprintf(stderr, "\n  - not found in DYNCFG nodes dictionary!");
+        errors++;
+    }
+    else if(df->cmds != t->cmds) {
+        fprintf(stderr, "\n  - has different cmds in DYNCFG nodes dictionary; found: ");
+        dyncfg_cmds2fp(df->cmds, stderr);
+        fprintf(stderr, ", expected: ");
+        dyncfg_cmds2fp(t->cmds, stderr);
+        fprintf(stderr, "\n");
+        errors++;
+    }
+
 cleanup:
     if(errors)
         fprintf(stderr, "\n  >>> FAILED\n\n");
@@ -307,6 +343,7 @@ int dyncfg_unittest(void) {
         .id = "unittest:sync:single1",
         .type = DYNCFG_TYPE_SINGLE,
         .cmds = DYNCFG_CMD_GET | DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = true,
         .expected = {
             .enabled = true,
@@ -319,6 +356,7 @@ int dyncfg_unittest(void) {
         .id = "unittest:async:single1",
         .type = DYNCFG_TYPE_SINGLE,
         .cmds = DYNCFG_CMD_GET | DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = false,
         .expected = {
             .enabled = true,
@@ -331,6 +369,7 @@ int dyncfg_unittest(void) {
         .id = "unittest:sync:template1",
         .type = DYNCFG_TYPE_TEMPLATE,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = true,
         .expected = {
             .enabled = true,
@@ -343,6 +382,7 @@ int dyncfg_unittest(void) {
         .id = "unittest:async:template1",
         .type = DYNCFG_TYPE_TEMPLATE,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = false,
         .expected = {
             .enabled = true,
@@ -354,7 +394,8 @@ int dyncfg_unittest(void) {
     TEST taj1 = {
         .id = "unittest:async:job1",
         .type = DYNCFG_TYPE_JOB,
-        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_REMOVE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = false,
         .expected = {
             .enabled = true,
@@ -363,6 +404,9 @@ int dyncfg_unittest(void) {
     dyncfg_unittest_add(&taj1);
     dyncfg_unittest_check(&taj1, "taj1-1", true);
 
+    
+
+    
 
 //    int rc;
 //    BUFFER *wb = buffer_create(0, NULL);

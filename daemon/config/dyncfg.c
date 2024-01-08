@@ -282,6 +282,9 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
     const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds, created_ut, modified_ut, sync, execute_cb, execute_cb_data);
     DYNCFG *df = dictionary_acquired_item_value(item);
 
+    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "DYNCFG: configuration '%s' is created with source type dyncfg, but we don't have a saved configuration for it", id);
+
     rrd_collector_started();
     rrd_function_add(host, NULL, string2str(df->function), 120, 1000,
                      "Dynamic configuration", "config",HTTP_ACCESS_MEMBER,
