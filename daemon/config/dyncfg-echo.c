@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define RRD_COLLECTOR_INTERNALS
-#define RRD_FUNCTIONS_INTERNALS
-
 #include "dyncfg-internals.h"
 #include "dyncfg.h"
 

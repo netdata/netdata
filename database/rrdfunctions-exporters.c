@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #define NETDATA_RRD_INTERNALS
-#define RRD_COLLECTOR_INTERNALS
-#define RRD_FUNCTIONS_INTERNALS
 
+#include "rrdfunctions-internals.h"
 #include "rrdfunctions-exporters.h"
 
 void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {

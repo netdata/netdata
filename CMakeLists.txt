@@ -978,6 +978,8 @@ set(RRD_PLUGIN_FILES
         database/rrdfunctions-inflight.h
         database/rrdfunctions-exporters.c
         database/rrdfunctions-exporters.h
+        database/rrdfunctions-internals.h
+        database/rrdcollector-internals.h
 )
 
 if(ENABLE_DBENGINE)

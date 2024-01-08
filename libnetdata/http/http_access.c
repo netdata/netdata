@@ -10,6 +10,10 @@ static struct {
     { .access = HTTP_ACCESS_MEMBER, .name = "member" },
     { .access = HTTP_ACCESS_ADMIN, .name = "admin" },
     { .access = HTTP_ACCESS_ANY, .name = "any" },
+
+    { .access = HTTP_ACCESS_MEMBER, .name = "members" },
+    { .access = HTTP_ACCESS_ADMIN, .name = "admins" },
+    { .access = HTTP_ACCESS_ANY, .name = "all" },
 };
 
 HTTP_ACCESS http_access2id(const char *access) {

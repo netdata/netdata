@@ -3,12 +3,11 @@
 #ifndef NETDATA_DYNCFG_INTERNALS_H
 #define NETDATA_DYNCFG_INTERNALS_H
 
-#define RRD_COLLECTOR_INTERNALS
-#define RRD_FUNCTIONS_INTERNALS
-
 #include "../common.h"
 #include "../../database/rrd.h"
 #include "../../database/rrdfunctions.h"
+#include "../../database/rrdfunctions-internals.h"
+#include "../../database/rrdcollector-internals.h"
 
 typedef struct dyncfg {
     RRDHOST *host;

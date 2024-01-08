@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #define NETDATA_RRD_INTERNALS
-#define RRD_COLLECTOR_INTERNALS
-#define RRD_FUNCTIONS_INTERNALS
+
 #include "rrd.h"
+#include "rrdfunctions-internals.h"
 
 #define MAX_FUNCTION_LENGTH (PLUGINSD_LINE_MAX - 512) // we need some space for the rest of the line
 
