@@ -10,11 +10,9 @@ static netdata_mutex_t aclk_query_queue_mutex = NETDATA_MUTEX_INITIALIZER;
 
 static struct aclk_query_queue {
     aclk_query_t head;
-    aclk_query_t tail;
     int block_push;
 } aclk_query_queue = {
     .head = NULL,
-    .tail = NULL,
     .block_push = 0
 };
 
@@ -31,15 +29,7 @@ static inline int _aclk_queue_query(aclk_query_t query)
         aclk_query_free(query);
         return 1;
     }
-    if (!aclk_query_queue.head) {
-        aclk_query_queue.head = query;
-        aclk_query_queue.tail = query;
-        ACLK_QUEUE_UNLOCK;
-        return 0;
-    }
-    // TODO deduplication
-    aclk_query_queue.tail->next = query;
-    aclk_query_queue.tail = query;
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(aclk_query_queue.head, query, prev, next);
     ACLK_QUEUE_UNLOCK;
     return 0;
 
@@ -77,9 +67,7 @@ aclk_query_t aclk_queue_pop(void)
         return ret;
     }
 
-    aclk_query_queue.head = ret->next;
-    if (unlikely(!aclk_query_queue.head))
-        aclk_query_queue.tail = aclk_query_queue.head;
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(aclk_query_queue.head, ret, prev, next);
     ACLK_QUEUE_UNLOCK;
 
     ret->next = NULL;

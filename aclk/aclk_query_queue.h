@@ -55,7 +55,7 @@ struct aclk_query {
     struct timeval created_tv;
     usec_t created;
     int timeout;
-    aclk_query_t next;
+    aclk_query_t prev, next;
 
     // TODO maybe remove?
     int version;
