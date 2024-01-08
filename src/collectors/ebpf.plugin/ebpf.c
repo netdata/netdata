@@ -4047,19 +4047,17 @@ int main(int argc, char **argv)
             fflush(stdout);
         }
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        pthread_mutex_lock(&collect_data_mutex);
         if (++update_apps_list == update_apps_every) {
             update_apps_list = 0;
+            pthread_mutex_lock(&lock);
+            pthread_mutex_lock(&collect_data_mutex);
             cleanup_exited_pids();
             collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
-            pthread_mutex_lock(&lock);
             ebpf_create_apps_charts(apps_groups_root_target);
+            pthread_mutex_unlock(&collect_data_mutex);
             pthread_mutex_unlock(&lock);
         }
-        pthread_mutex_unlock(&collect_data_mutex);
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
     ebpf_stop_threads(0);
