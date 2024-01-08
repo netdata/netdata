@@ -652,9 +652,9 @@ void *ebpf_read_dcstat_thread(void *ptr)
             continue;
 
         netdata_thread_disable_cancelability();
-        ebpf_read_dc_apps_table(maps_per_core, max_period);
 
         pthread_mutex_lock(&collect_data_mutex);
+        ebpf_read_dc_apps_table(maps_per_core, max_period);
         ebpf_dc_resume_apps_data();
         pthread_mutex_unlock(&collect_data_mutex);
 
