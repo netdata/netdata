@@ -226,11 +226,17 @@ void rrd_functions_host_destroy(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 
 static inline bool is_function_dyncfg(const char *name) {
-    return (name &&
-            *name &&
-            strncmp(name, PLUGINSD_FUNCTION_CONFIG, sizeof(PLUGINSD_FUNCTION_CONFIG) - 1) == 0 &&
-            (name[sizeof(PLUGINSD_FUNCTION_CONFIG)] == 0 || isspace(name[sizeof(PLUGINSD_FUNCTION_CONFIG)]))
-            );
+    if(!name || !*name)
+        return false;
+
+    if(strncmp(name, PLUGINSD_FUNCTION_CONFIG, sizeof(PLUGINSD_FUNCTION_CONFIG) - 1) != 0)
+        return false;
+
+    char c = name[sizeof(PLUGINSD_FUNCTION_CONFIG) - 1];
+    if(c == 0 || isspace(c))
+        return true;
+
+    return false;
 }
 
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
