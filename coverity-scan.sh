@@ -42,11 +42,19 @@ INSTALL_DIR="/opt"
 # the version of coverity to use
 COVERITY_BUILD_VERSION="${COVERITY_BUILD_VERSION:-cov-analysis-linux64-2023.6.2}"
 
-# TODO: For some reasons this does not fully load on Debian 10 (Haven't checked if it happens on other distros yet), it breaks
-source packaging/installer/functions.sh || echo "Failed to fully load the functions library"
+. packaging/installer/functions.sh
 
-cpus=$(find_processors)
-[ -z "${cpus}" ] && cpus=1
+JOBS=$(find_processors)
+[ -z "${JOBS}" ] && JOBS=1
+
+if command -v ninja 2>&1; then
+    ninja="$(command -v ninja)"
+fi
+
+CMAKE_OPTS="${ninja:+-G Ninja}"
+BUILD_OPTS="VERBOSE=1"
+[ -n "${ninja}" ] && BUILD_OPTS="-v"
+NETDATA_BUILD_DIR="${NETDATA_BUILD_DIR:-./cmake-build-release/}"
 
 if [ -f ".coverity-scan.conf" ]; then
   source ".coverity-scan.conf"
@@ -102,19 +110,20 @@ scanit() {
   progress "Working on netdata version: ${version}"
 
   progress "Cleaning up old builds..."
-  run make clean || echo >&2 "Nothing to clean"
+  rm -rf "${NETDATA_BUILD_DIR}"
 
   [ -d "cov-int" ] && rm -rf "cov-int"
 
   [ -f netdata-coverity-analysis.tgz ] && run rm netdata-coverity-analysis.tgz
 
   progress "Configuring netdata source..."
+  USE_SYSTEM_PROTOBUF=1
+  prepare_cmake_options
 
-  run autoreconf -ivf
-  run ./configure ${OTHER_OPTIONS}
+  run cmake ${NETDATA_CMAKE_OPTIONS}
 
   progress "Analyzing netdata..."
-  run "${covbuild}" --dir cov-int make -j${cpus}
+  run "${covbuild}" --dir cov-int cmake --build "${NETDATA_BUILD_DIR}" --parallel ${JOBS} -- ${BUILD_OPTS}
 
   echo >&2 "Compressing analysis..."
   run tar czvf netdata-coverity-analysis.tgz cov-int
@@ -169,21 +178,6 @@ installit() {
   [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
   return 0
 }
-
-OTHER_OPTIONS="--disable-lto"
-OTHER_OPTIONS+=" --with-zlib"
-OTHER_OPTIONS+=" --with-math"
-OTHER_OPTIONS+=" --enable-lz4"
-OTHER_OPTIONS+=" --enable-openssl"
-OTHER_OPTIONS+=" --enable-jsonc"
-OTHER_OPTIONS+=" --enable-plugin-nfacct"
-OTHER_OPTIONS+=" --enable-plugin-freeipmi"
-OTHER_OPTIONS+=" --enable-plugin-cups"
-OTHER_OPTIONS+=" --enable-exporting-prometheus-remote-write"
-# TODO: enable these plugins too
-#OTHER_OPTIONS+=" --enable-plugin-xenstat"
-#OTHER_OPTIONS+=" --enable-exporting-kinesis"
-#OTHER_OPTIONS+=" --enable-exporting-mongodb"
 
 FOUND_OPTS="NO"
 while [ -n "${1}" ]; do

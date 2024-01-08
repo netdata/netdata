@@ -454,15 +454,6 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
   fi
 fi
 
-enable_feature() {
-  NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS}" | sed -e "s/-DENABLE_${1}=Off[[:space:]]*//g" -e "s/-DENABLE_${1}=On[[:space:]]*//g")"
-  if [ "${2}" -eq 1 ]; then
-    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS}" | sed "s/$/ -DENABLE_${1}=On/")"
-  else
-    NETDATA_CMAKE_OPTIONS="$(echo "${NETDATA_CMAKE_OPTIONS}" | sed "s/$/ -DENABLE_${1}=Off/")"
-  fi
-}
-
 # set default make options
 if [ -z "${MAKEOPTS}" ]; then
   MAKEOPTS="-j$(find_processors)"
@@ -1104,35 +1095,6 @@ echo >&2
 NETDATA_BUILD_DIR="${NETDATA_BUILD_DIR:-./cmake-build-release/}"
 rm -rf "${NETDATA_BUILD_DIR}"
 
-check_for_module() {
-  if [ -z "${pkgconf}" ]; then
-    pkgconf="$(command -v pkgconf 2>/dev/null)"
-    [ -z "${pkgconf}" ] && pkgconf="$(command -v pkg-config 2>/dev/null)"
-    [ -z "${pkgconf}" ] && fatal "Unable to find a usable pkgconf/pkg-config command, cannot build Netdata." I0013
-  fi
-
-  "${pkgconf}" "${1}"
-  return "${?}"
-}
-
-check_for_feature() {
-  feature_name="${1}"
-  feature_state="${2}"
-  shift 2
-  feature_modules="${*}"
-
-  if [ -z "${feature_state}" ]; then
-    # shellcheck disable=SC2086
-    if check_for_module ${feature_modules}; then
-      enable_feature "${feature_name}" 1
-    else
-      enable_feature "${feature_name}" 0
-    fi
-  else
-    enable_feature "${feature_name}" "${feature_state}"
-  fi
-}
-
 # function to extract values from the config file
 config_option() {
   section="${1}"
@@ -1161,74 +1123,7 @@ NETDATA_GROUP="$(id -g -n "${NETDATA_USER}" 2> /dev/null)"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
 echo >&2 "Netdata user and group set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
-NETDATA_CMAKE_OPTIONS="-S ./ -B ${NETDATA_BUILD_DIR} ${CMAKE_OPTS} -DCMAKE_INSTALL_PREFIX=${NETDATA_PREFIX} ${NETDATA_USER:+-DNETDATA_USER=${NETDATA_USER}} ${NETDATA_CMAKE_OPTIONS} "
-
-# Feature autodetection code starts here
-
-if [ "${USE_SYSTEM_PROTOBUF}" -eq 1 ]; then
-  enable_feature BUNDLED_PROTOBUF 0
-else
-  enable_feature BUNDLED_PROTOBUF 1
-fi
-
-if [ -z "${ENABLE_SYSTEMD_PLUGIN}" ]; then
-    if check_for_module libsystemd; then
-        if check_for_module libelogind; then
-            ENABLE_SYSTEMD_JOURNAL=0
-        else
-            ENABLE_SYSTEMD_JOURNAL=1
-        fi
-    else
-        ENABLE_SYSTEMD_JOURNAL=0
-    fi
-fi
-
-enable_feature PLUGIN_SYSTEMD_JOURNAL "${ENABLE_SYSTEMD_JOURNAL}"
-
-[ -z "${NETDATA_ENABLE_ML}" ] && NETDATA_ENABLE_ML=1
-enable_feature ML "${NETDATA_ENABLE_ML}"
-
-if command -v cups-config >/dev/null 2>&1 || check_for_module libcups || check_for_module cups; then
-  ENABLE_CUPS=1
-else
-  ENABLE_CUPS=0
-fi
-
-enable_feature PLUGIN_CUPS "${ENABLE_CUPS}"
-
-IS_LINUX=0
-[ "$(uname -s)" = "Linux" ] && IS_LINUX=1
-enable_feature PLUGIN_DEBUGFS "${IS_LINUX}"
-enable_feature PLUGIN_PERF "${IS_LINUX}"
-enable_feature PLUGIN_SLABINFO "${IS_LINUX}"
-enable_feature PLUGIN_CGROUP_NETWORK "${IS_LINUX}"
-enable_feature PLUGIN_LOCAL_LISTENERS "${IS_LINUX}"
-enable_feature PLUGIN_LOGS_MANAGEMENT "${ENABLE_LOGS_MANAGEMENT}"
-enable_feature LOGS_MANAGEMENT_TESTS "${ENABLE_LOGS_MANAGEMENT_TESTS}"
-
-enable_feature ACLK "${ENABLE_CLOUD}"
-enable_feature CLOUD "${ENABLE_CLOUD}"
-enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C}"
-enable_feature BUNDLED_YAML "${BUNDLE_YAML}"
-enable_feature DBENGINE "${ENABLE_DBENGINE}"
-enable_feature H2O "${ENABLE_H2O}"
-enable_feature PLUGIN_EBPF "${ENABLE_EBPF}"
-
-ENABLE_APPS=0
-
-if [ "${IS_LINUX}" = 1 ] || [ "$(uname -s)" = "FreeBSD" ]; then
-    ENABLE_APPS=1
-fi
-
-enable_feature PLUGIN_APPS "${ENABLE_APPS}"
-
-check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
-check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
-check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
-check_for_feature PLUGIN_NFACCT "${ENABLE_NFACCT}" libnetfilter_acct libnml
-check_for_feature PLUGIN_XENSTAT "${ENABLE_XENSTAT}" xenstat xenlight
-
-# End of feature autodetection code
+prepare_cmake_options
 
 if [ -n "${NETDATA_PREPARE_ONLY}" ]; then
     progress "Exiting before building Netdata as requested."

@@ -33,7 +33,8 @@ jobs:
           sudo apt-get install -y libjson-c-dev libyaml-dev libipmimonitoring-dev \
                                   libcups2-dev libsnappy-dev libprotobuf-dev \
                                   libprotoc-dev libssl-dev protobuf-compiler \
-                                  libnetfilter-acct-dev
+                                  libnetfilter-acct-dev libmongoc-dev libxen-dev \
+                                  libsystemd-dev ninja-build
       - name: Run coverity-scan
         id: run
         env:
