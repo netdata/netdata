@@ -24,6 +24,9 @@ void dyncfg_file_save(const char *id, DYNCFG *df) {
     fprintf(fp, "version=%zu\n", DYNCFG_VERSION);
     fprintf(fp, "id=%s\n", id);
 
+    if(df->template)
+        fprintf(fp, "template=%s\n", string2str(df->template));
+
     char uuid_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(df->host_uuid, uuid_str);
     fprintf(fp, "host=%s\n", uuid_str);
@@ -64,7 +67,7 @@ void dyncfg_file_load(const char *filename) {
     };
 
     char line[PLUGINSD_LINE_MAX];
-    CLEAN_CHAR_P *id = NULL, *hostname = NULL;
+    CLEAN_CHAR_P *id = NULL;
 
     HTTP_CONTENT_TYPE content_type = CT_NONE;
     size_t content_length = 0;
@@ -97,7 +100,10 @@ void dyncfg_file_load(const char *filename) {
                        filename, version, DYNCFG_VERSION);
 
         } else if (strcmp(key, "id") == 0) {
+            freez(id);
             id = strdupz(value);
+        } else if (strcmp(key, "template") == 0) {
+            tmp.template = string_strdupz(value);
         } else if (strcmp(key, "host") == 0) {
             uuid_parse_flexi(value, tmp.host_uuid);
         } else if (strcmp(key, "path") == 0) {

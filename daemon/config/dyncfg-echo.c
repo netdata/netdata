@@ -38,18 +38,23 @@ void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code, void *result_cb_data) {
     freez(e);
 }
 
-void dyncfg_echo_status(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe_unused) {
-    if (!(df->cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE)))
+void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe_unused, DYNCFG_CMDS cmd) {
+    if(!(df->cmds & cmd))
         return;
+
+    const char *cmd_str = dyncfg_id2cmd_one(cmd);
+    if(!cmd_str) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: command given does not resolve to a known command");
+        return;
+    }
 
     struct dyncfg_echo *e = callocz(1, sizeof(struct dyncfg_echo));
     e->item = dictionary_acquired_item_dup(dyncfg_globals.nodes, item);
     e->wb = buffer_create(0, NULL);
     e->df = df;
 
-    char buf[string_strlen(df->function) + 20];
-    snprintfz(buf, sizeof(buf), "%s %s",
-              string2str(df->function), df->user_disabled ? "disable" : "enable");
+    char buf[string_strlen(df->function) + strlen(cmd_str) + 20];
+    snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), cmd_str);
 
     rrd_function_run(df->host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
                      dyncfg_echo_cb, e,

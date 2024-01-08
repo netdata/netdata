@@ -601,16 +601,16 @@ Where:
 
 - `id` is a unique identifier for the configurable entity. This should by design be unique across Netdata. It should be something like `plugin:module:jobs`, e.g. `go.d:postgresql:jobs:masterdb`. This is assumed to be colon-separated with the last part (`masterdb` in our example), being the one displayed to users when there ano conflicts under the same configuration path.
 - `action` can be:
-  - `add`, to declare the dynamic configuration entity
-  - `remove`, to remove the dynamic configuration entity
+  - `create`, to declare the dynamic configuration entity
+  - `delete`, to remove the dynamic configuration entity
 
-When the `action` is `add`, the following additional parameters are expected:
+When the `action` is `create`, the following additional parameters are expected:
 
-> CONFIG id action type path source_type source supported_commands
+> CONFIG id action type "path" source_type "source" "supported commands"
 
 Where:
 
-- `action` should be `add`
+- `action` should be `create`
 - `type` can be `single`, `template` or `job`:
   - `single` is used when the configurable entity is fixed and users should never be able to add or delete it.
   - `template` is used to define a template based on which users can add multiple configurations, like adding data collection jobs. So, the plugin defines the template of the jobs and users are presented with a `[+]` button to add such configuration jobs. The plugin can define multiple templates by giving different `id`s to them.
@@ -631,6 +631,7 @@ Where:
   - `add`, to receive job creation commands for templates. Only `templates` should support this command.
   - `remove`, to remove a configuration. Only `jobs` should support this command.
   - `enable` and `disable`, to receive user requests to enable and disable this entity. Adding only one of `enable` or `disable` to the supported commands, Netdata will add both of them. The plugin should expose these commands on `templates` only when it wants to receive `enable` and `disable` commands for all the `jobs` of this `template`.
+  - `restart`, to restart a job.
 
 The plugin receives commands as if it had exposed a `FUNCTION` named `config`. Netdata formats all these calls like this:
 

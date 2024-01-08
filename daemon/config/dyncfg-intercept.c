@@ -19,6 +19,8 @@ struct dyncfg_call {
 void dyncfg_function_result_cb(BUFFER *wb, int code, void *result_cb_data) {
     struct dyncfg_call *dc = result_cb_data;
 
+    bool called_from_dyncfg_echo = dc->result_cb == dyncfg_echo_cb ? true : false;
+
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_advanced(dyncfg_globals.nodes, dc->id, -1);
     if(item) {
         DYNCFG *df = dictionary_acquired_item_value(item);
@@ -38,40 +40,47 @@ void dyncfg_function_result_cb(BUFFER *wb, int code, void *result_cb_data) {
             df->restart_required = true;
         }
 
-        if(code == HTTP_RESP_OK || code == HTTP_RESP_ACCEPTED) {
-            if(dc->cmd == DYNCFG_CMD_ADD) {
-                char id[strlen(dc->id) + 1 + strlen(dc->add_name) + 1];
-                snprintfz(id, sizeof(id), "%s:%s", dc->id, dc->add_name);
+        if (!called_from_dyncfg_echo) {
+            if (code == HTTP_RESP_OK || code == HTTP_RESP_ACCEPTED) {
+                if (dc->cmd == DYNCFG_CMD_ADD) {
+                    char id[strlen(dc->id) + 1 + strlen(dc->add_name) + 1];
+                    snprintfz(id, sizeof(id), "%s:%s", dc->id, dc->add_name);
 
-                const DICTIONARY_ITEM *new_item =
-                    dyncfg_add_internal(df->host, id, string2str(df->path),
-                                        DYNCFG_STATUS_OK, DYNCFG_TYPE_JOB, DYNCFG_SOURCE_TYPE_DYNCFG,
-                                        "dyncfg", df->cmds & ~DYNCFG_CMD_ADD, 0, 0,
-                                        df->sync, NULL, NULL);
+                    const DICTIONARY_ITEM *new_item = dyncfg_add_internal(
+                        df->host,
+                        id,
+                        string2str(df->path),
+                        DYNCFG_STATUS_OK,
+                        DYNCFG_TYPE_JOB,
+                        DYNCFG_SOURCE_TYPE_DYNCFG,
+                        "dyncfg",
+                        df->cmds & ~DYNCFG_CMD_ADD,
+                        0,
+                        0,
+                        df->sync,
+                        NULL,
+                        NULL);
 
-                DYNCFG *new_df = dictionary_acquired_item_value(new_item);
-                SWAP(new_df->payload, dc->payload);
+                    DYNCFG *new_df = dictionary_acquired_item_value(new_item);
+                    SWAP(new_df->payload, dc->payload);
 
-                dyncfg_file_save(id, new_df);
-                dictionary_acquired_item_release(dyncfg_globals.nodes, new_item);
+                    dyncfg_file_save(id, new_df);
+                    dictionary_acquired_item_release(dyncfg_globals.nodes, new_item);
+                } else if (dc->cmd == DYNCFG_CMD_UPDATE) {
+                    SWAP(df->payload, dc->payload);
+                    save_required = true;
+                } else if (dc->cmd == DYNCFG_CMD_ENABLE) {
+                    df->user_disabled = false;
+                } else if (dc->cmd == DYNCFG_CMD_DISABLE) {
+                    df->user_disabled = true;
+                } else if (dc->cmd == DYNCFG_CMD_REMOVE) {
+                    dyncfg_file_delete(dc->id);
+                }
             }
-            else if(dc->cmd == DYNCFG_CMD_UPDATE) {
-                SWAP(df->payload, dc->payload);
-                save_required = true;
-            }
-            else if(dc->cmd == DYNCFG_CMD_ENABLE) {
-                df->user_disabled = false;
-            }
-            else if(dc->cmd == DYNCFG_CMD_DISABLE) {
-                df->user_disabled = true;
-            }
-            else if(dc->cmd == DYNCFG_CMD_REMOVE) {
-                dyncfg_file_delete(dc->id);
-            }
+
+            if (save_required || old_user_disabled != df->user_disabled)
+                dyncfg_file_save(dc->id, df);
         }
-
-        if(save_required || old_user_disabled != df->user_disabled)
-            dyncfg_file_save(dc->id, df);
 
         dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     }
@@ -83,6 +92,19 @@ void dyncfg_function_result_cb(BUFFER *wb, int code, void *result_cb_data) {
     freez(dc->function);
     freez(dc->id);
     freez(dc);
+}
+
+// ----------------------------------------------------------------------------
+
+static void dyncfg_apply_action_on_all_template_jobs(const char *template_id, DYNCFG_CMDS c) {
+    STRING *template = string_strdupz(template_id);
+
+    DYNCFG *df;
+    dfe_start_read(dyncfg_globals.nodes, df) {
+        if(df->template == template && df->type == DYNCFG_TYPE_JOB)
+            dyncfg_echo(df_dfe.item, df, df_dfe.name, c);
+    }
+    dfe_done(df);
 }
 
 // ----------------------------------------------------------------------------
@@ -101,6 +123,8 @@ int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFF
                                void *register_progresser_cb_data) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
+
+    bool called_from_dyncfg_echo = result_cb == dyncfg_echo_cb ? true : false;
 
     DYNCFG_CMDS c = DYNCFG_CMD_NONE;
     const DICTIONARY_ITEM *item = NULL;
@@ -197,6 +221,24 @@ int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFF
             rc = HTTP_RESP_OK;
             make_the_call_to_plugin = false;
         }
+    }
+    else if(c & (DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE|DYNCFG_CMD_RESTART) && df->type == DYNCFG_TYPE_TEMPLATE) {
+        if(!called_from_dyncfg_echo) {
+            bool old_user_disabled = df->user_disabled;
+            if (c == DYNCFG_CMD_ENABLE)
+                df->user_disabled = false;
+            else if (c == DYNCFG_CMD_DISABLE)
+                df->user_disabled = true;
+
+            if (df->user_disabled != old_user_disabled)
+                dyncfg_file_save(id, df);
+        }
+
+        dyncfg_apply_action_on_all_template_jobs(id, c);
+
+        rc = HTTP_RESP_OK;
+        dyncfg_default_response(result_body_wb, rc, "applied");
+        make_the_call_to_plugin = false;
     }
     else  if(c == DYNCFG_CMD_ADD) {
         if (df->type != DYNCFG_TYPE_TEMPLATE) {

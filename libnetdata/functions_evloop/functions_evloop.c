@@ -359,7 +359,7 @@ void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char
     netdata_mutex_lock(wg->stdout_mutex);
 
     fprintf(stdout,
-            PLUGINSD_KEYWORD_CONFIG " '%s' add '%s' '%s' '%s' '%s' '%s'\n",
+            PLUGINSD_KEYWORD_CONFIG " '%s' " PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE " '%s' '%s' '%s' '%s' '%s'\n",
             id, dyncfg_id2type(type), path, dyncfg_id2source_type(source_type) , source, buffer_tostring(c)
     );
     fflush(stdout);
@@ -377,7 +377,7 @@ void functions_evloop_dyncfg_del(struct functions_evloop_globals *wg, const char
 
     netdata_mutex_lock(wg->stdout_mutex);
 
-    fprintf(stdout,PLUGINSD_KEYWORD_CONFIG " '%s' remove\n", id);
+    fprintf(stdout,PLUGINSD_KEYWORD_CONFIG " '%s' " PLUGINSD_KEYWORD_CONFIG_ACTION_DELETE "\n", id);
     fflush(stdout);
 
     netdata_mutex_unlock(wg->stdout_mutex);

@@ -8,7 +8,10 @@
 // STRING implementation
 
 typedef struct netdata_string STRING;
+
 STRING *string_strdupz(const char *str);
+STRING *string_strndupz(const char *str, size_t len);
+
 STRING *string_dup(STRING *string);
 void string_freez(STRING *string);
 size_t string_strlen(STRING *string);

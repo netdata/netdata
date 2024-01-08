@@ -49,6 +49,7 @@ DYNCFG_CMDS dyncfg_cmds2id(const char *cmds);
 void dyncfg_cmds2buffer(DYNCFG_CMDS cmds, struct web_buffer *wb);
 void dyncfg_cmds2json_array(DYNCFG_CMDS cmds, const char *key, struct web_buffer *wb);
 void dyncfg_cmds2fp(DYNCFG_CMDS cmds, FILE *fp);
+const char *dyncfg_id2cmd_one(DYNCFG_CMDS cmd);
 
 bool dyncfg_is_valid_id(const char *id);
 char *dyncfg_escape_id_for_filename(const char *id);

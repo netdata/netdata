@@ -13,7 +13,7 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
     char *id     = get_word(words, num_words, i++);
     char *action = get_word(words, num_words, i++);
 
-    if(strcmp(action, "add") == 0) {
+    if(strcmp(action, PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE) == 0) {
         char *type_str           = get_word(words, num_words, i++);
         char *path               = get_word(words, num_words, i++);
         char *source_type_str    = get_word(words, num_words, i++);
@@ -41,7 +41,7 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
                 parser))
             return PARSER_RC_ERROR;
     }
-    else if(strcmp(action, "remove") == 0) {
+    else if(strcmp(action, PLUGINSD_KEYWORD_CONFIG_ACTION_DELETE) == 0) {
         dyncfg_del_low_level(host, id);
     }
     else

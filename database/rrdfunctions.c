@@ -283,6 +283,8 @@ void rrd_function_del(RRDHOST *host, RRDSET *st, const char *name) {
         dictionary_del(st->functions_view, key);
     else
         rrdhost_flag_set(host, RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED);
+
+    dictionary_garbage_collect(host->functions);
 }
 
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {

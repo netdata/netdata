@@ -17,31 +17,48 @@ void dyncfg_cleanup(DYNCFG *v) {
 
     string_freez(v->function);
     v->function = NULL;
+
+    string_freez(v->template);
+    v->template = NULL;
 }
 
-static void dyncfg_normalize(DYNCFG *v) {
+static void dyncfg_normalize(DYNCFG *df) {
     usec_t now_ut = now_realtime_usec();
 
-    if(!v->created_ut)
-        v->created_ut = now_ut;
+    if(!df->created_ut)
+        df->created_ut = now_ut;
 
-    if(!v->modified_ut)
-        v->modified_ut = now_ut;
+    if(!df->modified_ut)
+        df->modified_ut = now_ut;
 }
 
 static void dyncfg_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    DYNCFG *v = value;
-    dyncfg_cleanup(v);
+    DYNCFG *df = value;
+    dyncfg_cleanup(df);
 }
 
 static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
-    DYNCFG *v = value;
-    dyncfg_normalize(v);
+    DYNCFG *df = value;
+    dyncfg_normalize(df);
 
     const char *id = dictionary_acquired_item_name(item);
     char buf[strlen(id) + 20];
     snprintfz(buf, sizeof(buf), PLUGINSD_FUNCTION_CONFIG " %s", id);
-    v->function = string_strdupz(buf);
+    df->function = string_strdupz(buf);
+
+    if(df->type == DYNCFG_TYPE_JOB && !df->template) {
+        const char *last_colon = strrchr(id, ':');
+        if(last_colon)
+            df->template = string_strndupz(id, last_colon - id);
+        else
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "DYNCFG: id '%s' is a job, but does not contain a colon to find the template", id);
+    }
+
+    if(!df->saves && df->type == DYNCFG_TYPE_JOB && df->template) {
+        // new jobs (df->saves == 0) inherit the user_disabled value of their templates
+        df->user_disabled = dyncfg_is_user_disabled(string2str(df->template));
+    }
 }
 
 static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
@@ -196,6 +213,17 @@ static void dyncfg_send_updates(const char *id) {
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 }
 
+bool dyncfg_is_user_disabled(const char *id) {
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
+    if(!item)
+        return false;
+
+    DYNCFG *df = dictionary_acquired_item_value(item);
+    bool ret = df->user_disabled;
+    dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+    return ret;
+}
+
 bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
@@ -254,7 +282,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
                      "Dynamic configuration", "config",HTTP_ACCESS_MEMBER,
                      sync, dyncfg_function_execute_cb, NULL);
 
-    dyncfg_echo_status(item, df, id);
+    dyncfg_echo(item, df, id, df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE);
     dyncfg_send_updates(id);
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 
@@ -270,14 +298,18 @@ void dyncfg_del_low_level(RRDHOST *host, const char *id) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
     if(item) {
         DYNCFG *df = dictionary_acquired_item_value(item);
-        bool has_saves = df->saves > 0 ? true : false;
         rrd_function_del(host, NULL, string2str(df->function));
-        dictionary_del(dyncfg_globals.nodes, id);
-        dictionary_acquired_item_release(dyncfg_globals.nodes, item);
-        dictionary_garbage_collect(dyncfg_globals.nodes);
 
-        if(has_saves)
-            dyncfg_file_delete(id);
+        bool garbage_collect = false;
+        if(df->saves == 0) {
+            dictionary_del(dyncfg_globals.nodes, id);
+            garbage_collect = true;
+        }
+
+        dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+
+        if(garbage_collect)
+            dictionary_garbage_collect(dyncfg_globals.nodes);
     }
 }
 

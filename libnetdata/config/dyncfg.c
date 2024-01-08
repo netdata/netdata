@@ -124,6 +124,15 @@ static struct {
     { .cmd = DYNCFG_CMD_RESTART, .name = "restart" }
 };
 
+const char *dyncfg_id2cmd_one(DYNCFG_CMDS cmd) {
+    for (size_t i = 0; i < sizeof(cmd_map) / sizeof(cmd_map[0]); i++) {
+        if(cmd == cmd_map[i].cmd)
+            return cmd_map[i].name;
+    }
+
+    return NULL;
+}
+
 DYNCFG_CMDS dyncfg_cmds2id(const char *cmds) {
     DYNCFG_CMDS result = DYNCFG_CMD_NONE;
     const char *p = cmds;
