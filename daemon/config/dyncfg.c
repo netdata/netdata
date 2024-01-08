@@ -54,6 +54,10 @@ static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *dat
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "DYNCFG: id '%s' is a job, but does not contain a colon to find the template", id);
     }
+}
+
+static void dyncfg_react_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
+    DYNCFG *df = value;
 
     if(!df->saves && df->type == DYNCFG_TYPE_JOB && df->template) {
         // new jobs (df->saves == 0) inherit the user_disabled value of their templates
@@ -141,6 +145,7 @@ void dyncfg_init_low_level(bool load_saved) {
     if(!dyncfg_globals.nodes) {
         dyncfg_globals.nodes = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, sizeof(DYNCFG));
         dictionary_register_insert_callback(dyncfg_globals.nodes, dyncfg_insert_cb, NULL);
+        dictionary_register_react_callback(dyncfg_globals.nodes, dyncfg_react_cb, NULL);
         dictionary_register_conflict_callback(dyncfg_globals.nodes, dyncfg_conflict_cb, NULL);
         dictionary_register_delete_callback(dyncfg_globals.nodes, dyncfg_delete_cb, NULL);
 
