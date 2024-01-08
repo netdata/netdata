@@ -318,9 +318,9 @@ STRING *string_strndupz(const char *str, size_t len) {
     memcpy(buf, str, len);
     buf[len] = '\0';
 
-    STRING *string = string_index_search(str, len + 1);
+    STRING *string = string_index_search(buf, len + 1);
     while(!string)
-        string = string_index_search(str, len + 1);
+        string = string_index_insert(buf, len + 1);
 
     string_stats_atomic_increment(partition, active_references);
     return string;
