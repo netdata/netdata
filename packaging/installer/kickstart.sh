@@ -403,6 +403,9 @@ support_list() {
 }
 
 success_banner() {
+  printf >&2 "%s\n" "To view your system's real-time performance metrics, open your web browser and enter http://NODE:19999."
+  printf >&2 "%s\n\n" "Replace NODE with the IP address or hostname of your Netdata server to access the dashboard."
+
   printf >&2 "%s\n\n" "Official documentation can be found online at ${DOCS_URL}."
 
   if [ -z "${CLAIM_TOKEN}" ]; then
@@ -1357,6 +1360,14 @@ check_special_native_deps() {
   fi
 }
 
+cleanup_apt_cache() {
+    cache_dir="/var/cache/apt/archives"
+
+    if [ -d "${cache_dir}" ]; then
+        run_as_root find "${cache_dir}" -type f -name 'netdata*.deb' -delete
+    fi
+}
+
 common_rpm_opts() {
   pkg_type="rpm"
   pkg_suffix=".noarch"
@@ -1423,6 +1434,7 @@ try_package_install() {
         install_subcmd="install"
       fi
       needs_early_refresh=1
+      needs_apt_cache_cleanup=1
       pm_cmd="apt-get"
       repo_subcmd="update"
       pkg_type="deb"
@@ -1520,6 +1532,10 @@ try_package_install() {
       if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
         warning "${failed_refresh_msg}"
         return 2
+      fi
+
+      if [ -n "${needs_apt_cache_cleanup}" ]; then
+        cleanup_apt_cache
       fi
     fi
 
@@ -1751,8 +1767,14 @@ install_local_build_dependencies() {
   fi
 
   # shellcheck disable=SC2086
-  if ! run_as_root "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
-    warning "Failed to install all required packages, but installation might still be possible."
+  if [ "$(uname -s)" = "Darwin" ]; then
+    if ! run "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
+      warning "Failed to install all required packages, but installation might still be possible."
+    fi
+  else
+    if ! run_as_root "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
+      warning "Failed to install all required packages, but installation might still be possible."
+    fi
   fi
 }
 

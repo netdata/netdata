@@ -59,6 +59,10 @@ struct netdata_static_thread {
 const char *netdata_thread_tag(void);
 int netdata_thread_tag_exists(void);
 
+#define THREAD_TAG_STREAM_RECEIVER "RCVR"
+#define THREAD_TAG_STREAM_SENDER "SNDR"
+
+
 size_t netdata_threads_init(void);
 void netdata_threads_init_after_fork(size_t stacksize);
 void netdata_threads_init_for_external_plugins(size_t stacksize);

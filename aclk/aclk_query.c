@@ -6,7 +6,6 @@
 #include "../../web/server/web_client_cache.h"
 
 #define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
-#define ACLK_MAX_WEB_RESPONSE_SIZE (30 * 1024 * 1024)
 
 pthread_cond_t query_cond_wait = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t query_lock_wait = PTHREAD_MUTEX_INITIALIZER;
@@ -136,13 +135,6 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
 
     w->response.code = (short)web_client_api_request_with_node_selection(localhost, w, path);
     web_client_timeout_checkpoint_response_ready(w, &t);
-
-    if(buffer_strlen(w->response.data) > ACLK_MAX_WEB_RESPONSE_SIZE) {
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "response is too big");
-        w->response.data->content_type = CT_TEXT_PLAIN;
-        w->response.code = HTTP_RESP_CONTENT_TOO_LONG;
-    }
 
     if (aclk_stats_enabled) {
         ACLK_STATS_LOCK;

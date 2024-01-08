@@ -10,7 +10,7 @@ endmeta-->
 # Splunk
 
 
-<img src="https://netdata.cloud/img/splunk.svg" width="150"/>
+<img src="https://netdata.cloud/img/splunk-black.svg" width="150"/>
 
 
 From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on Splunk.

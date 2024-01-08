@@ -459,9 +459,6 @@ void rrdpush_send_claimed_id(RRDHOST *host);
 void rrdpush_send_global_functions(RRDHOST *host);
 void rrdpush_send_dyncfg(RRDHOST *host);
 
-#define THREAD_TAG_STREAM_RECEIVER "RCVR" // "[host]" is appended
-#define THREAD_TAG_STREAM_SENDER "SNDR" // "[host]" is appended
-
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx);
 void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wait);
 

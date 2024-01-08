@@ -67,12 +67,15 @@ static inline unsigned long ulong_compare_and_swap(volatile unsigned long *ptr,
 
 static inline int crc32cmp(void *crcp, uLong crc)
 {
-    return (*(uint32_t *)crcp != crc);
+    uint32_t loaded_crc;
+    memcpy(&loaded_crc, crcp, sizeof(loaded_crc));
+    return (loaded_crc != crc);
 }
 
 static inline void crc32set(void *crcp, uLong crc)
 {
-    *(uint32_t *)crcp = crc;
+    uint32_t store_crc = (uint32_t) crc;
+    memcpy(crcp, &store_crc, sizeof(store_crc));
 }
 
 int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);

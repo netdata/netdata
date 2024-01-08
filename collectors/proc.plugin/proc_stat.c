@@ -46,6 +46,7 @@ struct cpu_chart {
     RRDDIM *rd_guest;
     RRDDIM *rd_guest_nice;
 
+    bool per_core_files_found;
     struct per_core_single_number_file files[PER_CORE_FILES];
 
     struct per_core_time_in_state_file time_in_state_files;
@@ -589,14 +590,71 @@ int do_proc_stat(int update_every, usec_t dt) {
                 continue;
             }
 
-            size_t core    = (row_key[3] == '\0') ? 0 : str2ul(&row_key[3]) + 1;
-            if(likely(core > 0)) cores_found = core;
+            size_t core = (row_key[3] == '\0') ? 0 : str2ul(&row_key[3]) + 1;
+            if (likely(core > 0))
+                cores_found = core;
+
+            bool do_any_core_metric = do_cpu_cores || do_core_throttle_count || do_cpu_freq || do_cpuidle;
+
+            if (likely((core == 0 && do_cpu) || (core > 0 && do_any_core_metric))) {
+                if (unlikely(core >= all_cpu_charts_size)) {
+                    size_t old_cpu_charts_size = all_cpu_charts_size;
+                    all_cpu_charts_size = core + 1;
+                    all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * all_cpu_charts_size);
+                    memset(&all_cpu_charts[old_cpu_charts_size], 0, sizeof(struct cpu_chart) * (all_cpu_charts_size - old_cpu_charts_size));
+                }
+
+                struct cpu_chart *cpu_chart = &all_cpu_charts[core];
+
+                if (unlikely(!cpu_chart->id))
+                    cpu_chart->id = strdupz(row_key);
+
+                if (core > 0 && !cpu_chart->per_core_files_found) {
+                    cpu_chart->per_core_files_found = true;
+
+                    char filename[FILENAME_MAX + 1];
+                    struct stat stbuf;
+
+                    if (do_core_throttle_count != CONFIG_BOOLEAN_NO) {
+                        snprintfz(filename, FILENAME_MAX, core_throttle_count_filename, cpu_chart->id);
+                        if (stat(filename, &stbuf) == 0) {
+                            cpu_chart->files[CORE_THROTTLE_COUNT_INDEX].filename = strdupz(filename);
+                            cpu_chart->files[CORE_THROTTLE_COUNT_INDEX].fd = -1;
+                            do_core_throttle_count = CONFIG_BOOLEAN_YES;
+                        }
+                    }
+
+                    if (do_package_throttle_count != CONFIG_BOOLEAN_NO) {
+                        snprintfz(filename, FILENAME_MAX, package_throttle_count_filename, cpu_chart->id);
+                        if (stat(filename, &stbuf) == 0) {
+                            cpu_chart->files[PACKAGE_THROTTLE_COUNT_INDEX].filename = strdupz(filename);
+                            cpu_chart->files[PACKAGE_THROTTLE_COUNT_INDEX].fd = -1;
+                            do_package_throttle_count = CONFIG_BOOLEAN_YES;
+                        }
+                    }
+
+                    if (do_cpu_freq != CONFIG_BOOLEAN_NO) {
+                        snprintfz(filename, FILENAME_MAX, scaling_cur_freq_filename, cpu_chart->id);
+                        if (stat(filename, &stbuf) == 0) {
+                            cpu_chart->files[CPU_FREQ_INDEX].filename = strdupz(filename);
+                            cpu_chart->files[CPU_FREQ_INDEX].fd = -1;
+                            do_cpu_freq = CONFIG_BOOLEAN_YES;
+                        }
+
+                        snprintfz(filename, FILENAME_MAX, time_in_state_filename, cpu_chart->id);
+                        if (stat(filename, &stbuf) == 0) {
+                            cpu_chart->time_in_state_files.filename = strdupz(filename);
+                            cpu_chart->time_in_state_files.ff = NULL;
+                            do_cpu_freq = CONFIG_BOOLEAN_YES;
+                            accurate_freq_avail = 1;
+                        }
+                    }
+                }
+            }
 
             if(likely((core == 0 && do_cpu) || (core > 0 && do_cpu_cores))) {
-                char *id;
                 unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0, guest = 0, guest_nice = 0;
 
-                id          = row_key;
                 user        = str2ull(procfile_lineword(ff, l, 1), NULL);
                 nice        = str2ull(procfile_lineword(ff, l, 2), NULL);
                 system      = str2ull(procfile_lineword(ff, l, 3), NULL);
@@ -615,17 +673,11 @@ int do_proc_stat(int update_every, usec_t dt) {
                 char *title, *type, *context, *family;
                 long priority;
 
-                if(unlikely(core >= all_cpu_charts_size)) {
-                    size_t old_cpu_charts_size = all_cpu_charts_size;
-                    all_cpu_charts_size = core + 1;
-                    all_cpu_charts = reallocz(all_cpu_charts, sizeof(struct cpu_chart) * all_cpu_charts_size);
-                    memset(&all_cpu_charts[old_cpu_charts_size], 0, sizeof(struct cpu_chart) * (all_cpu_charts_size - old_cpu_charts_size));
-                }
                 struct cpu_chart *cpu_chart = &all_cpu_charts[core];
 
-                if(unlikely(!cpu_chart->st)) {
-                    cpu_chart->id = strdupz(id);
+                char *id = row_key;
 
+                if(unlikely(!cpu_chart->st)) {
                     if(unlikely(core == 0)) {
                         title = "Total CPU utilization";
                         type = "system";
@@ -639,47 +691,6 @@ int do_proc_stat(int update_every, usec_t dt) {
                         context = "cpu.cpu";
                         family = "utilization";
                         priority = NETDATA_CHART_PRIO_CPU_PER_CORE;
-
-                        char filename[FILENAME_MAX + 1];
-                        struct stat stbuf;
-
-                        if(do_core_throttle_count != CONFIG_BOOLEAN_NO) {
-                            snprintfz(filename, FILENAME_MAX, core_throttle_count_filename, id);
-                            if (stat(filename, &stbuf) == 0) {
-                                cpu_chart->files[CORE_THROTTLE_COUNT_INDEX].filename = strdupz(filename);
-                                cpu_chart->files[CORE_THROTTLE_COUNT_INDEX].fd = -1;
-                                do_core_throttle_count = CONFIG_BOOLEAN_YES;
-                            }
-                        }
-
-                        if(do_package_throttle_count != CONFIG_BOOLEAN_NO) {
-                            snprintfz(filename, FILENAME_MAX, package_throttle_count_filename, id);
-                            if (stat(filename, &stbuf) == 0) {
-                                cpu_chart->files[PACKAGE_THROTTLE_COUNT_INDEX].filename = strdupz(filename);
-                                cpu_chart->files[PACKAGE_THROTTLE_COUNT_INDEX].fd = -1;
-                                do_package_throttle_count = CONFIG_BOOLEAN_YES;
-                            }
-                        }
-
-                        if(do_cpu_freq != CONFIG_BOOLEAN_NO) {
-
-                            snprintfz(filename, FILENAME_MAX, scaling_cur_freq_filename, id);
-
-                            if (stat(filename, &stbuf) == 0) {
-                                cpu_chart->files[CPU_FREQ_INDEX].filename = strdupz(filename);
-                                cpu_chart->files[CPU_FREQ_INDEX].fd = -1;
-                                do_cpu_freq = CONFIG_BOOLEAN_YES;
-                            }
-
-                            snprintfz(filename, FILENAME_MAX, time_in_state_filename, id);
-
-                            if (stat(filename, &stbuf) == 0) {
-                                cpu_chart->time_in_state_files.filename = strdupz(filename);
-                                cpu_chart->time_in_state_files.ff = NULL;
-                                do_cpu_freq = CONFIG_BOOLEAN_YES;
-                                accurate_freq_avail = 1;
-                            }
-                        }
                     }
 
                     cpu_chart->st = rrdset_create_localhost(

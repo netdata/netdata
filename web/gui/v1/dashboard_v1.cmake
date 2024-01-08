@@ -22,19 +22,19 @@ web/gui/v1/robots.txt
 web/gui/v1/service-worker.js
 web/gui/v1/sitemap.xml
 web/gui/v1/tv-react.html
-web/gui/v1/tv.html DESTINATION usr/share/netdata/web)
+web/gui/v1/tv.html DESTINATION ${WEB_DEST})
     install(FILES web/gui/v1/css/bootstrap-3.3.7.css
 web/gui/v1/css/bootstrap-slate-flat-3.3.7.css
 web/gui/v1/css/bootstrap-slider-10.0.0.min.css
 web/gui/v1/css/bootstrap-theme-3.3.7.min.css
 web/gui/v1/css/bootstrap-toggle-2.2.2.min.css
 web/gui/v1/css/dashboard.css
-web/gui/v1/css/dashboard.slate.css DESTINATION usr/share/netdata/web/css)
+web/gui/v1/css/dashboard.slate.css DESTINATION ${WEB_DEST}/css)
     install(FILES web/gui/v1/fonts/glyphicons-halflings-regular.eot
 web/gui/v1/fonts/glyphicons-halflings-regular.svg
 web/gui/v1/fonts/glyphicons-halflings-regular.ttf
 web/gui/v1/fonts/glyphicons-halflings-regular.woff
-web/gui/v1/fonts/glyphicons-halflings-regular.woff2 DESTINATION usr/share/netdata/web/fonts)
+web/gui/v1/fonts/glyphicons-halflings-regular.woff2 DESTINATION ${WEB_DEST}/fonts)
     install(FILES web/gui/v1/images/alert-128-orange.png
 web/gui/v1/images/alert-128-red.png
 web/gui/v1/images/alert-multi-size-orange.ico
@@ -84,7 +84,7 @@ web/gui/v1/images/overview.png
 web/gui/v1/images/packaging-beta-tag.svg
 web/gui/v1/images/post.png
 web/gui/v1/images/pricing.png
-web/gui/v1/images/seo-performance-128.png DESTINATION usr/share/netdata/web/images)
+web/gui/v1/images/seo-performance-128.png DESTINATION ${WEB_DEST}/images)
     install(FILES web/gui/v1/lib/bootstrap-3.3.7.min.js
 web/gui/v1/lib/bootstrap-slider-10.0.0.min.js
 web/gui/v1/lib/bootstrap-table-1.11.0.min.js
@@ -104,13 +104,13 @@ web/gui/v1/lib/jquery.sparkline-2.1.2.min.js
 web/gui/v1/lib/lz-string-1.4.4.min.js
 web/gui/v1/lib/pako-1.0.6.min.js
 web/gui/v1/lib/perfect-scrollbar-0.6.15.min.js
-web/gui/v1/lib/tableExport-1.6.0.min.js DESTINATION usr/share/netdata/web/lib)
+web/gui/v1/lib/tableExport-1.6.0.min.js DESTINATION ${WEB_DEST}/lib)
     install(FILES web/gui/v1/static/css/2.c454aab8.chunk.css
 web/gui/v1/static/css/2.c454aab8.chunk.css.map
 web/gui/v1/static/css/4.a36e3b73.chunk.css
 web/gui/v1/static/css/4.a36e3b73.chunk.css.map
 web/gui/v1/static/css/main.53ba10f1.chunk.css
-web/gui/v1/static/css/main.53ba10f1.chunk.css.map DESTINATION usr/share/netdata/web/static/css)
+web/gui/v1/static/css/main.53ba10f1.chunk.css.map DESTINATION ${WEB_DEST}/static/css)
     install(FILES web/gui/v1/static/js/10.a5cd7d0e.chunk.js
 web/gui/v1/static/js/10.a5cd7d0e.chunk.js.map
 web/gui/v1/static/js/2.62d105c5.chunk.js
@@ -135,7 +135,7 @@ web/gui/v1/static/js/main.e248095a.chunk.js
 web/gui/v1/static/js/main.e248095a.chunk.js.LICENSE
 web/gui/v1/static/js/main.e248095a.chunk.js.map
 web/gui/v1/static/js/runtime-main.08abed8f.js
-web/gui/v1/static/js/runtime-main.08abed8f.js.map DESTINATION usr/share/netdata/web/static/js)
+web/gui/v1/static/js/runtime-main.08abed8f.js.map DESTINATION ${WEB_DEST}/static/js)
     install(FILES web/gui/v1/static/media/ibm-plex-sans-latin-100.245539db.woff2
 web/gui/v1/static/media/ibm-plex-sans-latin-100.9a582f3a.woff
 web/gui/v1/static/media/ibm-plex-sans-latin-100italic.1ea7c5d2.woff
@@ -164,5 +164,5 @@ web/gui/v1/static/media/ibm-plex-sans-latin-700.b8809d61.woff
 web/gui/v1/static/media/ibm-plex-sans-latin-700.c9983d3d.woff2
 web/gui/v1/static/media/ibm-plex-sans-latin-700italic.02954bee.woff2
 web/gui/v1/static/media/ibm-plex-sans-latin-700italic.72e9af40.woff
-web/gui/v1/static/media/material-icons.0509ab09.woff2 DESTINATION usr/share/netdata/web/static/media)
-    install(FILES web/gui/v1/index.html DESTINATION usr/share/netdata/web/v1)
+web/gui/v1/static/media/material-icons.0509ab09.woff2 DESTINATION ${WEB_DEST}/static/media)
+    install(FILES web/gui/v1/index.html DESTINATION ${WEB_DEST}/v1)

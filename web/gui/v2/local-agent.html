@@ -28,12 +28,14 @@
         webpackPublicPath: "",
         agentApiUrl: searchParams.get("agent") || getBasename(),
         posthogToken: "phc_hnhlqe6D2Q4IcQNrFItaqdXJAxQ8RcHkPAFAp74pubv",
-        version: "6.68.0",
+        version: "6.75.2",
         tracking: false,
         cookieDomain: ".netdata.cloud",
         onprem: false,
         nodeEnv: "production"
       }
+
+      window.visitedNodes = []
 
       function loadStyle(url, { media, insertAfter: aref, insertBefore: bref, rel, type } = {}) {
         rel = rel || 'stylesheet'
@@ -219,6 +221,25 @@
               }
 
               window.envSettings.visitor = event.data.person_guid
+
+              try {
+                var visitedNodesByName = event.data.urls.reduce(function (vn, visitedUrl) {
+                  vn[visitedUrl[4]] = vn[visitedUrl[4]] || {}
+                  vn[visitedUrl[4]].id = visitedUrl[0]
+                  vn[visitedUrl[4]].name = visitedUrl[4]
+                  vn[visitedUrl[4]].lastAccessTime = visitedUrl[2]
+                  vn[visitedUrl[4]].urls = vn[visitedUrl[4]].urls || []
+                  vn[visitedUrl[4]].urls.push(visitedUrl[1])
+
+                  return vn
+                }, {})
+
+                window.visitedNodes = Object.keys(visitedNodesByName).map(function(vn) {
+                  return visitedNodesByName[vn]
+                })
+              } catch(e) {
+                // do nothing
+              }
             }
           });
         }).catch(() => {})</script></body></html>

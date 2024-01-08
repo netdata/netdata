@@ -3777,11 +3777,6 @@ static void ebpf_create_statistic_charts(int update_every)
                              NETDATA_EBPF_ORDER_STAT_THREADS,
                              update_every,
                              NULL);
-    /*
-#ifdef NETDATA_DEV_MODE
-    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
-#endif
-     */
 
     ebpf_create_thread_chart(NETDATA_EBPF_LIFE_TIME,
                              "Time remaining for thread.",
@@ -3789,11 +3784,6 @@ static void ebpf_create_statistic_charts(int update_every)
                              NETDATA_EBPF_ORDER_STAT_LIFE_TIME,
                              update_every,
                              NULL);
-    /*
-#ifdef NETDATA_DEV_MODE
-    EBPF_PLUGIN_FUNCTIONS(EBPF_FUNCTION_THREAD, EBPF_PLUGIN_THREAD_FUNCTION_DESCRIPTION);
-#endif
-     */
 
     int i,j;
     char name[256];
@@ -3811,9 +3801,6 @@ static void ebpf_create_statistic_charts(int update_every)
                                  j++,
                                  update_every,
                                  em);
-#ifdef NETDATA_DEV_MODE
-        EBPF_PLUGIN_FUNCTIONS(em->functions.fcnt_name, em->functions.fcnt_desc);
-#endif
 
         em->functions.order_thread_lifetime = j;
         snprintfz(name, sizeof(name) - 1, "%s_%s", NETDATA_EBPF_LIFE_TIME, em->info.thread_name);
@@ -3824,9 +3811,6 @@ static void ebpf_create_statistic_charts(int update_every)
                                  j++,
                                  update_every,
                                  em);
-#ifdef NETDATA_DEV_MODE
-        EBPF_PLUGIN_FUNCTIONS(em->functions.fcnt_name, em->functions.fcnt_desc);
-#endif
     }
 
     ebpf_create_statistic_load_chart(update_every);

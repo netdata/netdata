@@ -326,7 +326,7 @@ while [ -n "${1}" ]; do
       # TODO: Needs CMake Support
       ;;
     "--enable-exporting-prometheus-remote-write" | "--enable-backend-prometheus-remote-write") EXPORTER_PROMETHEUS=1 ;;
-    "--disable-exporting-prometheus-remote-write" | "--disable-backend-prometheus-remote-write") EXPORTER_PROMETHEUS=1 ;;
+    "--disable-exporting-prometheus-remote-write" | "--disable-backend-prometheus-remote-write") EXPORTER_PROMETHEUS=0 ;;
     "--enable-exporting-mongodb" | "--enable-backend-mongodb") EXPORTER_MONGODB=1 ;;
     "--disable-exporting-mongodb" | "--disable-backend-mongodb") EXPORTER_MONGODB=0 ;;
     "--enable-exporting-pubsub")
@@ -1859,6 +1859,9 @@ progress "eBPF Kernel Collector"
 install_ebpf
 
 should_install_fluentbit() {
+  if [ "$(uname -s)" = "Darwin" ]; then
+    return 1
+  fi
   if [ "${ENABLE_LOGS_MANAGEMENT}" = 0 ]; then
     warning "netdata-installer.sh run with --disable-logsmanagement, Fluent-Bit installation is skipped."
     return 1
@@ -1875,6 +1878,7 @@ should_install_fluentbit() {
 
 install_fluentbit() {
   if ! should_install_fluentbit; then
+    enable_feature PLUGIN_LOGS_MANAGEMENT 0
     return 0
   fi
 

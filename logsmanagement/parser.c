@@ -226,7 +226,6 @@ int search_keyword( char *src, size_t src_sz __maybe_unused,
             size_t regcomp_err_str_size = regerror(rc, &regex_compiled, 0, 0);
             char *regcomp_err_str = mallocz(regcomp_err_str_size);
             regerror(rc, &regex_compiled, regcomp_err_str, regcomp_err_str_size);
-            freez(regcomp_err_str);
             fatal("Could not compile regular expression:%.*s, error: %s", (int) MAX_REGEX_SIZE, regexString, regcomp_err_str);
         }
     }

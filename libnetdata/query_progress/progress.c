@@ -636,6 +636,7 @@ int progress_unittest(void) {
         for(size_t i = 0; i < permanent ;i++) {
             qp = query_progress_find_in_hashtable_unsafe(&valid[i]);
             assert(qp);
+            (void)qp;
         }
     }
 

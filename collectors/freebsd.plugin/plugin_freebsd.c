@@ -91,7 +91,7 @@ void *freebsd_main(void *ptr)
 
     // initialize FreeBSD plugin
     if (freebsd_plugin_init())
-        netdata_cleanup_and_exit(1);
+        netdata_cleanup_and_exit(1, NULL, NULL, NULL);
 
     // check the enabled status for each module
     int i;

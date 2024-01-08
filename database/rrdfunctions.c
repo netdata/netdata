@@ -774,7 +774,14 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
     if(access != HTTP_ACCESS_ADMINS && rdcf->access != HTTP_ACCESS_ANY && access > rdcf->access) {
-        rrd_call_function_error(result_wb, "This function requires a higher access level.", code);
+
+        if(!aclk_connected)
+            rrd_call_function_error(result_wb, "This Netdata must be connected to Netdata Cloud to access this function.", HTTP_RESP_PRECOND_FAIL);
+        else if(access >= HTTP_ACCESS_ANY)
+            rrd_call_function_error(result_wb, "You need to login to the Netdata Cloud space this agent is claimed to, to access this function.", HTTP_RESP_PRECOND_FAIL);
+        else /* if(access < HTTP_ACCESS_ANY && rdcf->access < access) */
+            rrd_call_function_error(result_wb, "To access this function you need to be an admin in this Netdata Cloud space.", HTTP_RESP_PRECOND_FAIL);
+
         dictionary_acquired_item_release(host->functions, host_function_acquired);
         return HTTP_RESP_PRECOND_FAIL;
     }
@@ -1098,7 +1105,7 @@ int rrdhost_function_streaming(uuid_t *transaction __maybe_unused, BUFFER *wb,
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_STREAMING_HELP);
     buffer_json_member_add_array(wb, "data");
 
-    size_t max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX];
+    size_t max_sent_bytes_on_this_connection_per_type[STREAM_TRAFFIC_TYPE_MAX] = { 0 };
     size_t max_db_metrics = 0, max_db_instances = 0, max_db_contexts = 0;
     size_t max_collection_replication_instances = 0, max_streaming_replication_instances = 0;
     size_t max_ml_anomalous = 0, max_ml_normal = 0, max_ml_trained = 0, max_ml_pending = 0, max_ml_silenced = 0;

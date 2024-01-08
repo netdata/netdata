@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#ifndef MQTT_WSS_CPUSTATS
 #define MQTT_WSS_CPUSTATS
+#endif
 
 #include "aclk_stats.h"
 

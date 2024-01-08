@@ -95,8 +95,8 @@ const logs_qry_res_err_t *fetch_log_sources(BUFFER *wb){
         buffer_json_member_add_string(wb, "filename", p_file_infos_arr->data[i]->filename);
         buffer_json_member_add_string(wb, "log_type", log_src_type_t_str[p_file_infos_arr->data[i]->log_type]);
         buffer_json_member_add_string(wb, "db_dir", p_file_infos_arr->data[i]->db_dir);
-        buffer_json_member_add_uint64(wb, "db_version", db_user_version(p_file_infos_arr->data[i]->db, -1));
-        buffer_json_member_add_uint64(wb, "db_flush_freq", db_user_version(p_file_infos_arr->data[i]->db, -1));
+        buffer_json_member_add_int64(wb, "db_version", db_user_version(p_file_infos_arr->data[i]->db, -1));
+        buffer_json_member_add_int64(wb, "db_flush_freq", db_user_version(p_file_infos_arr->data[i]->db, -1));
         buffer_json_member_add_int64( wb, "db_disk_space_limit", p_file_infos_arr->data[i]->blob_max_size * BLOB_MAX_FILES);
         buffer_json_object_close(wb); // options object
     }

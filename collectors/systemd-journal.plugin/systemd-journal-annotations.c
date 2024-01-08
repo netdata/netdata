@@ -712,8 +712,8 @@ void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused,
 
 // ----------------------------------------------------------------------------
 
-static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row __maybe_unused, void *data __maybe_unused) {
-    buffer_json_add_array_item_object(json_array);
-    buffer_json_member_add_string(json_array, "value", buffer_tostring(rkv->wb));
-    buffer_json_object_close(json_array);
-}
+//static void netdata_systemd_journal_rich_message(FACETS *facets __maybe_unused, BUFFER *json_array, FACET_ROW_KEY_VALUE *rkv, FACET_ROW *row __maybe_unused, void *data __maybe_unused) {
+//    buffer_json_add_array_item_object(json_array);
+//    buffer_json_member_add_string(json_array, "value", buffer_tostring(rkv->wb));
+//    buffer_json_object_close(json_array);
+//}

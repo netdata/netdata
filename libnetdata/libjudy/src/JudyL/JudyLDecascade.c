@@ -345,6 +345,7 @@ FUNCTION int j__udyBranchUToBranchB(
 // allocation and free, in order to allow the caller to continue with a LeafB1
 // if allocation fails.
 
+__attribute__((no_sanitize("shift")))
 FUNCTION int j__udyLeafB1ToLeaf1(
 	Pjp_t	  Pjp,		// points to LeafB1 to shrink.
 	Pvoid_t	  Pjpm)		// for global accounting.
@@ -431,6 +432,7 @@ FUNCTION int j__udyLeafB1ToLeaf1(
 // TBD:  In this and all following functions, the caller should already be able
 // to compute the Pop1 return value, so why return it?
 
+__attribute__((no_sanitize("shift")))
 FUNCTION Word_t  j__udyLeaf1ToLeaf2(
 	uint16_t * PLeaf2,	// destination uint16_t * Index portion of leaf.
 #ifdef JUDYL

@@ -116,10 +116,10 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) __attri
 static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) __attribute__((const));
 
 //                                                          sign       div/mul      <--- multiplier / divider --->     10/100       RESET      EXISTS     VALUE
-#define STORAGE_NUMBER_POSITIVE_MAX_RAW (storage_number)( (0 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )
-#define STORAGE_NUMBER_POSITIVE_MIN_RAW (storage_number)( (0 << 31) | (0 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (0 << 26) | (0 << 25) | (1 << 24) | 0x00000001 )
-#define STORAGE_NUMBER_NEGATIVE_MAX_RAW (storage_number)( (1 << 31) | (0 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (0 << 26) | (0 << 25) | (1 << 24) | 0x00000001 )
-#define STORAGE_NUMBER_NEGATIVE_MIN_RAW (storage_number)( (1 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )
+#define STORAGE_NUMBER_POSITIVE_MAX_RAW (storage_number)( (0U << 31) | (1U << 30) | (1U << 29) | (1U << 28) | (1U << 27) | (1U << 26) | (0U << 25) | (1U << 24) | 0x00ffffff )
+#define STORAGE_NUMBER_POSITIVE_MIN_RAW (storage_number)( (0U << 31) | (0U << 30) | (1U << 29) | (1U << 28) | (1U << 27) | (0U << 26) | (0U << 25) | (1U << 24) | 0x00000001 )
+#define STORAGE_NUMBER_NEGATIVE_MAX_RAW (storage_number)( (1U << 31) | (0U << 30) | (1U << 29) | (1U << 28) | (1U << 27) | (0U << 26) | (0U << 25) | (1U << 24) | 0x00000001 )
+#define STORAGE_NUMBER_NEGATIVE_MIN_RAW (storage_number)( (1U << 31) | (1U << 30) | (1U << 29) | (1U << 28) | (1U << 27) | (1U << 26) | (0U << 25) | (1U << 24) | 0x00ffffff )
 
 // accepted accuracy loss
 #define ACCURACY_LOSS_ACCEPTED_PERCENT 0.0001
@@ -155,10 +155,10 @@ static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) {
     // bit 25 SN_FLAG_NOT_ANOMALOUS
 
     // bit 30, 29, 28 = (multiplier or divider) 0-7 (8 total)
-    int mul = (int)((value & ((1<<29)|(1<<28)|(1<<27))) >> 27);
+    int mul = (int)((value & ((1U<<29)|(1U<<28)|(1U<<27))) >> 27);
 
     // bit 24 to bit 1 = the value, so remove all other bits
-    value ^= value & ((1<<31)|(1<<30)|(1<<29)|(1<<28)|(1<<27)|(1<<26)|(1<<25)|(1<<24));
+    value ^= value & ((1U <<31)|(1U <<30)|(1U <<29)|(1U <<28)|(1U <<27)|(1U <<26)|(1U <<25)|(1U<<24));
 
     NETDATA_DOUBLE n = value;
 

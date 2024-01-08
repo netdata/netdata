@@ -79,14 +79,11 @@ static inline int web_client_uncork_socket(struct web_client *w __maybe_unused) 
     return 0;
 }
 
-char *strip_control_characters(char *url) {
-    char *s = url;
-    if(!s) return "";
+static inline char *strip_control_characters(char *url) {
+    if(!url) return "";
 
-    if(iscntrl(*s)) *s = ' ';
-    while(*++s) {
+    for(char *s = url; *s ;s++)
         if(iscntrl(*s)) *s = ' ';
-    }
 
     return url;
 }
@@ -1490,7 +1487,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                 buffer_strcat(w->response.data, "I am doing it already");
 
             netdata_log_error("web request to exit received.");
-            netdata_cleanup_and_exit(0);
+            netdata_cleanup_and_exit(0, NULL, NULL, NULL);
             return HTTP_RESP_OK;
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {

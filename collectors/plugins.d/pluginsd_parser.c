@@ -1375,8 +1375,10 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
             return pluginsd_delete_job(words, num_words, parser);
 
         default:
-            fatal("Unknown keyword '%s' with id %zu", keyword->keyword, keyword->id);
+            break;
     }
+
+    fatal("Unknown keyword '%s' with id %zu", keyword->keyword, keyword->id);
 }
 
 #include "gperf-hashtable.h"

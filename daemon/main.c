@@ -309,7 +309,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 
 void web_client_cache_destroy(void);
 
-void netdata_cleanup_and_exit(int ret) {
+void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
@@ -318,7 +318,13 @@ void netdata_cleanup_and_exit(int ret) {
     nd_log_limits_unlimited();
     netdata_log_info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
 
-    send_statistics("EXIT", ret?"ERROR":"OK","-");
+    // send the stat from our caller
+    analytics_statistic_t statistic = { action, action_result, action_data };
+    analytics_statistic_send(&statistic);
+
+    // notify we are exiting
+    statistic = (analytics_statistic_t) {"EXIT", ret?"ERROR":"OK","-"};
+    analytics_statistic_send(&statistic);
 
     delta_shutdown_time("create shutdown file");
 
@@ -475,6 +481,8 @@ void netdata_cleanup_and_exit(int ret) {
             delta_shutdown_time("stop dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
+
+            rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
         }
 #endif
     }
@@ -1496,11 +1504,11 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
-#endif
 
                         if(strcmp(optarg, "pgd-tests") == 0) {
                             return pgd_test(argc, argv);
                         }
+#endif
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
                             sql_init_database(DB_CHECK_RECOVER, 0);
@@ -2026,6 +2034,15 @@ int main(int argc, char **argv) {
         // setup threads configs
         default_stacksize = netdata_threads_init();
 
+#ifdef NETDATA_INTERNAL_CHECKS
+        config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring", true);
+        config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring extended", true);
+#endif
+
+        if(config_get_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring extended", false))
+            // this has to run before starting any other threads that use workers
+            workers_utilization_enable();
+
         for (i = 0; static_threads[i].name != NULL ; i++) {
             struct netdata_static_thread *st = &static_threads[i];
 
@@ -2205,11 +2222,16 @@ int main(int argc, char **argv) {
     netdata_log_info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
     netdata_ready = true;
 
-    send_statistics("START", "-",  "-");
-    if (crash_detected)
-        send_statistics("CRASH", "-", "-");
-    if (incomplete_shutdown_detected)
-        send_statistics("INCOMPLETE_SHUTDOWN", "-", "-");
+    analytics_statistic_t start_statistic = { "START", "-",  "-" };
+    analytics_statistic_send(&start_statistic);
+    if (crash_detected) {
+        analytics_statistic_t crash_statistic = { "CRASH", "-",  "-" };
+        analytics_statistic_send(&crash_statistic);
+    }
+    if (incomplete_shutdown_detected) {
+        analytics_statistic_t incomplete_shutdown_statistic = { "INCOMPLETE_SHUTDOWN", "-", "-" };
+        analytics_statistic_send(&incomplete_shutdown_statistic);
+    }
 
     //check if ANALYTICS needs to start
     if (netdata_anonymous_statistics_enabled == 1) {
@@ -2231,7 +2253,9 @@ int main(int argc, char **argv) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/.aclk_report_sent", netdata_configured_varlib_dir);
     if (netdata_anonymous_statistics_enabled > 0 && access(filename, F_OK)) { // -1 -> not initialized
-        send_statistics("ACLK_DISABLED", "-", "-");
+        analytics_statistic_t statistic = { "ACLK_DISABLED", "-", "-" };
+        analytics_statistic_send(&statistic);
+
         int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 444);
         if (fd == -1)
             netdata_log_error("Cannot create file '%s'. Please fix this.", filename);

@@ -256,3 +256,6 @@ database/engine/journalfile_v2_virtmemb.ksy
 libnetdata/gorilla/gorilla_benchmark
 libnetdata/gorilla/gorilla_fuzzer
 libnetdata/gorilla/fuzz-*.log
+
+# ignore build/ directory (default dir for many IDEs/LSPs)
+build/

@@ -152,6 +152,7 @@ extern int j__udyLInsertBranch(Pjp_t Pjp, Word_t Index, Word_t Btype, Pjpm_t);
 // Return -1 for error (details in JPM), 0 for Index already inserted, 1 for
 // new Index inserted.
 
+__attribute__((no_sanitize("shift")))
 FUNCTION static int j__udyInsWalk(
         Pjp_t   Pjp,            // current JP to descend.
         Word_t  Index,          // to insert.

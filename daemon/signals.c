@@ -227,7 +227,7 @@ void signals_handle(void) {
                                 nd_log_limits_unlimited();
                                 netdata_log_info("SIGNAL: Received %s. Cleaning up to exit...", name);
                                 commands_exit();
-                                netdata_cleanup_and_exit(0);
+                                netdata_cleanup_and_exit(0, NULL, NULL, NULL);
                                 exit(0);
                                 break;
 

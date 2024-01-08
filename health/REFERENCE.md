@@ -245,7 +245,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`repeat`](#alert-line-repeat)                      | no              | The interval for sending notifications when an alert is in WARNING or CRITICAL mode.  |
 | [`options`](#alert-line-options)                    | no              | Add an option to not clear alerts.                                                    |
 | [`host labels`](#alert-line-host-labels)            | no              | Restrict an alert or template to a list of matching labels present on a host.         |
-| [`chart labels`](#alert-line-chart-labels)          | no              | Restrict an alert or template to a list of matching labels present on a host.         |
+| [`chart labels`](#alert-line-chart-labels)          | no              | Restrict an alert or template to a list of matching labels present on a chart.         |
 | [`summary`](#alert-line-summary)                    | no              | A brief description of the alert.                                                     |
 | [`info`](#alert-line-info)                          | no              | A longer text field that provides more information of this alert                      |
 

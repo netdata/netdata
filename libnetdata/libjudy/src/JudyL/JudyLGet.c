@@ -44,6 +44,8 @@
 // See the manual entry for details.  Note support for "shortcut" entries to
 // trees known to start with a JPM.
 
+__attribute__((no_sanitize("shift")))
+
 #ifdef JUDY1
 
 #ifdef JUDYGETINLINE

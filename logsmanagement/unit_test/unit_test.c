@@ -169,6 +169,7 @@ static int test_compression_decompression() {
         fprintf(stderr, "- Error, original and decompressed data not the same\n");
         ++errors;
     }
+    freez(decompressed_text);
 
     fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
     return errors;
@@ -183,6 +184,7 @@ static int test_read_last_line() {
     #else
     char tmpname[] = "/tmp/tmp.XXXXXX";
     #endif
+    (void) umask(0022);
 
     int fd = mkstemp(tmpname);
     if (fd == -1){
@@ -219,6 +221,7 @@ static int test_read_last_line() {
 
     unlink(tmpname);
     close(fd);
+    fclose(tmpfp);
 
     fprintf(stderr, "%s\n", errors ? "FAIL" : "OK");
     return errors;

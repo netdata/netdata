@@ -291,6 +291,17 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/focal
+legacy: # Info for platforms we used to support and still need to handle packages for
+  - <<: *fedora
+    version: "37"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/37
+  - <<: *opensuse
+    version: "15.4"
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/15.4
 no_include: # Info for platforms not covered in CI
   - distro: docker
     version: "19.03 or newer"

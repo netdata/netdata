@@ -28,6 +28,10 @@ extern "C" {
 #define NETDATA_INTERNAL_CHECKS 1
 #endif
 
+#ifndef SIZEOF_VOID_P
+#error SIZEOF_VOID_P is not defined
+#endif
+
 #if SIZEOF_VOID_P == 4
 #define ENV32BIT 1
 #else
@@ -690,7 +694,7 @@ typedef enum {
 } OPEN_FD_EXCLUDE;
 void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
 
-void netdata_cleanup_and_exit(int ret) NORETURN;
+void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) NORETURN;
 extern char *netdata_configured_host_prefix;
 
 #define XXH_INLINE_ALL

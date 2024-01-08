@@ -27,7 +27,7 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
         return 0;
     }
 
-    if (fractional_digits >= 0 && fractional_digits <= 9) {
+    if (fractional_digits >= 1 && fractional_digits <= 9) {
         int fractional_part = (int)(now_ut % USEC_PER_SEC);
         if (fractional_part && len - used_length > fractional_digits + 1) {
             char format[] = ".%01d";

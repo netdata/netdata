@@ -518,12 +518,12 @@ static size_t sampling_running_file_query_estimate_remaining_lines_by_time(FUNCT
     return remaining_logs_by_time;
 }
 
-static size_t sampling_running_file_query_estimate_remaining_lines(sd_journal *j, FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
-    size_t expected_matching_logs_by_seqnum = 0;
-    double proportion_by_seqnum = 0.0;
+static size_t sampling_running_file_query_estimate_remaining_lines(sd_journal *j __maybe_unused, FUNCTION_QUERY_STATUS *fqs, struct journal_file *jf, FACETS_ANCHOR_DIRECTION direction, usec_t msg_ut) {
     size_t remaining_logs_by_seqnum = 0;
 
 #ifdef HAVE_SD_JOURNAL_GET_SEQNUM
+    size_t expected_matching_logs_by_seqnum = 0;
+    double proportion_by_seqnum = 0.0;
     uint64_t current_msg_seqnum;
     sd_id128_t current_msg_writer;
     if(!fqs->query_file.first_msg_seqnum || sd_journal_get_seqnum(j, &current_msg_seqnum, &current_msg_writer) < 0) {
@@ -1533,7 +1533,6 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
             .stop_monotonic_ut = stop_monotonic_ut,
     };
     FUNCTION_QUERY_STATUS *fqs = NULL;
-    const DICTIONARY_ITEM *fqs_item = NULL;
 
     FACETS *facets = facets_create(50, FACETS_OPTION_ALL_KEYS_FTS,
                                    SYSTEMD_ALWAYS_VISIBLE_KEYS,
@@ -1855,7 +1854,6 @@ void function_systemd_journal(const char *transaction, char *function, usec_t *s
     // put this request into the progress db
 
     fqs = &tmp_fqs;
-    fqs_item = NULL;
 
     // ------------------------------------------------------------------------
     // validate parameters
