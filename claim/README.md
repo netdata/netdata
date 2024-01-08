@@ -69,7 +69,7 @@ When coming from the [Nodes tab](https://github.com/netdata/netdata/blob/master/
 If you want to connect a node that is running on a Linux environment, the script that will be provided to you by Netdata Cloud is the [kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
@@ -98,7 +98,7 @@ The default user is `netdata`. Yours may be different, so pay attention to the o
 and run the script.
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 
 ### Connect an agent running in Docker
@@ -288,7 +288,7 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 To connect a node that is running on a macOS environment the script that will be provided to you by Netdata Cloud is the [kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md#install-netdata-with-our-automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```bash
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install-prefix /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
+curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install-prefix /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud
 ```
 
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
@@ -329,7 +329,7 @@ You can now move on to connecting. When you connect with the [kickstart](https:/
 append the same proxy setting you added to `netdata.conf`.
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud --claim-proxy http://[user:pass@]host:ip
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://app.netdata.cloud --claim-proxy http://[user:pass@]host:ip
 ```
 
 Hit **Enter**. The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if

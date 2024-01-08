@@ -16,22 +16,22 @@
       commands:
         - channel: nightly
           command: >
-            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
             --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
         - channel: stable
           command: >
-            wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
             --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
     - &ks_curl
       method: curl
       commands:
         - channel: nightly
           command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+            curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
             --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
         - channel: stable
           command: >
-            curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
+            curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
             --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
   additional_info: &ref_containers >
     Did you know you can also deploy Netdata on your OS using {% goToCategory navigateToSettings=$navigateToSettings categoryId="deploy.docker-kubernetes" %}Kubernetes{% /goToCategory %} or {% goToCategory categoryId="deploy.docker-kubernetes" %}Docker{% /goToCategory %}?
@@ -594,11 +594,11 @@
       commands:
         - channel: nightly
           command: >
-            fetch -o /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            fetch -o /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
             --nightly-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
         - channel: stable
           command: >
-            fetch -o /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+            fetch -o /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
             --stable-channel{% if $showClaimingOptions %} --claim-token {% claim_token %} --claim-rooms {% $claim_rooms %} --claim-url {% claim_url %}{% /if %}
   additional_info: |
     Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net-mgmt/netdata).

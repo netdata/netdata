@@ -8,13 +8,13 @@
 The recommended method to uninstall Netdata on a system is to use our kickstart installer script with the `--uninstall` option like so:
 
 ```sh
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
 ```
 
 Or (if you have curl but not wget):
 
 ```sh
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
+curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
 ```
 
 This will work in most cases without you needing to do anything more other than accepting removal of configuration
