@@ -146,7 +146,7 @@ option when you install or update Netdata using the [automatic one-line installa
 script](#automatic-one-line-installation-script).
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update

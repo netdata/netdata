@@ -18,7 +18,7 @@ used, read the contents of the `.environment` file and look for a `REINSTALL_OPT
 optional parameters.
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --reinstall
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --reinstall
 ```
 
 ### Performing a clean reinstall
@@ -35,7 +35,7 @@ used, read the contents of the `.environment` file and look for a `REINSTALL_OPT
 optional parameters.
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --reinstall-clean
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --reinstall-clean
 ```
 
 ### Changing the install type of an existing installation
