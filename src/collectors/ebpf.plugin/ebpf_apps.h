@@ -46,6 +46,29 @@
 #define EBPF_CLEANUP_FACTOR 10
 
 // ----------------------------------------------------------------------------
+// Structures used to read information from kernel ring
+typedef struct ebpf_process_stat {
+    uint64_t ct;
+    uint32_t uid;
+    uint32_t gid;
+    char name[TASK_COMM_LEN];
+
+    uint32_t tgid;
+    uint32_t pid;
+
+    //Counter
+    uint32_t exit_call;
+    uint32_t release_call;
+    uint32_t create_process;
+    uint32_t create_thread;
+
+    //Counter
+    uint32_t task_err;
+
+    uint8_t removeme;
+} ebpf_process_stat_t;
+
+// ----------------------------------------------------------------------------
 // pid_stat
 //
 struct ebpf_target {
@@ -67,6 +90,7 @@ struct ebpf_target {
     netdata_publish_vfs_t vfs;
     netdata_fd_stat_t fd;
     netdata_publish_shm_t shm;
+    ebpf_process_stat_t process;
 
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
@@ -117,6 +141,7 @@ typedef struct ebpf_pid_stat {
         netdata_fd_stat_t fd;
         int not_updated;
     } publish_fd;
+    ebpf_process_stat_t process;
 
     struct ebpf_target *target;       // app_groups.conf targets
     struct ebpf_target *user_target;  // uid based targets
@@ -149,29 +174,6 @@ struct ebpf_pid_on_target {
     int32_t pid;
     struct ebpf_pid_on_target *next;
 };
-
-// ----------------------------------------------------------------------------
-// Structures used to read information from kernel ring
-typedef struct ebpf_process_stat {
-    uint64_t ct;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t tgid;
-    uint32_t pid;
-
-    //Counter
-    uint32_t exit_call;
-    uint32_t release_call;
-    uint32_t create_process;
-    uint32_t create_thread;
-
-    //Counter
-    uint32_t task_err;
-
-    uint8_t removeme;
-} ebpf_process_stat_t;
 
 /**
  * Internal function used to write debug messages.
@@ -214,7 +216,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest);
 void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core);
 void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
 
-extern ebpf_process_stat_t **global_process_stats;
 extern netdata_publish_swap_t **swap_pid;
 extern netdata_publish_vfs_t **vfs_pid;
 extern netdata_publish_shm_t **shm_pid;
@@ -260,10 +261,5 @@ extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
 // Threads integrated with apps
 
 #include "libnetdata/threads/threads.h"
-
-// ARAL variables
-extern ARAL *ebpf_aral_apps_pid_stat;
-extern ARAL *ebpf_aral_process_stat;
-#define NETDATA_EBPF_PROC_ARAL_NAME "ebpf_proc_stat"
 
 #endif /* NETDATA_EBPF_APPS_H */

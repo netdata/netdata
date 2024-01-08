@@ -7,7 +7,6 @@
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
 ARAL *ebpf_aral_apps_pid_stat = NULL;
-ARAL *ebpf_aral_process_stat = NULL;
 ARAL *ebpf_aral_socket_pid = NULL;
 ARAL *ebpf_aral_vfs_pid = NULL;
 ARAL *ebpf_aral_shm_pid = NULL;
@@ -18,7 +17,6 @@ ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 netdata_publish_swap_t **swap_pid = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
 netdata_publish_shm_t **shm_pid = NULL;
-ebpf_process_stat_t **global_process_stats = NULL;
 
 /**
  * eBPF ARAL Init
@@ -34,8 +32,6 @@ void ebpf_aral_init(void)
     }
 
     ebpf_aral_apps_pid_stat = ebpf_allocate_pid_aral("ebpf_pid_stat", sizeof(struct ebpf_pid_stat));
-
-    ebpf_aral_process_stat = ebpf_allocate_pid_aral(NETDATA_EBPF_PROC_ARAL_NAME, sizeof(ebpf_process_stat_t));
 
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
@@ -64,36 +60,6 @@ struct ebpf_pid_stat *ebpf_pid_stat_get(void)
 void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
 {
     aral_freez(ebpf_aral_apps_pid_stat, stat);
-}
-
-/*****************************************************************
- *
- *  PROCESS ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF process stat get
- *
- * Get a ebpf_pid_stat entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-ebpf_process_stat_t *ebpf_process_stat_get(void)
-{
-    ebpf_process_stat_t *target = aral_mallocz(ebpf_aral_process_stat);
-    memset(target, 0, sizeof(ebpf_process_stat_t));
-    return target;
-}
-
-/**
- * eBPF process release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_process_stat_release(ebpf_process_stat_t *stat)
-{
-    aral_freez(ebpf_aral_process_stat, stat);
 }
 
 /*****************************************************************
@@ -1137,12 +1103,6 @@ void cleanup_exited_pids()
             pid_t r = p->pid;
             p = p->next;
 
-            // Clean process structure
-            if (global_process_stats) {
-                ebpf_process_stat_release(global_process_stats[r]);
-                global_process_stats[r] = NULL;
-            }
-
             cleanup_variables_from_other_threads(r);
 
             del_pid_entry(r);
@@ -1239,6 +1199,31 @@ void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core)
 }
 
 /**
+ * Sum values for pid
+ *
+ * @param structure to store result.
+ * @param root the structure with all available PIDs
+ */
+void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_pid_on_target *root)
+{
+    memset(process, 0, sizeof(ebpf_process_stat_t));
+    while (root) {
+        int32_t pid = root->pid;
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+        if (local_pid) {
+            ebpf_process_stat_t *in = &local_pid->process;
+            process->task_err = in->task_err;
+            process->release_call = in->release_call;
+            process->exit_call = in->exit_call;
+            process->create_thread = in->create_thread;
+            process->create_process = in->create_process;
+        }
+
+        root = root->next;
+    }
+}
+
+/**
  * Collect data for all process
  *
  * Read data from hash table and store it in appropriate vectors.
@@ -1279,12 +1264,11 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 
         uint32_t key = 0, next_key = 0;
         while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-            ebpf_process_stat_t *w = global_process_stats[key];
-            if (!w) {
-                w = ebpf_process_stat_get();
-                global_process_stats[key] = w;
-            }
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key);
+            if (!local_pid)
+                goto end_process_loop;
 
+            ebpf_process_stat_t *w = &local_pid->process;
             if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, process_stat_vector)) {
                 goto end_process_loop;
             }
@@ -1311,4 +1295,14 @@ end_process_loop:
         aggregate_pid_on_target(pids->target, pids, NULL);
 
     post_aggregate_targets(apps_groups_root_target);
+
+
+    struct ebpf_target *w;
+    for (w = apps_groups_root_target; w; w = w->next) {
+        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_PROCESS_IDX))))
+            continue;
+
+        ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
+        pids = pids->next;
+    }
 }
