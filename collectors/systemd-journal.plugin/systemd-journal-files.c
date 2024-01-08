@@ -715,7 +715,7 @@ void journal_files_registry_update(void) {
 
         for(unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES; i++) {
             if(!journal_directories[i].path) break;
-            journal_directory_scan_recursively(files, dirs, journal_directories[i].path, 0);
+            journal_directory_scan_recursively(files, dirs, string2str(journal_directories[i].path), 0);
         }
 
         const char **array = mallocz(sizeof(const char *) * dictionary_entries(files));
@@ -819,15 +819,15 @@ void journal_init_files_and_directories(void) {
     // ------------------------------------------------------------------------
     // setup the journal directories
 
-    journal_directories[d++].path = strdupz("/run/log/journal");
-    journal_directories[d++].path = strdupz("/var/log/journal");
+    journal_directories[d++].path = string_strdupz("/run/log/journal");
+    journal_directories[d++].path = string_strdupz("/var/log/journal");
 
     if(*netdata_configured_host_prefix) {
         char path[PATH_MAX];
         snprintfz(path, sizeof(path), "%s/var/log/journal", netdata_configured_host_prefix);
-        journal_directories[d++].path = strdupz(path);
+        journal_directories[d++].path = string_strdupz(path);
         snprintfz(path, sizeof(path), "%s/run/log/journal", netdata_configured_host_prefix);
-        journal_directories[d++].path = strdupz(path);
+        journal_directories[d++].path = string_strdupz(path);
     }
 
     // terminate the list

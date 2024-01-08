@@ -292,8 +292,16 @@ static void process_pending(Watcher *watcher) {
     dictionary_garbage_collect(watcher->pending);
 }
 
+size_t journal_watcher_wanted_session_id = 0;
+
+void journal_watcher_restart(void) {
+    __atomic_add_fetch(&journal_watcher_wanted_session_id, 1, __ATOMIC_RELAXED);
+}
+
 void *journal_watcher_main(void *arg __maybe_unused) {
     while(1) {
+        size_t journal_watcher_session_id = journal_watcher_wanted_session_id;
+
         Watcher watcher = {
                 .watchList = mallocz(INITIAL_WATCHES * sizeof(WatchEntry)),
                 .freeList = NULL,
@@ -312,12 +320,12 @@ void *journal_watcher_main(void *arg __maybe_unused) {
 
         for (unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES; i++) {
             if (!journal_directories[i].path) break;
-            watch_directory_and_subdirectories(&watcher, inotifyFd, journal_directories[i].path);
+            watch_directory_and_subdirectories(&watcher, inotifyFd, string2str(journal_directories[i].path));
         }
 
         usec_t last_headers_update_ut = now_monotonic_usec();
         struct buffered_reader reader;
-        while (1) {
+        while (journal_watcher_session_id == __atomic_load_n(&journal_watcher_wanted_session_id, __ATOMIC_RELAXED)) {
             buffered_reader_ret_t rc = buffered_reader_read_timeout(
                     &reader, inotifyFd, SYSTEMD_JOURNAL_EXECUTE_WATCHER_PENDING_EVERY_MS, false);
 
@@ -372,7 +380,7 @@ void *journal_watcher_main(void *arg __maybe_unused) {
         // this will scan the directories and cleanup the registry
         journal_files_registry_update();
 
-        sleep_usec(5 * USEC_PER_SEC);
+        sleep_usec(2 * USEC_PER_SEC);
     }
 
     return NULL;

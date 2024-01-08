@@ -11,7 +11,7 @@ static bool plugin_should_exit = false;
 static bool journal_data_direcories_exist() {
     struct stat st;
     for (unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES && journal_directories[i].path; i++) {
-        if ((stat(journal_directories[i].path, &st) == 0) && S_ISDIR(st.st_mode))
+        if ((stat(string2str(journal_directories[i].path), &st) == 0) && S_ISDIR(st.st_mode))
             return true;
     }
     return false;
@@ -89,16 +89,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
                                   NULL);
 #endif
 
-    functions_evloop_dyncfg_add(
-        wg,
-        "systemd-journal:monitored-directories",
-        "/collectors/logs/systemd-journal",
-        DYNCFG_TYPE_TEMPLATE,
-        DYNCFG_SOURCE_TYPE_INTERNAL,
-        "internal",
-        DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
-        systemd_journal_directories_dyncfg_cb,
-        NULL);
+    systemd_journal_dyncfg_init(wg);
 
     // ------------------------------------------------------------------------
     // register functions to netdata

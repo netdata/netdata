@@ -241,6 +241,7 @@ int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BU
     struct inflight_function *t = dictionary_set(parser->inflight.functions, transaction_str, &tmp, sizeof(struct inflight_function));
     if(!t->sent_successfully) {
         int code = t->code;
+        dictionary_write_unlock(parser->inflight.functions);
         dictionary_del(parser->inflight.functions, transaction_str);
         pluginsd_inflight_functions_garbage_collect(parser, now_ut);
         return code;

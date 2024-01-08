@@ -39,6 +39,9 @@ void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code, void *result_cb_data) {
 }
 
 void dyncfg_echo_status(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe_unused) {
+    if (!(df->cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE)))
+        return;
+
     struct dyncfg_echo *e = callocz(1, sizeof(struct dyncfg_echo));
     e->item = dictionary_acquired_item_dup(dyncfg_globals.nodes, item);
     e->wb = buffer_create(0, NULL);

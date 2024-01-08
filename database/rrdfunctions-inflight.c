@@ -220,8 +220,6 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     BUFFER *temp_wb  = buffer_create(1024, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
     temp_wb->content_type = r->result.wb->content_type;
 
-    netdata_mutex_lock(&tmp->mutex);
-
     int code = r->rdcf->execute_cb(&r->transaction_uuid, temp_wb, r->payload,
                                    &r->stop_monotonic_ut, r->sanitized_cmd, r->rdcf->execute_cb_data,
                                    // we overwrite the result callbacks,
@@ -232,7 +230,11 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
                                    rrd_inflight_async_function_register_canceller_cb, r,
                                    rrd_inflight_async_function_register_progresser_cb, r);
 
-    if (code == HTTP_RESP_OK) {
+    // this has to happen after we execute the callback
+    // because if an async call is responded in sync mode, there will be a deadlock.
+    netdata_mutex_lock(&tmp->mutex);
+
+    if (code == HTTP_RESP_OK || tmp->data_are_ready) {
         bool cancelled = false;
         int rc = 0;
         while (rc == 0 && !cancelled && !tmp->data_are_ready) {
@@ -314,6 +316,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
         }
     }
     else {
+        // the response is not ok, and we don't have the data
         tmp->free_with_signal = true;
         we_should_free = false;
     }
