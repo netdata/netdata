@@ -52,7 +52,7 @@ installation script in dry-run mode to attempt to determine what method to use t
 command:
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --dry-run
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --dry-run
 ```
 
 Note that if you installed Netdata using an installation prefix, you will need to add an `--install-prefix` option
@@ -75,7 +75,7 @@ If you installed Netdata using an installation prefix, you will need to add an `
 that prefix to this command to make sure it finds Netdata.
 
 ```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
 ### Issues with older binpkg installs

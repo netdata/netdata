@@ -33,7 +33,7 @@ The simplest method is to use the single line [kickstart script](https://learn.n
 If you have a Netdata cloud account then clicking on the **Connect Nodes** button will generate the kickstart command you should use. Use the command from the "Linux" tab, it should look something like this:
 
 ```sh
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <CLAIM_TOKEN> --claim-url https://app.netdata.cloud
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <CLAIM_TOKEN> --claim-url https://app.netdata.cloud
 ```
 Please respond in the affirmative for any relevant prompts during the installation process. 
 

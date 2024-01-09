@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#16739](https://github.com/netdata/netdata/pull/16739) ([netdatabot](https://github.com/netdatabot))
+- change get kickstart url to https://get.netdata.cloud/kickstart.sh [\#16738](https://github.com/netdata/netdata/pull/16738) ([ilyam8](https://github.com/ilyam8))
 - health: add httpcheck bad header alert [\#16736](https://github.com/netdata/netdata/pull/16736) ([ilyam8](https://github.com/ilyam8))
 - fix missing CPU frequency [\#16732](https://github.com/netdata/netdata/pull/16732) ([ilyam8](https://github.com/ilyam8))
 - fix excessive "maximum number of cgroups reached" log messages [\#16730](https://github.com/netdata/netdata/pull/16730) ([ilyam8](https://github.com/ilyam8))
@@ -72,6 +74,7 @@
 - Remove assert [\#16611](https://github.com/netdata/netdata/pull/16611) ([stelfrag](https://github.com/stelfrag))
 - Remove CPack stuff from CMake [\#16608](https://github.com/netdata/netdata/pull/16608) ([vkalintiris](https://github.com/vkalintiris))
 - Remove includes outside of libnetdata. [\#16607](https://github.com/netdata/netdata/pull/16607) ([vkalintiris](https://github.com/vkalintiris))
+- Fix \(and improve\) Coverity scanning. [\#16605](https://github.com/netdata/netdata/pull/16605) ([Ferroin](https://github.com/Ferroin))
 - remove v1 dashboard version check from installer [\#16603](https://github.com/netdata/netdata/pull/16603) ([ilyam8](https://github.com/ilyam8))
 - fix not assigned proc\_count in installer [\#16602](https://github.com/netdata/netdata/pull/16602) ([ilyam8](https://github.com/ilyam8))
 - improve enable\_feature function in the installer [\#16601](https://github.com/netdata/netdata/pull/16601) ([ilyam8](https://github.com/ilyam8))
@@ -418,8 +421,6 @@
 - Add icons to integrations markdown files [\#16169](https://github.com/netdata/netdata/pull/16169) ([Ancairon](https://github.com/Ancairon))
 - Fix netdata-uninstaller; blindly deletes NETDATA\_PREFIX env var [\#16167](https://github.com/netdata/netdata/pull/16167) ([tkatsoulas](https://github.com/tkatsoulas))
 - apps: remove mem\_private on FreeBSD [\#16166](https://github.com/netdata/netdata/pull/16166) ([ilyam8](https://github.com/ilyam8))
-- fix repo path for openSUSE 15.5 packages [\#16161](https://github.com/netdata/netdata/pull/16161) ([tkatsoulas](https://github.com/tkatsoulas))
-- Modify eBPF exit [\#16159](https://github.com/netdata/netdata/pull/16159) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
