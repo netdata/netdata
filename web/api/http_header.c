@@ -55,6 +55,7 @@ static void web_client_enable_deflate(struct web_client *w, bool gzip) {
 }
 
 static void http_header_origin(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    freez(w->origin);
     w->origin = strdupz(v);
 }
 
@@ -71,17 +72,21 @@ static void http_header_dnt(struct web_client *w, const char *v, size_t len __ma
 }
 
 static void http_header_user_agent(struct web_client *w, const char *v, size_t len __maybe_unused) {
-    if(w->mode == HTTP_REQUEST_MODE_STREAM)
+    if(w->mode == HTTP_REQUEST_MODE_STREAM) {
+        freez(w->user_agent);
         w->user_agent = strdupz(v);
+    }
 }
 
 static void http_header_x_auth_token(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    freez(w->auth_bearer_token);
     w->auth_bearer_token = strdupz(v);
 }
 
 static void http_header_host(struct web_client *w, const char *v, size_t len) {
     char buffer[NI_MAXHOST];
     strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
+    freez(w->server_host);
     w->server_host = strdupz(buffer);
 }
 
@@ -99,12 +104,14 @@ static void http_header_accept_encoding(struct web_client *w, const char *v, siz
 static void http_header_x_forwarded_host(struct web_client *w, const char *v, size_t len) {
     char buffer[NI_MAXHOST];
     strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
+    freez(w->forwarded_host);
     w->forwarded_host = strdupz(buffer);
 }
 
 static void http_header_x_forwarded_for(struct web_client *w, const char *v, size_t len) {
     char buffer[NI_MAXHOST];
     strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
+    freez(w->forwarded_for);
     w->forwarded_for = strdupz(buffer);
 }
 

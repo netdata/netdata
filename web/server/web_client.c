@@ -219,6 +219,9 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
             ND_LOG_FIELD_U64(NDF_RESPONSE_PREPARATION_TIME_USEC, prep_ut),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_TIME_USEC, sent_ut),
             ND_LOG_FIELD_U64(NDF_RESPONSE_TOTAL_TIME_USEC, total_ut),
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
             ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
             ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
@@ -246,17 +249,6 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
 }
 
 void web_client_request_done(struct web_client *w) {
-    ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
-            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
-            ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
-            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
-            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
-            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
-            ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
     web_client_uncork_socket(w);
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
