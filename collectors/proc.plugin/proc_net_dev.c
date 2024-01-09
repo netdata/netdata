@@ -1109,7 +1109,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
 
         enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
-        enable_record_disabled_interfaces = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "record disabled interfaces", CONFIG_BOOLEAN_YES);
+        enable_record_disabled_interfaces = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "enable record disabled interfaces", CONFIG_BOOLEAN_YES);
 
         do_bandwidth    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "bandwidth for all interfaces", CONFIG_BOOLEAN_AUTO);
         do_packets      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "packets for all interfaces", CONFIG_BOOLEAN_AUTO);
