@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "plugin_proc.h"
+#include "proc_net_dev_renames.h"
 
 #define PLUGIN_PROC_MODULE_NETDEV_NAME "/proc/net/dev"
 #define CONFIG_SECTION_PLUGIN_PROC_NETDEV "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_NETDEV_NAME
@@ -13,19 +14,13 @@
 
 time_t double_linked_device_collect_delay_secs = 120;
 
-void cgroup_netdev_reset_all(void);
-void cgroup_netdev_release(const DICTIONARY_ITEM *link);
-const void *cgroup_netdev_dup(const DICTIONARY_ITEM *link);
-void cgroup_netdev_add_bandwidth(const DICTIONARY_ITEM *link, NETDATA_DOUBLE received, NETDATA_DOUBLE sent);
-
 enum {
     NETDEV_DUPLEX_UNKNOWN,
     NETDEV_DUPLEX_HALF,
     NETDEV_DUPLEX_FULL
 };
 
-static const char *get_duplex_string(int duplex)
-{
+static const char *get_duplex_string(int duplex) {
     switch (duplex) {
         case NETDEV_DUPLEX_FULL:
             return "full";
@@ -46,8 +41,7 @@ enum {
     NETDEV_OPERSTATE_UP
 };
 
-static inline int get_operstate(char *operstate)
-{
+static inline int get_operstate(char *operstate) {
     // As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
     if (!strcmp(operstate, "up"))
         return NETDEV_OPERSTATE_UP;
@@ -65,8 +59,7 @@ static inline int get_operstate(char *operstate)
     return NETDEV_OPERSTATE_UNKNOWN;
 }
 
-static const char *get_operstate_string(int operstate)
-{
+static const char *get_operstate_string(int operstate) {
     switch (operstate) {
         case NETDEV_OPERSTATE_UP:
             return "up";
@@ -94,13 +87,11 @@ static struct netdev {
     size_t len;
 
     // flags
-    int virtual;
-    int configured;
+    bool virtual;
+    bool configured;
     int enabled;
-    int updated;
-
+    bool updated;
     bool function_ready;
-
     bool double_linked; // iflink != ifindex
 
     time_t discover_time;
@@ -255,10 +246,8 @@ static struct netdev {
 
     const DICTIONARY_ITEM *cgroup_netdev_link;
 
-    struct netdev *next;
-} *netdev_root = NULL, *netdev_last_used = NULL;
-
-static size_t netdev_added = 0, netdev_found = 0;
+    struct netdev *prev, *next;
+} *netdev_root = NULL;
 
 // ----------------------------------------------------------------------------
 
@@ -382,133 +371,21 @@ static void netdev_free(struct netdev *d) {
     freez((void *)d->filename_carrier);
     freez((void *)d->filename_mtu);
     freez((void *)d);
-    netdev_added--;
 }
+
+static netdata_mutex_t netdev_mutex = NETDATA_MUTEX_INITIALIZER;
 
 // ----------------------------------------------------------------------------
-// netdev renames
 
-static struct netdev_rename {
-    const char *host_device;
-    uint32_t hash;
-
-    const char *container_device;
-    const char *container_name;
-    const char *ctx_prefix;
-
-    RRDLABELS *chart_labels;
-
-    int processed;
-
-    const DICTIONARY_ITEM *cgroup_netdev_link;
-
-    struct netdev_rename *next;
-} *netdev_rename_root = NULL;
-
-static int netdev_pending_renames = 0;
-static netdata_mutex_t netdev_rename_mutex = NETDATA_MUTEX_INITIALIZER;
-static netdata_mutex_t netdev_dev_mutex = NETDATA_MUTEX_INITIALIZER;
-
-static struct netdev_rename *netdev_rename_find(const char *host_device, uint32_t hash) {
-    struct netdev_rename *r;
-
-    for(r = netdev_rename_root; r ; r = r->next)
-        if(r->hash == hash && !strcmp(host_device, r->host_device))
-            return r;
-
-    return NULL;
-}
-
-// other threads can call this function to register a rename to a netdev
-void netdev_rename_device_add(
-    const char *host_device,
-    const char *container_device,
-    const char *container_name,
-    RRDLABELS *labels,
-    const char *ctx_prefix,
-    const DICTIONARY_ITEM *cgroup_netdev_link)
-{
-    netdata_mutex_lock(&netdev_rename_mutex);
-
-    uint32_t hash = simple_hash(host_device);
-    struct netdev_rename *r = netdev_rename_find(host_device, hash);
-    if(!r) {
-        r = callocz(1, sizeof(struct netdev_rename));
-        r->host_device      = strdupz(host_device);
-        r->container_device = strdupz(container_device);
-        r->container_name   = strdupz(container_name);
-        r->ctx_prefix       = strdupz(ctx_prefix);
-        r->chart_labels     = rrdlabels_create();
-        rrdlabels_migrate_to_these(r->chart_labels, labels);
-        r->hash             = hash;
-        r->next             = netdev_rename_root;
-        r->processed        = 0;
-        r->cgroup_netdev_link = cgroup_netdev_link;
-
-        netdev_rename_root  = r;
-        netdev_pending_renames++;
-        collector_info("CGROUP: registered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
-    }
-    else {
-        if(strcmp(r->container_device, container_device) != 0 || strcmp(r->container_name, container_name) != 0) {
-            freez((void *) r->container_device);
-            freez((void *) r->container_name);
-
-            r->container_device = strdupz(container_device);
-            r->container_name   = strdupz(container_name);
-
-            rrdlabels_migrate_to_these(r->chart_labels, labels);
-            
-            r->processed        = 0;
-            r->cgroup_netdev_link = cgroup_netdev_link;
-
-            netdev_pending_renames++;
-            collector_info("CGROUP: altered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
-        }
-    }
-
-    netdata_mutex_unlock(&netdev_rename_mutex);
-}
-
-// other threads can call this function to delete a rename to a netdev
-void netdev_rename_device_del(const char *host_device) {
-    netdata_mutex_lock(&netdev_rename_mutex);
-
-    struct netdev_rename *r, *last = NULL;
-
-    uint32_t hash = simple_hash(host_device);
-    for(r = netdev_rename_root; r ; last = r, r = r->next) {
-        if (r->hash == hash && !strcmp(host_device, r->host_device)) {
-            if (netdev_rename_root == r)
-                netdev_rename_root = r->next;
-            else if (last)
-                last->next = r->next;
-
-            if(!r->processed)
-                netdev_pending_renames--;
-
-            collector_info("CGROUP: unregistered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
-
-            freez((void *) r->host_device);
-            freez((void *) r->container_name);
-            freez((void *) r->container_device);
-            freez((void *) r->ctx_prefix);
-            rrdlabels_destroy(r->chart_labels);
-            cgroup_netdev_release(r->cgroup_netdev_link);
-            freez((void *) r);
-            break;
-        }
-    }
-
-    netdata_mutex_unlock(&netdev_rename_mutex);
-}
-
-static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *r) {
-    collector_info("CGROUP: renaming network interface '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
+static inline void netdev_rename(struct netdev *d, struct rename_task *r) {
+    collector_info("CGROUP: renaming network interface '%s' as '%s' under '%s'", d->name, r->container_device, r->container_name);
 
     netdev_charts_release(d);
     netdev_free_chart_strings(d);
+
+    cgroup_netdev_release(d->cgroup_netdev_link);
     d->cgroup_netdev_link = cgroup_netdev_dup(r->cgroup_netdev_link);
+    d->discover_time = 0;
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
 
@@ -585,31 +462,13 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     d->flipped = 1;
 }
 
-static inline void netdev_rename(struct netdev *d) {
-    struct netdev_rename *r = netdev_rename_find(d->name, d->hash);
-    if(unlikely(r && !r->processed)) {
-        netdev_rename_cgroup(d, r);
-        r->processed = 1;
-        d->discover_time = 0;
-        netdev_pending_renames--;
+static void netdev_rename_this_device(struct netdev *d) {
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(netdev_renames, d->name);
+    if(item) {
+        struct rename_task *r = dictionary_acquired_item_value(item);
+        netdev_rename(d, r);
+        dictionary_acquired_item_release(netdev_renames, item);
     }
-}
-
-static inline void netdev_rename_lock(struct netdev *d) {
-    netdata_mutex_lock(&netdev_rename_mutex);
-    netdev_rename(d);
-    netdata_mutex_unlock(&netdev_rename_mutex);
-}
-
-static inline void netdev_rename_all_lock(void) {
-    netdata_mutex_lock(&netdev_rename_mutex);
-
-    struct netdev *d;
-    for(d = netdev_root; d ; d = d->next)
-        netdev_rename(d);
-
-    netdev_pending_renames = 0;
-    netdata_mutex_unlock(&netdev_rename_mutex);
 }
 
 // ----------------------------------------------------------------------------
@@ -645,11 +504,11 @@ int netdev_function_net_interfaces(uuid_t *transaction __maybe_unused, BUFFER *w
     double max_drops_rx = 0.0;
     double max_drops_tx = 0.0;
 
-    netdata_mutex_lock(&netdev_dev_mutex);
+    netdata_mutex_lock(&netdev_mutex);
 
     RRDDIM *rd = NULL;
 
-    for (struct netdev *d = netdev_root; d != netdev_last_used; d = d->next) {
+    for (struct netdev *d = netdev_root; d ; d = d->next) {
         if (unlikely(!d->function_ready))
             continue;
 
@@ -709,7 +568,7 @@ int netdev_function_net_interfaces(uuid_t *transaction __maybe_unused, BUFFER *w
         buffer_json_array_close(wb);
     }
 
-    netdata_mutex_unlock(&netdev_dev_mutex);
+    netdata_mutex_unlock(&netdev_mutex);
 
     buffer_json_array_close(wb); // data
     buffer_json_member_add_object(wb, "columns");
@@ -918,49 +777,26 @@ int netdev_function_net_interfaces(uuid_t *transaction __maybe_unused, BUFFER *w
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
     buffer_json_finalize(wb);
 
-    int response = HTTP_RESP_OK;
-    if(is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data)) {
-        buffer_flush(wb);
-        response = HTTP_RESP_CLIENT_CLOSED_REQUEST;
-    }
-
-    if(result_cb)
-        result_cb(wb, response, result_cb_data);
-
-    return response;
+    return HTTP_RESP_OK;
 }
 
 // netdev data collection
 
 static void netdev_cleanup() {
-    if(likely(netdev_found == netdev_added)) return;
-
-    netdev_added = 0;
-    struct netdev *d = netdev_root, *last = NULL;
+    struct netdev *d = netdev_root;
     while(d) {
         if(unlikely(!d->updated)) {
-            // collector_info("Removing network device '%s', linked after '%s'", d->name, last?last->name:"ROOT");
+            struct netdev *next = d->next; // keep the next, to continue;
 
-            if(netdev_last_used == d)
-                netdev_last_used = last;
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(netdev_root, d, prev, next);
 
-            struct netdev *t = d;
-
-            if(d == netdev_root || !last)
-                netdev_root = d = d->next;
-
-            else
-                last->next = d = d->next;
-
-            t->next = NULL;
-            netdev_free(t);
+            netdev_free(d);
+            d = next;
+            continue;
         }
-        else {
-            netdev_added++;
-            last = d;
-            d->updated = 0;
-            d = d->next;
-        }
+
+        d->updated = false;
+        d = d->next;
     }
 }
 
@@ -970,19 +806,9 @@ static struct netdev *get_netdev(const char *name) {
     uint32_t hash = simple_hash(name);
 
     // search it, from the last position to the end
-    for(d = netdev_last_used ; d ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
-            netdev_last_used = d->next;
+    for(d = netdev_root ; d ; d = d->next) {
+        if(unlikely(hash == d->hash && !strcmp(name, d->name)))
             return d;
-        }
-    }
-
-    // search it from the beginning to the last position we used
-    for(d = netdev_root ; d != netdev_last_used ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
-            netdev_last_used = d->next;
-            return d;
-        }
     }
 
     // create a new one
@@ -1036,18 +862,7 @@ static struct netdev *get_netdev(const char *name) {
     d->chart_family = strdupz(d->name);
     d->priority = NETDATA_CHART_PRIO_FIRST_NET_IFACE;
 
-    netdev_rename_lock(d);
-
-    netdev_added++;
-
-    // link it to the end
-    if(netdev_root) {
-        struct netdev *e;
-        for(e = netdev_root; e->next ; e = e->next) ;
-        e->next = d;
-    }
-    else
-        netdev_root = d;
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(netdev_root, d, prev, next);
 
     return d;
 }
@@ -1125,6 +940,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         disabled_list = simple_pattern_create(
                 config_get(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "disable by default interfaces matching",
                            "lo fireqos* *-ifb fwpr* fwbr* fwln*"), NULL, SIMPLE_PATTERN_EXACT, true);
+
+        netdev_renames_init();
     }
 
     if(unlikely(!ff)) {
@@ -1134,12 +951,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
-
-    // rename all the devices, if we have pending renames
-    if(unlikely(netdev_pending_renames))
-        netdev_rename_all_lock();
-
-    netdev_found = 0;
 
     kernel_uint_t system_rbytes = 0;
     kernel_uint_t system_tbytes = 0;
@@ -1156,14 +967,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if(name[len - 1] == ':') name[len - 1] = '\0';
 
         struct netdev *d = get_netdev(name);
-        d->updated = 1;
-        netdev_found++;
+        d->updated = true;
 
         if(unlikely(!d->configured)) {
-            // this is the first time we see this interface
+            // the first time we see this interface
 
             // remember we configured it
-            d->configured = 1;
+            d->configured = true;
             d->discover_time = now;
 
             d->enabled = enable_new_interfaces;
@@ -1174,12 +984,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             char buf[FILENAME_MAX + 1];
             snprintfz(buf, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
 
-            d->virtual = likely(access(buf, R_OK) == 0) ? 1 : 0;
+            d->virtual = likely(access(buf, R_OK) == 0) ? true : false;
 
             // At least on Proxmox inside LXC: eth0 is virtual.
             // Virtual interfaces are not taken into account in system.net calculations
             if (inside_lxc_container && d->virtual && strncmp(d->name, "eth", 3) == 0)
-                d->virtual = 0;
+                d->virtual = false;
 
             if (d->virtual)
                 rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO);
@@ -1260,13 +1070,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if(unlikely(!d->enabled))
             continue;
 
+        if(!d->cgroup_netdev_link)
+            netdev_rename_this_device(d);
+
         // See https://github.com/netdata/netdata/issues/15206
         // This is necessary to prevent the creation of charts for virtual interfaces that will later be 
         // recreated as container interfaces (create container) or
         // rediscovered and recreated only to be deleted almost immediately (stop/remove container)
-        if (d->double_linked && d->virtual && (now - d->discover_time < double_linked_device_collect_delay_secs)) {
+        if (d->double_linked && d->virtual && (now - d->discover_time < double_linked_device_collect_delay_secs))
             continue;
-        }
 
         if(likely(d->do_bandwidth != CONFIG_BOOLEAN_NO || !d->virtual)) {
             d->rbytes      = str2kernel_uint_t(procfile_lineword(ff, l, 1));
@@ -1974,10 +1786,10 @@ void *netdev_main(void *ptr)
 
             worker_is_busy(0);
 
-            netdata_mutex_lock(&netdev_dev_mutex);
+            netdata_mutex_lock(&netdev_mutex);
             if (do_proc_net_dev(localhost->rrd_update_every, hb_dt))
                 break;
-            netdata_mutex_unlock(&netdev_dev_mutex);
+            netdata_mutex_unlock(&netdev_mutex);
         }
     }
     netdata_thread_cleanup_pop(1);

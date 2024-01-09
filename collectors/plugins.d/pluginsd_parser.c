@@ -1225,7 +1225,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
         ND_LOG_STACK_PUSH(lgs);
 
         buffered_reader_init(&parser->reader);
-        BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
+        CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
         while(likely(service_running(SERVICE_COLLECTORS))) {
 
             if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
@@ -1247,7 +1247,6 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
             buffer->len = 0;
             buffer->buffer[0] = '\0';
         }
-        buffer_free(buffer);
 
         cd->unsafe.enabled = parser->user.enabled;
         count = parser->user.data_collections_count;
