@@ -210,6 +210,8 @@ static struct {
         , { "bmp"  , 0    , CT_IMAGE_BMP }
         , { "ico"  , 0    , CT_IMAGE_XICON }
         , { "icns" , 0    , CT_IMAGE_ICNS }
+
+        // terminator
         , { NULL   , 0    , 0 }
 };
 

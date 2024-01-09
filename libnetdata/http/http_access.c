@@ -5,7 +5,7 @@
 static struct {
     HTTP_ACCESS access;
     const char *name;
-} rrd_function_access_levels[] = {
+} access_levels[] = {
     { .access = HTTP_ACCESS_NONE, .name = "none" },
     { .access = HTTP_ACCESS_MEMBER, .name = "member" },
     { .access = HTTP_ACCESS_ADMIN, .name = "admin" },
@@ -14,16 +14,18 @@ static struct {
     { .access = HTTP_ACCESS_MEMBER, .name = "members" },
     { .access = HTTP_ACCESS_ADMIN, .name = "admins" },
     { .access = HTTP_ACCESS_ANY, .name = "all" },
+
+    // terminator
+    { .access = 0, .name = NULL },
 };
 
 HTTP_ACCESS http_access2id(const char *access) {
     if(!access || !*access)
         return HTTP_ACCESS_MEMBER;
 
-    size_t entries = sizeof(rrd_function_access_levels) / sizeof(rrd_function_access_levels[0]);
-    for(size_t i = 0; i < entries ;i++) {
-        if(strcmp(rrd_function_access_levels[i].name, access) == 0)
-            return rrd_function_access_levels[i].access;
+    for(size_t i = 0; access_levels[i].name ;i++) {
+        if(strcmp(access_levels[i].name, access) == 0)
+            return access_levels[i].access;
     }
 
     nd_log(NDLS_DAEMON, NDLP_WARNING, "HTTP access level '%s' is not valid", access);
@@ -31,10 +33,9 @@ HTTP_ACCESS http_access2id(const char *access) {
 }
 
 const char *http_id2access(HTTP_ACCESS access) {
-    size_t entries = sizeof(rrd_function_access_levels) / sizeof(rrd_function_access_levels[0]);
-    for(size_t i = 0; i < entries ;i++) {
-        if(access == rrd_function_access_levels[i].access)
-            return rrd_function_access_levels[i].name;
+    for(size_t i = 0; i < access_levels[i].name ;i++) {
+        if(access == access_levels[i].access)
+            return access_levels[i].name;
     }
 
     nd_log(NDLS_DAEMON, NDLP_WARNING, "HTTP access level %d is not valid", access);
