@@ -137,6 +137,9 @@ const char *dyncfg_id2cmd_one(DYNCFG_CMDS cmd) {
 }
 
 DYNCFG_CMDS dyncfg_cmds2id(const char *cmds) {
+    if(!cmds || !*cmds)
+        return DYNCFG_CMD_NONE;
+    
     DYNCFG_CMDS result = DYNCFG_CMD_NONE;
     const char *p = cmds;
     size_t len, i;
