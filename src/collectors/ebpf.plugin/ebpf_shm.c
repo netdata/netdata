@@ -580,30 +580,27 @@ static void ebpf_update_shm_cgroup(int maps_per_core)
 static void read_shm_apps_table(int maps_per_core)
 {
     netdata_publish_shm_t *cv = shm_vector;
-    uint32_t key;
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_shm_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    while (pids) {
-        key = pids->pid;
-
+    uint32_t key = 0, next_key = 0;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
-            pids = pids->next;
-            continue;
+            goto end_shm_loop;
         }
 
         shm_apps_accumulator(cv, maps_per_core);
 
         shm_fill_pid(key, cv);
 
+end_shm_loop:
         // now that we've consumed the value, zero it out in the map.
         memset(cv, 0, length);
         bpf_map_update_elem(fd, &key, cv, BPF_EXIST);
 
-        pids = pids->next;
+        key = next_key;
     }
 }
 
