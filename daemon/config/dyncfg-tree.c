@@ -69,6 +69,10 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent) 
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
+    buffer_json_member_add_uint64(wb, "version", 1);
+
+    buffer_json_member_add_object(wb, "tree");
+
     STRING *last_path = NULL;
     for(size_t i = 0; i < used ;i++) {
         df = dictionary_acquired_item_value(items[i]);
@@ -86,6 +90,10 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent) 
 
     if(used)
         buffer_json_object_close(wb);
+
+    buffer_json_object_close(wb); // paths
+
+    buffer_json_agents_v2(wb, NULL, 0, false, false);
 
     buffer_json_finalize(wb);
 
