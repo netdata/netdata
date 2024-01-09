@@ -33,7 +33,7 @@ HTTP_ACCESS http_access2id(const char *access) {
 }
 
 const char *http_id2access(HTTP_ACCESS access) {
-    for(size_t i = 0; i < access_levels[i].name ;i++) {
+    for(size_t i = 0; access_levels[i].name ;i++) {
         if(access == access_levels[i].access)
             return access_levels[i].name;
     }
