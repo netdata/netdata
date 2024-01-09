@@ -1247,7 +1247,6 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
             buffer->len = 0;
             buffer->buffer[0] = '\0';
         }
-        buffer_free(buffer);
 
         cd->unsafe.enabled = parser->user.enabled;
         count = parser->user.data_collections_count;
