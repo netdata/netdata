@@ -690,7 +690,6 @@ static void cachestat_apps_accumulator(netdata_cachestat_pid_t *out, int maps_pe
 static inline void cachestat_save_pid_values(netdata_publish_cachestat_t *out, netdata_cachestat_pid_t *in)
 {
     out->ct = in->ct;
-    out->not_updated = 0;
     if (!out->current.mark_page_accessed) {
         memcpy(&out->current, &in[0], sizeof(netdata_cachestat_pid_t));
         return;
@@ -728,11 +727,12 @@ static void ebpf_read_cachestat_apps_table(int maps_per_core, int max_period)
             goto end_cachestat_loop;
 
         netdata_publish_cachestat_t *publish = &local_pid->cachestat;
-        if (!publish->ct || publish->ct != cv->ct)
+        if (!publish->ct || publish->ct != cv->ct){
             cachestat_save_pid_values(publish, cv);
-        else if (++publish->not_updated >= max_period) {
+            local_pid->not_updated = 0;
+        } else if (++local_pid->not_updated >= max_period) {
             bpf_map_delete_elem(fd, &key);
-            publish->not_updated = 0;
+            local_pid->not_updated = 0;
         }
 
 end_cachestat_loop:

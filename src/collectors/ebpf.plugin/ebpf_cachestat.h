@@ -80,7 +80,6 @@ typedef struct netdata_publish_cachestat_pid {
 
 typedef struct netdata_publish_cachestat {
     uint64_t ct;
-    int not_updated;
 
     long long ratio;
     long long dirty;

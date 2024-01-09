@@ -137,10 +137,7 @@ typedef struct ebpf_pid_stat {
     // each process gets a unique number
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dc;
-    struct {
-        netdata_fd_stat_t fd;
-        int not_updated;
-    } publish_fd;
+    netdata_fd_stat_t fd;
     ebpf_process_stat_t process;
     netdata_publish_shm_t shm;
 

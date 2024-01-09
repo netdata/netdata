@@ -554,10 +554,10 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
             netdata_publish_dcstat_t *publish = &pid_stat->dc;
             if (!publish->ct || publish->ct != cv->ct) {
                 memcpy(&publish->curr, &cv[0], sizeof(netdata_dcstat_pid_t));
-                publish->not_updated = 0;
-            } else if (++publish->not_updated >= max_period) {
+                pid_stat->not_updated = 0;
+            } else if (++pid_stat->not_updated >= max_period) {
                 bpf_map_delete_elem(fd, &key);
-                publish->not_updated = 0;
+                pid_stat->not_updated = 0;
             }
         }
 

@@ -686,13 +686,13 @@ static void ebpf_read_fd_apps_table(int maps_per_core, int max_period)
 
         ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key);
         if (pid_stat) {
-            netdata_fd_stat_t *publish_fd = &pid_stat->publish_fd.fd;
+            netdata_fd_stat_t *publish_fd = &pid_stat->fd;
             if (!publish_fd->ct || publish_fd->ct != fv->ct) {
                 memcpy(publish_fd, &fv[0], sizeof(netdata_fd_stat_t));
-                pid_stat->publish_fd.not_updated = 0;
-            } else if (++pid_stat->publish_fd.not_updated >= max_period) {
+                pid_stat->not_updated = 0;
+            } else if (++pid_stat->not_updated >= max_period) {
                 bpf_map_delete_elem(fd, &key);
-                pid_stat->publish_fd.not_updated = 0;
+                pid_stat->not_updated = 0;
             }
         }
 
@@ -719,7 +719,7 @@ static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *r
         int32_t pid = root->pid;
         ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid);
         if (pid_stat) {
-            netdata_fd_stat_t *w = &pid_stat->publish_fd.fd;
+            netdata_fd_stat_t *w = &pid_stat->fd;
             fd->open_call += w->open_call;
             fd->close_call += w->close_call;
             fd->open_err += w->open_err;
@@ -817,7 +817,7 @@ static void ebpf_update_fd_cgroup()
             netdata_fd_stat_t *out = &pids->fd;
             ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
             if (local_pid) {
-                netdata_fd_stat_t *in = &local_pid->publish_fd.fd;
+                netdata_fd_stat_t *in = &local_pid->fd;
 
                 memcpy(out, in, sizeof(netdata_fd_stat_t));
             }

@@ -77,7 +77,6 @@ typedef struct netdata_publish_dcstat_pid {
 
 typedef struct netdata_publish_dcstat {
     uint64_t ct;
-    int not_updated;
 
     long long ratio;
     long long cache_access;
