@@ -44,7 +44,7 @@ void cgroup_rename_task_add(
     };
     rrdlabels_migrate_to_these(tmp.chart_labels, labels);
 
-    struct rename_task *t = dictionary_set(netdev_renames, host_device, &tmp, sizeof(tmp));
+    dictionary_set(netdev_renames, host_device, &tmp, sizeof(tmp));
 }
 
 // other threads can call this function to delete a rename to a netdev
