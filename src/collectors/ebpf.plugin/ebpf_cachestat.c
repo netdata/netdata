@@ -58,10 +58,6 @@ netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru",
 static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_dirtied",
                                                                   "__set_page_dirty", "__folio_mark_dirty"  };
 
-#ifdef NETDATA_DEV_MODE
-int cachestat_disable_priority;
-#endif
-
 struct netdata_static_thread ebpf_read_cachestat = {
     .name = "EBPF_READ_CACHESTAT",
     .config_section = NULL,

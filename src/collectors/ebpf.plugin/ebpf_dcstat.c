@@ -59,10 +59,6 @@ netdata_ebpf_targets_t dc_targets[] = { {.name = "lookup_fast", .mode = EBPF_LOA
                                         {.name = "d_lookup", .mode = EBPF_LOAD_TRAMPOLINE},
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
-#ifdef NETDATA_DEV_MODE
-int dcstat_disable_priority;
-#endif
-
 struct netdata_static_thread ebpf_read_dcstat = {
     .name = "EBPF_READ_DCSTAT",
     .config_section = NULL,

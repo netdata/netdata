@@ -57,12 +57,8 @@ netdata_ebpf_targets_t fd_targets[] = { {.name = "open", .mode = EBPF_LOAD_TRAMP
                                         {.name = "close", .mode = EBPF_LOAD_TRAMPOLINE},
                                         {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
-#ifdef NETDATA_DEV_MODE
-int fd_disable_priority;
-#endif
-
 struct netdata_static_thread ebpf_read_fd = {
-    .name = "EBPF_READ_F",
+    .name = "EBPF_READ_FD",
     .config_section = NULL,
     .config_name = NULL,
     .env_name = NULL,

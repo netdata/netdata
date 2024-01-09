@@ -65,10 +65,6 @@ struct config process_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-#ifdef NETDATA_DEV_MODE
-int process_disable_priority;
-#endif
-
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
