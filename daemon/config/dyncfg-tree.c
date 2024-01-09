@@ -89,17 +89,19 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent, 
 
             dyncfg_to_json(df, dictionary_acquired_item_name(items[i]), wb);
 
-            if(df->restart_required)
-                restart_required++;
+            if(df->status != DYNCFG_STATUS_ORPHAN) {
+                if (df->restart_required)
+                    restart_required++;
 
-            if(df->plugin_rejected)
-                plugin_rejected++;
+                if (df->plugin_rejected)
+                    plugin_rejected++;
 
-            if(df->status == DYNCFG_STATUS_FAILED)
-                status_failed++;
+                if (df->status == DYNCFG_STATUS_FAILED)
+                    status_failed++;
 
-            if(df->status == DYNCFG_STATUS_INCOMPLETE)
-                status_incomplete++;
+                if (df->status == DYNCFG_STATUS_INCOMPLETE)
+                    status_incomplete++;
+            }
         }
 
         if (used)
