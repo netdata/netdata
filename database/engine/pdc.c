@@ -631,8 +631,8 @@ void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
 inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error) {
     time_t start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
 
-    time_t end_time_s;
-    size_t entries;
+    time_t end_time_s = 0;
+    size_t entries = 0;
 
     switch (descr->type) {
         case PAGE_METRICS:
@@ -645,7 +645,8 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
             entries = descr->gorilla.entries;
             break;
         default:
-            fatal("Unknown page type: %uc\n", descr->type);
+            // Nothing to do. Validate page will notify the user.
+            break;
     }
 
     return validate_page(
@@ -674,18 +675,19 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         uint32_t overwrite_zero_update_every_s,   // can be zero, if unknown
         bool have_read_error,
         const char *msg,
-        RRDENG_COLLECT_PAGE_FLAGS flags) {
-
+        RRDENG_COLLECT_PAGE_FLAGS flags)
+{
     VALIDATED_PAGE_DESCRIPTOR vd = {
             .start_time_s = start_time_s,
             .end_time_s = end_time_s,
             .update_every_s = update_every_s,
             .page_length = page_length,
+            .point_size = page_type_size[page_type],
             .type = page_type,
             .is_valid = true,
     };
 
-    vd.point_size = page_type_size[vd.type];
+    bool known_page_type = true;
     switch (page_type) {
         case PAGE_METRICS:
         case PAGE_TIER:
@@ -701,8 +703,8 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
             vd.entries = entries;
             break;
         default:
-            // TODO: should set vd.is_valid false instead?
-            fatal("Unknown page type: %uc", page_type);
+            known_page_type = false;
+            break;
     }
 
     // allow to be called without update every (when loading pages from disk)
@@ -725,7 +727,8 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
     // 512 bytes.
     max_page_length += ((page_type == PAGE_GORILLA_METRICS) * GORILLA_BUFFER_SIZE);
 
-    if( have_read_error                                         ||
+    if (!known_page_type                                        ||
+        have_read_error                                         ||
         vd.page_length == 0                                     ||
         vd.page_length > max_page_length                        ||
         vd.start_time_s > vd.end_time_s                         ||
