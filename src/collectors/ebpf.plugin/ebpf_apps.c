@@ -1296,13 +1296,11 @@ end_process_loop:
 
     post_aggregate_targets(apps_groups_root_target);
 
-
     struct ebpf_target *w;
     for (w = apps_groups_root_target; w; w = w->next) {
-        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_PROCESS_IDX))))
+        if (unlikely(!(w->processes)))
             continue;
 
         ebpf_process_sum_values_for_pids(&w->process, w->root_pid);
-        pids = pids->next;
     }
 }
