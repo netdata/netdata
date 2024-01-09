@@ -199,7 +199,7 @@ static void dyncfg_send_updates(const char *id) {
     DYNCFG *df = dictionary_acquired_item_value(item);
 
     if(df->type == DYNCFG_TYPE_SINGLE || df->type == DYNCFG_TYPE_JOB) {
-        if (df->cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
+        if (df->cmds & DYNCFG_CMD_UPDATE)
             dyncfg_echo_update(item, df, id);
     }
     else if(df->type == DYNCFG_TYPE_TEMPLATE) {
@@ -287,7 +287,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
 
     rrd_collector_started();
     rrd_function_add(host, NULL, string2str(df->function), 120, 1000,
-                     "Dynamic configuration", "config",HTTP_ACCESS_MEMBER,
+                     "Dynamic configuration", "config",HTTP_ACCESS_ADMIN,
                      sync, dyncfg_function_execute_cb, NULL);
 
     dyncfg_echo(item, df, id, df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE);

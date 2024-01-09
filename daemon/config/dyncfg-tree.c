@@ -67,7 +67,7 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent) 
     qsort(items, used, sizeof(const DICTIONARY_ITEM *), dyncfg_tree_compar);
 
     buffer_flush(wb);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
     buffer_json_member_add_uint64(wb, "version", 1);
 

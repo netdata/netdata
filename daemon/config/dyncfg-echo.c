@@ -79,7 +79,7 @@ static void dyncfg_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const c
                      dyncfg_echo_cb, e,
                      NULL, NULL,
                      NULL, NULL,
-                     NULL);
+                     df->payload);
 }
 
 void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id) {
