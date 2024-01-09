@@ -597,7 +597,7 @@ static inline char *trim_all(char *buffer) {
     return buffer;
 }
 
-static bool streq(const char *a, const char *b) {
+static inline bool streq(const char *a, const char *b) {
     if (a == b)
         return true;
 
@@ -607,7 +607,7 @@ static bool streq(const char *a, const char *b) {
     return strcmp(a, b) == 0;
 }
 
-static bool strstartswith(const char *string, const char *prefix) {
+static inline bool strstartswith(const char *string, const char *prefix) {
     if (string == NULL || prefix == NULL)
         return false;
 
@@ -620,7 +620,7 @@ static bool strstartswith(const char *string, const char *prefix) {
     return strncmp(string, prefix, prefix_len) == 0;
 }
 
-static bool strendswith(const char *string, const char *suffix) {
+static inline bool strendswith(const char *string, const char *suffix) {
     if (string == NULL || suffix == NULL)
         return false;
 

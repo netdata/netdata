@@ -1371,7 +1371,8 @@ STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender) {
             STREAM_CAP_REPLICATION |
             STREAM_CAP_BINARY |
             STREAM_CAP_INTERPOLATED |
-            STREAM_CAP_SLOTS | STREAM_CAP_PROGRESS |
+            STREAM_CAP_SLOTS |
+            STREAM_CAP_PROGRESS |
             STREAM_CAP_COMPRESSIONS_AVAILABLE |
             STREAM_CAP_DYNCFG |
             STREAM_CAP_IEEE754 |
