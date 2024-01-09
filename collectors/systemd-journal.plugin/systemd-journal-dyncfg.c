@@ -4,12 +4,6 @@
 
 #define JOURNAL_DIRECTORIES_JSON_NODE "journalDirectories"
 
-static inline void cleanup_json_object_pp(struct json_object **jobj) {
-    if(*jobj)
-        json_object_put(*jobj);
-}
-#define CLEAN_JSON_OBJECT _cleanup_(cleanup_json_object_pp) struct json_object
-
 static int systemd_journal_directories_dyncfg_update(BUFFER *result, BUFFER *payload) {
     if(!payload || !buffer_strlen(payload))
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "empty payload received");
@@ -93,6 +87,7 @@ void systemd_journal_dyncfg_init(struct functions_evloop_globals *wg) {
         wg,
         "systemd-journal:monitored-directories",
         "/collectors/logs/systemd-journal",
+        DYNCFG_STATUS_RUNNING,
         DYNCFG_TYPE_SINGLE,
         DYNCFG_SOURCE_TYPE_INTERNAL,
         "internal",

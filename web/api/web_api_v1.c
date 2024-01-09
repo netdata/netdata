@@ -859,7 +859,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             responseHandler,
             google_version,
             google_reqId,
-            (int64_t)st->last_updated.tv_sec);
+            (int64_t)(st ? st->last_updated.tv_sec : 0));
     }
     else if(format == DATASOURCE_JSONP) {
         if(responseHandler == NULL)
@@ -1446,6 +1446,7 @@ static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w,
     char *action = "tree";
     char *path = "/";
     char *id = NULL;
+    char *add_name = NULL;
     int timeout = 120;
 
     while(url) {
@@ -1465,6 +1466,8 @@ static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w,
             path = value;
         else if(!strcmp(name, "id"))
             id = value;
+        else if(!strcmp(name, "name"))
+            add_name = value;
         else if(!strcmp(name, "timeout")) {
             timeout = (int)strtol(value, NULL, 10);
             if(timeout < 10)
@@ -1478,13 +1481,32 @@ static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w,
     size_t len = (action ? strlen(action) : 0)
                  + (id ? strlen(id) : 0)
                  + (path ? strlen(path) : 0)
+                 + (add_name ? strlen(add_name) : 0)
                  + 100;
 
     char cmd[len];
     if(strcmp(action, "tree") == 0)
-        snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " tree %s", path);
-    else
-        snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s", id, action);
+        snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " tree '%s' '%s'", path, id?id:"");
+    else {
+        DYNCFG_CMDS c = dyncfg_cmds2id(action);
+        if(!id || !*id || !dyncfg_is_valid_id(id)) {
+            rrd_call_function_error(w->response.data, "invalid id given", HTTP_RESP_BAD_REQUEST);
+            return HTTP_RESP_BAD_REQUEST;
+        }
+        if(c == DYNCFG_CMD_NONE) {
+            rrd_call_function_error(w->response.data, "invalid action given", HTTP_RESP_BAD_REQUEST);
+            return HTTP_RESP_BAD_REQUEST;
+        }
+        else if(c == DYNCFG_CMD_ADD) {
+            if(!add_name || !*add_name || !dyncfg_is_valid_id(add_name)) {
+                rrd_call_function_error(w->response.data, "invalid name given", HTTP_RESP_BAD_REQUEST);
+                return HTTP_RESP_BAD_REQUEST;
+            }
+            snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s %s", id, dyncfg_id2cmd_one(c), add_name);
+        }
+        else
+            snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s", id, dyncfg_id2cmd_one(c));
+    }
 
     buffer_flush(w->response.data);
     int code = rrd_function_run(host, w->response.data, timeout, w->access, cmd,

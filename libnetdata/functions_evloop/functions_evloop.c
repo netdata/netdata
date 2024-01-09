@@ -339,7 +339,7 @@ static void functions_evloop_config_cb(const char *transaction, char *function, 
     netdata_mutex_unlock(wg->stdout_mutex);
 }
 
-void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data) {
+void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data) {
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
         return;
@@ -359,8 +359,9 @@ void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char
     netdata_mutex_lock(wg->stdout_mutex);
 
     fprintf(stdout,
-            PLUGINSD_KEYWORD_CONFIG " '%s' " PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE " '%s' '%s' '%s' '%s' '%s'\n",
-            id, dyncfg_id2type(type), path, dyncfg_id2source_type(source_type) , source, buffer_tostring(c)
+            PLUGINSD_KEYWORD_CONFIG " '%s' " PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE " '%s' '%s' '%s' '%s' '%s' '%s'\n",
+            id, dyncfg_id2status(status), dyncfg_id2type(type), path,
+            dyncfg_id2source_type(source_type), source, buffer_tostring(c)
     );
     fflush(stdout);
 
@@ -377,7 +378,26 @@ void functions_evloop_dyncfg_del(struct functions_evloop_globals *wg, const char
 
     netdata_mutex_lock(wg->stdout_mutex);
 
-    fprintf(stdout,PLUGINSD_KEYWORD_CONFIG " '%s' " PLUGINSD_KEYWORD_CONFIG_ACTION_DELETE "\n", id);
+    fprintf(stdout,
+            PLUGINSD_KEYWORD_CONFIG " %s " PLUGINSD_KEYWORD_CONFIG_ACTION_DELETE "\n",
+            id);
+    fflush(stdout);
+
+    netdata_mutex_unlock(wg->stdout_mutex);
+}
+
+void functions_evloop_dyncfg_status(struct functions_evloop_globals *wg, const char *id, DYNCFG_STATUS status) {
+    if(!dyncfg_is_valid_id(id)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
+        return;
+    }
+
+    netdata_mutex_lock(wg->stdout_mutex);
+
+    fprintf(stdout,
+            PLUGINSD_KEYWORD_CONFIG " %s " PLUGINSD_KEYWORD_CONFIG_ACTION_STATUS " %s\n",
+            id, dyncfg_id2status(status));
+
     fflush(stdout);
 
     netdata_mutex_unlock(wg->stdout_mutex);

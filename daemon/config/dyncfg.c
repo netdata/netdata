@@ -202,17 +202,20 @@ static void dyncfg_send_updates(const char *id) {
         if (df->cmds & DYNCFG_CMD_UPDATE)
             dyncfg_echo_update(item, df, id);
     }
-    else if(df->type == DYNCFG_TYPE_TEMPLATE) {
+    else if(df->type == DYNCFG_TYPE_TEMPLATE && (df->cmds & DYNCFG_CMD_ADD)) {
+        STRING *template = string_strdupz(id);
+
         size_t len = strlen(id);
         DYNCFG *tf;
         dfe_start_reentrant(dyncfg_globals.nodes, tf) {
             const char *t_id = tf_dfe.name;
-            if(tf->type == DYNCFG_TYPE_JOB && strncmp(t_id, id, len) == 0 && t_id[len] == ':' && t_id[len + 1]) {
-                if (tf->cmds & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE))
-                    dyncfg_echo_add(tf_dfe.item, tf, id, &t_id[len + 1]);
+            if(tf->type == DYNCFG_TYPE_JOB && tf->template == template && strncmp(t_id, id, len) == 0 && t_id[len] == ':' && t_id[len + 1]) {
+                dyncfg_echo_add(item, df, id, &t_id[len + 1]);
             }
         }
         dfe_done(tf);
+
+        string_freez(template);
     }
 
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
@@ -286,9 +289,18 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         nd_log(NDLS_DAEMON, NDLP_WARNING, "DYNCFG: configuration '%s' is created with source type dyncfg, but we don't have a saved configuration for it", id);
 
     rrd_collector_started();
-    rrd_function_add(host, NULL, string2str(df->function), 120, 1000,
-                     "Dynamic configuration", "config",HTTP_ACCESS_ADMIN,
-                     sync, dyncfg_function_execute_cb, NULL);
+    rrd_function_add(
+        host,
+        NULL,
+        string2str(df->function),
+        120,
+        1000,
+        "Dynamic configuration",
+        "config",
+        HTTP_ACCESS_ADMIN,
+        sync,
+        dyncfg_function_intercept_cb,
+        NULL);
 
     dyncfg_echo(item, df, id, df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE);
     dyncfg_send_updates(id);
@@ -318,6 +330,25 @@ void dyncfg_del_low_level(RRDHOST *host, const char *id) {
 
         if(garbage_collect)
             dictionary_garbage_collect(dyncfg_globals.nodes);
+    }
+}
+
+void dyncfg_status_low_level(RRDHOST *host, const char *id, DYNCFG_STATUS status) {
+    if(!dyncfg_is_valid_id(id)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
+        return;
+    }
+
+    if(status == DYNCFG_STATUS_NONE) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: status provided to id '%s' is invalid. Ignoring it.", id);
+        return;
+    }
+
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
+    if(item) {
+        DYNCFG *df = dictionary_acquired_item_value(item);
+        df->status = status;
+        dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     }
 }
 

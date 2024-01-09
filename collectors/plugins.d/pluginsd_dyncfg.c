@@ -14,13 +14,14 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
     char *action = get_word(words, num_words, i++);
 
     if(strcmp(action, PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE) == 0) {
+        char *status_str         = get_word(words, num_words, i++);
         char *type_str           = get_word(words, num_words, i++);
         char *path               = get_word(words, num_words, i++);
         char *source_type_str    = get_word(words, num_words, i++);
         char *source             = get_word(words, num_words, i++);
         char *supported_cmds_str = get_word(words, num_words, i++);
 
-        DYNCFG_STATUS status = DYNCFG_STATUS_OK;
+        DYNCFG_STATUS status = dyncfg_status2id(status_str);
         DYNCFG_TYPE type = dyncfg_type2id(type_str);
         DYNCFG_SOURCE_TYPE source_type = dyncfg_source_type2id(source_type_str);
         DYNCFG_CMDS cmds = dyncfg_cmds2id(supported_cmds_str);
@@ -43,6 +44,10 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
     }
     else if(strcmp(action, PLUGINSD_KEYWORD_CONFIG_ACTION_DELETE) == 0) {
         dyncfg_del_low_level(host, id);
+    }
+    else if(strcmp(action, PLUGINSD_KEYWORD_CONFIG_ACTION_STATUS) == 0) {
+        char *status_str         = get_word(words, num_words, i++);
+        dyncfg_status_low_level(host, id, dyncfg_status2id(status_str));
     }
     else
         nd_log(NDLS_COLLECTORS, NDLP_WARNING, "DYNCFG: unknown action '%s' received from plugin", action);

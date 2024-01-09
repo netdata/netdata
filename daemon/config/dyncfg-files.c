@@ -21,6 +21,8 @@ void dyncfg_file_save(const char *id, DYNCFG *df) {
         return;
     }
 
+    df->modified_ut = now_realtime_usec();
+
     fprintf(fp, "version=%zu\n", DYNCFG_VERSION);
     fprintf(fp, "id=%s\n", id);
 

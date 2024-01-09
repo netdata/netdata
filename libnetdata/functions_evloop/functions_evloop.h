@@ -33,6 +33,7 @@
 #define PLUGINSD_KEYWORD_CONFIG                 "CONFIG"
 #define PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE   "create"
 #define PLUGINSD_KEYWORD_CONFIG_ACTION_DELETE   "delete"
+#define PLUGINSD_KEYWORD_CONFIG_ACTION_STATUS   "status"
 
 #define PLUGINSD_FUNCTION_CONFIG                "config"
 
@@ -122,7 +123,8 @@ static inline void pluginsd_function_progress_to_stdout(const char *transaction,
     fflush(stdout);
 }
 
-void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data);
+void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data);
 void functions_evloop_dyncfg_del(struct functions_evloop_globals *wg, const char *id);
+void functions_evloop_dyncfg_status(struct functions_evloop_globals *wg, const char *id, DYNCFG_STATUS status);
 
 #endif //NETDATA_FUNCTIONS_EVLOOP_H

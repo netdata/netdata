@@ -602,15 +602,27 @@ Where:
 - `id` is a unique identifier for the configurable entity. This should by design be unique across Netdata. It should be something like `plugin:module:jobs`, e.g. `go.d:postgresql:jobs:masterdb`. This is assumed to be colon-separated with the last part (`masterdb` in our example), being the one displayed to users when there ano conflicts under the same configuration path.
 - `action` can be:
   - `create`, to declare the dynamic configuration entity
-  - `delete`, to remove the dynamic configuration entity
+  - `delete`, to delete the dynamic configuration entity - this does not delete user configuration, we if an entity with the same id is created in the future, the saved configuration will be given to it.
+  - `status`, to update the dynamic configuration entity status
+
+> IMPORTANT:<br/>
+> The plugin should blindly create, delete and update the status of its dynamic configuration entities, without any special logic applied to it. Netdata needs to be updated of what is actually happening at the plugin. Keep in mind that creating dynamic configuration entities triggers responses from Netdata, depending on its type and status. Re-creating a job, triggers the same responses every time. 
+
 
 When the `action` is `create`, the following additional parameters are expected:
 
-> CONFIG id action type "path" source_type "source" "supported commands"
+> CONFIG id action status type "path" source_type "source" "supported commands"
 
 Where:
 
 - `action` should be `create`
+- `status` can be:
+  - `accepted`, the plugin accepted the configuration, but it is not running yet.
+  - `running`, the plugin accepted and runs the configuration.
+  - `failed`, the plugin tries to run the configuration but it fails.
+  - `incomplete`, the plugin needs additional settings to run this configuration. This is usually used for the cases the plugin discovered a job, but important information is missing for it to work.
+  - `disabled`, the configuration has been disabled by a user.
+  - `orphan`, the configuration is not claimed by any plugin. This is used internally by Netdata to mark the configuration nodes available, for which there is no plugin related to them. Do not use in plugins directly.
 - `type` can be `single`, `template` or `job`:
   - `single` is used when the configurable entity is fixed and users should never be able to add or delete it.
   - `template` is used to define a template based on which users can add multiple configurations, like adding data collection jobs. So, the plugin defines the template of the jobs and users are presented with a `[+]` button to add such configuration jobs. The plugin can define multiple templates by giving different `id`s to them.
@@ -676,6 +688,12 @@ All other responses should have the following response body:
 ```
 
 The user interface presents the message to users, even when the response is successful (HTTP code 200).
+
+When responding to additions and updates, Netdata uses the following success response codes to derive additional information:
+
+- `200`, responding with 200, means the configuration has been accepted and it is running.
+- `202`, responding with 202, means the configuration has been accepted but it is not yet running. A subsequent `status` action will update it.
+- `299`, responding with 299, means the configuration has been accepted but a restart is required to apply it. 
 
 ## Data collection
 

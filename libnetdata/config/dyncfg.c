@@ -51,7 +51,7 @@ static struct {
 
 DYNCFG_SOURCE_TYPE dyncfg_source_type2id(const char *source_type) {
     if(!source_type || !*source_type)
-        return DYNCFG_SOURCE_TYPE_STOCK;
+        return DYNCFG_SOURCE_TYPE_INTERNAL;
 
     size_t entries = sizeof(dyncfg_source_types) / sizeof(dyncfg_source_types[0]);
     for(size_t i = 0; i < entries ;i++) {
@@ -59,7 +59,7 @@ DYNCFG_SOURCE_TYPE dyncfg_source_type2id(const char *source_type) {
             return dyncfg_source_types[i].source_type;
     }
 
-    return DYNCFG_SOURCE_TYPE_STOCK;
+    return DYNCFG_SOURCE_TYPE_INTERNAL;
 }
 
 const char *dyncfg_id2source_type(DYNCFG_SOURCE_TYPE source_type) {
@@ -69,7 +69,7 @@ const char *dyncfg_id2source_type(DYNCFG_SOURCE_TYPE source_type) {
             return dyncfg_source_types[i].name;
     }
 
-    return "stock";
+    return "internal";
 }
 
 // ----------------------------------------------------------------------------
@@ -78,15 +78,18 @@ static struct {
     DYNCFG_STATUS status;
     const char *name;
 } dyncfg_statuses[] = {
-    { .status = DYNCFG_STATUS_OK, .name = "ok" },
+    { .status = DYNCFG_STATUS_NONE, .name = "none" },
+    { .status = DYNCFG_STATUS_ACCEPTED, .name = "accepted" },
+    { .status = DYNCFG_STATUS_RUNNING, .name = "running" },
+    { .status = DYNCFG_STATUS_FAILED, .name = "failed" },
     { .status = DYNCFG_STATUS_DISABLED, .name = "disabled" },
     { .status = DYNCFG_STATUS_ORPHAN, .name = "orphan" },
-    { .status = DYNCFG_STATUS_REJECTED, .name = "rejected" },
+    { .status = DYNCFG_STATUS_INCOMPLETE, .name = "incomplete" },
 };
 
 DYNCFG_STATUS dyncfg_status2id(const char *status) {
     if(!status || !*status)
-        return DYNCFG_STATUS_OK;
+        return DYNCFG_STATUS_NONE;
 
     size_t entries = sizeof(dyncfg_statuses) / sizeof(dyncfg_statuses[0]);
     for(size_t i = 0; i < entries ;i++) {
@@ -94,7 +97,7 @@ DYNCFG_STATUS dyncfg_status2id(const char *status) {
             return dyncfg_statuses[i].status;
     }
 
-    return DYNCFG_STATUS_OK;
+    return DYNCFG_STATUS_NONE;
 }
 
 const char *dyncfg_id2status(DYNCFG_STATUS status) {
@@ -104,7 +107,7 @@ const char *dyncfg_id2status(DYNCFG_STATUS status) {
             return dyncfg_statuses[i].name;
     }
 
-    return "ok";
+    return "none";
 }
 
 // ----------------------------------------------------------------------------
@@ -197,7 +200,7 @@ bool dyncfg_is_valid_id(const char *id) {
     const char *s = id;
 
     while(*s) {
-        if(isspace(*s)) return false;
+        if(isspace(*s) || *s == '\'') return false;
         s++;
     }
 

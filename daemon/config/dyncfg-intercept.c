@@ -16,7 +16,17 @@ struct dyncfg_call {
     void *result_cb_data;
 };
 
-void dyncfg_function_result_cb(BUFFER *wb, int code, void *result_cb_data) {
+DYNCFG_STATUS dyncfg_status_from_successful_response(int code) {
+    DYNCFG_STATUS status;
+    if(code == DYNCFG_RESP_RUNNING)
+        status = DYNCFG_STATUS_RUNNING;
+    else if(code == DYNCFG_RESP_ACCEPTED || code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
+        status = DYNCFG_STATUS_ACCEPTED;
+
+    return status;
+}
+
+void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_data) {
     struct dyncfg_call *dc = result_cb_data;
 
     bool called_from_dyncfg_echo = dc->result_cb == dyncfg_echo_cb ? true : false;
@@ -27,21 +37,10 @@ void dyncfg_function_result_cb(BUFFER *wb, int code, void *result_cb_data) {
         bool old_user_disabled = df->user_disabled;
         bool save_required = false;
 
-        if(code == HTTP_RESP_NOT_FOUND) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: plugin returned not found error to call '%s', marking config node as rejected.", dc->function);
-            df->status = DYNCFG_STATUS_REJECTED;
-        }
-        else if(code == HTTP_RESP_NOT_IMPLEMENTED) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: plugin returned not supported error to call '%s', disabling this action for this config node.", dc->function);
-            df->cmds &= ~dc->cmd;
-        }
-        else if(code == HTTP_RESP_ACCEPTED) {
-            nd_log(NDLS_DAEMON, NDLP_INFO, "DYNCFG: plugin returned 202 to call '%s', restart is required.", dc->function);
-            df->restart_required = true;
-        }
-
         if (!called_from_dyncfg_echo) {
-            if (code == HTTP_RESP_OK || code == HTTP_RESP_ACCEPTED) {
+            // the command was sent by a user
+
+            if (DYNCFG_RESP_SUCCESS(code)) {
                 if (dc->cmd == DYNCFG_CMD_ADD) {
                     char id[strlen(dc->id) + 1 + strlen(dc->add_name) + 1];
                     snprintfz(id, sizeof(id), "%s:%s", dc->id, dc->add_name);
@@ -50,24 +49,32 @@ void dyncfg_function_result_cb(BUFFER *wb, int code, void *result_cb_data) {
                         df->host,
                         id,
                         string2str(df->path),
-                        DYNCFG_STATUS_OK,
+                        dyncfg_status_from_successful_response(code),
                         DYNCFG_TYPE_JOB,
                         DYNCFG_SOURCE_TYPE_DYNCFG,
-                        "dyncfg",
-                        df->cmds & ~DYNCFG_CMD_ADD,
+                        "dyncfg", // TODO find the source of the update
+                        (df->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
                         0,
                         0,
                         df->sync,
-                        NULL,
-                        NULL);
+                        df->execute_cb,
+                        df->execute_cb_data);
 
                     DYNCFG *new_df = dictionary_acquired_item_value(new_item);
                     SWAP(new_df->payload, dc->payload);
+                    if(code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
+                        new_df->restart_required = true;
 
                     dyncfg_file_save(id, new_df);
                     dictionary_acquired_item_release(dyncfg_globals.nodes, new_item);
                 } else if (dc->cmd == DYNCFG_CMD_UPDATE) {
+                    df->source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
+                    string_freez(df->source);
+                    df->source = string_strdupz("dyncfg"); // TODO find the source of the update
+
+                    df->status = dyncfg_status_from_successful_response(code);
                     SWAP(df->payload, dc->payload);
+
                     save_required = true;
                 } else if (dc->cmd == DYNCFG_CMD_ENABLE) {
                     df->user_disabled = false;
@@ -76,11 +83,52 @@ void dyncfg_function_result_cb(BUFFER *wb, int code, void *result_cb_data) {
                 } else if (dc->cmd == DYNCFG_CMD_REMOVE) {
                     dyncfg_file_delete(dc->id);
                 }
-            }
 
-            if (save_required || old_user_disabled != df->user_disabled)
-                dyncfg_file_save(dc->id, df);
+                if(dc->cmd != DYNCFG_CMD_ADD && code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
+                    df->restart_required = true;
+            }
+            else
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "DYNCFG: plugin returned code %d to user initiated call: %s", code, dc->function);
         }
+        else {
+            // the command was sent by dyncfg
+
+            if(DYNCFG_RESP_SUCCESS(code)) {
+                if(dc->cmd == DYNCFG_CMD_ADD) {
+                    char id[strlen(dc->id) + 1 + strlen(dc->add_name) + 1];
+                    snprintfz(id, sizeof(id), "%s:%s", dc->id, dc->add_name);
+
+                    const DICTIONARY_ITEM *new_item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
+                    if(new_item) {
+                        DYNCFG *new_df = dictionary_acquired_item_value(new_item);
+                        new_df->status = dyncfg_status_from_successful_response(code);
+
+                        if(code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
+                            new_df->restart_required = true;
+
+                        dictionary_acquired_item_release(dyncfg_globals.nodes, new_item);
+                    }
+                }
+                else if(dc->cmd  == DYNCFG_CMD_UPDATE) {
+                    df->status = dyncfg_status_from_successful_response(code);
+                    df->plugin_rejected = false;
+                }
+
+                if(dc->cmd != DYNCFG_CMD_ADD && code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
+                    df->restart_required = true;
+            }
+            else {
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "DYNCFG: plugin returned code %d to dyncfg initiated call: %s", code, df->function);
+
+                if(dc->cmd & (DYNCFG_CMD_UPDATE | DYNCFG_CMD_ADD))
+                    df->plugin_rejected = true;
+            }
+        }
+
+        if (save_required || old_user_disabled != df->user_disabled)
+            dyncfg_file_save(dc->id, df);
 
         dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     }
@@ -100,27 +148,29 @@ static void dyncfg_apply_action_on_all_template_jobs(const char *template_id, DY
     STRING *template = string_strdupz(template_id);
 
     DYNCFG *df;
-    dfe_start_read(dyncfg_globals.nodes, df) {
+    dfe_start_reentrant(dyncfg_globals.nodes, df) {
         if(df->template == template && df->type == DYNCFG_TYPE_JOB)
             dyncfg_echo(df_dfe.item, df, df_dfe.name, c);
     }
     dfe_done(df);
+
+    string_freez(template);
 }
 
 // ----------------------------------------------------------------------------
 // the callback for all config functions
 
-int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFFER *payload,
-                               usec_t *stop_monotonic_ut, const char *function,
-                               void *execute_cb_data __maybe_unused,
-                               rrd_function_result_callback_t result_cb, void *result_cb_data,
-                               rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                               rrd_function_is_cancelled_cb_t is_cancelled_cb,
-                               void *is_cancelled_cb_data,
-                               rrd_function_register_canceller_cb_t register_canceller_cb,
-                               void *register_canceller_cb_data,
-                               rrd_function_register_progresser_cb_t register_progresser_cb,
-                               void *register_progresser_cb_data) {
+int dyncfg_function_intercept_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFFER *payload,
+                                 usec_t *stop_monotonic_ut, const char *function,
+                                 void *execute_cb_data __maybe_unused,
+                                 rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                 rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
+                                 rrd_function_is_cancelled_cb_t is_cancelled_cb,
+                                 void *is_cancelled_cb_data,
+                                 rrd_function_register_canceller_cb_t register_canceller_cb,
+                                 void *register_canceller_cb_data,
+                                 rrd_function_register_progresser_cb_t register_progresser_cb,
+                                 void *register_progresser_cb_data) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
@@ -278,7 +328,7 @@ int dyncfg_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFF
             stop_monotonic_ut,
             function,
             df->execute_cb_data,
-            dyncfg_function_result_cb,
+            dyncfg_function_intercept_result_cb,
             dc,
             progress_cb,
             progress_cb_data,

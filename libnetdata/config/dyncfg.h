@@ -5,6 +5,11 @@
 
 #define DYNCFG_VERSION (size_t)1
 
+#define DYNCFG_RESP_SUCCESS(code) (code >= 200 && code <= 299)
+#define DYNCFG_RESP_RUNNING                   200 // accepted and running
+#define DYNCFG_RESP_ACCEPTED                  202 // accepted, but not running yet
+#define DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED 299 // accepted, but restart is required to apply it
+
 typedef enum __attribute__((packed)) {
     DYNCFG_TYPE_SINGLE = 0,
     DYNCFG_TYPE_TEMPLATE,
@@ -25,10 +30,12 @@ const char *dyncfg_id2source_type(DYNCFG_SOURCE_TYPE source_type);
 
 typedef enum __attribute__((packed)) {
     DYNCFG_STATUS_NONE = 0,
-    DYNCFG_STATUS_OK,
-    DYNCFG_STATUS_DISABLED,
-    DYNCFG_STATUS_REJECTED,
-    DYNCFG_STATUS_ORPHAN,
+    DYNCFG_STATUS_ACCEPTED,     // the plugin has accepted the configuration
+    DYNCFG_STATUS_RUNNING,      // the plugin runs the accepted configuration
+    DYNCFG_STATUS_FAILED,       // the plugin fails to run the accepted configuration
+    DYNCFG_STATUS_DISABLED,     // the configuration is disabled by a user
+    DYNCFG_STATUS_ORPHAN,       // no plugin has claimed this configurations
+    DYNCFG_STATUS_INCOMPLETE,   // a special kind of failed configuration
 } DYNCFG_STATUS;
 DYNCFG_STATUS dyncfg_status2id(const char *status);
 const char *dyncfg_id2status(DYNCFG_STATUS status);

@@ -35,8 +35,11 @@ static int dyncfg_inline_callback(uuid_t *transaction, BUFFER *wb, BUFFER *paylo
     return code;
 }
 
-bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data) {
-    if(dyncfg_add_low_level(host, id, path, DYNCFG_STATUS_OK, type, source_type, source, cmds, 0, 0, true, dyncfg_inline_callback, NULL)) {
+bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data) {
+
+    if(dyncfg_add_low_level(host, id, path, status, type, source_type, source, cmds,
+                             0, 0, true,
+                             dyncfg_inline_callback, NULL)) {
         struct dyncfg_node tmp = {
             .cmds = cmds,
             .type = type,
@@ -54,6 +57,10 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_TYPE typ
 void dyncfg_del(RRDHOST *host, const char *id) {
     dictionary_del(dyncfg_nodes, id);
     dyncfg_del_low_level(host, id);
+}
+
+void dyncfg_status(RRDHOST *host, const char *id, DYNCFG_STATUS status) {
+    dyncfg_status_low_level(host, id, status);
 }
 
 void dyncfg_init(bool load_saved) {

@@ -28,6 +28,7 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
         buffer_json_member_add_boolean(wb, "sync", df->sync);
         buffer_json_member_add_boolean(wb, "user_disabled", df->user_disabled);
         buffer_json_member_add_boolean(wb, "restart_required", df->restart_required);
+        buffer_json_member_add_boolean(wb, "plugin_rejected", df->restart_required);
         if(df->payload && buffer_strlen(df->payload)) {
             buffer_json_member_add_object(wb, "payload");
             buffer_json_member_add_boolean(wb, "content_type", content_type_id2string(df->payload->content_type));
@@ -41,10 +42,11 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
     buffer_json_object_close(wb);
 }
 
-static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent) {
+static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent, const char *id) {
     size_t entries = dictionary_entries(dyncfg_globals.nodes);
     size_t used = 0;
     const DICTIONARY_ITEM *items[entries];
+    size_t restart_required = 0, plugin_rejected = 0, status_incomplete = 0, status_failed = 0;
 
     size_t parent_len = strlen(parent);
     DYNCFG *df;
@@ -72,26 +74,48 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent) 
     buffer_json_member_add_uint64(wb, "version", 1);
 
     buffer_json_member_add_object(wb, "tree");
+    {
+        STRING *last_path = NULL;
+        for (size_t i = 0; i < used; i++) {
+            df = dictionary_acquired_item_value(items[i]);
+            if (df->path != last_path) {
+                last_path = df->path;
 
-    STRING *last_path = NULL;
-    for(size_t i = 0; i < used ;i++) {
-        df = dictionary_acquired_item_value(items[i]);
-        if(df->path != last_path) {
-            last_path = df->path;
+                if (i)
+                    buffer_json_object_close(wb);
 
-            if(i)
-                buffer_json_object_close(wb);
+                buffer_json_member_add_object(wb, string2str(last_path));
+            }
 
-            buffer_json_member_add_object(wb, string2str(last_path));
+            dyncfg_to_json(df, dictionary_acquired_item_name(items[i]), wb);
+
+            if(df->restart_required)
+                restart_required++;
+
+            if(df->plugin_rejected)
+                plugin_rejected++;
+
+            if(df->status == DYNCFG_STATUS_FAILED)
+                status_failed++;
+
+            if(df->status == DYNCFG_STATUS_INCOMPLETE)
+                status_incomplete++;
         }
 
-        dyncfg_to_json(df, dictionary_acquired_item_name(items[i]), wb);
+        if (used)
+            buffer_json_object_close(wb);
     }
+    buffer_json_object_close(wb); // tree
 
-    if(used)
-        buffer_json_object_close(wb);
-
-    buffer_json_object_close(wb); // paths
+    buffer_json_member_add_object(wb, "attention");
+    {
+        buffer_json_member_add_boolean(wb, "degraded", restart_required + plugin_rejected + status_failed + status_incomplete > 0);
+        buffer_json_member_add_uint64(wb, "restart_required", restart_required);
+        buffer_json_member_add_uint64(wb, "plugin_rejected", plugin_rejected);
+        buffer_json_member_add_uint64(wb, "status_failed", status_failed);
+        buffer_json_member_add_uint64(wb, "status_incomplete", status_incomplete);
+    }
+    buffer_json_object_close(wb); // attention
 
     buffer_json_agents_v2(wb, NULL, 0, false, false);
 
@@ -115,54 +139,54 @@ static int dyncfg_config_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *
     RRDHOST *host = execute_cb_data;
     int code;
 
-    if(strncmp(function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG)) != 0) {
-        code = HTTP_RESP_INTERNAL_SERVER_ERROR;
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: received function that is not config: %s", function);
-        rrd_call_function_error(result_body_wb, "wrong function call", code);
+    char buf[strlen(function) + 1];
+    memcpy(buf, function, sizeof(buf));
+
+    char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
+    size_t num_words = quoted_strings_splitter_pluginsd(buf, words, MAX_FUNCTION_PARAMETERS);
+
+    const char *config = get_word(words, num_words, 0);
+    const char *action = get_word(words, num_words, 1);
+    const char *path = get_word(words, num_words, 2);
+    const char *id = get_word(words, num_words, 3);
+
+    if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0) {
+        char *msg = "invalid function call, expected: config";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", function, msg);
+        code = dyncfg_default_response(result_body_wb, HTTP_RESP_BAD_REQUEST, msg);
+        goto cleanup;
+    }
+
+    if(!action || !*action) {
+        char *msg = "invalid function call, expected: config tree";
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", function, msg);
+        code = dyncfg_default_response(result_body_wb, HTTP_RESP_BAD_REQUEST, msg);
+        goto cleanup;
+    }
+
+    if(strcmp(action, "tree") == 0) {
+        if(!path || !*path)
+            path = "/";
+
+        if(!id || !*id)
+            id = NULL;
+        else if(!dyncfg_is_valid_id(id)) {
+            char *msg = "invalid id given";
+            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", function, msg);
+            code = dyncfg_default_response(result_body_wb, HTTP_RESP_BAD_REQUEST, msg);
+            goto cleanup;
+        }
+
+        code = HTTP_RESP_OK;
+        dyncfg_tree_for_host(host, result_body_wb, path, id);
     }
     else {
-        // extract the id
-        const char *id = &function[sizeof(PLUGINSD_FUNCTION_CONFIG)];
-        while (*id && isspace(*id))
-            id++;
-        const char *space = id;
-        while (*space && !isspace(*space))
-            space++;
-        size_t id_len = space - id;
-
-        char id_copy[id_len + 1];
-        memcpy(id_copy, id, id_len);
-        id_copy[id_len] = '\0';
-
-        // extract the path
-        const char *path = space;
-        while (*path && isspace(*path))
-            path++;
-        space = path;
-        while (*space && !isspace(*space))
-            space++;
-        size_t path_len = space - path;
-
-        if (*path || !path_len) {
-            path_len = 1;
-            path = "/";
-        }
-
-        char path_copy[path_len + 1];
-        memcpy(path_copy, path, path_len);
-        path_copy[path_len] = '\0';
-
-        if (strcmp(id_copy, "tree") == 0) {
-            code = HTTP_RESP_OK;
-            dyncfg_tree_for_host(host, result_body_wb, path_copy);
-        }
-        else {
-            code = HTTP_RESP_NOT_FOUND;
-            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unknown config id '%s' in call: %s", id_copy, function);
-            rrd_call_function_error(result_body_wb, "unknown config id given", code);
-        }
+        code = HTTP_RESP_NOT_FOUND;
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unknown config id '%s' in call: %s", action, function);
+        rrd_call_function_error(result_body_wb, "unknown config id given", code);
     }
 
+cleanup:
     if(result_cb)
         result_cb(result_body_wb, code, result_cb_data);
 

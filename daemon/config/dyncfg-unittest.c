@@ -49,6 +49,87 @@ struct dyncfg_unittest_action {
     void *result_cb_data;
 };
 
+static void dyncfg_unittest_register_error(const char *id, const char *msg) {
+    if(msg)
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: error on id '%s': %s", id ? id : "", msg);
+
+    __atomic_add_fetch(&dyncfg_unittest_data.errors, 1, __ATOMIC_RELAXED);
+}
+
+static int dyncfg_unittest_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *result, BUFFER *payload,
+                                      usec_t *stop_monotonic_ut __maybe_unused, const char *function,
+                                      void *execute_cb_data,
+                                      rrd_function_result_callback_t result_cb, void *result_cb_data,
+                                      rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
+                                      rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
+                                      void *is_cancelled_cb_data __maybe_unused,
+                                      rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
+                                      void *register_canceller_cb_data __maybe_unused,
+                                      rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
+                                      void *register_progresser_cb_data __maybe_unused);
+
+bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, const char *add_name) {
+    CLEAN_JSON_OBJECT *jobj = json_tokener_parse(buffer_tostring(payload));
+    if(!jobj) {
+        dyncfg_unittest_register_error(t->id, "cannot parse json payload");
+        return false;
+    }
+
+    struct json_object *json_double;
+    struct json_object *json_boolean;
+
+    json_object_object_get_ex(jobj, "double", &json_double);
+    double value_double = json_object_get_double(json_double);
+
+    json_object_object_get_ex(jobj, "boolean", &json_boolean);
+    int value_boolean = json_object_get_boolean(json_boolean);
+
+    if(cmd == DYNCFG_CMD_UPDATE) {
+        t->current.value.dbl = value_double;
+        t->current.value.bln = value_boolean;
+    }
+    else if(cmd == DYNCFG_CMD_ADD) {
+        char buf[strlen(t->id) + strlen(add_name) + 20];
+        snprintfz(buf, sizeof(buf), "%s:%s", t->id, add_name);
+        TEST tmp = {
+            .id = NULL,
+            .cmds = t->cmds | DYNCFG_CMD_GET | DYNCFG_CMD_REMOVE | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+            .sync = t->sync,
+            .type = DYNCFG_TYPE_JOB,
+            .source_type = DYNCFG_SOURCE_TYPE_DYNCFG,
+            .current =
+                {.enabled = true,
+                 .removed = false,
+                 .value =
+                     {
+                         .dbl = value_double,
+                         .bln = value_boolean,
+                     }},
+            .expected = {
+                .enabled = true,
+                .removed = false,
+                .value = {
+                    .dbl = 3.14,
+                    .bln = true,
+                }}};
+        const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(dyncfg_unittest_data.nodes, buf, &tmp, sizeof(tmp));
+        TEST *t2 = dictionary_acquired_item_value(item);
+        t2->id = dictionary_acquired_item_name(item);
+        dictionary_acquired_item_release(dyncfg_unittest_data.nodes, item);
+
+        dyncfg_add_low_level(localhost, t2->id, "/unittest",
+                             DYNCFG_STATUS_RUNNING, t2->type, t2->source_type, LINE_FILE_STR,
+                             t2->cmds, 0, 0, t2->sync,
+                             dyncfg_unittest_execute_cb, t2);
+    }
+    else {
+        dyncfg_unittest_register_error(t->id, "invalid command received to parse payload");
+        return false;
+    }
+
+    return true;
+}
+
 static int dyncfg_unittest_action(struct dyncfg_unittest_action *a) {
     TEST *t = a->t;
 
@@ -58,15 +139,14 @@ static int dyncfg_unittest_action(struct dyncfg_unittest_action *a) {
         t->current.enabled = true;
     else if(a->cmd == DYNCFG_CMD_DISABLE)
         t->current.enabled = false;
-    else if(a->cmd == DYNCFG_CMD_ADD) {
-        // TODO add the node by parsing the json payload
-    }
-    else if(a->cmd == DYNCFG_CMD_UPDATE) {
-        // TODO update the node by parsing the json payload
-    }
-    else if(a->cmd == DYNCFG_CMD_REMOVE) {
+    else if(a->cmd == DYNCFG_CMD_ADD || a->cmd == DYNCFG_CMD_UPDATE)
+        rc = dyncfg_unittest_parse_payload(a->payload, a->t, a->cmd, a->add_name) ? HTTP_RESP_OK : HTTP_RESP_BAD_REQUEST;
+    else if(a->cmd == DYNCFG_CMD_REMOVE)
         t->current.removed = true;
-    }
+    else
+        rc = HTTP_RESP_BAD_REQUEST;
+
+    dyncfg_default_response(a->result, rc, NULL);
 
     a->result_cb(a->result, rc, a->result_cb_data);
 
@@ -115,58 +195,51 @@ static int dyncfg_unittest_execute_cb(uuid_t *transaction __maybe_unused, BUFFER
 
     if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0) {
         char *msg = "did not receive a config call";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        dyncfg_unittest_register_error(id, msg);
         rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
-        dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     if(!id || !*id) {
         char *msg = "did not receive an id";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        dyncfg_unittest_register_error(id, msg);
         rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
-        dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     if(strcmp(t->id, id) != 0) {
         char *msg = "id received is not the expected";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        dyncfg_unittest_register_error(id, msg);
         rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
-        dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     if(!action || !*action) {
         char *msg = "did not receive an action";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        dyncfg_unittest_register_error(id, msg);
         rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
-        dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     DYNCFG_CMDS cmd = dyncfg_cmds2id(action);
     if(cmd == DYNCFG_CMD_NONE) {
         char *msg = "action received is not known";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        dyncfg_unittest_register_error(id, msg);
         rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
-        dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     if(!(t->cmds & cmd)) {
         char *msg = "received a command that is not supported";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        dyncfg_unittest_register_error(id, msg);
         rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
-        dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
     if(t->current.removed && cmd != DYNCFG_CMD_ADD) {
         char *msg = "received a command for a removed entry";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: on id '%s': %s", id, msg);
+        dyncfg_unittest_register_error(id, msg);
         rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
-        dyncfg_unittest_data.errors++;
         goto cleanup;
     }
 
@@ -217,7 +290,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload)
                               pld);
     if(rc != HTTP_RESP_OK) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s; returned code %d", cmd, rc);
-        dyncfg_unittest_data.errors++;
+        dyncfg_unittest_register_error(NULL, NULL);
     }
 
     return rc;
@@ -229,7 +302,7 @@ static void dyncfg_unittest_cleanup_files(void) {
 
     DIR *dir = opendir(path);
     if (!dir) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot open directory '%s'", path);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: cannot open directory '%s'", path);
         return;
     }
 
@@ -237,8 +310,8 @@ static void dyncfg_unittest_cleanup_files(void) {
     char filename[PATH_MAX];
     while ((entry = readdir(dir)) != NULL) {
         if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strstartswith(entry->d_name, "unittest:") && strendswith(entry->d_name, ".dyncfg")) {
-            snprintf(filename, sizeof(filename), "%s/%s", dyncfg_globals.dir, entry->d_name);
-            nd_log(NDLS_DAEMON, NDLP_INFO, "DYNCFG: deleting file '%s'", filename);
+            snprintf(filename, sizeof(filename), "%s/%s", path, entry->d_name);
+            nd_log(NDLS_DAEMON, NDLP_INFO, "DYNCFG UNITTEST: deleting file '%s'", filename);
             unlink(filename);
         }
     }
@@ -249,11 +322,10 @@ static void dyncfg_unittest_cleanup_files(void) {
 static void dyncfg_unittest_add(TEST *t) {
     dictionary_set(dyncfg_unittest_data.nodes, t->id, &t, sizeof(*t));
 
-    if(!dyncfg_add_low_level(localhost, t->id, "/unittests", DYNCFG_STATUS_OK, t->type,
+    if(!dyncfg_add_low_level(localhost, t->id, "/unittests", DYNCFG_STATUS_RUNNING, t->type,
         t->source_type, LINE_FILE_STR,
         t->cmds, 0, 0, t->sync, dyncfg_unittest_execute_cb, t)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: test '%s' is not accepted", t->id);
-        dyncfg_unittest_data.errors++;
+        dyncfg_unittest_register_error(t->id, "addition of job failed");
     }
 }
 
@@ -324,12 +396,13 @@ static void dyncfg_unittest_check(TEST *t, const char *name, bool received) {
     }
 
 cleanup:
-    if(errors)
+    if(errors) {
         fprintf(stderr, "\n  >>> FAILED\n\n");
+        dyncfg_unittest_register_error(NULL, NULL);
+    }
     else
         fprintf(stderr, " OK\n");
 
-    dyncfg_unittest_data.errors += errors;
 }
 
 int dyncfg_unittest(void) {
@@ -337,7 +410,7 @@ int dyncfg_unittest(void) {
 
     dyncfg_unittest_cleanup_files();
     rrd_functions_inflight_init();
-    dyncfg_init(true);
+    dyncfg_init(false);
 
     TEST tss1 = {
         .id = "unittest:sync:single1",
@@ -454,5 +527,5 @@ int dyncfg_unittest(void) {
 
     dyncfg_unittest_cleanup_files();
     dictionary_destroy(dyncfg_unittest_data.nodes);
-    return dyncfg_unittest_data.errors ? 1 : 0;
+    return __atomic_load_n(&dyncfg_unittest_data.errors, __ATOMIC_RELAXED) > 0 ? 1 : 0;
 }

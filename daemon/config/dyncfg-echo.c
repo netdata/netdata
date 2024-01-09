@@ -19,16 +19,6 @@ struct dyncfg_echo {
 void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code, void *result_cb_data) {
     struct dyncfg_echo *e = result_cb_data;
 
-    if(code != HTTP_RESP_OK) {
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-               "DYNCFG: command for configuration node '%s' failed with code %d",
-               e->item ? dictionary_acquired_item_name(e->item) : "(null)", code);
-
-        e->df->status = DYNCFG_STATUS_REJECTED;
-    }
-    else
-        e->df->status = DYNCFG_STATUS_OK;
-
     buffer_free(e->wb);
     dictionary_acquired_item_release(dyncfg_globals.nodes, e->item);
 
@@ -86,8 +76,8 @@ void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id)
     dyncfg_echo_payload(item, df, id, "update");
 }
 
-void dyncfg_echo_add(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, const char *job_name) {
+void dyncfg_echo_add(const DICTIONARY_ITEM *template_item, DYNCFG *template_df, const char *template_id, const char *job_name) {
     char buf[strlen(job_name) + 20];
     snprintfz(buf, sizeof(buf), "add %s", job_name);
-    dyncfg_echo_payload(item, df, id, buf);
+    dyncfg_echo_payload(template_item, template_df, template_id, buf);
 }
