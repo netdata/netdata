@@ -224,6 +224,7 @@ void log_stack_push(struct log_stack_entry *lgs);
 #define D_RRDENGINE         0x0000000100000000
 #define D_ACLK              0x0000000200000000
 #define D_REPLICATION       0x0000002000000000
+#define D_COLLECTOR         0x0000004000000000
 #define D_SYSTEM            0x8000000000000000
 
 extern uint64_t debug_flags;

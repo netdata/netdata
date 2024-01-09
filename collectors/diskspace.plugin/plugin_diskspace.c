@@ -19,6 +19,7 @@ static netdata_thread_t *diskspace_slow_thread = NULL;
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
 static int cleanup_mount_points = 1;
+static int enable_record_excluded_mountpoints_or_filesystems = -1;
 
 static inline void mountinfo_reload(int force) {
     static time_t last_loaded = 0;
@@ -341,6 +342,18 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             true);
 
         dict_mountpoints = dictionary_create_advanced(DICT_OPTION_NONE, &dictionary_stats_category_collectors, 0);
+    }
+
+    if(unlikely(
+        (simple_pattern_matches(excluded_mountpoints, mi->mount_point) || simple_pattern_matches(excluded_filesystems, mi->filesystem)) &&
+        enable_record_excluded_mountpoints_or_filesystems == CONFIG_BOOLEAN_NO
+    )) {
+        netdata_log_debug(D_COLLECTOR, "DISKSPACE: Skipping mount point '%s' (disk '%s', filesystem '%s', root '%s') because it is excluded by configuration.",
+            mi->mount_point, 
+            disk, 
+            mi->filesystem ? mi->filesystem : "<unknown>", 
+            mi->root ? mi->root : "<unknonw>");
+        return;
     }
 
     struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
@@ -876,6 +889,7 @@ void *diskspace_main(void *ptr) {
     netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
+    enable_record_excluded_mountpoints_or_filesystems = config_get_boolean(CONFIG_SECTION_DISKSPACE, "enable record excluded mountpoints or filesystems", CONFIG_BOOLEAN_YES);
 
     int update_every = (int)config_get_number(CONFIG_SECTION_DISKSPACE, "update every", localhost->rrd_update_every);
     if(update_every < localhost->rrd_update_every)

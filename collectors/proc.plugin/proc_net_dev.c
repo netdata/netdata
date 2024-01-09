@@ -1073,6 +1073,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     static SIMPLE_PATTERN *disabled_list = NULL;
     static procfile *ff = NULL;
     static int enable_new_interfaces = -1;
+    static int enable_record_disabled_interfaces = -1;
     static int do_bandwidth = -1, do_packets = -1, do_errors = -1, do_drops = -1, do_fifo = -1, do_compressed = -1,
                do_events = -1, do_speed = -1, do_duplex = -1, do_operstate = -1, do_carrier = -1, do_mtu = -1;
     static char *path_to_sys_devices_virtual_net = NULL, *path_to_sys_class_net_speed = NULL,
@@ -1108,6 +1109,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
 
         enable_new_interfaces = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "enable new interfaces detected at runtime", CONFIG_BOOLEAN_AUTO);
+        enable_record_disabled_interfaces = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "record disabled interfaces", CONFIG_BOOLEAN_YES);
 
         do_bandwidth    = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "bandwidth for all interfaces", CONFIG_BOOLEAN_AUTO);
         do_packets      = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_NETDEV, "packets for all interfaces", CONFIG_BOOLEAN_AUTO);
@@ -1170,6 +1172,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
             if(d->enabled)
                 d->enabled = !simple_pattern_matches(disabled_list, d->name);
+
+            if (unlikely(!d->enabled && enable_record_disabled_interfaces == CONFIG_BOOLEAN_NO)) {
+                netdata_log_debug(D_COLLECTOR, "NET_DEV: Skipping interface '%s' disabled by configuration", d->name);
+                continue;
+            }
 
             char buf[FILENAME_MAX + 1];
             snprintfz(buf, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
