@@ -87,13 +87,11 @@ static struct netdev {
     size_t len;
 
     // flags
-    int virtual;
-    int configured;
+    bool virtual;
+    bool configured;
     int enabled;
-    int updated;
-
+    bool updated;
     bool function_ready;
-
     bool double_linked; // iflink != ifindex
 
     time_t discover_time;
@@ -249,9 +247,7 @@ static struct netdev {
     const DICTIONARY_ITEM *cgroup_netdev_link;
 
     struct netdev *prev, *next;
-} *netdev_root = NULL, *netdev_last_used = NULL;
-
-static size_t netdev_added = 0, netdev_found = 0;
+} *netdev_root = NULL;
 
 // ----------------------------------------------------------------------------
 
@@ -375,7 +371,6 @@ static void netdev_free(struct netdev *d) {
     freez((void *)d->filename_carrier);
     freez((void *)d->filename_mtu);
     freez((void *)d);
-    netdev_added--;
 }
 
 static netdata_mutex_t netdev_mutex = NETDATA_MUTEX_INITIALIZER;
@@ -788,15 +783,10 @@ int netdev_function_net_interfaces(uuid_t *transaction __maybe_unused, BUFFER *w
 // netdev data collection
 
 static void netdev_cleanup() {
-    if(likely(netdev_found == netdev_added)) return;
-
     struct netdev *d = netdev_root;
     while(d) {
         if(unlikely(!d->updated)) {
             struct netdev *next = d->next; // keep the next, to continue;
-
-            if(netdev_last_used == netdev_root)
-                netdev_last_used = d->prev;
 
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(netdev_root, d, prev, next);
 
@@ -805,7 +795,7 @@ static void netdev_cleanup() {
             continue;
         }
 
-        d->updated = 0;
+        d->updated = false;
         d = d->next;
     }
 }
@@ -815,25 +805,10 @@ static struct netdev *get_netdev(const char *name) {
 
     uint32_t hash = simple_hash(name);
 
-    if(!netdev_last_used)
-        netdev_last_used = netdev_root;
-
     // search it, from the last position to the end
-    for(d = netdev_last_used ; d ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
-            netdev_last_used = d->next;
+    for(d = netdev_root ; d ; d = d->next) {
+        if(unlikely(hash == d->hash && !strcmp(name, d->name)))
             return d;
-        }
-    }
-
-    // search it from the beginning to the last position we used
-    if(netdev_root != netdev_last_used) {
-        for (d = netdev_root; d != netdev_last_used; d = d->next) {
-            if (unlikely(hash == d->hash && !strcmp(name, d->name))) {
-                netdev_last_used = d->next;
-                return d;
-            }
-        }
     }
 
     // create a new one
@@ -888,7 +863,6 @@ static struct netdev *get_netdev(const char *name) {
     d->priority = NETDATA_CHART_PRIO_FIRST_NET_IFACE;
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(netdev_root, d, prev, next);
-    netdev_added++;
 
     return d;
 }
@@ -978,8 +952,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    netdev_found = 0;
-
     kernel_uint_t system_rbytes = 0;
     kernel_uint_t system_tbytes = 0;
 
@@ -995,14 +967,13 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if(name[len - 1] == ':') name[len - 1] = '\0';
 
         struct netdev *d = get_netdev(name);
-        d->updated = 1;
-        netdev_found++;
+        d->updated = true;
 
         if(unlikely(!d->configured)) {
             // the first time we see this interface
 
             // remember we configured it
-            d->configured = 1;
+            d->configured = true;
             d->discover_time = now;
 
             d->enabled = enable_new_interfaces;
@@ -1013,12 +984,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             char buf[FILENAME_MAX + 1];
             snprintfz(buf, FILENAME_MAX, path_to_sys_devices_virtual_net, d->name);
 
-            d->virtual = likely(access(buf, R_OK) == 0) ? 1 : 0;
+            d->virtual = likely(access(buf, R_OK) == 0) ? true : false;
 
             // At least on Proxmox inside LXC: eth0 is virtual.
             // Virtual interfaces are not taken into account in system.net calculations
             if (inside_lxc_container && d->virtual && strncmp(d->name, "eth", 3) == 0)
-                d->virtual = 0;
+                d->virtual = false;
 
             if (d->virtual)
                 rrdlabels_add(d->chart_labels, "interface_type", "virtual", RRDLABEL_SRC_AUTO);
