@@ -139,7 +139,7 @@ const char *dyncfg_id2cmd_one(DYNCFG_CMDS cmd) {
 DYNCFG_CMDS dyncfg_cmds2id(const char *cmds) {
     if(!cmds || !*cmds)
         return DYNCFG_CMD_NONE;
-    
+
     DYNCFG_CMDS result = DYNCFG_CMD_NONE;
     const char *p = cmds;
     size_t len, i;
@@ -251,7 +251,7 @@ int dyncfg_default_response(BUFFER *wb, int code, const char *msg) {
 
 int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction, const char *function,
                               usec_t *stop_monotonic_ut, bool *cancelled,
-                              BUFFER *payload, BUFFER *result) {
+                              BUFFER *payload, const char *source, BUFFER *result) {
     if(!function || !*function)
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "command received is empty");
 
@@ -283,7 +283,7 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
     buffer_flush(result);
     result->content_type = CT_APPLICATION_JSON;
 
-    int code = df->cb(transaction, id, cmd, payload, stop_monotonic_ut, cancelled, result, df->data);
+    int code = df->cb(transaction, id, cmd, payload, stop_monotonic_ut, cancelled, result, source, df->data);
 
     if(!result->expires)
         result->expires = now_realtime_sec();

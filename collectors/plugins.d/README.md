@@ -489,11 +489,11 @@ Users can get a list of all the registered functions using the `/api/v1/function
 
 Once a function is called, the plugin will receive at its standard input a command that looks like this:
 
-> FUNCTION transaction_id timeout "name and parameters of the function as one quoted parameter"
+> FUNCTION transaction_id timeout "name and parameters of the function as one quoted parameter" "source of request"
 
 When the function to be called is to receive a payload of parameters, the call looks like this:
 
-> FUNCTION_PAYLOAD transaction_id timeout "name and parameters of the function as one quoted parameter" "content/type"
+> FUNCTION_PAYLOAD transaction_id timeout "name and parameters of the function as one quoted parameter" "source of request" "content/type"
 > body of the payload, formatted according to content/type
 > FUNCTION PAYLOAD END
 

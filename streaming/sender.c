@@ -1163,7 +1163,7 @@ static void stream_execute_function_progress_callback(void *data, size_t done, s
     }
 }
 
-static void execute_commands_function(struct sender_state *s, const char *command, const char *transaction, const char *timeout_s, const char *function, BUFFER *payload) {
+static void execute_commands_function(struct sender_state *s, const char *command, const char *transaction, const char *timeout_s, const char *function, BUFFER *payload, const char *source) {
     worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
     nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
 
@@ -1186,12 +1186,11 @@ static void execute_commands_function(struct sender_state *s, const char *comman
         BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_functions);
 
         int code = rrd_function_run(s->host, wb,
-                                    timeout,
-            HTTP_ACCESS_ADMIN, function, false, transaction,
+                                    timeout,HTTP_ACCESS_ADMIN, function, false, transaction,
                                     stream_execute_function_callback, tmp,
                                     stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
                                     stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,
-                                    NULL, NULL, payload);
+                                    NULL, NULL, payload, source);
 
         if(code != HTTP_RESP_OK) {
             if (!buffer_strlen(wb))
@@ -1204,6 +1203,7 @@ static void cleanup_intercepting_input(struct sender_state *s) {
     freez((void *)s->functions.transaction);
     freez((void *)s->functions.timeout_s);
     freez((void *)s->functions.function);
+    freez((void *)s->functions.source);
     buffer_free(s->functions.payload);
 
     s->functions.transaction = NULL;
@@ -1236,7 +1236,7 @@ void execute_commands(struct sender_state *s) {
             if(strcmp(start, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END "\n") == 0) {
                 execute_commands_function(s, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END,
                                           s->functions.transaction, s->functions.timeout_s,
-                                          s->functions.function, s->functions.payload);
+                                          s->functions.function, s->functions.payload, s->functions.source);
 
                 cleanup_intercepting_input(s);
             }
@@ -1255,18 +1255,21 @@ void execute_commands(struct sender_state *s) {
             char *transaction  = get_word(s->line.words, s->line.num_words, 1);
             char *timeout_s    = get_word(s->line.words, s->line.num_words, 2);
             char *function     = get_word(s->line.words, s->line.num_words, 3);
+            char *source       = get_word(s->line.words, s->line.num_words, 4);
 
-            execute_commands_function(s, command, transaction, timeout_s, function, NULL);
+            execute_commands_function(s, command, transaction, timeout_s, function, NULL, source);
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0) {
             char *transaction  = get_word(s->line.words, s->line.num_words, 1);
             char *timeout_s    = get_word(s->line.words, s->line.num_words, 2);
             char *function     = get_word(s->line.words, s->line.num_words, 3);
-            char *content_type = get_word(s->line.words, s->line.num_words, 4);
+            char *source       = get_word(s->line.words, s->line.num_words, 4);
+            char *content_type = get_word(s->line.words, s->line.num_words, 5);
 
-            s->functions.transaction = strdupz(transaction);
-            s->functions.timeout_s = strdupz(timeout_s);
-            s->functions.function = strdupz(function);
+            s->functions.transaction = strdupz(transaction ? transaction : "");
+            s->functions.timeout_s = strdupz(timeout_s ? timeout_s : "");
+            s->functions.function = strdupz(function ? function : "");
+            s->functions.source = strdupz(source ? source : "");
             s->functions.payload = buffer_create(0, NULL);
             s->functions.payload->content_type = content_type_string2id(content_type);
             s->functions.intercept_input = true;

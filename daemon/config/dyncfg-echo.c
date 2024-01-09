@@ -50,7 +50,7 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
                      dyncfg_echo_cb, e,
                      NULL, NULL,
                      NULL, NULL,
-                     NULL);
+                     NULL, NULL);
 }
 
 static void dyncfg_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe_unused, const char *cmd) {
@@ -69,7 +69,7 @@ static void dyncfg_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const c
                      dyncfg_echo_cb, e,
                      NULL, NULL,
                      NULL, NULL,
-                     df->payload);
+                     df->payload, NULL);
 }
 
 void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id) {

@@ -63,6 +63,7 @@ static int systemd_journal_directories_dyncfg_cb(const char *transaction,
                                                  usec_t *stop_monotonic_ut __maybe_unused,
                                                  bool *cancelled __maybe_unused,
                                                  BUFFER *result,
+                                                 const char *source __maybe_unused,
                                                  void *data __maybe_unused) {
     CLEAN_BUFFER *action = buffer_create(100, NULL);
     dyncfg_cmds2buffer(cmd, action);

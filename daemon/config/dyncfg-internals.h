@@ -54,18 +54,7 @@ void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id)
 void dyncfg_echo_add(const DICTIONARY_ITEM *template_item, DYNCFG *template_df, const char *template_id, const char *job_name);
 
 const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data);
-int dyncfg_function_intercept_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFFER *payload,
-                               usec_t *stop_monotonic_ut, const char *function,
-                               void *execute_cb_data,
-                               rrd_function_result_callback_t result_cb, void *result_cb_data,
-                               rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                               rrd_function_is_cancelled_cb_t is_cancelled_cb,
-                               void *is_cancelled_cb_data,
-                               rrd_function_register_canceller_cb_t register_canceller_cb,
-                               void *register_canceller_cb_data,
-                               rrd_function_register_progresser_cb_t register_progresser_cb,
-                               void *register_progresser_cb_data);
-
+int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data);
 void dyncfg_cleanup(DYNCFG *v);
 
 bool dyncfg_is_user_disabled(const char *id);

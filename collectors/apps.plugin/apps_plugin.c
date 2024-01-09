@@ -4399,7 +4399,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
 
 static void function_processes(const char *transaction, char *function __maybe_unused,
                                usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-                               BUFFER *payload __maybe_unused, void *data __maybe_unused) {
+                               BUFFER *payload __maybe_unused, const char *source __maybe_unused, void *data __maybe_unused) {
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };

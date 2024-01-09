@@ -2,7 +2,7 @@
 
 #include "functions_evloop.h"
 
-static void functions_evloop_config_cb(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, void *data);
+static void functions_evloop_config_cb(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, const char *source, void *data);
 
 struct functions_evloop_worker_job {
     bool used;
@@ -14,6 +14,7 @@ struct functions_evloop_worker_job {
     time_t timeout;
 
     BUFFER *payload;
+    const char *source;
 
     functions_evloop_worker_execute_t cb;
     void *cb_data;
@@ -22,6 +23,7 @@ struct functions_evloop_worker_job {
 static void worker_job_cleanup(struct functions_evloop_worker_job *j) {
     freez((void *)j->cmd);
     freez((void *)j->transaction);
+    freez((void *)j->source);
     buffer_free(j->payload);
 }
 
@@ -88,7 +90,7 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
 
             last_acquired = true;
             j = dictionary_acquired_item_value(acquired);
-            j->cb(j->transaction, j->cmd, &j->stop_monotonic_ut, &j->cancelled, j->payload, j->cb_data);
+            j->cb(j->transaction, j->cmd, &j->stop_monotonic_ut, &j->cancelled, j->payload, j->source, j->cb_data);
             dictionary_del(wg->worker_queue, j->transaction);
             dictionary_acquired_item_release(wg->worker_queue, acquired);
             dictionary_garbage_collect(wg->worker_queue);
@@ -99,7 +101,7 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
     return NULL;
 }
 
-static void worker_add_job(struct functions_evloop_globals *wg, const char *keyword, char *transaction, char *function, char *timeout_s, BUFFER *payload) {
+static void worker_add_job(struct functions_evloop_globals *wg, const char *keyword, char *transaction, char *function, char *timeout_s, BUFFER *payload, const char *source) {
     if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                keyword,
@@ -127,6 +129,7 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                     .stop_monotonic_ut = now_monotonic_usec() + (timeout * USEC_PER_SEC),
                     .used = false,
                     .payload = buffer_dup(payload),
+                    .source = source ? strdupz(source) : NULL,
                     .cb = we->cb,
                     .cb_data = we->cb_data,
                 };
@@ -161,6 +164,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
         char *transaction;
         char *function;
         char *timeout_s;
+        char *source;
         char *content_type;
     } deferred = { 0 };
 
@@ -194,12 +198,13 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
                 s[deferred.last_len] = '\0';
                 buffer->len = deferred.last_len;
                 buffer->content_type = content_type_string2id(deferred.content_type);
-                worker_add_job(wg, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD, deferred.transaction, deferred.function, deferred.timeout_s, buffer);
+                worker_add_job(wg, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD, deferred.transaction, deferred.function, deferred.timeout_s, buffer, deferred.source);
                 buffer_flush(buffer);
 
                 freez(deferred.transaction);
                 freez(deferred.function);
                 freez(deferred.timeout_s);
+                freez(deferred.source);
                 freez(deferred.content_type);
                 memset(&deferred, 0, sizeof(deferred));
             }
@@ -218,13 +223,21 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             char *transaction = get_word(words, num_words, 1);
             char *timeout_s = get_word(words, num_words, 2);
             char *function = get_word(words, num_words, 3);
-            worker_add_job(wg, keyword, transaction, function, timeout_s, NULL);
+            char *source = get_word(words, num_words, 4);
+            worker_add_job(wg, keyword, transaction, function, timeout_s, NULL, source);
         }
         else if(keyword && (strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0)) {
-            deferred.transaction = strdupz(get_word(words, num_words, 1));
-            deferred.timeout_s = strdupz(get_word(words, num_words, 2));
-            deferred.function = strdupz(get_word(words, num_words, 3));
-            deferred.content_type = strdupz(get_word(words, num_words, 4));
+            char *transaction = get_word(words, num_words, 1);
+            char *timeout_s = get_word(words, num_words, 2);
+            char *function = get_word(words, num_words, 3);
+            char *source = get_word(words, num_words, 4);
+            char *content_type = get_word(words, num_words, 5);
+
+            deferred.transaction = strdupz(transaction ? transaction : "");
+            deferred.timeout_s = strdupz(timeout_s ? timeout_s : "");
+            deferred.function = strdupz(function ? function : "");
+            deferred.source = strdupz(source ? source : "");
+            deferred.content_type = strdupz(content_type ? content_type : "");
             deferred.last_len = 0;
             deferred.enabled = true;
         }
@@ -325,11 +338,11 @@ void functions_evloop_cancel_threads(struct functions_evloop_globals *wg){
 // ----------------------------------------------------------------------------
 
 static void functions_evloop_config_cb(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
-                                       BUFFER *payload, void *data) {
+                                       BUFFER *payload, const char *source, void *data) {
     struct functions_evloop_globals *wg = data;
 
     CLEAN_BUFFER *result = buffer_create(1024, NULL);
-    int code = dyncfg_node_find_and_call(wg->dyncfg.nodes, transaction, function, stop_monotonic_ut, cancelled, payload, result);
+    int code = dyncfg_node_find_and_call(wg->dyncfg.nodes, transaction, function, stop_monotonic_ut, cancelled, payload, source, result);
 
     netdata_mutex_lock(wg->stdout_mutex);
     pluginsd_function_result_begin_to_stdout(transaction, code, content_type_id2string(result->content_type), result->expires);

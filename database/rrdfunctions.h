@@ -18,13 +18,42 @@ typedef void (*rrd_function_progress_cb_t)(void *data, size_t done, size_t all);
 typedef void (*rrd_function_progresser_cb_t)(void *data);
 typedef void (*rrd_function_register_progresser_cb_t)(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data);
 
-typedef int (*rrd_function_execute_cb_t)(uuid_t *transaction, BUFFER *wb, BUFFER *payload,
-                                         usec_t *stop_monotonic_ut, const char *function, void *collector_data,
-                                         rrd_function_result_callback_t result_cb, void *result_cb_data,
-                                         rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                                         rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                                         rrd_function_register_canceller_cb_t register_canceller_cb, void *register_canceller_cb_data,
-                                         rrd_function_register_progresser_cb_t register_progresser_cb, void *register_progresser_cb_data);
+struct rrd_function_execute {
+    uuid_t *transaction;
+    const char *function;
+    BUFFER *payload;
+    const char *source;
+
+    usec_t *stop_monotonic_ut;
+
+    struct {
+        BUFFER *wb; // the response should be written here
+        rrd_function_result_callback_t cb;
+        void *data;
+    } result;
+
+    struct {
+        rrd_function_progress_cb_t cb;
+        void *data;
+    } progress;
+
+    struct {
+        rrd_function_is_cancelled_cb_t cb;
+        void *data;
+    } is_cancelled;
+
+    struct {
+        rrd_function_register_canceller_cb_t cb;
+        void *data;
+    } register_canceller;
+
+    struct {
+        rrd_function_register_progresser_cb_t cb;
+        void *data;
+    } register_progresser;
+};
+
+typedef int (*rrd_function_execute_cb_t)(struct rrd_function_execute *rfe, void *data);
 
 
 // ----------------------------------------------------------------------------
@@ -46,7 +75,8 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data, BUFFER *payload);
+                     rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
+                     BUFFER *payload, const char *source);
 
 int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 

@@ -38,6 +38,8 @@ void web_client_api_v1_management_init(void);
 void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key);
 void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb, const char *key);
 
+void web_client_source2buffer(struct web_client *w, BUFFER *source);
+
 extern char *api_secret;
 
 #endif //NETDATA_WEB_API_V1_H

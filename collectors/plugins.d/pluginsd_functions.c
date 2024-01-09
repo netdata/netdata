@@ -25,10 +25,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     if(pf->payload && buffer_strlen(pf->payload)) {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \"%s\"\n",
+            PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \"%s\" \"%s\"\n",
             transaction,
             pf->timeout_s,
             string2str(pf->function),
+            pf->source ? pf->source : "",
             content_type_id2string(pf->payload->content_type)
             );
 
@@ -38,10 +39,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     else {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\"\n",
+            PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \"%s\"\n",
             transaction,
             pf->timeout_s,
-            string2str(pf->function)
+            string2str(pf->function),
+            pf->source ? pf->source : ""
             );
     }
 
@@ -92,7 +94,8 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
     pf->result.cb(pf->result_body_wb, pf->code, pf->result.data);
 
     string_freez(pf->function);
-    freez((void *)pf->payload);
+    buffer_free((void *)pf->payload);
+    freez((void *)pf->source);
 }
 
 void pluginsd_inflight_functions_init(PARSER *parser) {
@@ -191,45 +194,36 @@ static void pluginsd_function_progress_to_plugin(void *data) {
 
 // this is the function called from
 // rrd_call_function_and_wait() and rrd_call_function_async()
-int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFFER *payload,
-                                        usec_t *stop_monotonic_ut, const char *function,
-                                        void *execute_cb_data,
-                                        rrd_function_result_callback_t result_cb, void *result_cb_data,
-                                        rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                                        rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
-                                        void *is_cancelled_cb_data __maybe_unused,
-                                        rrd_function_register_canceller_cb_t register_canceller_cb,
-                                        void *register_canceller_cb_data,
-                                        rrd_function_register_progresser_cb_t register_progresser_cb,
-                                        void *register_progresser_cb_data) {
+int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    PARSER  *parser = execute_cb_data;
+    PARSER  *parser = data;
 
     usec_t now_ut = now_monotonic_usec();
 
-    int timeout_s = (int)((*stop_monotonic_ut - now_ut + USEC_PER_SEC / 2) / USEC_PER_SEC);
+    int timeout_s = (int)((*rfe->stop_monotonic_ut - now_ut + USEC_PER_SEC / 2) / USEC_PER_SEC);
 
     struct inflight_function tmp = {
             .started_monotonic_ut = now_ut,
-            .stop_monotonic_ut = stop_monotonic_ut,
-            .result_body_wb = result_body_wb,
+            .stop_monotonic_ut = rfe->stop_monotonic_ut,
+            .result_body_wb = rfe->result.wb,
             .timeout_s = timeout_s,
-            .function = string_strdupz(function),
-            .payload = buffer_dup(payload),
+            .function = string_strdupz(rfe->function),
+            .payload = buffer_dup(rfe->payload),
+            .source = rfe->source ? strdupz(rfe->source) : NULL,
             .parser = parser,
 
             .result = {
-                    .cb = result_cb,
-                    .data = result_cb_data,
+                    .cb = rfe->result.cb,
+                    .data = rfe->result.data,
             },
             .progress = {
-                    .cb = progress_cb,
-                    .data = progress_cb_data,
+                    .cb = rfe->progress.cb,
+                    .data = rfe->progress.data,
             },
     };
-    uuid_copy(tmp.transaction, *transaction);
+    uuid_copy(tmp.transaction, *rfe->transaction);
 
     char transaction_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(tmp.transaction, transaction_str);
@@ -247,13 +241,13 @@ int pluginsd_function_execute_cb(uuid_t *transaction, BUFFER *result_body_wb, BU
         return code;
     }
     else {
-        if (register_canceller_cb)
-            register_canceller_cb(register_canceller_cb_data, pluginsd_function_cancel, t);
+        if (rfe->register_canceller.cb)
+            rfe->register_canceller.cb(rfe->register_canceller.data, pluginsd_function_cancel, t);
 
-        if (register_progresser_cb &&
+        if (rfe->register_progresser.cb &&
             (parser->repertoire == PARSER_INIT_PLUGINSD || (parser->repertoire == PARSER_INIT_STREAMING &&
                                                             stream_has_capability(&parser->user, STREAM_CAP_PROGRESS))))
-            register_progresser_cb(register_progresser_cb_data, pluginsd_function_progress_to_plugin, t);
+            rfe->register_progresser.cb(rfe->register_progresser.data, pluginsd_function_progress_to_plugin, t);
 
         if (!parser->inflight.smaller_monotonic_timeout_ut ||
             *tmp.stop_monotonic_ut + RRDFUNCTIONS_TIMEOUT_EXTENSION_UT < parser->inflight.smaller_monotonic_timeout_ut)

@@ -64,9 +64,10 @@ typedef enum __attribute__((packed)) {
     // authorization
     WEB_CLIENT_FLAG_AUTH_CLOUD              = (1 << 21),
     WEB_CLIENT_FLAG_AUTH_BEARER             = (1 << 22),
+    WEB_CLIENT_FLAG_AUTH_GOD                = (1 << 23),
 
     // transient settings
-    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 23), // flag to avoid redoing progress work
+    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 24), // flag to avoid redoing progress work
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2)
@@ -204,7 +205,6 @@ struct web_client {
         uuid_t bearer_token;
         uuid_t cloud_account_id;
         char client_name[CLOUD_USER_NAME_LENGTH];
-
     } auth;
 
     struct {                            // A callback to check if the query should be interrupted / stopped

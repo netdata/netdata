@@ -56,17 +56,7 @@ static void dyncfg_unittest_register_error(const char *id, const char *msg) {
     __atomic_add_fetch(&dyncfg_unittest_data.errors, 1, __ATOMIC_RELAXED);
 }
 
-static int dyncfg_unittest_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *result, BUFFER *payload,
-                                      usec_t *stop_monotonic_ut __maybe_unused, const char *function,
-                                      void *execute_cb_data,
-                                      rrd_function_result_callback_t result_cb, void *result_cb_data,
-                                      rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
-                                      rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
-                                      void *is_cancelled_cb_data __maybe_unused,
-                                      rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
-                                      void *register_canceller_cb_data __maybe_unused,
-                                      rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
-                                      void *register_progresser_cb_data __maybe_unused);
+static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *data);
 
 bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, const char *add_name) {
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse(buffer_tostring(payload));
@@ -164,26 +154,16 @@ static void *dyncfg_unittest_thread_action(void *ptr) {
     return ptr;
 }
 
-static int dyncfg_unittest_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *result, BUFFER *payload,
-                                      usec_t *stop_monotonic_ut __maybe_unused, const char *function,
-                                      void *execute_cb_data,
-                                      rrd_function_result_callback_t result_cb, void *result_cb_data,
-                                      rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
-                                      rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
-                                      void *is_cancelled_cb_data __maybe_unused,
-                                      rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
-                                      void *register_canceller_cb_data __maybe_unused,
-                                      rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
-                                      void *register_progresser_cb_data __maybe_unused) {
+static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *data) {
 
     int rc;
     bool run_the_callback = true;
-    TEST *t = execute_cb_data;
+    TEST *t = data;
 
     t->received = true;
 
-    char buf[strlen(function) + 1];
-    memcpy(buf, function, sizeof(buf));
+    char buf[strlen(rfe->function) + 1];
+    memcpy(buf, rfe->function, sizeof(buf));
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_pluginsd(buf, words, MAX_FUNCTION_PARAMETERS);
@@ -196,28 +176,28 @@ static int dyncfg_unittest_execute_cb(uuid_t *transaction __maybe_unused, BUFFER
     if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0) {
         char *msg = "did not receive a config call";
         dyncfg_unittest_register_error(id, msg);
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+        rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
     if(!id || !*id) {
         char *msg = "did not receive an id";
         dyncfg_unittest_register_error(id, msg);
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+        rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
     if(strcmp(t->id, id) != 0) {
         char *msg = "id received is not the expected";
         dyncfg_unittest_register_error(id, msg);
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+        rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
     if(!action || !*action) {
         char *msg = "did not receive an action";
         dyncfg_unittest_register_error(id, msg);
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+        rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
@@ -225,32 +205,32 @@ static int dyncfg_unittest_execute_cb(uuid_t *transaction __maybe_unused, BUFFER
     if(cmd == DYNCFG_CMD_NONE) {
         char *msg = "action received is not known";
         dyncfg_unittest_register_error(id, msg);
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+        rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
     if(!(t->cmds & cmd)) {
         char *msg = "received a command that is not supported";
         dyncfg_unittest_register_error(id, msg);
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+        rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
     if(t->current.removed && cmd != DYNCFG_CMD_ADD) {
         char *msg = "received a command for a removed entry";
         dyncfg_unittest_register_error(id, msg);
-        rc = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, msg);
+        rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
     struct dyncfg_unittest_action *a = callocz(1, sizeof(*a));
     a->t = t;
     a->add_name = add_name ? strdupz(add_name) : NULL;
-    a->result = result;
-    a->payload = buffer_dup(payload);
+    a->result = rfe->result.wb;
+    a->payload = buffer_dup(rfe->payload);
     a->cmd = cmd;
-    a->result_cb = result_cb;
-    a->result_cb_data = result_cb_data;
+    a->result_cb = rfe->result.cb;
+    a->result_cb_data = rfe->result.data;
 
     run_the_callback = false;
 
@@ -265,8 +245,8 @@ cleanup:
     if(run_the_callback) {
         __atomic_store_n(&t->finished, true, __ATOMIC_RELAXED);
 
-        if (result_cb)
-            result_cb(result, rc, result_cb_data);
+        if (rfe->result.cb)
+            rfe->result.cb(rfe->result.wb, rc, rfe->result.data);
     }
 
     return rc;
@@ -287,7 +267,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload)
                               NULL, NULL,
                               NULL, NULL,
                               NULL, NULL,
-                              pld);
+                              pld, NULL);
     if(rc != HTTP_RESP_OK) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s; returned code %d", cmd, rc);
         dyncfg_unittest_register_error(NULL, NULL);

@@ -125,22 +125,12 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent, 
         dictionary_acquired_item_release(dyncfg_globals.nodes, items[i]);
 }
 
-static int dyncfg_config_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *result_body_wb, BUFFER *payload __maybe_unused,
-                                    usec_t *stop_monotonic_ut __maybe_unused, const char *function,
-                                    void *execute_cb_data,
-                                    rrd_function_result_callback_t result_cb, void *result_cb_data,
-                                    rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
-                                    rrd_function_is_cancelled_cb_t is_cancelled_cb __maybe_unused,
-                                    void *is_cancelled_cb_data __maybe_unused,
-                                    rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
-                                    void *register_canceller_cb_data __maybe_unused,
-                                    rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
-                                    void *register_progresser_cb_data __maybe_unused) {
-    RRDHOST *host = execute_cb_data;
+static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data) {
+    RRDHOST *host = data;
     int code;
 
-    char buf[strlen(function) + 1];
-    memcpy(buf, function, sizeof(buf));
+    char buf[strlen(rfe->function) + 1];
+    memcpy(buf, rfe->function, sizeof(buf));
 
     char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
     size_t num_words = quoted_strings_splitter_pluginsd(buf, words, MAX_FUNCTION_PARAMETERS);
@@ -152,15 +142,15 @@ static int dyncfg_config_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *
 
     if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0) {
         char *msg = "invalid function call, expected: config";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", function, msg);
-        code = dyncfg_default_response(result_body_wb, HTTP_RESP_BAD_REQUEST, msg);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", rfe->function, msg);
+        code = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
     if(!action || !*action) {
         char *msg = "invalid function call, expected: config tree";
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", function, msg);
-        code = dyncfg_default_response(result_body_wb, HTTP_RESP_BAD_REQUEST, msg);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", rfe->function, msg);
+        code = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
         goto cleanup;
     }
 
@@ -172,23 +162,23 @@ static int dyncfg_config_execute_cb(uuid_t *transaction __maybe_unused, BUFFER *
             id = NULL;
         else if(!dyncfg_is_valid_id(id)) {
             char *msg = "invalid id given";
-            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", function, msg);
-            code = dyncfg_default_response(result_body_wb, HTTP_RESP_BAD_REQUEST, msg);
+            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG TREE: function call '%s': %s", rfe->function, msg);
+            code = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
             goto cleanup;
         }
 
         code = HTTP_RESP_OK;
-        dyncfg_tree_for_host(host, result_body_wb, path, id);
+        dyncfg_tree_for_host(host, rfe->result.wb, path, id);
     }
     else {
         code = HTTP_RESP_NOT_FOUND;
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unknown config id '%s' in call: %s", action, function);
-        rrd_call_function_error(result_body_wb, "unknown config id given", code);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unknown config id '%s' in call: %s", action, rfe->function);
+        rrd_call_function_error(rfe->result.wb, "unknown config id given", code);
     }
 
 cleanup:
-    if(result_cb)
-        result_cb(result_body_wb, code, result_cb_data);
+    if(rfe->result.cb)
+        rfe->result.cb(rfe->result.wb, code, rfe->result.data);
 
     return code;
 }

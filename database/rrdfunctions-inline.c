@@ -6,35 +6,26 @@ struct rrd_function_inline {
     rrd_function_execute_inline_cb_t cb;
 };
 
-static int rrd_function_run_inline(uuid_t *transaction __maybe_unused, BUFFER *wb, BUFFER *payload __maybe_unused,
-                            usec_t *stop_monotonic_ut __maybe_unused, const char *function __maybe_unused,
-                            void *execute_cb_data __maybe_unused,
-                            rrd_function_result_callback_t result_cb, void *result_cb_data,
-                            rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
-                            rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                            rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
-                            void *register_canceller_cb_data __maybe_unused,
-                            rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
-                            void *register_progresser_cb_data __maybe_unused) {
+static int rrd_function_run_inline(struct rrd_function_execute *rfe, void *data) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    struct rrd_function_inline *fi = execute_cb_data;
+    struct rrd_function_inline *fi = data;
 
     int code;
 
-    if(is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data))
+    if(rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     else
-        code = fi->cb(wb, function);
+        code = fi->cb(rfe->result.wb, rfe->function);
 
-    if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data))) {
-        buffer_flush(wb);
+    if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))) {
+        buffer_flush(rfe->result.wb);
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     }
 
-    if(result_cb)
-        result_cb(wb, code, result_cb_data);
+    if(rfe->result.cb)
+        rfe->result.cb(rfe->result.wb, code, rfe->result.data);
 
     return code;
 }

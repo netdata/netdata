@@ -4,33 +4,25 @@
 
 static DICTIONARY *dyncfg_nodes = NULL;
 
-static int dyncfg_inline_callback(uuid_t *transaction, BUFFER *wb, BUFFER *payload,
-                                  usec_t *stop_monotonic_ut, const char *function, void *collector_data __maybe_unused,
-                                  rrd_function_result_callback_t result_cb, void *result_cb_data,
-                                  rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
-                                  rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                                  rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
-                                  void *register_canceller_cb_data __maybe_unused,
-                                  rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
-                                  void *register_progresser_cb_data __maybe_unused) {
+static int dyncfg_inline_callback(struct rrd_function_execute *rfe, void *data) {
     char tr[UUID_COMPACT_STR_LEN];
-    uuid_unparse_lower_compact(*transaction, tr);
+    uuid_unparse_lower_compact(*rfe->transaction, tr);
 
-    bool cancelled = is_cancelled_cb ? is_cancelled_cb(is_cancelled_cb_data) : false;
+    bool cancelled = rfe->is_cancelled.cb ? rfe->is_cancelled.cb(rfe->is_cancelled.data) : false;
 
     int code;
     if(cancelled)
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     else
-        code = dyncfg_node_find_and_call(dyncfg_nodes, tr, function, stop_monotonic_ut, &cancelled, payload, wb);
+        code = dyncfg_node_find_and_call(dyncfg_nodes, tr, rfe->function, rfe->stop_monotonic_ut, &cancelled, rfe->payload, rfe->source, rfe->result.wb);
 
-    if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (is_cancelled_cb && is_cancelled_cb(is_cancelled_cb_data))) {
-        buffer_flush(wb);
+    if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))) {
+        buffer_flush(rfe->result.wb);
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     }
 
-    if(result_cb)
-        result_cb(wb, code, result_cb_data);
+    if(rfe->result.cb)
+        rfe->result.cb(rfe->result.wb, code, rfe->result.data);
 
     return code;
 }

@@ -65,7 +65,7 @@ char *dyncfg_escape_id_for_filename(const char *id);
 #include "../buffer/buffer.h"
 #include "../dictionary/dictionary.h"
 
-typedef int (*dyncfg_cb_t)(const char *transaction, const char *id, DYNCFG_CMDS cmd, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *result, void *data);
+typedef int (*dyncfg_cb_t)(const char *transaction, const char *id, DYNCFG_CMDS cmd, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *result, const char *source, void *data);
 
 struct dyncfg_node {
     DYNCFG_TYPE type;
@@ -80,6 +80,6 @@ int dyncfg_default_response(BUFFER *wb, int code, const char *msg);
 
 int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction, const char *function,
                               usec_t *stop_monotonic_ut, bool *cancelled,
-                              BUFFER *payload, BUFFER *result);
+                              BUFFER *payload, const char *source, BUFFER *result);
 
 #endif //LIBNETDATA_DYNCFG_H

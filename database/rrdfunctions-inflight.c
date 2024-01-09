@@ -14,6 +14,7 @@ struct rrd_function_inflight {
     const char *transaction;
     const char *cmd;
     const char *sanitized_cmd;
+    const char *source;
     size_t sanitized_cmd_length;
     int timeout;
     bool cancelled;
@@ -77,6 +78,7 @@ static void rrd_functions_inflight_cleanup(struct rrd_function_inflight *r) {
     freez((void *)r->transaction);
     freez((void *)r->cmd);
     freez((void *)r->sanitized_cmd);
+    freez((void *)r->source);
 
     r->payload = NULL;
     r->transaction = NULL;
@@ -192,13 +194,35 @@ static bool rrd_inflight_async_function_is_cancelled(void *data) {
 }
 
 static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_inflight *r) {
-    int code = r->rdcf->execute_cb(&r->transaction_uuid, r->result.wb, r->payload,
-                                   &r->stop_monotonic_ut, r->sanitized_cmd, r->rdcf->execute_cb_data,
-                                   rrd_inflight_async_function_nowait_finished, r,
-                                   r->progress.cb, r->progress.data,
-                                   rrd_inflight_async_function_is_cancelled, r,
-                                   rrd_inflight_async_function_register_canceller_cb, r,
-                                   rrd_inflight_async_function_register_progresser_cb, r);
+    struct rrd_function_execute rfe = {
+        .transaction = &r->transaction_uuid,
+        .function = r->sanitized_cmd,
+        .payload = r->payload,
+        .source = r->source,
+        .stop_monotonic_ut = &r->stop_monotonic_ut,
+        .result = {
+            .wb = r->result.wb,
+            .cb = rrd_inflight_async_function_nowait_finished,
+            .data = r,
+        },
+        .progress = {
+            .cb = r->progress.cb,
+            .data = r->progress.data,
+        },
+        .is_cancelled = {
+            .cb = rrd_inflight_async_function_is_cancelled,
+            .data = r,
+        },
+        .register_canceller = {
+            .cb = rrd_inflight_async_function_register_canceller_cb,
+            .data = r,
+        },
+        .register_progresser = {
+            .cb = rrd_inflight_async_function_register_progresser_cb,
+            .data = r,
+        },
+    };
+    int code = r->rdcf->execute_cb(&rfe, r->rdcf->execute_cb_data);
 
     return code;
 }
@@ -220,15 +244,38 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
     BUFFER *temp_wb  = buffer_create(1024, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
     temp_wb->content_type = r->result.wb->content_type;
 
-    int code = r->rdcf->execute_cb(&r->transaction_uuid, temp_wb, r->payload,
-                                   &r->stop_monotonic_ut, r->sanitized_cmd, r->rdcf->execute_cb_data,
-                                   // we overwrite the result callbacks,
-                                   // so that we can clean up the allocations made
-                                   rrd_async_function_signal_when_ready, tmp,
-                                   r->progress.cb, r->progress.data,
-                                   rrd_inflight_async_function_is_cancelled, r,
-                                   rrd_inflight_async_function_register_canceller_cb, r,
-                                   rrd_inflight_async_function_register_progresser_cb, r);
+    struct rrd_function_execute rfe = {
+        .transaction = &r->transaction_uuid,
+        .function = r->sanitized_cmd,
+        .payload = r->payload,
+        .source = r->source,
+        .stop_monotonic_ut = &r->stop_monotonic_ut,
+        .result = {
+            .wb = temp_wb,
+
+            // we overwrite the result callbacks,
+            // so that we can clean up the allocations made
+            .cb = rrd_async_function_signal_when_ready,
+            .data = tmp,
+        },
+        .progress = {
+            .cb = r->progress.cb,
+            .data = r->progress.data,
+        },
+        .is_cancelled = {
+            .cb = rrd_inflight_async_function_is_cancelled,
+            .data = r,
+        },
+        .register_canceller = {
+            .cb = rrd_inflight_async_function_register_canceller_cb,
+            .data = r,
+        },
+        .register_progresser = {
+            .cb = rrd_inflight_async_function_register_progresser_cb,
+            .data = r,
+        },
+    };
+    int code = r->rdcf->execute_cb(&rfe, r->rdcf->execute_cb_data);
 
     // this has to happen after we execute the callback
     // because if an async call is responded in sync mode, there will be a deadlock.
@@ -346,11 +393,14 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                     BUFFER *payload) {
+                     BUFFER *payload, const char *source) {
 
     int code;
     char sanitized_cmd[PLUGINSD_LINE_MAX + 1];
     const DICTIONARY_ITEM *host_function_acquired = NULL;
+
+    char sanitized_source[(source ? strlen(source) : 0) + 1];
+    rrd_functions_sanitize(sanitized_source, source ? source : "", sizeof(sanitized_source));
 
     // ------------------------------------------------------------------------
     // find the function
@@ -412,6 +462,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
         .sanitized_cmd = strdupz(sanitized_cmd),
         .sanitized_cmd_length = sanitized_cmd_length,
         .transaction = strdupz(transaction),
+        .source = strdupz(sanitized_source),
         .payload = buffer_dup(payload),
         .timeout = timeout_s,
         .cancelled = false,
@@ -455,14 +506,39 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 
     if(r->rdcf->sync) {
         // the caller has to wait
-        code = r->rdcf->execute_cb(&r->transaction_uuid, r->result.wb, r->payload,
-                                   &r->stop_monotonic_ut, r->sanitized_cmd, r->rdcf->execute_cb_data,
-                                   r->result.cb, r->result.data,
-                                   r->progress.cb, r->progress.data,
-                                   r->is_cancelled.cb, r->is_cancelled.data,  // it is ok to pass these, we block the caller
-                                   NULL, NULL,   // no need to register canceller, we will wait
-                                   NULL, NULL    // ?? do we need a progresser in this case?
-        );
+
+        struct rrd_function_execute rfe = {
+            .transaction = &r->transaction_uuid,
+            .function = r->sanitized_cmd,
+            .payload = r->payload,
+            .source = r->source,
+            .stop_monotonic_ut = &r->stop_monotonic_ut,
+            .result = {
+                .wb = r->result.wb,
+
+                // we overwrite the result callbacks,
+                // so that we can clean up the allocations made
+                .cb = r->result.cb,
+                .data = r->result.data,
+            },
+            .progress = {
+                .cb = r->progress.cb,
+                .data = r->progress.data,
+            },
+            .is_cancelled = {
+                .cb = r->is_cancelled.cb,
+                .data = r->is_cancelled.data,
+            },
+            .register_canceller = {
+                .cb = NULL,
+                .data = NULL,
+            },
+            .register_progresser = {
+                .cb = NULL,
+                .data = NULL,
+            },
+        };
+        code = r->rdcf->execute_cb(&rfe, r->rdcf->execute_cb_data);
 
         rrd_inflight_function_cleanup(host, r->transaction);
         return code;

@@ -1420,10 +1420,14 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     char transaction[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction);
 
+    CLEAN_BUFFER *source = buffer_create(100, NULL);
+    web_client_source2buffer(w, source);
+
     return rrd_function_run(host, wb, timeout, w->access, function, true, transaction,
                             NULL, NULL,
                             web_client_progress_functions_update, w,
-                            web_client_interrupt_callback, w, NULL);
+                            web_client_interrupt_callback, w, NULL,
+                            buffer_tostring(source));
 }
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
@@ -1440,6 +1444,33 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
     buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;
+}
+
+void web_client_source2buffer(struct web_client *w, BUFFER *source) {
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD))
+        buffer_sprintf(source, "method=NC");
+    else if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_BEARER))
+        buffer_sprintf(source, "method=api-bearer");
+    else
+        buffer_sprintf(source, "method=api");
+
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD) || web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_BEARER)) {
+        buffer_sprintf(source, ",role=%s", http_id2access(w->access));
+
+        char uuid_str[UUID_COMPACT_STR_LEN];
+        uuid_unparse_lower_compact(w->auth.cloud_account_id, uuid_str);
+        buffer_sprintf(source, ",user=%s,account=%s", w->auth.client_name, uuid_str);
+    }
+    else if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_GOD))
+        buffer_strcat(source, ",role=god");
+    else
+        buffer_sprintf(source, ",role=%s", http_id2access(w->access));
+
+    if(w->client_ip[0])
+        buffer_sprintf(source, ",ip=%s", w->client_ip);
+
+    if(w->forwarded_for)
+        buffer_sprintf(source, ",forwarded_for=%s", w->forwarded_for);
 }
 
 static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
@@ -1508,13 +1539,17 @@ static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w,
             snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s", id, dyncfg_id2cmd_one(c));
     }
 
+    CLEAN_BUFFER *source = buffer_create(100, NULL);
+    web_client_source2buffer(w, source);
+
     buffer_flush(w->response.data);
     int code = rrd_function_run(host, w->response.data, timeout, w->access, cmd,
                                 true, transaction,
                                 NULL, NULL,
                                 web_client_progress_functions_update, w,
                                 web_client_interrupt_callback, w,
-                                w->payload);
+                                w->payload,
+                                buffer_tostring(source));
 
     return code;
 }

@@ -120,7 +120,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
             }
             else {
                 nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "DYNCFG: plugin returned code %d to dyncfg initiated call: %s", code, df->function);
+                       "DYNCFG: plugin returned code %d to dyncfg initiated call: %s", code, dc->function);
 
                 if(dc->cmd & (DYNCFG_CMD_UPDATE | DYNCFG_CMD_ADD))
                     df->plugin_rejected = true;
@@ -160,28 +160,18 @@ static void dyncfg_apply_action_on_all_template_jobs(const char *template_id, DY
 // ----------------------------------------------------------------------------
 // the callback for all config functions
 
-int dyncfg_function_intercept_cb(uuid_t *transaction, BUFFER *result_body_wb, BUFFER *payload,
-                                 usec_t *stop_monotonic_ut, const char *function,
-                                 void *execute_cb_data __maybe_unused,
-                                 rrd_function_result_callback_t result_cb, void *result_cb_data,
-                                 rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
-                                 rrd_function_is_cancelled_cb_t is_cancelled_cb,
-                                 void *is_cancelled_cb_data,
-                                 rrd_function_register_canceller_cb_t register_canceller_cb,
-                                 void *register_canceller_cb_data,
-                                 rrd_function_register_progresser_cb_t register_progresser_cb,
-                                 void *register_progresser_cb_data) {
+int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __maybe_unused) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    bool called_from_dyncfg_echo = result_cb == dyncfg_echo_cb ? true : false;
+    bool called_from_dyncfg_echo = rfe->result.cb == dyncfg_echo_cb ? true : false;
 
     DYNCFG_CMDS c = DYNCFG_CMD_NONE;
     const DICTIONARY_ITEM *item = NULL;
     const char *add_name = NULL;
     size_t add_name_len = 0;
-    if(strncmp(function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG)) == 0) {
-        const char *id = &function[sizeof(PLUGINSD_FUNCTION_CONFIG)];
+    if(strncmp(rfe->function, PLUGINSD_FUNCTION_CONFIG " ", sizeof(PLUGINSD_FUNCTION_CONFIG)) == 0) {
+        const char *id = &rfe->function[sizeof(PLUGINSD_FUNCTION_CONFIG)];
         while(isspace(*id)) id++;
         const char *space = id;
         while(*space && !isspace(*space)) space++;
@@ -212,43 +202,43 @@ int dyncfg_function_intercept_cb(uuid_t *transaction, BUFFER *result_body_wb, BU
 
     if(!item) {
         rc = HTTP_RESP_NOT_FOUND;
-        dyncfg_default_response(result_body_wb, rc, "dyncfg functions intercept: id is not found");
+        dyncfg_default_response(rfe->result.wb, rc, "dyncfg functions intercept: id is not found");
 
-        if(result_cb)
-            result_cb(result_body_wb, rc, result_cb_data);
+        if(rfe->result.cb)
+            rfe->result.cb(rfe->result.wb, rc, rfe->result.data);
 
         return HTTP_RESP_NOT_FOUND;
     }
 
     DYNCFG *df = dictionary_acquired_item_value(item);
     const char *id = dictionary_acquired_item_name(item);
-    bool has_payload = payload && buffer_strlen(payload) ? true : false;
+    bool has_payload = rfe->payload && buffer_strlen(rfe->payload) ? true : false;
     bool make_the_call_to_plugin = true;
 
     if((c & (DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE | DYNCFG_CMD_RESTART)) && has_payload)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: command has a payload, but it is not going to be used: %s", function);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: command has a payload, but it is not going to be used: %s", rfe->function);
 
     if(c == DYNCFG_CMD_NONE) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: this command is unknown: %s", function);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: this command is unknown: %s", rfe->function);
 
         rc = HTTP_RESP_BAD_REQUEST;
-        dyncfg_default_response(result_body_wb, rc,
+        dyncfg_default_response(rfe->result.wb, rc,
                                 "dyncfg functions intercept: unknown command");
         make_the_call_to_plugin = false;
     }
     else if(!(df->cmds & c)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: this command is not supported by the configuration node: %s", function);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: this command is not supported by the configuration node: %s", rfe->function);
 
         rc = HTTP_RESP_BAD_REQUEST;
-        dyncfg_default_response(result_body_wb, rc,
+        dyncfg_default_response(rfe->result.wb, rc,
                                 "dyncfg functions intercept: this command is not supported by this configuration node");
         make_the_call_to_plugin = false;
     }
     else if((c & (DYNCFG_CMD_ADD | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST)) && !has_payload) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: command requires a payload, but no payload given: %s", function);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: command requires a payload, but no payload given: %s", rfe->function);
 
         rc = HTTP_RESP_BAD_REQUEST;
-        dyncfg_default_response(result_body_wb, rc,
+        dyncfg_default_response(rfe->result.wb, rc,
                                 "dyncfg functions intercept: payload is required");
         make_the_call_to_plugin = false;
     }
@@ -260,14 +250,14 @@ int dyncfg_function_intercept_cb(uuid_t *transaction, BUFFER *result_body_wb, BU
             char *colon = strrchr(template, ':');
             if(colon) *colon = '\0';
             if(template[0])
-                loaded = dyncfg_get_schema(template, result_body_wb);
+                loaded = dyncfg_get_schema(template, rfe->result.wb);
         }
         else
-            loaded = dyncfg_get_schema(id, result_body_wb);
+            loaded = dyncfg_get_schema(id, rfe->result.wb);
 
         if(loaded) {
-            result_body_wb->content_type = CT_APPLICATION_JSON;
-            result_body_wb->expires = now_realtime_sec();
+            rfe->result.wb->content_type = CT_APPLICATION_JSON;
+            rfe->result.wb->expires = now_realtime_sec();
             rc = HTTP_RESP_OK;
             make_the_call_to_plugin = false;
         }
@@ -287,24 +277,24 @@ int dyncfg_function_intercept_cb(uuid_t *transaction, BUFFER *result_body_wb, BU
         dyncfg_apply_action_on_all_template_jobs(id, c);
 
         rc = HTTP_RESP_OK;
-        dyncfg_default_response(result_body_wb, rc, "applied");
+        dyncfg_default_response(rfe->result.wb, rc, "applied");
         make_the_call_to_plugin = false;
     }
     else  if(c == DYNCFG_CMD_ADD) {
         if (df->type != DYNCFG_TYPE_TEMPLATE) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: add command can only be applied on templates, not %s: %s",
-                   dyncfg_id2type(df->type), function);
+                   dyncfg_id2type(df->type), rfe->function);
 
             rc = HTTP_RESP_BAD_REQUEST;
-            dyncfg_default_response(result_body_wb, rc,
+            dyncfg_default_response(rfe->result.wb, rc,
                                     "dyncfg functions intercept: add command is only allowed in templates");
             make_the_call_to_plugin = false;
         }
         else if (!add_name || !*add_name || !add_name_len) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: add command does not specify a name: %s", function);
+            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: add command does not specify a name: %s", rfe->function);
 
             rc = HTTP_RESP_BAD_REQUEST;
-            dyncfg_default_response(result_body_wb, rc,
+            dyncfg_default_response(rfe->result.wb, rc,
                                     "dyncfg functions intercept: command add requires a name, which is missing");
 
             make_the_call_to_plugin = false;
@@ -313,34 +303,21 @@ int dyncfg_function_intercept_cb(uuid_t *transaction, BUFFER *result_body_wb, BU
 
     if(make_the_call_to_plugin) {
         struct dyncfg_call *dc = callocz(1, sizeof(*dc));
-        dc->function = strdupz(function);
+        dc->function = strdupz(rfe->function);
         dc->id = strdupz(id);
         dc->add_name = (c == DYNCFG_CMD_ADD) ? strndupz(add_name, add_name_len) : NULL;
         dc->cmd = c;
-        dc->result_cb = result_cb;
-        dc->result_cb_data = result_cb_data;
-        dc->payload = buffer_dup(payload);
+        dc->result_cb = rfe->result.cb;
+        dc->result_cb_data = rfe->result.data;
+        dc->payload = buffer_dup(rfe->payload);
 
-        rc = df->execute_cb(
-            transaction,
-            result_body_wb,
-            payload,
-            stop_monotonic_ut,
-            function,
-            df->execute_cb_data,
-            dyncfg_function_intercept_result_cb,
-            dc,
-            progress_cb,
-            progress_cb_data,
-            is_cancelled_cb,
-            is_cancelled_cb_data,
-            register_canceller_cb,
-            register_canceller_cb_data,
-            register_progresser_cb,
-            register_progresser_cb_data);
+        rfe->result.cb = dyncfg_function_intercept_result_cb;
+        rfe->result.data = dc;
+
+        rc = df->execute_cb(rfe, df->execute_cb_data);
     }
-    else if(result_cb)
-        result_cb(result_body_wb, rc, result_cb_data);
+    else if(rfe->result.cb)
+        rfe->result.cb(rfe->result.wb, rc, rfe->result.data);
 
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     return rc;
