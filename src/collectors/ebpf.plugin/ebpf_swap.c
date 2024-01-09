@@ -461,18 +461,15 @@ static void ebpf_update_swap_cgroup(int maps_per_core)
 static void read_swap_apps_table(int maps_per_core)
 {
     netdata_publish_swap_t *cv = swap_vector;
-    uint32_t key;
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_swap_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
-    while (pids) {
-        key = pids->pid;
 
+    uint32_t key = 0, next_key = 0;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
-            pids = pids->next;
-            continue;
+            goto end_swap_loop;
         }
 
         swap_apps_accumulator(cv, maps_per_core);
@@ -480,9 +477,9 @@ static void read_swap_apps_table(int maps_per_core)
         swap_fill_pid(key, cv);
 
         // We are cleaning to avoid passing data read from one process to other.
+end_swap_loop:
         memset(cv, 0, length);
-
-        pids = pids->next;
+        key = next_key;
     }
 }
 
