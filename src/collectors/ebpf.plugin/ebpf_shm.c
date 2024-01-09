@@ -685,8 +685,6 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SHM_IDX))))
             continue;
 
-        ebpf_shm_sum_pids(&w->shm, w->root_pid);
-
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_shmget_call");
         write_chart_dimension("calls", (long long) w->shm.get);
         ebpf_write_end_chart();

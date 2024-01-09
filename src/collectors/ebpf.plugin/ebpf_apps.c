@@ -9,7 +9,6 @@
 ARAL *ebpf_aral_apps_pid_stat = NULL;
 ARAL *ebpf_aral_socket_pid = NULL;
 ARAL *ebpf_aral_vfs_pid = NULL;
-ARAL *ebpf_aral_shm_pid = NULL;
 
 // ----------------------------------------------------------------------------
 // Global vectors used with apps
