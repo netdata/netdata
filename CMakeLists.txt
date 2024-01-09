@@ -132,7 +132,7 @@ if(NOT ${DISABLE_HARDENING})
         endif()
 
         if(NOT ${CMAKE_C_FLAGS} MATCHES "stack-clash-protection")
-                check_c_compiler_flag("-fstack-clash-protection", HAVE_STACK_CLASH_FLAG)
+                check_c_compiler_flag("-fstack-clash-protection" HAVE_STACK_CLASH_FLAG)
                 if(HAVE_STACK_CLASH_FLAG)
                         set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fstack-clash-protection")
                 endif()
