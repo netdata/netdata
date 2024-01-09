@@ -54,7 +54,7 @@ extern unsigned long long zfs_arcstats_shrinkable_cache_size_bytes;
 extern bool inside_lxc_container;
 
 // netdev renames
-void netdev_rename_device_add(
+void cgroup_rename_task_add(
     const char *host_device,
     const char *container_device,
     const char *container_name,
@@ -62,7 +62,7 @@ void netdev_rename_device_add(
     const char *ctx_prefix,
     const DICTIONARY_ITEM *cgroup_netdev_link);
 
-void netdev_rename_device_del(const char *host_device);
+void cgroup_rename_task_device_del(const char *host_device);
 
 #include "proc_self_mountinfo.h"
 #include "proc_pressure.h"

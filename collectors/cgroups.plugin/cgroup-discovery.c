@@ -42,7 +42,7 @@ static inline void cgroup_free_network_interfaces(struct cgroup *cg) {
         cg->interfaces = i->next;
 
         // delete the registration of proc_net_dev rename
-        netdev_rename_device_del(i->host_device);
+        cgroup_rename_task_device_del(i->host_device);
 
         freez((void *)i->host_device);
         freez((void *)i->container_device);
@@ -1084,8 +1084,13 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
             collector_info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
 
             // register a device rename to proc_net_dev.c
-            netdev_rename_device_add(i->host_device, i->container_device, cg->chart_id, cg->chart_labels,
-                                     k8s_is_kubepod(cg) ? "k8s." : "", cgroup_netdev_get(cg));
+            cgroup_rename_task_add(
+                i->host_device,
+                i->container_device,
+                cg->chart_id,
+                cg->chart_labels,
+                k8s_is_kubepod(cg) ? "k8s." : "",
+                cgroup_netdev_get(cg));
         }
     }
 
