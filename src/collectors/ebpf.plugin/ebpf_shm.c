@@ -1023,6 +1023,8 @@ static void shm_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_shm_read_global_table(stats, maps_per_core);
+        pthread_mutex_lock(&lock);
+
         pthread_mutex_lock(&collect_data_mutex);
         if (apps) {
             read_shm_apps_table(maps_per_core);
@@ -1031,8 +1033,6 @@ static void shm_collector(ebpf_module_t *em)
         if (cgroups) {
             ebpf_update_shm_cgroup(maps_per_core);
         }
-
-        pthread_mutex_lock(&lock);
 
         shm_send_global();
 
@@ -1049,8 +1049,8 @@ static void shm_collector(ebpf_module_t *em)
             ebpf_shm_send_cgroup_data(update_every);
         }
 
-        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&collect_data_mutex);
+        pthread_mutex_unlock(&lock);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
