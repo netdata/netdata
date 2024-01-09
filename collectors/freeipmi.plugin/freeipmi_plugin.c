@@ -1975,7 +1975,7 @@ int main (int argc, char **argv) {
     size_t iteration = 0;
     usec_t step = 100 * USEC_PER_MS;
     bool global_chart_created = false;
-    bool tty = isatty(fileno(stderr)) == 1;
+    bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
