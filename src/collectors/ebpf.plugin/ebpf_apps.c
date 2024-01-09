@@ -14,7 +14,6 @@ ARAL *ebpf_aral_shm_pid = NULL;
 // ----------------------------------------------------------------------------
 // Global vectors used with apps
 ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
-netdata_publish_swap_t **swap_pid = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
 
 /**
@@ -1028,12 +1027,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
  */
 void cleanup_variables_from_other_threads(uint32_t pid)
 {
-    // Clean swap structure
-    if (swap_pid) {
-        freez(swap_pid[pid]);
-        swap_pid[pid] = NULL;
-    }
-
     // Clean vfs structure
     if (vfs_pid) {
         ebpf_vfs_release(vfs_pid[pid]);
