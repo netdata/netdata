@@ -11,6 +11,7 @@ struct dyncfg_call {
     char *function;
     char *id;
     char *add_name;
+    char *source;
     DYNCFG_CMDS cmd;
     rrd_function_result_callback_t result_cb;
     void *result_cb_data;
@@ -52,7 +53,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                         dyncfg_status_from_successful_response(code),
                         DYNCFG_TYPE_JOB,
                         DYNCFG_SOURCE_TYPE_DYNCFG,
-                        "dyncfg", // TODO find the source of the update
+                        dc->source,
                         (df->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
                         0,
                         0,
@@ -70,7 +71,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                 } else if (dc->cmd == DYNCFG_CMD_UPDATE) {
                     df->source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
                     string_freez(df->source);
-                    df->source = string_strdupz("dyncfg"); // TODO find the source of the update
+                    df->source = string_strdupz(dc->source);
 
                     df->status = dyncfg_status_from_successful_response(code);
                     SWAP(df->payload, dc->payload);
@@ -139,6 +140,8 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
     buffer_free(dc->payload);
     freez(dc->function);
     freez(dc->id);
+    freez(dc->source);
+    freez(dc->add_name);
     freez(dc);
 }
 
@@ -305,6 +308,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         struct dyncfg_call *dc = callocz(1, sizeof(*dc));
         dc->function = strdupz(rfe->function);
         dc->id = strdupz(id);
+        dc->source = rfe->source ? strdupz(rfe->source) : NULL;
         dc->add_name = (c == DYNCFG_CMD_ADD) ? strndupz(add_name, add_name_len) : NULL;
         dc->cmd = c;
         dc->result_cb = rfe->result.cb;
