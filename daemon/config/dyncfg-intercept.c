@@ -15,6 +15,7 @@ struct dyncfg_call {
     DYNCFG_CMDS cmd;
     rrd_function_result_callback_t result_cb;
     void *result_cb_data;
+    bool from_dyncfg_echo;
 };
 
 DYNCFG_STATUS dyncfg_status_from_successful_response(int code) {
@@ -30,7 +31,7 @@ DYNCFG_STATUS dyncfg_status_from_successful_response(int code) {
 void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_data) {
     struct dyncfg_call *dc = result_cb_data;
 
-    bool called_from_dyncfg_echo = dc->result_cb == dyncfg_echo_cb ? true : false;
+    bool called_from_dyncfg_echo = dc->from_dyncfg_echo;
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_advanced(dyncfg_globals.nodes, dc->id, -1);
     if(item) {
@@ -58,8 +59,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                         0,
                         0,
                         df->sync,
-                        df->execute_cb,
-                        df->execute_cb_data);
+                        df->execute_cb, df->execute_cb_data, false);
 
                     DYNCFG *new_df = dictionary_acquired_item_value(new_item);
                     SWAP(new_df->payload, dc->payload);
@@ -115,6 +115,11 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                     df->status = dyncfg_status_from_successful_response(code);
                     df->plugin_rejected = false;
                 }
+                else if (dc->cmd == DYNCFG_CMD_ENABLE) {
+                    df->user_disabled = false;
+                } else if (dc->cmd == DYNCFG_CMD_DISABLE) {
+                    df->user_disabled = true;
+                }
 
                 if(dc->cmd != DYNCFG_CMD_ADD && code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
                     df->restart_required = true;
@@ -167,7 +172,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    bool called_from_dyncfg_echo = rfe->result.cb == dyncfg_echo_cb ? true : false;
+    bool called_from_dyncfg_echo = rrd_function_has_this_original_result_callback(rfe->transaction, dyncfg_echo_cb);
 
     DYNCFG_CMDS c = DYNCFG_CMD_NONE;
     const DICTIONARY_ITEM *item = NULL;
@@ -314,6 +319,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         dc->result_cb = rfe->result.cb;
         dc->result_cb_data = rfe->result.data;
         dc->payload = buffer_dup(rfe->payload);
+        dc->from_dyncfg_echo = called_from_dyncfg_echo;
 
         rfe->result.cb = dyncfg_function_intercept_result_cb;
         rfe->result.data = dc;

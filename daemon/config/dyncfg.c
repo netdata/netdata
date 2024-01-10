@@ -128,7 +128,7 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
         changes++;
     }
 
-    if(nv->execute_cb && (v->execute_cb != nv->execute_cb || v->execute_cb_data != nv->execute_cb_data)) {
+    if(!v->execute_cb || (nv->overwrite_cb && nv->execute_cb && (v->execute_cb != nv->execute_cb || v->execute_cb_data != nv->execute_cb_data))) {
         v->execute_cb = nv->execute_cb;
         v->execute_cb_data = nv->execute_cb_data;
         changes++;
@@ -166,7 +166,7 @@ void dyncfg_init_low_level(bool load_saved) {
 
 // ----------------------------------------------------------------------------
 
-const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
+const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data, bool overwrite_cb) {
     DYNCFG tmp = {
         .host = host,
         .path = string_strdupz(path),
@@ -183,6 +183,7 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
         .payload = NULL,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
+        .overwrite_cb = overwrite_cb,
     };
     uuid_copy(tmp.host_uuid, host->host_uuid);
 
@@ -282,7 +283,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         nd_log(NDLS_DAEMON, NDLP_NOTICE, "%s", buffer_tostring(t));
     }
 
-    const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds, created_ut, modified_ut, sync, execute_cb, execute_cb_data);
+    const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds, created_ut, modified_ut, sync, execute_cb, execute_cb_data, true);
     DYNCFG *df = dictionary_acquired_item_value(item);
 
 //    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)

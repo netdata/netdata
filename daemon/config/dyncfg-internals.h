@@ -32,6 +32,9 @@ typedef struct dyncfg {
 
     rrd_function_execute_cb_t execute_cb;
     void *execute_cb_data;
+
+    // constructor data
+    bool overwrite_cb;
 } DYNCFG;
 
 struct dyncfg_globals {
@@ -53,7 +56,7 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, DYNCFG
 void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id);
 void dyncfg_echo_add(const DICTIONARY_ITEM *template_item, DYNCFG *template_df, const char *template_id, const char *job_name);
 
-const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data);
+const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data, bool overwrite_cb);
 int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data);
 void dyncfg_cleanup(DYNCFG *v);
 

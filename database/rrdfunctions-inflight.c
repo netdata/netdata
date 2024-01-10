@@ -547,6 +547,21 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
     return rrd_call_function_async(r, wait);
 }
 
+bool rrd_function_has_this_original_result_callback(uuid_t *transaction, rrd_function_result_callback_t cb) {
+    bool ret = false;
+    char str[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(*transaction, str);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(rrd_functions_inflight_requests, str);
+    if(item) {
+        struct rrd_function_inflight *r = dictionary_acquired_item_value(item);
+        if(r->result.cb == cb)
+            ret = true;
+
+        dictionary_acquired_item_release(rrd_functions_inflight_requests, item);
+    }
+    return ret;
+}
+
 static void rrd_function_cancel_inflight(struct rrd_function_inflight *r) {
     if(!r)
         return;

@@ -174,7 +174,7 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
     }
     else {
         code = HTTP_RESP_NOT_FOUND;
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unknown config id '%s' in call: %s", action, rfe->function);
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unknown config id '%s' in call: '%s'. This can happen if the plugin that registered the dynamic configuration is not running now.", action, rfe->function);
         rrd_call_function_error(rfe->result.wb, "unknown config id given", code);
     }
 

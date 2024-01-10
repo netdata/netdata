@@ -13,6 +13,9 @@ struct dyncfg_unittest {
     size_t errors;
 
     DICTIONARY *nodes;
+
+    SPINLOCK spinlock;
+    struct dyncfg_unittest_action *queue;
 } dyncfg_unittest_data = { 0 };
 
 typedef struct {
@@ -26,6 +29,7 @@ typedef struct {
 
 typedef struct {
     const char *id;
+    const char *source;
     bool sync;
     DYNCFG_TYPE type;
     DYNCFG_CMDS cmds;
@@ -36,6 +40,9 @@ typedef struct {
 
     bool received;
     bool finished;
+
+    size_t last_saves;
+    bool needs_save;
 } TEST;
 
 struct dyncfg_unittest_action {
@@ -44,9 +51,12 @@ struct dyncfg_unittest_action {
     BUFFER *payload;
     DYNCFG_CMDS cmd;
     const char *add_name;
+    const char *source;
 
     rrd_function_result_callback_t result_cb;
     void *result_cb_data;
+
+    struct dyncfg_unittest_action *prev, *next;
 };
 
 static void dyncfg_unittest_register_error(const char *id, const char *msg) {
@@ -58,7 +68,7 @@ static void dyncfg_unittest_register_error(const char *id, const char *msg) {
 
 static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *data);
 
-bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, const char *add_name) {
+bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, const char *add_name, const char *source) {
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse(buffer_tostring(payload));
     if(!jobj) {
         dyncfg_unittest_register_error(t->id, "cannot parse json payload");
@@ -82,7 +92,8 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
         char buf[strlen(t->id) + strlen(add_name) + 20];
         snprintfz(buf, sizeof(buf), "%s:%s", t->id, add_name);
         TEST tmp = {
-            .id = NULL,
+            .id = strdupz(buf),
+            .source = strdupz(source),
             .cmds = (t->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_GET | DYNCFG_CMD_REMOVE | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_TEST,
             .sync = t->sync,
             .type = DYNCFG_TYPE_JOB,
@@ -103,14 +114,16 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
                 .value = {
                     .dbl = 3.14,
                     .bln = true,
-                }}};
+                }
+            },
+            .needs_save = true,
+        };
         const DICTIONARY_ITEM *item = dictionary_set_and_acquire_item(dyncfg_unittest_data.nodes, buf, &tmp, sizeof(tmp));
         TEST *t2 = dictionary_acquired_item_value(item);
-        t2->id = dictionary_acquired_item_name(item);
         dictionary_acquired_item_release(dyncfg_unittest_data.nodes, item);
 
-        dyncfg_add_low_level(localhost, t2->id, "/unittest",
-                             DYNCFG_STATUS_RUNNING, t2->type, t2->source_type, LINE_FILE_STR,
+        dyncfg_add_low_level(localhost, t2->id, "/unittests",
+                             DYNCFG_STATUS_RUNNING, t2->type, t2->source_type, t2->source,
                              t2->cmds, 0, 0, t2->sync,
                              dyncfg_unittest_execute_cb, t2);
     }
@@ -132,7 +145,7 @@ static int dyncfg_unittest_action(struct dyncfg_unittest_action *a) {
     else if(a->cmd == DYNCFG_CMD_DISABLE)
         t->current.enabled = false;
     else if(a->cmd == DYNCFG_CMD_ADD || a->cmd == DYNCFG_CMD_UPDATE)
-        rc = dyncfg_unittest_parse_payload(a->payload, a->t, a->cmd, a->add_name) ? HTTP_RESP_OK : HTTP_RESP_BAD_REQUEST;
+        rc = dyncfg_unittest_parse_payload(a->payload, a->t, a->cmd, a->add_name, a->source) ? HTTP_RESP_OK : HTTP_RESP_BAD_REQUEST;
     else if(a->cmd == DYNCFG_CMD_REMOVE)
         t->current.removed = true;
     else
@@ -152,8 +165,19 @@ static int dyncfg_unittest_action(struct dyncfg_unittest_action *a) {
 }
 
 static void *dyncfg_unittest_thread_action(void *ptr) {
-    dyncfg_unittest_action(ptr);
-    return ptr;
+    while(1) {
+        struct dyncfg_unittest_action *a = NULL;
+        spinlock_lock(&dyncfg_unittest_data.spinlock);
+        a = dyncfg_unittest_data.queue;
+        if(a)
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dyncfg_unittest_data.queue, a, prev, next);
+        spinlock_unlock(&dyncfg_unittest_data.spinlock);
+
+        if(a)
+            dyncfg_unittest_action(a);
+        else
+            sleep_usec(10 * USEC_PER_MS);
+    }
 }
 
 static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *data) {
@@ -189,7 +213,7 @@ static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *da
         goto cleanup;
     }
 
-    if(strcmp(t->id, id) != 0) {
+    if(t->type != DYNCFG_TYPE_TEMPLATE && strcmp(t->id, id) != 0) {
         char *msg = "id received is not the expected";
         dyncfg_unittest_register_error(id, msg);
         rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST, msg);
@@ -228,6 +252,7 @@ static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *da
     struct dyncfg_unittest_action *a = callocz(1, sizeof(*a));
     a->t = t;
     a->add_name = add_name ? strdupz(add_name) : NULL;
+    a->source = rfe->source,
     a->result = rfe->result.wb;
     a->payload = buffer_dup(rfe->payload);
     a->cmd = cmd;
@@ -239,8 +264,9 @@ static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *da
     if(t->sync)
         rc = dyncfg_unittest_action(a);
     else {
-        netdata_thread_t thread;
-        netdata_thread_create(&thread, "unittest", NETDATA_THREAD_OPTION_DEFAULT, dyncfg_unittest_thread_action, a);
+        spinlock_lock(&dyncfg_unittest_data.spinlock);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(dyncfg_unittest_data.queue, a, prev, next);
+        spinlock_unlock(&dyncfg_unittest_data.spinlock);
         rc = HTTP_RESP_OK;
     }
 
@@ -283,7 +309,7 @@ static bool dyncfg_unittest_check(TEST *t, const char *cmd, bool received) {
         }
     }
 
-    if(t->current.enabled != t->expected.enabled) {
+    if(t->type != DYNCFG_TYPE_TEMPLATE && t->current.enabled != t->expected.enabled) {
         fprintf(stderr, "\n  - enabled flag found '%s', expected '%s'",
                 t->current.enabled?"true":"false",
                 t->expected.enabled?"true":"false");
@@ -332,6 +358,22 @@ static bool dyncfg_unittest_check(TEST *t, const char *cmd, bool received) {
         fprintf(stderr, "\n  - DYNCFG disabled config has no saves!");
         errors++;
     }
+    else if(t->source && string_strcmp(df->source, t->source) != 0) {
+        fprintf(stderr, "\n  - source does not match!");
+        errors++;
+    }
+    else if(df->source && !t->source) {
+        fprintf(stderr, "\n  - there is a source but it shouldn't be any!");
+        errors++;
+    }
+    else if(t->needs_save && df->saves <= t->last_saves) {
+        fprintf(stderr, "\n  - should be saved, but it is not saved!");
+        errors++;
+    }
+    else if(!t->needs_save && df->saves > t->last_saves) {
+        fprintf(stderr, "\n  - should be not be saved, but it saved!");
+        errors++;
+    }
 
 cleanup:
     if(errors) {
@@ -344,7 +386,61 @@ cleanup:
     return true;
 }
 
-static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload) {
+static void dyncfg_unittest_reset(void) {
+    TEST *t;
+    dfe_start_read(dyncfg_unittest_data.nodes, t) {
+        t->received = t->finished = false;
+        t->needs_save = false;
+
+        DYNCFG *df = dictionary_get(dyncfg_globals.nodes, t->id);
+        if(!df) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: cannot find id '%s'", t->id);
+            dyncfg_unittest_register_error(NULL, NULL);
+        }
+        else
+            t->last_saves = df->saves;
+    }
+    dfe_done(t);
+}
+
+void should_be_saved(TEST *t, DYNCFG_CMDS c) {
+    DYNCFG *df;
+
+    if(t->type == DYNCFG_TYPE_TEMPLATE) {
+        df = dictionary_get(dyncfg_globals.nodes, t->id);
+        t->current.enabled = !df->user_disabled;
+    }
+
+    t->needs_save =
+        c == DYNCFG_CMD_UPDATE ||
+        (t->current.enabled && c == DYNCFG_CMD_DISABLE) ||
+        (!t->current.enabled && c == DYNCFG_CMD_ENABLE);
+
+    if(t->type == DYNCFG_TYPE_TEMPLATE) {
+        STRING *template = string_strdupz(t->id);
+        dfe_start_read(dyncfg_globals.nodes, df) {
+            if(df->type == DYNCFG_TYPE_JOB && df->template == template) {
+                TEST *tt = dictionary_get(dyncfg_unittest_data.nodes, df_dfe.name);
+                if (!tt) {
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "DYNCFG UNITTEST: failed to find job id '%s'", df_dfe.name);
+                    dyncfg_unittest_register_error(NULL, NULL);
+                }
+                else {
+                    tt->needs_save = c == DYNCFG_CMD_UPDATE ||
+                         (tt->current.enabled && c == DYNCFG_CMD_DISABLE) ||
+                         (!tt->current.enabled && c == DYNCFG_CMD_ENABLE);
+                }
+            }
+        }
+        dfe_done(df);
+        string_freez(template);
+    }
+}
+
+static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload, const char *source) {
+    dyncfg_unittest_reset();
+
     char buf[strlen(cmd) + 1];
     memcpy(buf, cmd, sizeof(buf));
 
@@ -364,12 +460,16 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload)
         dyncfg_unittest_register_error(NULL, NULL);
         return HTTP_RESP_NOT_FOUND;
     }
-    t->received = t->finished = false;
+
+    if(t->type == DYNCFG_TYPE_TEMPLATE)
+        t->received = t->finished = true;
 
     if(c == DYNCFG_CMD_DISABLE)
         t->expected.enabled = false;
     if(c == DYNCFG_CMD_ENABLE)
         t->expected.enabled = true;
+    if(c == DYNCFG_CMD_UPDATE)
+        memset(&t->current.value, 0, sizeof(t->current.value));
 
     buffer_flush(wb);
 
@@ -380,12 +480,14 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload)
         buffer_strcat(pld, payload);
     }
 
+    should_be_saved(t, c);
+
     int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMIN, cmd,
                               true, NULL,
                               NULL, NULL,
                               NULL, NULL,
                               NULL, NULL,
-                              pld, NULL);
+                              pld, source);
     if(!DYNCFG_RESP_SUCCESS(rc)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s; returned code %d", cmd, rc);
         dyncfg_unittest_register_error(NULL, NULL);
@@ -393,15 +495,42 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload)
 
     dyncfg_unittest_check(t, cmd, true);
 
-    if(rc == HTTP_RESP_OK && c == DYNCFG_CMD_ADD) {
-        char buf2[strlen(id) + strlen(add_name) + 2];
-        snprintfz(buf2, sizeof(buf2), "%s:%s", id, add_name);
-        TEST *tt = dictionary_get(dyncfg_unittest_data.nodes, buf2);
-        if(!tt) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to find newly added id '%s' of command: %s", id, cmd);
-            dyncfg_unittest_register_error(NULL, NULL);
+    if(rc == HTTP_RESP_OK && t->type == DYNCFG_TYPE_TEMPLATE) {
+        if(c == DYNCFG_CMD_ADD) {
+            char buf2[strlen(id) + strlen(add_name) + 2];
+            snprintfz(buf2, sizeof(buf2), "%s:%s", id, add_name);
+            TEST *tt = dictionary_get(dyncfg_unittest_data.nodes, buf2);
+            if (!tt) {
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "DYNCFG UNITTEST: failed to find newly added id '%s' of command: %s",
+                       id, cmd);
+                dyncfg_unittest_register_error(NULL, NULL);
+            }
+            dyncfg_unittest_check(tt, cmd, true);
         }
-        dyncfg_unittest_check(tt, cmd, true);
+        else {
+            STRING *template = string_strdupz(t->id);
+            DYNCFG *df;
+            dfe_start_read(dyncfg_globals.nodes, df) {
+                if(df->type == DYNCFG_TYPE_JOB && df->template == template) {
+                    TEST *tt = dictionary_get(dyncfg_unittest_data.nodes, df_dfe.name);
+                    if (!tt) {
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "DYNCFG UNITTEST: failed to find id '%s' while running command: %s", df_dfe.name, cmd);
+                        dyncfg_unittest_register_error(NULL, NULL);
+                    }
+                    else {
+                        if(c == DYNCFG_CMD_DISABLE)
+                            tt->expected.enabled = false;
+                        if(c == DYNCFG_CMD_ENABLE)
+                            tt->expected.enabled = true;
+                        dyncfg_unittest_check(tt, cmd, true);
+                    }
+                }
+            }
+            dfe_done(df);
+            string_freez(template);
+        }
     }
 
     return rc;
@@ -431,10 +560,12 @@ static void dyncfg_unittest_cleanup_files(void) {
 }
 
 static TEST *dyncfg_unittest_add(TEST t) {
+    dyncfg_unittest_reset();
+
     TEST *ret = dictionary_set(dyncfg_unittest_data.nodes, t.id, &t, sizeof(t));
 
     if(!dyncfg_add_low_level(localhost, t.id, "/unittests", DYNCFG_STATUS_RUNNING, t.type,
-        t.source_type, LINE_FILE_STR,
+        t.source_type, t.source,
         t.cmds, 0, 0, t.sync, dyncfg_unittest_execute_cb, ret)) {
         dyncfg_unittest_register_error(t.id, "addition of job failed");
     }
@@ -444,33 +575,55 @@ static TEST *dyncfg_unittest_add(TEST t) {
     return ret;
 }
 
+void dyncfg_unittest_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    TEST *v = value;
+    freez((void *)v->id);
+    freez((void *)v->source);
+}
+
 int dyncfg_unittest(void) {
     dyncfg_unittest_data.nodes = dictionary_create(DICT_OPTION_NONE);
+    dictionary_register_delete_callback(dyncfg_unittest_data.nodes, dyncfg_unittest_delete_cb, NULL);
 
     dyncfg_unittest_cleanup_files();
     rrd_functions_inflight_init();
     dyncfg_init(false);
 
     // ------------------------------------------------------------------------
+    // create the thread for testing async communication
+
+    netdata_thread_t thread;
+    netdata_thread_create(&thread, "unittest", NETDATA_THREAD_OPTION_JOINABLE,
+                          dyncfg_unittest_thread_action, NULL);
+
+    // ------------------------------------------------------------------------
     // single
 
     TEST *tss1 = dyncfg_unittest_add((TEST){
-        .id = "unittest:sync:single1",
+        .id = strdupz("unittest:sync:single1"),
+        .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_SINGLE,
         .cmds = DYNCFG_CMD_GET | DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
         .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = true,
+        .current = {
+            .enabled = true,
+        },
         .expected = {
             .enabled = true,
         }
     }); (void)tss1;
 
     TEST *tas1 = dyncfg_unittest_add((TEST){
-        .id = "unittest:async:single1",
+        .id = strdupz("unittest:async:single1"),
+        .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_SINGLE,
         .cmds = DYNCFG_CMD_GET | DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
         .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = false,
+        .current = {
+            .enabled = true,
+        },
         .expected = {
             .enabled = true,
         }
@@ -480,7 +633,8 @@ int dyncfg_unittest(void) {
     // template
 
     TEST *tst1 = dyncfg_unittest_add((TEST){
-        .id = "unittest:sync:template1",
+        .id = strdupz("unittest:sync:template1"),
+        .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_TEMPLATE,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
         .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
@@ -488,7 +642,8 @@ int dyncfg_unittest(void) {
     }); (void)tst1;
 
     TEST *tat1 = dyncfg_unittest_add((TEST){
-        .id = "unittest:async:template1",
+        .id = strdupz("unittest:async:template2"),
+        .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_TEMPLATE,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
         .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
@@ -499,21 +654,26 @@ int dyncfg_unittest(void) {
     // job
 
     TEST *tsj1 = dyncfg_unittest_add((TEST){
-        .id = "unittest:sync:job1",
+        .id = strdupz("unittest:sync:template1:user1"),
+        .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_JOB,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
-        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+        .source_type = DYNCFG_SOURCE_TYPE_USER,
         .sync = true,
+        .current = {
+            .enabled = true,
+        },
         .expected = {
             .enabled = true,
         }
     }); (void)tsj1;
 
     TEST *taj1 = dyncfg_unittest_add((TEST){
-        .id = "unittest:async:job1",
+        .id = strdupz("unittest:async:template2:user2"),
+        .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_JOB,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
-        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+        .source_type = DYNCFG_SOURCE_TYPE_USER,
         .sync = false,
         .expected = {
             .enabled = true,
@@ -528,26 +688,46 @@ int dyncfg_unittest(void) {
     // ------------------------------------------------------------------------
     // dynamic job
 
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 add dynamic1", wb, "{\"double\":3.14,\"boolean\":true}");
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 add dynamic2", wb, "{\"double\":3.14,\"boolean\":true}");
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template1 add dynamic1", wb, "{\"double\":3.14,\"boolean\":true}");
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template1 add dynamic2", wb, "{\"double\":3.14,\"boolean\":true}");
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 add dyn1", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 add dyn2", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 add dyn3", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 add dyn4", wb, "{\"double\":3.14,\"boolean\":true}", LINE_FILE_STR);
 
     // ------------------------------------------------------------------------
     // saving of user_disabled
 
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single1 disable", wb, NULL);
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single1 disable", wb, NULL);
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:job1 disable", wb, NULL);
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:job1 disable", wb, NULL);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single1 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single1 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:user1 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2:user2 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:dyn1 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:dyn2 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2:dyn3 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2:dyn4 disable", wb, NULL, LINE_FILE_STR);
 
     // ------------------------------------------------------------------------
     // enabling
 
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single1 enable", wb, NULL);
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single1 enable", wb, NULL);
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:job1 enable", wb, NULL);
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:job1 enable", wb, NULL);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single1 enable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single1 enable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:user1 enable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2:user2 enable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:dyn1 enable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:dyn2 enable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2:dyn3 enable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2:dyn4 enable", wb, NULL, LINE_FILE_STR);
+
+    // ------------------------------------------------------------------------
+    // disabling template
+
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 disable", wb, NULL, LINE_FILE_STR);
+
+    // ------------------------------------------------------------------------
+    // enabling template
+
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 enable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 enable", wb, NULL, LINE_FILE_STR);
 
 
 //    // ------------------------------------------------------------------------
@@ -583,6 +763,9 @@ int dyncfg_unittest(void) {
 //    if(rc == HTTP_RESP_OK)
 //        fprintf(stderr, "%s\n", buffer_tostring(wb));
 
+    void *ptr;
+    netdata_thread_cancel(thread);
+    netdata_thread_join(thread, &ptr);
     dyncfg_unittest_cleanup_files();
     dictionary_destroy(dyncfg_unittest_data.nodes);
     return __atomic_load_n(&dyncfg_unittest_data.errors, __ATOMIC_RELAXED) > 0 ? 1 : 0;
