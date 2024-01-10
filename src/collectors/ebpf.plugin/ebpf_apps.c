@@ -7,12 +7,10 @@
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
 ARAL *ebpf_aral_apps_pid_stat = NULL;
-ARAL *ebpf_aral_socket_pid = NULL;
 ARAL *ebpf_aral_vfs_pid = NULL;
 
 // ----------------------------------------------------------------------------
 // Global vectors used with apps
-ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 netdata_publish_vfs_t **vfs_pid = NULL;
 
 /**
@@ -57,36 +55,6 @@ struct ebpf_pid_stat *ebpf_pid_stat_get(void)
 void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
 {
     aral_freez(ebpf_aral_apps_pid_stat, stat);
-}
-
-/*****************************************************************
- *
- *  SOCKET ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF socket Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-void ebpf_socket_aral_init()
-{
-    ebpf_aral_socket_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_NAME, sizeof(ebpf_socket_publish_apps_t));
-}
-
-/**
- * eBPF socket get
- *
- * Get a ebpf_socket_publish_apps_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void)
-{
-    ebpf_socket_publish_apps_t *target = aral_mallocz(ebpf_aral_socket_pid);
-    memset(target, 0, sizeof(ebpf_socket_publish_apps_t));
-    return target;
 }
 
 /*****************************************************************

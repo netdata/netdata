@@ -141,6 +141,7 @@ typedef struct ebpf_pid_stat {
     ebpf_process_stat_t process;
     netdata_publish_shm_t shm;
     netdata_publish_swap_t swap;
+    ebpf_socket_publish_apps_t socket;
 
     int not_updated;
 
@@ -231,10 +232,6 @@ extern void ebpf_aral_init(void);
 extern ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid);
 extern ebpf_process_stat_t *process_stat_vector;
 
-extern ARAL *ebpf_aral_socket_pid;
-void ebpf_socket_aral_init();
-ebpf_socket_publish_apps_t *ebpf_socket_stat_get(void);
-
 extern ARAL *ebpf_aral_vfs_pid;
 void ebpf_vfs_aral_init();
 netdata_publish_vfs_t *ebpf_vfs_get(void);
@@ -248,7 +245,6 @@ void ebpf_shm_release(netdata_publish_shm_t *stat);
 // ARAL Section end
 
 // Threads integrated with apps
-extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
 // Threads integrated with apps
 
 #include "libnetdata/threads/threads.h"
