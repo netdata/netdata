@@ -56,13 +56,9 @@ static void dyncfg_insert_cb(const DICTIONARY_ITEM *item, void *value, void *dat
     }
 }
 
-static void dyncfg_react_cb(const DICTIONARY_ITEM *item, void *value, void *data __maybe_unused) {
-    DYNCFG *df = value;
-
-    if(!df->saves && df->type == DYNCFG_TYPE_JOB && df->template) {
-        // new jobs (df->saves == 0) inherit the user_disabled value of their templates
-        df->user_disabled = dyncfg_is_user_disabled(string2str(df->template));
-    }
+static void dyncfg_react_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    DYNCFG *df = value; (void)df;
+    ;
 }
 
 static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
@@ -233,9 +229,33 @@ bool dyncfg_is_user_disabled(const char *id) {
     return ret;
 }
 
+bool dyncfg_job_has_registered_template(const char *id) {
+    char buf[strlen(id) + 1];
+    memcpy(buf, id, sizeof(buf));
+    char *colon = strrchr(buf, ':');
+    if(!colon)
+        return false;
+
+    *colon = '\0';
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, buf);
+    if(!item)
+        return false;
+
+    DYNCFG *df = dictionary_acquired_item_value(item);
+    bool ret = df->type == DYNCFG_TYPE_TEMPLATE;
+
+    dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+    return ret;
+}
+
 bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
+        return false;
+    }
+
+    if(type == DYNCFG_TYPE_JOB && !dyncfg_job_has_registered_template(id)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: job id '%s' does not have a registered template. Ignoring dynamic configuration for it.", id);
         return false;
     }
 
@@ -303,7 +323,11 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         dyncfg_function_intercept_cb,
         NULL);
 
-    dyncfg_echo(item, df, id, df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE);
+    DYNCFG_STATUS status_to_send_to_plugin = df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
+    if(status_to_send_to_plugin == DYNCFG_CMD_ENABLE && dyncfg_is_user_disabled(string2str(df->template)))
+        status_to_send_to_plugin = DYNCFG_CMD_DISABLE;
+
+    dyncfg_echo(item, df, id, status_to_send_to_plugin);
     dyncfg_send_updates(id);
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 
@@ -334,7 +358,7 @@ void dyncfg_del_low_level(RRDHOST *host, const char *id) {
     }
 }
 
-void dyncfg_status_low_level(RRDHOST *host, const char *id, DYNCFG_STATUS status) {
+void dyncfg_status_low_level(RRDHOST *host __maybe_unused, const char *id, DYNCFG_STATUS status) {
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
         return;

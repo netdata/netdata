@@ -415,27 +415,6 @@ void should_be_saved(TEST *t, DYNCFG_CMDS c) {
         c == DYNCFG_CMD_UPDATE ||
         (t->current.enabled && c == DYNCFG_CMD_DISABLE) ||
         (!t->current.enabled && c == DYNCFG_CMD_ENABLE);
-
-    if(t->type == DYNCFG_TYPE_TEMPLATE) {
-        STRING *template = string_strdupz(t->id);
-        dfe_start_read(dyncfg_globals.nodes, df) {
-            if(df->type == DYNCFG_TYPE_JOB && df->template == template) {
-                TEST *tt = dictionary_get(dyncfg_unittest_data.nodes, df_dfe.name);
-                if (!tt) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "DYNCFG UNITTEST: failed to find job id '%s'", df_dfe.name);
-                    dyncfg_unittest_register_error(NULL, NULL);
-                }
-                else {
-                    tt->needs_save = c == DYNCFG_CMD_UPDATE ||
-                         (tt->current.enabled && c == DYNCFG_CMD_DISABLE) ||
-                         (!tt->current.enabled && c == DYNCFG_CMD_ENABLE);
-                }
-            }
-        }
-        dfe_done(df);
-        string_freez(template);
-    }
 }
 
 static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload, const char *source) {
@@ -599,7 +578,7 @@ int dyncfg_unittest(void) {
     // ------------------------------------------------------------------------
     // single
 
-    TEST *tss1 = dyncfg_unittest_add((TEST){
+    TEST *single1 = dyncfg_unittest_add((TEST){
         .id = strdupz("unittest:sync:single1"),
         .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_SINGLE,
@@ -612,10 +591,10 @@ int dyncfg_unittest(void) {
         .expected = {
             .enabled = true,
         }
-    }); (void)tss1;
+    }); (void)single1;
 
-    TEST *tas1 = dyncfg_unittest_add((TEST){
-        .id = strdupz("unittest:async:single1"),
+    TEST *single2 = dyncfg_unittest_add((TEST){
+        .id = strdupz("unittest:async:single2"),
         .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_SINGLE,
         .cmds = DYNCFG_CMD_GET | DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
@@ -627,33 +606,33 @@ int dyncfg_unittest(void) {
         .expected = {
             .enabled = true,
         }
-    }); (void)tas1;
+    }); (void)single2;
 
     // ------------------------------------------------------------------------
     // template
 
-    TEST *tst1 = dyncfg_unittest_add((TEST){
+    TEST *template1 = dyncfg_unittest_add((TEST){
         .id = strdupz("unittest:sync:template1"),
         .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_TEMPLATE,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
         .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = true,
-    }); (void)tst1;
+    }); (void)template1;
 
-    TEST *tat1 = dyncfg_unittest_add((TEST){
+    TEST *template2 = dyncfg_unittest_add((TEST){
         .id = strdupz("unittest:async:template2"),
         .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_TEMPLATE,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
         .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = false,
-    }); (void)tat1;
+    }); (void)template2;
 
     // ------------------------------------------------------------------------
     // job
 
-    TEST *tsj1 = dyncfg_unittest_add((TEST){
+    TEST *user1 = dyncfg_unittest_add((TEST){
         .id = strdupz("unittest:sync:template1:user1"),
         .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_JOB,
@@ -666,9 +645,9 @@ int dyncfg_unittest(void) {
         .expected = {
             .enabled = true,
         }
-    }); (void)tsj1;
+    }); (void)user1;
 
-    TEST *taj1 = dyncfg_unittest_add((TEST){
+    TEST *user2 = dyncfg_unittest_add((TEST){
         .id = strdupz("unittest:async:template2:user2"),
         .source = strdupz(LINE_FILE_STR),
         .type = DYNCFG_TYPE_JOB,
@@ -678,7 +657,7 @@ int dyncfg_unittest(void) {
         .expected = {
             .enabled = true,
         }
-    }); (void)taj1;
+    }); (void)user2;
 
     // ------------------------------------------------------------------------
 
@@ -697,7 +676,7 @@ int dyncfg_unittest(void) {
     // saving of user_disabled
 
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single1 disable", wb, NULL, LINE_FILE_STR);
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single1 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single2 disable", wb, NULL, LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:user1 disable", wb, NULL, LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2:user2 disable", wb, NULL, LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:dyn1 disable", wb, NULL, LINE_FILE_STR);
@@ -709,7 +688,7 @@ int dyncfg_unittest(void) {
     // enabling
 
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single1 enable", wb, NULL, LINE_FILE_STR);
-    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single1 enable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single2 enable", wb, NULL, LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:user1 enable", wb, NULL, LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2:user2 enable", wb, NULL, LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:dyn1 enable", wb, NULL, LINE_FILE_STR);
@@ -729,34 +708,75 @@ int dyncfg_unittest(void) {
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 enable", wb, NULL, LINE_FILE_STR);
     dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 enable", wb, NULL, LINE_FILE_STR);
 
+    // ------------------------------------------------------------------------
+    // adding job on disabled template
+
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 disable", wb, NULL, LINE_FILE_STR);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 disable", wb, NULL, LINE_FILE_STR);
+
+    TEST *user3 = dyncfg_unittest_add((TEST){
+        .id = strdupz("unittest:sync:template1:user3"),
+        .source = strdupz(LINE_FILE_STR),
+        .type = DYNCFG_TYPE_JOB,
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_USER,
+        .sync = true,
+        .expected = {
+            .enabled = false,
+        }
+    }); (void)user3;
+
+    TEST *user4 = dyncfg_unittest_add((TEST){
+        .id = strdupz("unittest:async:template2:user4"),
+        .source = strdupz(LINE_FILE_STR),
+        .type = DYNCFG_TYPE_JOB,
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_USER,
+        .sync = false,
+        .expected = {
+            .enabled = false,
+        }
+    }); (void)user4;
+
+    TEST *user5 = dyncfg_unittest_add((TEST){
+        .id = strdupz("unittest:sync:template1:user5"),
+        .source = strdupz(LINE_FILE_STR),
+        .type = DYNCFG_TYPE_JOB,
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_USER,
+        .sync = true,
+        .expected = {
+            .enabled = false,
+        }
+    }); (void)user5;
+
+    TEST *user6 = dyncfg_unittest_add((TEST){
+        .id = strdupz("unittest:async:template2:user6"),
+        .source = strdupz(LINE_FILE_STR),
+        .type = DYNCFG_TYPE_JOB,
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_USER,
+        .sync = false,
+        .expected = {
+            .enabled = false,
+        }
+    }); (void)user6;
+
+//    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1:user5 disable", wb, NULL, LINE_FILE_STR);
+//    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2:user6 disable", wb, NULL, LINE_FILE_STR);
 
 //    // ------------------------------------------------------------------------
+//    // enable template with disabled jobs
 //
-//    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single disable", wb, NULL);
-//    if(rc == HTTP_RESP_OK && dyncfg_unittest_data.enabled) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is set, code %d", rc);
-//        dyncfg_unittest_data.errors++;
-//    }
+//    user3->expected.enabled = true;
+//    user5->expected.enabled = false;
+//    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 enable", wb, NULL, LINE_FILE_STR);
 //
-//    // ------------------------------------------------------------------------
-//    DYNCFG *df;
-//
-//    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single update", wb, "hello world");
-//    df = dictionary_get(dyncfg_globals.nodes, "unittest:sync:single");
-//    if(rc == HTTP_RESP_OK && (!df || !df->payload || strcmp(buffer_tostring(df->payload), "hello world") != 0)) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to update a single job");
-//        dyncfg_unittest_data.errors++;
-//    }
-//
-//    // ------------------------------------------------------------------------
-//
-//    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:jobs add master-db", wb, "master-db configuration instructions");
-//    df = dictionary_get(dyncfg_globals.nodes, "unittest:sync:jobs:master-db");
-//    if(rc == HTTP_RESP_OK && (!df || !df->payload || strcmp(buffer_tostring(df->payload), "master-db configuration instructions") != 0)) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to test adding a job to an existing template");
-//        dyncfg_unittest_data.errors++;
-//    }
-//
+//    user4->expected.enabled = true;
+//    user6->expected.enabled = false;
+//    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template2 enable", wb, NULL, LINE_FILE_STR);
+
+
 //    // ------------------------------------------------------------------------
 //
 //    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " tree", wb, NULL);

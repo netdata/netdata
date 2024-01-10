@@ -115,11 +115,10 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                     df->status = dyncfg_status_from_successful_response(code);
                     df->plugin_rejected = false;
                 }
-                else if (dc->cmd == DYNCFG_CMD_ENABLE) {
-                    df->user_disabled = false;
-                } else if (dc->cmd == DYNCFG_CMD_DISABLE) {
-                    df->user_disabled = true;
-                }
+                else if(dc->cmd == DYNCFG_CMD_DISABLE)
+                    df->status = DYNCFG_STATUS_DISABLED;
+                else if(dc->cmd == DYNCFG_CMD_ENABLE)
+                    df->status = dyncfg_status_from_successful_response(code);
 
                 if(dc->cmd != DYNCFG_CMD_ADD && code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
                     df->restart_required = true;
@@ -157,8 +156,16 @@ static void dyncfg_apply_action_on_all_template_jobs(const char *template_id, DY
 
     DYNCFG *df;
     dfe_start_reentrant(dyncfg_globals.nodes, df) {
-        if(df->template == template && df->type == DYNCFG_TYPE_JOB)
-            dyncfg_echo(df_dfe.item, df, df_dfe.name, c);
+        if(df->template == template && df->type == DYNCFG_TYPE_JOB) {
+            DYNCFG_STATUS cmd_to_send_to_plugin = c;
+
+            if(c == DYNCFG_CMD_ENABLE)
+                cmd_to_send_to_plugin = df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
+            else if(c == DYNCFG_CMD_DISABLE)
+                cmd_to_send_to_plugin = DYNCFG_CMD_DISABLE;
+
+            dyncfg_echo(df_dfe.item, df, df_dfe.name, cmd_to_send_to_plugin);
+        }
     }
     dfe_done(df);
 
@@ -270,7 +277,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
             make_the_call_to_plugin = false;
         }
     }
-    else if(c & (DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE|DYNCFG_CMD_RESTART) && df->type == DYNCFG_TYPE_TEMPLATE) {
+    else if(c & (DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_RESTART) && df->type == DYNCFG_TYPE_TEMPLATE) {
         if(!called_from_dyncfg_echo) {
             bool old_user_disabled = df->user_disabled;
             if (c == DYNCFG_CMD_ENABLE)
@@ -288,7 +295,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         dyncfg_default_response(rfe->result.wb, rc, "applied");
         make_the_call_to_plugin = false;
     }
-    else  if(c == DYNCFG_CMD_ADD) {
+    else if(c == DYNCFG_CMD_ADD) {
         if (df->type != DYNCFG_TYPE_TEMPLATE) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: add command can only be applied on templates, not %s: %s",
                    dyncfg_id2type(df->type), rfe->function);
@@ -307,6 +314,15 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
             make_the_call_to_plugin = false;
         }
+    }
+    else if(c == DYNCFG_CMD_ENABLE && df->type == DYNCFG_TYPE_JOB && dyncfg_is_user_disabled(string2str(df->template))) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot enable a job of a disabled template: %s", rfe->function);
+
+        rc = HTTP_RESP_BAD_REQUEST;
+        dyncfg_default_response(rfe->result.wb, rc,
+                                "dyncfg functions intercept: this job belongs to disabled template");
+
+        make_the_call_to_plugin = false;
     }
 
     if(make_the_call_to_plugin) {
