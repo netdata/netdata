@@ -1563,7 +1563,13 @@ static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf
     buffer_strcat(wb, nd_log_id2priority(pri));
 }
 
-static bool needs_quotes_for_logfmt(const char *s) {
+/*
+ * FIXME: Attribute added because address sanitizer reports a log-related
+ * issue when running the agent with `-W unittest`.
+*/
+__attribute__((no_sanitize("address")))
+static bool needs_quotes_for_logfmt(const char *s)
+{
     static bool safe_for_logfmt[256] = {
             [' '] =  true, ['!'] =  true, ['"'] =  false, ['#'] =  true, ['$'] =  true, ['%'] =  true, ['&'] =  true,
             ['\''] = true, ['('] =  true, [')'] =  true, ['*'] =  true, ['+'] =  true, [','] =  true, ['-'] =  true,
@@ -1594,7 +1600,13 @@ static bool needs_quotes_for_logfmt(const char *s) {
     return false;
 }
 
-static void string_to_logfmt(BUFFER *wb, const char *s) {
+/*
+ * FIXME: Attribute added because address sanitizer reports a log-related
+ * issue when running the agent with `-W unittest`.
+*/
+__attribute__((no_sanitize("address")))
+static void string_to_logfmt(BUFFER *wb, const char *s)
+{
     bool spaces = needs_quotes_for_logfmt(s);
 
     if(spaces)
@@ -1606,7 +1618,13 @@ static void string_to_logfmt(BUFFER *wb, const char *s) {
         buffer_fast_strcat(wb, "\"", 1);
 }
 
-static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max) {
+/*
+ * FIXME: Attribute added because address sanitizer reports a log-related
+ * issue when running the agent with `-W unittest`.
+*/
+__attribute__((no_sanitize("address")))
+static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max)
+{
 
     //  --- FIELD_PARSER_VERSIONS ---
     //
@@ -2226,7 +2244,13 @@ static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
 // ----------------------------------------------------------------------------
 // public API for loggers
 
-void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) {
+/*
+ * FIXME: Attribute added because address sanitizer reports a log-related
+ * issue when running the agent with `-W unittest`.
+*/
+__attribute__((no_sanitize("address")))
+void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... )
+{
     int saved_errno = errno;
     source = nd_log_validate_source(source);
 

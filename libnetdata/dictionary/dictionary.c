@@ -3643,6 +3643,11 @@ size_t dictionary_unittest_views(void) {
     return errors;
 }
 
+/*
+ * FIXME: a dictionary-related leak is reported when running the address
+ * sanitizer. Need to investigate if it's introduced by the unit-test itself,
+ * or the dictionary implementation.
+*/
 int dictionary_unittest(size_t entries) {
     if(entries < 10) entries = 10;
 
