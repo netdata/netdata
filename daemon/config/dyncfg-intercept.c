@@ -54,7 +54,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                         DYNCFG_TYPE_JOB,
                         DYNCFG_SOURCE_TYPE_DYNCFG,
                         dc->source,
-                        (df->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
+                        (df->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
                         0,
                         0,
                         df->sync,

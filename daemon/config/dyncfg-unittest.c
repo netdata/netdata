@@ -83,10 +83,12 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
         snprintfz(buf, sizeof(buf), "%s:%s", t->id, add_name);
         TEST tmp = {
             .id = NULL,
-            .cmds = t->cmds | DYNCFG_CMD_GET | DYNCFG_CMD_REMOVE | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+            .cmds = (t->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_GET | DYNCFG_CMD_REMOVE | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_TEST,
             .sync = t->sync,
             .type = DYNCFG_TYPE_JOB,
             .source_type = DYNCFG_SOURCE_TYPE_DYNCFG,
+            .received = true,
+            .finished = true,
             .current =
                 {.enabled = true,
                  .removed = false,
@@ -239,6 +241,7 @@ static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *da
     else {
         netdata_thread_t thread;
         netdata_thread_create(&thread, "unittest", NETDATA_THREAD_OPTION_DEFAULT, dyncfg_unittest_thread_action, a);
+        rc = HTTP_RESP_OK;
     }
 
 cleanup:
@@ -252,67 +255,10 @@ cleanup:
     return rc;
 }
 
-static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload) {
-    buffer_flush(wb);
-
-    CLEAN_BUFFER *pld = NULL;
-
-    if(payload) {
-        pld = buffer_create(1024, NULL);
-        buffer_strcat(pld, payload);
-    }
-
-    int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMIN, cmd,
-                              true, NULL,
-                              NULL, NULL,
-                              NULL, NULL,
-                              NULL, NULL,
-                              pld, NULL);
-    if(rc != HTTP_RESP_OK) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s; returned code %d", cmd, rc);
-        dyncfg_unittest_register_error(NULL, NULL);
-    }
-
-    return rc;
-}
-
-static void dyncfg_unittest_cleanup_files(void) {
-    char path[PATH_MAX];
-    snprintfz(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, "config");
-
-    DIR *dir = opendir(path);
-    if (!dir) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: cannot open directory '%s'", path);
-        return;
-    }
-
-    struct dirent *entry;
-    char filename[PATH_MAX];
-    while ((entry = readdir(dir)) != NULL) {
-        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strstartswith(entry->d_name, "unittest:") && strendswith(entry->d_name, ".dyncfg")) {
-            snprintf(filename, sizeof(filename), "%s/%s", path, entry->d_name);
-            nd_log(NDLS_DAEMON, NDLP_INFO, "DYNCFG UNITTEST: deleting file '%s'", filename);
-            unlink(filename);
-        }
-    }
-
-    closedir(dir);
-}
-
-static void dyncfg_unittest_add(TEST *t) {
-    dictionary_set(dyncfg_unittest_data.nodes, t->id, &t, sizeof(*t));
-
-    if(!dyncfg_add_low_level(localhost, t->id, "/unittests", DYNCFG_STATUS_RUNNING, t->type,
-        t->source_type, LINE_FILE_STR,
-        t->cmds, 0, 0, t->sync, dyncfg_unittest_execute_cb, t)) {
-        dyncfg_unittest_register_error(t->id, "addition of job failed");
-    }
-}
-
-static void dyncfg_unittest_check(TEST *t, const char *name, bool received) {
+static bool dyncfg_unittest_check(TEST *t, const char *cmd, bool received) {
     size_t errors = 0;
 
-    fprintf(stderr, "TEST '%s' on '%s'...", name, t->id);
+    fprintf(stderr, "CHECK '%s' after cmd '%s'...", t->id, cmd);
 
     if(t->received != received) {
         fprintf(stderr, "\n  - received flag found '%s', expected '%s'",
@@ -374,15 +320,128 @@ static void dyncfg_unittest_check(TEST *t, const char *name, bool received) {
         fprintf(stderr, "\n");
         errors++;
     }
+    else if(df->type == DYNCFG_TYPE_JOB && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves) {
+        fprintf(stderr, "\n  - DYNCFG job has no saves!");
+        errors++;
+    }
+    else if(df->type == DYNCFG_TYPE_JOB && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && (!df->payload || !buffer_strlen(df->payload))) {
+        fprintf(stderr, "\n  - DYNCFG job has no payload!");
+        errors++;
+    }
+    else if(df->user_disabled && !df->saves) {
+        fprintf(stderr, "\n  - DYNCFG disabled config has no saves!");
+        errors++;
+    }
 
 cleanup:
     if(errors) {
         fprintf(stderr, "\n  >>> FAILED\n\n");
         dyncfg_unittest_register_error(NULL, NULL);
+        return false;
     }
-    else
-        fprintf(stderr, " OK\n");
 
+    fprintf(stderr, " OK\n");
+    return true;
+}
+
+static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload) {
+    char buf[strlen(cmd) + 1];
+    memcpy(buf, cmd, sizeof(buf));
+
+    char *words[MAX_FUNCTION_PARAMETERS];    // an array of pointers for the words in this line
+    size_t num_words = quoted_strings_splitter_pluginsd(buf, words, MAX_FUNCTION_PARAMETERS);
+
+    // const char *config = get_word(words, num_words, 0);
+    const char *id = get_word(words, num_words, 1);
+    char *action = get_word(words, num_words, 2);
+    const char *add_name = get_word(words, num_words, 3);
+
+    DYNCFG_CMDS c = dyncfg_cmds2id(action);
+
+    TEST *t = dictionary_get(dyncfg_unittest_data.nodes, id);
+    if(!t) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: cannot find id '%s' from cmd: %s", id, cmd);
+        dyncfg_unittest_register_error(NULL, NULL);
+        return HTTP_RESP_NOT_FOUND;
+    }
+    t->received = t->finished = false;
+
+    if(c == DYNCFG_CMD_DISABLE)
+        t->expected.enabled = false;
+    if(c == DYNCFG_CMD_ENABLE)
+        t->expected.enabled = true;
+
+    buffer_flush(wb);
+
+    CLEAN_BUFFER *pld = NULL;
+
+    if(payload) {
+        pld = buffer_create(1024, NULL);
+        buffer_strcat(pld, payload);
+    }
+
+    int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMIN, cmd,
+                              true, NULL,
+                              NULL, NULL,
+                              NULL, NULL,
+                              NULL, NULL,
+                              pld, NULL);
+    if(!DYNCFG_RESP_SUCCESS(rc)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to run: %s; returned code %d", cmd, rc);
+        dyncfg_unittest_register_error(NULL, NULL);
+    }
+
+    dyncfg_unittest_check(t, cmd, true);
+
+    if(rc == HTTP_RESP_OK && c == DYNCFG_CMD_ADD) {
+        char buf2[strlen(id) + strlen(add_name) + 2];
+        snprintfz(buf2, sizeof(buf2), "%s:%s", id, add_name);
+        TEST *tt = dictionary_get(dyncfg_unittest_data.nodes, buf2);
+        if(!tt) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: failed to find newly added id '%s' of command: %s", id, cmd);
+            dyncfg_unittest_register_error(NULL, NULL);
+        }
+        dyncfg_unittest_check(tt, cmd, true);
+    }
+
+    return rc;
+}
+
+static void dyncfg_unittest_cleanup_files(void) {
+    char path[PATH_MAX];
+    snprintfz(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, "config");
+
+    DIR *dir = opendir(path);
+    if (!dir) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: cannot open directory '%s'", path);
+        return;
+    }
+
+    struct dirent *entry;
+    char filename[PATH_MAX];
+    while ((entry = readdir(dir)) != NULL) {
+        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strstartswith(entry->d_name, "unittest:") && strendswith(entry->d_name, ".dyncfg")) {
+            snprintf(filename, sizeof(filename), "%s/%s", path, entry->d_name);
+            nd_log(NDLS_DAEMON, NDLP_INFO, "DYNCFG UNITTEST: deleting file '%s'", filename);
+            unlink(filename);
+        }
+    }
+
+    closedir(dir);
+}
+
+static TEST *dyncfg_unittest_add(TEST t) {
+    TEST *ret = dictionary_set(dyncfg_unittest_data.nodes, t.id, &t, sizeof(t));
+
+    if(!dyncfg_add_low_level(localhost, t.id, "/unittests", DYNCFG_STATUS_RUNNING, t.type,
+        t.source_type, LINE_FILE_STR,
+        t.cmds, 0, 0, t.sync, dyncfg_unittest_execute_cb, ret)) {
+        dyncfg_unittest_register_error(t.id, "addition of job failed");
+    }
+
+    dyncfg_unittest_check(ret, "plugin create", t.type != DYNCFG_TYPE_TEMPLATE);
+
+    return ret;
 }
 
 int dyncfg_unittest(void) {
@@ -392,7 +451,10 @@ int dyncfg_unittest(void) {
     rrd_functions_inflight_init();
     dyncfg_init(false);
 
-    TEST tss1 = {
+    // ------------------------------------------------------------------------
+    // single
+
+    TEST *tss1 = dyncfg_unittest_add((TEST){
         .id = "unittest:sync:single1",
         .type = DYNCFG_TYPE_SINGLE,
         .cmds = DYNCFG_CMD_GET | DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
@@ -401,11 +463,9 @@ int dyncfg_unittest(void) {
         .expected = {
             .enabled = true,
         }
-    };
-    dyncfg_unittest_add(&tss1);
-    dyncfg_unittest_check(&tss1, "tss1-1", true);
+    }); (void)tss1;
 
-    TEST tas1 = {
+    TEST *tas1 = dyncfg_unittest_add((TEST){
         .id = "unittest:async:single1",
         .type = DYNCFG_TYPE_SINGLE,
         .cmds = DYNCFG_CMD_GET | DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
@@ -414,37 +474,42 @@ int dyncfg_unittest(void) {
         .expected = {
             .enabled = true,
         }
-    };
-    dyncfg_unittest_add(&tas1);
-    dyncfg_unittest_check(&tas1, "tas1-1", true);
+    }); (void)tas1;
 
-    TEST tst1 = {
+    // ------------------------------------------------------------------------
+    // template
+
+    TEST *tst1 = dyncfg_unittest_add((TEST){
         .id = "unittest:sync:template1",
         .type = DYNCFG_TYPE_TEMPLATE,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
         .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = true,
-        .expected = {
-            .enabled = true,
-        }
-    };
-    dyncfg_unittest_add(&tst1);
-    dyncfg_unittest_check(&tst1, "tst1-1", false);
+    }); (void)tst1;
 
-    TEST tat1 = {
+    TEST *tat1 = dyncfg_unittest_add((TEST){
         .id = "unittest:async:template1",
         .type = DYNCFG_TYPE_TEMPLATE,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
         .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
         .sync = false,
+    }); (void)tat1;
+
+    // ------------------------------------------------------------------------
+    // job
+
+    TEST *tsj1 = dyncfg_unittest_add((TEST){
+        .id = "unittest:sync:job1",
+        .type = DYNCFG_TYPE_JOB,
+        .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+        .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+        .sync = true,
         .expected = {
             .enabled = true,
         }
-    };
-    dyncfg_unittest_add(&tat1);
-    dyncfg_unittest_check(&tat1, "tat1-1", false);
+    }); (void)tsj1;
 
-    TEST taj1 = {
+    TEST *taj1 = dyncfg_unittest_add((TEST){
         .id = "unittest:async:job1",
         .type = DYNCFG_TYPE_JOB,
         .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
@@ -453,25 +518,38 @@ int dyncfg_unittest(void) {
         .expected = {
             .enabled = true,
         }
-    };
-    dyncfg_unittest_add(&taj1);
-    dyncfg_unittest_check(&taj1, "taj1-1", true);
+    }); (void)taj1;
+
+    // ------------------------------------------------------------------------
+
+    int rc; (void)rc;
+    BUFFER *wb = buffer_create(0, NULL);
+
+    // ------------------------------------------------------------------------
+    // dynamic job
+
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 add dynamic1", wb, "{\"double\":3.14,\"boolean\":true}");
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:template1 add dynamic2", wb, "{\"double\":3.14,\"boolean\":true}");
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template1 add dynamic1", wb, "{\"double\":3.14,\"boolean\":true}");
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:template1 add dynamic2", wb, "{\"double\":3.14,\"boolean\":true}");
+
+    // ------------------------------------------------------------------------
+    // saving of user_disabled
+
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single1 disable", wb, NULL);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single1 disable", wb, NULL);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:job1 disable", wb, NULL);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:job1 disable", wb, NULL);
+
+    // ------------------------------------------------------------------------
+    // enabling
+
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single1 enable", wb, NULL);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:single1 enable", wb, NULL);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:job1 enable", wb, NULL);
+    dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:async:job1 enable", wb, NULL);
 
 
-
-    
-
-//    int rc;
-//    BUFFER *wb = buffer_create(0, NULL);
-//
-//    // ------------------------------------------------------------------------
-//
-//    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single enable", wb, NULL);
-//    if(rc == HTTP_RESP_OK && !dyncfg_unittest_data.enabled) {
-//        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG UNITTEST: enabled flag is not set, code %d", rc);
-//        dyncfg_unittest_data.errors++;
-//    }
-//
 //    // ------------------------------------------------------------------------
 //
 //    rc = dyncfg_unittest_run(PLUGINSD_FUNCTION_CONFIG " unittest:sync:single disable", wb, NULL);
