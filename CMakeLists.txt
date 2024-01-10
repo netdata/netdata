@@ -124,7 +124,8 @@ include(CheckCCompilerFlag)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" TRUE)
 else()
-        option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" FALSE)
+        # FIXME: Until https://github.com/netdata/netdata/pull/16731 resolves the issue
+        option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" TRUE)
 endif()
 
 set(EXTRA_HARDENING_FLAGS "")
