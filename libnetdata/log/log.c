@@ -1567,8 +1567,8 @@ static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf
  * FIXME: Attribute added because address sanitizer reports a log-related
  * issue when running the agent with `-W unittest`.
 */
-static bool needs_quotes_for_logfmt(const char *s)
 __attribute__((no_sanitize("address")))
+static bool needs_quotes_for_logfmt(const char *s)
 {
     static bool safe_for_logfmt[256] = {
             [' '] =  true, ['!'] =  true, ['"'] =  false, ['#'] =  true, ['$'] =  true, ['%'] =  true, ['&'] =  true,
@@ -1604,8 +1604,8 @@ __attribute__((no_sanitize("address")))
  * FIXME: Attribute added because address sanitizer reports a log-related
  * issue when running the agent with `-W unittest`.
 */
-static void string_to_logfmt(BUFFER *wb, const char *s)
 __attribute__((no_sanitize("address")))
+static void string_to_logfmt(BUFFER *wb, const char *s)
 {
     bool spaces = needs_quotes_for_logfmt(s);
 
@@ -1622,8 +1622,8 @@ __attribute__((no_sanitize("address")))
  * FIXME: Attribute added because address sanitizer reports a log-related
  * issue when running the agent with `-W unittest`.
 */
-static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max)
 __attribute__((no_sanitize("address")))
+static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max)
 {
 
     //  --- FIELD_PARSER_VERSIONS ---
@@ -2248,8 +2248,8 @@ static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
  * FIXME: Attribute added because address sanitizer reports a log-related
  * issue when running the agent with `-W unittest`.
 */
-void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... )
 __attribute__((no_sanitize("address")))
+void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... )
 {
     int saved_errno = errno;
     source = nd_log_validate_source(source);
