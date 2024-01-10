@@ -646,6 +646,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
     int order = 20130;
     struct ebpf_target *w;
     int update_every = em->update_every;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
             continue;
@@ -753,6 +754,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
 
         w->charts_created &= ~(1<<EBPF_MODULE_SOCKET_IDX);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -1035,6 +1037,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
     // This algorithm is improved in https://github.com/netdata/netdata/pull/16030
     collected_number values[9];
 
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
             continue;
@@ -1101,6 +1104,7 @@ void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
         write_chart_dimension("calls", values[8]);
         ebpf_write_end_chart();
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /*****************************************************************
@@ -1723,6 +1727,7 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
     // can have values from the previous one.
     memset(values, 0, length);
     time_t update_time = time(NULL);
+    pthread_mutex_lock(&collect_data_mutex);
     while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         test = bpf_map_lookup_elem(fd, &key, values);
         if (test < 0) {
@@ -1800,6 +1805,7 @@ end_socket_loop:
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));
     }
+    pthread_mutex_unlock(&collect_data_mutex);
     netdata_thread_enable_cancelability();
 }
 
@@ -2596,7 +2602,6 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_read_hash_global_tables(stats, maps_per_core);
         }
 
-        pthread_mutex_lock(&collect_data_mutex);
         if (cgroups)
             ebpf_update_socket_cgroup();
 
@@ -2613,7 +2618,6 @@ static void socket_collector(ebpf_module_t *em)
         fflush(stdout);
 
         pthread_mutex_unlock(&lock);
-        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
