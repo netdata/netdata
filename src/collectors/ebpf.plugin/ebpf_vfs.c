@@ -1230,29 +1230,26 @@ static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
  */
 static void ebpf_vfs_read_apps(int maps_per_core)
 {
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     netdata_publish_vfs_t *vv = vfs_vector;
     int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
     size_t length = sizeof(netdata_publish_vfs_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    while (pids) {
-        uint32_t key = pids->pid;
-
+    uint32_t key = 0, next_key = 0;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, vv)) {
-            pids = pids->next;
-            continue;
+            goto end_vfs_loop;
         }
 
         vfs_apps_accumulator(vv, maps_per_core);
 
         vfs_fill_pid(key, vv);
 
+end_vfs_loop:
         // We are cleaning to avoid passing data read from one process to other.
         memset(vv, 0, length);
-
-        pids = pids->next;
+        key = next_key;
     }
 }
 
