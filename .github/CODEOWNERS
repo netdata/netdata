@@ -6,7 +6,7 @@
 
 # Ownership by directory structure
 .github/ @Ferroin @tkatsoulas
-aclk/ @stelfrag @underhood
+aclk/ @stelfrag
 build/ @Ferroin @tkatsoulas
 contrib/debian @Ferroin @tkatsoulas
 collectors/ @thiagoftsm
@@ -20,9 +20,9 @@ exporting/ @thiagoftsm
 daemon/ @thiagoftsm @vkalintiris
 database/ @thiagoftsm @vkalintiris
 docs/ @tkatsoulas @Ancairon
-health/ @thiagoftsm @vkalintiris @MrZammler
-health/health.d/ @thiagoftsm @MrZammler
-health/notifications/ @Ferroin @thiagoftsm @MrZammler
+health/ @thiagoftsm @vkalintiris
+health/health.d/ @thiagoftsm
+health/notifications/ @Ferroin @thiagoftsm
 ml/ @vkalintiris
 libnetdata/ @thiagoftsm @vkalintiris
 packaging/ @Ferroin @tkatsoulas
@@ -32,7 +32,7 @@ system/ @Ferroin @tkatsoulas
 tests/ @Ferroin @vkalintiris @tkatsoulas
 web/ @thiagoftsm @vkalintiris
 web/gui/ @novykh
-logsmanagement/ @Dim-P @thiagoftsm
+logsmanagement/ @thiagoftsm
 
 # Ownership by filetype (overwrites ownership by directory)
 *.am @Ferroin @tkatsoulas
