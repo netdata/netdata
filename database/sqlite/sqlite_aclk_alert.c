@@ -201,7 +201,7 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, bool skip_filter)
         ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
         rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
     } else
-        error_report("Failed to store alert event %"PRId64", rc = %d", ae->unique_id, rc);
+        error_report("Failed to store alert event %"PRIu32", rc = %d", ae->unique_id, rc);
 
 done:
     if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
