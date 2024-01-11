@@ -12,19 +12,10 @@ Netdata is fully capable of long-term metrics storage, at per-second granularity
 
 2. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
 
-3. `save`, data are only in RAM while Netdata runs and are saved to / loaded from disk on Netdata restart. It also
-   uses `mmap()` and supports [KSM](#ksm).
-
-4. `map`, data are in memory mapped files. This works like the swap. When Netdata writes data on its memory, the Linux
-   kernel marks the related memory pages as dirty and automatically starts updating them on disk. Unfortunately we
-   cannot control how frequently this works. The Linux kernel uses exactly the same algorithm it uses for its swap
-   memory. This mode uses `mmap()` but does not support [KSM](#ksm). _Keep in mind though, this option will have a
-   constant write on your disk._
-
-5. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all others
+3. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all others
    except `none`.
 
-6. `none`, without a database (collected metrics can only be streamed to another Netdata).
+4. `none`, without a database (collected metrics can only be streamed to another Netdata).
 
 ## Which database mode to use
 
@@ -47,7 +38,7 @@ You can select the database mode by editing `netdata.conf` and setting:
 
 ```conf
 [db]
-  # dbengine (default), ram, save (the default if dbengine not available), map (swap like), none, alloc
+  # dbengine (default), ram (the default if dbengine not available), alloc, none
   mode = dbengine
 ```
 

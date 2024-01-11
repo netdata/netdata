@@ -79,8 +79,6 @@ struct pg_cache_page_index;
 typedef enum __attribute__ ((__packed__)) rrd_memory_mode {
     RRD_MEMORY_MODE_NONE     = 0,
     RRD_MEMORY_MODE_RAM      = 1,
-    RRD_MEMORY_MODE_MAP      = 2,
-    RRD_MEMORY_MODE_SAVE     = 3,
     RRD_MEMORY_MODE_ALLOC    = 4,
     RRD_MEMORY_MODE_DBENGINE = 5,
 
@@ -89,8 +87,6 @@ typedef enum __attribute__ ((__packed__)) rrd_memory_mode {
 
 #define RRD_MEMORY_MODE_NONE_NAME "none"
 #define RRD_MEMORY_MODE_RAM_NAME "ram"
-#define RRD_MEMORY_MODE_MAP_NAME "map"
-#define RRD_MEMORY_MODE_SAVE_NAME "save"
 #define RRD_MEMORY_MODE_ALLOC_NAME "alloc"
 #define RRD_MEMORY_MODE_DBENGINE_NAME "dbengine"
 
@@ -325,13 +321,12 @@ struct rrddim {
 #endif
 
     // ------------------------------------------------------------------------
-    // db mode RAM, SAVE, MAP, ALLOC, NONE specifics
+    // db mode RAM, ALLOC, NONE specifics
     // TODO - they should be managed by storage engine
     //        (RRDDIM_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
     struct {
         size_t memsize;                             // the memory allocated for this dimension (without RRDDIM)
-        void *rd_on_file;                           // pointer to the header written on disk
         storage_number *data;                       // the array of values
     } db;
 
@@ -380,22 +375,6 @@ size_t rrddim_size(void);
 #define rrddim_check_updated(rd) ((rd)->collector.options & RRDDIM_OPTION_UPDATED)
 #define rrddim_set_updated(rd) (rd)->collector.options |= RRDDIM_OPTION_UPDATED
 #define rrddim_clear_updated(rd) (rd)->collector.options &= ~RRDDIM_OPTION_UPDATED
-
-// returns the RRDDIM cache filename, or NULL if it does not exist
-const char *rrddim_cache_filename(RRDDIM *rd);
-
-// updated the header with the latest RRDDIM value, for memory mode MAP and SAVE
-void rrddim_memory_file_update(RRDDIM *rd);
-
-// free the memory file structures for memory mode MAP and SAVE
-void rrddim_memory_file_free(RRDDIM *rd);
-
-bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MODE memory_mode);
-
-// return the v019 header size of RRDDIM files
-size_t rrddim_memory_file_header_size(void);
-
-void rrddim_memory_file_save(RRDDIM *rd);
 
 // ------------------------------------------------------------------------
 // DATA COLLECTION STORAGE OPS
@@ -960,12 +939,6 @@ STRING *rrd_string_strdupz(const char *s);
 #define rrdset_number_of_dimensions(st) \
     dictionary_entries((st)->rrddim_root_index)
 
-void rrdset_memory_file_save(RRDSET *st);
-void rrdset_memory_file_free(RRDSET *st);
-void rrdset_memory_file_update(RRDSET *st);
-const char *rrdset_cache_filename(RRDSET *st);
-bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE memory_mode);
-
 #include "rrdcollector.h"
 #include "rrdfunctions.h"
 
@@ -1488,13 +1461,9 @@ RRDSET *rrdset_create_custom(RRDHOST *host
     rrdset_create(localhost, type, id, name, family, context, title, units, plugin, module, priority, update_every, chart_type)
 
 void rrdhost_free_all(void);
-void rrdhost_save_all(void);
-void rrdhost_cleanup_all(void);
 
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force);
-void rrdhost_save_charts(RRDHOST *host);
-void rrdhost_delete_charts(RRDHOST *host);
 
 int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
 
@@ -1623,8 +1592,6 @@ void rrdhost_set_is_parent_label(void);
 // ----------------------------------------------------------------------------
 // RRD internal functions
 
-void rrdset_delete_files(RRDSET *st);
-void rrdset_save(RRDSET *st);
 void rrdset_free(RRDSET *st);
 
 void rrddim_free(RRDSET *st, RRDDIM *rd);
@@ -1632,10 +1599,8 @@ void rrddim_free(RRDSET *st, RRDDIM *rd);
 #ifdef NETDATA_RRD_INTERNALS
 
 char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id);
-const char *rrdset_cache_dir(RRDSET *st);
 
 void rrdset_reset(RRDSET *st);
-void rrdset_delete_obsolete_dimensions(RRDSET *st);
 
 #endif /* NETDATA_RRD_INTERNALS */
 

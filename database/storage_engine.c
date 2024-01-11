@@ -32,30 +32,6 @@ static STORAGE_ENGINE engines[] = {
         }
     },
     {
-        .id = RRD_MEMORY_MODE_MAP,
-        .name = RRD_MEMORY_MODE_MAP_NAME,
-        .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
-        .api = {
-            .metric_get = rrddim_metric_get,
-            .metric_get_or_create = rrddim_metric_get_or_create,
-            .metric_dup = rrddim_metric_dup,
-            .metric_release = rrddim_metric_release,
-            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
-        }
-    },
-    {
-        .id = RRD_MEMORY_MODE_SAVE,
-        .name = RRD_MEMORY_MODE_SAVE_NAME,
-        .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
-        .api = {
-            .metric_get = rrddim_metric_get,
-            .metric_get_or_create = rrddim_metric_get_or_create,
-            .metric_dup = rrddim_metric_dup,
-            .metric_release = rrddim_metric_release,
-            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
-        }
-    },
-    {
         .id = RRD_MEMORY_MODE_ALLOC,
         .name = RRD_MEMORY_MODE_ALLOC_NAME,
         .seb = STORAGE_ENGINE_BACKEND_RRDDIM,

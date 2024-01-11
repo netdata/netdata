@@ -356,8 +356,6 @@ int is_legacy = 1;
     switch(memory_mode) {
         default:
         case RRD_MEMORY_MODE_ALLOC:
-        case RRD_MEMORY_MODE_MAP:
-        case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_RAM:
             if(host->rrdpush_seconds_to_replicate > (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every)
                 host->rrdpush_seconds_to_replicate = (time_t) host->rrd_history_entries * (time_t) host->rrd_update_every;
@@ -390,8 +388,8 @@ int is_legacy = 1;
             host->cache_dir = strdupz(filename);
         }
 
-        if((host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE ||
-             (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_legacy))) {
+        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_legacy)
+        {
             int r = mkdir(host->cache_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 nd_log(NDLS_DAEMON, NDLP_CRIT,
@@ -1358,26 +1356,6 @@ void rrd_finalize_collection_for_all_hosts(void) {
     dfe_done(host);
 }
 
-// ----------------------------------------------------------------------------
-// RRDHOST - save host files
-
-void rrdhost_save_charts(RRDHOST *host) {
-    if(!host) return;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRD: 'host:%s' saving / closing database...",
-           rrdhost_hostname(host));
-
-    RRDSET *st;
-
-    // we get a write lock
-    // to ensure only one thread is saving the database
-    rrdset_foreach_write(st, host) {
-        rrdset_save(st);
-    }
-    rrdset_foreach_done(st);
-}
-
 struct rrdhost_system_info *rrdhost_labels_to_system_info(RRDLABELS *labels) {
     struct rrdhost_system_info *info = callocz(1, sizeof(struct rrdhost_system_info));
     info->hops = 1;
@@ -1575,103 +1553,6 @@ void rrdhost_finalize_collection(RRDHOST *host) {
         rrdset_finalize_collection(st, true);
     rrdset_foreach_done(st);
 }
-
-// ----------------------------------------------------------------------------
-// RRDHOST - delete host files
-
-void rrdhost_delete_charts(RRDHOST *host) {
-    if(!host) return;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRD: 'host:%s' deleting disk files...",
-           rrdhost_hostname(host));
-
-    RRDSET *st;
-
-    if(host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || host->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
-        // we get a write lock
-        // to ensure only one thread is saving the database
-        rrdset_foreach_write(st, host){
-            rrdset_delete_files(st);
-        }
-        rrdset_foreach_done(st);
-    }
-
-    recursively_delete_dir(host->cache_dir, "left over host");
-}
-
-// ----------------------------------------------------------------------------
-// RRDHOST - cleanup host files
-
-void rrdhost_cleanup_charts(RRDHOST *host) {
-    if(!host) return;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRD: 'host:%s' cleaning up disk files...",
-           rrdhost_hostname(host));
-
-    RRDSET *st;
-    uint32_t rrdhost_delete_obsolete_charts = rrdhost_option_check(host, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS);
-
-    // we get a write lock
-    // to ensure only one thread is saving the database
-    rrdset_foreach_write(st, host) {
-
-        if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
-            rrdset_delete_files(st);
-
-        else if(rrdhost_delete_obsolete_charts && rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
-            rrdset_delete_obsolete_dimensions(st);
-
-        else
-            rrdset_save(st);
-
-    }
-    rrdset_foreach_done(st);
-}
-
-
-// ----------------------------------------------------------------------------
-// RRDHOST - save all hosts to disk
-
-void rrdhost_save_all(void) {
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRD: saving databases [%zu hosts(s)]...",
-           rrdhost_hosts_available());
-
-    rrd_rdlock();
-
-    RRDHOST *host;
-    rrdhost_foreach_read(host)
-        rrdhost_save_charts(host);
-
-    rrd_unlock();
-}
-
-// ----------------------------------------------------------------------------
-// RRDHOST - save or delete all hosts from disk
-
-void rrdhost_cleanup_all(void) {
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "RRD: cleaning up database [%zu hosts(s)]...",
-           rrdhost_hosts_available());
-
-    rrd_rdlock();
-
-    RRDHOST *host;
-    rrdhost_foreach_read(host) {
-        if (host != localhost && rrdhost_option_check(host, RRDHOST_OPTION_DELETE_ORPHAN_HOST) && !host->receiver
-            /* don't delete multi-host DB host files */
-            && !(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_storage_engine_shared(host->db[0].si))
-        )
-            rrdhost_delete_charts(host);
-        else
-            rrdhost_cleanup_charts(host);
-    }
-
-    rrd_unlock();
-}
-
 
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables

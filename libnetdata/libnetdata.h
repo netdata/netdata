@@ -553,8 +553,6 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
 int netdata_munmap(void *ptr, size_t size);
 int memory_file_save(const char *filename, void *mem, size_t size);
 
-int fd_is_valid(int fd);
-
 extern struct rlimit rlimit_nofile;
 
 extern int enable_ksm;
@@ -562,8 +560,6 @@ extern int enable_ksm;
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
 int verify_netdata_host_prefix();
-
-int recursively_delete_dir(const char *path, const char *reason);
 
 extern volatile sig_atomic_t netdata_exit;
 

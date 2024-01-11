@@ -2238,7 +2238,6 @@ int test_dbengine(void)
 
     rrd_wrlock();
     rrdeng_prepare_exit((struct rrdengine_instance *)host->db[0].si);
-    rrdhost_delete_charts(host);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
     rrd_unlock();
@@ -2648,7 +2647,6 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     freez(query_threads);
     rrd_wrlock();
     rrdeng_prepare_exit((struct rrdengine_instance *)host->db[0].si);
-    rrdhost_delete_charts(host);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
     rrd_unlock();

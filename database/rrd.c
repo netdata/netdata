@@ -19,7 +19,7 @@ int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 #ifdef ENABLE_DBENGINE
 RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
 #else
-RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_SAVE;
+RRD_MEMORY_MODE default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
 #endif
 int gap_when_lost_iterations_above = 1;
 
@@ -32,14 +32,8 @@ inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
         case RRD_MEMORY_MODE_RAM:
             return RRD_MEMORY_MODE_RAM_NAME;
 
-        case RRD_MEMORY_MODE_MAP:
-            return RRD_MEMORY_MODE_MAP_NAME;
-
         case RRD_MEMORY_MODE_NONE:
             return RRD_MEMORY_MODE_NONE_NAME;
-
-        case RRD_MEMORY_MODE_SAVE:
-            return RRD_MEMORY_MODE_SAVE_NAME;
 
         case RRD_MEMORY_MODE_ALLOC:
             return RRD_MEMORY_MODE_ALLOC_NAME;
@@ -53,7 +47,7 @@ inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
         return eng->name;
     }
 
-    return RRD_MEMORY_MODE_SAVE_NAME;
+    return RRD_MEMORY_MODE_RAM_NAME;
 }
 
 RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
@@ -62,7 +56,7 @@ RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
         return eng->id;
     }
 
-    return RRD_MEMORY_MODE_SAVE;
+    return RRD_MEMORY_MODE_RAM;
 }
 
 
@@ -130,28 +124,6 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type) {
         case RRDSET_TYPE_STACKED:
             return RRDSET_TYPE_STACKED_NAME;
     }
-}
-
-// ----------------------------------------------------------------------------
-// RRD - cache directory
-
-char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id) {
-    char *ret = NULL;
-
-    char b[FILENAME_MAX + 1];
-    char n[FILENAME_MAX + 1];
-    rrdset_strncpyz_name(b, id, FILENAME_MAX);
-
-    snprintfz(n, FILENAME_MAX, "%s/%s", host->cache_dir, b);
-    ret = strdupz(n);
-
-    if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
-        int r = mkdir(ret, 0775);
-        if(r != 0 && errno != EEXIST)
-            netdata_log_error("Cannot create directory '%s'", ret);
-    }
-
-    return ret;
 }
 
 // ----------------------------------------------------------------------------

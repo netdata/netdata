@@ -1260,37 +1260,6 @@ int netdata_munmap(void *ptr, size_t size) {
     return munmap(ptr, size);
 }
 
-int memory_file_save(const char *filename, void *mem, size_t size) {
-    char tmpfilename[FILENAME_MAX + 1];
-
-    snprintfz(tmpfilename, FILENAME_MAX, "%s.%ld.tmp", filename, (long) getpid());
-
-    int fd = open(tmpfilename, O_RDWR | O_CREAT | O_NOATIME, 0664);
-    if (fd < 0) {
-        netdata_log_error("Cannot create/open file '%s'.", filename);
-        return -1;
-    }
-
-    if (write(fd, mem, size) != (ssize_t) size) {
-        netdata_log_error("Cannot write to file '%s' %ld bytes.", filename, (long) size);
-        close(fd);
-        return -1;
-    }
-
-    close(fd);
-
-    if (rename(tmpfilename, filename)) {
-        netdata_log_error("Cannot rename '%s' to '%s'", tmpfilename, filename);
-        return -1;
-    }
-
-    return 0;
-}
-
-int fd_is_valid(int fd) {
-    return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
-}
-
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len) {
     char *s = fgets(buf, (int)buf_size, fp);
     if (!s) return NULL;
@@ -1330,65 +1299,6 @@ int snprintfz(char *dst, size_t n, const char *fmt, ...) {
     va_start(args, fmt);
     int ret = vsnprintfz(dst, n, fmt, args);
     va_end(args);
-
-    return ret;
-}
-
-/*
-// poor man cycle counting
-static unsigned long tsc;
-void begin_tsc(void) {
-    unsigned long a, d;
-    asm volatile ("cpuid\nrdtsc" : "=a" (a), "=d" (d) : "0" (0) : "ebx", "ecx");
-    tsc = ((unsigned long)d << 32) | (unsigned long)a;
-}
-unsigned long end_tsc(void) {
-    unsigned long a, d;
-    asm volatile ("rdtscp" : "=a" (a), "=d" (d) : : "ecx");
-    return (((unsigned long)d << 32) | (unsigned long)a) - tsc;
-}
-*/
-
-int recursively_delete_dir(const char *path, const char *reason) {
-    DIR *dir = opendir(path);
-    if(!dir) {
-        netdata_log_error("Cannot read %s directory to be deleted '%s'", reason?reason:"", path);
-        return -1;
-    }
-
-    int ret = 0;
-    struct dirent *de = NULL;
-    while((de = readdir(dir))) {
-        if(de->d_type == DT_DIR
-           && (
-                   (de->d_name[0] == '.' && de->d_name[1] == '\0')
-                   || (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0')
-           ))
-            continue;
-
-        char fullpath[FILENAME_MAX + 1];
-        snprintfz(fullpath, FILENAME_MAX, "%s/%s", path, de->d_name);
-
-        if(de->d_type == DT_DIR) {
-            int r = recursively_delete_dir(fullpath, reason);
-            if(r > 0) ret += r;
-            continue;
-        }
-
-        netdata_log_info("Deleting %s file '%s'", reason?reason:"", fullpath);
-        if(unlikely(unlink(fullpath) == -1))
-            netdata_log_error("Cannot delete %s file '%s'", reason?reason:"", fullpath);
-        else
-            ret++;
-    }
-
-    netdata_log_info("Deleting empty directory '%s'", path);
-    if(unlikely(rmdir(path) == -1))
-        netdata_log_error("Cannot delete empty directory '%s'", path);
-    else
-        ret++;
-
-    closedir(dir);
 
     return ret;
 }
@@ -1778,6 +1688,11 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
 
     netdata_pclose(NULL, fp, pid);
     return true;
+}
+
+
+static int fd_is_valid(int fd) {
+    return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
 }
 
 void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){

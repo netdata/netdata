@@ -856,7 +856,7 @@ static inline PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, PARSER
     st->counter++;
     st->counter_done++;
 
-    // these are only needed for db mode RAM, SAVE, MAP, ALLOC
+    // these are only needed for db mode RAM, ALLOC
     st->db.current_entry++;
     if(st->db.current_entry >= st->db.entries)
         st->db.current_entry -= st->db.entries;
