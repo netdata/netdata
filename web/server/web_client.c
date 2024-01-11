@@ -183,7 +183,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         web_client_flag_clear(w, WEB_CLIENT_CHUNKED_TRANSFER);
     }
 
-    web_client_flags_check_auth(w);
+    web_client_flags_clear_auth(w);
     web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
     web_client_reset_path_flags(w);
 }

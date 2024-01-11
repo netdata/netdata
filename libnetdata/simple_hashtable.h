@@ -245,7 +245,7 @@ static inline void simple_hashtable_del_value_sorted_named(SIMPLE_HASHTABLE_NAME
 static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *old_value __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *new_value __maybe_unused) { ; }
 #endif
 
-static void simple_hashtable_init_named(SIMPLE_HASHTABLE_NAMED *ht, size_t size) {
+static inline void simple_hashtable_init_named(SIMPLE_HASHTABLE_NAMED *ht, size_t size) {
     memset(ht, 0, sizeof(*ht));
     ht->size = size;
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));

@@ -46,7 +46,7 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
     buffer_json_object_close(wb);
 }
 
-static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent, const char *id) {
+static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent, const char *id __maybe_unused) {
     size_t entries = dictionary_entries(dyncfg_globals.nodes);
     size_t used = 0;
     const DICTIONARY_ITEM *items[entries];

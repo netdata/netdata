@@ -4,7 +4,7 @@
 
 static DICTIONARY *dyncfg_nodes = NULL;
 
-static int dyncfg_inline_callback(struct rrd_function_execute *rfe, void *data) {
+static int dyncfg_inline_callback(struct rrd_function_execute *rfe, void *data __maybe_unused) {
     char tr[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(*rfe->transaction, tr);
 

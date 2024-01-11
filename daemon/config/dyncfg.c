@@ -323,7 +323,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         dyncfg_function_intercept_cb,
         NULL);
 
-    DYNCFG_STATUS status_to_send_to_plugin = df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
+    DYNCFG_CMDS status_to_send_to_plugin = df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
     if(status_to_send_to_plugin == DYNCFG_CMD_ENABLE && dyncfg_is_user_disabled(string2str(df->template)))
         status_to_send_to_plugin = DYNCFG_CMD_DISABLE;
 

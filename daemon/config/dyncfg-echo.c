@@ -16,7 +16,7 @@ struct dyncfg_echo {
     BUFFER *wb;
 };
 
-void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code, void *result_cb_data) {
+void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code __maybe_unused, void *result_cb_data) {
     struct dyncfg_echo *e = result_cb_data;
 
     buffer_free(e->wb);

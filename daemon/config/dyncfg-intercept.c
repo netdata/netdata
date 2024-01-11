@@ -157,7 +157,7 @@ static void dyncfg_apply_action_on_all_template_jobs(const char *template_id, DY
     DYNCFG *df;
     dfe_start_reentrant(dyncfg_globals.nodes, df) {
         if(df->template == template && df->type == DYNCFG_TYPE_JOB) {
-            DYNCFG_STATUS cmd_to_send_to_plugin = c;
+            DYNCFG_CMDS cmd_to_send_to_plugin = c;
 
             if(c == DYNCFG_CMD_ENABLE)
                 cmd_to_send_to_plugin = df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;

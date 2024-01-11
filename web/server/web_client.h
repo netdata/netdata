@@ -74,8 +74,8 @@ typedef enum __attribute__((packed)) {
 #define web_client_reset_path_flags(w) (w)->flags &= ~(WEB_CLIENT_FLAG_PATH_WITH_VERSION|WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH|WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION)
 
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))
-#define web_client_flag_set(w, flag) (w)->flags |= flag
-#define web_client_flag_clear(w, flag) (w)->flags &= ~flag
+#define web_client_flag_set(w, flag) (w)->flags |= (flag)
+#define web_client_flag_clear(w, flag) (w)->flags &= ~(flag)
 
 #define WEB_CLIENT_IS_DEAD(w) web_client_flag_set(w, WEB_CLIENT_FLAG_DEAD)
 #define web_client_check_dead(w) web_client_flag_check(w, WEB_CLIENT_FLAG_DEAD)
