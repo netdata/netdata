@@ -210,7 +210,7 @@ typedef struct query_metric {
     RRDR_DIMENSION_FLAGS status;
 
     struct query_metric_tier {
-        STORAGE_METRIC_HANDLE *db_metric_handle;
+        STORAGE_METRIC_HANDLE *smh;
         time_t db_first_time_s;         // the oldest timestamp available for this tier
         time_t db_last_time_s;          // the latest timestamp available for this tier
         time_t db_update_every_s;       // latest update every for this tier

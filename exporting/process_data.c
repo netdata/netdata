@@ -77,8 +77,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     time_t before = instance->before;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = storage_engine_oldest_time_s(rd->tiers[0].backend, rd->tiers[0].db_metric_handle);
-    time_t last_t = storage_engine_latest_time_s(rd->tiers[0].backend, rd->tiers[0].db_metric_handle);
+    time_t first_t = storage_engine_oldest_time_s(rd->tiers[0].seb, rd->tiers[0].smh);
+    time_t last_t = storage_engine_latest_time_s(rd->tiers[0].seb, rd->tiers[0].smh);
     time_t update_every = st->update_every;
     struct storage_engine_query_handle handle;
 
@@ -126,7 +126,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     size_t counter = 0;
     NETDATA_DOUBLE sum = 0;
 
-    for (storage_engine_query_init(rd->tiers[0].backend, rd->tiers[0].db_metric_handle, &handle, after, before, STORAGE_PRIORITY_SYNCHRONOUS); !storage_engine_query_is_finished(&handle);) {
+    for (storage_engine_query_init(rd->tiers[0].seb, rd->tiers[0].smh, &handle, after, before, STORAGE_PRIORITY_SYNCHRONOUS); !storage_engine_query_is_finished(&handle);) {
         STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
         points_read++;
 

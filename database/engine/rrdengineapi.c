@@ -74,14 +74,14 @@ static inline bool rrdeng_page_alignment_release(struct pg_alignment *pa) {
 }
 
 // charts call this
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid __maybe_unused) {
     struct pg_alignment *pa = callocz(1, sizeof(struct pg_alignment));
     rrdeng_page_alignment_acquire(pa);
     return (STORAGE_METRICS_GROUP *)pa;
 }
 
 // charts call this
-void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance __maybe_unused, STORAGE_METRICS_GROUP *smg) {
+void rrdeng_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_METRICS_GROUP *smg) {
     if(unlikely(!smg)) return;
 
     struct pg_alignment *pa = (struct pg_alignment *)smg;
@@ -108,8 +108,8 @@ void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-static METRIC *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, const char *rd_id, const char *st_id) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+static METRIC *rrdeng_metric_get_legacy(STORAGE_INSTANCE *si, const char *rd_id, const char *st_id) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     uuid_t legacy_uuid;
     rrdeng_generate_legacy_uuid(rd_id, st_id, &legacy_uuid);
     return mrg_metric_get_and_acquire(main_mrg, &legacy_uuid, (Word_t) ctx);
@@ -118,25 +118,25 @@ static METRIC *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, const cha
 // ----------------------------------------------------------------------------
 // metric handle
 
-void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+void rrdeng_metric_release(STORAGE_METRIC_HANDLE *smh) {
+    METRIC *metric = (METRIC *)smh;
     mrg_metric_release(main_mrg, metric);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *smh) {
+    METRIC *metric = (METRIC *)smh;
     return (STORAGE_METRIC_HANDLE *) mrg_metric_dup(main_mrg, metric);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, uuid_t *uuid) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return (STORAGE_METRIC_HANDLE *) mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
 }
 
-static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid) {
-    internal_fatal(!db_instance, "DBENGINE: db_instance is NULL");
+static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, uuid_t *uuid) {
+    internal_fatal(!si, "DBENGINE: STORAGE_INSTANCE is NULL");
 
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     MRG_ENTRY entry = {
             .uuid = uuid,
             .section = (Word_t)ctx,
@@ -149,8 +149,8 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid)
     return metric;
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     METRIC *metric;
 
     metric = mrg_metric_get_and_acquire(main_mrg, &rd->metric_uuid, (Word_t) ctx);
@@ -160,13 +160,13 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
             // this is a single host database
             // generate uuid from the chart and dimensions ids
             // and overwrite the one supplied by rrddim
-            metric = rrdeng_metric_get_legacy(db_instance, rrddim_id(rd), rrdset_id(rd->rrdset));
+            metric = rrdeng_metric_get_legacy(si, rrddim_id(rd), rrdset_id(rd->rrdset));
             if (metric)
                 uuid_copy(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric));
         }
 
         if(likely(!metric))
-            metric = rrdeng_metric_create(db_instance, &rd->metric_uuid);
+            metric = rrdeng_metric_create(si, &rd->metric_uuid);
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -245,8 +245,8 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_store_metric_final().
  */
-STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
+    METRIC *metric = (METRIC *)smh;
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
 
     bool is_1st_metric_writer = true;
@@ -262,7 +262,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     struct rrdeng_collect_handle *handle;
 
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
-    handle->common.backend = STORAGE_ENGINE_BACKEND_DBENGINE;
+    handle->common.seb = STORAGE_ENGINE_BACKEND_DBENGINE;
     handle->metric = metric;
     
     handle->pgc_page = NULL;
@@ -295,8 +295,8 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     return (STORAGE_COLLECT_HANDLE *)handle;
 }
 
-void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
-    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
 
     if (unlikely(!handle->pgc_page))
         return;
@@ -461,7 +461,7 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, siz
     return d;
 }
 
-static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_handle,
+static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
                                              const usec_t point_in_time_ut,
                                              const NETDATA_DOUBLE n,
                                              const NETDATA_DOUBLE min_value,
@@ -470,7 +470,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
                                              const uint16_t anomaly_count,
                                              const SN_FLAGS flags)
 {
-    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     if(unlikely(!handle->page_data))
@@ -497,7 +497,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
         if(unlikely(++handle->page_position >= handle->page_entries_max)) {
             internal_fatal(handle->page_position > handle->page_entries_max, "DBENGINE: exceeded page max number of points");
             handle->page_flags |= RRDENG_PAGE_FULL;
-            rrdeng_store_metric_flush_current_page(collection_handle);
+            rrdeng_store_metric_flush_current_page(sch);
         }
     }
 
@@ -543,7 +543,7 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __m
 #endif
 }
 
-void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
+void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch,
                               const usec_t point_in_time_ut,
                               const NETDATA_DOUBLE n,
                               const NETDATA_DOUBLE min_value,
@@ -554,7 +554,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 {
     timing_step(TIMING_STEP_RRDSET_STORE_METRIC);
 
-    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(point_in_time_ut > (usec_t)max_acceptable_collected_time() * USEC_PER_SEC))
@@ -571,11 +571,11 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         if(handle->pgc_page) {
             if (unlikely(delta_ut < handle->update_every_ut)) {
                 handle->page_flags |= RRDENG_PAGE_STEP_TOO_SMALL;
-                rrdeng_store_metric_flush_current_page(collection_handle);
+                rrdeng_store_metric_flush_current_page(sch);
             }
             else if (unlikely(delta_ut % handle->update_every_ut)) {
                 handle->page_flags |= RRDENG_PAGE_STEP_UNALIGNED;
-                rrdeng_store_metric_flush_current_page(collection_handle);
+                rrdeng_store_metric_flush_current_page(sch);
             }
             else {
                 size_t points_gap = delta_ut / handle->update_every_ut;
@@ -583,7 +583,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 
                 if (points_gap >= page_remaining_points) {
                     handle->page_flags |= RRDENG_PAGE_BIG_GAP;
-                    rrdeng_store_metric_flush_current_page(collection_handle);
+                    rrdeng_store_metric_flush_current_page(sch);
                 }
                 else {
                     // loop to fill the gap
@@ -594,7 +594,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                          this_ut <= stop_ut;
                          this_ut = handle->page_end_time_ut + handle->update_every_ut) {
                         rrdeng_store_metric_append_point(
-                                collection_handle,
+                                sch,
                                 this_ut,
                                 NAN, NAN, NAN,
                                 1, 0,
@@ -618,7 +618,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 
     timing_step(TIMING_STEP_DBENGINE_FIRST_CHECK);
 
-    rrdeng_store_metric_append_point(collection_handle,
+    rrdeng_store_metric_append_point(sch,
                                      point_in_time_ut,
                                      n, min_value, max_value,
                                      count, anomaly_count,
@@ -629,12 +629,12 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
  * Releases the database reference from the handle for storing metrics.
  * Returns 1 if it's safe to delete the dimension.
  */
-int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
-    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch) {
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     handle->page_flags |= RRDENG_PAGE_COLLECT_FINALIZE;
-    rrdeng_store_metric_flush_current_page(collection_handle);
+    rrdeng_store_metric_flush_current_page(sch);
     rrdeng_page_alignment_release(handle->alignment);
 
     __atomic_sub_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
@@ -656,8 +656,8 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     return 0;
 }
 
-void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
-    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
     check_and_fix_mrg_update_every(handle);
 
     METRIC *metric = handle->metric;
@@ -667,7 +667,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
         return;
 
     handle->page_flags |= RRDENG_PAGE_UPDATE_EVERY_CHANGE;
-    rrdeng_store_metric_flush_current_page(collection_handle);
+    rrdeng_store_metric_flush_current_page(sch);
     mrg_metric_set_update_every(main_mrg, metric, update_every);
     handle->update_every_ut = update_every_ut;
 }
@@ -704,8 +704,8 @@ static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_u
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
-                             struct storage_engine_query_handle *rrddim_handle,
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
+                             struct storage_engine_query_handle *seqh,
                              time_t start_time_s,
                              time_t end_time_s,
                              STORAGE_PRIORITY priority)
@@ -714,7 +714,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
 
     netdata_thread_disable_cancelability();
 
-    METRIC *metric = (METRIC *)db_metric_handle;
+    METRIC *metric = (METRIC *)smh;
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
     struct rrdeng_query_handle *handle;
 
@@ -751,11 +751,11 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
             mrg_metric_set_update_every_s_if_zero(main_mrg, metric, default_rrd_update_every);
         }
 
-        rrddim_handle->handle = (STORAGE_QUERY_HANDLE *) handle;
-        rrddim_handle->start_time_s = handle->start_time_s;
-        rrddim_handle->end_time_s = handle->end_time_s;
-        rrddim_handle->priority = priority;
-        rrddim_handle->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
+        seqh->handle = (STORAGE_QUERY_HANDLE *) handle;
+        seqh->start_time_s = handle->start_time_s;
+        seqh->end_time_s = handle->end_time_s;
+        seqh->priority = priority;
+        seqh->seb = STORAGE_ENGINE_BACKEND_DBENGINE;
 
         pg_cache_preload(handle);
 
@@ -767,16 +767,16 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
         handle->now_s = start_time_s;
         handle->dt_s = db_update_every_s;
 
-        rrddim_handle->handle = (STORAGE_QUERY_HANDLE *) handle;
-        rrddim_handle->start_time_s = handle->start_time_s;
-        rrddim_handle->end_time_s = 0;
-        rrddim_handle->priority = priority;
-        rrddim_handle->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
+        seqh->handle = (STORAGE_QUERY_HANDLE *) handle;
+        seqh->start_time_s = handle->start_time_s;
+        seqh->end_time_s = 0;
+        seqh->priority = priority;
+        seqh->seb = STORAGE_ENGINE_BACKEND_DBENGINE;
     }
 }
 
-static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_handle, bool debug_this __maybe_unused) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
+static bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     if (likely(handle->page)) {
@@ -786,7 +786,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
         pgdc_reset(&handle->pgdc, NULL, UINT32_MAX);
     }
 
-    if (unlikely(handle->now_s > rrddim_handle->end_time_s))
+    if (unlikely(handle->now_s > seqh->end_time_s))
         return false;
 
     size_t entries = 0;
@@ -846,11 +846,11 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     STORAGE_POINT sp;
 
-    if (unlikely(handle->now_s > rrddim_handle->end_time_s)) {
+    if (unlikely(handle->now_s > seqh->end_time_s)) {
         storage_point_empty(sp, handle->now_s - handle->dt_s, handle->now_s);
         goto prepare_for_next_iteration;
     }
@@ -858,8 +858,8 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
     if (unlikely(!handle->page || handle->position >= handle->entries)) {
         // We need to get a new page
 
-        if (!rrdeng_load_page_next(rrddim_handle, false)) {
-            handle->now_s = rrddim_handle->end_time_s;
+        if (!rrdeng_load_page_next(seqh, false)) {
+            handle->now_s = seqh->end_time_s;
             storage_point_empty(sp, handle->now_s - handle->dt_s, handle->now_s);
             goto prepare_for_next_iteration;
         }
@@ -871,7 +871,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
     pgdc_get_next_point(&handle->pgdc, handle->position, &sp);
 
 prepare_for_next_iteration:
-    internal_fatal(sp.end_time_s < rrddim_handle->start_time_s, "DBENGINE: this point is too old for this query");
+    internal_fatal(sp.end_time_s < seqh->start_time_s, "DBENGINE: this point is too old for this query");
     internal_fatal(sp.end_time_s < handle->now_s, "DBENGINE: this point is too old for this point in time");
 
     handle->now_s += handle->dt_s;
@@ -880,17 +880,17 @@ prepare_for_next_iteration:
     return sp;
 }
 
-int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
-    return (handle->now_s > rrddim_handle->end_time_s);
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *seqh) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
+    return (handle->now_s > seqh->end_time_s);
 }
 
 /*
  * Releases the database reference from the handle for loading metrics.
  */
-void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle)
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh)
 {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
 
     if (handle->page) {
         pgc_page_release(main_cache, handle->page);
@@ -902,24 +902,24 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_hand
 
     unregister_query_handle(handle);
     rrdeng_query_handle_release(handle);
-    rrddim_handle->handle = NULL;
+    seqh->handle = NULL;
     netdata_thread_enable_cancelability();
 }
 
-time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
+time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
 
     if(handle->pdc) {
         rrdeng_prep_wait(handle->pdc);
-        if (handle->pdc->optimal_end_time_s > rrddim_handle->end_time_s)
-            rrddim_handle->end_time_s = handle->pdc->optimal_end_time_s;
+        if (handle->pdc->optimal_end_time_s > seqh->end_time_s)
+            seqh->end_time_s = handle->pdc->optimal_end_time_s;
     }
 
-    return rrddim_handle->end_time_s;
+    return seqh->end_time_s;
 }
 
-time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh) {
+    METRIC *metric = (METRIC *)smh;
     time_t latest_time_s = 0;
 
     if (metric)
@@ -928,8 +928,8 @@ time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     return latest_time_s;
 }
 
-time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh) {
+    METRIC *metric = (METRIC *)smh;
 
     time_t oldest_time_s = 0;
     if (metric)
@@ -938,9 +938,9 @@ time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     return oldest_time_s;
 }
 
-bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s)
+bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s)
 {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     if (unlikely(!ctx)) {
         netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
@@ -957,18 +957,18 @@ bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_
     return true;
 }
 
-uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return ctx->config.max_disk_space;
 }
 
-uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return __atomic_load_n(&ctx->atomic.current_disk_space, __ATOMIC_RELAXED);
 }
 
-time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
 
     time_t t = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
     if(t == LONG_MAX || t < 0)
@@ -977,8 +977,8 @@ time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance) {
     return t;
 }
 
-size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 }
 
@@ -1099,8 +1099,8 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     netdata_log_info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 
-bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+bool rrdeng_is_legacy(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return ctx->config.legacy;
 }
 

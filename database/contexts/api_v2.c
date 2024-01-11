@@ -1019,10 +1019,10 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             STORAGE_ENGINE *eng = localhost->db[tier].eng;
             if (!eng) continue;
 
-            uint64_t max = storage_engine_disk_space_max(eng->backend, localhost->db[tier].instance);
-            uint64_t used = storage_engine_disk_space_used(eng->backend, localhost->db[tier].instance);
-            time_t first_time_s = storage_engine_global_first_time_s(eng->backend, localhost->db[tier].instance);
-            size_t currently_collected_metrics = storage_engine_collected_metrics(eng->backend, localhost->db[tier].instance);
+            uint64_t max = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
+            uint64_t used = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
+            time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
+            size_t currently_collected_metrics = storage_engine_collected_metrics(eng->seb, localhost->db[tier].si);
 
             NETDATA_DOUBLE percent;
             if (used && max)
