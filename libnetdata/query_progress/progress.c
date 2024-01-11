@@ -369,16 +369,20 @@ int web_api_v2_report_progress(uuid_t *transaction, BUFFER *wb) {
         return HTTP_RESP_NOT_FOUND;
     }
 
-    buffer_json_member_add_uint64(wb, "status", 200);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
 
+    buffer_json_member_add_uint64(wb, "started_ut", qp->started_ut);
     if(qp->finished_ut) {
+        buffer_json_member_add_uint64(wb, "finished_ut", qp->finished_ut);
         buffer_json_member_add_double(wb, "progress", 100.0);
         buffer_json_member_add_uint64(wb, "age_ut", qp->finished_ut - qp->started_ut);
     }
     else {
-        buffer_json_member_add_uint64(wb, "age_ut", now_realtime_usec() - qp->started_ut);
+        usec_t now_ut = now_realtime_usec();
+        buffer_json_member_add_uint64(wb, "now_ut", now_ut);
+        buffer_json_member_add_uint64(wb, "age_ut", now_ut - qp->started_ut);
 
-        if (qp->all)
+        if   (qp->all)
             buffer_json_member_add_double(wb, "progress", (double) qp->done * 100.0 / (double) qp->all);
         else
             buffer_json_member_add_uint64(wb, "working", qp->done);
