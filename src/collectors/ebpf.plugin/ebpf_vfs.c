@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <sys/resource.h>
-
 #include "ebpf.h"
 #include "ebpf_vfs.h"
 
@@ -59,10 +57,6 @@ netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD
                                          {.name = "vfs_create", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "release_task", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
-
-#ifdef NETDATA_DEV_MODE
-int vfs_disable_priority;
-#endif
 
 #ifdef LIBBPF_MAJOR_VERSION
 /**
@@ -168,7 +162,7 @@ static int ebpf_vfs_attach_probe(struct vfs_bpf *obj)
 {
     obj->links.netdata_vfs_write_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_vfs_write_kprobe, false,
                                                                      vfs_targets[NETDATA_EBPF_VFS_WRITE].name);
-    int ret = libbpf_get_error(obj->links.netdata_vfs_write_kprobe);
+    long ret = libbpf_get_error(obj->links.netdata_vfs_write_kprobe);
     if (ret)
         return -1;
 
@@ -890,11 +884,6 @@ static void ebpf_vfs_exit(void *ptr)
 
         ebpf_obsolete_vfs_global(em);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_vfs_pid)
-            ebpf_statistic_obsolete_aral_chart(em, vfs_disable_priority);
-#endif
-
         fflush(stdout);
         pthread_mutex_unlock(&lock);
     }
@@ -1041,8 +1030,9 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_tar
 
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_vfs_t *w = vfs_pid[pid];
-        if (w) {
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+        if (local_pid) {
+            netdata_publish_vfs_t *w = &local_pid->vfs;
             accumulator.write_call += w->write_call;
             accumulator.writev_call += w->writev_call;
             accumulator.read_call += w->read_call;
@@ -1207,28 +1197,9 @@ static void vfs_apps_accumulator(netdata_publish_vfs_t *out, int maps_per_core)
 }
 
 /**
- * Fill PID
- *
- * Fill PID structures
- *
- * @param current_pid pid that we are collecting data
- * @param out         values read from hash tables;
- */
-static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
-{
-    netdata_publish_vfs_t *curr = vfs_pid[current_pid];
-    if (!curr) {
-        curr = ebpf_vfs_get();
-        vfs_pid[current_pid] = curr;
-    }
-
-    memcpy(curr, &publish[0], sizeof(netdata_publish_vfs_t));
-}
-
-/**
  * Read the hash table and store data to allocated vectors.
  */
-static void ebpf_vfs_read_apps(int maps_per_core)
+static void ebpf_vfs_read_apps(int maps_per_core, int max_period)
 {
     netdata_publish_vfs_t *vv = vfs_vector;
     int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
@@ -1244,7 +1215,18 @@ static void ebpf_vfs_read_apps(int maps_per_core)
 
         vfs_apps_accumulator(vv, maps_per_core);
 
-        vfs_fill_pid(key, vv);
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key);
+        if (!local_pid)
+            goto end_vfs_loop;
+
+        netdata_publish_vfs_t *publish = &local_pid->vfs;
+        if (!publish->ct || publish->ct != vv->ct) {
+            memcpy(publish, vv, sizeof(netdata_publish_vfs_t));
+            local_pid->not_updated = 0;
+        } else if (++local_pid->not_updated >= max_period){
+            bpf_map_delete_elem(fd, &key);
+            local_pid->not_updated = 0;
+        }
 
 end_vfs_loop:
         // We are cleaning to avoid passing data read from one process to other.
@@ -1260,32 +1242,20 @@ end_vfs_loop:
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void read_update_vfs_cgroup(int maps_per_core)
+static void read_update_vfs_cgroup()
 {
     ebpf_cgroup_target_t *ect ;
-    netdata_publish_vfs_t *vv = vfs_vector;
-    int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
-    size_t length = sizeof(netdata_publish_vfs_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
-
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_vfs_t *out = &pids->vfs;
-            if (likely(vfs_pid) && vfs_pid[pid]) {
-                netdata_publish_vfs_t *in = vfs_pid[pid];
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+            if (local_pid) {
+                netdata_publish_vfs_t *in = &local_pid->vfs;
 
                 memcpy(out, in, sizeof(netdata_publish_vfs_t));
-            } else {
-                memset(vv, 0, length);
-                if (!bpf_map_lookup_elem(fd, &pid, vv)) {
-                    vfs_apps_accumulator(vv, maps_per_core);
-
-                    memcpy(out, vv, sizeof(netdata_publish_vfs_t));
-                }
             }
         }
     }
@@ -1923,6 +1893,7 @@ static void vfs_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
+    int max_period = update_every * EBPF_CLEANUP_FACTOR;
     while (!ebpf_plugin_exit && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_plugin_exit || ++counter != update_every)
@@ -1933,17 +1904,12 @@ static void vfs_collector(ebpf_module_t *em)
         ebpf_vfs_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
-            ebpf_vfs_read_apps(maps_per_core);
+            ebpf_vfs_read_apps(maps_per_core, max_period);
 
         if (cgroups)
-            read_update_vfs_cgroup(maps_per_core);
+            read_update_vfs_cgroup();
 
         pthread_mutex_lock(&lock);
-
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_vfs_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_vfs_pid, em);
-#endif
 
         ebpf_vfs_send_data(em);
         fflush(stdout);
@@ -2382,13 +2348,9 @@ void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  *  @param apps is apps enabled?
  */
-static void ebpf_vfs_allocate_global_vectors(int apps)
+static void ebpf_vfs_allocate_global_vectors()
 {
-    if (apps) {
-        ebpf_vfs_aral_init();
-        vfs_pid = callocz((size_t)pid_max, sizeof(netdata_publish_vfs_t *));
-        vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
-    }
+    vfs_vector = callocz(ebpf_nprocs, sizeof(netdata_publish_vfs_t));
 
     memset(vfs_aggregated_data, 0, sizeof(vfs_aggregated_data));
     memset(vfs_publish_aggregated, 0, sizeof(vfs_publish_aggregated));
@@ -2454,7 +2416,7 @@ void *ebpf_vfs_thread(void *ptr)
 
     ebpf_update_pid_table(&vfs_maps[NETDATA_VFS_PID], em);
 
-    ebpf_vfs_allocate_global_vectors(em->apps_charts);
+    ebpf_vfs_allocate_global_vectors();
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
@@ -2475,10 +2437,6 @@ void *ebpf_vfs_thread(void *ptr)
     ebpf_create_global_charts(em);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_vfs_pid)
-        vfs_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_VFS_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 

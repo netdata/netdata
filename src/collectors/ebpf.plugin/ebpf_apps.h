@@ -143,6 +143,7 @@ typedef struct ebpf_pid_stat {
     netdata_publish_shm_t shm;
     netdata_publish_swap_t swap;
     ebpf_socket_publish_apps_t socket;
+    netdata_publish_vfs_t vfs;
 
     int not_updated;
 
@@ -218,8 +219,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest);
 
 void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core);
 void ebpf_process_apps_accumulator(ebpf_process_stat_t *out, int maps_per_core);
-
-extern netdata_publish_vfs_t **vfs_pid;
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
 // this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/src/libnetdata/aral).

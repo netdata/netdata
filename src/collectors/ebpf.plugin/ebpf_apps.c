@@ -7,11 +7,6 @@
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
 ARAL *ebpf_aral_apps_pid_stat = NULL;
-ARAL *ebpf_aral_vfs_pid = NULL;
-
-// ----------------------------------------------------------------------------
-// Global vectors used with apps
-netdata_publish_vfs_t **vfs_pid = NULL;
 
 /**
  * eBPF ARAL Init
@@ -55,46 +50,6 @@ struct ebpf_pid_stat *ebpf_pid_stat_get(void)
 void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
 {
     aral_freez(ebpf_aral_apps_pid_stat, stat);
-}
-
-/*****************************************************************
- *
- *  VFS ARAL FUNCTIONS
- *
- *****************************************************************/
-
-/**
- * eBPF VFS Aral init
- *
- * Initiallize array allocator that will be used when integration with apps is enabled.
- */
-void ebpf_vfs_aral_init()
-{
-    ebpf_aral_vfs_pid = ebpf_allocate_pid_aral(NETDATA_EBPF_VFS_ARAL_NAME, sizeof(netdata_publish_vfs_t));
-}
-
-/**
- * eBPF publish VFS get
- *
- * Get a netdata_publish_vfs_t entry to be used with a specific PID.
- *
- * @return it returns the address on success.
- */
-netdata_publish_vfs_t *ebpf_vfs_get(void)
-{
-    netdata_publish_vfs_t *target = aral_mallocz(ebpf_aral_vfs_pid);
-    memset(target, 0, sizeof(netdata_publish_vfs_t));
-    return target;
-}
-
-/**
- * eBPF VFS release
- *
- * @param stat Release a target after usage.
- */
-void ebpf_vfs_release(netdata_publish_vfs_t *stat)
-{
-    aral_freez(ebpf_aral_vfs_pid, stat);
 }
 
 // ----------------------------------------------------------------------------
@@ -988,20 +943,6 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
 }
 
 /**
- * Cleanup variable from other threads
- *
- * @param pid current pid.
- */
-void cleanup_variables_from_other_threads(uint32_t pid)
-{
-    // Clean vfs structure
-    if (vfs_pid) {
-        ebpf_vfs_release(vfs_pid[pid]);
-        vfs_pid[pid] = NULL;
-    }
-}
-
-/**
  * Remove PIDs when they are not running more.
  */
 void cleanup_exited_pids()
@@ -1015,8 +956,6 @@ void cleanup_exited_pids()
 
             pid_t r = p->pid;
             p = p->next;
-
-            cleanup_variables_from_other_threads(r);
 
             del_pid_entry(r);
         } else {
