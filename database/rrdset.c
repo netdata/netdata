@@ -888,7 +888,7 @@ void rrdset_reset(RRDSET *st) {
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             for(size_t tier = 0; tier < storage_tiers ;tier++)
-                storage_engine_store_flush(rd->tiers[tier].db_collection_handle);
+                storage_engine_store_flush(rd->tiers[tier].sch);
         }
     }
     rrddim_foreach_done(rd);
@@ -1267,7 +1267,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         if (likely(!storage_point_is_unset(t->virtual_point))) {
 
             storage_engine_store_metric(
-                t->db_collection_handle,
+                t->sch,
                 t->next_point_end_time_s * USEC_PER_SEC,
                 t->virtual_point.sum,
                 t->virtual_point.min,
@@ -1278,7 +1278,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         }
         else {
             storage_engine_store_metric(
-                t->db_collection_handle,
+                t->sch,
                 t->next_point_end_time_s * USEC_PER_SEC,
                 NAN,
                 NAN,
@@ -1357,7 +1357,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 #endif // NETDATA_LOG_COLLECTION_ERRORS
 
     // store the metric on tier 0
-    storage_engine_store_metric(rd->tiers[0].db_collection_handle, point_end_time_ut,
+    storage_engine_store_metric(rd->tiers[0].sch, point_end_time_ut,
                                 n, 0, 0,
                                 1, 0, flags);
 
@@ -2140,9 +2140,9 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            if (rd->tiers[tier].db_collection_handle)
+            if (rd->tiers[tier].sch)
                 storage_engine_store_change_collection_frequency(
-                        rd->tiers[tier].db_collection_handle,
+                        rd->tiers[tier].sch,
                         (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
     }

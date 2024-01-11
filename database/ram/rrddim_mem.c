@@ -127,11 +127,11 @@ bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, uuid_t
     return true;
 }
 
-void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
-    struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+    struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 
-    rrddim_store_metric_flush(collection_handle);
+    rrddim_store_metric_flush(sch);
     mh->update_every_s = update_every;
 }
 
@@ -152,8 +152,8 @@ STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *smh, uint32_t
     return (STORAGE_COLLECT_HANDLE *)ch;
 }
 
-void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
-    struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
+void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *sch) {
+    struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 
     RRDDIM *rd = mh->rd;
@@ -168,8 +168,8 @@ void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
     mh->current_entry = 0;
 }
 
-static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *collection_handle, time_t now_collect_s) {
-    struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
+static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *sch, time_t now_collect_s) {
+    struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 
     RRDDIM *rd = mh->rd;
@@ -182,7 +182,7 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *collection_handle
     time_t last_stored_s = mh->last_updated_s;
     size_t gap_entries = (now_collect_s - last_stored_s) / update_every_s;
     if(gap_entries >= entries)
-        rrddim_store_metric_flush(collection_handle);
+        rrddim_store_metric_flush(sch);
 
     else {
         storage_number empty = pack_storage_number(NAN, SN_FLAG_NONE);
@@ -203,7 +203,7 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *collection_handle
     }
 }
 
-void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle,
+void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *sch,
                                  usec_t point_in_time_ut,
                                  NETDATA_DOUBLE n,
                                  NETDATA_DOUBLE min_value __maybe_unused,
@@ -212,7 +212,7 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle,
                                  uint16_t anomaly_count __maybe_unused,
                                  SN_FLAGS flags)
 {
-    struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
+    struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 
     RRDDIM *rd = ch->rd;
@@ -225,7 +225,7 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle,
         return;
 
     if(unlikely(mh->last_updated_s && point_in_time_s - mh->update_every_s > mh->last_updated_s))
-        rrddim_fill_the_gap(collection_handle, point_in_time_s);
+        rrddim_fill_the_gap(sch, point_in_time_s);
 
     rd->db.data[mh->current_entry] = pack_storage_number(n, flags);
     mh->counter++;
@@ -233,8 +233,8 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle,
     mh->last_updated_s = point_in_time_s;
 }
 
-int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
-    freez(collection_handle);
+int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch) {
+    freez(sch);
     __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_collect_handle), __ATOMIC_RELAXED);
     return 0;
 }

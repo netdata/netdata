@@ -120,7 +120,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier].smh) {
-                rd->tiers[tier].db_collection_handle =
+                rd->tiers[tier].sch =
                         storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
                 initialized++;
             }
@@ -176,15 +176,15 @@ bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
     size_t tiers_available = 0, tiers_said_no_retention = 0;
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(!rd->tiers[tier].db_collection_handle)
+        if(!rd->tiers[tier].sch)
             continue;
 
         tiers_available++;
 
-        if(storage_engine_store_finalize(rd->tiers[tier].db_collection_handle))
+        if(storage_engine_store_finalize(rd->tiers[tier].sch))
             tiers_said_no_retention++;
 
-        rd->tiers[tier].db_collection_handle = NULL;
+        rd->tiers[tier].sch = NULL;
     }
 
     // return true if the dimension has retention in the db
@@ -257,8 +257,8 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rc += rrddim_set_divisor(st, rd, ctr->divisor);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if (!rd->tiers[tier].db_collection_handle)
-            rd->tiers[tier].db_collection_handle =
+        if (!rd->tiers[tier].sch)
+            rd->tiers[tier].sch =
                     storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
     }
 

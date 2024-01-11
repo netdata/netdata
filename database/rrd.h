@@ -283,7 +283,7 @@ struct rrddim_tier {
     uint32_t tier_grouping;
     time_t next_point_end_time_s;
     STORAGE_METRIC_HANDLE *smh;                     // the metric handle inside the database
-    STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
+    STORAGE_COLLECT_HANDLE *sch;   // the data collection handle
 };
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
@@ -438,28 +438,28 @@ static inline STORAGE_COLLECT_HANDLE *storage_metric_store_init(STORAGE_ENGINE_B
 }
 
 void rrdeng_store_metric_next(
-        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
         NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
         uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
 
 void rrddim_collect_store_metric(
-        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
         NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
         uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
 
 static inline void storage_engine_store_metric(
-        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
         NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
         uint16_t count, uint16_t anomaly_count, SN_FLAGS flags) {
-    internal_fatal(!is_valid_backend(collection_handle->seb), "STORAGE: invalid backend");
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_next(collection_handle, point_in_time_ut,
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_next(sch, point_in_time_ut,
                                         n, min_value, max_value,
                                         count, anomaly_count, flags);
 #endif
-    return rrddim_collect_store_metric(collection_handle, point_in_time_ut,
+    return rrddim_collect_store_metric(sch, point_in_time_ut,
                                        n, min_value, max_value,
                                        count, anomaly_count, flags);
 }
@@ -506,48 +506,48 @@ static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND seb
     return 0;
 }
 
-void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
-void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle);
-static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
-    if(unlikely(!collection_handle))
+void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch);
+void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *sch);
+static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
+    if(unlikely(!sch))
         return;
 
-    internal_fatal(!is_valid_backend(collection_handle->seb), "STORAGE: invalid backend");
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_store_metric_flush_current_page(collection_handle);
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_store_metric_flush_current_page(sch);
     else
 #endif
-        rrddim_store_metric_flush(collection_handle);
+        rrddim_store_metric_flush(sch);
 }
 
-int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
-int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
+int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch);
+int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch);
 // a finalization function to run after collection is over
 // returns 1 if it's safe to delete the dimension
-static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
-    internal_fatal(!is_valid_backend(collection_handle->seb), "STORAGE: invalid backend");
+static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_finalize(collection_handle);
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_finalize(sch);
 #endif
 
-    return rrddim_collect_finalize(collection_handle);
+    return rrddim_collect_finalize(sch);
 }
 
-void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
-void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
-static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
-    internal_fatal(!is_valid_backend(collection_handle->seb), "STORAGE: invalid backend");
+void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
+static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_store_metric_change_collection_frequency(collection_handle, update_every);
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_store_metric_change_collection_frequency(sch, update_every);
     else
 #endif
-        rrddim_store_metric_change_collection_frequency(collection_handle, update_every);
+        rrddim_store_metric_change_collection_frequency(sch, update_every);
 }
 
 
