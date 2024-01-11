@@ -866,7 +866,7 @@ static inline void post_aggregate_targets(struct ebpf_target *root)
  *
  * @param pid the PID that will be removed.
  */
-static inline void del_pid_entry(pid_t pid)
+static inline void ebpf_del_pid_entry(pid_t pid)
 {
     struct ebpf_pid_stat *p = ebpf_all_pids[pid];
 
@@ -945,25 +945,26 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
 /**
  * Remove PIDs when they are not running more.
  */
-void cleanup_exited_pids()
+void ebpf_cleanup_exited_pids(int max)
 {
     struct ebpf_pid_stat *p = NULL;
 
     for (p = ebpf_root_of_pids; p;) {
-        if (!p->updated && (!p->keep || p->keeploops > 0)) {
+        if (p->not_updated > max) {
             if (unlikely(debug_enabled && (p->keep || p->keeploops)))
                 debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
 
             pid_t r = p->pid;
             p = p->next;
 
-            del_pid_entry(r);
-        } else {
+            ebpf_del_pid_entry(r);
+        }/* else {
             if (unlikely(p->keep))
                 p->keeploops++;
             p->keep = 0;
             p = p->next;
-        }
+        } */
+        p = p->next;
     }
 }
 
