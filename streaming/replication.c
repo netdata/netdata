@@ -162,7 +162,7 @@ static struct replication_query *replication_query_prepare(
         }
     }
 
-    q->backend = st->rrdhost->db[0].eng->backend;
+    q->backend = st->rrdhost->db[0].eng->seb;
 
     // prepare our array of dimensions
     size_t count = 0;
@@ -184,7 +184,7 @@ static struct replication_query *replication_query_prepare(
         d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
         d->rd = rd;
 
-        storage_engine_query_init(q->backend, rd->tiers[0].db_metric_handle, &d->handle, q->query.after, q->query.before,
+        storage_engine_query_init(q->backend, rd->tiers[0].smh, &d->handle, q->query.after, q->query.before,
                      q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW);
         d->enabled = true;
         d->skip = false;

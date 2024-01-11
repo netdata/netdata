@@ -10,7 +10,7 @@ static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_NONE,
         .name = RRD_MEMORY_MODE_NONE_NAME,
-        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
+        .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -22,7 +22,7 @@ static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_RAM,
         .name = RRD_MEMORY_MODE_RAM_NAME,
-        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
+        .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -34,7 +34,7 @@ static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_MAP,
         .name = RRD_MEMORY_MODE_MAP_NAME,
-        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
+        .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -46,7 +46,7 @@ static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_SAVE,
         .name = RRD_MEMORY_MODE_SAVE_NAME,
-        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
+        .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -58,7 +58,7 @@ static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_ALLOC,
         .name = RRD_MEMORY_MODE_ALLOC_NAME,
-        .backend = STORAGE_ENGINE_BACKEND_RRDDIM,
+        .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
         .api = {
             .metric_get = rrddim_metric_get,
             .metric_get_or_create = rrddim_metric_get_or_create,
@@ -71,7 +71,7 @@ static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_MEMORY_MODE_DBENGINE,
         .name = RRD_MEMORY_MODE_DBENGINE_NAME,
-        .backend = STORAGE_ENGINE_BACKEND_DBENGINE,
+        .seb = STORAGE_ENGINE_BACKEND_DBENGINE,
         .api = {
             .metric_get = rrdeng_metric_get,
             .metric_get_or_create = rrdeng_metric_get_or_create,

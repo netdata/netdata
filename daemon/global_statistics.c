@@ -2560,9 +2560,9 @@ static void dbengine2_statistics_charts(void) {
                 /* get localhost's DB engine's statistics for each tier */
                 for(size_t tier = 0; tier < storage_tiers ;tier++) {
                     if(host->db[tier].mode != RRD_MEMORY_MODE_DBENGINE) continue;
-                    if(!host->db[tier].instance) continue;
+                    if(!host->db[tier].si) continue;
 
-                    if(is_storage_engine_shared(host->db[tier].instance)) {
+                    if(is_storage_engine_shared(host->db[tier].si)) {
                         if(counted_multihost_db[tier])
                             continue;
                         else
@@ -2570,7 +2570,7 @@ static void dbengine2_statistics_charts(void) {
                     }
 
                     ++dbengine_contexts;
-                    rrdeng_get_37_statistics((struct rrdengine_instance *)host->db[tier].instance, local_stats_array);
+                    rrdeng_get_37_statistics((struct rrdengine_instance *)host->db[tier].si, local_stats_array);
                     for (i = 0; i < RRDENG_NR_STATS; ++i) {
                         /* aggregate statistics across hosts */
                         stats_array[i] += local_stats_array[i];

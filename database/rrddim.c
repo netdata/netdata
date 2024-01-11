@@ -99,9 +99,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for(size_t tier = 0; tier < storage_tiers ; tier++) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
-            rd->tiers[tier].backend = eng->backend;
+            rd->tiers[tier].seb = eng->seb;
             rd->tiers[tier].tier_grouping = host->db[tier].tier_grouping;
-            rd->tiers[tier].db_metric_handle = eng->api.metric_get_or_create(rd, host->db[tier].instance);
+            rd->tiers[tier].smh = eng->api.metric_get_or_create(rd, host->db[tier].si);
             storage_point_unset(rd->tiers[tier].virtual_point);
             initialized++;
 
@@ -111,7 +111,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         if(!initialized)
             netdata_log_error("Failed to initialize all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
 
-        if(!rd->tiers[0].db_metric_handle)
+        if(!rd->tiers[0].smh)
             netdata_log_error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
@@ -119,9 +119,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     {
         size_t initialized = 0;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            if (rd->tiers[tier].db_metric_handle) {
-                rd->tiers[tier].db_collection_handle =
-                        storage_metric_store_init(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
+            if (rd->tiers[tier].smh) {
+                rd->tiers[tier].sch =
+                        storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
                 initialized++;
             }
         }
@@ -176,15 +176,15 @@ bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
     size_t tiers_available = 0, tiers_said_no_retention = 0;
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(!rd->tiers[tier].db_collection_handle)
+        if(!rd->tiers[tier].sch)
             continue;
 
         tiers_available++;
 
-        if(storage_engine_store_finalize(rd->tiers[tier].db_collection_handle))
+        if(storage_engine_store_finalize(rd->tiers[tier].sch))
             tiers_said_no_retention++;
 
-        rd->tiers[tier].db_collection_handle = NULL;
+        rd->tiers[tier].sch = NULL;
     }
 
     // return true if the dimension has retention in the db
@@ -222,11 +222,11 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrddim_memory_file_free(rd);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(!rd->tiers[tier].db_metric_handle) continue;
+        if(!rd->tiers[tier].smh) continue;
 
         STORAGE_ENGINE* eng = host->db[tier].eng;
-        eng->api.metric_release(rd->tiers[tier].db_metric_handle);
-        rd->tiers[tier].db_metric_handle = NULL;
+        eng->api.metric_release(rd->tiers[tier].smh);
+        rd->tiers[tier].smh = NULL;
     }
 
     if(rd->db.data) {
@@ -257,9 +257,9 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rc += rrddim_set_divisor(st, rd, ctr->divisor);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if (!rd->tiers[tier].db_collection_handle)
-            rd->tiers[tier].db_collection_handle =
-                    storage_metric_store_init(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
+        if (!rd->tiers[tier].sch)
+            rd->tiers[tier].sch =
+                    storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
     }
 
     if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
@@ -420,10 +420,10 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
 // ----------------------------------------------------------------------------
 
 time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
-    if(unlikely(tier > storage_tiers || !rd->tiers[tier].db_metric_handle))
+    if(unlikely(tier > storage_tiers || !rd->tiers[tier].smh))
         return 0;
 
-    return storage_engine_latest_time_s(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle);
+    return storage_engine_latest_time_s(rd->tiers[tier].seb, rd->tiers[tier].smh);
 }
 
 // get the timestamp of the last entry in the round-robin database
@@ -431,7 +431,7 @@ time_t rrddim_last_entry_s(RRDDIM *rd) {
     time_t latest_time_s = rrddim_last_entry_s_of_tier(rd, 0);
 
     for(size_t tier = 1; tier < storage_tiers ;tier++) {
-        if(unlikely(!rd->tiers[tier].db_metric_handle)) continue;
+        if(unlikely(!rd->tiers[tier].smh)) continue;
 
         time_t t = rrddim_last_entry_s_of_tier(rd, tier);
         if(t > latest_time_s)
@@ -442,10 +442,10 @@ time_t rrddim_last_entry_s(RRDDIM *rd) {
 }
 
 time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
-    if(unlikely(tier > storage_tiers || !rd->tiers[tier].db_metric_handle))
+    if(unlikely(tier > storage_tiers || !rd->tiers[tier].smh))
         return 0;
 
-    return storage_engine_oldest_time_s(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle);
+    return storage_engine_oldest_time_s(rd->tiers[tier].seb, rd->tiers[tier].smh);
 }
 
 time_t rrddim_first_entry_s(RRDDIM *rd) {

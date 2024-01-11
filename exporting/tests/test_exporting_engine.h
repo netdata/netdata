@@ -55,9 +55,9 @@ int __wrap_connect_to_one_of(
     size_t *reconnects_counter,
     char *connected_to,
     size_t connected_to_size);
-time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
-time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
-void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *smh);
+time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *smh);
+void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle);
 STORAGE_POINT __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle);
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle);

@@ -134,7 +134,7 @@ struct storage_engine_query_handle {
     time_t start_time_s;
     time_t end_time_s;
     STORAGE_PRIORITY priority;
-    STORAGE_ENGINE_BACKEND backend;
+    STORAGE_ENGINE_BACKEND seb;
     STORAGE_QUERY_HANDLE *handle;
 };
 
@@ -271,7 +271,7 @@ typedef enum __attribute__ ((__packed__)) rrddim_flags {
 // ----------------------------------------------------------------------------
 // engine-specific iterator state for dimension data collection
 typedef struct storage_collect_handle {
-    STORAGE_ENGINE_BACKEND backend;
+    STORAGE_ENGINE_BACKEND seb;
 } STORAGE_COLLECT_HANDLE;
 
 // ----------------------------------------------------------------------------
@@ -279,11 +279,11 @@ typedef struct storage_collect_handle {
 
 struct rrddim_tier {
     STORAGE_POINT virtual_point;
-    STORAGE_ENGINE_BACKEND backend;
+    STORAGE_ENGINE_BACKEND seb;
     uint32_t tier_grouping;
     time_t next_point_end_time_s;
-    STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
-    STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
+    STORAGE_METRIC_HANDLE *smh;                     // the metric handle inside the database
+    STORAGE_COLLECT_HANDLE *sch;   // the data collection handle
 };
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
@@ -400,268 +400,268 @@ void rrddim_memory_file_save(RRDDIM *rd);
 // ------------------------------------------------------------------------
 // DATA COLLECTION STORAGE OPS
 
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance, uuid_t *uuid) {
-    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, uuid_t *uuid);
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, uuid_t *uuid);
+static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, uuid_t *uuid) {
+    internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_metrics_group_get(db_instance, uuid);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_metrics_group_get(si, uuid);
 #endif
-    return rrddim_metrics_group_get(db_instance, uuid);
+    return rrddim_metrics_group_get(si, uuid);
 }
 
-void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
-void rrddim_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
-static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg) {
-    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+void rrdeng_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);
+void rrddim_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);
+static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg) {
+    internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_metrics_group_release(db_instance, smg);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_metrics_group_release(si, smg);
     else
 #endif
-        rrddim_metrics_group_release(db_instance, smg);
+        rrddim_metrics_group_release(si, smg);
 }
 
-STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
-STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
-static inline STORAGE_COLLECT_HANDLE *storage_metric_store_init(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
-    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
+STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
+static inline STORAGE_COLLECT_HANDLE *storage_metric_store_init(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
+    internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_init(db_metric_handle, update_every, smg);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_init(smh, update_every, smg);
 #endif
-    return rrddim_collect_init(db_metric_handle, update_every, smg);
+    return rrddim_collect_init(smh, update_every, smg);
 }
 
 void rrdeng_store_metric_next(
-        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
         NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
         uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
 
 void rrddim_collect_store_metric(
-        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
         NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
         uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
 
 static inline void storage_engine_store_metric(
-        STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut,
+        STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
         NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
         uint16_t count, uint16_t anomaly_count, SN_FLAGS flags) {
-    internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_next(collection_handle, point_in_time_ut,
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_next(sch, point_in_time_ut,
                                         n, min_value, max_value,
                                         count, anomaly_count, flags);
 #endif
-    return rrddim_collect_store_metric(collection_handle, point_in_time_ut,
+    return rrddim_collect_store_metric(sch, point_in_time_ut,
                                        n, min_value, max_value,
                                        count, anomaly_count, flags);
 }
 
-uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
-static inline uint64_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *si);
+static inline uint64_t storage_engine_disk_space_max(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_disk_space_max(db_instance);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_max(si);
 #endif
 
     return 0;
 }
 
-uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
-static inline uint64_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *si);
+static inline uint64_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_disk_space_used(db_instance);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_disk_space_used(si);
 #endif
 
     // TODO - calculate the total host disk space for memory mode save and map
     return 0;
 }
 
-time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance);
-static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *si);
+static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_global_first_time_s(db_instance);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_global_first_time_s(si);
 #endif
 
     return now_realtime_sec() - (time_t)(default_rrd_history_entries * default_rrd_update_every);
 }
 
-size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance);
-static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_INSTANCE *db_instance __maybe_unused) {
+size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *si);
+static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_currently_collected_metrics(db_instance);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_currently_collected_metrics(si);
 #endif
 
     // TODO - calculate the total host disk space for memory mode save and map
     return 0;
 }
 
-void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle);
-void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle);
-static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
-    if(unlikely(!collection_handle))
+void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch);
+void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *sch);
+static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
+    if(unlikely(!sch))
         return;
 
-    internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_store_metric_flush_current_page(collection_handle);
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_store_metric_flush_current_page(sch);
     else
 #endif
-        rrddim_store_metric_flush(collection_handle);
+        rrddim_store_metric_flush(sch);
 }
 
-int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
-int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
+int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch);
+int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch);
 // a finalization function to run after collection is over
 // returns 1 if it's safe to delete the dimension
-static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
-    internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
+static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_finalize(collection_handle);
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_finalize(sch);
 #endif
 
-    return rrddim_collect_finalize(collection_handle);
+    return rrddim_collect_finalize(sch);
 }
 
-void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
-void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
-static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
-    internal_fatal(!is_valid_backend(collection_handle->backend), "STORAGE: invalid backend");
+void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
+static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(collection_handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_store_metric_change_collection_frequency(collection_handle, update_every);
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_store_metric_change_collection_frequency(sch, update_every);
     else
 #endif
-        rrddim_store_metric_change_collection_frequency(collection_handle, update_every);
+        rrddim_store_metric_change_collection_frequency(sch, update_every);
 }
 
 
 // ----------------------------------------------------------------------------
 // STORAGE ENGINE QUERY OPS
 
-time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
-time_t rrddim_query_oldest_time_s(STORAGE_METRIC_HANDLE *db_metric_handle);
-static inline time_t storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND backend  __maybe_unused, STORAGE_METRIC_HANDLE *db_metric_handle) {
-    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh);
+time_t rrddim_query_oldest_time_s(STORAGE_METRIC_HANDLE *smh);
+static inline time_t storage_engine_oldest_time_s(STORAGE_ENGINE_BACKEND seb  __maybe_unused, STORAGE_METRIC_HANDLE *smh) {
+    internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_metric_oldest_time(db_metric_handle);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_metric_oldest_time(smh);
 #endif
-    return rrddim_query_oldest_time_s(db_metric_handle);
+    return rrddim_query_oldest_time_s(smh);
 }
 
-time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
-time_t rrddim_query_latest_time_s(STORAGE_METRIC_HANDLE *db_metric_handle);
-static inline time_t storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND backend __maybe_unused, STORAGE_METRIC_HANDLE *db_metric_handle) {
-    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh);
+time_t rrddim_query_latest_time_s(STORAGE_METRIC_HANDLE *smh);
+static inline time_t storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_METRIC_HANDLE *smh) {
+    internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_metric_latest_time(db_metric_handle);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_metric_latest_time(smh);
 #endif
-    return rrddim_query_latest_time_s(db_metric_handle);
+    return rrddim_query_latest_time_s(smh);
 }
 
 void rrdeng_load_metric_init(
-        STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrddim_handle,
+        STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
                 time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 
 void rrddim_query_init(
-        STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle,
+        STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
                 time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 
 static inline void storage_engine_query_init(
-        STORAGE_ENGINE_BACKEND backend __maybe_unused,
-        STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle,
+        STORAGE_ENGINE_BACKEND seb __maybe_unused,
+        STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
                 time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority) {
-    internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
+    internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_load_metric_init(db_metric_handle, handle, start_time_s, end_time_s, priority);
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_load_metric_init(smh, seqh, start_time_s, end_time_s, priority);
     else
 #endif
-        rrddim_query_init(db_metric_handle, handle, start_time_s, end_time_s, priority);
+        rrddim_query_init(smh, seqh, start_time_s, end_time_s, priority);
 }
 
-STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
-STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handle);
-static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_query_handle *handle) {
-    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh);
+STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *seqh);
+static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_query_handle *seqh) {
+    internal_fatal(!is_valid_backend(seqh->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_load_metric_next(handle);
+    if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_metric_next(seqh);
 #endif
-    return rrddim_query_next_metric(handle);
+    return rrddim_query_next_metric(seqh);
 }
 
-int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle);
-int rrddim_query_is_finished(struct storage_engine_query_handle *handle);
-static inline int storage_engine_query_is_finished(struct storage_engine_query_handle *handle) {
-    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *seqh);
+int rrddim_query_is_finished(struct storage_engine_query_handle *seqh);
+static inline int storage_engine_query_is_finished(struct storage_engine_query_handle *seqh) {
+    internal_fatal(!is_valid_backend(seqh->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_load_metric_is_finished(handle);
+    if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_metric_is_finished(seqh);
 #endif
-    return rrddim_query_is_finished(handle);
+    return rrddim_query_is_finished(seqh);
 }
 
-void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle);
-void rrddim_query_finalize(struct storage_engine_query_handle *handle);
-static inline void storage_engine_query_finalize(struct storage_engine_query_handle *handle) {
-    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh);
+void rrddim_query_finalize(struct storage_engine_query_handle *seqh);
+static inline void storage_engine_query_finalize(struct storage_engine_query_handle *seqh) {
+    internal_fatal(!is_valid_backend(seqh->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_load_metric_finalize(handle);
+    if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_load_metric_finalize(seqh);
     else
 #endif
-        rrddim_query_finalize(handle);
+        rrddim_query_finalize(seqh);
 }
 
-time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
-time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
-static inline time_t storage_engine_align_to_optimal_before(struct storage_engine_query_handle *handle) {
-    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh);
+time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *seqh);
+static inline time_t storage_engine_align_to_optimal_before(struct storage_engine_query_handle *seqh) {
+    internal_fatal(!is_valid_backend(seqh->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_load_align_to_optimal_before(handle);
+    if(likely(seqh->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_align_to_optimal_before(seqh);
 #endif
-    return rrddim_query_align_to_optimal_before(handle);
+    return rrddim_query_align_to_optimal_before(seqh);
 }
 
 // ------------------------------------------------------------------------
 // function pointers for all APIs provided by a storage engine
 typedef struct storage_engine_api {
     // metric management
-    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *instance, uuid_t *uuid);
-    STORAGE_METRIC_HANDLE *(*metric_get_or_create)(RRDDIM *rd, STORAGE_INSTANCE *instance);
+    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *si, uuid_t *uuid);
+    STORAGE_METRIC_HANDLE *(*metric_get_or_create)(RRDDIM *rd, STORAGE_INSTANCE *si);
     void (*metric_release)(STORAGE_METRIC_HANDLE *);
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
-    bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *db_instance, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
+    bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *si, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
 } STORAGE_ENGINE_API;
 
 typedef struct storage_engine {
-    STORAGE_ENGINE_BACKEND backend;
+    STORAGE_ENGINE_BACKEND seb;
     RRD_MEMORY_MODE id;
     const char* name;
     STORAGE_ENGINE_API api;
@@ -779,7 +779,7 @@ struct rrdset {
 
     rrd_ml_chart_t *ml_chart;
 
-    STORAGE_METRICS_GROUP *storage_metrics_groups[RRD_STORAGE_TIERS];
+    STORAGE_METRICS_GROUP *smg[RRD_STORAGE_TIERS];
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents
@@ -1223,7 +1223,7 @@ struct rrdhost {
     struct {
         RRD_MEMORY_MODE mode;                       // the db mode for this tier
         STORAGE_ENGINE *eng;                        // the storage engine API for this tier
-        STORAGE_INSTANCE *instance;                 // the db instance for this tier
+        STORAGE_INSTANCE *si;                       // the db instance for this tier
         uint32_t tier_grouping;                     // tier 0 iterations aggregated on this tier
     } db[RRD_STORAGE_TIERS];
 
@@ -1417,7 +1417,7 @@ extern netdata_rwlock_t rrd_rwlock;
 
 // ----------------------------------------------------------------------------
 
-bool is_storage_engine_shared(STORAGE_INSTANCE *engine);
+bool is_storage_engine_shared(STORAGE_INSTANCE *si);
 void rrdset_index_init(RRDHOST *host);
 void rrdset_index_destroy(RRDHOST *host);
 
