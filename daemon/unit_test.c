@@ -1977,7 +1977,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                storage_engine_query_init(rd[i][j]->tiers[0].backend, rd[i][j]->tiers[0].db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
+                storage_engine_query_init(rd[i][j]->tiers[0].backend, rd[i][j]->tiers[0].smh, &handle, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
@@ -2445,7 +2445,7 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        storage_engine_query_init(rd->tiers[0].backend, rd->tiers[0].db_metric_handle, &handle, time_after, time_before, STORAGE_PRIORITY_NORMAL);
+        storage_engine_query_init(rd->tiers[0].backend, rd->tiers[0].smh, &handle, time_after, time_before, STORAGE_PRIORITY_NORMAL);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);

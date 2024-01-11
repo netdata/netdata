@@ -118,13 +118,13 @@ static METRIC *rrdeng_metric_get_legacy(STORAGE_INSTANCE *si, const char *rd_id,
 // ----------------------------------------------------------------------------
 // metric handle
 
-void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+void rrdeng_metric_release(STORAGE_METRIC_HANDLE *smh) {
+    METRIC *metric = (METRIC *)smh;
     mrg_metric_release(main_mrg, metric);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *smh) {
+    METRIC *metric = (METRIC *)smh;
     return (STORAGE_METRIC_HANDLE *) mrg_metric_dup(main_mrg, metric);
 }
 
@@ -245,8 +245,8 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_store_metric_final().
  */
-STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
+    METRIC *metric = (METRIC *)smh;
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
 
     bool is_1st_metric_writer = true;
@@ -704,7 +704,7 @@ static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_u
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
                              struct storage_engine_query_handle *rrddim_handle,
                              time_t start_time_s,
                              time_t end_time_s,
@@ -714,7 +714,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
 
     netdata_thread_disable_cancelability();
 
-    METRIC *metric = (METRIC *)db_metric_handle;
+    METRIC *metric = (METRIC *)smh;
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
     struct rrdeng_query_handle *handle;
 
@@ -918,8 +918,8 @@ time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *r
     return rrddim_handle->end_time_s;
 }
 
-time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh) {
+    METRIC *metric = (METRIC *)smh;
     time_t latest_time_s = 0;
 
     if (metric)
@@ -928,8 +928,8 @@ time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     return latest_time_s;
 }
 
-time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
-    METRIC *metric = (METRIC *)db_metric_handle;
+time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh) {
+    METRIC *metric = (METRIC *)smh;
 
     time_t oldest_time_s = 0;
     if (metric)

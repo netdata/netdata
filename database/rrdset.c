@@ -1377,7 +1377,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     };
 
     for(size_t tier = 1; tier < storage_tiers ;tier++) {
-        if(unlikely(!rd->tiers[tier].db_metric_handle)) continue;
+        if(unlikely(!rd->tiers[tier].smh)) continue;
 
         struct rrddim_tier *t = &rd->tiers[tier];
 
