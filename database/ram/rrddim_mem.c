@@ -333,15 +333,15 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *smh, size_t slot) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *handle, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority __maybe_unused) {
+void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority __maybe_unused) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
 
     check_metric_handle_from_rrddim(mh);
 
-    handle->start_time_s = start_time_s;
-    handle->end_time_s = end_time_s;
-    handle->priority = priority;
-    handle->backend = STORAGE_ENGINE_BACKEND_RRDDIM;
+    seqh->start_time_s = start_time_s;
+    seqh->end_time_s = end_time_s;
+    seqh->priority = priority;
+    seqh->backend = STORAGE_ENGINE_BACKEND_RRDDIM;
     struct mem_query_handle* h = mallocz(sizeof(struct mem_query_handle));
     h->smh = smh;
 
@@ -356,14 +356,14 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_h
     // netdata_log_info("RRDDIM QUERY INIT: start %ld, end %ld, next %ld, first %ld, last %ld, dt %ld", start_time, end_time, h->next_timestamp, h->slot_timestamp, h->last_timestamp, h->dt);
 
     __atomic_add_fetch(&rrddim_db_memory_size, sizeof(struct mem_query_handle), __ATOMIC_RELAXED);
-    handle->handle = (STORAGE_QUERY_HANDLE *)h;
+    seqh->handle = (STORAGE_QUERY_HANDLE *)h;
 }
 
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handle) {
-    struct mem_query_handle* h = (struct mem_query_handle*)handle->handle;
+STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *seqh) {
+    struct mem_query_handle* h = (struct mem_query_handle*)seqh->handle;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)h->smh;
     RRDDIM *rd = mh->rd;
 
@@ -403,27 +403,27 @@ STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handl
     return sp;
 }
 
-int rrddim_query_is_finished(struct storage_engine_query_handle *handle) {
-    struct mem_query_handle *h = (struct mem_query_handle*)handle->handle;
-    return (h->next_timestamp > handle->end_time_s);
+int rrddim_query_is_finished(struct storage_engine_query_handle *seqh) {
+    struct mem_query_handle *h = (struct mem_query_handle*)seqh->handle;
+    return (h->next_timestamp > seqh->end_time_s);
 }
 
-void rrddim_query_finalize(struct storage_engine_query_handle *handle) {
+void rrddim_query_finalize(struct storage_engine_query_handle *seqh) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    struct mem_query_handle *h = (struct mem_query_handle*)handle->handle;
+    struct mem_query_handle *h = (struct mem_query_handle*)seqh->handle;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)h->smh;
 
-    internal_error(!rrddim_query_is_finished(handle),
+    internal_error(!rrddim_query_is_finished(seqh),
                    "QUERY: query for chart '%s' dimension '%s' has been stopped unfinished",
                    rrdset_id(mh->rd->rrdset), rrddim_name(mh->rd));
 
 #endif
-    freez(handle->handle);
+    freez(seqh->handle);
     __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_query_handle), __ATOMIC_RELAXED);
 }
 
-time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle) {
-    return rrddim_handle->end_time_s;
+time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *seqh) {
+    return seqh->end_time_s;
 }
 
 time_t rrddim_query_latest_time_s(STORAGE_METRIC_HANDLE *smh) {

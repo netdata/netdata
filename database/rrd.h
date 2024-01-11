@@ -579,74 +579,74 @@ static inline time_t storage_engine_latest_time_s(STORAGE_ENGINE_BACKEND backend
 }
 
 void rrdeng_load_metric_init(
-        STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *rrddim_handle,
+        STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
                 time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 
 void rrddim_query_init(
-        STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *handle,
+        STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
                 time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 
 static inline void storage_engine_query_init(
         STORAGE_ENGINE_BACKEND backend __maybe_unused,
-        STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *handle,
+        STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
                 time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority) {
     internal_fatal(!is_valid_backend(backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
     if(likely(backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_load_metric_init(smh, handle, start_time_s, end_time_s, priority);
+        rrdeng_load_metric_init(smh, seqh, start_time_s, end_time_s, priority);
     else
 #endif
-        rrddim_query_init(smh, handle, start_time_s, end_time_s, priority);
+        rrddim_query_init(smh, seqh, start_time_s, end_time_s, priority);
 }
 
-STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
-STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handle);
-static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_query_handle *handle) {
-    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh);
+STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *seqh);
+static inline STORAGE_POINT storage_engine_query_next_metric(struct storage_engine_query_handle *seqh) {
+    internal_fatal(!is_valid_backend(seqh->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_load_metric_next(handle);
+    if(likely(seqh->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_metric_next(seqh);
 #endif
-    return rrddim_query_next_metric(handle);
+    return rrddim_query_next_metric(seqh);
 }
 
-int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle);
-int rrddim_query_is_finished(struct storage_engine_query_handle *handle);
-static inline int storage_engine_query_is_finished(struct storage_engine_query_handle *handle) {
-    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *seqh);
+int rrddim_query_is_finished(struct storage_engine_query_handle *seqh);
+static inline int storage_engine_query_is_finished(struct storage_engine_query_handle *seqh) {
+    internal_fatal(!is_valid_backend(seqh->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_load_metric_is_finished(handle);
+    if(likely(seqh->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_metric_is_finished(seqh);
 #endif
-    return rrddim_query_is_finished(handle);
+    return rrddim_query_is_finished(seqh);
 }
 
-void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle);
-void rrddim_query_finalize(struct storage_engine_query_handle *handle);
-static inline void storage_engine_query_finalize(struct storage_engine_query_handle *handle) {
-    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh);
+void rrddim_query_finalize(struct storage_engine_query_handle *seqh);
+static inline void storage_engine_query_finalize(struct storage_engine_query_handle *seqh) {
+    internal_fatal(!is_valid_backend(seqh->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_load_metric_finalize(handle);
+    if(likely(seqh->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        rrdeng_load_metric_finalize(seqh);
     else
 #endif
-        rrddim_query_finalize(handle);
+        rrddim_query_finalize(seqh);
 }
 
-time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
-time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
-static inline time_t storage_engine_align_to_optimal_before(struct storage_engine_query_handle *handle) {
-    internal_fatal(!is_valid_backend(handle->backend), "STORAGE: invalid backend");
+time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh);
+time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *seqh);
+static inline time_t storage_engine_align_to_optimal_before(struct storage_engine_query_handle *seqh) {
+    internal_fatal(!is_valid_backend(seqh->backend), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
-    if(likely(handle->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_load_align_to_optimal_before(handle);
+    if(likely(seqh->backend == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_load_align_to_optimal_before(seqh);
 #endif
-    return rrddim_query_align_to_optimal_before(handle);
+    return rrddim_query_align_to_optimal_before(seqh);
 }
 
 // ------------------------------------------------------------------------

@@ -42,16 +42,16 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
                                      SN_FLAGS flags);
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
 
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *rrddim_handle,
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
                                     time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
-STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh);
 
 
-int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle);
-void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle);
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *seqh);
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh);
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh);
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh);
-time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
+time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh);
 
 void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 

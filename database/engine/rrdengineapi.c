@@ -705,7 +705,7 @@ static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_u
  * The handle must be released with rrdeng_load_metric_final().
  */
 void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
-                             struct storage_engine_query_handle *rrddim_handle,
+                             struct storage_engine_query_handle *seqh,
                              time_t start_time_s,
                              time_t end_time_s,
                              STORAGE_PRIORITY priority)
@@ -751,11 +751,11 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
             mrg_metric_set_update_every_s_if_zero(main_mrg, metric, default_rrd_update_every);
         }
 
-        rrddim_handle->handle = (STORAGE_QUERY_HANDLE *) handle;
-        rrddim_handle->start_time_s = handle->start_time_s;
-        rrddim_handle->end_time_s = handle->end_time_s;
-        rrddim_handle->priority = priority;
-        rrddim_handle->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
+        seqh->handle = (STORAGE_QUERY_HANDLE *) handle;
+        seqh->start_time_s = handle->start_time_s;
+        seqh->end_time_s = handle->end_time_s;
+        seqh->priority = priority;
+        seqh->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
 
         pg_cache_preload(handle);
 
@@ -767,16 +767,16 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
         handle->now_s = start_time_s;
         handle->dt_s = db_update_every_s;
 
-        rrddim_handle->handle = (STORAGE_QUERY_HANDLE *) handle;
-        rrddim_handle->start_time_s = handle->start_time_s;
-        rrddim_handle->end_time_s = 0;
-        rrddim_handle->priority = priority;
-        rrddim_handle->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
+        seqh->handle = (STORAGE_QUERY_HANDLE *) handle;
+        seqh->start_time_s = handle->start_time_s;
+        seqh->end_time_s = 0;
+        seqh->priority = priority;
+        seqh->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
     }
 }
 
-static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_handle, bool debug_this __maybe_unused) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
+static bool rrdeng_load_page_next(struct storage_engine_query_handle *seqh, bool debug_this __maybe_unused) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     if (likely(handle->page)) {
@@ -786,7 +786,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
         pgdc_reset(&handle->pgdc, NULL, UINT32_MAX);
     }
 
-    if (unlikely(handle->now_s > rrddim_handle->end_time_s))
+    if (unlikely(handle->now_s > seqh->end_time_s))
         return false;
 
     size_t entries = 0;
@@ -846,11 +846,11 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
 // Returns the metric and sets its timestamp into current_time
 // IT IS REQUIRED TO **ALWAYS** SET ALL RETURN VALUES (current_time, end_time, flags)
 // IT IS REQUIRED TO **ALWAYS** KEEP TRACK OF TIME, EVEN OUTSIDE THE DATABASE BOUNDARIES
-STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
+STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
     STORAGE_POINT sp;
 
-    if (unlikely(handle->now_s > rrddim_handle->end_time_s)) {
+    if (unlikely(handle->now_s > seqh->end_time_s)) {
         storage_point_empty(sp, handle->now_s - handle->dt_s, handle->now_s);
         goto prepare_for_next_iteration;
     }
@@ -858,8 +858,8 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
     if (unlikely(!handle->page || handle->position >= handle->entries)) {
         // We need to get a new page
 
-        if (!rrdeng_load_page_next(rrddim_handle, false)) {
-            handle->now_s = rrddim_handle->end_time_s;
+        if (!rrdeng_load_page_next(seqh, false)) {
+            handle->now_s = seqh->end_time_s;
             storage_point_empty(sp, handle->now_s - handle->dt_s, handle->now_s);
             goto prepare_for_next_iteration;
         }
@@ -871,7 +871,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
     pgdc_get_next_point(&handle->pgdc, handle->position, &sp);
 
 prepare_for_next_iteration:
-    internal_fatal(sp.end_time_s < rrddim_handle->start_time_s, "DBENGINE: this point is too old for this query");
+    internal_fatal(sp.end_time_s < seqh->start_time_s, "DBENGINE: this point is too old for this query");
     internal_fatal(sp.end_time_s < handle->now_s, "DBENGINE: this point is too old for this point in time");
 
     handle->now_s += handle->dt_s;
@@ -880,17 +880,17 @@ prepare_for_next_iteration:
     return sp;
 }
 
-int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
-    return (handle->now_s > rrddim_handle->end_time_s);
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *seqh) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
+    return (handle->now_s > seqh->end_time_s);
 }
 
 /*
  * Releases the database reference from the handle for loading metrics.
  */
-void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle)
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh)
 {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
 
     if (handle->page) {
         pgc_page_release(main_cache, handle->page);
@@ -902,20 +902,20 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_hand
 
     unregister_query_handle(handle);
     rrdeng_query_handle_release(handle);
-    rrddim_handle->handle = NULL;
+    seqh->handle = NULL;
     netdata_thread_enable_cancelability();
 }
 
-time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
+time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
 
     if(handle->pdc) {
         rrdeng_prep_wait(handle->pdc);
-        if (handle->pdc->optimal_end_time_s > rrddim_handle->end_time_s)
-            rrddim_handle->end_time_s = handle->pdc->optimal_end_time_s;
+        if (handle->pdc->optimal_end_time_s > seqh->end_time_s)
+            seqh->end_time_s = handle->pdc->optimal_end_time_s;
     }
 
-    return rrddim_handle->end_time_s;
+    return seqh->end_time_s;
 }
 
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *smh) {
