@@ -10,7 +10,6 @@ static pthread_attr_t *netdata_threads_attr = NULL;
 typedef struct {
     void *arg;
     char tag[NETDATA_THREAD_NAME_MAX + 1];
-    SPINLOCK detach_lock;
     void *(*start_routine) (void *);
     NETDATA_THREAD_OPTIONS options;
 } NETDATA_THREAD;
@@ -183,7 +182,6 @@ static void thread_cleanup(void *ptr) {
         NETDATA_THREAD *info = (NETDATA_THREAD *)ptr;
         nd_log(NDLS_DAEMON, NDLP_ERR, "THREADS: internal error - thread local variable does not match the one passed to this function. Expected thread '%s', passed thread '%s'", netdata_thread->tag, info->tag);
     }
-    spinlock_lock(&netdata_thread->detach_lock);
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", gettid());
@@ -198,7 +196,6 @@ static void thread_cleanup(void *ptr) {
 
     netdata_thread->tag[0] = '\0';
 
-    spinlock_unlock(&netdata_thread->detach_lock);
     freez(netdata_thread);
     netdata_thread = NULL;
 }
@@ -275,6 +272,14 @@ static void *netdata_thread_init(void *ptr) {
 
     netdata_thread_set_tag(netdata_thread->tag);
 
+    if (!(netdata_thread->options & NETDATA_THREAD_OPTION_JOINABLE)) {
+        int rc = pthread_detach(pthread_self());
+        if (rc != 0)
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "cannot request detach of newly created %s thread. pthread_detach() failed with code %d",
+                   netdata_thread->tag, rc);
+    }
+
     void *ret = NULL;
     pthread_cleanup_push(thread_cleanup, ptr) {
         ret = netdata_thread->start_routine(netdata_thread->arg);
@@ -291,22 +296,10 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
     info->options = options;
     strncpyz(info->tag, tag, NETDATA_THREAD_NAME_MAX);
 
-    spinlock_init(&info->detach_lock);
-    spinlock_lock(&info->detach_lock);
-
     int ret = pthread_create(thread, netdata_threads_attr, netdata_thread_init, info);
     if(ret != 0)
         nd_log(NDLS_DAEMON, NDLP_ERR, "failed to create new thread for %s. pthread_create() failed with code %d", tag, ret);
 
-    else {
-        if (!(options & NETDATA_THREAD_OPTION_JOINABLE)) {
-            int ret2 = pthread_detach(*thread);
-            if (ret2 != 0)
-                nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot request detach of newly created %s thread. pthread_detach() failed with code %d", tag, ret2);
-        }
-    }
-
-    spinlock_unlock(&info->detach_lock);
     return ret;
 }
 
