@@ -28,8 +28,8 @@ void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_
 
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(STORAGE_INSTANCE *si, RRDDIM *rd);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, uuid_t *uuid);
-void rrdeng_metric_release(STORAGE_METRIC_HANDLE *smh);
-STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *smh);
+void rrdeng_metric_release(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh);
+STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh);
 
 STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch);

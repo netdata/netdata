@@ -634,8 +634,8 @@ typedef struct storage_engine_api {
     // metric management
     STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *si, uuid_t *uuid);
     STORAGE_METRIC_HANDLE *(*metric_get_or_create)(STORAGE_INSTANCE *si, RRDDIM *rd);
-    void (*metric_release)(STORAGE_METRIC_HANDLE *);
-    STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
+    void (*metric_release)(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh);
+    STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh);
     bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *si, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
 } STORAGE_ENGINE_API;
 

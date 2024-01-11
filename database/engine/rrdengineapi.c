@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "database/engine/rrddiskprotocol.h"
+#include "database/rrd.h"
 #include "rrdengine.h"
 
 /* Default global database instance */
@@ -118,12 +119,12 @@ static METRIC *rrdeng_metric_get_legacy(STORAGE_INSTANCE *si, const char *rd_id,
 // ----------------------------------------------------------------------------
 // metric handle
 
-void rrdeng_metric_release(STORAGE_METRIC_HANDLE *smh) {
+void rrdeng_metric_release(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh) {
     METRIC *metric = (METRIC *)smh;
     mrg_metric_release(main_mrg, metric);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *smh) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh) {
     METRIC *metric = (METRIC *)smh;
     return (STORAGE_METRIC_HANDLE *) mrg_metric_dup(main_mrg, metric);
 }

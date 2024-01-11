@@ -209,7 +209,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         if(!rd->tiers[tier].smh) continue;
 
         STORAGE_ENGINE* eng = host->db[tier].eng;
-        eng->api.metric_release(rd->tiers[tier].smh);
+        eng->api.metric_release(host->db[tier].si, rd->tiers[tier].smh);
         rd->tiers[tier].smh = NULL;
     }
 

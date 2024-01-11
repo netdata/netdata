@@ -223,7 +223,8 @@ static inline void query_metric_release(QUERY_TARGET *qt, QUERY_METRIC *qm) {
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(qm->tiers[tier].smh) {
             STORAGE_ENGINE *eng = query_metric_storage_engine(qt, qm, tier);
-            eng->api.metric_release(qm->tiers[tier].smh);
+            // FIXME: ask @ktsaou what we should pass here
+            eng->api.metric_release(NULL, qm->tiers[tier].smh);
             qm->tiers[tier].smh = NULL;
         }
     }
@@ -253,9 +254,13 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
         tier_retention[tier].db_update_every_s = (time_t) (qn->rrdhost->db[tier].tier_grouping * ri->update_every_s);
 
         if(rm->rrddim && rm->rrddim->tiers[tier].smh)
-            tier_retention[tier].smh = eng->api.metric_dup(rm->rrddim->tiers[tier].smh);
-        else
+        {
+            // FIXME: ask @ktsaou which instance we should pass here.
+            tier_retention[tier].smh = eng->api.metric_dup(NULL, rm->rrddim->tiers[tier].smh);
+        }
+        else {
             tier_retention[tier].smh = eng->api.metric_get(qn->rrdhost->db[tier].si, &rm->uuid);
+        }
 
         if(tier_retention[tier].smh) {
             tier_retention[tier].db_first_time_s = storage_engine_oldest_time_s(tier_retention[tier].eng->seb, tier_retention[tier].smh);
@@ -343,7 +348,7 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
     // cleanup anything we allocated to the retention we will not use
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if (tier_retention[tier].smh)
-            tier_retention[tier].eng->api.metric_release(tier_retention[tier].smh);
+            tier_retention[tier].eng->api.metric_release(NULL, tier_retention[tier].smh);
     }
 
     return false;

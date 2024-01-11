@@ -90,13 +90,18 @@ rrddim_metric_get(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid) {
     return (STORAGE_METRIC_HANDLE *)mh;
 }
 
-STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *smh) {
+STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh) {
+    UNUSED(si);
+
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
     __atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED);
     return smh;
 }
 
-void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh __maybe_unused) {
+void rrddim_metric_release(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh)
+{
+    UNUSED(si);
+
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
 
     if(__atomic_sub_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) == 0) {
