@@ -141,7 +141,8 @@ void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch
     mh->update_every_s = update_every;
 }
 
-STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every __maybe_unused, STORAGE_METRICS_GROUP *smg __maybe_unused) {
+STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRICS_GROUP *smg __maybe_unused, STORAGE_METRIC_HANDLE *smh, uint32_t update_every __maybe_unused)
+{
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
     RRDDIM *rd = mh->rd;
 
