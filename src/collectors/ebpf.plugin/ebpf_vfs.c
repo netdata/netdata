@@ -41,6 +41,17 @@ static ebpf_local_maps_t vfs_maps[] = {{.name = "tbl_vfs_pid", .internal_input =
 #endif
                                        }};
 
+struct netdata_static_thread ebpf_read_vfs = {
+    .name = "EBPF_READ_VFS",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 struct config vfs_config = { .first_section = NULL,
     .last_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -572,6 +583,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
     int order = 20275;
     struct ebpf_target *w;
     int update_every = em->update_every;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_VFS_IDX))))
             continue;
@@ -730,6 +742,7 @@ void ebpf_obsolete_vfs_apps_charts(struct ebpf_module *em)
         }
         w->charts_created &= ~(1<<EBPF_MODULE_VFS_IDX);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -870,6 +883,9 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
 static void ebpf_vfs_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    if (ebpf_read_vfs.thread)
+        netdata_thread_cancel(*ebpf_read_vfs.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -1093,11 +1109,10 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_tar
 void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
     struct ebpf_target *w;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_VFS_IDX))))
             continue;
-
-        ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_vfs_unlink");
         write_chart_dimension("calls", w->vfs.unlink_call);
@@ -1161,6 +1176,7 @@ void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
             ebpf_write_end_chart();
         }
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -1876,6 +1892,72 @@ static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
 }
 
 /**
+ * Resume apps data
+ */
+void ebpf_vfs_resume_apps_data() {
+    struct ebpf_target *w;
+    for (w = apps_groups_root_target; w; w = w->next) {
+        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_VFS_IDX))))
+            continue;
+
+        ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
+    }
+}
+
+/**
+ * VFS thread
+ *
+ * Thread used to generate  charts.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_vfs_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int maps_per_core = em->maps_per_core;
+    int update_every = em->update_every;
+
+    int counter = update_every - 1;
+
+    uint32_t lifetime = em->lifetime;
+    uint32_t running_time = 0;
+    usec_t period = update_every * USEC_PER_SEC;
+    int max_period = update_every * EBPF_CLEANUP_FACTOR;
+    while (!ebpf_plugin_exit && running_time < lifetime) {
+        (void)heartbeat_next(&hb, period);
+        if (ebpf_plugin_exit || ++counter != update_every)
+            continue;
+
+        netdata_thread_disable_cancelability();
+
+        pthread_mutex_lock(&collect_data_mutex);
+        ebpf_vfs_read_apps(maps_per_core, max_period);
+        ebpf_vfs_resume_apps_data();
+        pthread_mutex_unlock(&collect_data_mutex);
+
+        counter = 0;
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_thread_enable_cancelability();
+    }
+
+    return NULL;
+}
+
+/**
  * Main loop for this collector.
  *
  * @param step the number of microseconds used with heart beat
@@ -1893,7 +1975,6 @@ static void vfs_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
-    int max_period = update_every * EBPF_CLEANUP_FACTOR;
     while (!ebpf_plugin_exit && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
         if (ebpf_plugin_exit || ++counter != update_every)
@@ -1902,9 +1983,6 @@ static void vfs_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_vfs_read_global_table(stats, maps_per_core);
-        pthread_mutex_lock(&collect_data_mutex);
-        if (apps)
-            ebpf_vfs_read_apps(maps_per_core, max_period);
 
         if (cgroups)
             read_update_vfs_cgroup();
@@ -1921,7 +1999,6 @@ static void vfs_collector(ebpf_module_t *em)
             ebpf_vfs_send_cgroup_data(em);
 
         pthread_mutex_unlock(&lock);
-        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
@@ -2439,6 +2516,13 @@ void *ebpf_vfs_thread(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
 
     pthread_mutex_unlock(&lock);
+
+    ebpf_read_vfs.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_vfs.thread,
+                          ebpf_read_vfs.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_vfs_thread,
+                          em);
 
     vfs_collector(em);
 
