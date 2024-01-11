@@ -50,8 +50,15 @@ void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
 
 int rrdeng_store_metric_finalize(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch);
 
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
-                                    time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
+void rrdeng_load_metric_init(STORAGE_INSTANCE *si,
+                             STORAGE_METRICS_GROUP *smg,
+                             STORAGE_METRIC_HANDLE *smh,
+                             STORAGE_COLLECT_HANDLE *sch,
+                             struct storage_engine_query_handle *seqh,
+                             time_t start_time_s,
+                             time_t end_time_s,
+                             STORAGE_PRIORITY priority);
+
 STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh);
 
 

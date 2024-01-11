@@ -1261,7 +1261,9 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
 
         struct query_metric_tier *tier_ptr = &qm->tiers[tier];
         STORAGE_ENGINE *eng = query_metric_storage_engine(ops->r->internal.qt, qm, tier);
-        storage_engine_query_init(eng->seb, tier_ptr->smh, &ops->plans[p].handle,
+
+        // TODO: ask @ktsaou how we can get the pointers we need here.
+        storage_engine_query_init(eng->seb, NULL, NULL, tier_ptr->smh, NULL, &ops->plans[p].handle,
                 after, before, ops->r->internal.qt->request.priority);
 
         ops->plans[p].initialized = true;
@@ -1982,7 +1984,9 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
         long before_wanted = smaller_tier_last_time;
 
         struct rrddim_tier *tmp = &rd->tiers[read_tier];
-        storage_engine_query_init(tmp->seb, tmp->smh, &seqh, after_wanted, before_wanted, STORAGE_PRIORITY_HIGH);
+
+        // TODO: ask @ktsaou how we can get the pointers we need here.
+        storage_engine_query_init(tmp->seb, NULL, NULL, tmp->smh, NULL, &seqh, after_wanted, before_wanted, STORAGE_PRIORITY_HIGH);
 
         size_t points_read = 0;
 

@@ -722,12 +722,19 @@ static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_u
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
+void rrdeng_load_metric_init(STORAGE_INSTANCE *si,
+                             STORAGE_METRICS_GROUP *smg,
+                             STORAGE_METRIC_HANDLE *smh,
+                             STORAGE_COLLECT_HANDLE *sch,
                              struct storage_engine_query_handle *seqh,
                              time_t start_time_s,
                              time_t end_time_s,
                              STORAGE_PRIORITY priority)
 {
+    UNUSED(si);
+    UNUSED(smg);
+    UNUSED(sch);
+
     usec_t started_ut = now_monotonic_usec();
 
     netdata_thread_disable_cancelability();

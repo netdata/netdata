@@ -360,7 +360,19 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *smh, size_t slot) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority __maybe_unused) {
+void rrddim_query_init(STORAGE_INSTANCE *si,
+                       STORAGE_METRICS_GROUP *smg,
+                       STORAGE_METRIC_HANDLE *smh,
+                       STORAGE_COLLECT_HANDLE *sch,
+                       struct storage_engine_query_handle *seqh,
+                       time_t start_time_s,
+                       time_t end_time_s,
+                       STORAGE_PRIORITY priority __maybe_unused)
+{
+    UNUSED(si);
+    UNUSED(smg);
+    UNUSED(sch);
+
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
 
     check_metric_handle_from_rrddim(mh);

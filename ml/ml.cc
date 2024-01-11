@@ -358,9 +358,15 @@ ml_dimension_calculated_numbers(ml_training_thread_t *training_thread, ml_dimens
     */
     struct storage_engine_query_handle handle;
 
-    storage_engine_query_init(dim->rd->tiers[0].seb, dim->rd->tiers[0].smh, &handle,
-              training_response.query_after_t, training_response.query_before_t,
-              STORAGE_PRIORITY_BEST_EFFORT);
+    storage_engine_query_init(dim->rd->tiers[0].seb,
+                              dim->rd->rrdset->rrdhost->db[0].si,
+                              dim->rd->rrdset->smg[0],
+                              dim->rd->tiers[0].smh,
+                              dim->rd->tiers[0].sch,
+                              &handle,
+                              training_response.query_after_t,
+                              training_response.query_before_t,
+                              STORAGE_PRIORITY_BEST_EFFORT);
 
     size_t idx = 0;
     memset(training_thread->training_cns, 0, sizeof(calculated_number_t) * max_n * (Cfg.lag_n + 1));
