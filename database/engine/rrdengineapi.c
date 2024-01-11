@@ -546,7 +546,10 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __m
 #endif
 }
 
-void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch,
+void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
+                              STORAGE_METRICS_GROUP *smg,
+                              STORAGE_METRIC_HANDLE *smh,
+                              STORAGE_COLLECT_HANDLE *sch,
                               const usec_t point_in_time_ut,
                               const NETDATA_DOUBLE n,
                               const NETDATA_DOUBLE min_value,
@@ -555,6 +558,10 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch,
                               const uint16_t anomaly_count,
                               const SN_FLAGS flags)
 {
+    UNUSED(si);
+    UNUSED(smg);
+    UNUSED(smh);
+
     timing_step(TIMING_STEP_RRDSET_STORE_METRIC);
 
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;

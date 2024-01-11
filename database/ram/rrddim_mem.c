@@ -214,7 +214,10 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *sch, time_t now_c
     }
 }
 
-void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *sch,
+void rrddim_collect_store_metric(STORAGE_INSTANCE *si,
+                                 STORAGE_METRICS_GROUP *smg,
+                                 STORAGE_METRIC_HANDLE *smh,
+                                 STORAGE_COLLECT_HANDLE *sch,
                                  usec_t point_in_time_ut,
                                  NETDATA_DOUBLE n,
                                  NETDATA_DOUBLE min_value __maybe_unused,
@@ -223,6 +226,10 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *sch,
                                  uint16_t anomaly_count __maybe_unused,
                                  SN_FLAGS flags)
 {
+    UNUSED(si);
+    UNUSED(smg);
+    UNUSED(smh);
+
     struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 

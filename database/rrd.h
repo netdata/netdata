@@ -416,30 +416,52 @@ static inline STORAGE_COLLECT_HANDLE *storage_metric_store_init(STORAGE_ENGINE_B
     return rrddim_collect_init(si, smg, smh, update_every);
 }
 
-void rrdeng_store_metric_next(
-        STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
-        NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
-        uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
+void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
+                              STORAGE_METRICS_GROUP *smg,
+                              STORAGE_METRIC_HANDLE *smh,
+                              STORAGE_COLLECT_HANDLE *sch,
+                              usec_t point_in_time_ut,
+                              NETDATA_DOUBLE n,
+                              NETDATA_DOUBLE min_value,
+                              NETDATA_DOUBLE max_value,
+                              uint16_t count,
+                              uint16_t anomaly_count,
+                              SN_FLAGS flags);
 
-void rrddim_collect_store_metric(
-        STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
-        NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
-        uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
+void rrddim_collect_store_metric(STORAGE_INSTANCE *si,
+                                 STORAGE_METRICS_GROUP *smg,
+                                 STORAGE_METRIC_HANDLE *smh,
+                                 STORAGE_COLLECT_HANDLE *sch,
+                                 usec_t point_in_time_ut,
+                                 NETDATA_DOUBLE n,
+                                 NETDATA_DOUBLE min_value,
+                                 NETDATA_DOUBLE max_value,
+                                 uint16_t count,
+                                 uint16_t anomaly_count,
+                                 SN_FLAGS flags);
 
-static inline void storage_engine_store_metric(
-        STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut,
-        NETDATA_DOUBLE n, NETDATA_DOUBLE min_value, NETDATA_DOUBLE max_value,
-        uint16_t count, uint16_t anomaly_count, SN_FLAGS flags) {
+static inline void storage_engine_store_metric(STORAGE_INSTANCE *si,
+                                               STORAGE_METRICS_GROUP *smg,
+                                               STORAGE_METRIC_HANDLE *smh,
+                                               STORAGE_COLLECT_HANDLE *sch,
+                                               usec_t point_in_time_ut,
+                                               NETDATA_DOUBLE n,
+                                               NETDATA_DOUBLE min_value,
+                                               NETDATA_DOUBLE max_value,
+                                               uint16_t count,
+                                               uint16_t anomaly_count,
+                                               SN_FLAGS flags)
+{
     internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
     if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_next(sch, point_in_time_ut,
-                                        n, min_value, max_value,
+        return rrdeng_store_metric_next(si, smg, smh, sch,
+                                        point_in_time_ut, n, min_value, max_value,
                                         count, anomaly_count, flags);
 #endif
-    return rrddim_collect_store_metric(sch, point_in_time_ut,
-                                       n, min_value, max_value,
+    return rrddim_collect_store_metric(si, smg, smh, sch,
+                                       point_in_time_ut, n, min_value, max_value,
                                        count, anomaly_count, flags);
 }
 

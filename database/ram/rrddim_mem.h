@@ -34,7 +34,12 @@ void rrddim_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *s
 
 STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, uint32_t update_every);
 void rrddim_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every);
-void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut, NETDATA_DOUBLE n,
+void rrddim_collect_store_metric(STORAGE_INSTANCE *si,
+                                 STORAGE_METRICS_GROUP *smg,
+                                 STORAGE_METRIC_HANDLE *smh,
+                                 STORAGE_COLLECT_HANDLE *sch,
+                                 usec_t point_in_time_ut,
+                                 NETDATA_DOUBLE n,
                                  NETDATA_DOUBLE min_value,
                                  NETDATA_DOUBLE max_value,
                                  uint16_t count,
