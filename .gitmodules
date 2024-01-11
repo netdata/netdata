@@ -1,6 +1,3 @@
-[submodule "mqtt_websockets"]
-	path = mqtt_websockets
-	url = https://github.com/underhood/mqtt_websockets.git
 [submodule "aclk/aclk-schemas"]
 	path = aclk/aclk-schemas
 	url = https://github.com/netdata/aclk-schemas.git

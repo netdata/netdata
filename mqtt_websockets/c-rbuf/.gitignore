@@ -1,0 +1,8 @@
+build/*
+!build/.keep
+libringbuffer.*
+test
+.vscode
+*.o
+.deps
+.dirstamp

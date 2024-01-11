@@ -22,3 +22,4 @@ exclude_paths:
   - build/**
   - build_external/**
   - packaging/**
+  - mqtt_websockets/**

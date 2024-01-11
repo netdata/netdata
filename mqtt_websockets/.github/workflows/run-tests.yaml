@@ -1,0 +1,14 @@
+name: run-tests
+on:
+  push:
+  schedule:
+      - cron: '5 3 * * 0'
+  pull_request:
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install ruby and deps
+        run: sudo apt-get install ruby ruby-dev mosquitto
+      - name: Checkout
+        uses: actions/checkout@v2
