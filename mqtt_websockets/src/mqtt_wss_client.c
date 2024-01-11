@@ -10,7 +10,9 @@
 //
 // You should have received a copy of the GNU General Public License along with this program.
 // If not, see <https://www.gnu.org/licenses/>.
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "mqtt_wss_client.h"
 #include "mqtt_ng.h"
