@@ -149,7 +149,7 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, uuid_t *uuid) {
     return metric;
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(STORAGE_INSTANCE *si, RRDDIM *rd) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     METRIC *metric;
 
