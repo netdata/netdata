@@ -143,7 +143,7 @@ STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *smh, uint32_t
     internal_fatal((uint32_t)mh->update_every_s != update_every, "RRDDIM: update requested does not match the dimension");
 
     struct mem_collect_handle *ch = callocz(1, sizeof(struct mem_collect_handle));
-    ch->common.backend = STORAGE_ENGINE_BACKEND_RRDDIM;
+    ch->common.seb = STORAGE_ENGINE_BACKEND_RRDDIM;
     ch->rd = rd;
     ch->smh = smh;
 
@@ -341,7 +341,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_h
     seqh->start_time_s = start_time_s;
     seqh->end_time_s = end_time_s;
     seqh->priority = priority;
-    seqh->backend = STORAGE_ENGINE_BACKEND_RRDDIM;
+    seqh->seb = STORAGE_ENGINE_BACKEND_RRDDIM;
     struct mem_query_handle* h = mallocz(sizeof(struct mem_query_handle));
     h->smh = smh;
 

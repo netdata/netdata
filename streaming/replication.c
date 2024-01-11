@@ -162,7 +162,7 @@ static struct replication_query *replication_query_prepare(
         }
     }
 
-    q->backend = st->rrdhost->db[0].eng->backend;
+    q->backend = st->rrdhost->db[0].eng->seb;
 
     // prepare our array of dimensions
     size_t count = 0;

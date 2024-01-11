@@ -258,8 +258,8 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             tier_retention[tier].smh = eng->api.metric_get(qn->rrdhost->db[tier].si, &rm->uuid);
 
         if(tier_retention[tier].smh) {
-            tier_retention[tier].db_first_time_s = storage_engine_oldest_time_s(tier_retention[tier].eng->backend, tier_retention[tier].smh);
-            tier_retention[tier].db_last_time_s = storage_engine_latest_time_s(tier_retention[tier].eng->backend, tier_retention[tier].smh);
+            tier_retention[tier].db_first_time_s = storage_engine_oldest_time_s(tier_retention[tier].eng->seb, tier_retention[tier].smh);
+            tier_retention[tier].db_last_time_s = storage_engine_latest_time_s(tier_retention[tier].eng->seb, tier_retention[tier].smh);
 
             if(!common_first_time_s)
                 common_first_time_s = tier_retention[tier].db_first_time_s;

@@ -262,7 +262,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
     struct rrdeng_collect_handle *handle;
 
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
-    handle->common.backend = STORAGE_ENGINE_BACKEND_DBENGINE;
+    handle->common.seb = STORAGE_ENGINE_BACKEND_DBENGINE;
     handle->metric = metric;
     
     handle->pgc_page = NULL;
@@ -755,7 +755,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
         seqh->start_time_s = handle->start_time_s;
         seqh->end_time_s = handle->end_time_s;
         seqh->priority = priority;
-        seqh->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
+        seqh->seb = STORAGE_ENGINE_BACKEND_DBENGINE;
 
         pg_cache_preload(handle);
 
@@ -771,7 +771,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
         seqh->start_time_s = handle->start_time_s;
         seqh->end_time_s = 0;
         seqh->priority = priority;
-        seqh->backend = STORAGE_ENGINE_BACKEND_DBENGINE;
+        seqh->seb = STORAGE_ENGINE_BACKEND_DBENGINE;
     }
 }
 
