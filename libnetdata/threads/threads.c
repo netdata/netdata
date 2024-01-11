@@ -273,9 +273,11 @@ static void *netdata_thread_init(void *ptr) {
     netdata_thread_set_tag(netdata_thread->tag);
 
     if (!(netdata_thread->options & NETDATA_THREAD_OPTION_JOINABLE)) {
-        int ret2 = pthread_detach(pthread_self());
-        if (ret2 != 0)
-            nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot request detach of newly created %s thread. pthread_detach() failed with code %d", tag, ret2);
+        int rc = pthread_detach(pthread_self());
+        if (rc != 0)
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "cannot request detach of newly created %s thread. pthread_detach() failed with code %d",
+                   netdata_thread->tag, rc);
     }
 
     void *ret = NULL;
