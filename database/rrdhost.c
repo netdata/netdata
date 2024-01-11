@@ -337,7 +337,7 @@ int is_legacy = 1;
     netdata_mutex_init(&host->receiver_lock);
 
     if (likely(!archived)) {
-        rrdfunctions_host_init(host);
+        rrd_functions_host_init(host);
         host->last_connected = now_realtime_sec();
         host->rrdlabels = rrdlabels_create();
         rrdhost_initialize_rrdpush_sender(
@@ -573,9 +573,6 @@ int is_legacy = 1;
          , string2str(host->health.health_default_recipient)
     );
 
-    host->configurable_plugins = dyncfg_dictionary_create();
-    dictionary_register_delete_callback(host->configurable_plugins, plugin_del_cb, NULL);
-
     if(!archived) {
         metaqueue_host_update_info(host);
         rrdhost_load_rrdcontext_data(host);
@@ -694,7 +691,7 @@ static void rrdhost_update(RRDHOST *host
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_ARCHIVED);
 
-        rrdfunctions_host_init(host);
+        rrd_functions_host_init(host);
 
         if(!host->rrdlabels)
             host->rrdlabels = rrdlabels_create();
@@ -1115,18 +1112,17 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     if (unlikely(!localhost))
         return 1;
 
+    dyncfg_host_init(localhost);
+
     // we register this only on localhost
     // for the other nodes, the origin server should register it
-    rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
-    rrd_function_add(localhost, NULL, "streaming", 10, RRDFUNCTIONS_PRIORITY_DEFAULT + 1,
-                     RRDFUNCTIONS_STREAMING_HELP, "top",
-                     HTTP_ACCESS_MEMBERS, true,
-                     rrdhost_function_streaming, NULL);
+    rrd_function_add_inline(localhost, NULL, "streaming", 10,
+                            RRDFUNCTIONS_PRIORITY_DEFAULT + 1, RRDFUNCTIONS_STREAMING_HELP, "top",
+        HTTP_ACCESS_MEMBER, rrdhost_function_streaming);
 
-    rrd_function_add(localhost, NULL, "netdata-api-calls", 10, RRDFUNCTIONS_PRIORITY_DEFAULT + 2,
-                     RRDFUNCTIONS_PROGRESS_HELP, "top",
-                     HTTP_ACCESS_MEMBERS, true,
-                     rrdhost_function_progress, NULL);
+    rrd_function_add_inline(localhost, NULL, "netdata-api-calls", 10,
+                            RRDFUNCTIONS_PRIORITY_DEFAULT + 2, RRDFUNCTIONS_PROGRESS_HELP, "top",
+        HTTP_ACCESS_MEMBER, rrdhost_function_progress);
 
     if (likely(system_info)) {
         migrate_localhost(&localhost->host_uuid);
@@ -1328,7 +1324,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     freez(host->node_id);
 
     rrdfamily_index_destroy(host);
-    rrdfunctions_host_destroy(host);
+    rrd_functions_host_destroy(host);
     rrdvariables_destroy(host->rrdvars);
     if (host == localhost)
         rrdvariables_destroy(health_rrdvars);
@@ -1848,6 +1844,10 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->now = now;
 
     RRDHOST_FLAGS flags = __atomic_load_n(&host->flags, __ATOMIC_RELAXED);
+
+    // --- dyncfg ---
+
+    s->dyncfg.status = dyncfg_available_for_rrdhost(host) ? RRDHOST_DYNCFG_STATUS_AVAILABLE : RRDHOST_DYNCFG_STATUS_UNAVAILABLE;
 
     // --- db ---
 

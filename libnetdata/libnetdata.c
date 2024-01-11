@@ -129,6 +129,9 @@ static void (*libc_free)(void *) = free_first_run;
 static char *strdup_first_run(const char *s);
 static char *(*libc_strdup)(const char *) = strdup_first_run;
 
+static char *strndup_first_run(const char *s, size_t len);
+static char *(*libc_strndup)(const char *, size_t) = strndup_first_run;
+
 static size_t malloc_usable_size_first_run(void *ptr);
 #ifdef HAVE_MALLOC_USABLE_SIZE
 static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size_first_run;
@@ -169,6 +172,11 @@ static char *strdup_first_run(const char *s) {
     return libc_strdup(s);
 }
 
+static char *strndup_first_run(const char *s, size_t len) {
+    link_system_library_function((libc_function_t *) &libc_strndup, "strndup", true);
+    return libc_strndup(s, len);
+}
+
 static size_t malloc_usable_size_first_run(void *ptr) {
     link_system_library_function((libc_function_t *) &libc_malloc_usable_size, "malloc_usable_size", false);
 
@@ -200,6 +208,10 @@ void free(void *ptr) {
 
 char *strdup(const char *s) {
     return strdupz(s);
+}
+
+char *strndup(const char *s, size_t len) {
+    return strndupz(s, len);
 }
 
 size_t malloc_usable_size(void *ptr) {
@@ -365,6 +377,30 @@ char *strdupz_int(const char *s, const char *file, const char *function, size_t 
     return (char *)&t->data;
 }
 
+char *strndupz_int(const char *s, size_t len, const char *file, const char *function, size_t line) {
+    struct malloc_trace *p = malloc_trace_find_or_create(file, function, line);
+    size_t size = len + 1;
+
+    size_t_atomic_count(add, p->strdup_calls, 1);
+    size_t_atomic_count(add, p->allocations, 1);
+    size_t_atomic_bytes(add, p->bytes, size);
+
+    struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
+    if (unlikely(!t)) fatal("strndupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
+    t->signature.magic = 0x0BADCAFE;
+    t->signature.trace = p;
+    t->signature.size = size;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
+        t->padding[i] = 0xFF;
+#endif
+
+    memcpy(&t->data, s, size);
+    t->data[len] = '\0';
+    return (char *)&t->data;
+}
+
 static struct malloc_header *malloc_get_header(void *ptr, const char *caller, const char *file, const char *function, size_t line) {
     uint8_t *ret = (uint8_t *)ptr - malloc_header_size;
     struct malloc_header *t = (struct malloc_header *)ret;
@@ -447,6 +483,12 @@ void freez_int(void *ptr, const char *file, const char *function, size_t line) {
 char *strdupz(const char *s) {
     char *t = strdup(s);
     if (unlikely(!t)) fatal("Cannot strdup() string '%s'", s);
+    return t;
+}
+
+char *strndupz(const char *s, size_t len) {
+    char *t = strndup(s, len);
+    if (unlikely(!t)) fatal("Cannot strndup() string '%s' of len %zu", s, len);
     return t;
 }
 

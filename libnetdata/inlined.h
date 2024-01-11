@@ -597,4 +597,40 @@ static inline char *trim_all(char *buffer) {
     return buffer;
 }
 
+static inline bool streq(const char *a, const char *b) {
+    if (a == b)
+        return true;
+
+    if (a == NULL || b == NULL)
+        return false;
+
+    return strcmp(a, b) == 0;
+}
+
+static inline bool strstartswith(const char *string, const char *prefix) {
+    if (string == NULL || prefix == NULL)
+        return false;
+
+    size_t string_len = strlen(string);
+    size_t prefix_len = strlen(prefix);
+
+    if (prefix_len > string_len)
+        return false;
+
+    return strncmp(string, prefix, prefix_len) == 0;
+}
+
+static inline bool strendswith(const char *string, const char *suffix) {
+    if (string == NULL || suffix == NULL)
+        return false;
+
+    size_t string_len = strlen(string);
+    size_t suffix_len = strlen(suffix);
+
+    if (suffix_len > string_len)
+        return false;
+
+    return strcmp(string + string_len - suffix_len, suffix) == 0;
+}
+
 #endif //NETDATA_INLINED_H

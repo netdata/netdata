@@ -160,7 +160,10 @@ typedef struct function_query_status {
     "|message"                                  \
     ""
 
-static void logsmanagement_function_facets(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled){
+static void logsmanagement_function_facets(const char *transaction, char *function,
+                                           usec_t *stop_monotonic_ut, bool *cancelled,
+                                           BUFFER *payload __maybe_unused,
+                                           const char *src __maybe_unused, void *data __maybe_unused){
 
     struct rusage start, end;
     getrusage(RUSAGE_THREAD, &start);
@@ -711,7 +714,8 @@ struct functions_evloop_globals *logsmanagement_func_facets_init(bool *p_logsman
 
     functions_evloop_add_function(  wg, LOGS_MANAG_FUNC_NAME, 
                                     logsmanagement_function_facets,
-                                    LOGS_MANAG_QUERY_TIMEOUT_DEFAULT);
+                                    LOGS_MANAG_QUERY_TIMEOUT_DEFAULT,
+                                  NULL);
     
     return wg;
 }

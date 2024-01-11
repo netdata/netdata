@@ -173,7 +173,7 @@ static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, uuid_t *transact
         uuid_copy(qp->transaction, *transaction);
 }
 
-static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, const char *payload, const char *client) {
+static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, BUFFER *payload, const char *client) {
     qp->mode = mode;
     qp->acl = acl;
     qp->started_ut = started_ut ? started_ut : now_realtime_usec();
@@ -186,8 +186,8 @@ static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, 
     if(query && *query && !buffer_strlen(qp->query))
         buffer_strcat(qp->query, query);
 
-    if(payload && *payload && !buffer_strlen(qp->payload))
-        buffer_strcat(qp->payload, payload);
+    if(payload && !buffer_strlen(qp->payload))
+        buffer_copy(qp->payload, payload);
 
     if(client && *client && !buffer_strlen(qp->client))
         buffer_strcat(qp->client, client);
@@ -210,7 +210,7 @@ static inline void query_progress_unlink_from_cache_unsafe(QUERY_PROGRESS *qp) {
 // ----------------------------------------------------------------------------
 // Progress API
 
-void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, const char *payload, const char *client) {
+void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, BUFFER *payload, const char *client) {
     if(!transaction)
         return;
 

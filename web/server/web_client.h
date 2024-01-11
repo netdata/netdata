@@ -5,6 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
+struct web_client;
+
 extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 
 #define HTTP_REQ_MAX_HEADER_FETCH_TRIES 100
@@ -12,7 +14,7 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
     HTTP_VALIDATION_TOO_MANY_READ_RETRIES,
@@ -24,25 +26,48 @@ typedef enum {
 #endif
 } HTTP_VALIDATION;
 
-typedef enum web_client_flags {
-    WEB_CLIENT_FLAG_DEAD                    = (1 << 1), // if set, this client is dead
-    WEB_CLIENT_FLAG_KEEPALIVE               = (1 << 2), // if set, the web client will be re-used
-    WEB_CLIENT_FLAG_WAIT_RECEIVE            = (1 << 3), // if set, we are waiting more input data
-    WEB_CLIENT_FLAG_WAIT_SEND               = (1 << 4), // if set, we have data to send to the client
-    WEB_CLIENT_FLAG_DO_NOT_TRACK            = (1 << 5), // if set, we should not set cookies on this client
-    WEB_CLIENT_FLAG_TRACKING_REQUIRED       = (1 << 6), // if set, we need to send cookies
-    WEB_CLIENT_FLAG_TCP_CLIENT              = (1 << 7), // if set, the client is using a TCP socket
-    WEB_CLIENT_FLAG_UNIX_CLIENT             = (1 << 8), // if set, the client is using a UNIX socket
-    WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET       = (1 << 9), // don't close the socket when cleaning up (static-threaded web server)
-    WEB_CLIENT_CHUNKED_TRANSFER             = (1 << 10), // chunked transfer (used with zlib compression)
-    WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE        = (1 << 11), // if set, we are waiting more input data from an ssl conn
-    WEB_CLIENT_FLAG_SSL_WAIT_SEND           = (1 << 12), // if set, we have data to send to the client from an ssl conn
-    WEB_CLIENT_FLAG_PATH_IS_V0              = (1 << 13), // v0 dashboard found on the path
-    WEB_CLIENT_FLAG_PATH_IS_V1              = (1 << 14), // v1 dashboard found on the path
-    WEB_CLIENT_FLAG_PATH_IS_V2              = (1 << 15), // v2 dashboard found on the path
-    WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH = (1 << 16), // the path has a trailing hash
-    WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION = (1 << 17), // the path ends with a filename extension
-    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 18), // when set we track the progress of this transaction
+typedef enum __attribute__((packed)) {
+    WEB_CLIENT_FLAG_DEAD                    = (1 << 0), // this client is dead
+
+    WEB_CLIENT_FLAG_KEEPALIVE               = (1 << 1), // the web client will be re-used
+
+    // compression
+    WEB_CLIENT_ENCODING_GZIP                = (1 << 2),
+    WEB_CLIENT_ENCODING_DEFLATE             = (1 << 3),
+    WEB_CLIENT_CHUNKED_TRANSFER             = (1 << 4), // chunked transfer (used with zlib compression)
+
+    WEB_CLIENT_FLAG_WAIT_RECEIVE            = (1 << 5), // we are waiting more input data
+    WEB_CLIENT_FLAG_WAIT_SEND               = (1 << 6), // we have data to send to the client
+    WEB_CLIENT_FLAG_SSL_WAIT_RECEIVE        = (1 << 7), // we are waiting more input data from ssl connection
+    WEB_CLIENT_FLAG_SSL_WAIT_SEND           = (1 << 8), // we have data to send to the client from ssl connection
+
+    // DNT
+    WEB_CLIENT_FLAG_DO_NOT_TRACK            = (1 << 9), // we should not set cookies on this client
+    WEB_CLIENT_FLAG_TRACKING_REQUIRED       = (1 << 10), // we need to send cookies
+
+    // connection type
+    WEB_CLIENT_FLAG_CONN_TCP                = (1 << 11), // the client is using a TCP socket
+    WEB_CLIENT_FLAG_CONN_UNIX               = (1 << 12), // the client is using a UNIX socket
+    WEB_CLIENT_FLAG_CONN_CLOUD              = (1 << 13), // the client is using Netdata Cloud
+    WEB_CLIENT_FLAG_CONN_WEBRTC             = (1 << 14), // the client is using WebRTC
+
+    // streaming
+    WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET       = (1 << 15), // don't close the socket when cleaning up
+
+    // dashboard version
+    WEB_CLIENT_FLAG_PATH_IS_V0              = (1 << 16), // v0 dashboard found on the path
+    WEB_CLIENT_FLAG_PATH_IS_V1              = (1 << 17), // v1 dashboard found on the path
+    WEB_CLIENT_FLAG_PATH_IS_V2              = (1 << 18), // v2 dashboard found on the path
+    WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH = (1 << 19), // the path has a trailing hash
+    WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION = (1 << 20), // the path ends with a filename extension
+
+    // authorization
+    WEB_CLIENT_FLAG_AUTH_CLOUD              = (1 << 21),
+    WEB_CLIENT_FLAG_AUTH_BEARER             = (1 << 22),
+    WEB_CLIENT_FLAG_AUTH_GOD                = (1 << 23),
+
+    // transient settings
+    WEB_CLIENT_FLAG_PROGRESS_TRACKING       = (1 << 24), // flag to avoid redoing progress work
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2)
@@ -83,12 +108,19 @@ typedef enum web_client_flags {
 #define web_client_enable_ssl_wait_send(w) web_client_flag_set(w, WEB_CLIENT_FLAG_SSL_WAIT_SEND)
 #define web_client_disable_ssl_wait_send(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_SSL_WAIT_SEND)
 
-#define web_client_set_tcp(w) web_client_flag_set(w, WEB_CLIENT_FLAG_TCP_CLIENT)
-#define web_client_set_unix(w) web_client_flag_set(w, WEB_CLIENT_FLAG_UNIX_CLIENT)
-#define web_client_check_unix(w) web_client_flag_check(w, WEB_CLIENT_FLAG_UNIX_CLIENT)
-#define web_client_check_tcp(w) web_client_flag_check(w, WEB_CLIENT_FLAG_TCP_CLIENT)
+#define web_client_check_conn_unix(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_UNIX)
+#define web_client_check_conn_tcp(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_TCP)
+#define web_client_check_conn_cloud(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD)
+#define web_client_check_conn_webrtc(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_WEBRTC)
 
-#define web_client_is_corkable(w) web_client_flag_check(w, WEB_CLIENT_FLAG_TCP_CLIENT)
+#define web_client_flags_clear_conn(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_CONN_TCP | WEB_CLIENT_FLAG_CONN_UNIX | WEB_CLIENT_FLAG_CONN_CLOUD | WEB_CLIENT_FLAG_CONN_WEBRTC)
+#define web_client_flags_check_auth(w) web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD | WEB_CLIENT_FLAG_AUTH_BEARER)
+#define web_client_flags_clear_auth(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_AUTH_CLOUD | WEB_CLIENT_FLAG_AUTH_BEARER)
+
+void web_client_set_conn_tcp(struct web_client *w);
+void web_client_set_conn_unix(struct web_client *w);
+void web_client_set_conn_cloud(struct web_client *w);
+void web_client_set_conn_webrtc(struct web_client *w);
 
 #define NETDATA_WEB_REQUEST_URL_SIZE 65536              // static allocation
 
@@ -99,6 +131,8 @@ typedef enum web_client_flags {
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_MAX_SIZE 65536
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
+
+#define CLOUD_USER_NAME_LENGTH 64
 
 struct response {
     BUFFER *header;         // our response header
@@ -157,9 +191,7 @@ struct web_client {
     char *origin;                       // the Origin: header
     char *user_agent;                   // the User-Agent: header
 
-    char *post_payload;                 // when this request is a POST, this has the payload
-    size_t post_payload_size;           // the size of the buffer allocated for the payload
-                                        // the actual contents may be less than the size
+    BUFFER *payload;                    // when this request is a POST, this has the payload
 
     // STATIC-THREADED WEB SERVER MEMBERS
     size_t pollinfo_slot;               // POLLINFO slot of the web client
@@ -168,6 +200,12 @@ struct web_client {
 #ifdef ENABLE_HTTPS
     NETDATA_SSL ssl;
 #endif
+
+    struct {
+        uuid_t bearer_token;
+        uuid_t cloud_account_id;
+        char client_name[CLOUD_USER_NAME_LENGTH];
+    } auth;
 
     struct {                            // A callback to check if the query should be interrupted / stopped
         web_client_interrupt_t callback;
@@ -219,8 +257,6 @@ void web_client_free(struct web_client *w);
 
 void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
-const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type);
-void web_client_enable_deflate(struct web_client *w, int gzip);
 int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path);
 
 void web_client_timeout_checkpoint_init(struct web_client *w);
@@ -229,5 +265,7 @@ usec_t web_client_timeout_checkpoint(struct web_client *w);
 bool web_client_timeout_checkpoint_and_check(struct web_client *w, usec_t *usec_since_last_checkpoint);
 usec_t web_client_timeout_checkpoint_response_ready(struct web_client *w, usec_t *usec_since_last_checkpoint);
 void web_client_log_completed_request(struct web_client *w, bool update_web_stats);
+
+HTTP_VALIDATION http_request_validate(struct web_client *w);
 
 #endif

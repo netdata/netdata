@@ -36,25 +36,29 @@ LABEL,                   51, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_R
 OVERWRITE,               52, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_REP_METADATA,    WORKER_PARSER_FIRST_JOB + 18
 SET,                     11, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 19
 VARIABLE,                53, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING|PARSER_REP_METADATA,    WORKER_PARSER_FIRST_JOB + 20
-DYNCFG_ENABLE,          101, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 21
-DYNCFG_REGISTER_MODULE, 102, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 22
-DYNCFG_REGISTER_JOB,    103, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 23
-DYNCFG_RESET,           104, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 24
-REPORT_JOB_STATUS,      110, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 25
-DELETE_JOB,             111, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 26
+CONFIG,                 100, PARSER_INIT_PLUGINSD|PARSER_REP_METADATA,                          WORKER_PARSER_FIRST_JOB + 21
 #
 # Streaming only keywords
 #
-CLAIMED_ID,              61, PARSER_INIT_STREAMING|PARSER_REP_METADATA,                         WORKER_PARSER_FIRST_JOB + 27
-BEGIN2,                   2, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 28
-SET2,                     1, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 29
-END2,                     3, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 30
+CLAIMED_ID,              61, PARSER_INIT_STREAMING|PARSER_REP_METADATA,                         WORKER_PARSER_FIRST_JOB + 22
+BEGIN2,                   2, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 23
+SET2,                     1, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 24
+END2,                     3, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 25
 #
 # Streaming Replication keywords
 #
-CHART_DEFINITION_END,    33, PARSER_INIT_STREAMING|PARSER_REP_METADATA,                         WORKER_PARSER_FIRST_JOB + 31
-RBEGIN,                  22, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 32
-RDSTATE,                 23, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 33
-REND,                    25, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 34
-RSET,                    21, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 35
-RSSTATE,                 24, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 36
+CHART_DEFINITION_END,    33, PARSER_INIT_STREAMING|PARSER_REP_METADATA,                         WORKER_PARSER_FIRST_JOB + 26
+RBEGIN,                  22, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 27
+RDSTATE,                 23, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 28
+REND,                    25, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 29
+RSET,                    21, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 30
+RSSTATE,                 24, PARSER_INIT_STREAMING,                                             WORKER_PARSER_FIRST_JOB + 31
+#
+# obsolete - do nothing commands
+#
+DYNCFG_ENABLE,          901, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 32
+DYNCFG_REGISTER_MODULE, 902, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 33
+DYNCFG_REGISTER_JOB,    903, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 34
+DYNCFG_RESET,           904, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 35
+REPORT_JOB_STATUS,      905, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 36
+DELETE_JOB,             906, PARSER_INIT_PLUGINSD|PARSER_INIT_STREAMING,                        WORKER_PARSER_FIRST_JOB + 37

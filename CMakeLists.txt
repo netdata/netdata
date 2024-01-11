@@ -144,7 +144,7 @@ if(NOT ${DISABLE_HARDENING})
         endif()
 
         if(NOT ${CMAKE_C_FLAGS} MATCHES "stack-clash-protection")
-                check_c_compiler_flag("-fstack-clash-protection", HAVE_STACK_CLASH_FLAG)
+                check_c_compiler_flag("-fstack-clash-protection" HAVE_STACK_CLASH_FLAG)
                 if(HAVE_STACK_CLASH_FLAG)
                         set(EXTRA_HARDENING_FLAGS "${EXTRA_HARDENING_FLAGS} -fstack-clash-protection")
                 endif()
@@ -641,8 +641,10 @@ set(LIBNETDATA_FILES
         libnetdata/http/http_access.h
         libnetdata/http/http_defs.c
         libnetdata/http/http_defs.h
-        libnetdata/dyn_conf/dyn_conf.c
-        libnetdata/dyn_conf/dyn_conf.h
+        libnetdata/http/content_type.c
+        libnetdata/http/content_type.h
+        libnetdata/config/dyncfg.c
+        libnetdata/config/dyncfg.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -760,6 +762,15 @@ set(DAEMON_FILES
         daemon/pipename.h
         daemon/unit_test.c
         daemon/unit_test.h
+        daemon/config/dyncfg.c
+        daemon/config/dyncfg.h
+        daemon/config/dyncfg-files.c
+        daemon/config/dyncfg-unittest.c
+        daemon/config/dyncfg-inline.c
+        daemon/config/dyncfg-echo.c
+        daemon/config/dyncfg-internals.h
+        daemon/config/dyncfg-intercept.c
+        daemon/config/dyncfg-tree.c
 )
 
 set(H2O_FILES
@@ -784,6 +795,10 @@ set(API_PLUGIN_FILES
         web/api/web_api_v1.h
         web/api/web_api_v2.c
         web/api/web_api_v2.h
+        web/api/http_auth.c
+        web/api/http_auth.h
+        web/api/http_header.c
+        web/api/http_header.h
         web/api/badges/web_buffer_svg.c
         web/api/badges/web_buffer_svg.h
         web/api/exporters/allmetrics.c
@@ -929,6 +944,12 @@ set(RRD_PLUGIN_FILES
         database/rrdfamily.c
         database/rrdfunctions.c
         database/rrdfunctions.h
+        database/rrdfunctions-inline.c
+        database/rrdfunctions-inline.h
+        database/rrdfunctions-progress.c
+        database/rrdfunctions-progress.h
+        database/rrdfunctions-streaming.c
+        database/rrdfunctions-streaming.h
         database/rrdhost.c
         database/rrdlabels.c
         database/rrd.c
@@ -965,6 +986,12 @@ set(RRD_PLUGIN_FILES
         database/sqlite/dbdata.c
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
+        database/rrdfunctions-inflight.c
+        database/rrdfunctions-inflight.h
+        database/rrdfunctions-exporters.c
+        database/rrdfunctions-exporters.h
+        database/rrdfunctions-internals.h
+        database/rrdcollector-internals.h
 )
 
 if(ENABLE_DBENGINE)
@@ -1022,6 +1049,7 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         collectors/systemd-journal.plugin/systemd-journal-files.c
         collectors/systemd-journal.plugin/systemd-journal-fstat.c
         collectors/systemd-journal.plugin/systemd-journal-watcher.c
+        collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
 )
 
 set(STREAMING_PLUGIN_FILES

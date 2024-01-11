@@ -1128,7 +1128,7 @@ static void stream_execute_function_callback(BUFFER *func_wb, int code, void *da
         pluginsd_function_result_begin_to_buffer(wb
                                                  , string2str(tmp->transaction)
                                                  , code
-                                                 , functions_content_type_to_format(func_wb->content_type)
+                                                 , content_type_id2string(func_wb->content_type)
                                                  , func_wb->expires);
 
         buffer_fast_strcat(wb, buffer_tostring(func_wb), buffer_strlen(func_wb));
@@ -1163,6 +1163,60 @@ static void stream_execute_function_progress_callback(void *data, size_t done, s
     }
 }
 
+static void execute_commands_function(struct sender_state *s, const char *command, const char *transaction, const char *timeout_s, const char *function, BUFFER *payload, const char *source) {
+    worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
+    nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
+
+    if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
+        netdata_log_error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
+                          rrdhost_hostname(s->host), s->connected_to,
+                          command,
+                          transaction?transaction:"(unset)",
+                          timeout_s?timeout_s:"(unset)",
+                          function?function:"(unset)");
+    }
+    else {
+        int timeout = str2i(timeout_s);
+        if(timeout <= 0) timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
+
+        struct inflight_stream_function *tmp = callocz(1, sizeof(struct inflight_stream_function));
+        tmp->received_ut = now_realtime_usec();
+        tmp->sender = s;
+        tmp->transaction = string_strdupz(transaction);
+        BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_functions);
+
+        int code = rrd_function_run(s->host, wb,
+                                    timeout,HTTP_ACCESS_ADMIN, function, false, transaction,
+                                    stream_execute_function_callback, tmp,
+                                    stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
+                                    stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,
+                                    NULL, NULL, payload, source);
+
+        if(code != HTTP_RESP_OK) {
+            if (!buffer_strlen(wb))
+                rrd_call_function_error(wb, "Failed to route request to collector", code);
+        }
+    }
+}
+
+static void cleanup_intercepting_input(struct sender_state *s) {
+    freez((void *)s->functions.transaction);
+    freez((void *)s->functions.timeout_s);
+    freez((void *)s->functions.function);
+    freez((void *)s->functions.source);
+    buffer_free(s->functions.payload);
+
+    s->functions.transaction = NULL;
+    s->functions.timeout_s = NULL;
+    s->functions.function = NULL;
+    s->functions.payload = NULL;
+    s->functions.intercept_input = false;
+}
+
+static void execute_commands_cleanup(struct sender_state *s) {
+    cleanup_intercepting_input(s);
+}
+
 // This is just a placeholder until the gap filling state machine is inserted
 void execute_commands(struct sender_state *s) {
     worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
@@ -1176,105 +1230,49 @@ void execute_commands(struct sender_state *s) {
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
     *end = 0;
     while( start < end && (newline = strchr(start, '\n')) ) {
-        *newline = '\0';
+        s->line.count++;
 
-        if (s->receiving_function_payload && unlikely(strcmp(start, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END) != 0)) {
-            if (buffer_strlen(s->function_payload.payload) != 0)
-                buffer_strcat(s->function_payload.payload, "\n");
-            buffer_strcat(s->function_payload.payload, start);
+        if(s->functions.intercept_input) {
+            if(strcmp(start, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END "\n") == 0) {
+                execute_commands_function(s, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END,
+                                          s->functions.transaction, s->functions.timeout_s,
+                                          s->functions.function, s->functions.payload, s->functions.source);
+
+                cleanup_intercepting_input(s);
+            }
+            else
+                buffer_strcat(s->functions.payload, start);
+
             start = newline + 1;
             continue;
         }
 
-        s->line.count++;
+        *newline = '\0';
         s->line.num_words = quoted_strings_splitter_pluginsd(start, s->line.words, PLUGINSD_MAX_WORDS);
         const char *command = get_word(s->line.words, s->line.num_words, 0);
 
-        if(command && (strcmp(command, PLUGINSD_KEYWORD_FUNCTION) == 0 || strcmp(command, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END) == 0)) {
-            worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
-            nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
+        if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION) == 0) {
+            char *transaction  = get_word(s->line.words, s->line.num_words, 1);
+            char *timeout_s    = get_word(s->line.words, s->line.num_words, 2);
+            char *function     = get_word(s->line.words, s->line.num_words, 3);
+            char *source       = get_word(s->line.words, s->line.num_words, 4);
 
-            char *transaction = s->receiving_function_payload ? s->function_payload.txid : get_word(s->line.words, s->line.num_words, 1);
-            char *timeout_s = s->receiving_function_payload ? s->function_payload.timeout : get_word(s->line.words, s->line.num_words, 2);
-            char *function = s->receiving_function_payload ? s->function_payload.fn_name : get_word(s->line.words, s->line.num_words, 3);
-
-            if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                netdata_log_error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                      rrdhost_hostname(s->host), s->connected_to,
-                      command,
-                      transaction?transaction:"(unset)",
-                      timeout_s?timeout_s:"(unset)",
-                      function?function:"(unset)");
-            }
-            else {
-                int timeout = str2i(timeout_s);
-                if(timeout <= 0) timeout = PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT;
-
-                struct inflight_stream_function *tmp = callocz(1, sizeof(struct inflight_stream_function));
-                tmp->received_ut = now_realtime_usec();
-                tmp->sender = s;
-                tmp->transaction = string_strdupz(transaction);
-                BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions);
-
-                char *payload = s->receiving_function_payload ? (char *)buffer_tostring(s->function_payload.payload) : NULL;
-                int code = rrd_function_run(s->host, wb,
-                                            timeout, HTTP_ACCESS_ADMINS, function, false, transaction,
-                                            stream_execute_function_callback, tmp,
-                                            stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
-                                            stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,
-                                            NULL, NULL, payload);
-
-                if(code != HTTP_RESP_OK) {
-                    if (!buffer_strlen(wb))
-                        rrd_call_function_error(wb, "Failed to route request to collector", code);
-
-                    stream_execute_function_callback(wb, code, tmp);
-                }
-            }
-
-            if (s->receiving_function_payload) {
-                s->receiving_function_payload = false;
-
-                buffer_free(s->function_payload.payload);
-                freez(s->function_payload.txid);
-                freez(s->function_payload.timeout);
-                freez(s->function_payload.fn_name);
-
-                memset(&s->function_payload, 0, sizeof(struct function_payload_state));
-            }
+            execute_commands_function(s, command, transaction, timeout_s, function, NULL, source);
         }
-        else if (command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0) {
-            nd_log(NDLS_ACCESS, NDLP_INFO, NULL);
+        else if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0) {
+            char *transaction  = get_word(s->line.words, s->line.num_words, 1);
+            char *timeout_s    = get_word(s->line.words, s->line.num_words, 2);
+            char *function     = get_word(s->line.words, s->line.num_words, 3);
+            char *source       = get_word(s->line.words, s->line.num_words, 4);
+            char *content_type = get_word(s->line.words, s->line.num_words, 5);
 
-            if (s->receiving_function_payload) {
-                netdata_log_error("STREAM %s [send to %s] received %s command while already receiving function payload",
-                                  rrdhost_hostname(s->host), s->connected_to, command);
-                s->receiving_function_payload = false;
-                buffer_free(s->function_payload.payload);
-                s->function_payload.payload = NULL;
-
-                // TODO send error response
-            }
-
-            char *transaction = get_word(s->line.words, s->line.num_words, 1);
-            char *timeout_s = get_word(s->line.words, s->line.num_words, 2);
-            char *function = get_word(s->line.words, s->line.num_words, 3);
-
-            if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
-                netdata_log_error("STREAM %s [send to %s] %s execution command is incomplete (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
-                      rrdhost_hostname(s->host), s->connected_to,
-                      command,
-                      transaction?transaction:"(unset)",
-                      timeout_s?timeout_s:"(unset)",
-                      function?function:"(unset)");
-            }
-
-            s->receiving_function_payload = true;
-            s->function_payload.payload = buffer_create(4096, &netdata_buffers_statistics.buffers_functions);
-
-            s->function_payload.txid = strdupz(get_word(s->line.words, s->line.num_words, 1));
-            s->function_payload.timeout = strdupz(get_word(s->line.words, s->line.num_words, 2));
-            s->function_payload.fn_name = strdupz(get_word(s->line.words, s->line.num_words, 3));
+            s->functions.transaction = strdupz(transaction ? transaction : "");
+            s->functions.timeout_s = strdupz(timeout_s ? timeout_s : "");
+            s->functions.function = strdupz(function ? function : "");
+            s->functions.source = strdupz(source ? source : "");
+            s->functions.payload = buffer_create(0, NULL);
+            s->functions.payload->content_type = content_type_string2id(content_type);
+            s->functions.intercept_input = true;
         }
         else if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
@@ -1480,6 +1478,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     rrdpush_sender_thread_close_socket(host);
     rrdpush_sender_pipe_close(host, host->sender->rrdpush_sender_pipe, false);
+    execute_commands_cleanup(host->sender);
 
     rrdhost_clear_sender___while_having_sender_mutex(host);
 
@@ -1680,6 +1679,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
             now_s = now_monotonic_sec();
             rrdpush_sender_cbuffer_recreate_timed(s, now_s, false, true);
+            execute_commands_cleanup(s);
 
             rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
             s->flags &= ~SENDER_FLAG_OVERFLOW;
@@ -1697,7 +1697,6 @@ void *rrdpush_sender_thread(void *ptr) {
             rrdpush_send_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
             rrdpush_send_global_functions(s->host);
-            rrdpush_send_dyncfg(s->host);
             s->replication.oldest_request_after_t = 0;
 
             rrdhost_flag_set(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);

@@ -5,6 +5,8 @@
 
 #include "../libnetdata.h"
 
+#define MAX_FUNCTION_PARAMETERS 1024
+
 #define PLUGINSD_KEYWORD_CHART                  "CHART"
 #define PLUGINSD_KEYWORD_CHART_DEFINITION_END   "CHART_DEFINITION_END"
 
@@ -28,6 +30,13 @@
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN  "FUNCTION_RESULT_BEGIN"
 #define PLUGINSD_KEYWORD_FUNCTION_RESULT_END    "FUNCTION_RESULT_END"
 
+#define PLUGINSD_KEYWORD_CONFIG                 "CONFIG"
+#define PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE   "create"
+#define PLUGINSD_KEYWORD_CONFIG_ACTION_DELETE   "delete"
+#define PLUGINSD_KEYWORD_CONFIG_ACTION_STATUS   "status"
+
+#define PLUGINSD_FUNCTION_CONFIG                "config"
+
 #define PLUGINSD_KEYWORD_REPLAY_CHART           "REPLAY_CHART"
 #define PLUGINSD_KEYWORD_REPLAY_BEGIN           "RBEGIN"
 #define PLUGINSD_KEYWORD_REPLAY_SET             "RSET"
@@ -44,21 +53,16 @@
 #define PLUGINSD_KEYWORD_HOST_LABEL             "HOST_LABEL"
 #define PLUGINSD_KEYWORD_HOST                   "HOST"
 
-#define PLUGINSD_KEYWORD_DYNCFG_ENABLE          "DYNCFG_ENABLE"
-#define PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE "DYNCFG_REGISTER_MODULE"
-
-#define PLUGINSD_KEYWORD_REPORT_JOB_STATUS      "REPORT_JOB_STATUS"
-
 #define PLUGINSD_KEYWORD_EXIT                   "EXIT"
 
 #define PLUGINSD_KEYWORD_SLOT                   "SLOT" // to change the length of this, update pluginsd_extract_chart_slot() too
 
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
-typedef void (*functions_evloop_worker_execute_t)(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled);
+typedef void (*functions_evloop_worker_execute_t)(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, const char *source, void *data);
 struct functions_evloop_worker_job;
 struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, const char *tag, netdata_mutex_t *stdout_mutex, bool *plugin_should_exit);
-void functions_evloop_add_function(struct functions_evloop_globals *wg, const char *function, functions_evloop_worker_execute_t cb, time_t default_timeout);
+void functions_evloop_add_function(struct functions_evloop_globals *wg, const char *function, functions_evloop_worker_execute_t cb, time_t default_timeout, void *data);
 void functions_evloop_cancel_threads(struct functions_evloop_globals *wg);
 
 #define FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT (10 * USEC_PER_SEC)
@@ -118,5 +122,9 @@ static inline void pluginsd_function_progress_to_stdout(const char *transaction,
             transaction, done, all);
     fflush(stdout);
 }
+
+void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data);
+void functions_evloop_dyncfg_del(struct functions_evloop_globals *wg, const char *id);
+void functions_evloop_dyncfg_status(struct functions_evloop_globals *wg, const char *id, DYNCFG_STATUS status);
 
 #endif //NETDATA_FUNCTIONS_EVLOOP_H

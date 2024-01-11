@@ -10,14 +10,6 @@
 #define PLUGINSD_CMD_MAX (FILENAME_MAX*2)
 #define PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH 0
 
-#define PLUGINSD_KEYWORD_DYNCFG_ENABLE          "DYNCFG_ENABLE"
-#define PLUGINSD_KEYWORD_DYNCFG_REGISTER_MODULE "DYNCFG_REGISTER_MODULE"
-#define PLUGINSD_KEYWORD_DYNCFG_REGISTER_JOB    "DYNCFG_REGISTER_JOB"
-#define PLUGINSD_KEYWORD_DYNCFG_RESET           "DYNCFG_RESET"
-
-#define PLUGINSD_KEYWORD_REPORT_JOB_STATUS      "REPORT_JOB_STATUS"
-#define PLUGINSD_KEYWORD_DELETE_JOB             "DELETE_JOB"
-
 #define PLUGINSD_MAX_DIRECTORIES 20
 extern char *plugin_directories[PLUGINSD_MAX_DIRECTORIES];
 
@@ -46,9 +38,6 @@ struct plugind {
     } unsafe;
 
     time_t started_t;
-
-    const DICTIONARY_ITEM *cfg_dict_item;
-    struct configurable_plugin *configuration;
 
     struct plugind *prev;
     struct plugind *next;

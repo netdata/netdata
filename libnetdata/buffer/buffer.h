@@ -36,37 +36,6 @@ typedef enum __attribute__ ((__packed__)) {
 } BUFFER_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) {
-    CT_NONE = 0,
-    CT_APPLICATION_JSON,
-    CT_TEXT_PLAIN,
-    CT_TEXT_HTML,
-    CT_APPLICATION_X_JAVASCRIPT,
-    CT_TEXT_CSS,
-    CT_TEXT_XML,
-    CT_APPLICATION_XML,
-    CT_TEXT_XSL,
-    CT_APPLICATION_OCTET_STREAM,
-    CT_APPLICATION_X_FONT_TRUETYPE,
-    CT_APPLICATION_X_FONT_OPENTYPE,
-    CT_APPLICATION_FONT_WOFF,
-    CT_APPLICATION_FONT_WOFF2,
-    CT_APPLICATION_VND_MS_FONTOBJ,
-    CT_IMAGE_SVG_XML,
-    CT_IMAGE_PNG,
-    CT_IMAGE_JPG,
-    CT_IMAGE_GIF,
-    CT_IMAGE_XICON,
-    CT_IMAGE_ICNS,
-    CT_IMAGE_BMP,
-    CT_PROMETHEUS,
-    CT_AUDIO_MPEG,
-    CT_AUDIO_OGG,
-    CT_VIDEO_MP4,
-    CT_APPLICATION_PDF,
-    CT_APPLICATION_ZIP,
-} HTTP_CONTENT_TYPE;
-
-typedef enum __attribute__ ((__packed__)) {
     BUFFER_JSON_OPTIONS_DEFAULT = 0,
     BUFFER_JSON_OPTIONS_MINIFY = (1 << 0),
     BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS = (1 << 1),
@@ -164,6 +133,9 @@ void buffer_json_finalize(BUFFER *wb);
 
 static const char *buffer_tostring(BUFFER *wb)
 {
+    if(unlikely(!wb))
+        return NULL;
+
     buffer_need_bytes(wb, 1);
     wb->buffer[wb->len] = '\0';
 
@@ -1247,6 +1219,28 @@ buffer_rrdf_table_add_field(BUFFER *wb, size_t field_id, const char *key, const 
             buffer_json_member_add_boolean(wb, "dummy", true);
     }
     buffer_json_object_close(wb);
+}
+
+static inline void buffer_copy(BUFFER *dst, BUFFER *src) {
+    if(!src || !dst)
+        return;
+
+    buffer_contents_replace(dst, buffer_tostring(src), buffer_strlen(src));
+
+    dst->content_type = src->content_type;
+    dst->options = src->options;
+    dst->date = src->date;
+    dst->expires = src->expires;
+    dst->json = src->json;
+}
+
+static inline BUFFER *buffer_dup(BUFFER *src) {
+    if(!src)
+        return NULL;
+
+    BUFFER *dst = buffer_create(buffer_strlen(src) + 1, src->statistics);
+    buffer_copy(dst, src);
+    return dst;
 }
 
 #endif /* NETDATA_WEB_BUFFER_H */

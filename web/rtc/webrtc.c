@@ -292,6 +292,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     w->statistics.received_bytes = size;
     w->interrupt.callback = web_client_stop_callback;
     w->interrupt.callback_data = chan;
+    web_client_set_conn_webrtc(w);
 
     w->acl = HTTP_ACL_WEBRTC;
 

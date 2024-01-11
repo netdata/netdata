@@ -277,7 +277,10 @@ void ebpf_socket_read_open_connections(BUFFER *buf, struct ebpf_module *em)
 static void ebpf_function_socket_manipulation(const char *transaction,
                                               char *function __maybe_unused,
                                               usec_t *stop_monotonic_ut __maybe_unused,
-                                              bool *cancelled __maybe_unused)
+                                              bool *cancelled __maybe_unused,
+                                              BUFFER *payload __maybe_unused,
+                                              const char *source __maybe_unused,
+                                              void *data __maybe_unused)
 {
     ebpf_module_t *em = &ebpf_modules[EBPF_MODULE_SOCKET_IDX];
 
@@ -434,7 +437,7 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    BUFFER *wb = buffer_create(4096, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
@@ -684,7 +687,7 @@ void *ebpf_function_thread(void *ptr)
                                                                 &ebpf_plugin_exit);
 
     functions_evloop_add_function(
-        wg, EBPF_FUNCTION_SOCKET, ebpf_function_socket_manipulation, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+        wg, EBPF_FUNCTION_SOCKET, ebpf_function_socket_manipulation, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
 
     pthread_mutex_lock(&lock);
     int i;

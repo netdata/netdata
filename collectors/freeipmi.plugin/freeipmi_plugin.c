@@ -1471,10 +1471,12 @@ static const char *get_sensor_function_priority(struct sensor *sn) {
     }
 }
 
-static void freeimi_function_sensors(const char *transaction, char *function __maybe_unused, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused) {
+static void freeimi_function_sensors(const char *transaction, char *function __maybe_unused,
+                                     usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+                                     BUFFER *payload __maybe_unused, const char *source __maybe_unused, void *data __maybe_unused) {
     time_t expires = now_realtime_sec() + update_every;
 
-    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    BUFFER *wb = buffer_create(4096, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
@@ -1973,7 +1975,7 @@ int main (int argc, char **argv) {
     size_t iteration = 0;
     usec_t step = 100 * USEC_PER_MS;
     bool global_chart_created = false;
-    bool tty = isatty(fileno(stderr)) == 1;
+    bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -2045,7 +2047,7 @@ int main (int argc, char **argv) {
             struct functions_evloop_globals *wg =
                 functions_evloop_init(1, "FREEIPMI", &stdout_mutex, &function_plugin_should_exit);
             functions_evloop_add_function(
-                wg, "ipmi-sensors", freeimi_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+                wg, "ipmi-sensors", freeimi_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
             FREEIPMI_GLOBAL_FUNCTION_SENSORS();
         }
 

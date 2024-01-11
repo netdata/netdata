@@ -1,7 +1,6 @@
 #ifndef CHECKIN_JSON_H
 #define CHECKIN_JSON_H 1
 
-
 #if ENABLE_JSONC
 #include <json-c/json.h>
 // fix an older json-c bug
@@ -72,6 +71,10 @@ size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e);
 
 int json_callback_print(JSON_ENTRY *e);
 
+static inline void cleanup_json_object_pp(struct json_object **jobj) {
+    if(*jobj)
+        json_object_put(*jobj);
+}
+#define CLEAN_JSON_OBJECT _cleanup_(cleanup_json_object_pp) struct json_object
 
-
-#endif
+#endif // CHECKIN_JSON_H

@@ -34,6 +34,8 @@
 // ----------------------------------------------------------------------------
 // netdata include files
 
+#include "daemon/config/dyncfg.h"
+
 #include "global_statistics.h"
 
 // the netdata database

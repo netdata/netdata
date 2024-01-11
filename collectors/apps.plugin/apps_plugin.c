@@ -4397,7 +4397,9 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     buffer_json_add_array_item_double(wb, _tmp);                                                                \
 } while(0)
 
-static void function_processes(const char *transaction, char *function __maybe_unused, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused) {
+static void function_processes(const char *transaction, char *function __maybe_unused,
+                               usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+                               BUFFER *payload __maybe_unused, const char *source __maybe_unused, void *data __maybe_unused) {
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -4459,8 +4461,8 @@ static void function_processes(const char *transaction, char *function __maybe_u
             return;
         }
         else {
-            char msg[PLUGINSD_LINE_MAX];
-            snprintfz(msg, PLUGINSD_LINE_MAX, "Invalid parameter '%s'", keyword);
+            char msg[1024];
+            snprintfz(msg, sizeof(msg), "Invalid parameter '%s'", keyword);
             pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, msg);
             return;
         }
@@ -4472,7 +4474,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
     unsigned int memory_divisor = 1024;
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 
-    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+    BUFFER *wb = buffer_create(4096, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
@@ -5348,7 +5350,7 @@ int main(int argc, char **argv) {
     struct functions_evloop_globals *wg =
             functions_evloop_init(1, "APPS", &apps_and_stdout_mutex, &apps_plugin_exit);
 
-    functions_evloop_add_function(wg, "processes", function_processes, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT);
+    functions_evloop_add_function(wg, "processes", function_processes, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
 
     // ------------------------------------------------------------------------
 

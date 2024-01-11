@@ -21,5 +21,4 @@ exclude_paths:
   - web/server/h2o/libh2o/**
   - build/**
   - build_external/**
-  - libnetdata/dyn_conf/tests/**
   - packaging/**

@@ -307,6 +307,25 @@ STRING *string_strdupz(const char *str) {
     return string;
 }
 
+STRING *string_strndupz(const char *str, size_t len) {
+    if(unlikely(!str || !*str || !len)) return NULL;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    uint8_t partition = string_partition_str(str);
+#endif
+
+    char buf[len + 1];
+    memcpy(buf, str, len);
+    buf[len] = '\0';
+
+    STRING *string = string_index_search(buf, len + 1);
+    while(!string)
+        string = string_index_insert(buf, len + 1);
+
+    string_stats_atomic_increment(partition, active_references);
+    return string;
+}
+
 void string_freez(STRING *string) {
     if(unlikely(!string)) return;
 

@@ -5,8 +5,8 @@
 
 typedef enum __attribute__((packed)) {
     HTTP_ACCESS_NONE     = 0,
-    HTTP_ACCESS_ADMINS   = 1,
-    HTTP_ACCESS_MEMBERS  = 2,
+    HTTP_ACCESS_ADMIN    = 1,
+    HTTP_ACCESS_MEMBER   = 2,
     HTTP_ACCESS_ANY      = 3,
 
     // keep this list so that lower numbers are more strict access levels

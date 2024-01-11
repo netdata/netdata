@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#define NETDATA_RRDCOLLECTOR_INTERNALS
 #include "rrdcollector.h"
+#include "rrdcollector-internals.h"
 
 // Each function points to this collector structure
 // so that when the collector exits, all of them will

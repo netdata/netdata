@@ -473,17 +473,7 @@ static void netdev_rename_this_device(struct netdev *d) {
 
 // ----------------------------------------------------------------------------
 
-int netdev_function_net_interfaces(uuid_t *transaction __maybe_unused, BUFFER *wb,
-                                   usec_t *stop_monotonic_ut __maybe_unused, const char *function __maybe_unused,
-                                   void *collector_data __maybe_unused,
-                                   rrd_function_result_callback_t result_cb, void *result_cb_data,
-                                   rrd_function_progress_cb_t progress_cb __maybe_unused, void *progress_cb_data __maybe_unused,
-                                   rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
-                                   rrd_function_register_canceller_cb_t register_canceller_cb __maybe_unused,
-                                   void *register_canceller_cb_data __maybe_unused,
-                                   rrd_function_register_progresser_cb_t register_progresser_cb __maybe_unused,
-                                   void *register_progresser_cb_data __maybe_unused) {
-
+int netdev_function_net_interfaces(BUFFER *wb, const char *function __maybe_unused) {
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -1761,16 +1751,14 @@ void *netdev_main(void *ptr)
     worker_register("NETDEV");
     worker_register_job_name(0, "netdev");
 
-    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
         double_linked_device_collect_delay_secs = 300;
-    }
+
+    rrd_function_add_inline(localhost, NULL, "network-interfaces", 10,
+                            RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_NETDEV_HELP,
+                            "top", HTTP_ACCESS_ANY, netdev_function_net_interfaces);
 
     netdata_thread_cleanup_push(netdev_main_cleanup, ptr) {
-        rrd_collector_started();
-        rrd_function_add(localhost, NULL, "network-interfaces", 10, RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_NETDEV_HELP,
-                         "top", HTTP_ACCESS_ANY,
-                         true, netdev_function_net_interfaces, NULL);
-
         usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
         heartbeat_t hb;
         heartbeat_init(&hb);

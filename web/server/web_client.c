@@ -10,6 +10,26 @@ char *web_x_frame_options = NULL;
 
 int web_enable_gzip = 1, web_gzip_level = 3, web_gzip_strategy = Z_DEFAULT_STRATEGY;
 
+void web_client_set_conn_tcp(struct web_client *w) {
+    web_client_flags_clear_conn(w);
+    web_client_flag_set(w, WEB_CLIENT_FLAG_CONN_TCP);
+}
+
+void web_client_set_conn_unix(struct web_client *w) {
+    web_client_flags_clear_conn(w);
+    web_client_flag_set(w, WEB_CLIENT_FLAG_CONN_UNIX);
+}
+
+void web_client_set_conn_cloud(struct web_client *w) {
+    web_client_flags_clear_conn(w);
+    web_client_flag_set(w, WEB_CLIENT_FLAG_CONN_CLOUD);
+}
+
+void web_client_set_conn_webrtc(struct web_client *w) {
+    web_client_flags_clear_conn(w);
+    web_client_flag_set(w, WEB_CLIENT_FLAG_CONN_WEBRTC);
+}
+
 inline int web_client_permission_denied(struct web_client *w) {
     w->response.data->content_type = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
@@ -36,7 +56,7 @@ static inline int bad_request_multiple_dashboard_versions(struct web_client *w) 
 
 static inline int web_client_cork_socket(struct web_client *w __maybe_unused) {
 #ifdef TCP_CORK
-    if(likely(web_client_is_corkable(w) && !w->tcp_cork && w->ofd != -1)) {
+    if(likely(web_client_check_conn_tcp(w) && !w->tcp_cork && w->ofd != -1)) {
         w->tcp_cork = true;
         if(unlikely(setsockopt(w->ofd, IPPROTO_TCP, TCP_CORK, (char *) &w->tcp_cork, sizeof(int)) != 0)) {
             netdata_log_error("%llu: failed to enable TCP_CORK on socket.", w->id);
@@ -111,9 +131,8 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         buffer_free(w->response.data);
         w->response.data = NULL;
 
-        freez(w->post_payload);
-        w->post_payload = NULL;
-        w->post_payload_size = 0;
+        buffer_free(w->payload);
+        w->payload = NULL;
     }
     else {
         // the web client is to be re-used
@@ -126,7 +145,11 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         buffer_reset(w->response.header);
         buffer_reset(w->response.data);
 
-        // leave w->post_payload
+        if(w->payload)
+            buffer_reset(w->payload);
+
+        // to add more items here,
+        // web_client_reuse_from_cache() needs to be adjusted to maintain them
     }
 
     freez(w->server_host);
@@ -157,9 +180,11 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         w->response.zstream.total_in = 0;
         w->response.zstream.total_out = 0;
         w->response.zinitialized = false;
-        w->flags &= ~WEB_CLIENT_CHUNKED_TRANSFER;
+        web_client_flag_clear(w, WEB_CLIENT_CHUNKED_TRANSFER);
     }
 
+    web_client_flags_check_auth(w);
+    web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
     web_client_reset_path_flags(w);
 }
 
@@ -194,6 +219,12 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
             ND_LOG_FIELD_U64(NDF_RESPONSE_PREPARATION_TIME_USEC, prep_ut),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_TIME_USEC, sent_ut),
             ND_LOG_FIELD_U64(NDF_RESPONSE_TOTAL_TIME_USEC, total_ut),
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
+            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
+            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
+            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -218,14 +249,6 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
 }
 
 void web_client_request_done(struct web_client *w) {
-    ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_SRC_IP, w->client_ip),
-            ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
-            ND_LOG_FIELD_TXT(NDF_SRC_PORT, w->client_port),
-            ND_LOG_FIELD_END(),
-    };
-    ND_LOG_STACK_PUSH(lgs);
-
     web_client_uncork_socket(w);
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
@@ -503,52 +526,6 @@ static int mysendfile(struct web_client *w, char *filename) {
 }
 #endif
 
-void web_client_enable_deflate(struct web_client *w, int gzip) {
-    if(unlikely(w->response.zinitialized)) {
-        netdata_log_debug(D_DEFLATE, "%llu: Compression has already be initialized for this client.", w->id);
-        return;
-    }
-
-    if(unlikely(w->response.sent)) {
-        netdata_log_error("%llu: Cannot enable compression in the middle of a conversation.", w->id);
-        return;
-    }
-
-    w->response.zstream.zalloc = Z_NULL;
-    w->response.zstream.zfree = Z_NULL;
-    w->response.zstream.opaque = Z_NULL;
-
-    w->response.zstream.next_in = (Bytef *)w->response.data->buffer;
-    w->response.zstream.avail_in = 0;
-    w->response.zstream.total_in = 0;
-
-    w->response.zstream.next_out = w->response.zbuffer;
-    w->response.zstream.avail_out = 0;
-    w->response.zstream.total_out = 0;
-
-    w->response.zstream.zalloc = Z_NULL;
-    w->response.zstream.zfree = Z_NULL;
-    w->response.zstream.opaque = Z_NULL;
-
-//  if(deflateInit(&w->response.zstream, Z_DEFAULT_COMPRESSION) != Z_OK) {
-//      netdata_log_error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
-//      return;
-//  }
-
-    // Select GZIP compression: windowbits = 15 + 16 = 31
-    if(deflateInit2(&w->response.zstream, web_gzip_level, Z_DEFLATED, 15 + ((gzip)?16:0), 8, web_gzip_strategy) != Z_OK) {
-        netdata_log_error("%llu: Failed to initialize zlib. Proceeding without compression.", w->id);
-        return;
-    }
-
-    w->response.zsent = 0;
-    w->response.zoutput = true;
-    w->response.zinitialized = true;
-    w->flags |= WEB_CLIENT_CHUNKED_TRANSFER;
-
-    netdata_log_debug(D_DEFLATE, "%llu: Initialized compression.", w->id);
-}
-
 void buffer_data_options2string(BUFFER *wb, uint32_t options) {
     int count = 0;
 
@@ -653,6 +630,9 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
+            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
+            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -661,7 +641,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
         web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
         query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                        buffer_tostring(w->url_as_received),
-                                       w->post_payload,
+                                       w->payload,
                                        w->forwarded_for ? w->forwarded_for : w->client_ip);
     }
 
@@ -687,191 +667,6 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
     }
 }
 
-const char *web_content_type_to_string(HTTP_CONTENT_TYPE content_type) {
-    switch(content_type) {
-        case CT_TEXT_HTML:
-            return "text/html; charset=utf-8";
-
-        case CT_APPLICATION_XML:
-            return "application/xml; charset=utf-8";
-
-        case CT_APPLICATION_JSON:
-            return "application/json; charset=utf-8";
-
-        case CT_APPLICATION_X_JAVASCRIPT:
-            return "application/javascript; charset=utf-8";
-
-        case CT_TEXT_CSS:
-            return "text/css; charset=utf-8";
-
-        case CT_TEXT_XML:
-            return "text/xml; charset=utf-8";
-
-        case CT_TEXT_XSL:
-            return "text/xsl; charset=utf-8";
-
-        case CT_APPLICATION_OCTET_STREAM:
-            return "application/octet-stream";
-
-        case CT_IMAGE_SVG_XML:
-            return "image/svg+xml";
-
-        case CT_APPLICATION_X_FONT_TRUETYPE:
-            return "application/x-font-truetype";
-
-        case CT_APPLICATION_X_FONT_OPENTYPE:
-            return "application/x-font-opentype";
-
-        case CT_APPLICATION_FONT_WOFF:
-            return "application/font-woff";
-
-        case CT_APPLICATION_FONT_WOFF2:
-            return "application/font-woff2";
-
-        case CT_APPLICATION_VND_MS_FONTOBJ:
-            return "application/vnd.ms-fontobject";
-
-        case CT_IMAGE_PNG:
-            return "image/png";
-
-        case CT_IMAGE_JPG:
-            return "image/jpeg";
-
-        case CT_IMAGE_GIF:
-            return "image/gif";
-
-        case CT_IMAGE_XICON:
-            return "image/x-icon";
-
-        case CT_IMAGE_BMP:
-            return "image/bmp";
-
-        case CT_IMAGE_ICNS:
-            return "image/icns";
-
-        case CT_PROMETHEUS:
-            return "text/plain; version=0.0.4";
-
-        case CT_AUDIO_MPEG:
-            return "audio/mpeg";
-
-        case CT_AUDIO_OGG:
-            return "audio/ogg";
-
-        case CT_VIDEO_MP4:
-            return "video/mp4";
-
-        case CT_APPLICATION_PDF:
-            return "application/pdf";
-
-        case CT_APPLICATION_ZIP:
-            return "application/zip";
-
-        default:
-        case CT_TEXT_PLAIN:
-            return "text/plain; charset=utf-8";
-    }
-}
-
-static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0,
-                    hash_authorization = 0, hash_host = 0, hash_forwarded_host = 0, hash_forwarded_for = 0,
-                    hash_transaction_id = 0;
-    static uint32_t hash_accept_encoding = 0;
-
-    if(unlikely(!hash_origin)) {
-        hash_origin = simple_uhash("Origin");
-        hash_connection = simple_uhash("Connection");
-        hash_accept_encoding = simple_uhash("Accept-Encoding");
-        hash_donottrack = simple_uhash("DNT");
-        hash_useragent = simple_uhash("User-Agent");
-        hash_authorization = simple_uhash("X-Auth-Token");
-        hash_host = simple_uhash("Host");
-        hash_forwarded_host = simple_uhash("X-Forwarded-Host");
-        hash_forwarded_for = simple_uhash("X-Forwarded-For");
-        hash_transaction_id = simple_uhash("X-Transaction-ID");
-    }
-
-    char *e = s;
-
-    // find the :
-    while(*e && *e != ':') e++;
-    if(!*e) return e;
-
-    // get the name
-    *e = '\0';
-
-    // find the value
-    char *v = e + 1, *ve;
-
-    // skip leading spaces from value
-    while(*v == ' ') v++;
-    ve = v;
-
-    // find the \r
-    while(*ve && *ve != '\r') ve++;
-    if(!*ve || ve[1] != '\n') {
-        *e = ':';
-        return ve;
-    }
-
-    // terminate the value
-    *ve = '\0';
-
-    uint32_t hash = simple_uhash(s);
-
-    if(hash == hash_origin && !strcasecmp(s, "Origin"))
-        w->origin = strdupz(v);
-
-    else if(hash == hash_connection && !strcasecmp(s, "Connection")) {
-        if(strcasestr(v, "keep-alive"))
-            web_client_enable_keepalive(w);
-    }
-    else if(respect_web_browser_do_not_track_policy && hash == hash_donottrack && !strcasecmp(s, "DNT")) {
-        if(*v == '0') web_client_disable_donottrack(w);
-        else if(*v == '1') web_client_enable_donottrack(w);
-    }
-    else if(parse_useragent && hash == hash_useragent && !strcasecmp(s, "User-Agent")) {
-        w->user_agent = strdupz(v);
-    }
-    else if(hash == hash_authorization&& !strcasecmp(s, "X-Auth-Token")) {
-        w->auth_bearer_token = strdupz(v);
-    }
-    else if(hash == hash_host && !strcasecmp(s, "Host")) {
-        char buffer[NI_MAXHOST];
-        strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
-        w->server_host = strdupz(buffer);
-    }
-    else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
-        if(web_enable_gzip) {
-            if(strcasestr(v, "gzip"))
-                web_client_enable_deflate(w, 1);
-            //
-            // does not seem to work
-            // else if(strcasestr(v, "deflate"))
-            //  web_client_enable_deflate(w, 0);
-        }
-    }
-    else if(hash == hash_forwarded_host && !strcasecmp(s, "X-Forwarded-Host")) {
-        char buffer[NI_MAXHOST];
-        strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
-        w->forwarded_host = strdupz(buffer);
-    }
-    else if(hash == hash_forwarded_for && !strcasecmp(s, "X-Forwarded-For")) {
-        char buffer[NI_MAXHOST];
-        strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
-        w->forwarded_for = strdupz(buffer);
-    }
-    else if(hash == hash_transaction_id && !strcasecmp(s, "X-Transaction-ID")) {
-        char buffer[UUID_STR_LEN * 2];
-        strncpyz(buffer, v, ((size_t)(ve - v) < sizeof(buffer) - 1 ? (size_t)(ve - v) : sizeof(buffer) - 1));
-        uuid_parse_flexi(buffer, w->transaction); // will not alter w->transaction if it fails
-    }
-
-    *e = ':';
-    *ve = '\r';
-    return ve;
-}
 
 /**
  * Valid Method
@@ -955,7 +750,7 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
  * @return It returns HTTP_VALIDATION_OK on success and another code present
  *          in the enum HTTP_VALIDATION otherwise.
  */
-static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
+HTTP_VALIDATION http_request_validate(struct web_client *w) {
     char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
 
     size_t last_pos = w->header_parse_last_size;
@@ -971,7 +766,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         if(w->header_parse_last_size < last_pos)
             last_pos = 0;
 
-        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size, &w->post_payload, &w->post_payload_size);
+        is_it_valid =
+            url_is_request_complete_and_extract_payload(s, &s[last_pos], w->header_parse_last_size, &w->payload);
         if(!is_it_valid) {
             if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
                 netdata_log_info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
@@ -987,7 +783,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         is_it_valid = 1;
     } else {
         last_pos = w->header_parse_last_size;
-        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size, &w->post_payload, &w->post_payload_size);
+        is_it_valid =
+            url_is_request_complete_and_extract_payload(s, &s[last_pos], w->header_parse_last_size, &w->payload);
     }
 
     s = web_client_valid_method(w, s);
@@ -1050,7 +847,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 *ue = c;
 
 #ifdef ENABLE_HTTPS
-                if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
+                if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
                     if (!w->ssl.conn && (http_is_using_ssl_force(w) || http_is_using_ssl_default(w)) && (w->mode != HTTP_REQUEST_MODE_STREAM)) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
@@ -1067,7 +864,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
             }
 
             // another header line
-            s = http_header_parse(w, s, (w->mode == HTTP_REQUEST_MODE_STREAM)); // parse user agent
+            s = http_header_parse_line(w, s);
         }
     }
 
@@ -1080,17 +877,23 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ((!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx)) {
+    if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
         if (SSL_connection(&w->ssl)) {
             bytes = netdata_ssl_write(&w->ssl, buf, len) ;
             web_client_enable_wait_from_ssl(w);
         }
         else
             bytes = send(w->ofd,buf, len , flags);
-    } else
+    }
+    else if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
         bytes = send(w->ofd,buf, len , flags);
+    else
+        bytes = -999;
 #else
-    bytes = send(w->ofd, buf, len, flags);
+    if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
+        bytes = send(w->ofd, buf, len, flags);
+    else
+        bytes = -999;
 #endif
 
     return bytes;
@@ -1111,7 +914,6 @@ void web_client_build_http_header(struct web_client *w) {
     // prepare the HTTP response header
     netdata_log_debug(D_WEB_CLIENT, "%llu: Generating HTTP header with response %d.", w->id, w->response.code);
 
-    const char *content_type_string = web_content_type_to_string(w->response.data->content_type);
     const char *code_msg = http_response_code2string(w->response.code);
 
     // prepare the last modified and expiration dates
@@ -1135,15 +937,15 @@ void web_client_build_http_header(struct web_client *w) {
                        "Server: Netdata Embedded HTTP Server %s\r\n"
                        "Access-Control-Allow-Origin: %s\r\n"
                        "Access-Control-Allow-Credentials: true\r\n"
-                       "Content-Type: %s\r\n"
                        "Date: %s\r\n",
                        w->response.code,
                        code_msg,
                        web_client_has_keepalive(w)?"keep-alive":"close",
                        VERSION,
                        w->origin ? w->origin : "*",
-                       content_type_string,
                        rfc7231_date);
+
+        http_header_content_type(w->response.header_output, w->response.data->content_type);
     }
 
     if(unlikely(web_x_frame_options))
@@ -1225,7 +1027,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     size_t count = 0;
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
+    if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
         if (SSL_connection(&w->ssl)) {
             bytes = netdata_ssl_write(&w->ssl, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output));
             web_client_enable_wait_from_ssl(w);
@@ -1241,7 +1043,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
             }
         }
     }
-    else {
+    else if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w)) {
         while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
             count++;
 
@@ -1251,15 +1053,21 @@ static inline void web_client_send_http_header(struct web_client *w) {
             }
         }
     }
+    else
+        bytes = -999;
 #else
-    while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
-        count++;
+    if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w)) {
+        while ((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
+            count++;
 
-        if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-            netdata_log_error("Cannot send HTTP headers to web client.");
-            break;
+            if (count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                netdata_log_error("Cannot send HTTP headers to web client.");
+                break;
+            }
         }
     }
+    else
+        bytes = -999;
 #endif
 
     if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
@@ -1356,6 +1164,9 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
+            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
+            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -1578,6 +1389,9 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
+            ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
+            ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -1594,7 +1408,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
                 query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                                buffer_tostring(w->url_as_received),
-                                               w->post_payload,
+                                               w->payload,
                                                w->forwarded_for ? w->forwarded_for : w->client_ip);
             }
 
@@ -2099,7 +1913,7 @@ ssize_t web_client_receive(struct web_client *w)
     errno = 0;
 
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_ssl_web_server_ctx) ) {
+    if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
         if (SSL_connection(&w->ssl)) {
             bytes = netdata_ssl_read(&w->ssl, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
             web_client_enable_wait_from_ssl(w);
@@ -2108,11 +1922,16 @@ ssize_t web_client_receive(struct web_client *w)
             bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
         }
     }
-    else{
+    else if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w)) {
         bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
     }
+    else // other connection methods
+        bytes = -1;
 #else
-    bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+    if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w))
+        bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+    else
+        bytes = -1;
 #endif
 
     if(likely(bytes > 0)) {
@@ -2194,6 +2013,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
     BUFFER *b4 = w->url_path_decoded;
     BUFFER *b5 = w->url_as_received;
     BUFFER *b6 = w->url_query_string_decoded;
+    BUFFER *b7 = w->payload;
 
 #ifdef ENABLE_HTTPS
     NETDATA_SSL ssl = w->ssl;
@@ -2220,6 +2040,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
     w->url_path_decoded = b4;
     w->url_as_received = b5;
     w->url_query_string_decoded = b6;
+    w->payload = b7;
 }
 
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {

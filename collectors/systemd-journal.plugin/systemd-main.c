@@ -11,7 +11,7 @@ static bool plugin_should_exit = false;
 static bool journal_data_direcories_exist() {
     struct stat st;
     for (unsigned i = 0; i < MAX_JOURNAL_DIRECTORIES && journal_directories[i].path; i++) {
-        if ((stat(journal_directories[i].path, &st) == 0) && S_ISDIR(st.st_mode))
+        if ((stat(string2str(journal_directories[i].path), &st) == 0) && S_ISDIR(st.st_mode))
             return true;
     }
     return false;
@@ -49,7 +49,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         char buf[] = "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true source:all";
         // char buf[] = "systemd-journal after:1695332964 before:1695937764 direction:backward last:100 slice:true source:all DHKucpqUoe1:PtVoyIuX.MU";
         // char buf[] = "systemd-journal after:1694511062 before:1694514662 anchor:1694514122024403";
-        function_systemd_journal("123", buf, &stop_monotonic_ut, &cancelled);
+        function_systemd_journal("123", buf, &stop_monotonic_ut, &cancelled, NULL, NULL, NULL);
 //        function_systemd_units("123", "systemd-units", 600, &cancelled);
         exit(1);
     }
@@ -57,7 +57,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     if(argc == 2 && strcmp(argv[1], "debug-units") == 0) {
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
-        function_systemd_units("123", "systemd-units", &stop_monotonic_ut, &cancelled);
+        function_systemd_units("123", "systemd-units", &stop_monotonic_ut, &cancelled, NULL, NULL, NULL);
         exit(1);
     }
 #endif
@@ -75,13 +75,21 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     struct functions_evloop_globals *wg =
             functions_evloop_init(SYSTEMD_JOURNAL_WORKER_THREADS, "SDJ", &stdout_mutex, &plugin_should_exit);
 
-    functions_evloop_add_function(wg, SYSTEMD_JOURNAL_FUNCTION_NAME, function_systemd_journal,
-            SYSTEMD_JOURNAL_DEFAULT_TIMEOUT);
+    functions_evloop_add_function(wg,
+                                  SYSTEMD_JOURNAL_FUNCTION_NAME,
+                                  function_systemd_journal,
+                                  SYSTEMD_JOURNAL_DEFAULT_TIMEOUT,
+                                  NULL);
 
 #ifdef ENABLE_SYSTEMD_DBUS
-    functions_evloop_add_function(wg, SYSTEMD_UNITS_FUNCTION_NAME, function_systemd_units,
-            SYSTEMD_UNITS_DEFAULT_TIMEOUT);
+    functions_evloop_add_function(wg,
+                                  SYSTEMD_UNITS_FUNCTION_NAME,
+                                  function_systemd_units,
+                                  SYSTEMD_UNITS_DEFAULT_TIMEOUT,
+                                  NULL);
 #endif
+
+    systemd_journal_dyncfg_init(wg);
 
     // ------------------------------------------------------------------------
     // register functions to netdata
@@ -106,7 +114,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     usec_t step_ut = 100 * USEC_PER_MS;
     usec_t send_newline_ut = 0;
     usec_t since_last_scan_ut = SYSTEMD_JOURNAL_ALL_FILES_SCAN_EVERY_USEC * 2; // something big to trigger scanning at start
-    bool tty = isatty(fileno(stderr)) == 1;
+    bool tty = isatty(fileno(stdout)) == 1;
 
     heartbeat_t hb;
     heartbeat_init(&hb);

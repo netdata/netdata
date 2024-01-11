@@ -108,13 +108,15 @@ static struct {
     uint32_t hash;
     DATASOURCE_FORMAT value;
 } api_v1_data_google_formats[] = {
-        // this is not error - when google requests json, it expects javascript
-        // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source#responseformat
-        {  "json"     , 0    , DATASOURCE_DATATABLE_JSONP}
-        , {"html"     , 0    , DATASOURCE_HTML}
-        , {"csv"      , 0    , DATASOURCE_CSV}
-        , {"tsv-excel", 0    , DATASOURCE_TSV}
-        , {           NULL, 0, 0}
+    // this is not an error - when Google requests json, it expects javascript
+    // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source#responseformat
+      {"json",      0, DATASOURCE_DATATABLE_JSONP}
+    , {"html",      0, DATASOURCE_HTML}
+    , {"csv",       0, DATASOURCE_CSV}
+    , {"tsv-excel", 0, DATASOURCE_TSV}
+
+    // terminator
+    , {NULL,        0, 0}
 };
 
 void web_client_api_v1_init(void) {
@@ -857,7 +859,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             responseHandler,
             google_version,
             google_reqId,
-            (int64_t)st->last_updated.tv_sec);
+            (int64_t)(st ? st->last_updated.tv_sec : 0));
     }
     else if(format == DATASOURCE_JSONP) {
         if(responseHandler == NULL)
@@ -942,7 +944,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     char *cookie = strstr(w->response.data->buffer, NETDATA_REGISTRY_COOKIE_NAME "=");
     if(cookie)
         strncpyz(person_guid, &cookie[sizeof(NETDATA_REGISTRY_COOKIE_NAME)], UUID_STR_LEN - 1);
-    else if(extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)) != BEARER_STATUS_EXTRACTED_FROM_HEADER)
+    else if(!extract_bearer_token_from_request(w, person_guid, sizeof(person_guid)))
         person_guid[0] = '\0';
 
     char action = '\0';
@@ -1418,10 +1420,14 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     char transaction[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction);
 
+    CLEAN_BUFFER *source = buffer_create(100, NULL);
+    web_client_source2buffer(w, source);
+
     return rrd_function_run(host, wb, timeout, w->access, function, true, transaction,
                             NULL, NULL,
                             web_client_progress_functions_update, w,
-                            web_client_interrupt_callback, w, NULL);
+                            web_client_interrupt_callback, w, NULL,
+                            buffer_tostring(source));
 }
 
 int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
@@ -1438,6 +1444,114 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
     buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;
+}
+
+void web_client_source2buffer(struct web_client *w, BUFFER *source) {
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD))
+        buffer_sprintf(source, "method=NC");
+    else if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_BEARER))
+        buffer_sprintf(source, "method=api-bearer");
+    else
+        buffer_sprintf(source, "method=api");
+
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD) || web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_BEARER)) {
+        buffer_sprintf(source, ",role=%s", http_id2access(w->access));
+
+        char uuid_str[UUID_COMPACT_STR_LEN];
+        uuid_unparse_lower_compact(w->auth.cloud_account_id, uuid_str);
+        buffer_sprintf(source, ",user=%s,account=%s", w->auth.client_name, uuid_str);
+    }
+    else if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_GOD))
+        buffer_strcat(source, ",role=god");
+    else
+        buffer_sprintf(source, ",role=%s", http_id2access(w->access));
+
+    if(w->client_ip[0])
+        buffer_sprintf(source, ",ip=%s", w->client_ip);
+
+    if(w->forwarded_for)
+        buffer_sprintf(source, ",forwarded_for=%s", w->forwarded_for);
+}
+
+static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w, char *url __maybe_unused) {
+    char *action = "tree";
+    char *path = "/";
+    char *id = NULL;
+    char *add_name = NULL;
+    int timeout = 120;
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "action"))
+            action = value;
+        else if(!strcmp(name, "path"))
+            path = value;
+        else if(!strcmp(name, "id"))
+            id = value;
+        else if(!strcmp(name, "name"))
+            add_name = value;
+        else if(!strcmp(name, "timeout")) {
+            timeout = (int)strtol(value, NULL, 10);
+            if(timeout < 10)
+                timeout = 10;
+        }
+    }
+
+    char transaction[UUID_COMPACT_STR_LEN];
+    uuid_unparse_lower_compact(w->transaction, transaction);
+
+    size_t len = (action ? strlen(action) : 0)
+                 + (id ? strlen(id) : 0)
+                 + (path ? strlen(path) : 0)
+                 + (add_name ? strlen(add_name) : 0)
+                 + 100;
+
+    char cmd[len];
+    if(strcmp(action, "tree") == 0)
+        snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " tree '%s' '%s'", path, id?id:"");
+    else {
+        DYNCFG_CMDS c = dyncfg_cmds2id(action);
+        if(!id || !*id || !dyncfg_is_valid_id(id)) {
+            rrd_call_function_error(w->response.data, "invalid id given", HTTP_RESP_BAD_REQUEST);
+            return HTTP_RESP_BAD_REQUEST;
+        }
+        if(c == DYNCFG_CMD_NONE) {
+            rrd_call_function_error(w->response.data, "invalid action given", HTTP_RESP_BAD_REQUEST);
+            return HTTP_RESP_BAD_REQUEST;
+        }
+        else if(c == DYNCFG_CMD_ADD) {
+            if(!add_name || !*add_name || !dyncfg_is_valid_id(add_name)) {
+                rrd_call_function_error(w->response.data, "invalid name given", HTTP_RESP_BAD_REQUEST);
+                return HTTP_RESP_BAD_REQUEST;
+            }
+            snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s %s", id, dyncfg_id2cmd_one(c), add_name);
+        }
+        else
+            snprintfz(cmd, sizeof(cmd), PLUGINSD_FUNCTION_CONFIG " %s %s", id, dyncfg_id2cmd_one(c));
+    }
+
+    CLEAN_BUFFER *source = buffer_create(100, NULL);
+    web_client_source2buffer(w, source);
+
+    buffer_flush(w->response.data);
+    int code = rrd_function_run(host, w->response.data, timeout, w->access, cmd,
+                                true, transaction,
+                                NULL, NULL,
+                                web_client_progress_functions_update, w,
+                                web_client_interrupt_callback, w,
+                                w->payload,
+                                buffer_tostring(source));
+
+    return code;
 }
 
 #ifndef ENABLE_DBENGINE
@@ -1585,6 +1699,8 @@ static struct web_api_command api_commands_v1[] = {
 
         {"function", 0, HTTP_ACL_ACLK_WEBRTC_DASHBOARD_WITH_OPTIONAL_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_function, 0 },
         {"functions", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_functions, 0 },
+
+        {"config", 0, HTTP_ACL_ACLK_WEBRTC_DASHBOARD_WITH_OPTIONAL_BEARER | ACL_DEV_OPEN_ACCESS, web_client_api_request_v1_config, 0 },
 
         {"dbengine_stats", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_dbengine_stats, 0 },
 

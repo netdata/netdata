@@ -63,6 +63,11 @@ typedef enum __attribute__((__packed__)) {
     // web server, aclk and stream receiver
     NDF_SRC_TRANSPORT,                          // the transport we received the request, one of: http, https, pluginsd
 
+    // Netdata Cloud Related
+    NDF_ACCOUNT_ID,
+    NDF_USER_NAME,
+    NDF_USER_ROLE,
+
     // web server and stream receiver
     NDF_SRC_IP,                                 // the streaming / web server source IP
     NDF_SRC_PORT,                               // the streaming / web server source Port

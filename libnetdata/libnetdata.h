@@ -242,6 +242,11 @@ size_t judy_aral_structures(void);
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#define SWAP(a, b) do { \
+    typeof(a) _tmp = b; \
+    b = a;              \
+    a = _tmp;           \
+} while(0)
 
 #define GUID_LEN 36
 
@@ -515,6 +520,7 @@ int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
 int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data);
 
 #define strdupz(s) strdupz_int(s, __FILE__, __FUNCTION__, __LINE__)
+#define strndupz(s, len) strndupz_int(s, len, __FILE__, __FUNCTION__, __LINE__)
 #define callocz(nmemb, size) callocz_int(nmemb, size, __FILE__, __FUNCTION__, __LINE__)
 #define mallocz(size) mallocz_int(size, __FILE__, __FUNCTION__, __LINE__)
 #define reallocz(ptr, size) reallocz_int(ptr, size, __FILE__, __FUNCTION__, __LINE__)
@@ -522,6 +528,7 @@ int malloc_trace_walkthrough(int (*callback)(void *item, void *data), void *data
 #define mallocz_usable_size(ptr) mallocz_usable_size_int(ptr, __FILE__, __FUNCTION__, __LINE__)
 
 char *strdupz_int(const char *s, const char *file, const char *function, size_t line);
+char *strndupz_int(const char *s, size_t len, const char *file, const char *function, size_t line);
 void *callocz_int(size_t nmemb, size_t size, const char *file, const char *function, size_t line);
 void *mallocz_int(size_t size, const char *file, const char *function, size_t line);
 void *reallocz_int(void *ptr, size_t size, const char *file, const char *function, size_t line);
@@ -530,6 +537,7 @@ size_t mallocz_usable_size_int(void *ptr, const char *file, const char *function
 
 #else // NETDATA_TRACE_ALLOCATIONS
 char *strdupz(const char *s) MALLOCLIKE NEVERNULL;
+char *strndupz(const char *s, size_t len) MALLOCLIKE NEVERNULL;
 void *callocz(size_t nmemb, size_t size) MALLOCLIKE NEVERNULL;
 void *mallocz(size_t size) MALLOCLIKE NEVERNULL;
 void *reallocz(void *ptr, size_t size) MALLOCLIKE NEVERNULL;
@@ -702,6 +710,8 @@ extern char *netdata_configured_host_prefix;
 
 #include "uuid/uuid.h"
 #include "http/http_access.h"
+#include "http/content_type.h"
+#include "config/dyncfg.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
 #include "os.h"
@@ -747,7 +757,6 @@ extern char *netdata_configured_host_prefix;
 #include "http/http_defs.h"
 #include "gorilla/gorilla.h"
 #include "facets/facets.h"
-#include "dyn_conf/dyn_conf.h"
 #include "functions_evloop/functions_evloop.h"
 #include "query_progress/progress.h"
 
@@ -900,6 +909,17 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now)
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running);
 
 int netdata_base64_decode(const char *encoded, char *decoded, size_t decoded_size);
+
+static inline void freez_charp(char **p) {
+    freez(*p);
+}
+
+static inline void freez_const_charp(const char **p) {
+    freez((void *)*p);
+}
+
+#define CLEAN_CONST_CHAR_P _cleanup_(freez_const_charp) const char
+#define CLEAN_CHAR_P _cleanup_(freez_charp) char
 
 # ifdef __cplusplus
 }

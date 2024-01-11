@@ -5,7 +5,7 @@
 
 #include "../libnetdata.h"
 
-void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, const char *payload, const char *client);
+void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, BUFFER *payload, const char *client);
 void query_progress_done_step(uuid_t *transaction, size_t done);
 void query_progress_set_finish_line(uuid_t *transaction, size_t all);
 void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int response_code, usec_t duration_ut, size_t response_size, size_t sent_size);

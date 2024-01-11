@@ -1520,7 +1520,8 @@ static void netdata_systemd_journal_function_help(const char *transaction) {
     buffer_free(wb);
 }
 
-void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled) {
+void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
+                              BUFFER *payload __maybe_unused, const char *source __maybe_unused, void *data __maybe_unused) {
     fstat_thread_calls = 0;
     fstat_thread_cached_responses = 0;
 

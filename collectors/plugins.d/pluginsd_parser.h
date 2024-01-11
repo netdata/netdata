@@ -231,7 +231,7 @@ static inline int parser_action(PARSER *parser, char *input) {
         rc = PARSER_RC_ERROR;
 
     if(rc == PARSER_RC_ERROR) {
-        CLEAN_BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
+        CLEAN_BUFFER *wb = buffer_create(1024, NULL);
         line_splitter_reconstruct_line(wb, &parser->line);
         netdata_log_error("PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
                 command, parser->line.count, buffer_tostring(wb));

@@ -202,6 +202,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         false);
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+    dyncfg_host_init(host);
 
     if(host->rrdlabels) {
         rrdlabels_migrate_to_these(host->rrdlabels, parser->user.host_define.rrdlabels);
@@ -1355,23 +1356,16 @@ PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, 
         case 99:
             return pluginsd_exit(words, num_words, parser);
 
-        case 101:
-            return pluginsd_register_plugin(words, num_words, parser);
+        case 100:
+            return pluginsd_config(words, num_words, parser);
 
-        case 102:
-            return pluginsd_register_module(words, num_words, parser);
-
-        case 103:
-            return pluginsd_register_job(words, num_words, parser);
-
-        case 104:
-            return pluginsd_dyncfg_reset(words, num_words, parser);
-
-        case 110:
-            return pluginsd_job_status(words, num_words, parser);
-        
-        case 111:
-            return pluginsd_delete_job(words, num_words, parser);
+        case 901:
+        case 902:
+        case 903:
+        case 904:
+        case 905:
+        case 906:
+            return pluginsd_dyncfg_noop(words, num_words, parser);
 
         default:
             break;

@@ -3,112 +3,6 @@
 #include "web_api_v2.h"
 #include "../rtc/webrtc.h"
 
-#define BEARER_TOKEN_EXPIRATION 86400
-
-struct bearer_token {
-    time_t created_s;
-    time_t expires_s;
-};
-
-static void bearer_token_cleanup(void) {
-    static time_t attempts = 0;
-
-    if(++attempts % 1000 != 0)
-        return;
-
-    time_t now_s = now_monotonic_sec();
-
-    struct bearer_token *z;
-    dfe_start_read(netdata_authorized_bearers, z) {
-        if(z->expires_s < now_s)
-            dictionary_del(netdata_authorized_bearers, z_dfe.name);
-    }
-    dfe_done(z);
-
-    dictionary_garbage_collect(netdata_authorized_bearers);
-}
-
-void bearer_tokens_init(void) {
-    netdata_authorized_bearers = dictionary_create_advanced(
-            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-            NULL, sizeof(struct bearer_token));
-}
-
-static time_t bearer_get_token(uuid_t *uuid) {
-    char uuid_str[UUID_STR_LEN];
-
-    uuid_generate_random(*uuid);
-    uuid_unparse_lower(*uuid, uuid_str);
-
-    struct bearer_token t = { 0 }, *z;
-    z = dictionary_set(netdata_authorized_bearers, uuid_str, &t, sizeof(t));
-    if(!z->created_s) {
-        z->created_s = now_monotonic_sec();
-        z->expires_s = z->created_s + BEARER_TOKEN_EXPIRATION;
-    }
-
-    bearer_token_cleanup();
-
-    return now_realtime_sec() + BEARER_TOKEN_EXPIRATION;
-}
-
-#define HTTP_REQUEST_AUTHORIZATION_BEARER "\r\nAuthorization: Bearer "
-#define HTTP_REQUEST_X_NETDATA_AUTH_BEARER "\r\nX-Netdata-Auth: Bearer "
-
-BEARER_STATUS extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len) {
-    const char *req = buffer_tostring(w->response.data);
-    size_t req_len = buffer_strlen(w->response.data);
-    const char *bearer = NULL;
-    const char *bearer_end = NULL;
-
-    bearer = strcasestr(req, HTTP_REQUEST_X_NETDATA_AUTH_BEARER);
-    if(bearer)
-        bearer_end = bearer + sizeof(HTTP_REQUEST_X_NETDATA_AUTH_BEARER) - 1;
-    else {
-        bearer = strcasestr(req, HTTP_REQUEST_AUTHORIZATION_BEARER);
-        if(bearer)
-            bearer_end = bearer + sizeof(HTTP_REQUEST_AUTHORIZATION_BEARER) - 1;
-    }
-
-    if(!bearer || !bearer_end)
-        return BEARER_STATUS_NO_BEARER_IN_HEADERS;
-
-    const char *token_start = bearer_end;
-
-    while(isspace(*token_start))
-        token_start++;
-
-    const char *token_end = token_start + UUID_STR_LEN - 1 + 2;
-    if (token_end > req + req_len)
-        return BEARER_STATUS_BEARER_DOES_NOT_FIT;
-
-    strncpyz(dst, token_start, dst_len - 1);
-    uuid_t uuid;
-    if (uuid_parse(dst, uuid) != 0)
-        return BEARER_STATUS_NOT_PARSABLE;
-
-    return BEARER_STATUS_EXTRACTED_FROM_HEADER;
-}
-
-BEARER_STATUS api_check_bearer_token(struct web_client *w) {
-    if(!netdata_authorized_bearers)
-        return BEARER_STATUS_NO_BEARERS_DICTIONARY;
-
-    char token[UUID_STR_LEN];
-    BEARER_STATUS t = extract_bearer_token_from_request(w, token, sizeof(token));
-    if(t != BEARER_STATUS_EXTRACTED_FROM_HEADER)
-        return t;
-
-    struct bearer_token *z = dictionary_get(netdata_authorized_bearers, token);
-    if(!z)
-        return BEARER_STATUS_NOT_FOUND_IN_DICTIONARY;
-
-    if(z->expires_s < now_monotonic_sec())
-        return BEARER_STATUS_EXPIRED;
-
-    return BEARER_STATUS_AVAILABLE_AND_VALIDATED;
-}
-
 static bool verify_agent_uuids(const char *machine_guid, const char *node_id, const char *claim_id) {
     if(!machine_guid || !node_id || !claim_id)
         return false;
@@ -206,7 +100,7 @@ int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __may
     }
 
     uuid_t uuid;
-    time_t expires_s = bearer_get_token(&uuid);
+    time_t expires_s = bearer_create_token(&uuid, w);
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -661,7 +555,7 @@ cleanup:
 }
 
 static int web_client_api_request_v2_webrtc(RRDHOST *host __maybe_unused, struct web_client *w, char *url __maybe_unused) {
-    return webrtc_new_connection(w->post_payload, w->response.data);
+    return webrtc_new_connection(buffer_tostring(w->payload), w->response.data);
 }
 
 static int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
@@ -689,176 +583,6 @@ static int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, stru
     return web_api_v2_report_progress(&tr, w->response.data);
 }
 
-#define CONFIG_API_V2_URL "/api/v2/config"
-static int web_client_api_request_v2_config(RRDHOST *host __maybe_unused, struct web_client *w, char *query __maybe_unused) {
-
-    char *url = strdupz(buffer_tostring(w->url_as_received));
-    char *url_full = url;
-
-    buffer_flush(w->response.data);
-
-    if (strncmp(url, "/host/", strlen("/host/")) == 0) {
-        url += strlen("/host/");
-        char *host_id_end = strchr(url, '/');
-        if (host_id_end == NULL) {
-            buffer_sprintf(w->response.data, "Invalid URL");
-            freez(url_full);
-            return HTTP_RESP_BAD_REQUEST;
-        }
-        url += host_id_end - url;
-    }
-
-    if (strncmp(url, CONFIG_API_V2_URL, strlen(CONFIG_API_V2_URL)) != 0) {
-        buffer_sprintf(w->response.data, "Invalid URL");
-        freez(url_full);
-        return HTTP_RESP_BAD_REQUEST;
-    }
-    url += strlen(CONFIG_API_V2_URL);
-
-    char *save_ptr = NULL;
-    char *plugin = strtok_r(url, "/", &save_ptr);
-    char *module = strtok_r(NULL, "/", &save_ptr);
-    char *job_id = strtok_r(NULL, "/", &save_ptr);
-    char *extra = strtok_r(NULL, "/", &save_ptr);
-
-    if (extra != NULL) {
-        buffer_sprintf(w->response.data, "Invalid URL");
-        freez(url_full);
-        return HTTP_RESP_BAD_REQUEST;
-    }
-
-    int http_method;
-    switch (w->mode)
-    {
-        case HTTP_REQUEST_MODE_GET:
-        case HTTP_REQUEST_MODE_POST:
-        case HTTP_REQUEST_MODE_PUT:
-        case HTTP_REQUEST_MODE_DELETE:
-            http_method = w->mode;
-            break;
-        default:
-            buffer_sprintf(w->response.data, "Invalid HTTP method");
-            freez(url_full);
-            return HTTP_RESP_BAD_REQUEST;
-    }
-
-    struct uni_http_response resp = dyn_conf_process_http_request(host->configurable_plugins, http_method, plugin, module, job_id, w->post_payload, w->post_payload_size);
-    if (resp.content[resp.content_length - 1] != '\0') {
-        char *con = mallocz(resp.content_length + 1);
-        memcpy(con, resp.content, resp.content_length);
-        con[resp.content_length] = '\0';
-        if (resp.content_free)
-            resp.content_free(resp.content);
-        resp.content = con;
-        resp.content_free = freez_dyncfg;
-    }
-    buffer_strcat(w->response.data, resp.content);
-    if (resp.content_free)
-        resp.content_free(resp.content);
-    w->response.data->content_type = resp.content_type;
-    freez(url_full);
-    return resp.status;
-}
-
-static json_object *job_statuses_grouped() {
-    json_object *top_obj = json_object_new_object();
-    json_object *host_vec = json_object_new_array();
-
-
-    RRDHOST *host;
-
-    dfe_start_reentrant(rrdhost_root_index, host) {
-        json_object *host_obj = json_object_new_object();
-        json_object *host_sub_obj = json_object_new_string(host->machine_guid);
-        json_object_object_add(host_obj, "host_guid", host_sub_obj);
-        host_sub_obj = json_object_new_array();
-
-        DICTIONARY *plugins_dict = host->configurable_plugins;
-
-        struct configurable_plugin *plugin;
-        dfe_start_read(plugins_dict, plugin) {
-            json_object *plugin_obj = json_object_new_object();
-            json_object *plugin_sub_obj = json_object_new_string(plugin->name);
-            json_object_object_add(plugin_obj, "name", plugin_sub_obj);
-            plugin_sub_obj = json_object_new_array();
-
-            struct module *module;
-            dfe_start_read(plugin->modules, module) {
-                json_object *module_obj = json_object_new_object();
-                json_object *module_sub_obj = json_object_new_string(module->name);
-                json_object_object_add(module_obj, "name", module_sub_obj);
-                module_sub_obj = json_object_new_array();
-
-                struct job *job;
-                dfe_start_read(module->jobs, job) {
-                    json_object *job_obj = json_object_new_object();
-                    json_object *job_sub_obj = json_object_new_string(job->name);
-                    json_object_object_add(job_obj, "name", job_sub_obj);
-                    job_sub_obj = job2json(job);
-                    json_object_object_add(job_obj, "job", job_sub_obj);
-                    json_object_array_add(module_sub_obj, job_obj);
-                } dfe_done(job);
-                json_object_object_add(module_obj, "jobs", module_sub_obj);
-                json_object_array_add(plugin_sub_obj, module_obj);
-            } dfe_done(module);
-            json_object_object_add(plugin_obj, "modules", plugin_sub_obj);
-            json_object_array_add(host_sub_obj, plugin_obj);
-        } dfe_done(plugin);
-        json_object_object_add(host_obj, "plugins", host_sub_obj);
-        json_object_array_add(host_vec, host_obj);
-    }
-    dfe_done(host);
-
-    json_object_object_add(top_obj, "hosts", host_vec);
-    return top_obj;
-}
-
-static json_object *job_statuses_flat() {
-    RRDHOST *host;
-
-    json_object *ret = json_object_new_array();
-
-    dfe_start_reentrant(rrdhost_root_index, host) {
-        DICTIONARY *plugins_dict = host->configurable_plugins;
-
-        struct configurable_plugin *plugin;
-        dfe_start_read(plugins_dict, plugin) {
-            struct module *module;
-            dfe_start_read(plugin->modules, module) {
-                struct job *job;
-                dfe_start_read(module->jobs, job) {
-                    json_object *job_rich = json_object_new_object();
-                    json_object *obj = json_object_new_string(host->machine_guid);
-                    json_object_object_add(job_rich, "host_guid", obj);
-                    obj = json_object_new_string(plugin->name);
-                    json_object_object_add(job_rich, "plugin_name", obj);
-                    obj = json_object_new_string(module->name);
-                    json_object_object_add(job_rich, "module_name", obj);
-                    obj = job2json(job);
-                    json_object_object_add(job_rich, "job", obj);
-                    json_object_array_add(ret, job_rich);
-                } dfe_done(job);
-            } dfe_done(module);
-        } dfe_done(plugin);
-    }
-    dfe_done(host);
-
-    return ret;
-}
-
-static int web_client_api_request_v2_job_statuses(RRDHOST *host __maybe_unused, struct web_client *w, char *query) {
-    json_object *json;
-    if (strstr(query, "grouped") != NULL)
-        json = job_statuses_grouped();
-    else
-        json = job_statuses_flat();
-
-    buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, json_object_to_json_string_ext(json, JSON_C_TO_STRING_PRETTY));
-    w->response.data->content_type = CT_APPLICATION_JSON;
-    return HTTP_RESP_OK;
-}
-
 static struct web_api_command api_commands_v2[] = {
         {"info",                0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_info,              0},
 
@@ -881,9 +605,6 @@ static struct web_api_command api_commands_v2[] = {
         {"rtc_offer",           0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v2_webrtc,            0},
         {"bearer_protection",   0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection,                    0},
         {"bearer_get_token",    0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token,                         0},
-
-        {"config",        0,       HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_config,            1},
-        {"job_statuses",  0,       HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_job_statuses,      0},
 
         { "ilove.svg",       0,    HTTP_ACL_NOCHECK,                    web_client_api_request_v2_ilove,             0 },
         { "progress",        0,    HTTP_ACL_NOCHECK,                    web_client_api_request_v2_progress,          0 },

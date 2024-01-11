@@ -1116,9 +1116,21 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
                 .journal = "ND_SRC_TRANSPORT",
                 .logfmt = "src_transport",
         },
+        [NDF_ACCOUNT_ID] = {
+            .journal = "ND_ACCOUNT_ID",
+            .logfmt = "account",
+        },
+        [NDF_USER_NAME] = {
+            .journal = "ND_USER_NAME",
+            .logfmt = "user",
+        },
+        [NDF_USER_ROLE] = {
+            .journal = "ND_USER_ROLE",
+            .logfmt = "role",
+        },
         [NDF_SRC_IP] = {
-                .journal = "ND_SRC_IP",
-                .logfmt = "src_ip",
+            .journal = "ND_SRC_IP",
+            .logfmt = "src_ip",
         },
         [NDF_SRC_FORWARDED_HOST] = {
                 .journal = "ND_SRC_FORWARDED_HOST",
@@ -1360,11 +1372,12 @@ static void nd_logger_json(BUFFER *wb, struct log_field *fields, size_t fields_m
             case NDFT_DBL:
                 buffer_json_member_add_double(wb, key, fields[i].entry.dbl);
                 break;
-            case NDFT_UUID:{
-                char u[UUID_COMPACT_STR_LEN];
-                uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
-                buffer_json_member_add_string(wb, key, u);
-            }
+            case NDFT_UUID:
+                if(!uuid_is_null(*fields[i].entry.uuid)) {
+                    char u[UUID_COMPACT_STR_LEN];
+                    uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                    buffer_json_member_add_string(wb, key, u);
+                }
                 break;
             case NDFT_CALLBACK: {
                 if(!tmp)
@@ -1689,13 +1702,14 @@ static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields
                     buffer_fast_strcat(wb, "=", 1);
                     buffer_print_netdata_double(wb, fields[i].entry.dbl);
                     break;
-                case NDFT_UUID: {
-                    char u[UUID_COMPACT_STR_LEN];
-                    uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
-                    buffer_strcat(wb, key);
-                    buffer_fast_strcat(wb, "=", 1);
-                    buffer_fast_strcat(wb, u, sizeof(u) - 1);
-                }
+                case NDFT_UUID:
+                    if(!uuid_is_null(*fields[i].entry.uuid)) {
+                        char u[UUID_COMPACT_STR_LEN];
+                        uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                        buffer_strcat(wb, key);
+                        buffer_fast_strcat(wb, "=", 1);
+                        buffer_fast_strcat(wb, u, sizeof(u) - 1);
+                    }
                     break;
                 case NDFT_CALLBACK: {
                     if(!tmp)
@@ -1786,11 +1800,12 @@ static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields
             case NDFT_DBL:
                 rc = asprintf(&value, "%s=%f", key, fields[i].entry.dbl);
                 break;
-            case NDFT_UUID: {
-                char u[UUID_COMPACT_STR_LEN];
-                uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
-                rc = asprintf(&value, "%s=%s", key, u);
-            }
+            case NDFT_UUID:
+                if(!uuid_is_null(*fields[i].entry.uuid)) {
+                    char u[UUID_COMPACT_STR_LEN];
+                    uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                    rc = asprintf(&value, "%s=%s", key, u);
+                }
                 break;
             case NDFT_CALLBACK: {
                 if(!tmp)
@@ -1884,14 +1899,15 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
                 buffer_print_netdata_double(wb, fields[i].entry.dbl);
                 buffer_putc(wb, '\n');
                 break;
-            case NDFT_UUID:{
-                char u[UUID_COMPACT_STR_LEN];
-                uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
-                buffer_strcat(wb, key);
-                buffer_putc(wb, '=');
-                buffer_fast_strcat(wb, u, sizeof(u) - 1);
-                buffer_putc(wb, '\n');
-            }
+            case NDFT_UUID:
+                if(!uuid_is_null(*fields[i].entry.uuid)) {
+                    char u[UUID_COMPACT_STR_LEN];
+                    uuid_unparse_lower_compact(*fields[i].entry.uuid, u);
+                    buffer_strcat(wb, key);
+                    buffer_putc(wb, '=');
+                    buffer_fast_strcat(wb, u, sizeof(u) - 1);
+                    buffer_putc(wb, '\n');
+                }
                 break;
             case NDFT_CALLBACK: {
                 if(!tmp)
@@ -2089,7 +2105,7 @@ static void nd_logger_merge_log_stack_to_thread_fields(void) {
             if((type == NDFT_TXT && (!e->txt || !*e->txt)) ||
                 (type == NDFT_BFR && (!e->bfr || !buffer_strlen(e->bfr))) ||
                 (type == NDFT_STR && !e->str) ||
-                (type == NDFT_UUID && !e->uuid) ||
+                (type == NDFT_UUID && (!e->uuid || uuid_is_null(*e->uuid))) ||
                 (type == NDFT_CALLBACK && !e->cb.formatter) ||
                 type == NDFT_UNSET)
                 continue;
