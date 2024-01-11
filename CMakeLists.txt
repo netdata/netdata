@@ -2137,6 +2137,7 @@ install(DIRECTORY DESTINATION etc/netdata/python.d)
 install(DIRECTORY DESTINATION etc/netdata/ssl)
 install(DIRECTORY DESTINATION etc/netdata/statsd.d)
 install(DIRECTORY DESTINATION usr/lib/netdata/conf.d)
+install(DIRECTORY DESTINATION usr/lib/netdata/conf.d/schema.d)
 install(DIRECTORY DESTINATION usr/libexec/netdata/plugins.d)
 install(DIRECTORY DESTINATION ${WEB_DEST})
 
@@ -2423,6 +2424,10 @@ install(FILES
         collectors/charts.d.plugin/opensips/opensips.conf
         collectors/charts.d.plugin/sensors/sensors.conf
         DESTINATION usr/lib/netdata/conf.d/charts.d)
+
+install(FILES
+        collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
+        DESTINATION usr/lib/netdata/conf.d/schema.d)
 
 #
 # ebpf files
