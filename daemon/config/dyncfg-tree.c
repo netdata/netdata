@@ -29,12 +29,16 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
         buffer_json_member_add_boolean(wb, "user_disabled", df->user_disabled);
         buffer_json_member_add_boolean(wb, "restart_required", df->restart_required);
         buffer_json_member_add_boolean(wb, "plugin_rejected", df->restart_required);
-        if(df->payload && buffer_strlen(df->payload)) {
-            buffer_json_member_add_object(wb, "payload");
-            buffer_json_member_add_boolean(wb, "content_type", content_type_id2string(df->payload->content_type));
-            buffer_json_member_add_uint64(wb, "content_length", df->payload->len);
-            buffer_json_object_close(wb);
+        buffer_json_member_add_object(wb, "payload");
+        {
+            if (df->payload && buffer_strlen(df->payload)) {
+                buffer_json_member_add_boolean(wb, "available", true);
+                buffer_json_member_add_string(wb, "content_type", content_type_id2string(df->payload->content_type));
+                buffer_json_member_add_uint64(wb, "content_length", df->payload->len);
+            } else
+                buffer_json_member_add_boolean(wb, "available", false);
         }
+        buffer_json_object_close(wb); // payload
         buffer_json_member_add_uint64(wb, "saves", df->saves);
         buffer_json_member_add_uint64(wb, "created_ut", df->created_ut);
         buffer_json_member_add_uint64(wb, "modified_ut", df->modified_ut);
@@ -193,6 +197,6 @@ cleanup:
 void dyncfg_host_init(RRDHOST *host) {
     rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120,
                      1000, "Dynamic configuration", "config",
-                     HTTP_ACCESS_MEMBER,
+                     HTTP_ACCESS_ADMIN,
                      true, dyncfg_config_execute_cb, host);
 }

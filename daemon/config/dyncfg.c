@@ -389,7 +389,7 @@ void dyncfg_add_streaming(BUFFER *wb) {
                    , 120
                    , "Dynamic configuration"
                    , "config"
-                   , http_id2access(HTTP_ACCESS_MEMBER)
+                   , http_id2access(HTTP_ACCESS_ADMIN)
                    , 1000
     );
 }
