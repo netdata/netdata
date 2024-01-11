@@ -1,0 +1,6 @@
+[submodule "c-rbuf"]
+	path = c-rbuf
+	url = https://github.com/underhood/c-rbuf.git
+[submodule "c_rhash"]
+	path = c_rhash
+	url = https://github.com/underhood/c_rhash.git
