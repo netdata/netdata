@@ -526,6 +526,83 @@ static void generate_as_collected_prom_metric(BUFFER *wb,
         buffer_sprintf(wb, "\n");
 }
 
+static void prometheus_print_os_info(
+    BUFFER *wb,
+    PROMETHEUS_OUTPUT_OPTIONS output_options)
+{
+    FILE *fp = fopen("/etc/os-release", "r");
+    char buf[BUFSIZ];
+    int first_line = 1;
+
+    if (!fp) {
+        /* Fallback to lsb-release */
+        fp = fopen("/etc/lsb-release", "r");
+    }
+    if (!fp) {
+        return;
+    }
+
+    buffer_sprintf(wb, "netdata_os_info{");
+
+    while (fgets(buf, BUFSIZ-1, fp)) {
+      char *in, *sanitized;
+      char *key, *val;
+      int in_val_part = 0;
+
+      /* sanitize the line */
+      sanitized = in = buf;
+      in_val_part = 0;
+      while (*in && *in != '\n') {
+          if (!in_val_part) {
+              /* Only accepts alphabetic characters and '_'
+               * in key part */
+              if (isalpha(*in) || *in == '_') {
+                  *(sanitized++) = tolower(*in);
+              } else if (*in == '=') {
+                  in_val_part = 1;
+                  *(sanitized++) = '=';
+              }
+          } else {
+              /* Don't accept special characters in
+               * value part */
+              switch (*in) {
+                  case '"':
+                  case '\'':
+                  case '\r':
+                  case '\t':
+                      break;
+                  default:
+                      if (isprint(*in)) {
+                          *(sanitized++) = *in;
+                      }
+              }
+          }
+          in++;
+      }
+      /* Terminate the string */
+      *(sanitized++) = '\0';
+
+      /* Split key/val */
+      key = buf;
+      val = strchr(buf, '=');
+
+      /* If we have a key/value pair, add it as a label */
+      if (val) {
+          *val = '\0';
+          val++;
+          buffer_sprintf(wb, "%s%s=\"%s\"", first_line ? "":",", key, val);
+          first_line = 0;
+      }
+    }
+
+    /* Finish the line */
+    if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
+        buffer_sprintf(wb, "} 1 %llu\n", now_realtime_usec() / USEC_PER_MS);
+    else
+        buffer_sprintf(wb, "} 1\n");
+
+    fclose(fp);
+}
 /**
  * Write metrics in Prometheus format to a buffer.
  *
@@ -578,6 +655,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     if (instance->labels_buffer)
         buffer_flush(instance->labels_buffer);
+
+    if (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS)
+        prometheus_print_os_info(wb, output_options);
 
     // send custom variables set for the host
     if (output_options & PROMETHEUS_OUTPUT_VARIABLES) {
