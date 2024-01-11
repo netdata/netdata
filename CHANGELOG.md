@@ -6,10 +6,15 @@
 
 **Merged pull requests:**
 
+- minor - fix/update codeowners [\#16750](https://github.com/netdata/netdata/pull/16750) ([underhood](https://github.com/underhood))
+- Address sanitizer through CMake and use it for unit tests. [\#16748](https://github.com/netdata/netdata/pull/16748) ([vkalintiris](https://github.com/vkalintiris))
+- Remove unused file [\#16747](https://github.com/netdata/netdata/pull/16747) ([stelfrag](https://github.com/stelfrag))
 - cleanup proc net-dev renames [\#16745](https://github.com/netdata/netdata/pull/16745) ([ktsaou](https://github.com/ktsaou))
+- uninstaller: improve removing `netdata` from groups [\#16742](https://github.com/netdata/netdata/pull/16742) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16739](https://github.com/netdata/netdata/pull/16739) ([netdatabot](https://github.com/netdatabot))
 - change get kickstart url to https://get.netdata.cloud/kickstart.sh [\#16738](https://github.com/netdata/netdata/pull/16738) ([ilyam8](https://github.com/ilyam8))
 - health: add httpcheck bad header alert [\#16736](https://github.com/netdata/netdata/pull/16736) ([ilyam8](https://github.com/ilyam8))
+- update default netdata.conf used for native packages [\#16734](https://github.com/netdata/netdata/pull/16734) ([ilyam8](https://github.com/ilyam8))
 - fix missing CPU frequency [\#16732](https://github.com/netdata/netdata/pull/16732) ([ilyam8](https://github.com/ilyam8))
 - fix excessive "maximum number of cgroups reached" log messages [\#16730](https://github.com/netdata/netdata/pull/16730) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16728](https://github.com/netdata/netdata/pull/16728) ([netdatabot](https://github.com/netdatabot))
@@ -371,7 +376,6 @@
 - cgroup-network: don't log an error opening pid file if doesn't exist [\#16196](https://github.com/netdata/netdata/pull/16196) ([ilyam8](https://github.com/ilyam8))
 - docker install: support for Proxmox vms/containers name resolution [\#16193](https://github.com/netdata/netdata/pull/16193) ([ilyam8](https://github.com/ilyam8))
 - Introduce workflow to always update bundled packages \(static builds\) into their latest release \(part1\) [\#16191](https://github.com/netdata/netdata/pull/16191) ([tkatsoulas](https://github.com/tkatsoulas))
-- Improvements for labels handling [\#16172](https://github.com/netdata/netdata/pull/16172) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -419,9 +423,6 @@
 - Add support for Ubuntu 23.10 native packages into our CI [\#16179](https://github.com/netdata/netdata/pull/16179) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update bundled static packages  [\#16177](https://github.com/netdata/netdata/pull/16177) ([tkatsoulas](https://github.com/tkatsoulas))
 - Regenerate integrations.js [\#16176](https://github.com/netdata/netdata/pull/16176) ([netdatabot](https://github.com/netdatabot))
-- facets: do not corrupt the index when doubling the hashtable [\#16171](https://github.com/netdata/netdata/pull/16171) ([ktsaou](https://github.com/ktsaou))
-- Add icons to integrations markdown files [\#16169](https://github.com/netdata/netdata/pull/16169) ([Ancairon](https://github.com/Ancairon))
-- Fix netdata-uninstaller; blindly deletes NETDATA\_PREFIX env var [\#16167](https://github.com/netdata/netdata/pull/16167) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
