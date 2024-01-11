@@ -2058,12 +2058,20 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
 
     // switch update every to the storage engine
     RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        for (size_t tier = 0; tier < storage_tiers; tier++) {
-            if (rd->tiers[tier].sch)
-                storage_engine_store_change_collection_frequency(
-                        rd->tiers[tier].sch,
-                        (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+    rrddim_foreach_read(rd, st)
+    {
+        for (size_t tier = 0; tier < storage_tiers; tier++)
+        {
+            STORAGE_INSTANCE *si = st->rrdhost->db[tier].si;
+            STORAGE_METRICS_GROUP *smg = st->smg[tier];
+            STORAGE_METRIC_HANDLE *smh = rd->tiers[tier].smh;
+            STORAGE_COLLECT_HANDLE *sch = rd->tiers[tier].sch;
+
+            if (!sch)
+                continue;
+
+            storage_engine_store_change_collection_frequency(si, smg, smh, sch,
+                (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
     }
     rrddim_foreach_done(rd);

@@ -2,6 +2,7 @@
 
 #include "rrddim_mem.h"
 #include "Judy.h"
+#include "database/rrd.h"
 
 static Pvoid_t rrddim_JudyHS_array = NULL;
 static netdata_rwlock_t rrddim_JudyHS_rwlock = NETDATA_RWLOCK_INITIALIZER;
@@ -133,7 +134,7 @@ bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, uuid_t
     return true;
 }
 
-void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+void rrddim_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 

@@ -516,17 +516,17 @@ static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
     return rrddim_collect_finalize(sch);
 }
 
-void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
-void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
-static inline void storage_engine_store_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+void rrdeng_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every);
+void rrddim_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every);
+static inline void storage_engine_store_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every) {
     internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
     if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_store_metric_change_collection_frequency(sch, update_every);
+        rrdeng_store_metric_change_collection_frequency(si, smg, smh, sch, update_every);
     else
 #endif
-        rrddim_store_metric_change_collection_frequency(sch, update_every);
+        rrddim_store_metric_change_collection_frequency(si, smg, smh, sch, update_every);
 }
 
 

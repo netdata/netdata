@@ -659,7 +659,11 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch) {
     return 0;
 }
 
-void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every) {
+void rrdeng_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every) {
+    UNUSED(si);
+    UNUSED(smg);
+    UNUSED(smh);
+
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
     check_and_fix_mrg_update_every(handle);
 

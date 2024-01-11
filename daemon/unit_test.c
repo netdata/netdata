@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "database/rrd.h"
 
 static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
     bool ok = sanitize_command_argument_string(dst, src, dst_size);
@@ -1923,10 +1924,16 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
 
     update_every = REGION_UPDATE_EVERY[current_region];
     time_now = time_start;
+
     // feed it with the test data
     for (i = 0 ; i < CHARTS ; ++i) {
+        STORAGE_INSTANCE *si = st[i]->rrdhost->db[0].si;
+        STORAGE_METRICS_GROUP *smg = st[i]->smg[0];
+
         for (j = 0 ; j < DIMS ; ++j) {
-            storage_engine_store_change_collection_frequency(rd[i][j]->tiers[0].sch, update_every);
+            STORAGE_METRIC_HANDLE *smh = rd[i][j]->tiers[0].smh;
+            STORAGE_COLLECT_HANDLE *sch = rd[i][j]->tiers[0].sch;
+            storage_engine_store_change_collection_frequency(si, smg, smh, sch, update_every);
 
             rd[i][j]->collector.last_collected_time.tv_sec =
             st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
