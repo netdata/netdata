@@ -74,14 +74,14 @@ static inline bool rrdeng_page_alignment_release(struct pg_alignment *pa) {
 }
 
 // charts call this
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid __maybe_unused) {
     struct pg_alignment *pa = callocz(1, sizeof(struct pg_alignment));
     rrdeng_page_alignment_acquire(pa);
     return (STORAGE_METRICS_GROUP *)pa;
 }
 
 // charts call this
-void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance __maybe_unused, STORAGE_METRICS_GROUP *smg) {
+void rrdeng_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_METRICS_GROUP *smg) {
     if(unlikely(!smg)) return;
 
     struct pg_alignment *pa = (struct pg_alignment *)smg;
@@ -108,8 +108,8 @@ void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-static METRIC *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, const char *rd_id, const char *st_id) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+static METRIC *rrdeng_metric_get_legacy(STORAGE_INSTANCE *si, const char *rd_id, const char *st_id) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     uuid_t legacy_uuid;
     rrdeng_generate_legacy_uuid(rd_id, st_id, &legacy_uuid);
     return mrg_metric_get_and_acquire(main_mrg, &legacy_uuid, (Word_t) ctx);
@@ -128,15 +128,15 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle
     return (STORAGE_METRIC_HANDLE *) mrg_metric_dup(main_mrg, metric);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, uuid_t *uuid) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return (STORAGE_METRIC_HANDLE *) mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
 }
 
-static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid) {
-    internal_fatal(!db_instance, "DBENGINE: db_instance is NULL");
+static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, uuid_t *uuid) {
+    internal_fatal(!si, "DBENGINE: STORAGE_INSTANCE is NULL");
 
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     MRG_ENTRY entry = {
             .uuid = uuid,
             .section = (Word_t)ctx,
@@ -149,8 +149,8 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid)
     return metric;
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     METRIC *metric;
 
     metric = mrg_metric_get_and_acquire(main_mrg, &rd->metric_uuid, (Word_t) ctx);
@@ -160,13 +160,13 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
             // this is a single host database
             // generate uuid from the chart and dimensions ids
             // and overwrite the one supplied by rrddim
-            metric = rrdeng_metric_get_legacy(db_instance, rrddim_id(rd), rrdset_id(rd->rrdset));
+            metric = rrdeng_metric_get_legacy(si, rrddim_id(rd), rrdset_id(rd->rrdset));
             if (metric)
                 uuid_copy(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric));
         }
 
         if(likely(!metric))
-            metric = rrdeng_metric_create(db_instance, &rd->metric_uuid);
+            metric = rrdeng_metric_create(si, &rd->metric_uuid);
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -938,9 +938,9 @@ time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     return oldest_time_s;
 }
 
-bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s)
+bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s)
 {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     if (unlikely(!ctx)) {
         netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
@@ -957,18 +957,18 @@ bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_
     return true;
 }
 
-uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return ctx->config.max_disk_space;
 }
 
-uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return __atomic_load_n(&ctx->atomic.current_disk_space, __ATOMIC_RELAXED);
 }
 
-time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
 
     time_t t = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
     if(t == LONG_MAX || t < 0)
@@ -977,8 +977,8 @@ time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *db_instance) {
     return t;
 }
 
-size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 }
 
@@ -1099,8 +1099,8 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     netdata_log_info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 
-bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+bool rrdeng_is_legacy(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return ctx->config.legacy;
 }
 

@@ -101,7 +101,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             STORAGE_ENGINE *eng = host->db[tier].eng;
             rd->tiers[tier].backend = eng->backend;
             rd->tiers[tier].tier_grouping = host->db[tier].tier_grouping;
-            rd->tiers[tier].db_metric_handle = eng->api.metric_get_or_create(rd, host->db[tier].instance);
+            rd->tiers[tier].db_metric_handle = eng->api.metric_get_or_create(rd, host->db[tier].si);
             storage_point_unset(rd->tiers[tier].virtual_point);
             initialized++;
 

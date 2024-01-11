@@ -9,11 +9,11 @@ static netdata_rwlock_t rrddim_JudyHS_rwlock = NETDATA_RWLOCK_INITIALIZER;
 // ----------------------------------------------------------------------------
 // metrics groups
 
-STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid __maybe_unused) {
     return NULL;
 }
 
-void rrddim_metrics_group_release(STORAGE_INSTANCE *db_instance __maybe_unused, STORAGE_METRICS_GROUP *smg __maybe_unused) {
+void rrddim_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_METRICS_GROUP *smg __maybe_unused) {
     // if(!smg) return; // smg may be NULL
     ;
 }
@@ -48,8 +48,8 @@ static void check_metric_handle_from_rrddim(struct mem_metric_handle *mh) {
 }
 
 STORAGE_METRIC_HANDLE *
-rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_unused) {
-    struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get(db_instance, &rd->metric_uuid);
+rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
+    struct mem_metric_handle *mh = (struct mem_metric_handle *)rrddim_metric_get(si, &rd->metric_uuid);
     while(!mh) {
         netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
         Pvoid_t *PValue = JudyHSIns(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(uuid_t), PJE0);
@@ -75,7 +75,7 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_un
 }
 
 STORAGE_METRIC_HANDLE *
-rrddim_metric_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid) {
+rrddim_metric_get(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid) {
     struct mem_metric_handle *mh = NULL;
     netdata_rwlock_rdlock(&rrddim_JudyHS_rwlock);
     Pvoid_t *PValue = JudyHSGet(rrddim_JudyHS_array, uuid, sizeof(uuid_t));
@@ -116,8 +116,8 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unuse
     }
 }
 
-bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s) {
-    STORAGE_METRIC_HANDLE *db_metric_handle = rrddim_metric_get(db_instance, uuid);
+bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s) {
+    STORAGE_METRIC_HANDLE *db_metric_handle = rrddim_metric_get(si, uuid);
     if(!db_metric_handle)
         return false;
 

@@ -26,8 +26,8 @@ extern uint8_t tier_page_type[];
 
 void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
-STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si);
+STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, uuid_t *uuid);
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle);
 STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle);
 
@@ -64,10 +64,10 @@ void rrdeng_exit_mode(struct rrdengine_instance *ctx);
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
 void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
-bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);
+bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);
 
-extern STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
+extern STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, uuid_t *uuid);
+extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);
 
 typedef struct rrdengine_size_statistics {
     size_t default_granularity_secs;
@@ -221,9 +221,9 @@ struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
-bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance);
+bool rrdeng_is_legacy(STORAGE_INSTANCE *si);
 
-uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *db_instance);
-uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *db_instance);
+uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *si);
+uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *si);
 
 #endif /* NETDATA_RRDENGINEAPI_H */
