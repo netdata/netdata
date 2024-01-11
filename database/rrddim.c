@@ -121,7 +121,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier].db_metric_handle) {
                 rd->tiers[tier].db_collection_handle =
-                        storage_metric_store_init(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
+                        storage_metric_store_init(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
                 initialized++;
             }
         }
@@ -259,7 +259,7 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if (!rd->tiers[tier].db_collection_handle)
             rd->tiers[tier].db_collection_handle =
-                    storage_metric_store_init(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
+                    storage_metric_store_init(rd->tiers[tier].backend, rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
     }
 
     if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {

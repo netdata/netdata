@@ -779,7 +779,7 @@ struct rrdset {
 
     rrd_ml_chart_t *ml_chart;
 
-    STORAGE_METRICS_GROUP *storage_metrics_groups[RRD_STORAGE_TIERS];
+    STORAGE_METRICS_GROUP *smg[RRD_STORAGE_TIERS];
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents
