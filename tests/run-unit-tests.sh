@@ -20,6 +20,8 @@
 
 install_netdata() {
   echo "Installing Netdata"
+
+  NETDATA_CMAKE_OPTIONS="-DCMAKE_BUILD_TYPE=Debug -DENABLE_ADDRESS_SANITIZER=On" \
   fakeroot ./netdata-installer.sh \
     --install-prefix "$HOME" \
     --dont-wait \
@@ -32,6 +34,8 @@ install_netdata() {
 
 c_unit_tests() {
   echo "Running C code unit tests"
+
+  ASAN_OPTIONS=detect_leaks=0 \
   "$HOME"/netdata/usr/sbin/netdata -W unittest
 }
 

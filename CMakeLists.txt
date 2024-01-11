@@ -71,6 +71,12 @@ if(NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+option(ENABLE_ADDRESS_SANITIZER "enable address sanitizer" False)
+
+if(ENABLE_ADDRESS_SANITIZER)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+endif()
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
@@ -114,7 +120,13 @@ option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
 include(CheckCCompilerFlag)
 
-option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" False)
+# Disable hardening for debug builds by default.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" TRUE)
+else()
+        # FIXME: Until https://github.com/netdata/netdata/pull/16731 resolves the issue
+        option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" TRUE)
+endif()
 
 set(EXTRA_HARDENING_FLAGS "")
 

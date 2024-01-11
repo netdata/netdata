@@ -182,25 +182,25 @@ void rrdset_update_heterogeneous_flag(RRDSET *st)
     (void)st;
 }
 
-time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle)
+time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *smh)
 {
-    (void)db_metric_handle;
+    (void)smh;
 
     function_called();
     return mock_type(time_t);
 }
 
-time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle)
+time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *smh)
 {
-    (void)db_metric_handle;
+    (void)smh;
 
     function_called();
     return mock_type(time_t);
 }
 
-void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time)
+void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct rrddim_query_handle *handle, time_t start_time, time_t end_time)
 {
-    (void)db_metric_handle;
+    (void)smh;
     (void)handle;
 
     function_called();

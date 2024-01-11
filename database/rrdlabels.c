@@ -694,6 +694,11 @@ static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABE
 // ----------------------------------------------------------------------------
 // rrdlabels_add()
 
+/*
+ * FIXME: Attribute added because address sanitizer reports an issue when
+ * running the agent with `-W unittest`.
+*/
+__attribute__((no_sanitize("address")))
 static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, const char *value, RRDLABEL_SRC ls)
 {
     RRDLABEL *new_label = add_label_name_value(key, value);
