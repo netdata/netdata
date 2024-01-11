@@ -1908,7 +1908,11 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     // Flush pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].sch);
+            rrdeng_store_metric_flush_current_page(
+                host->db[0].si,
+                st[i]->smg[0],
+                rd[i][j]->tiers[0].smh,
+                rd[i][j]->tiers[0].sch);
         }
     }
 }
@@ -2150,7 +2154,11 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].sch);
+            rrdeng_store_metric_flush_current_page(
+                host->db[0].si,
+                st[i]->smg[0],
+                rd[i][j]->tiers[0].smh,
+                rd[i][j]->tiers[0].sch);
         }
     }
 
@@ -2168,7 +2176,11 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].sch);
+            rrdeng_store_metric_flush_current_page(
+                host->db[0].si,
+                st[i]->smg[0],
+                rd[i][j]->tiers[0].smh,
+                rd[i][j]->tiers[0].sch);
         }
     }
 
@@ -2330,8 +2342,12 @@ static void generate_dbengine_chart(void *arg)
         rrdset_done(st);
         thread_info->time_max = time_current;
     }
+
+    STORAGE_INSTANCE *si = st->rrdhost->db[0].si;
+    STORAGE_METRICS_GROUP *smg = st->smg[0];
     for (j = 0; j < DSET_DIMS; ++j) {
-        rrdeng_store_metric_finalize((rd[j])->tiers[0].sch);
+
+        rrdeng_store_metric_finalize(si, smg, rd[j]->tiers[0].smh, rd[j]->tiers[0].sch);
     }
 }
 

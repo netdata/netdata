@@ -168,6 +168,9 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 }
 
 bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
+    RRDSET *st = rd->rrdset;
+    RRDHOST *host = st->rrdhost;
+
     size_t tiers_available = 0, tiers_said_no_retention = 0;
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
@@ -176,7 +179,10 @@ bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
 
         tiers_available++;
 
-        if(storage_engine_store_finalize(rd->tiers[tier].sch))
+        STORAGE_INSTANCE *si = host->db[tier].si;
+        STORAGE_METRICS_GROUP *smg = st->smg[tier];
+
+        if(storage_engine_store_finalize(si, smg, rd->tiers[tier].smh, rd->tiers[tier].sch))
             tiers_said_no_retention++;
 
         rd->tiers[tier].sch = NULL;

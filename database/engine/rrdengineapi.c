@@ -298,7 +298,11 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_INSTANCE *si, STORAGE_M
     return (STORAGE_COLLECT_HANDLE *)handle;
 }
 
-void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
+void rrdeng_store_metric_flush_current_page(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch) {
+    UNUSED(si);
+    UNUSED(smg);
+    UNUSED(smh);
+
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
 
     if (unlikely(!handle->pgc_page))
@@ -464,7 +468,10 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, siz
     return d;
 }
 
-static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
+static void rrdeng_store_metric_append_point(STORAGE_INSTANCE *si,
+                                             STORAGE_METRICS_GROUP *smg,
+                                             STORAGE_METRIC_HANDLE *smh,
+                                             STORAGE_COLLECT_HANDLE *sch,
                                              const usec_t point_in_time_ut,
                                              const NETDATA_DOUBLE n,
                                              const NETDATA_DOUBLE min_value,
@@ -500,7 +507,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
         if(unlikely(++handle->page_position >= handle->page_entries_max)) {
             internal_fatal(handle->page_position > handle->page_entries_max, "DBENGINE: exceeded page max number of points");
             handle->page_flags |= RRDENG_PAGE_FULL;
-            rrdeng_store_metric_flush_current_page(sch);
+            rrdeng_store_metric_flush_current_page(si, smg, smh, sch);
         }
     }
 
@@ -581,11 +588,11 @@ void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
         if(handle->pgc_page) {
             if (unlikely(delta_ut < handle->update_every_ut)) {
                 handle->page_flags |= RRDENG_PAGE_STEP_TOO_SMALL;
-                rrdeng_store_metric_flush_current_page(sch);
+                rrdeng_store_metric_flush_current_page(si, smg, smh, sch);
             }
             else if (unlikely(delta_ut % handle->update_every_ut)) {
                 handle->page_flags |= RRDENG_PAGE_STEP_UNALIGNED;
-                rrdeng_store_metric_flush_current_page(sch);
+                rrdeng_store_metric_flush_current_page(si, smg, smh, sch);
             }
             else {
                 size_t points_gap = delta_ut / handle->update_every_ut;
@@ -593,7 +600,7 @@ void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
 
                 if (points_gap >= page_remaining_points) {
                     handle->page_flags |= RRDENG_PAGE_BIG_GAP;
-                    rrdeng_store_metric_flush_current_page(sch);
+                    rrdeng_store_metric_flush_current_page(si, smg, smh, sch);
                 }
                 else {
                     // loop to fill the gap
@@ -604,7 +611,7 @@ void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
                          this_ut <= stop_ut;
                          this_ut = handle->page_end_time_ut + handle->update_every_ut) {
                         rrdeng_store_metric_append_point(
-                                sch,
+                                si, smg, smh, sch,
                                 this_ut,
                                 NAN, NAN, NAN,
                                 1, 0,
@@ -628,7 +635,7 @@ void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
 
     timing_step(TIMING_STEP_DBENGINE_FIRST_CHECK);
 
-    rrdeng_store_metric_append_point(sch,
+    rrdeng_store_metric_append_point(si, smg, smh, sch,
                                      point_in_time_ut,
                                      n, min_value, max_value,
                                      count, anomaly_count,
@@ -639,12 +646,13 @@ void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
  * Releases the database reference from the handle for storing metrics.
  * Returns 1 if it's safe to delete the dimension.
  */
-int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch) {
+int rrdeng_store_metric_finalize(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch)
+{
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     handle->page_flags |= RRDENG_PAGE_COLLECT_FINALIZE;
-    rrdeng_store_metric_flush_current_page(sch);
+    rrdeng_store_metric_flush_current_page(si, smg, smh, sch);
     rrdeng_page_alignment_release(handle->alignment);
 
     __atomic_sub_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
@@ -667,10 +675,6 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch) {
 }
 
 void rrdeng_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every) {
-    UNUSED(si);
-    UNUSED(smg);
-    UNUSED(smh);
-
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
     check_and_fix_mrg_update_every(handle);
 
@@ -681,7 +685,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORA
         return;
 
     handle->page_flags |= RRDENG_PAGE_UPDATE_EVERY_CHANGE;
-    rrdeng_store_metric_flush_current_page(sch);
+    rrdeng_store_metric_flush_current_page(si, smg, smh, sch);
     mrg_metric_set_update_every(main_mrg, metric, update_every);
     handle->update_every_ut = update_every_ut;
 }

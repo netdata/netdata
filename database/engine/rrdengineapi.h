@@ -33,7 +33,7 @@ void rrdeng_metric_release(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh);
 STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh);
 
 STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, uint32_t update_every);
-void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch);
+void rrdeng_store_metric_flush_current_page(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch);
 void rrdeng_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every);
 
 void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
@@ -48,7 +48,7 @@ void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
                               uint16_t anomaly_count,
                               SN_FLAGS flags);
 
-int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch);
+int rrdeng_store_metric_finalize(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch);
 
 void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
                                     time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);

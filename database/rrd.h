@@ -507,9 +507,9 @@ static inline size_t storage_engine_collected_metrics(STORAGE_ENGINE_BACKEND seb
     return 0;
 }
 
-void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch);
-void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *sch);
-static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
+void rrdeng_store_metric_flush_current_page(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch);
+void rrddim_store_metric_flush(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch);
+static inline void storage_engine_store_flush(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch) {
     if(unlikely(!sch))
         return;
 
@@ -517,25 +517,25 @@ static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
 
 #ifdef ENABLE_DBENGINE
     if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        rrdeng_store_metric_flush_current_page(sch);
+        rrdeng_store_metric_flush_current_page(si, smg, smh, sch);
     else
 #endif
-        rrddim_store_metric_flush(sch);
+        rrddim_store_metric_flush(si, smg, smh, sch);
 }
 
-int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch);
-int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch);
+int rrdeng_store_metric_finalize(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch);
+int rrddim_collect_finalize(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch);
 // a finalization function to run after collection is over
 // returns 1 if it's safe to delete the dimension
-static inline int storage_engine_store_finalize(STORAGE_COLLECT_HANDLE *sch) {
+static inline int storage_engine_store_finalize(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch) {
     internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
     if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_finalize(sch);
+        return rrdeng_store_metric_finalize(si, smg, smh, sch);
 #endif
 
-    return rrddim_collect_finalize(sch);
+    return rrddim_collect_finalize(si, smg, smh, sch);
 }
 
 void rrdeng_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every);

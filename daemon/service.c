@@ -44,8 +44,13 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
             if(rd->tiers[tier].sch) {
                 tiers_available++;
 
-                if(storage_engine_store_finalize(rd->tiers[tier].sch))
+                if(storage_engine_store_finalize(st->rrdhost->db[tier].si,
+                                                 st->smg[tier],
+                                                 rd->tiers[tier].smh,
+                                                 rd->tiers[tier].sch))
+                {
                     tiers_said_no_retention++;
+                }
 
                 rd->tiers[tier].sch = NULL;
             }
