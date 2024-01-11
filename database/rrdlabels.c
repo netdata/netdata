@@ -694,11 +694,6 @@ static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABE
 // ----------------------------------------------------------------------------
 // rrdlabels_add()
 
-/*
- * FIXME: Attribute added because address sanitizer reports an issue when
- * running the agent with `-W unittest`.
-*/
-__attribute__((no_sanitize("address")))
 static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, const char *value, RRDLABEL_SRC ls)
 {
     RRDLABEL *new_label = add_label_name_value(key, value);
@@ -715,10 +710,13 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
 
     if(*PValue) {
         new_ls |= RRDLABEL_FLAG_OLD;
+        *((RRDLABEL_SRC *)PValue) = new_ls;
+
         delete_label(new_label);
     }
     else {
         new_ls |= RRDLABEL_FLAG_NEW;
+        *((RRDLABEL_SRC *)PValue) = new_ls;
 
         RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(labels, new_label);
         if (old_label_with_same_key) {
@@ -728,7 +726,6 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
     }
 
     labels->version++;
-    *((RRDLABEL_SRC *)PValue) = new_ls;
 
     size_t mem_after_judyl = JudyLMemUsed(labels->JudyL);
     STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
@@ -1470,8 +1467,11 @@ static int rrdlabels_unittest_double_check()
     rrdlabels_add(labels, "key1", "value1", RRDLABEL_SRC_CONFIG);
     ret += rrdlabels_unittest_expect_value(labels, "key1", "value1", RRDLABEL_FLAG_NEW);
 
-    rrdlabels_add(labels, "key1", "value2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "key1", "value2", RRDLABEL_SRC_K8S);
     ret += !rrdlabels_unittest_expect_value(labels, "key1", "value2", RRDLABEL_FLAG_OLD);
+
+    rrdlabels_add(labels, "key1", "value3", RRDLABEL_SRC_ACLK);
+    ret += !rrdlabels_unittest_expect_value(labels, "key1", "value3", RRDLABEL_FLAG_OLD);
 
     ret += (rrdlabels_entries(labels) != 1);
 
