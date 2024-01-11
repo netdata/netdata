@@ -1580,7 +1580,6 @@ static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf
  * FIXME: Attribute added because address sanitizer reports a log-related
  * issue when running the agent with `-W unittest`.
 */
-__attribute__((no_sanitize("address")))
 static bool needs_quotes_for_logfmt(const char *s)
 {
     static bool safe_for_logfmt[256] = {
@@ -1617,7 +1616,6 @@ static bool needs_quotes_for_logfmt(const char *s)
  * FIXME: Attribute added because address sanitizer reports a log-related
  * issue when running the agent with `-W unittest`.
 */
-__attribute__((no_sanitize("address")))
 static void string_to_logfmt(BUFFER *wb, const char *s)
 {
     bool spaces = needs_quotes_for_logfmt(s);
@@ -1635,7 +1633,6 @@ static void string_to_logfmt(BUFFER *wb, const char *s)
  * FIXME: Attribute added because address sanitizer reports a log-related
  * issue when running the agent with `-W unittest`.
 */
-__attribute__((no_sanitize("address")))
 static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max)
 {
 
@@ -2170,8 +2167,8 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     if(likely(!thread_log_fields[NDF_TID].entry.set))
         thread_log_fields[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid());
 
+    char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
     if(likely(!thread_log_fields[NDF_THREAD_TAG].entry.set)) {
-        char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
         const char *thread_tag = netdata_thread_tag();
         if(!netdata_thread_tag_exists()) {
             if (!netdata_thread_tag_exists()) {
@@ -2264,7 +2261,6 @@ static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
  * FIXME: Attribute added because address sanitizer reports a log-related
  * issue when running the agent with `-W unittest`.
 */
-__attribute__((no_sanitize("address")))
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... )
 {
     int saved_errno = errno;
