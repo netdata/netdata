@@ -279,11 +279,6 @@ static inline void buffer_memcat(BUFFER *wb, const void *mem, size_t bytes) {
     buffer_overflow_check(wb);
 }
 
-/*
- * FIXME: Attribute added because address sanitizer reports a log-related
- * issue when running the agent with `-W unittest`.
-*/
-__attribute__((no_sanitize("address")))
 static inline void buffer_json_strcat(BUFFER *wb, const char *txt)
 {
     if(unlikely(!txt || !*txt)) return;

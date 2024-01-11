@@ -1576,10 +1576,6 @@ static void priority_annotator(BUFFER *wb, const char *key, struct log_field *lf
     buffer_strcat(wb, nd_log_id2priority(pri));
 }
 
-/*
- * FIXME: Attribute added because address sanitizer reports a log-related
- * issue when running the agent with `-W unittest`.
-*/
 static bool needs_quotes_for_logfmt(const char *s)
 {
     static bool safe_for_logfmt[256] = {
@@ -1612,10 +1608,6 @@ static bool needs_quotes_for_logfmt(const char *s)
     return false;
 }
 
-/*
- * FIXME: Attribute added because address sanitizer reports a log-related
- * issue when running the agent with `-W unittest`.
-*/
 static void string_to_logfmt(BUFFER *wb, const char *s)
 {
     bool spaces = needs_quotes_for_logfmt(s);
@@ -1629,10 +1621,6 @@ static void string_to_logfmt(BUFFER *wb, const char *s)
         buffer_fast_strcat(wb, "\"", 1);
 }
 
-/*
- * FIXME: Attribute added because address sanitizer reports a log-related
- * issue when running the agent with `-W unittest`.
-*/
 static void nd_logger_logfmt(BUFFER *wb, struct log_field *fields, size_t fields_max)
 {
 
@@ -2257,10 +2245,6 @@ static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
 // ----------------------------------------------------------------------------
 // public API for loggers
 
-/*
- * FIXME: Attribute added because address sanitizer reports a log-related
- * issue when running the agent with `-W unittest`.
-*/
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... )
 {
     int saved_errno = errno;
