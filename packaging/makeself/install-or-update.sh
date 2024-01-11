@@ -190,7 +190,7 @@ if command -v setcap >/dev/null 2>&1; then
         run setcap "cap_sys_admin=ep" "usr/libexec/netdata/plugins.d/perf.plugin"
     fi
 
-    run setcap "cap_net_admin,cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
+    run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
 else
   for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
