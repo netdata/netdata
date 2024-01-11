@@ -3578,7 +3578,7 @@ size_t dictionary_unittest_views(void) {
 
     // Add an item to both master and view, then remove the view first and the master second
     fprintf(stderr, "\nPASS 1: Adding 1 item to master:\n");
-    DICTIONARY_ITEM *item1_on_master = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE1", strlen("VALUE1"));
+    DICTIONARY_ITEM *item1_on_master = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE1", strlen("VALUE1") + 1);
     errors += unittest_check_dictionary("master", master, 1, 1, 0, 1, 0);
     errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 1, ITEM_FLAG_NONE, true, true, true);
 
@@ -3614,7 +3614,7 @@ size_t dictionary_unittest_views(void) {
     // The other way now:
     // Add an item to both master and view, then remove the master first and verify it is deleted on the view also
     fprintf(stderr, "\nPASS 2: Adding 1 item to master:\n");
-    item1_on_master = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE1", strlen("VALUE1"));
+    item1_on_master = dictionary_set_and_acquire_item(master, "KEY 1", "VALUE1", strlen("VALUE1") + 1);
     errors += unittest_check_dictionary("master", master, 1, 1, 0, 1, 0);
     errors += unittest_check_item("master", master, item1_on_master, "KEY 1", item1_on_master->shared->value, 1, ITEM_FLAG_NONE, true, true, true);
 

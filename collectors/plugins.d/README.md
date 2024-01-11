@@ -631,8 +631,8 @@ Where:
 - `source` can be `internal`, `stock`, `user`, `discovered` or `dyncfg`:
   - `internal` is used for configurations that are based on internal code settings
   - `stock` is used for default configurations
-  - `user` is used for user configurations, usually via a configuration file
   - `discovered` is used for dynamic configurations the plugin discovers by its own
+  - `user` is used for user configurations, usually via a configuration file
   - `dyncfg` is used for configuration received via this dynamic configuration mechanism
 - `source` should provide more details about the exact source of the configuration, like `line@file`, or `user@ip`, etc.
 - `supported_commands` is a space separated list of the following keywords, enclosed in single or double quotes. These commands are used by the user interface to determine the actions the users can take:
