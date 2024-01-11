@@ -59,16 +59,14 @@
 // CPU per core
 
 #define NETDATA_CHART_PRIO_CPU_PER_CORE               1000 // +1 per core
+#define NETDATA_CHART_PRIO_CPUFREQ_SCALING_CUR_FREQ   1002
+#define NETDATA_CHART_PRIO_CORE_THROTTLING            1003
+#define NETDATA_CHART_PRIO_PACKAGE_THROTTLING         1004
+#define NETDATA_CHART_PRIO_CPUIDLE                    1005
+#define NETDATA_CHART_PRIO_INTERRUPTS_PER_CORE        1006 // +1 per core
+#define NETDATA_CHART_PRIO_POWERCAP                   1007 // Linux powercap
 #define NETDATA_CHART_PRIO_CPU_TEMPERATURE            1050 // freebsd only
-#define NETDATA_CHART_PRIO_CPUFREQ_SCALING_CUR_FREQ   5003 // freebsd only
-#define NETDATA_CHART_PRIO_CPUIDLE                    6000
 
-#define NETDATA_CHART_PRIO_CORE_THROTTLING            5001
-#define NETDATA_CHART_PRIO_PACKAGE_THROTTLING         5002
-
-// Interrupts per core
-
-#define NETDATA_CHART_PRIO_INTERRUPTS_PER_CORE        1100 // +1 per core
 
 // Memory Section - 1xxx
 
@@ -383,10 +381,6 @@
 #define NETDATA_CHART_PRIO_POWER_SUPPLY_CHARGE        9501
 #define NETDATA_CHART_PRIO_POWER_SUPPLY_ENERGY        9502
 #define NETDATA_CHART_PRIO_POWER_SUPPLY_VOLTAGE       9503
-
-// Linux powercap
-
-#define NETDATA_CHART_PRIO_POWERCAP                   9600
 
 // Wireless
 
