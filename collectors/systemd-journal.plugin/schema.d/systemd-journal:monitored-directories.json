@@ -1,0 +1,34 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "journalDirectories": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^/.*$"
+        },
+        "maxItems": 100,
+	"uniqueItems": true
+      }
+    },
+    "required": [
+      "journalDirectories"
+    ]
+  },
+  "uiSchema": {
+    "journalDirectories": {
+      "ui:options": {
+        "addable": true,
+        "orderable": false,
+        "removable": true
+      },
+      "items": {
+        "ui:placeholder": "Enter absolute directory path",
+        "ui:widget": "text",
+        "ui:emptyValue": ""
+      }
+    }
+  }
+}
