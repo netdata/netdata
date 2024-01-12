@@ -49,7 +49,7 @@ struct buffer_fragment {
     size_t sent;
     buffer_frag_flag_t flags;
     void (*free_fnc)(void *ptr);
-    char *data;
+    unsigned char *data;
 
     uint16_t packet_id;
 
@@ -62,8 +62,8 @@ typedef struct buffer_fragment *mqtt_msg_data;
 // not for actual data sent
 struct header_buffer {
     size_t size;
-    char *data;
-    char *tail;
+    unsigned char *data;
+    unsigned char *tail;
     struct buffer_fragment *tail_frag;
 };
 
@@ -259,7 +259,7 @@ struct mqtt_ng_client {
     size_t max_msg_size;
 };
 
-char pingreq[] = { MQTT_CPT_PINGREQ << 4, 0x00 };
+unsigned char pingreq[] = { MQTT_CPT_PINGREQ << 4, 0x00 };
 
 struct buffer_fragment ping_frag = {
     .data = pingreq,
@@ -271,7 +271,7 @@ struct buffer_fragment ping_frag = {
     .packet_id = 0
 };
 
-int uint32_to_mqtt_vbi(uint32_t input, char *output) {
+int uint32_to_mqtt_vbi(uint32_t input, unsigned char *output) {
     int i = 1;
     *output = 0;
 
@@ -478,7 +478,7 @@ static void buffer_rebuild(struct header_buffer *buf)
 {
     struct buffer_fragment *frag = (struct buffer_fragment*)buf->data;
     do {
-        buf->tail = (char*)frag + sizeof(struct buffer_fragment);
+        buf->tail = (unsigned char *) frag + sizeof(struct buffer_fragment);
         buf->tail_frag = frag;
         if (!(frag->flags & BUFFER_FRAG_DATA_EXTERNAL)) {
             buf->tail_frag->data = buf->tail;
@@ -529,7 +529,7 @@ static void buffer_garbage_collect(struct header_buffer *buf, mqtt_wss_log_ctx_t
     }
 #endif
 
-    memmove(buf->data, frag, buf->tail - (char*)frag);
+    memmove(buf->data, frag, buf->tail - (unsigned char *) frag);
     buffer_rebuild(buf);
 }
 
@@ -935,7 +935,7 @@ mqtt_msg_data mqtt_ng_generate_connect(struct transaction_buffer *trx_buf,
     DATA_ADVANCE(&trx_buf->hdr_buffer, sizeof(mqtt_protocol_name_frag), frag);
 
     // [MQTT-3.1.2.3] Connect flags
-    char *connect_flags = WRITE_POS(frag);
+    unsigned char *connect_flags = WRITE_POS(frag);
     *connect_flags = 0;
     if (auth->username)
         *connect_flags |= MQTT_CONNECT_FLAG_USERNAME;
@@ -1949,7 +1949,7 @@ static int send_fragment(struct mqtt_ng_client *client) {
     struct buffer_fragment *frag = client->main_buffer.sending_frag;
 
     // for readability
-    char *ptr = frag->data + frag->sent;
+    unsigned char *ptr = frag->data + frag->sent;
     size_t bytes = frag->len - frag->sent;
 
     size_t processed = 0;
