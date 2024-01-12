@@ -1548,8 +1548,7 @@ static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w,
                                 NULL, NULL,
                                 web_client_progress_functions_update, w,
                                 web_client_interrupt_callback, w,
-                                w->payload,
-                                buffer_tostring(source));
+                                w->payload, buffer_tostring(source));
 
     return code;
 }
