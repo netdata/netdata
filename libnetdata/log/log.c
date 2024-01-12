@@ -2305,7 +2305,16 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
     char action_data[70+1];
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
 
-    const char *thread_tag = thread_log_fields[NDF_THREAD_TAG].entry.txt;
+    char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
+    const char *thread_tag = netdata_thread_tag();
+    if(!netdata_thread_tag_exists()) {
+        if (!netdata_thread_tag_exists()) {
+            os_thread_get_current_name_np(os_threadname);
+            if ('\0' != os_threadname[0])
+                /* If it is not an empty string replace "MAIN" thread_tag */
+                thread_tag = os_threadname;
+        }
+    }
     if(!thread_tag)
         thread_tag = "UNKNOWN";
 
