@@ -280,7 +280,10 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
     exit(1);
 }
 
-void worker_queue_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+void worker_queue_delete_cb(const DICTIONARY_ITEM *item, void *value, void *data) {
+    UNUSED(item);
+    UNUSED(data);
+
     struct functions_evloop_worker_job *j = value;
     worker_job_cleanup(j);
 }

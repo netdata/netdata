@@ -421,11 +421,17 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
  * @param where the variable with the flags set.
  * @param ret the return of the caller
  */
-static void netdata_ssl_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
-    (void)ssl;
+static void netdata_ssl_info_callback(const SSL *ssl, int where, int ret)
+{
+#ifdef NETDATA_INTERNAL_CHECKS
     if (where & SSL_CB_ALERT) {
         netdata_log_debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
     }
+#else
+    UNUSED(ssl);
+    UNUSED(where);
+    UNUSED(ret);
+#endif
 }
 
 /**

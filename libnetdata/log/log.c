@@ -1934,7 +1934,7 @@ static bool nd_logger_journal_direct(struct log_field *fields, size_t fields_max
 // ----------------------------------------------------------------------------
 // syslog logger - uses logfmt
 
-static bool nd_logger_syslog(int priority, ND_LOG_FORMAT format __maybe_unused, struct log_field *fields, size_t fields_max) {
+static bool nd_logger_syslog(int priority, struct log_field *fields, size_t fields_max) {
     CLEAN_BUFFER *wb = buffer_create(1024, NULL);
 
     nd_logger_logfmt(wb, fields, fields_max);
@@ -2058,7 +2058,7 @@ static void nd_logger_log_fields(SPINLOCK *spinlock, FILE *fp, bool limit, ND_LO
     }
 
     if(output == NDLM_SYSLOG)
-        nd_logger_syslog(priority, source->format, fields, fields_max);
+        nd_logger_syslog(priority, fields, fields_max);
 
     if(output == NDLM_FILE)
         nd_logger_file(fp, source->format, fields, fields_max);
@@ -2261,7 +2261,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     va_end(args);
 }
 
-void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
     int saved_errno = errno;
     source = nd_log_validate_source(source);
 

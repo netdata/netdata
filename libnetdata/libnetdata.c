@@ -1151,7 +1151,7 @@ inline int madvise_dontneed(void *mem, size_t len) {
     return ret;
 }
 
-inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused) {
+inline int madvise_dontdump(void *mem, size_t len) {
 #if __linux__
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTDUMP);
@@ -1160,11 +1160,13 @@ inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused)
         netdata_log_error("madvise(MADV_DONTDUMP) failed.");
     return ret;
 #else
+    UNUSED(mem);
+    UNUSED(len);
     return 0;
 #endif
 }
 
-inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused) {
+inline int madvise_mergeable(void *mem, size_t len) {
 #ifdef MADV_MERGEABLE
     static int logger = 1;
     int ret = madvise(mem, len, MADV_MERGEABLE);
@@ -1173,6 +1175,8 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
         netdata_log_error("madvise(MADV_MERGEABLE) failed.");
     return ret;
 #else
+    UNUSED(mem);
+    UNUSED(len);
     return 0;
 #endif
 }

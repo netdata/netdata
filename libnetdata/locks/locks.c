@@ -133,8 +133,14 @@ int __netdata_mutex_unlock(netdata_mutex_t *mutex) {
 
 #ifdef NETDATA_TRACE_RWLOCKS
 
-int netdata_mutex_init_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                             const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
+int netdata_mutex_init_debug(const char *file, const char *function,
+                             const unsigned long line, netdata_mutex_t *mutex) {
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(file);
+    UNUSED(function);
+    UNUSED(line);
+#endif
+
     netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_init(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     int ret = __netdata_mutex_init(mutex);
@@ -144,8 +150,14 @@ int netdata_mutex_init_debug(const char *file __maybe_unused, const char *functi
     return ret;
 }
 
-int netdata_mutex_destroy_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                             const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
+int netdata_mutex_destroy_debug(const char *file, const char *function,
+                             const unsigned long line, netdata_mutex_t *mutex) {
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(file);
+    UNUSED(function);
+    UNUSED(line);
+#endif
+
     netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_destroy(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     int ret = __netdata_mutex_destroy(mutex);
@@ -155,8 +167,14 @@ int netdata_mutex_destroy_debug(const char *file __maybe_unused, const char *fun
     return ret;
 }
 
-int netdata_mutex_lock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                             const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
+int netdata_mutex_lock_debug(const char *file, const char *function,
+                             const unsigned long line, netdata_mutex_t *mutex) {
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(file);
+    UNUSED(function);
+    UNUSED(line);
+#endif
+
     netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     usec_t start_s = now_monotonic_high_precision_usec();
@@ -172,8 +190,14 @@ int netdata_mutex_lock_debug(const char *file __maybe_unused, const char *functi
     return ret;
 }
 
-int netdata_mutex_trylock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                                const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
+int netdata_mutex_trylock_debug(const char *file, const char *function,
+                                const unsigned long line, netdata_mutex_t *mutex) {
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(file);
+    UNUSED(function);
+    UNUSED(line);
+#endif
+
     netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     usec_t start_s = now_monotonic_high_precision_usec();
@@ -189,8 +213,14 @@ int netdata_mutex_trylock_debug(const char *file __maybe_unused, const char *fun
     return ret;
 }
 
-int netdata_mutex_unlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                               const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
+int netdata_mutex_unlock_debug(const char *file, const char *function,
+                               const unsigned long line, netdata_mutex_t *mutex) {
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(file);
+    UNUSED(function);
+    UNUSED(line);
+#endif
+
     netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(%p) from %lu@%s, %s()", mutex, line, file, function);
 
     usec_t start_s = now_monotonic_high_precision_usec();
@@ -433,7 +463,13 @@ bool rw_spinlock_trywrite_lock(RW_SPINLOCK *rw_spinlock) {
 // ----------------------------------------------------------------------------
 // lockers list
 
-static netdata_rwlock_locker *find_rwlock_locker(const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
+static netdata_rwlock_locker *find_rwlock_locker(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
+#ifndef NETDATA_INTERNAL_CHECK
+    UNUSED(file);
+    UNUSED(function);
+    UNUSED(line);
+#endif
+
     pid_t pid = gettid();
     netdata_rwlock_locker *locker = NULL;
 
@@ -466,7 +502,7 @@ static netdata_rwlock_locker *add_rwlock_locker(const char *file, const char *fu
         locker->line = line;
 
         __netdata_mutex_lock(&rwlock->lockers_mutex);
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(rwlock->lockers, locker, prev, next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rwlock->lockers, locker, prev, next);
         Pvoid_t *PValue = JudyLIns(&rwlock->lockers_pid_JudyL, locker->pid, PJE0);
         *PValue = locker;
         if (lock_type == RWLOCK_REQUEST_READ || lock_type == RWLOCK_REQUEST_TRYREAD) rwlock->readers++;
@@ -477,11 +513,17 @@ static netdata_rwlock_locker *add_rwlock_locker(const char *file, const char *fu
     return locker;
 }
 
-static void remove_rwlock_locker(const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock, netdata_rwlock_locker *locker) {
+static void remove_rwlock_locker(const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock, netdata_rwlock_locker *locker) {
+#ifndef NETDATA_INTERNAL_CHECK
+    UNUSED(file);
+    UNUSED(function);
+    UNUSED(line);
+#endif
+
     __netdata_mutex_lock(&rwlock->lockers_mutex);
     locker->refcount--;
     if(!locker->refcount) {
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rwlock->lockers, locker, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rwlock->lockers, locker, prev, next);
         JudyLDel(&rwlock->lockers_pid_JudyL, locker->pid, PJE0);
         if (locker->lock == RWLOCK_REQUEST_READ || locker->lock == RWLOCK_REQUEST_TRYREAD) rwlock->readers--;
         else if (locker->lock == RWLOCK_REQUEST_WRITE || locker->lock == RWLOCK_REQUEST_TRYWRITE) rwlock->writers--;
@@ -493,9 +535,8 @@ static void remove_rwlock_locker(const char *file __maybe_unused, const char *fu
 // ----------------------------------------------------------------------------
 // debug versions of rwlock
 
-int netdata_rwlock_destroy_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                                 const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
-
+int netdata_rwlock_destroy_debug(const char *file, const char *function,
+                                 const unsigned long line, netdata_rwlock_t *rwlock) {
     int ret = __netdata_rwlock_destroy(rwlock);
     if(!ret) {
         while (rwlock->lockers)
@@ -505,8 +546,13 @@ int netdata_rwlock_destroy_debug(const char *file __maybe_unused, const char *fu
     return ret;
 }
 
-int netdata_rwlock_init_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                              const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
+int netdata_rwlock_init_debug(const char *file, const char *function,
+                              const unsigned long line, netdata_rwlock_t *rwlock) {
+#ifndef NETDATA_INTERNAL_CHECK
+    UNUSED(file);
+    UNUSED(function);
+    UNUSED(line);
+#endif
 
     int ret = __netdata_rwlock_init(rwlock);
     if(!ret) {
@@ -520,9 +566,8 @@ int netdata_rwlock_init_debug(const char *file __maybe_unused, const char *funct
     return ret;
 }
 
-int netdata_rwlock_rdlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                                const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
-
+int netdata_rwlock_rdlock_debug(const char *file, const char *function,
+                                const unsigned long line, netdata_rwlock_t *rwlock) {
     netdata_rwlock_locker *locker = add_rwlock_locker(file, function, line, rwlock, RWLOCK_REQUEST_READ);
 
     int ret = __netdata_rwlock_rdlock(rwlock);
@@ -534,9 +579,8 @@ int netdata_rwlock_rdlock_debug(const char *file __maybe_unused, const char *fun
     return ret;
 }
 
-int netdata_rwlock_wrlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                                const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
-
+int netdata_rwlock_wrlock_debug(const char *file, const char *function,
+                                const unsigned long line, netdata_rwlock_t *rwlock) {
     netdata_rwlock_locker *locker = add_rwlock_locker(file, function, line, rwlock, RWLOCK_REQUEST_WRITE);
 
     int ret = __netdata_rwlock_wrlock(rwlock);
@@ -548,9 +592,8 @@ int netdata_rwlock_wrlock_debug(const char *file __maybe_unused, const char *fun
     return ret;
 }
 
-int netdata_rwlock_unlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                                const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
-
+int netdata_rwlock_unlock_debug(const char *file, const char *function,
+                                const unsigned long line, netdata_rwlock_t *rwlock) {
     netdata_rwlock_locker *locker = find_rwlock_locker(file, function, line, rwlock);
 
     if(unlikely(!locker))
@@ -563,9 +606,8 @@ int netdata_rwlock_unlock_debug(const char *file __maybe_unused, const char *fun
     return ret;
 }
 
-int netdata_rwlock_tryrdlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
-                                   const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
-
+int netdata_rwlock_tryrdlock_debug(const char *file, const char *function,
+                                   const unsigned long line, netdata_rwlock_t *rwlock) {
     netdata_rwlock_locker *locker = add_rwlock_locker(file, function, line, rwlock, RWLOCK_REQUEST_TRYREAD);
 
     int ret = __netdata_rwlock_tryrdlock(rwlock);

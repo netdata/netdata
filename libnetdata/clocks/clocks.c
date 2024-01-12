@@ -17,7 +17,9 @@ usec_t clock_monotonic_resolution = DEFAULT_CLOCK_RESOLUTION_UT;
 usec_t clock_realtime_resolution = DEFAULT_CLOCK_RESOLUTION_UT;
 
 #ifndef HAVE_CLOCK_GETTIME
-inline int clock_gettime(clockid_t clk_id __maybe_unused, struct timespec *ts) {
+inline int clock_gettime(clockid_t clk_id, struct timespec *ts) {
+    UNUSED(clk_id);
+
     struct timeval tv;
     if(unlikely(gettimeofday(&tv, NULL) == -1)) {
         netdata_log_error("gettimeofday() failed.");

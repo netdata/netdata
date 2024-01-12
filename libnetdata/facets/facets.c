@@ -355,7 +355,7 @@ uint32_t facets_rows(FACETS *facets) {
 
 // ----------------------------------------------------------------------------
 
-static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row);
+static void facets_row_free(FACETS *facets, FACET_ROW *row);
 static inline void facet_value_is_used(FACET_KEY *k, FACET_VALUE *v);
 static inline bool facets_key_is_facet(FACETS *facets, FACET_KEY *k);
 
@@ -903,6 +903,7 @@ void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, siz
     size_t total_ut = to_ut - from_ut;
     ssize_t remaining_entries = (ssize_t)entries;
     size_t slot = facets_histogram_slot_at_time_ut(facets, from_ut, v);
+
     for(; slot < facets->histogram.slots ;slot++) {
         usec_t slot_start_ut = facets->histogram.after_ut + slot * facets->histogram.slot_width_ut;
         usec_t slot_end_ut = slot_start_ut + facets->histogram.slot_width_ut;
@@ -920,6 +921,7 @@ void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, siz
 
     // Check if all entries are assigned
     // This should always be true if the distribution is correct
+    UNUSED(remaining_entries);
     internal_fatal(remaining_entries < 0 || remaining_entries >= (ssize_t)(slots),
                    "distribution of estimations is not accurate - there are %zd remaining entries",
                    remaining_entries);
@@ -1010,7 +1012,7 @@ static inline void facets_key_value_transformed(FACETS *facets, FACET_KEY *k, FA
         buffer_strcat(dst, facets_key_value_cached(k, v, facets->report.used_hashes_registry));
 }
 
-static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, const char *first_key) {
+static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets, FACET_KEY *k, const char *key, const char *first_key) {
     CLEAN_BUFFER *tb = buffer_create(0, NULL);
 
     buffer_json_member_add_array(wb, key);
@@ -1033,7 +1035,9 @@ static inline void facets_histogram_value_names(BUFFER *wb, FACETS *facets __may
     buffer_json_array_close(wb); // key
 }
 
-static inline void facets_histogram_value_colors(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
+static inline void facets_histogram_value_colors(BUFFER *wb, FACETS *facets, FACET_KEY *k, const char *key) {
+    UNUSED(facets);
+
     buffer_json_member_add_array(wb, key);
     {
         if(k && k->values.enabled) {
@@ -1050,7 +1054,9 @@ static inline void facets_histogram_value_colors(BUFFER *wb, FACETS *facets __ma
     buffer_json_array_close(wb); // key
 }
 
-static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
+static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets, FACET_KEY *k, const char *key) {
+    UNUSED(facets);
+
     buffer_json_member_add_array(wb, key);
     {
         if(k && k->values.enabled) {
@@ -1067,7 +1073,9 @@ static inline void facets_histogram_value_units(BUFFER *wb, FACETS *facets __may
     buffer_json_array_close(wb); // key
 }
 
-static inline void facets_histogram_value_min(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
+static inline void facets_histogram_value_min(BUFFER *wb, FACETS *facets, FACET_KEY *k, const char *key) {
+    UNUSED(facets);
+
     buffer_json_member_add_array(wb, key);
     {
         if(k && k->values.enabled) {
@@ -1084,7 +1092,9 @@ static inline void facets_histogram_value_min(BUFFER *wb, FACETS *facets __maybe
     buffer_json_array_close(wb); // key
 }
 
-static inline void facets_histogram_value_max(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
+static inline void facets_histogram_value_max(BUFFER *wb, FACETS *facets, FACET_KEY *k, const char *key) {
+    UNUSED(facets);
+
     buffer_json_member_add_array(wb, key);
     {
         if(k && k->values.enabled) {
@@ -1101,7 +1111,7 @@ static inline void facets_histogram_value_max(BUFFER *wb, FACETS *facets __maybe
     buffer_json_array_close(wb); // key
 }
 
-static inline void facets_histogram_value_avg(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
+static inline void facets_histogram_value_avg(BUFFER *wb, FACETS *facets, FACET_KEY *k, const char *key) {
     buffer_json_member_add_array(wb, key);
     {
         if(k && k->values.enabled) {
@@ -1118,7 +1128,9 @@ static inline void facets_histogram_value_avg(BUFFER *wb, FACETS *facets __maybe
     buffer_json_array_close(wb); // key
 }
 
-static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key) {
+static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets, FACET_KEY *k, const char *key) {
+    UNUSED(facets);
+
     buffer_json_member_add_array(wb, key);
     {
         if(k && k->values.enabled) {
@@ -1135,7 +1147,9 @@ static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe
     buffer_json_array_close(wb); // key
 }
 
-static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, uint32_t sum) {
+static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets, FACET_KEY *k, const char *key, uint32_t sum) {
+    UNUSED(facets);
+
     buffer_json_member_add_array(wb, key);
     {
         if(k && k->values.enabled) {
@@ -1733,30 +1747,6 @@ void facets_set_additional_options(FACETS *facets, FACETS_OPTIONS options) {
 
 // ----------------------------------------------------------------------------
 
-static inline void facets_key_set_unsampled_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
-        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
-
-    k->current_value.flags |= FACET_KEY_VALUE_UPDATED | FACET_KEY_VALUE_UNSAMPLED;
-
-    facets->operations.values.registered++;
-    facets->operations.values.unsampled++;
-
-    // no need to copy the UNSET value
-    // empty values are exported as empty
-    k->current_value.raw = NULL;
-    k->current_value.raw_len = 0;
-    k->current_value.b->len = 0;
-    k->current_value.flags &= ~FACET_KEY_VALUE_COPIED;
-
-    if(unlikely(k->values.enabled))
-        FACET_VALUE_ADD_UNSAMPLED_VALUE_TO_INDEX(k);
-    else {
-        k->key_found_in_row++;
-        k->key_values_selected_in_row++;
-    }
-}
-
 static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
     if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
         facets->keys_in_row.array[facets->keys_in_row.used++] = k;
@@ -1844,7 +1834,9 @@ void facets_add_key_value_length(FACETS *facets, const char *key, size_t key_len
 // ----------------------------------------------------------------------------
 // FACET_ROW dictionary hooks
 
-static void facet_row_key_value_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+static void facet_row_key_value_insert_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    UNUSED(item);
+
     FACET_ROW_KEY_VALUE *rkv = value;
     FACET_ROW *row = data; (void)row;
 
@@ -1853,7 +1845,9 @@ static void facet_row_key_value_insert_callback(const DICTIONARY_ITEM *item __ma
         buffer_contents_replace(rkv->wb, rkv->tmp, rkv->tmp_len);
 }
 
-static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
+static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data) {
+    UNUSED(item);
+
     FACET_ROW_KEY_VALUE *rkv = old_value;
     FACET_ROW_KEY_VALUE *n_rkv = new_value;
     FACET_ROW *row = data; (void)row;
@@ -1868,7 +1862,9 @@ static bool facet_row_key_value_conflict_callback(const DICTIONARY_ITEM *item __
     return false;
 }
 
-static void facet_row_key_value_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+static void facet_row_key_value_delete_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    UNUSED(item);
+
     FACET_ROW_KEY_VALUE *rkv = value;
     FACET_ROW *row = data; (void)row;
 
@@ -1878,7 +1874,9 @@ static void facet_row_key_value_delete_callback(const DICTIONARY_ITEM *item __ma
 // ----------------------------------------------------------------------------
 // FACET_ROW management
 
-static void facets_row_free(FACETS *facets __maybe_unused, FACET_ROW *row) {
+static void facets_row_free(FACETS *facets, FACET_ROW *row) {
+    UNUSED(facets);
+
     dictionary_destroy(row->dict);
     freez(row);
 }

@@ -206,53 +206,69 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
 // ----------------------------------------------------------------------------
 // validate each pointer is indexed once - internal checks only
 
+static inline void pointer_index_init(DICTIONARY *dict) {
 #ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
-static inline void pointer_index_init(DICTIONARY *dict __maybe_unused) {
     netdata_mutex_init(&dict->global_pointer_registry_mutex);
+#else
+    UNUSED(dict);
+#endif
 }
 
-static inline void pointer_destroy_index(DICTIONARY *dict __maybe_unused) {
+static inline void pointer_destroy_index(DICTIONARY *dict) {
+#ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     JudyHSFreeArray(&dict->global_pointer_registry, PJE0);
     netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
+#else
+    UNUSED(dict);
+#endif
 }
-static inline void pointer_add(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item __maybe_unused) {
+
+static inline void pointer_add(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+#ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     Pvoid_t *PValue = JudyHSIns(&dict->global_pointer_registry, &item, sizeof(void *), PJE0);
     if(*PValue != NULL)
         fatal("pointer already exists in registry");
     *PValue = item;
     netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
+#else
+    UNUSED(dict);
+    UNUSED(item);
+#endif
 }
 
-static inline void pointer_check(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item __maybe_unused) {
+static inline void pointer_check(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+#ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     Pvoid_t *PValue = JudyHSGet(dict->global_pointer_registry, &item, sizeof(void *));
     if(PValue == NULL)
         fatal("pointer is not found in registry");
     netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
+#else
+    UNUSED(dict);
+    UNUSED(item);
+#endif
 }
 
-static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item __maybe_unused) {
+static inline void pointer_del(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+#ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     int ret = JudyHSDel(&dict->global_pointer_registry, &item, sizeof(void *), PJE0);
     if(!ret)
         fatal("pointer to be deleted does not exist in registry");
     netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
+#else
+    UNUSED(dict);
+    UNUSED(item);
+#endif
 }
-#else // !NETDATA_DICTIONARY_VALIDATE_POINTERS
-#define pointer_index_init(dict) debug_dummy()
-#define pointer_destroy_index(dict) debug_dummy()
-#define pointer_add(dict, item) debug_dummy()
-#define pointer_check(dict, item) debug_dummy()
-#define pointer_del(dict, item) debug_dummy()
-#endif // !NETDATA_DICTIONARY_VALIDATE_POINTERS
 
 // ----------------------------------------------------------------------------
 // memory statistics
 
-#ifdef DICT_WITH_STATS
 static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
+#ifdef DICT_WITH_STATS
     if(key_size)
         __atomic_fetch_add(&dict->stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
 
@@ -261,9 +277,16 @@ static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_siz
 
     if(value_size)
         __atomic_fetch_add(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
+#else
+    UNUSED(dict);
+    UNUSED(key_size);
+    UNUSED(item_size);
+    UNUSED(value_size);
+#endif
 }
 
 static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
+#ifdef DICT_WITH_STATS
     if(key_size)
         __atomic_fetch_sub(&dict->stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
 
@@ -272,11 +295,13 @@ static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_si
 
     if(value_size)
         __atomic_fetch_sub(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
-}
 #else
-#define DICTIONARY_STATS_PLUS_MEMORY(dict, key_size, item_size, value_size) do {;} while(0)
-#define DICTIONARY_STATS_MINUS_MEMORY(dict, key_size, item_size, value_size) do {;} while(0)
+    UNUSED(dict);
+    UNUSED(key_size);
+    UNUSED(item_size);
+    UNUSED(value_size);
 #endif
+}
 
 // ----------------------------------------------------------------------------
 // callbacks registration
@@ -683,10 +708,6 @@ static inline size_t dictionary_locks_init(DICTIONARY *dict) {
     return 0;
 }
 
-static inline size_t dictionary_locks_destroy(DICTIONARY *dict __maybe_unused) {
-    return 0;
-}
-
 static inline void ll_recursive_lock_set_thread_as_writer(DICTIONARY *dict) {
     pid_t expected = 0, desired = gettid();
     if(!__atomic_compare_exchange_n(&dict->items.writer_pid, &expected, desired, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
@@ -857,18 +878,6 @@ void dictionary_garbage_collect(DICTIONARY *dict) {
 
 // ----------------------------------------------------------------------------
 // reference counters
-
-static inline size_t reference_counter_init(DICTIONARY *dict __maybe_unused) {
-    // allocate memory required for reference counters
-    // return number of bytes
-    return 0;
-}
-
-static inline size_t reference_counter_free(DICTIONARY *dict __maybe_unused) {
-    // free memory required for reference counters
-    // return number of bytes
-    return 0;
-}
 
 static void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     REFCOUNT refcount;
@@ -1080,9 +1089,10 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
 
 // if a dictionary item can be freed, return true, otherwise return false
 // we use the shared reference counter
-static inline bool item_shared_release_and_check_if_it_can_be_freed(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
-    // if we can set refcount to REFCOUNT_DELETING, we can delete this item
+static inline bool item_shared_release_and_check_if_it_can_be_freed(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    UNUSED(dict);
 
+    // if we can set refcount to REFCOUNT_DELETING, we can delete this item
     REFCOUNT links = __atomic_sub_fetch(&item->shared->links, 1, __ATOMIC_RELEASE);
     if(links == 0 && __atomic_compare_exchange_n(&item->shared->links, &links, REFCOUNT_DELETING, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
 
@@ -1300,7 +1310,9 @@ void dictionary_static_items_aral_init(void) {
     }
 }
 
-static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {
+static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {
+    UNUSED(dict);
+
     DICTIONARY_ITEM *item;
 
     size_t size = sizeof(DICTIONARY_ITEM);
@@ -1818,8 +1830,6 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     dict->items.list = NULL;
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
-    dict_size += dictionary_locks_destroy(dict);
-    dict_size += reference_counter_free(dict);
     dict_size += dictionary_hooks_free(dict);
     dict_size += sizeof(DICTIONARY);
     DICTIONARY_STATS_MINUS_MEMORY(dict, 0, sizeof(DICTIONARY), 0);
@@ -1968,7 +1978,14 @@ static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_IT
 #endif
 
 #define api_is_name_good(dict, name, name_len) api_is_name_good_with_trace(dict, name, name_len, __FUNCTION__)
-static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const char *name, ssize_t name_len __maybe_unused, const char *function __maybe_unused) {
+static bool api_is_name_good_with_trace(DICTIONARY *dict, const char *name, ssize_t name_len, const char *function) {
+#ifndef NETDATA_INTERNAL_CHECKS
+    UNUSED(dict);
+    UNUSED(name);
+    UNUSED(name_len);
+    UNUSED(function);
+#endif
+
     if(unlikely(!name)) {
         internal_error(
             true,
@@ -2045,7 +2062,6 @@ static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dicti
     size_t dict_size = 0;
     dict_size += sizeof(DICTIONARY);
     dict_size += dictionary_locks_init(dict);
-    dict_size += reference_counter_init(dict);
     dict_size += hashtable_init_unsafe(dict);
 
     dictionary_static_items_aral_init();
@@ -2787,19 +2803,26 @@ static size_t dictionary_unittest_reset_dont_overwrite_nonclone(DICTIONARY *dict
     return errors;
 }
 
-static int dictionary_unittest_walkthrough_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data __maybe_unused) {
+static int dictionary_unittest_walkthrough_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    UNUSED(item);
+    UNUSED(value);
+    UNUSED(data);
+
     return 1;
 }
 
 static size_t dictionary_unittest_walkthrough(DICTIONARY *dict, char **names, char **values, size_t entries) {
-    (void)names;
-    (void)values;
+    UNUSED(names);
+    UNUSED(values);
+
     int sum = dictionary_walkthrough_read(dict, dictionary_unittest_walkthrough_callback, NULL);
     if(sum < (int)entries) return entries - sum;
     else return sum - entries;
 }
 
-static int dictionary_unittest_walkthrough_delete_this_callback(const DICTIONARY_ITEM *item, void *value __maybe_unused, void *data) {
+static int dictionary_unittest_walkthrough_delete_this_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    UNUSED(value);
+
     const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
 
     if(!dictionary_del((DICTIONARY *)data, name))
@@ -2816,7 +2839,11 @@ static size_t dictionary_unittest_walkthrough_delete_this(DICTIONARY *dict, char
     else return sum - entries;
 }
 
-static int dictionary_unittest_walkthrough_stop_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data __maybe_unused) {
+static int dictionary_unittest_walkthrough_stop_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    UNUSED(item);
+    UNUSED(value);
+    UNUSED(data);
+
     return -1;
 }
 
@@ -2974,7 +3001,11 @@ static void dictionary_unittest_null_dfe(DICTIONARY *dict, char **names, char **
 }
 
 
-static int unittest_check_dictionary_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data __maybe_unused) {
+static int unittest_check_dictionary_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    UNUSED(item);
+    UNUSED(value);
+    UNUSED(data);
+
     return 1;
 }
 
@@ -3071,7 +3102,9 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
     return errors;
 }
 
-static int check_item_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+static int check_item_callback(const DICTIONARY_ITEM *item, void *value, void *data) {
+    UNUSED(item);
+
     return value == data;
 }
 

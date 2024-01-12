@@ -157,7 +157,9 @@ size_t JulyLGet_binary_search_position_of_index(const struct JulyL *July, Word_t
     return left;
 }
 
-PPvoid_t JulyLGet(Pcvoid_t PArray, Word_t Index, PJError_t PJError __maybe_unused) {
+PPvoid_t JulyLGet(Pcvoid_t PArray, Word_t Index, PJError_t PJError) {
+    UNUSED(PJError);
+
     const struct JulyL *July = PArray;
     if(!July)
         return NULL;
@@ -170,7 +172,9 @@ PPvoid_t JulyLGet(Pcvoid_t PArray, Word_t Index, PJError_t PJError __maybe_unuse
     return (PPvoid_t)&July->array[pos].value;
 }
 
-PPvoid_t JulyLIns(PPvoid_t PPArray, Word_t Index, PJError_t PJError __maybe_unused) {
+PPvoid_t JulyLIns(PPvoid_t PPArray, Word_t Index, PJError_t PJError) {
+    UNUSED(PJError);
+
     struct JulyL *July = *PPArray;
     if(unlikely(!July)) {
         July = julyl_get();
@@ -209,7 +213,9 @@ PPvoid_t JulyLIns(PPvoid_t PPArray, Word_t Index, PJError_t PJError __maybe_unus
     return &July->array[pos].value;
 }
 
-PPvoid_t JulyLFirst(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unused) {
+PPvoid_t JulyLFirst(Pcvoid_t PArray, Word_t *Index, PJError_t PJError) {
+    UNUSED(PJError);
+
     const struct JulyL *July = PArray;
     if(!July)
         return NULL;
@@ -224,7 +230,9 @@ PPvoid_t JulyLFirst(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_un
     return (PPvoid_t)&July->array[pos].value;
 }
 
-PPvoid_t JulyLNext(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unused) {
+PPvoid_t JulyLNext(Pcvoid_t PArray, Word_t *Index, PJError_t PJError) {
+    UNUSED(PJError);
+
     const struct JulyL *July = PArray;
     if(!July)
         return NULL;
@@ -246,7 +254,9 @@ PPvoid_t JulyLNext(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unu
     return (PPvoid_t)&July->array[pos].value;
 }
 
-PPvoid_t JulyLLast(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unused) {
+PPvoid_t JulyLLast(Pcvoid_t PArray, Word_t *Index, PJError_t PJError) {
+    UNUSED(PJError);
+
     const struct JulyL *July = PArray;
     if(!July)
         return NULL;
@@ -264,7 +274,9 @@ PPvoid_t JulyLLast(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unu
     return (PPvoid_t)&July->array[pos].value;
 }
 
-PPvoid_t JulyLPrev(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unused) {
+PPvoid_t JulyLPrev(Pcvoid_t PArray, Word_t *Index, PJError_t PJError) {
+    UNUSED(PJError);
+
     const struct JulyL *July = PArray;
     if(!July)
         return NULL;
@@ -282,7 +294,9 @@ PPvoid_t JulyLPrev(Pcvoid_t PArray, Word_t *Index, PJError_t PJError __maybe_unu
     return (PPvoid_t)&July->array[pos].value;
 }
 
-Word_t JulyLFreeArray(PPvoid_t PPArray, PJError_t PJError __maybe_unused) {
+Word_t JulyLFreeArray(PPvoid_t PPArray, PJError_t PJError) {
+    UNUSED(PJError);
+
     struct JulyL *July = *PPArray;
     if(unlikely(!July))
         return 0;

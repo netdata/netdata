@@ -145,7 +145,10 @@ void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size) {
     return mem;
 }
 
-void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_unused) {
+void onewayalloc_freez(ONEWAYALLOC *owa, const void *ptr) {
+    UNUSED(owa);
+    UNUSED(ptr);
+
 #ifdef FSANITIZE_ADDRESS
     freez((void *)ptr);
     return;

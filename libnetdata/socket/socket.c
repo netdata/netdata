@@ -1756,7 +1756,7 @@ static inline int poll_process_tcp_read(POLLJOB *p, POLLINFO *pi, struct pollfd 
     return 1;
 }
 
-static inline int poll_process_udp_read(POLLINFO *pi, struct pollfd *pf, time_t now __maybe_unused) {
+static inline int poll_process_udp_read(POLLINFO *pi, struct pollfd *pf, time_t now) {
     pi->last_received_t = now;
     pi->recv_count++;
 
