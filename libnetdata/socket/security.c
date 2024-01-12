@@ -423,12 +423,13 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
  */
 static void netdata_ssl_info_callback(const SSL *ssl, int where, int ret)
 {
+    UNUSED(ssl);
+
 #ifdef NETDATA_INTERNAL_CHECKS
     if (where & SSL_CB_ALERT) {
         netdata_log_debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
     }
 #else
-    UNUSED(ssl);
     UNUSED(where);
     UNUSED(ret);
 #endif
