@@ -1201,6 +1201,7 @@ static inline void del_pid_entry(pid_t pid)
             }
             JudyLFreeArray(&pid_ptr->socket_stats.JudyLArray, PJE0);
         }
+        aral_freez(ebpf_judy_pid.pid_table, pid_ptr);
         JudyLDel(&ebpf_judy_pid.index.JudyLArray, p->pid, PJE0);
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
