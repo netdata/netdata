@@ -54,7 +54,7 @@ fi
 CMAKE_OPTS="${ninja:+-G Ninja}"
 BUILD_OPTS="VERBOSE=1"
 [ -n "${ninja}" ] && BUILD_OPTS="-v"
-NETDATA_BUILD_DIR="${NETDATA_BUILD_DIR:-./cmake-build-release/}"
+NETDATA_BUILD_DIR="${NETDATA_BUILD_DIR:-./build/}"
 
 if [ -f ".coverity-scan.conf" ]; then
   source ".coverity-scan.conf"
