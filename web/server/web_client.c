@@ -183,6 +183,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         web_client_flag_clear(w, WEB_CLIENT_CHUNKED_TRANSFER);
     }
 
+    memset(w->transaction, 0, sizeof(w->transaction));
     web_client_flags_clear_auth(w);
     web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
     web_client_reset_path_flags(w);
@@ -1172,7 +1173,8 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     ND_LOG_STACK_PUSH(lgs);
 
     // give a new transaction id to the request
-    uuid_generate_random(w->transaction);
+    if(uuid_is_null(w->transaction))
+        uuid_generate_random(w->transaction);
 
     static uint32_t
             hash_api = 0,
@@ -1397,7 +1399,8 @@ void web_client_process_request_from_web_server(struct web_client *w) {
     ND_LOG_STACK_PUSH(lgs);
 
     // give a new transaction id to the request
-    uuid_generate_random(w->transaction);
+    if(uuid_is_null(w->transaction))
+        uuid_generate_random(w->transaction);
 
     // start timing us
     web_client_timeout_checkpoint_init(w);
