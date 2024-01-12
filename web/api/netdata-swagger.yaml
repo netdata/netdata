@@ -226,6 +226,129 @@ paths:
           description: No context id was supplied in the request.
         "404":
           description: No context with the given id is found.
+  /api/v1/config:
+    get:
+      operationId: getConfig
+      tags:
+        - dyncfg
+      description: |
+        Get dynamic configuration information.
+      parameters:
+        - name: action
+          in: query
+          description: The type of information required
+          schema:
+            type: string
+            enum:
+              - tree
+              - schema
+              - get
+              - enable
+              - disable
+              - restart
+            default: tree
+        - name: id
+          in: query
+          description: The ID of the dynamic configuration entity
+          schema:
+            type: string
+        - name: path
+          in: query
+          description: Top level path of the configuration entities, used with action 'tree'
+          schema:
+            type: string
+            default: '/'
+        - name: timeout
+          in: query
+          description: The timeout in seconds
+          schema:
+            type: number
+            default: 120
+      responses:
+        "200":
+          description: The call was successful.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/config_default_response'
+                  - $ref: '#/components/schemas/config_tree'
+                  - $ref: "#/components/schemas/config_schema"
+        "400":
+          description: Something is wrong with the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/config_default_response'
+        "404":
+          description: The configurable entity requests is not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/config_default_response'
+    post:
+      operationId: postConfig
+      tags:
+        - dyncfg
+      description: |
+        Post dynamic configuration to Netdata.
+      parameters:
+        - name: action
+          in: query
+          description: The type of action required.
+          schema:
+            type: string
+            enum:
+              - add
+              - test
+              - update
+        - name: id
+          in: query
+          description: The ID of the dynamic configuration entity to configure.
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: Name of the dynamic configuration entity, used with action 'add'
+          schema:
+            type: string
+        - name: timeout
+          in: query
+          description: The timeout in seconds
+          schema:
+            type: number
+            default: 120
+      responses:
+        "200":
+          description: The call was successful. This also means the configuration is currently running.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/config_default_response'
+        "202":
+          description: The call was successful. The configuration has been accepted, but its status is not yet known.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/config_default_response'
+        "299":
+          description: The call was successful. The configuration has been accepted, but a restart is required to apply it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/config_default_response'
+        "400":
+          description: Something is wrong with the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/config_default_response'
+        "404":
+          description: The configurable entity requests is not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/config_default_response'
   /api/v2/data:
     get:
       operationId: dataQuery2
@@ -3259,3 +3382,105 @@ components:
             $ref: '#/components/schemas/weighted_dimension'
     weighted_dimension:
       type: number
+    config_schema:
+      type: object
+      properties:
+        jsonSchema:
+          type: object
+          description: Standard JSON Schema object describing the schema of each configurable entity.
+        uiSchema:
+          type: object
+          description: Schema for react-json-schema-form to drive the UI. Provides additional UI-specific configuration.
+    config_tree:
+      type: object
+      properties:
+        version:
+          type: integer
+          description: The version of dynamic configuration supported by the Netdata agent.
+        tree:
+          type: object
+          description: A map of configuration entity paths, each containing one or more configurable entities.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              $ref: '#/components/schemas/config_entity'
+        attention:
+          $ref: '#/components/schemas/config_attention'
+    config_entity:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Can be 'single' for entities appearing once, 'template' for entities supporting multiple instances, or 'job' for jobs belonging to a template.
+        status:
+          type: string
+          description: The current status of the entity. Values include 'accepted', 'running', 'failed', 'disabled', 'incomplete', or 'orphan'.
+        cmds:
+          type: array
+          items:
+            type: string
+          description: An array of the possible actions supported by this entity.
+        source_type:
+          type: string
+          description: The source type of the configuration (e.g., 'internal', 'stock', 'user', 'discovered', 'dyncfg').
+        source:
+          type: string
+          description: Additional information about the source, formatted as comma-separated name-value pairs.
+        sync:
+          type: boolean
+          description: Indicates if this is an internal module (true) or an external plugin (false).
+        user_disabled:
+          type: boolean
+          description: True if the entity is disabled by the user.
+        restart_required:
+          type: boolean
+          description: True if the entity requires a restart after addition or update.
+        plugin_rejected:
+          type: boolean
+          description: True if a previously saved configuration failed to apply after a restart.
+        payload:
+          type: object
+          description: Object containing at least an 'available' boolean indicating if there's a saved configuration for this entity.
+          properties:
+            available:
+              type: boolean
+        saves:
+          type: integer
+          description: The number of times this configuration has been saved to disk by the dynamic configuration manager.
+        created_ut:
+          type: integer
+          format: int64
+          description: The timestamp in microseconds when this dynamic configuration was first created.
+        modified_ut:
+          type: integer
+          format: int64
+          description: The timestamp in microseconds when this dynamic configuration was last modified.
+        template:
+          type: string
+          description: Shows the template the job belongs to, applicable when type is 'job'.
+    config_attention:
+      type: object
+      properties:
+        degraded:
+          type: boolean
+        restart_required:
+          type: integer
+        plugin_rejected:
+          type: integer
+        status_failed:
+          type: integer
+        status_incomplete:
+          type: integer
+    config_default_response:
+      type: object
+      properties:
+        status:
+          type: integer
+          description: The HTTP status code of the response.
+        message:
+          type: string
+          description: A descriptive message about the response or the action taken.
+        data:
+          type: object
+          description: The data payload of the response, contents vary depending on the specific request and action.
+          additionalProperties: true

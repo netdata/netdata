@@ -21,6 +21,10 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
     buffer_json_member_add_object(wb, id);
     {
         buffer_json_member_add_string(wb, "type", dyncfg_id2type(df->type));
+
+        if(df->type == DYNCFG_TYPE_JOB)
+            buffer_json_member_add_string(wb, "template", string2str(df->template));
+
         buffer_json_member_add_string(wb, "status", dyncfg_id2status(df->status));
         dyncfg_cmds2json_array(df->cmds, "cmds", wb);
         buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(df->source_type));
@@ -46,13 +50,17 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
     buffer_json_object_close(wb);
 }
 
-static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent, const char *id __maybe_unused) {
+static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, const char *id) {
     size_t entries = dictionary_entries(dyncfg_globals.nodes);
     size_t used = 0;
     const DICTIONARY_ITEM *items[entries];
     size_t restart_required = 0, plugin_rejected = 0, status_incomplete = 0, status_failed = 0;
 
-    size_t parent_len = strlen(parent);
+    STRING *template = NULL;
+    if(id && *id)
+        template = string_strdupz(id);
+
+    size_t path_len = strlen(path);
     DYNCFG *df;
     dfe_start_read(dyncfg_globals.nodes, df) {
         if(!df->host) {
@@ -60,17 +68,21 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *parent, 
                 df->host = host;
         }
 
-        if(df->host != host || strncmp(string2str(df->path), parent, parent_len) != 0)
+        if(df->host != host || strncmp(string2str(df->path), path, path_len) != 0)
             continue;
 
         if(!rrd_function_available(host, string2str(df->function)))
             df->status = DYNCFG_STATUS_ORPHAN;
 
+        if((id && strcmp(id, df_dfe.name) != 0) || (template && df->template != template))
+            continue;
+
         items[used++] = dictionary_acquired_item_dup(dyncfg_globals.nodes, df_dfe.item);
     }
     dfe_done(df);
 
-    qsort(items, used, sizeof(const DICTIONARY_ITEM *), dyncfg_tree_compar);
+    if(used > 1)
+        qsort(items, used, sizeof(const DICTIONARY_ITEM *), dyncfg_tree_compar);
 
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
