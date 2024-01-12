@@ -185,7 +185,7 @@ int netdata_mutex_lock_debug(const char *file, const char *function,
     (void)start_s;
     (void)end_s;
 
-    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_lock(%p) = %d in %" PRIu64 " usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
@@ -208,7 +208,7 @@ int netdata_mutex_trylock_debug(const char *file, const char *function,
     (void)start_s;
     (void)end_s;
 
-    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_trylock(%p) = %d in %" PRIu64 " usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
@@ -231,7 +231,7 @@ int netdata_mutex_unlock_debug(const char *file, const char *function,
     (void)start_s;
     (void)end_s;
 
-    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(%p) = %d in %llu usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
+    netdata_log_debug(D_LOCKS, "MUTEX_LOCK: netdata_mutex_unlock(%p) = %d in %" PRIu64 " usec, from %lu@%s, %s()", mutex, ret, end_s - start_s, line, file, function);
 
     return ret;
 }
