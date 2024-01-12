@@ -2156,14 +2156,17 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         thread_log_fields[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid());
 
     char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
+    bool use_os_threadname = false;
     if(likely(!thread_log_fields[NDF_THREAD_TAG].entry.set)) {
         const char *thread_tag = netdata_thread_tag();
         if(!netdata_thread_tag_exists()) {
             if (!netdata_thread_tag_exists()) {
                 os_thread_get_current_name_np(os_threadname);
-                if ('\0' != os_threadname[0])
+                if ('\0' != os_threadname[0]) {
                     /* If it is not an empty string replace "MAIN" thread_tag */
                     thread_tag = os_threadname;
+                    use_os_threadname = true;
+                }
             }
         }
         thread_log_fields[NDF_THREAD_TAG].entry = ND_LOG_FIELD_TXT(NDF_THREAD_TAG, thread_tag);
@@ -2224,6 +2227,10 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
         freez((void *)nd_log.sources[source].pending_msg);
         nd_log.sources[source].pending_msg = NULL;
+    }
+    else {
+        if (use_os_threadname)
+            thread_log_fields[NDF_THREAD_TAG].entry.set = false;
     }
 
     errno = 0;
