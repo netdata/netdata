@@ -1509,11 +1509,7 @@ static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w,
     char transaction[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(w->transaction, transaction);
 
-    size_t len = (action ? strlen(action) : 0)
-                 + (id ? strlen(id) : 0)
-                 + (path ? strlen(path) : 0)
-                 + (add_name ? strlen(add_name) : 0)
-                 + 100;
+    size_t len = strlen(action) + (id ? strlen(id) : 0) + strlen(path) + (add_name ? strlen(add_name) : 0) + 100;
 
     char cmd[len];
     if(strcmp(action, "tree") == 0)
