@@ -11,7 +11,6 @@
 #include "schema-wrappers/proto_2_json.h"
 
 #define ACLK_V2_PAYLOAD_SEPARATOR "\x0D\x0A\x0D\x0A"
-#define ACLK_CLOUD_REQ_V2_PREFIX "GET /"
 
 #define ACLK_V_COMPRESSION 2
 
@@ -100,13 +99,17 @@ static inline int aclk_v2_payload_get_query(const char *payload, char **query_ur
 {
     const char *start, *end;
 
-    // TODO better check of URL
-    if(strncmp(payload, ACLK_CLOUD_REQ_V2_PREFIX, strlen(ACLK_CLOUD_REQ_V2_PREFIX)) != 0) {
+    if(strncmp(payload, "GET /", 5) == 0 || strncmp(payload, "PUT /", 5) == 0)
+        start = payload + 4;
+    else if(strncmp(payload, "POST /", 6) == 0)
+        start = payload + 5;
+    else if(strncmp(payload, "DELETE /", 8) == 0)
+        start = payload + 7;
+    else {
         errno = 0;
-        netdata_log_error("Only accepting requests that start with \"%s\" from CLOUD.", ACLK_CLOUD_REQ_V2_PREFIX);
+        netdata_log_error("Only accepting requests that start with GET, POST, PUT, DELETE from CLOUD.");
         return 1;
     }
-    start = payload + 4;
 
     if(!(end = strstr(payload, HTTP_1_1 HTTP_ENDL))) {
         errno = 0;
