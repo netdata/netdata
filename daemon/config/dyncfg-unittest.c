@@ -516,8 +516,8 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
 }
 
 static void dyncfg_unittest_cleanup_files(void) {
-    char path[PATH_MAX];
-    snprintfz(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, "config");
+    char path[FILENAME_MAX];
+    snprintfz(path, sizeof(path) - 1, "%s/%s", netdata_configured_varlib_dir, "config");
 
     DIR *dir = opendir(path);
     if (!dir) {
@@ -526,7 +526,7 @@ static void dyncfg_unittest_cleanup_files(void) {
     }
 
     struct dirent *entry;
-    char filename[FILENAME_MAX];
+    char filename[FILENAME_MAX + sizeof(entry->d_name)];
     while ((entry = readdir(dir)) != NULL) {
         if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strstartswith(entry->d_name, "unittest:") && strendswith(entry->d_name, ".dyncfg")) {
             snprintf(filename, sizeof(filename), "%s/%s", path, entry->d_name);
@@ -788,5 +788,6 @@ int dyncfg_unittest(void) {
     netdata_thread_join(thread, &ptr);
     dyncfg_unittest_cleanup_files();
     dictionary_destroy(dyncfg_unittest_data.nodes);
+    buffer_free(wb);
     return __atomic_load_n(&dyncfg_unittest_data.errors, __ATOMIC_RELAXED) > 0 ? 1 : 0;
 }
