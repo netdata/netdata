@@ -26,8 +26,8 @@ Send notifications to Telegram using Netdata's Agent alert notification feature,
 #### 
 
 - A bot token. To get one, contact the [@BotFather](https://t.me/BotFather) bot and send the command `/newbot` and follow the instructions. Invite your bot to a group where you want it to send messages.
-- The chat ID for every chat you want to send messages to. Invite [@myidbot](https://t.me/myidbot) bot to the group that will receive notifications and write the command `/getgroupid@myidbot` command to get the group chat ID. Group IDs start with a hyphen, supergroup IDs start with `-100`.
-- Terminal access to the Agent you wish to configure
+- The chat ID for every chat you want to send messages to. Invite [@myidbot](https://t.me/myidbot) bot to the group that will receive notifications, and write the command `/getgroupid@myidbot` to get the group chat ID. Group IDs start with a hyphen, supergroup IDs start with `-100`.
+- Terminal access to the Agent you wish to configure.
 
 
 
@@ -87,7 +87,7 @@ role_recipients_telegram[sitemgr]="-49999333876"
 
 SEND_TELEGRAM="YES"
 TELEGRAM_BOT_TOKEN="111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5"
-DEFAULT_RECIPIENT_TELEGRAM="-100233335555"
+DEFAULT_RECIPIENT_TELEGRAM="-49999333876"
 
 ```
 
