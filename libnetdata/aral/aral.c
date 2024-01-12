@@ -220,7 +220,7 @@ static inline void aral_free_validate_internal_check(ARAL *ar, ARAL_FREE *fr) {
 // ----------------------------------------------------------------------------
 // find the page a pointer belongs to
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_ARAL_INTERNAL_CHECKS
 static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void *ptr) {
     aral_lock(ar);
 
