@@ -199,8 +199,6 @@ set(EXTRA_HARDENING_CXX_FLAGS "")
 set(EXTRA_OPT_C_FLAGS "")
 set(EXTRA_OPT_CXX_FLAGS "")
 
-option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" False)
-
 if(NOT ${DISABLE_HARDENING})
         add_double_extra_compiler_flag("stack-protector" "-fstack-protector-strong" "-fstack-protector" EXTRA_HARDENING)
         add_double_extra_compiler_flag("_FORTIFY_SOURCE" "-D_FORTIFY_SOURCE=3" "-D_FORTIFY_SOURCE=2" EXTRA_HARDENING)
