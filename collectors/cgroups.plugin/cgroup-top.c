@@ -15,17 +15,17 @@ void cgroup_netdev_link_init(void) {
 }
 
 const DICTIONARY_ITEM *cgroup_netdev_get(struct cgroup *cg) {
-    if(cg->cgroup_netdev_link)
-        return cg->cgroup_netdev_link;
-
-
-    struct cgroup_netdev_link t = {
+    if(!cg->cgroup_netdev_link) {
+        struct cgroup_netdev_link t = {
             .read_slot = 0,
-            .received = { NAN, NAN },
-            .sent = { NAN, NAN },
-    };
+            .received = {NAN, NAN},
+            .sent = {NAN, NAN},
+        };
 
-    cg->cgroup_netdev_link = dictionary_set_and_acquire_item(cgroup_netdev_link_dict, cg->id, &t, sizeof(struct cgroup_netdev_link));
+        cg->cgroup_netdev_link =
+            dictionary_set_and_acquire_item(cgroup_netdev_link_dict, cg->id, &t, sizeof(struct cgroup_netdev_link));
+    }
+
     return dictionary_acquired_item_dup(cgroup_netdev_link_dict, cg->cgroup_netdev_link);
 }
 
@@ -34,6 +34,7 @@ void cgroup_netdev_delete(struct cgroup *cg) {
         dictionary_acquired_item_release(cgroup_netdev_link_dict, cg->cgroup_netdev_link);
         dictionary_del(cgroup_netdev_link_dict, cg->id);
         dictionary_garbage_collect(cgroup_netdev_link_dict);
+        cg->cgroup_netdev_link = NULL;
     }
 }
 
