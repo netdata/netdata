@@ -236,13 +236,13 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
 
     if(!isnan(rc->config.green) && isnan(st->green)) {
         netdata_log_debug(D_HEALTH, "Health alarm '%s.%s' green threshold set from " NETDATA_DOUBLE_FORMAT_AUTO
-                        " to " NETDATA_DOUBLE_FORMAT_AUTO ".", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->rrdset->green, rc->green);
+                        " to " NETDATA_DOUBLE_FORMAT_AUTO ".", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->rrdset->green, rc->config.green);
         st->green = rc->config.green;
     }
 
     if(!isnan(rc->config.red) && isnan(st->red)) {
         netdata_log_debug(D_HEALTH, "Health alarm '%s.%s' red threshold set from " NETDATA_DOUBLE_FORMAT_AUTO " to " NETDATA_DOUBLE_FORMAT_AUTO
-                        ".", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->rrdset->red, rc->red);
+                        ".", rrdset_id(rc->rrdset), rrdcalc_name(rc), rc->rrdset->red, rc->config.red);
         st->red = rc->config.red;
     }
 
@@ -593,15 +593,15 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
           rc->config.green,
           rc->config.red,
           (int)rc->config.group,
-          rc->after,
-          rc->before,
+          rc->config.after,
+          rc->config.before,
           rc->config.options,
           (rc->config.dimensions)?rrdcalc_dimensions(rc):"NONE",
           (rc->config.foreach_dimension)?rrdcalc_foreachdim(rc):"NONE",
           rc->config.update_every,
-          (rc->config.calculation)?rc->calculation->parsed_as:"NONE",
-          (rc->config.warning)?rc->warning->parsed_as:"NONE",
-          (rc->config.critical)?rc->critical->parsed_as:"NONE",
+          (rc->config.calculation)?rc->config.calculation->parsed_as:"NONE",
+          (rc->config.warning)?rc->config.warning->parsed_as:"NONE",
+          (rc->config.critical)?rc->config.critical->parsed_as:"NONE",
           rrdcalc_source(rc),
           rc->config.delay_up_duration,
           rc->config.delay_down_duration,
