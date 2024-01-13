@@ -1,8 +1,6 @@
 #include "jsmn.h"
 #include "../libnetdata.h"
 #include "json.h"
-#include "libnetdata/libnetdata.h"
-#include "../../health/health.h"
 
 #define JSON_TOKENS 1024
 
@@ -171,50 +169,6 @@ static inline void json_jsonc_set_integer(JSON_ENTRY *e, char *key, int64_t valu
     e->data.number = (NETDATA_DOUBLE)value;
 }
 
-/**
- * Parse Array
- *
- * Parse the array object.
- *
- * @param ptr the pointer for the object that we will parse.
- * @param callback_data additional data to be used together the callback function
- * @param callback_function function used to create a silencer.
- */
-static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,int (*callback_function)(struct json_entry *)) {
-    int end = json_object_array_length(ptr);
-    JSON_ENTRY e;
-
-    if(end) {
-        int i;
-        i = 0;
-
-        enum json_type type;
-        do {
-            json_object *jvalue =  json_object_array_get_idx(ptr, i);
-            if(jvalue) {
-                e.callback_data = callback_data;
-                e.type = JSON_OBJECT;
-                callback_function(&e);
-                json_object_object_foreach(jvalue, key, val) {
-                    type = json_object_get_type(val);
-                    if (type == json_type_array) {
-                        e.type = JSON_ARRAY;
-                        json_jsonc_parse_array(val, callback_data, callback_function);
-                    } else if (type == json_type_object) {
-                        json_walk(val,callback_data,callback_function);
-                    } else if (type == json_type_string) {
-                        json_jsonc_set_string(&e,key,json_object_get_string(val));
-                        callback_function(&e);
-                    } else if (type == json_type_boolean) {
-                        json_jsonc_set_boolean(&e,json_object_get_boolean(val));
-                        callback_function(&e);
-                    }
-                }
-            }
-
-        } while (++i < end);
-    }
-}
 #else
 
 /**
@@ -450,7 +404,6 @@ size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(s
         type = json_object_get_type(val);
         if (type == json_type_array) {
             e.type = JSON_ARRAY;
-            json_jsonc_parse_array(val,NULL,health_silencers_json_read_callback);
         } else if (type == json_type_object) {
             e.type = JSON_OBJECT;
         } else if (type == json_type_string) {

@@ -18,7 +18,6 @@
 #endif
 
 unsigned int default_health_enabled = 1;
-char *silencers_filename;
 SIMPLE_PATTERN *conf_enabled_alarms = NULL;
 DICTIONARY *health_rrdvars;
 
@@ -286,45 +285,6 @@ inline char *health_stock_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
     return config_get(CONFIG_SECTION_DIRECTORIES, "stock health config", buffer);
-}
-
-/**
- * Silencers init
- *
- * Function used to initialize the silencer structure.
- */
-static void health_silencers_init(void) {
-    FILE *fd = fopen(silencers_filename, "r");
-    if (fd) {
-        fseek(fd, 0 , SEEK_END);
-        off_t length = (off_t) ftell(fd);
-        fseek(fd, 0 , SEEK_SET);
-
-        if (length > 0 && length < HEALTH_SILENCERS_MAX_FILE_LEN) {
-            char *str = mallocz((length+1)* sizeof(char));
-            if(str) {
-                size_t copied;
-                copied = fread(str, sizeof(char), length, fd);
-                if (copied == (length* sizeof(char))) {
-                    str[length] = 0x00;
-                    json_parse(str, NULL, health_silencers_json_read_callback);
-                    netdata_log_info("Parsed health silencers file %s", silencers_filename);
-                } else {
-                    netdata_log_error("Cannot read the data from health silencers file %s", silencers_filename);
-                }
-                freez(str);
-            }
-        } else {
-            netdata_log_error("Health silencers file %s has the size %" PRId64 " that is out of range[ 1 , %d ]. Aborting read.",
-                              silencers_filename,
-                              (int64_t)length,
-                              HEALTH_SILENCERS_MAX_FILE_LEN);
-        }
-        fclose(fd);
-    } else {
-        netdata_log_info("Cannot open the file %s, so Netdata will work with the default health configuration.",
-                         silencers_filename);
-    }
 }
 
 /**

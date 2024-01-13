@@ -29,78 +29,6 @@ void free_silencers(SILENCER *t) {
     return;
 }
 
-/**
- * Silencers to JSON Entry
- *
- * Fill the buffer with the other values given.
- *
- * @param wb a pointer to the output buffer
- * @param var the json variable
- * @param val the json value
- * @param hasprev has it a previous value?
- *
- * @return
- */
-int health_silencers2json_entry(BUFFER *wb, char* var, char* val, int hasprev) {
-    if (val) {
-        buffer_sprintf(wb, "%s\n\t\t\t\"%s\": \"%s\"", (hasprev)?",":"", var, val);
-        return 1;
-    } else {
-        return hasprev;
-    }
-}
-
-/**
- * Silencer to JSON
- *
- * Write the silencer values using JSON format inside a buffer.
- *
- * @param wb is the buffer to write the silencers.
- */
-void health_silencers2json(BUFFER *wb) {
-    buffer_sprintf(wb, "{\n\t\"all\": %s,"
-                       "\n\t\"type\": \"%s\","
-                       "\n\t\"silencers\": [",
-                   (silencers->all_alarms)?"true":"false",
-                   (silencers->stype == STYPE_NONE)?"None":((silencers->stype == STYPE_DISABLE_ALARMS)?"DISABLE":"SILENCE"));
-
-    SILENCER *silencer;
-    int i = 0, j = 0;
-    for(silencer = silencers->silencers; silencer ; silencer = silencer->next) {
-        if(likely(i)) buffer_strcat(wb, ",");
-        buffer_strcat(wb, "\n\t\t{");
-        j=health_silencers2json_entry(wb, HEALTH_ALARM_KEY, silencer->alarms, j);
-        j=health_silencers2json_entry(wb, HEALTH_CHART_KEY, silencer->charts, j);
-        j=health_silencers2json_entry(wb, HEALTH_CONTEXT_KEY, silencer->contexts, j);
-        j=health_silencers2json_entry(wb, HEALTH_HOST_KEY, silencer->hosts, j);
-        j=0;
-        buffer_strcat(wb, "\n\t\t}");
-        i++;
-    }
-    if(likely(i)) buffer_strcat(wb, "\n\t");
-    buffer_strcat(wb, "]\n}\n");
-}
-
-/**
- * Silencer to FILE
- *
- * Write the silencer buffer to a file.
- * @param wb
- */
-void health_silencers2file(BUFFER *wb) {
-    if (wb->len == 0) return;
-
-    FILE *fd = fopen(silencers_filename, "wb");
-    if(fd) {
-        size_t written = (size_t)fprintf(fd, "%s", wb->buffer) ;
-        if (written == wb->len ) {
-            netdata_log_info("Silencer changes written to %s", silencers_filename);
-        }
-        fclose(fd);
-        return;
-    }
-    netdata_log_error("Silencer changes could not be written to %s. Error %s", silencers_filename, strerror(errno));
-}
 
 /**
  * Request V1 MGMT Health
@@ -123,8 +51,6 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
 
     buffer_flush(w->response.data);
 
-    //Local instance of the silencer
-    SILENCER *silencer = NULL;
     int config_changed = 1;
 
     if (!w->auth_bearer_token) {
@@ -132,11 +58,17 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
         ret = HTTP_RESP_FORBIDDEN;
     } else {
         netdata_log_debug(D_HEALTH, "HEALTH command API: Comparing secret '%s' to '%s'", w->auth_bearer_token, api_secret);
-        if (strcmp(w->auth_bearer_token, api_secret)) {
+        if (strcmp(w->auth_bearer_token, api_secret))
+        {
             buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
             ret = HTTP_RESP_FORBIDDEN;
-        } else {
-            while (url) {
+        }
+        else
+        {
+            SILENCER *silencer = NULL;
+
+            while (url)
+            {
                 char *value = strsep_skip_consecutive_separators(&url, "&");
                 if (!value || !*value) continue;
 
@@ -174,7 +106,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                         config_changed=0;
                     }
                 } else {
-                    silencer = health_silencers_addparam(silencer, key, value);
+                    silencer = health_silencer_add_param(silencer, key, value);
                 }
             }
 
@@ -185,9 +117,11 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                     buffer_strcat(wb, HEALTH_CMDAPI_MSG_STYPEWARNING);
                 }
             }
+
             if (unlikely(silencers->stype != STYPE_NONE && !silencers->all_alarms && !silencers->silencers)) {
                 buffer_strcat(wb, HEALTH_CMDAPI_MSG_NOSELECTORWARNING);
             }
+
             ret = HTTP_RESP_OK;
         }
     }

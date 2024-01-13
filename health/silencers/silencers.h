@@ -1,19 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_HEALTH_LIB
-# define NETDATA_HEALTH_LIB 1
+#ifndef NETDATA_SILENCERS_H
+#define NETDATA_SILENCERS_H
 
-# include "../libnetdata.h"
+#include "libnetdata/libnetdata.h"
 
-#define HEALTH_ALARM_KEY "alarm"
-#define HEALTH_TEMPLATE_KEY "template"
-#define HEALTH_CONTEXT_KEY "context"
-#define HEALTH_CHART_KEY "chart"
-#define HEALTH_HOST_KEY "hosts"
-#define HEALTH_OS_KEY "os"
-#define HEALTH_LOOKUP_KEY "lookup"
-#define HEALTH_CALC_KEY "calc"
-
+#ifdef __cplusplus
+extern "C" {
+#endif
+    
 typedef struct silencer {
     char *alarms;
     SIMPLE_PATTERN *alarms_pattern;
@@ -43,11 +38,19 @@ typedef struct silencers {
 } SILENCERS;
 
 extern SILENCERS *silencers;
+extern char *silencers_filename;
 
-SILENCER *create_silencer(void);
-int health_silencers_json_read_callback(JSON_ENTRY *e);
 void health_silencers_add(SILENCER *silencer);
-SILENCER * health_silencers_addparam(SILENCER *silencer, char *key, char *value);
+SILENCER * health_silencer_add_param(SILENCER *silencer, char *key, char *value);
 int health_initialize_global_silencers();
+void health_silencers_init(void);
+void health_silencers2file(BUFFER *wb);
+void health_silencers2json(BUFFER *wb);
 
+bool load_health_silencers(const char *path);
+
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* NETDATA_SILENCERS_H */

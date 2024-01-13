@@ -4,6 +4,7 @@
 #define NETDATA_HEALTH_H 1
 
 #include "daemon/common.h"
+#include "health/silencers/silencers.h"
 
 extern unsigned int default_health_enabled;
 
@@ -39,9 +40,6 @@ void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_
 #define HEALTH_LOG_MINIMUM_HISTORY 86400
 #endif
 
-#define HEALTH_SILENCERS_MAX_FILE_LEN 10000
-
-extern char *silencers_filename;
 extern SIMPLE_PATTERN *conf_enabled_alarms;
 extern DICTIONARY *health_rrdvars;
 

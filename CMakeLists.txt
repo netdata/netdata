@@ -595,8 +595,6 @@ set(LIBNETDATA_FILES
         libnetdata/functions_evloop/functions_evloop.h
         libnetdata/gorilla/gorilla.cc
         libnetdata/gorilla/gorilla.h
-        libnetdata/health/health.c
-        libnetdata/health/health.h
         libnetdata/july/july.c
         libnetdata/july/july.h
         libnetdata/inlined.h
@@ -891,6 +889,9 @@ set(EXPORTING_ENGINE_FILES
 )
 
 set(HEALTH_PLUGIN_FILES
+        health/silencers/silencers.c
+        health/silencers/silencers.h
+        health/silencers/utils.cc
         health/health.c
         health/health.h
         health/health_config.c
