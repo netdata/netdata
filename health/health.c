@@ -1298,7 +1298,7 @@ void *health_main(void *ptr) {
 
                         netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
                               rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                              rc->config.calculation->parsed_as, buffer_tostring(rc->calculation->error_msg)
+                              rc->config.calculation->parsed_as, buffer_tostring(rc->config.calculation->error_msg)
                               );
                     } else {
                         rc->run_flags &= ~RRDCALC_FLAG_CALC_ERROR;
@@ -1306,7 +1306,7 @@ void *health_main(void *ptr) {
                         netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
                               NETDATA_DOUBLE_FORMAT
                               ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                              rc->config.calculation->parsed_as, rc->calculation->result,
+                              rc->config.calculation->parsed_as, rc->config.calculation->result,
                               buffer_tostring(rc->config.calculation->error_msg), rrdcalc_source(rc)
                               );
 
@@ -1350,7 +1350,7 @@ void *health_main(void *ptr) {
                             netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression gave value "
                                   NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc),
-                                  rrdcalc_name(rc), rc->config.warning->result, buffer_tostring(rc->warning->error_msg), rrdcalc_source(rc)
+                                  rrdcalc_name(rc), rc->config.warning->result, buffer_tostring(rc->config.warning->error_msg), rrdcalc_source(rc)
                                   );
                             warning_status = rrdcalc_value2status(rc->config.warning->result);
                         }
@@ -1376,7 +1376,7 @@ void *health_main(void *ptr) {
                             netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': critical expression gave value "
                                   NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc),
-                                  rrdcalc_name(rc), rc->config.critical->result, buffer_tostring(rc->critical->error_msg),
+                                  rrdcalc_name(rc), rc->config.critical->result, buffer_tostring(rc->config.critical->error_msg),
                                   rrdcalc_source(rc)
                                   );
                             critical_status = rrdcalc_value2status(rc->config.critical->result);
