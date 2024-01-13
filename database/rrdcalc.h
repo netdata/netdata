@@ -38,16 +38,23 @@ typedef enum {
 
 #define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
 
-struct rrdcalc {
-    STRING *key;                    // the unique key in the host's rrdcalc_root_index
+struct rrd_alert_match {
+    STRING *charts;                         // the charts that should be linked to (for templates)
+    STRING *plugin;                         // the plugin name that should be linked to
+    STRING *module;                         // the module name that should be linked to
+    STRING *host_labels;                    // the label read from an alarm file
+    STRING *chart_labels;                   // the chart label read from an alarm file
 
-    uint32_t id;                    // the unique id of this alarm
-    uint32_t next_event_id;         // the next event id that will be used for this alarm
+    SIMPLE_PATTERN *charts_pattern;         // the simple pattern of charts
+    SIMPLE_PATTERN *plugin_pattern;         // the simple pattern of plugin
+    SIMPLE_PATTERN *module_pattern;         // the simple pattern of module
+    SIMPLE_PATTERN *host_labels_pattern;    // the simple pattern of labels
+    SIMPLE_PATTERN *chart_labels_pattern;   // the simple pattern of chart labels
+};
+void rrd_alert_match_free(struct rrd_alert_match *am);
 
-    uuid_t config_hash_id;          // a predictable hash_id based on specific alert configuration
-
+struct rrd_alert_config {
     STRING *name;                   // the name of this alarm
-    STRING *chart;                  // the chart id this should be linked to
 
     STRING *exec;                   // the command to execute when this alarm switches state
     STRING *recipient;              // the recipient of the alarm (the first parameter to exec)
@@ -56,17 +63,9 @@ struct rrdcalc {
     STRING *component;              // the component that this alarm refers to
     STRING *type;                   // type of the alarm
 
-    STRING *plugin_match;           // the plugin name that should be linked to
-    SIMPLE_PATTERN *plugin_pattern;
-
-    STRING *module_match;           // the module name that should be linked to
-    SIMPLE_PATTERN *module_pattern;
-
     STRING *source;                 // the source of this alarm
     STRING *units;                  // the units of the alarm
     STRING *summary;                // a short alert summary
-    STRING *original_summary;       // the original summary field before any variable replacement
-    STRING *original_info;          // the original info field before any variable replacement
     STRING *info;                   // a description of the alarm
 
     int update_every;               // update frequency for the alarm
@@ -107,17 +106,26 @@ struct rrdcalc {
 
     uint32_t warn_repeat_every;    // interval between repeating warning notifications
     uint32_t crit_repeat_every;    // interval between repeating critical notifications
+};
+void rrd_alert_config_free(struct rrd_alert_config *ac);
 
-    // ------------------------------------------------------------------------
-    // Labels settings
-    STRING *host_labels;                 // the label read from an alarm file
-    SIMPLE_PATTERN *host_labels_pattern; // the simple pattern of labels
+struct rrdcalc {
+    uint32_t id;                    // the unique id of this alarm
+    uint32_t next_event_id;         // the next event id that will be used for this alarm
 
-    STRING *chart_labels;                 // the chart label read from an alarm file
-    SIMPLE_PATTERN *chart_labels_pattern; // the simple pattern of chart labels
+    uuid_t config_hash_id;          // a predictable hash_id based on specific alert configuration
+
+    STRING *key;                    // the unique key in the host's rrdcalc_root_index
+    STRING *chart;                  // the chart id this should be linked to
+
+    struct rrd_alert_match match;
+    struct rrd_alert_config config;
 
     // ------------------------------------------------------------------------
     // runtime information
+
+    STRING *original_summary;       // the original summary field before any variable replacement
+    STRING *original_info;          // the original info field before any variable replacement
 
     RRDCALC_STATUS old_status;      // the old status of the alarm
     RRDCALC_STATUS status;          // the current status of the alarm
@@ -161,25 +169,25 @@ struct rrdcalc {
     struct rrdcalc *prev;
 };
 
-#define rrdcalc_name(rc) string2str((rc)->name)
+#define rrdcalc_name(rc) string2str((rc)->config.name)
 #define rrdcalc_chart_name(rc) string2str((rc)->chart)
-#define rrdcalc_exec(rc) string2str((rc)->exec)
-#define rrdcalc_recipient(rc) string2str((rc)->recipient)
-#define rrdcalc_classification(rc) string2str((rc)->classification)
-#define rrdcalc_component(rc) string2str((rc)->component)
-#define rrdcalc_type(rc) string2str((rc)->type)
-#define rrdcalc_plugin_match(rc) string2str((rc)->plugin_match)
-#define rrdcalc_module_match(rc) string2str((rc)->module_match)
-#define rrdcalc_source(rc) string2str((rc)->source)
-#define rrdcalc_units(rc) string2str((rc)->units)
+#define rrdcalc_exec(rc) string2str((rc)->config.exec)
+#define rrdcalc_recipient(rc) string2str((rc)->config.recipient)
+#define rrdcalc_classification(rc) string2str((rc)->config.classification)
+#define rrdcalc_component(rc) string2str((rc)->config.component)
+#define rrdcalc_type(rc) string2str((rc)->config.type)
+#define rrdcalc_plugin_match(rc) string2str((rc)->match.plugin)
+#define rrdcalc_module_match(rc) string2str((rc)->match.module)
+#define rrdcalc_source(rc) string2str((rc)->config.source)
+#define rrdcalc_units(rc) string2str((rc)->config.units)
 #define rrdcalc_original_summary(rc) string2str((rc)->original_summary)
-#define rrdcalc_summary(rc) string2str((rc)->summary)
+#define rrdcalc_summary(rc) string2str((rc)->config.summary)
 #define rrdcalc_original_info(rc) string2str((rc)->original_info)
-#define rrdcalc_info(rc) string2str((rc)->info)
-#define rrdcalc_dimensions(rc) string2str((rc)->dimensions)
-#define rrdcalc_foreachdim(rc) string2str((rc)->foreach_dimension)
-#define rrdcalc_host_labels(rc) string2str((rc)->host_labels)
-#define rrdcalc_chart_labels(rc) string2str((rc)->chart_labels)
+#define rrdcalc_info(rc) string2str((rc)->config.info)
+#define rrdcalc_dimensions(rc) string2str((rc)->config.dimensions)
+#define rrdcalc_foreachdim(rc) string2str((rc)->config.foreach_dimension)
+#define rrdcalc_host_labels(rc) string2str((rc)->match.host_labels)
+#define rrdcalc_chart_labels(rc) string2str((rc)->match.chart_labels)
 
 #define foreach_rrdcalc_in_rrdhost_read(host, rc) \
     dfe_start_read((host)->rrdcalc_root_index, rc) \
@@ -190,7 +198,28 @@ struct rrdcalc {
 #define foreach_rrdcalc_in_rrdhost_done(rc) \
     dfe_done(rc)
 
-struct alert_config {
+#define SQL_ALERT_CONFIG_TXT(cfg, name, value) do {     \
+    if(cfg) {                                           \
+        string_freez(cfg->name);                        \
+        cfg->name = string_strdupz(value);              \
+    }                                                   \
+} while(0)
+
+#define SQL_ALERT_CONFIG_STRING_DUP(cfg, name, value) do {  \
+    if(cfg) {                                           \
+        string_freez(cfg->name);                        \
+        cfg->name = string_dup(value);                  \
+    }                                                   \
+} while(0)
+
+#define SQL_ALERT_CONFIG_VALUE(cfg, name, value) do {  \
+    if(cfg) {                                          \
+        cfg->name = value;                             \
+    }                                                  \
+} while(0)
+
+
+struct sql_alert_config {
     STRING *alarm;
     STRING *template_key;
     STRING *os;
@@ -207,7 +236,7 @@ struct alert_config {
     STRING *green;
     STRING *red;
     STRING *exec;
-    STRING *to;
+    STRING *recipient;
     STRING *units;
     STRING *summary;
     STRING *info;
@@ -230,7 +259,7 @@ struct alert_config {
     int32_t p_update_every;
 };
 
-#define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
+#define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->config.after)
 
 void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc);
 
@@ -246,13 +275,13 @@ void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc);
 
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id);
 void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
-int rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc);
+bool rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc);
 
 void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
 void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
-    if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {
+    if (unlikely(rc->config.warn_repeat_every > 0 || rc->config.crit_repeat_every > 0)) {
         return 1;
     }
     return 0;

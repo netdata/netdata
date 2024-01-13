@@ -958,7 +958,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
     "@p_db_lookup_dimensions,@p_db_lookup_method,@p_db_lookup_options,@p_db_lookup_after,"                              \
     "@p_db_lookup_before,@p_update_every,@source,@chart_labels,@summary)"
 
-int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
+int sql_store_alert_config_hash(uuid_t *hash_id, struct sql_alert_config *cfg)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0;
@@ -1062,7 +1062,7 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->to, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->recipient, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1172,7 +1172,7 @@ bind_fail:
 #endif
 int alert_hash_and_store_config(
     uuid_t hash_id,
-    struct alert_config *cfg,
+    struct sql_alert_config *cfg,
     int store_hash)
 {
 #if defined ENABLE_HTTPS
@@ -1198,7 +1198,7 @@ int alert_hash_and_store_config(
     DIGEST_ALERT_CONFIG_VAL(cfg->warn);
     DIGEST_ALERT_CONFIG_VAL(cfg->crit);
     DIGEST_ALERT_CONFIG_VAL(cfg->exec);
-    DIGEST_ALERT_CONFIG_VAL(cfg->to);
+    DIGEST_ALERT_CONFIG_VAL(cfg->recipient);
     DIGEST_ALERT_CONFIG_VAL(cfg->units);
     DIGEST_ALERT_CONFIG_VAL(cfg->info);
     DIGEST_ALERT_CONFIG_VAL(cfg->classification);

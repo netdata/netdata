@@ -1090,7 +1090,7 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
             }
 
             active_alerts[cnt].name = (char *)rrdcalc_name(rc);
-            len += string_strlen(rc->name);
+            len += string_strlen(rc->config.name);
             active_alerts[cnt].chart = (char *)rrdcalc_chart_name(rc);
             len += string_strlen(rc->chart);
             active_alerts[cnt].status = rc->status;

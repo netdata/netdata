@@ -318,8 +318,8 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     struct rrdcontext_to_json_v2_data *ctl = data;
     struct alert_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
-    t->name = rc->name;
-    t->summary = rc->summary;
+    t->name = rc->config.name;
+    t->summary = rc->config.summary;
     t->ati = ctl->alerts.ati++;
 
     t->nodes = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_VALUE_LINK_DONT_CLONE|DICT_OPTION_NAME_LINK_DONT_CLONE);
@@ -350,17 +350,17 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->chart_id = rc->rrdset->id;
     t->chart_name = rc->rrdset->name;
     t->family = rc->rrdset->family;
-    t->units = rc->units;
-    t->classification = rc->classification;
-    t->type = rc->type;
-    t->recipient = rc->recipient;
-    t->component = rc->component;
-    t->name = rc->name;
-    t->source = rc->source;
+    t->units = rc->config.units;
+    t->classification = rc->config.classification;
+    t->type = rc->config.type;
+    t->recipient = rc->config.recipient;
+    t->component = rc->config.component;
+    t->name = rc->config.name;
+    t->source = rc->config.source;
     t->status = rc->status;
     t->flags = rc->run_flags;
-    t->info = rc->info;
-    t->summary = rc->summary;
+    t->info = rc->config.info;
+    t->summary = rc->config.summary;
     t->value = rc->value;
     t->last_updated = rc->last_updated;
     t->last_status_change = rc->last_status_change;
@@ -369,7 +369,7 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->alarm_id = rc->id;
     t->ni = ctl->nodes.ni;
     t->global_id = rc->ae ? rc->ae->global_id : 0;
-    t->name = rc->name;
+    t->name = rc->config.name;
 
     uuid_copy(t->config_hash_id, rc->config_hash_id);
     if(rc->ae)
@@ -438,12 +438,12 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
             RRDSET *st = ri->rrdset;
             rw_spinlock_read_lock(&st->alerts.spinlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->name))) {
+                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->config.name))) {
                     matched = FTS_MATCHED_ALERT;
                     break;
                 }
 
-                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->info))) {
+                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->config.info))) {
                     matched = FTS_MATCHED_ALERT_INFO;
                     break;
                 }
@@ -463,7 +463,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
             RRDSET *st = ri->rrdset;
             rw_spinlock_read_lock(&st->alerts.spinlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                if(ctl->alerts.alert_name_pattern && !simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->name))
+                if(ctl->alerts.alert_name_pattern && !simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->config.name))
                     continue;
 
                 if(ctl->alerts.alarm_id_filter && ctl->alerts.alarm_id_filter != rcl->id)
@@ -503,7 +503,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                 struct alert_v2_entry t = {
                         .tmp = rcl,
                 };
-                struct alert_v2_entry *a2e = dictionary_set(ctl->alerts.alerts, string2str(rcl->name), &t,
+                struct alert_v2_entry *a2e = dictionary_set(ctl->alerts.alerts, string2str(rcl->config.name), &t,
                                                             sizeof(struct alert_v2_entry));
                 size_t ati = a2e->ati;
                 matches++;

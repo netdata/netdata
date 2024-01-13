@@ -618,7 +618,7 @@ static void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const c
             rw_spinlock_read_lock(&st->alerts.spinlock);
             if (st->alerts.base) {
                 for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-                    z = dictionary_set(dict, string2str(rc->name), NULL, sizeof(*z));
+                    z = dictionary_set(dict, string2str(rc->config.name), NULL, sizeof(*z));
 
                     switch(rc->status) {
                         case RRDCALC_STATUS_CLEAR:
@@ -939,10 +939,10 @@ static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
                 if(rc->status < RRDCALC_STATUS_CLEAR)
                     continue;
 
-                buffer_json_member_add_object(wb, string2str(rc->name));
+                buffer_json_member_add_object(wb, string2str(rc->config.name));
                 buffer_json_member_add_string(wb, "st", rrdcalc_status2string(rc->status));
                 buffer_json_member_add_double(wb, "vl", rc->value);
-                buffer_json_member_add_string(wb, "un", string2str(rc->units));
+                buffer_json_member_add_string(wb, "un", string2str(rc->config.units));
                 buffer_json_object_close(wb);
             }
             buffer_json_object_close(wb);

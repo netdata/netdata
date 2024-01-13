@@ -532,7 +532,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                 active_alerts[n_warn+n_crit].status = rc->status;
                 n_warn++;
             } else if (ae->alarm_id == rc->id)
-                expr = rc->warning;
+                expr = rc->config.warning;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
             if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
                 active_alerts[n_warn+n_crit].name = (char *)rrdcalc_name(rc);
@@ -540,10 +540,10 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                 active_alerts[n_warn+n_crit].status = rc->status;
                 n_crit++;
             } else if (ae->alarm_id == rc->id)
-                expr = rc->critical;
+                expr = rc->config.critical;
         } else if (unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
             if (ae->alarm_id == rc->id)
-                expr = rc->warning;
+                expr = rc->config.warning;
         }
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
@@ -739,7 +739,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
-    if(unlikely(!rc->update_every)) {
+    if(unlikely(!rc->config.update_every)) {
         netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }
@@ -767,7 +767,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     }
 
     if(RRDCALC_HAS_DB_LOOKUP(rc)) {
-        time_t needed = now + rc->before + rc->after;
+        time_t needed = now + rc->config.before + rc->config.after;
 
         if(needed + update_every < first || needed - update_every > last) {
             netdata_log_debug(D_HEALTH
@@ -918,7 +918,7 @@ static SILENCE_TYPE check_silenced(RRDCALC *rc, const char *host)
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
         if (
-                (!s->alarms_pattern || (rc->name && s->alarms_pattern && simple_pattern_matches_string(s->alarms_pattern, rc->name))) &&
+                (!s->alarms_pattern || (rc->config.name && s->alarms_pattern && simple_pattern_matches_string(s->alarms_pattern, rc->config.name))) &&
                 (!s->contexts_pattern || (rc->rrdset && rc->rrdset->context && s->contexts_pattern && simple_pattern_matches_string(s->contexts_pattern, rc->rrdset->context))) &&
                 (!s->hosts_pattern || (host && s->hosts_pattern && simple_pattern_matches(s->hosts_pattern, host))) &&
                 (!s->charts_pattern || (rc->chart && s->charts_pattern && simple_pattern_matches_string(s->charts_pattern, rc->chart)))
@@ -1020,7 +1020,7 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
             RRDCALCTEMPLATE *rt;
             foreach_rrdcalctemplate_read(host, rt) {
-                if(!rt->foreach_dimension_pattern)
+                if(!rt->config.foreach_dimension_pattern)
                     continue;
 
                 if(rrdcalctemplate_check_rrdset_conditions(rt, st, host)) {
@@ -1190,24 +1190,24 @@ void *health_main(void *ptr) {
                                                                     rc->next_event_id++,
                                                                     rc->config_hash_id,
                                                                     now,
-                                                                    rc->name,
+                                                                    rc->config.name,
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
                                                                     rc->rrdset->name,
-                                                                    rc->classification,
-                                                                    rc->component,
-                                                                    rc->type,
-                                                                    rc->exec,
-                                                                    rc->recipient,
+                                                                    rc->config.classification,
+                                                                    rc->config.component,
+                                                                    rc->config.type,
+                                                                    rc->config.exec,
+                                                                    rc->config.recipient,
                                                                     now - rc->last_status_change,
                                                                     rc->value,
                                                                     NAN,
                                                                     rc->status,
                                                                     RRDCALC_STATUS_REMOVED,
-                                                                    rc->source,
-                                                                    rc->units,
-                                                                    rc->summary,
-                                                                    rc->info,
+                                                                    rc->config.source,
+                                                                    rc->config.units,
+                                                                    rc->config.summary,
+                                                                    rc->config.info,
                                                                     0,
                                                                     rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
@@ -1250,8 +1250,8 @@ void *health_main(void *ptr) {
                     int value_is_null = 0;
 
                     int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
-                                                  rc->after, rc->before, rc->group, NULL,
-                                                  0, rc->options | RRDR_OPTION_SELECTED_TIER,
+                                                  rc->config.after, rc->config.before, rc->config.group, NULL,
+                                                  0, rc->config.options | RRDR_OPTION_SELECTED_TIER,
                                                   &rc->db_after,&rc->db_before,
                                                   NULL, NULL, NULL,
                                                   &value_is_null, NULL, 0, 0,
@@ -1288,17 +1288,17 @@ void *health_main(void *ptr) {
                 // ------------------------------------------------------------
                 // if there is calculation expression, run it
 
-                if (unlikely(rc->calculation)) {
+                if (unlikely(rc->config.calculation)) {
                     worker_is_busy(WORKER_HEALTH_JOB_CALC_EVAL);
 
-                    if (unlikely(!expression_evaluate(rc->calculation))) {
+                    if (unlikely(!expression_evaluate(rc->config.calculation))) {
                         // calculation failed
                         rc->value = NAN;
                         rc->run_flags |= RRDCALC_FLAG_CALC_ERROR;
 
                         netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
                               rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                              rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg)
+                              rc->config.calculation->parsed_as, buffer_tostring(rc->calculation->error_msg)
                               );
                     } else {
                         rc->run_flags &= ~RRDCALC_FLAG_CALC_ERROR;
@@ -1306,11 +1306,11 @@ void *health_main(void *ptr) {
                         netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
                               NETDATA_DOUBLE_FORMAT
                               ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                              rc->calculation->parsed_as, rc->calculation->result,
-                              buffer_tostring(rc->calculation->error_msg), rrdcalc_source(rc)
+                              rc->config.calculation->parsed_as, rc->calculation->result,
+                              buffer_tostring(rc->config.calculation->error_msg), rrdcalc_source(rc)
                               );
 
-                        rc->value = rc->calculation->result;
+                        rc->value = rc->config.calculation->result;
                     }
                 }
             }
@@ -1333,53 +1333,53 @@ void *health_main(void *ptr) {
                     // --------------------------------------------------------
                     // check the warning expression
 
-                    if (likely(rc->warning)) {
+                    if (likely(rc->config.warning)) {
                         worker_is_busy(WORKER_HEALTH_JOB_WARNING_EVAL);
 
-                        if (unlikely(!expression_evaluate(rc->warning))) {
+                        if (unlikely(!expression_evaluate(rc->config.warning))) {
                             // calculation failed
                             rc->run_flags |= RRDCALC_FLAG_WARN_ERROR;
 
                             netdata_log_debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s",
                                   rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                                  buffer_tostring(rc->warning->error_msg)
+                                  buffer_tostring(rc->config.warning->error_msg)
                                   );
                         } else {
                             rc->run_flags &= ~RRDCALC_FLAG_WARN_ERROR;
                             netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': warning expression gave value "
                                   NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc),
-                                  rrdcalc_name(rc), rc->warning->result, buffer_tostring(rc->warning->error_msg), rrdcalc_source(rc)
+                                  rrdcalc_name(rc), rc->config.warning->result, buffer_tostring(rc->warning->error_msg), rrdcalc_source(rc)
                                   );
-                            warning_status = rrdcalc_value2status(rc->warning->result);
+                            warning_status = rrdcalc_value2status(rc->config.warning->result);
                         }
                     }
 
                     // --------------------------------------------------------
                     // check the critical expression
 
-                    if (likely(rc->critical)) {
+                    if (likely(rc->config.critical)) {
                         worker_is_busy(WORKER_HEALTH_JOB_CRITICAL_EVAL);
 
-                        if (unlikely(!expression_evaluate(rc->critical))) {
+                        if (unlikely(!expression_evaluate(rc->config.critical))) {
                             // calculation failed
                             rc->run_flags |= RRDCALC_FLAG_CRIT_ERROR;
 
                             netdata_log_debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': critical expression failed with error: %s",
                                   rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                                  buffer_tostring(rc->critical->error_msg)
+                                  buffer_tostring(rc->config.critical->error_msg)
                                   );
                         } else {
                             rc->run_flags &= ~RRDCALC_FLAG_CRIT_ERROR;
                             netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': critical expression gave value "
                                   NETDATA_DOUBLE_FORMAT
                                   ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc),
-                                  rrdcalc_name(rc), rc->critical->result, buffer_tostring(rc->critical->error_msg),
+                                  rrdcalc_name(rc), rc->config.critical->result, buffer_tostring(rc->critical->error_msg),
                                   rrdcalc_source(rc)
                                   );
-                            critical_status = rrdcalc_value2status(rc->critical->result);
+                            critical_status = rrdcalc_value2status(rc->config.critical->result);
                         }
                     }
 
@@ -1426,18 +1426,18 @@ void *health_main(void *ptr) {
                         // apply trigger hysteresis
 
                         if (now > rc->delay_up_to_timestamp) {
-                            rc->delay_up_current = rc->delay_up_duration;
-                            rc->delay_down_current = rc->delay_down_duration;
+                            rc->delay_up_current = rc->config.delay_up_duration;
+                            rc->delay_down_current = rc->config.delay_down_duration;
                             rc->delay_last = 0;
                             rc->delay_up_to_timestamp = 0;
                         } else {
-                            rc->delay_up_current = (int) (rc->delay_up_current * rc->delay_multiplier);
-                            if (rc->delay_up_current > rc->delay_max_duration)
-                                rc->delay_up_current = rc->delay_max_duration;
+                            rc->delay_up_current = (int) (rc->delay_up_current * rc->config.delay_multiplier);
+                            if (rc->delay_up_current > rc->config.delay_max_duration)
+                                rc->delay_up_current = rc->config.delay_max_duration;
 
-                            rc->delay_down_current = (int) (rc->delay_down_current * rc->delay_multiplier);
-                            if (rc->delay_down_current > rc->delay_max_duration)
-                                rc->delay_down_current = rc->delay_max_duration;
+                            rc->delay_down_current = (int) (rc->delay_down_current * rc->config.delay_multiplier);
+                            if (rc->delay_down_current > rc->config.delay_max_duration)
+                                rc->delay_down_current = rc->config.delay_max_duration;
                         }
 
                         if (status > rc->status)
@@ -1458,27 +1458,27 @@ void *health_main(void *ptr) {
                                                                     rc->next_event_id++,
                                                                     rc->config_hash_id,
                                                                     now,
-                                                                    rc->name,
+                                                                    rc->config.name,
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
                                                                     rc->rrdset->name,
-                                                                    rc->classification,
-                                                                    rc->component,
-                                                                    rc->type,
-                                                                    rc->exec,
-                                                                    rc->recipient,
+                                                                    rc->config.classification,
+                                                                    rc->config.component,
+                                                                    rc->config.type,
+                                                                    rc->config.exec,
+                                                                    rc->config.recipient,
                                                                     now - rc->last_status_change,
                                                                     rc->old_value,
                                                                     rc->value,
                                                                     rc->status,
                                                                     status,
-                                                                    rc->source,
-                                                                    rc->units,
-                                                                    rc->summary,
-                                                                    rc->info,
+                                                                    rc->config.source,
+                                                                    rc->config.units,
+                                                                    rc->config.summary,
+                                                                    rc->config.info,
                                                                     rc->delay_last,
                                                                     (
-                                                                     ((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                                                     ((rc->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                                                                      ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                                                                      (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
                                                                      )
@@ -1506,7 +1506,7 @@ void *health_main(void *ptr) {
                     }
 
                     rc->last_updated = now;
-                    rc->next_update = now + rc->update_every;
+                    rc->next_update = now + rc->config.update_every;
 
                     if (next_run > rc->next_update)
                         next_run = rc->next_update;
@@ -1522,10 +1522,10 @@ void *health_main(void *ptr) {
                     if(unlikely(rrdcalc_isrepeating(rc) && rc->delay_up_to_timestamp <= now)) {
                         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
                             rc->run_flags &= ~RRDCALC_FLAG_RUN_ONCE;
-                            repeat_every = rc->warn_repeat_every;
+                            repeat_every = rc->config.warn_repeat_every;
                         } else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
                             rc->run_flags &= ~RRDCALC_FLAG_RUN_ONCE;
-                            repeat_every = rc->crit_repeat_every;
+                            repeat_every = rc->config.crit_repeat_every;
                         } else if(unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
                             if(!(rc->run_flags & RRDCALC_FLAG_RUN_ONCE)) {
                                 if(rc->old_status == RRDCALC_STATUS_CRITICAL) {
@@ -1549,27 +1549,27 @@ void *health_main(void *ptr) {
                                                                     rc->next_event_id++,
                                                                     rc->config_hash_id,
                                                                     now,
-                                                                    rc->name,
+                                                                    rc->config.name,
                                                                     rc->rrdset->id,
                                                                     rc->rrdset->context,
                                                                     rc->rrdset->name,
-                                                                    rc->classification,
-                                                                    rc->component,
-                                                                    rc->type,
-                                                                    rc->exec,
-                                                                    rc->recipient,
+                                                                    rc->config.classification,
+                                                                    rc->config.component,
+                                                                    rc->config.type,
+                                                                    rc->config.exec,
+                                                                    rc->config.recipient,
                                                                     now - rc->last_status_change,
                                                                     rc->old_value,
                                                                     rc->value,
                                                                     rc->old_status,
                                                                     rc->status,
-                                                                    rc->source,
-                                                                    rc->units,
-                                                                    rc->summary,
-                                                                    rc->info,
+                                                                    rc->config.source,
+                                                                    rc->config.units,
+                                                                    rc->config.summary,
+                                                                    rc->config.info,
                                                                     rc->delay_last,
                                                                     (
-                                                                     ((rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                                                     ((rc->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                                                                      ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                                                                      (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
                                                                      )

@@ -82,14 +82,14 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , hash_id
                    , rrdcalc_name(rc)
                    , rrdcalc_chart_name(rc)
-                   , rc->classification?rrdcalc_classification(rc):"Unknown"
-                   , rc->component?rrdcalc_component(rc):"Unknown"
-                   , rc->type?rrdcalc_type(rc):"Unknown"
+                   , rc->config.classification?rrdcalc_classification(rc):"Unknown"
+                   , rc->config.component?rrdcalc_component(rc):"Unknown"
+                   , rc->config.type?rrdcalc_type(rc):"Unknown"
                    , (rc->rrdset)?"true":"false"
                    , (rc->run_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
                    , (rc->run_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
-                   , rc->exec?rrdcalc_exec(rc):string2str(host->health.health_default_exec)
-                   , rc->recipient?rrdcalc_recipient(rc):string2str(host->health.health_default_recipient)
+                   , rc->config.exec?rrdcalc_exec(rc):string2str(host->health.health_default_exec)
+                   , rc->config.recipient?rrdcalc_recipient(rc):string2str(host->health.health_default_recipient)
                    , rrdcalc_source(rc)
                    , rrdcalc_units(rc)
                    , rrdcalc_summary(rc)
@@ -98,26 +98,26 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , (unsigned long)rc->last_status_change
                    , (unsigned long)rc->last_updated
                    , (unsigned long)rc->next_update
-                   , rc->update_every
-                   , rc->delay_up_duration
-                   , rc->delay_down_duration
-                   , rc->delay_max_duration
-                   , rc->delay_multiplier
+                   , rc->config.update_every
+                   , rc->config.delay_up_duration
+                   , rc->config.delay_down_duration
+                   , rc->config.delay_max_duration
+                   , rc->config.delay_multiplier
                    , rc->delay_last
                    , (unsigned long)rc->delay_up_to_timestamp
-                   , rc->warn_repeat_every
-                   , rc->crit_repeat_every
+                   , rc->config.warn_repeat_every
+                   , rc->config.crit_repeat_every
                    , value_string
                    , (unsigned long)rc->last_repeat
                    , (unsigned long)rc->times_repeat
     );
 
-    if(unlikely(rc->options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)) {
+    if(unlikely(rc->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)) {
         buffer_strcat(wb, "\t\t\t\"no_clear_notification\": true,\n");
     }
 
     if(RRDCALC_HAS_DB_LOOKUP(rc)) {
-        if(rc->dimensions)
+        if(rc->config.dimensions)
             health_string2json(wb, "\t\t\t", "lookup_dimensions", rrdcalc_dimensions(rc), ",\n");
 
         buffer_sprintf(wb,
@@ -129,35 +129,35 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                         "\t\t\t\"lookup_options\": \"",
                        (unsigned long) rc->db_after,
                        (unsigned long) rc->db_before,
-                       time_grouping_method2string(rc->group),
-                       rc->after,
-                       rc->before
+                       time_grouping_method2string(rc->config.group),
+                       rc->config.after,
+                       rc->config.before
         );
-        buffer_data_options2string(wb, rc->options);
+        buffer_data_options2string(wb, rc->config.options);
         buffer_strcat(wb, "\",\n");
     }
 
-    if(rc->calculation) {
-        health_string2json(wb, "\t\t\t", "calc", rc->calculation->source, ",\n");
-        health_string2json(wb, "\t\t\t", "calc_parsed", rc->calculation->parsed_as, ",\n");
+    if(rc->config.calculation) {
+        health_string2json(wb, "\t\t\t", "calc", rc->config.calculation->source, ",\n");
+        health_string2json(wb, "\t\t\t", "calc_parsed", rc->config.calculation->parsed_as, ",\n");
     }
 
-    if(rc->warning) {
-        health_string2json(wb, "\t\t\t", "warn", rc->warning->source, ",\n");
-        health_string2json(wb, "\t\t\t", "warn_parsed", rc->warning->parsed_as, ",\n");
+    if(rc->config.warning) {
+        health_string2json(wb, "\t\t\t", "warn", rc->config.warning->source, ",\n");
+        health_string2json(wb, "\t\t\t", "warn_parsed", rc->config.warning->parsed_as, ",\n");
     }
 
-    if(rc->critical) {
-        health_string2json(wb, "\t\t\t", "crit", rc->critical->source, ",\n");
-        health_string2json(wb, "\t\t\t", "crit_parsed", rc->critical->parsed_as, ",\n");
+    if(rc->config.critical) {
+        health_string2json(wb, "\t\t\t", "crit", rc->config.critical->source, ",\n");
+        health_string2json(wb, "\t\t\t", "crit_parsed", rc->config.critical->parsed_as, ",\n");
     }
 
     buffer_strcat(wb, "\t\t\t\"green\":");
-    buffer_print_netdata_double(wb, rc->green);
+    buffer_print_netdata_double(wb, rc->config.green);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\t\"red\":");
-    buffer_print_netdata_double(wb, rc->red);
+    buffer_print_netdata_double(wb, rc->config.red);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\t\"value\":");

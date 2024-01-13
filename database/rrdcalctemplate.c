@@ -31,36 +31,36 @@ bool rrdcalctemplate_check_rrdset_conditions(RRDCALCTEMPLATE *rt, RRDSET *st, RR
     if(rt->context != st->context)
         return false;
 
-    if(rt->foreach_dimension_pattern && !rrdset_number_of_dimensions(st))
+    if(rt->config.foreach_dimension_pattern && !rrdset_number_of_dimensions(st))
         return false;
 
-    if (rt->charts_pattern && !simple_pattern_matches_string(rt->charts_pattern, st->name) && !simple_pattern_matches_string(rt->charts_pattern, st->id))
+    if (rt->match.charts_pattern && !simple_pattern_matches_string(rt->match.charts_pattern, st->name) && !simple_pattern_matches_string(rt->match.charts_pattern, st->id))
         return false;
 
-    if (rt->module_pattern && !simple_pattern_matches_string(rt->module_pattern, st->module_name))
+    if (rt->match.module_pattern && !simple_pattern_matches_string(rt->match.module_pattern, st->module_name))
         return false;
 
-    if (rt->plugin_pattern && !simple_pattern_matches_string(rt->plugin_pattern, st->plugin_name))
+    if (rt->match.plugin_pattern && !simple_pattern_matches_string(rt->match.plugin_pattern, st->plugin_name))
         return false;
 
-    if(host->rrdlabels && rt->host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(host->rrdlabels,
-                                                                                            rt->host_labels_pattern,
-                                                                                            '=', NULL))
+    if(host->rrdlabels && rt->match.host_labels_pattern &&
+        !rrdlabels_match_simple_pattern_parsed(host->rrdlabels,
+                                               rt->match.host_labels_pattern, '=', NULL))
         return false;
 
-    if(st->rrdlabels && rt->chart_labels_pattern && !rrdlabels_match_simple_pattern_parsed(st->rrdlabels,
-                                                                                            rt->chart_labels_pattern,
-                                                                                            '=', NULL))
+    if(st->rrdlabels && rt->match.chart_labels_pattern &&
+        !rrdlabels_match_simple_pattern_parsed(st->rrdlabels,
+                                               rt->match.chart_labels_pattern, '=', NULL))
         return false;
 
     return true;
 }
 
 void rrdcalctemplate_check_rrddim_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDDIM *rd, RRDHOST *host) {
-    if (simple_pattern_matches_string(rt->foreach_dimension_pattern, rd->id) ||
-        simple_pattern_matches_string(rt->foreach_dimension_pattern, rd->name)) {
+    if (simple_pattern_matches_string(rt->config.foreach_dimension_pattern, rd->id) ||
+        simple_pattern_matches_string(rt->config.foreach_dimension_pattern, rd->name)) {
         char *overwrite_alert_name = rrdcalc_alert_name_with_dimension(
-            rrdcalctemplate_name(rt), string_strlen(rt->name), rrddim_name(rd), string_strlen(rd->name));
+            rrdcalctemplate_name(rt), string_strlen(rt->config.name), rrddim_name(rd), string_strlen(rd->name));
         rrdcalc_add_from_rrdcalctemplate(host, rt, st, overwrite_alert_name, rrddim_name(rd));
         freez(overwrite_alert_name);
     }
@@ -70,7 +70,7 @@ void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, 
     if(!rrdcalctemplate_check_rrdset_conditions(rt, st, host))
         return;
 
-    if(!rt->foreach_dimension_pattern) {
+    if(!rt->config.foreach_dimension_pattern) {
         rrdcalc_add_from_rrdcalctemplate(host, rt, st, NULL, NULL);
         return;
     }
@@ -93,36 +93,10 @@ void rrdcalctemplate_link_matching_templates_to_rrdset(RRDSET *st) {
 }
 
 static void rrdcalctemplate_free_internals(RRDCALCTEMPLATE *rt) {
-    expression_free(rt->calculation);
-    expression_free(rt->warning);
-    expression_free(rt->critical);
+    rrd_alert_match_free(&rt->match);
+    rrd_alert_config_free(&rt->config);
 
-    string_freez(rt->plugin_match);
-    simple_pattern_free(rt->plugin_pattern);
-
-    string_freez(rt->module_match);
-    simple_pattern_free(rt->module_pattern);
-
-    string_freez(rt->charts_match);
-    simple_pattern_free(rt->charts_pattern);
-
-    string_freez(rt->name);
-    string_freez(rt->exec);
-    string_freez(rt->recipient);
-    string_freez(rt->classification);
-    string_freez(rt->component);
-    string_freez(rt->type);
     string_freez(rt->context);
-    string_freez(rt->source);
-    string_freez(rt->units);
-    string_freez(rt->info);
-    string_freez(rt->dimensions);
-    string_freez(rt->foreach_dimension);
-    string_freez(rt->host_labels);
-    string_freez(rt->chart_labels);
-    simple_pattern_free(rt->foreach_dimension_pattern);
-    simple_pattern_free(rt->host_labels_pattern);
-    simple_pattern_free(rt->chart_labels_pattern);
 }
 
 void rrdcalctemplate_free_unused_rrdcalctemplate_loaded_from_config(RRDCALCTEMPLATE *rt) {
@@ -162,27 +136,27 @@ static void rrdcalctemplate_insert_callback(const DICTIONARY_ITEM *item __maybe_
                     ", crit_repeat_every %u",
           rrdcalctemplate_name(rt),
           (rt->context)?string2str(rt->context):"NONE",
-          (rt->exec)?rrdcalctemplate_exec(rt):"DEFAULT",
-          (rt->recipient)?rrdcalctemplate_recipient(rt):"DEFAULT",
-          rt->green,
-          rt->red,
-          (int)rt->group,
-          rt->after,
-          rt->before,
-          rt->options,
-          (rt->dimensions)?rrdcalctemplate_dimensions(rt):"NONE",
-          (rt->foreach_dimension)?rrdcalctemplate_foreachdim(rt):"NONE",
-          rt->update_every,
-          (rt->calculation)?rt->calculation->parsed_as:"NONE",
-          (rt->warning)?rt->warning->parsed_as:"NONE",
-          (rt->critical)?rt->critical->parsed_as:"NONE",
+          (rt->config.exec)?rrdcalctemplate_exec(rt):"DEFAULT",
+          (rt->config.recipient)?rrdcalctemplate_recipient(rt):"DEFAULT",
+          rt->config.green,
+          rt->config.red,
+          (int)rt->config.group,
+          rt->config.after,
+          rt->config.before,
+          rt->config.options,
+          (rt->config.dimensions)?rrdcalctemplate_dimensions(rt):"NONE",
+          (rt->config.foreach_dimension)?rrdcalctemplate_foreachdim(rt):"NONE",
+          rt->config.update_every,
+          (rt->config.config.calculation)?rt->config.calculation->parsed_as:"NONE",
+          (rt->config.config.warning)?rt->config.warning->parsed_as:"NONE",
+          (rt->config.config.critical)?rt->config.critical->parsed_as:"NONE",
           rrdcalctemplate_source(rt),
-          rt->delay_up_duration,
-          rt->delay_down_duration,
-          rt->delay_max_duration,
-          rt->delay_multiplier,
-          rt->warn_repeat_every,
-          rt->crit_repeat_every
+          rt->config.delay_up_duration,
+          rt->config.delay_down_duration,
+          rt->config.delay_max_duration,
+          rt->config.delay_multiplier,
+          rt->config.warn_repeat_every,
+          rt->config.crit_repeat_every
     );
 }
 
@@ -217,12 +191,12 @@ void rrdcalctemplate_add_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
         return;
     }
 
-    if(unlikely(!rt->update_every)) {
+    if(unlikely(!rt->config.update_every)) {
         netdata_log_error("Health configuration for template '%s' has no frequency (parameter 'every'). Ignoring it.", rrdcalctemplate_name(rt));
         return;
     }
 
-    if(unlikely(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->calculation && !rt->warning && !rt->critical)) {
+    if(unlikely(!RRDCALCTEMPLATE_HAS_DB_LOOKUP(rt) && !rt->config.calculation && !rt->config.warning && !rt->config.critical)) {
         netdata_log_error("Health configuration for template '%s' is useless (no calculation, no warning and no critical evaluation)", rrdcalctemplate_name(rt));
         return;
     }
