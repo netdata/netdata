@@ -3,7 +3,7 @@
 #ifndef HTTP_SERVER_H
 #define HTTP_SERVER_H
 
-#include "libnetdata/libnetdata.h"
+#include <stddef.h>
 
 void *h2o_main(void * ptr);
 

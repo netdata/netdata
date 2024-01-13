@@ -3,7 +3,6 @@
 #ifndef HTTPD_STREAMING_H
 #define HTTPD_STREAMING_H
 
-#include "daemon/common.h"
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 #include "h2o.h"
 

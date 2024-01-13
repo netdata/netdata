@@ -1,3 +1,4 @@
+#include "libnetdata/libnetdata.h"
 #include "connlist.h"
 
 conn_list_t conn_list = { NULL, NULL, 0, 0, PTHREAD_MUTEX_INITIALIZER };
