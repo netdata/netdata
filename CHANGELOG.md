@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- fix thread name on fatal and cgroup netdev rename crash [\#16771](https://github.com/netdata/netdata/pull/16771) ([ktsaou](https://github.com/ktsaou))
+- allow POST requests to be received from ACLK [\#16770](https://github.com/netdata/netdata/pull/16770) ([ktsaou](https://github.com/ktsaou))
+- Keep transaction id of request headers [\#16769](https://github.com/netdata/netdata/pull/16769) ([ktsaou](https://github.com/ktsaou))
+- Fix coverity issues [\#16766](https://github.com/netdata/netdata/pull/16766) ([stelfrag](https://github.com/stelfrag))
+- Add missing call for aral\_freez \(eBPF\) [\#16765](https://github.com/netdata/netdata/pull/16765) ([thiagoftsm](https://github.com/thiagoftsm))
+- /api/v1/config tree improvements and swagger documentation [\#16764](https://github.com/netdata/netdata/pull/16764) ([ktsaou](https://github.com/ktsaou))
 - fix compiler warnings [\#16763](https://github.com/netdata/netdata/pull/16763) ([ktsaou](https://github.com/ktsaou))
 - fix cmake \_GNU\_SOURCE warnings [\#16761](https://github.com/netdata/netdata/pull/16761) ([ktsaou](https://github.com/ktsaou))
 - fix phtread-detatch\(\) call [\#16760](https://github.com/netdata/netdata/pull/16760) ([ktsaou](https://github.com/ktsaou))
@@ -26,6 +32,7 @@
 - health: add httpcheck bad header alert [\#16736](https://github.com/netdata/netdata/pull/16736) ([ilyam8](https://github.com/ilyam8))
 - update default netdata.conf used for native packages [\#16734](https://github.com/netdata/netdata/pull/16734) ([ilyam8](https://github.com/ilyam8))
 - fix missing CPU frequency [\#16732](https://github.com/netdata/netdata/pull/16732) ([ilyam8](https://github.com/ilyam8))
+- Fix handling of hardening flags with Clang [\#16731](https://github.com/netdata/netdata/pull/16731) ([Ferroin](https://github.com/Ferroin))
 - fix excessive "maximum number of cgroups reached" log messages [\#16730](https://github.com/netdata/netdata/pull/16730) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16728](https://github.com/netdata/netdata/pull/16728) ([netdatabot](https://github.com/netdatabot))
 - update ebpf-socket function name and columns [\#16727](https://github.com/netdata/netdata/pull/16727) ([ilyam8](https://github.com/ilyam8))
@@ -386,8 +393,6 @@
 - Removing support for Alpine 3.15 [\#16205](https://github.com/netdata/netdata/pull/16205) ([tkatsoulas](https://github.com/tkatsoulas))
 - Improve context load on startup [\#16203](https://github.com/netdata/netdata/pull/16203) ([stelfrag](https://github.com/stelfrag))
 - cgroup-network: don't log an error opening pid file if doesn't exist [\#16196](https://github.com/netdata/netdata/pull/16196) ([ilyam8](https://github.com/ilyam8))
-- docker install: support for Proxmox vms/containers name resolution [\#16193](https://github.com/netdata/netdata/pull/16193) ([ilyam8](https://github.com/ilyam8))
-- Introduce workflow to always update bundled packages \(static builds\) into their latest release \(part1\) [\#16191](https://github.com/netdata/netdata/pull/16191) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -421,11 +426,6 @@
 - apps: always expose "other" group [\#16198](https://github.com/netdata/netdata/pull/16198) ([ilyam8](https://github.com/ilyam8))
 - journal timeout [\#16195](https://github.com/netdata/netdata/pull/16195) ([ktsaou](https://github.com/ktsaou))
 - systemd-journal timeout to 55 secs [\#16194](https://github.com/netdata/netdata/pull/16194) ([ktsaou](https://github.com/ktsaou))
-- update bundled UI to v6.49.0 [\#16192](https://github.com/netdata/netdata/pull/16192) ([ilyam8](https://github.com/ilyam8))
-- Faster facets [\#16190](https://github.com/netdata/netdata/pull/16190) ([ktsaou](https://github.com/ktsaou))
-- Journal updates [\#16189](https://github.com/netdata/netdata/pull/16189) ([ktsaou](https://github.com/ktsaou))
-- Add agent version on startup [\#16188](https://github.com/netdata/netdata/pull/16188) ([stelfrag](https://github.com/stelfrag))
-- Suppress "families" log [\#16186](https://github.com/netdata/netdata/pull/16186) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
