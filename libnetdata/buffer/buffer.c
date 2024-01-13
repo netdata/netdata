@@ -492,12 +492,3 @@ int buffer_unittest(void) {
     buffer_free(wb);
     return errors;
 }
-
-#ifdef ENABLE_H2O
-h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb) {
-    h2o_iovec_t ret;
-    ret.base = wb->buffer;
-    ret.len = wb->len;
-    return ret;
-}
-#endif
