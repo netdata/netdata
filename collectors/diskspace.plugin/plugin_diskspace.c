@@ -637,6 +637,8 @@ static void diskspace_main_cleanup(void *ptr) {
 #endif
 
 int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unused) {
+    netdata_mutex_lock(&slow_mountinfo_mutex);
+
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -840,6 +842,7 @@ int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unu
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
     buffer_json_finalize(wb);
 
+    netdata_mutex_unlock(&slow_mountinfo_mutex);
     return HTTP_RESP_OK;
 }
 
