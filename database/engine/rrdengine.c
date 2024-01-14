@@ -229,7 +229,7 @@ static void after_work_standard_callback(uv_work_t* req, int status) {
     worker_is_idle();
 }
 
-static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb work_cb, after_work_cb after_work_cb) {
+static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb do_work_cb, after_work_cb do_after_work_cb) {
     struct rrdeng_work *work_request = NULL;
 
     internal_fatal(rrdeng_main.tid != gettid(), "work_dispatch() can only be run from the event loop thread");
@@ -240,8 +240,8 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
     work_request->ctx = ctx;
     work_request->data = data;
     work_request->completion = completion;
-    work_request->work_cb = work_cb;
-    work_request->after_work_cb = after_work_cb;
+    work_request->work_cb = do_work_cb;
+    work_request->after_work_cb = do_after_work_cb;
     work_request->opcode = opcode;
 
     if(uv_queue_work(&rrdeng_main.loop, &work_request->req, work_standard_worker, after_work_standard_callback)) {

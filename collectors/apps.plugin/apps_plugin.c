@@ -1349,8 +1349,8 @@ void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t h
     pid_incremental_rate(stat, p->status_nonvoluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
 }
 
-static void update_proc_state_count(char proc_state) {
-    switch (proc_state) {
+static void update_proc_state_count(char proc_stt) {
+    switch (proc_stt) {
         case 'S':
             proc_state_count[PROC_STATUS_SLEEPING] += 1;
             break;

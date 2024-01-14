@@ -4,8 +4,13 @@
 #include "streaming/common.h"
 #include "http_server.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wtype-limits"
 #include "h2o.h"
 #include "h2o/http1.h"
+#pragma GCC diagnostic pop
 
 #include "streaming.h"
 #include "h2o_utils.h"

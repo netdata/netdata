@@ -1415,8 +1415,8 @@ RRDHOST *rrdhost_find_or_create(
     const char *abbrev_timezone,
     int32_t utc_offset,
     const char *tags,
-    const char *program_name,
-    const char *program_version,
+    const char *prog_name,
+    const char *prog_version,
     int update_every,
     long history,
     RRD_MEMORY_MODE mode,
@@ -1607,7 +1607,7 @@ void rrdset_reset(RRDSET *st);
 void set_host_properties(
     RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *registry_hostname,
     const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
-    const char *program_name, const char *program_version);
+    const char *prog_name, const char *prog_version);
 
 size_t get_tier_grouping(size_t tier);
 void store_metric_collection_completed(void);

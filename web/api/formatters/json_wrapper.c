@@ -435,23 +435,23 @@ static void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, co
             qm = tqm;
         }
 
-        const char *key, *id, *name;
+        const char *k, *id, *name;
 
         if(v2) {
-            key = rrdmetric_acquired_name(rma);
-            id = key;
-            name = key;
+            k = rrdmetric_acquired_name(rma);
+            id = k;
+            name = k;
         }
         else {
             snprintfz(buf, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
                       rrdmetric_acquired_id(rma),
                       rrdmetric_acquired_name(rma));
-            key = buf;
+            k = buf;
             id = rrdmetric_acquired_id(rma);
             name = rrdmetric_acquired_name(rma);
         }
 
-        z = dictionary_set(dict, key, NULL, sizeof(*z));
+        z = dictionary_set(dict, k, NULL, sizeof(*z));
         if(!z->id) {
             z->id = id;
             z->name = name;

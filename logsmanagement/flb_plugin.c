@@ -475,9 +475,9 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                     case FLB_KMSG:
                     {
                         if(unlikely(skip_kmsg_log_buffering)){
-                            static time_t netdata_start_time = 0;
-                            if (!netdata_start_time) netdata_start_time = now_boottime_sec();
-                            if(now_boottime_sec() - netdata_start_time < KERNEL_LOGS_COLLECT_INIT_WAIT) 
+                            static time_t start_time = 0;
+                            if (!start_time) start_time = now_boottime_sec();
+                            if(now_boottime_sec() - start_time < KERNEL_LOGS_COLLECT_INIT_WAIT)
                                 goto skip_collect_and_drop_logs;
                             else skip_kmsg_log_buffering = 0;
                         }

@@ -612,8 +612,8 @@ void *analytics_main(void *ptr)
 
         analytics_gather_mutable_meta_data();
 
-        analytics_statistic_t statistic = { "META", "-", "-"  };
-        analytics_statistic_send(&statistic);
+        analytics_statistic_t stt = { "META", "-", "-"  };
+        analytics_statistic_send(&stt);
         analytics_log_data();
 
         sec = 0;

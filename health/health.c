@@ -997,14 +997,14 @@ static void health_event_loop(void) {
                              now > (rc->rrdset->last_collected_time.tv_sec + 60))) {
                     if (!rrdcalc_isrepeating(rc)) {
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
-                        time_t now = now_realtime_sec();
+                        time_t now_tmp = now_realtime_sec();
 
                         ALARM_ENTRY *ae =
                             health_create_alarm_entry(
                                 host,
                                 rc,
-                                now,
-                                now - rc->last_status_change,
+                                now_tmp,
+                                now_tmp - rc->last_status_change,
                                 rc->value,
                                 NAN,
                                 rc->status,
@@ -1017,9 +1017,9 @@ static void health_event_loop(void) {
                             health_alarm_log_add_entry(host, ae);
                             rc->old_status = rc->status;
                             rc->status = RRDCALC_STATUS_REMOVED;
-                            rc->last_status_change = now;
+                            rc->last_status_change = now_tmp;
                             rc->last_status_change_value = rc->value;
-                            rc->last_updated = now;
+                            rc->last_updated = now_tmp;
                             rc->value = NAN;
                             rc->ae = ae;
 

@@ -2065,9 +2065,9 @@ int main(int argc, char **argv) {
 
 #ifdef ENABLE_H2O
         delta_startup_time("initialize h2o server");
-        for (int i = 0; static_threads[i].name; i++) {
-            if (static_threads[i].start_routine == h2o_main)
-                static_threads[i].enabled = httpd_is_enabled();
+        for (int t = 0; static_threads[t].name; t++) {
+            if (static_threads[t].start_routine == h2o_main)
+                static_threads[t].enabled = httpd_is_enabled();
         }
 #endif
     }

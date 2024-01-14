@@ -1419,7 +1419,14 @@ if(ENABLE_H2O)
                 -Wno-deprecated-declarations
                 -Wno-unused-parameter
                 -Wno-sign-compare
-                -Wno-missing-field-initializers)
+                -Wno-missing-field-initializers
+                -Wno-unused-but-set-variable
+                -Wno-type-limits
+                -Wno-implicit-fallthrough
+                -Wno-shadow
+                -Wno-unused-function
+                -Wno-misleading-indentation
+        )
 
         target_compile_options(h2o PUBLIC -DH2O_USE_LIBUV=0)
 
@@ -1434,12 +1441,13 @@ endif()
 
 add_library(judy STATIC ${LIBJUDY_SOURCES})
 
-target_compile_options(judy PUBLIC
+target_compile_options(judy PRIVATE
         -Wno-sign-compare
         -Wno-implicit-fallthrough
+        -Wno-shadow
 )
 
-target_compile_definitions(judy PUBLIC
+target_compile_definitions(judy PRIVATE
         JUDYL
         $<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:JU_64BIT>
 )

@@ -25,7 +25,7 @@ h2o_iovec_pair_vector_t *parse_URL_params(h2o_mem_pool_t *pool, h2o_iovec_t para
         if (params_vec->capacity == params_vec->size)
             h2o_vector_reserve(pool, params_vec, params_vec->capacity + KEY_VAL_BUFFER_GROWTH_STEP);
 
-            params_vec->entries[params_vec->size++] = param;
+        params_vec->entries[params_vec->size++] = param;
     }
 
     return params_vec;
