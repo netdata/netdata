@@ -232,7 +232,7 @@ static void ebpf_update_process_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             ebpf_process_stat_t *out = &pids->ps;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
             if (local_pid) {
                 ebpf_process_stat_t *in = &local_pid->process;
 

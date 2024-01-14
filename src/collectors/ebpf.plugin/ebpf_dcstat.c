@@ -549,7 +549,7 @@ static void ebpf_read_dc_apps_table(int maps_per_core, int max_period)
 
         ebpf_dcstat_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key);
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(key, cv->tgid);
         if (pid_stat) {
             netdata_publish_dcstat_t *publish = &pid_stat->dc;
             if (!publish->ct || publish->ct != cv->ct) {
@@ -582,7 +582,7 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
     netdata_dcstat_pid_t *dst = &publish->curr;
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid);
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid, 0);
         if (pid_stat) {
             netdata_publish_dcstat_t *w = &pid_stat->dc;
             if (w) {
@@ -774,7 +774,7 @@ static void ebpf_update_dc_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_dcstat_pid_t *out = &pids->dc;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
             if (local_pid) {
                 netdata_publish_dcstat_t *in = &local_pid->dc;
 

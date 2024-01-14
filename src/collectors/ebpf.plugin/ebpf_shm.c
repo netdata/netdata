@@ -539,7 +539,7 @@ static void ebpf_update_shm_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
             if (local_pid) {
                 netdata_publish_shm_t *in = &local_pid->shm;
 
@@ -573,7 +573,7 @@ static void ebpf_read_shm_apps_table(int maps_per_core, int max_period)
 
         shm_apps_accumulator(cv, maps_per_core);
 
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key);
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, 0);
         if (!local_pid)
             goto end_shm_loop;
 
@@ -654,7 +654,7 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_tar
     memset(shm, 0, sizeof(netdata_publish_shm_t));
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid);
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid, 0);
         if (pid_stat) {
             netdata_publish_shm_t *w = &pid_stat->shm;
             shm->get += w->get;

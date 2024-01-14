@@ -455,14 +455,19 @@ static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
  *
  * Get or allocate the PID entry for the specified pid.
  *
- * @param pid the pid to search the data.
+ * @param pid   the pid to search the data.
+ * @param tgid  the task group id
  *
  * @return It returns the pid entry structure
  */
-ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid)
+ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid, pid_t tgid)
 {
-    if (unlikely(ebpf_all_pids[pid]))
+    ebpf_pid_stat_t *ptr = ebpf_all_pids[pid];
+    if (unlikely(ptr)) {
+        if (!ptr->ppid && tgid)
+            ptr->ppid = tgid;
         return ebpf_all_pids[pid];
+    }
 
     struct ebpf_pid_stat *p = ebpf_pid_stat_get();
 
@@ -473,6 +478,7 @@ ebpf_pid_stat_t *ebpf_get_pid_entry(pid_t pid)
     ebpf_root_of_pids = p;
 
     p->pid = pid;
+    p->ppid = tgid;
 
     ebpf_all_pids[pid] = p;
     ebpf_all_pids_count++;
@@ -660,7 +666,7 @@ static inline int ebpf_collect_data_for_pid(pid_t pid, void *ptr)
         return 0;
     }
 
-    ebpf_pid_stat_t *p = ebpf_get_pid_entry(pid);
+    ebpf_pid_stat_t *p = ebpf_get_pid_entry(pid, 0);
     if (unlikely(!p || p->read))
         return 0;
     p->read = 1;
@@ -1062,7 +1068,7 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
     memset(process, 0, sizeof(ebpf_process_stat_t));
     while (root) {
         int32_t pid = root->pid;
-        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid);
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
         if (local_pid) {
             ebpf_process_stat_t *in = &local_pid->process;
             process->task_err = in->task_err;
@@ -1117,7 +1123,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd, int maps_per_core)
 
         uint32_t key = 0, next_key = 0;
         while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
-            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key);
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, 0);
             if (!local_pid)
                 goto end_process_loop;
 
