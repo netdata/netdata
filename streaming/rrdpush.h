@@ -84,7 +84,7 @@ extern STREAM_CAPABILITIES globally_disabled_capabilities;
 
 STREAM_CAPABILITIES stream_our_capabilities(RRDHOST *host, bool sender);
 
-#define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)) == (capability))
+#define stream_has_capability(rpt, capability) (((rpt)->capabilities & (capability)) == (capability))
 
 static inline bool stream_has_more_than_one_capability_of(STREAM_CAPABILITIES caps, STREAM_CAPABILITIES mask) {
     STREAM_CAPABILITIES common = (STREAM_CAPABILITIES)(caps & mask);
