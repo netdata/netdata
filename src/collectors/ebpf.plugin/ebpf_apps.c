@@ -964,12 +964,7 @@ void ebpf_cleanup_exited_pids(int max)
             p = p->next;
 
             ebpf_del_pid_entry(r);
-        }/* else {
-            if (unlikely(p->keep))
-                p->keeploops++;
-            p->keep = 0;
-            p = p->next;
-        } */
+        }
         p = p->next;
     }
 }
