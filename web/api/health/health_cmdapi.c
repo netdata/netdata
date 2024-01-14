@@ -90,16 +90,16 @@ void health_silencers2json(BUFFER *wb) {
 void health_silencers2file(BUFFER *wb) {
     if (wb->len == 0) return;
 
-    FILE *fd = fopen(silencers_filename, "wb");
+    FILE *fd = fopen(health_silencers_filename(), "wb");
     if(fd) {
         size_t written = (size_t)fprintf(fd, "%s", wb->buffer) ;
         if (written == wb->len ) {
-            netdata_log_info("Silencer changes written to %s", silencers_filename);
+            netdata_log_info("Silencer changes written to %s", health_silencers_filename());
         }
         fclose(fd);
         return;
     }
-    netdata_log_error("Silencer changes could not be written to %s. Error %s", silencers_filename, strerror(errno));
+    netdata_log_error("Silencer changes could not be written to %s. Error %s", health_silencers_filename(), strerror(errno));
 }
 
 /**

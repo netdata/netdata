@@ -884,6 +884,11 @@ set(HEALTH_PLUGIN_FILES
         health/health_config.c
         health/health_json.c
         health/health_log.c
+        health/health_prototypes.c
+        health/health_prototypes.h
+        health/health_silencers.c
+        health/health_silencers.h
+        health/health_internals.h
 )
 
 set(IDLEJITTER_PLUGIN_FILES collectors/idlejitter.plugin/plugin_idlejitter.c)

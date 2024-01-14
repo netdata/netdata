@@ -1837,7 +1837,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
         default_rrd_update_every,
         default_rrd_history_entries,
         RRD_MEMORY_MODE_DBENGINE,
-        default_health_enabled,
+        health_plugin_enabled(),
         default_rrdpush_enabled,
         default_rrdpush_destination,
         default_rrdpush_api_key,

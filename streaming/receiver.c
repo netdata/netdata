@@ -551,7 +551,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
     rpt->config.mode = default_rrd_memory_mode;
     rpt->config.history = default_rrd_history_entries;
 
-    rpt->config.health_enabled = (int)default_health_enabled;
+    rpt->config.health_enabled = health_plugin_enabled();
     rpt->config.alarms_delay = 60;
     rpt->config.alarms_history = HEALTH_LOG_DEFAULT_HISTORY;
 

@@ -572,7 +572,7 @@ void recursive_config_double_dir_load(
         const char *user_path
         , const char *stock_path
         , const char *subpath
-        , int (*callback)(const char *filename, void *data)
+        , int (*callback)(const char *filename, void *data, bool stock_config)
         , void *data
         , size_t depth
 );

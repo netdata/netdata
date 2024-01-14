@@ -855,6 +855,17 @@ void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc) {
 }
 
 void rrd_alert_match_free(struct rrd_alert_match *am) {
+    if(am->is_template)
+        string_freez(am->on.context);
+    else
+        string_freez(am->on.chart);
+
+    string_freez(am->os);
+    simple_pattern_free(am->os_pattern);
+
+    string_freez(am->host);
+    simple_pattern_free(am->host_pattern);
+
     string_freez(am->plugin);
     simple_pattern_free(am->plugin_pattern);
 

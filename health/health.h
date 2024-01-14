@@ -5,8 +5,6 @@
 
 #include "daemon/common.h"
 
-extern unsigned int default_health_enabled;
-
 typedef enum __attribute__((packed)) {
     HEALTH_ENTRY_FLAG_PROCESSED             = 0x00000001, // notifications engine has processed this
     HEALTH_ENTRY_FLAG_UPDATED               = 0x00000002, // there is a more recent update about this transition
@@ -41,13 +39,10 @@ void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_
 
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
-extern char *silencers_filename;
-extern SIMPLE_PATTERN *conf_enabled_alarms;
-extern DICTIONARY *health_rrdvars;
+void health_plugin_init(void);
+void health_plugin_destroy(void);
 
-void health_init(void);
-
-void health_reload(void);
+void health_plugin_reload(void);
 
 void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
@@ -90,7 +85,6 @@ ALARM_ENTRY* health_create_alarm_entry(
 
 void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
-void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 char *health_user_config_dir(void);
 char *health_stock_config_dir(void);
 void health_alarm_log_free(RRDHOST *host);
@@ -100,11 +94,15 @@ void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 void *health_cmdapi_thread(void *ptr);
 
 char *health_edit_command_from_source(const char *source);
-void sql_refresh_hashes(void);
+void sql_hashes_refresh(void);
+void sql_hashes_disable(void);
 
 void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function);
 #define health_log_alert(host, ae) health_log_alert_transition_with_trace(host, ae, __LINE__, __FILE__, __FUNCTION__)
+
+#include "health_prototypes.h"
+#include "health_silencers.h"
 
 #endif //NETDATA_HEALTH_H

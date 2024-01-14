@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health.h"
+#include "health_internals.h"
 
 #define WORKER_HEALTH_JOB_RRD_LOCK              0
 #define WORKER_HEALTH_JOB_HOST_LOCK             1
@@ -16,11 +17,6 @@
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 10
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
-
-unsigned int default_health_enabled = 1;
-char *silencers_filename;
-SIMPLE_PATTERN *conf_enabled_alarms = NULL;
-DICTIONARY *health_rrdvars;
 
 void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_FLAGS flags) {
     buffer_json_member_add_array(wb, key);
@@ -294,7 +290,7 @@ inline char *health_stock_config_dir(void) {
  * Function used to initialize the silencer structure.
  */
 static void health_silencers_init(void) {
-    FILE *fd = fopen(silencers_filename, "r");
+    FILE *fd = fopen(health_silencers_filename(), "r");
     if (fd) {
         fseek(fd, 0 , SEEK_END);
         off_t length = (off_t) ftell(fd);
@@ -308,104 +304,43 @@ static void health_silencers_init(void) {
                 if (copied == (length* sizeof(char))) {
                     str[length] = 0x00;
                     json_parse(str, NULL, health_silencers_json_read_callback);
-                    netdata_log_info("Parsed health silencers file %s", silencers_filename);
+                    netdata_log_info("Parsed health silencers file %s", health_silencers_filename());
                 } else {
-                    netdata_log_error("Cannot read the data from health silencers file %s", silencers_filename);
+                    netdata_log_error("Cannot read the data from health silencers file %s", health_silencers_filename());
                 }
                 freez(str);
             }
         } else {
             netdata_log_error("Health silencers file %s has the size %" PRId64 " that is out of range[ 1 , %d ]. Aborting read.",
-                              silencers_filename,
+                              health_silencers_filename(),
                               (int64_t)length,
                               HEALTH_SILENCERS_MAX_FILE_LEN);
         }
         fclose(fd);
     } else {
         netdata_log_info("Cannot open the file %s, so Netdata will work with the default health configuration.",
-                         silencers_filename);
+                         health_silencers_filename());
     }
 }
 
-/**
- * Health Init
- *
- * Initialize the health thread.
- */
-void health_init(void) {
-    netdata_log_debug(D_HEALTH, "Health configuration initializing");
+void health_plugin_init(void) {
+    health_load_config_defaults();
 
-    if(!(default_health_enabled = (unsigned int)config_get_boolean(CONFIG_SECTION_HEALTH, "enabled", default_health_enabled))) {
-        netdata_log_debug(D_HEALTH, "Health is disabled.");
+    if(!health_plugin_enabled())
         return;
-    }
 
+    if (!health_globals.rrdvars)
+        health_globals.rrdvars = health_rrdvariables_create();
+
+    health_reload_prototypes();
     health_silencers_init();
 }
 
-// ----------------------------------------------------------------------------
-// re-load health configuration
+void health_plugin_destroy(void) {
+    if(health_globals.rrdvars)
+        dictionary_destroy(health_globals.rrdvars);
 
-/**
- * Reload host
- *
- * Reload configuration for a specific host.
- *
- * @param host the structure of the host that the function will reload the configuration.
- */
-static void health_reload_host(RRDHOST *host) {
-    if(unlikely(!host->health.health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
-        return;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "[%s]: Reloading health.",
-           rrdhost_hostname(host));
-
-    char *user_path = health_user_config_dir();
-    char *stock_path = health_stock_config_dir();
-
-    // free all running alarms
-    rrdcalc_delete_all(host);
-    rrdcalctemplate_delete_all(host);
-
-    // invalidate all previous entries in the alarm log
-    rw_spinlock_read_lock(&host->health_log.spinlock);
-    ALARM_ENTRY *t;
-    for(t = host->health_log.alarms ; t ; t = t->next) {
-        if(t->new_status != RRDCALC_STATUS_REMOVED)
-            t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
-    }
-    rw_spinlock_read_unlock(&host->health_log.spinlock);
-
-    // reset all thresholds to all charts
-    RRDSET *st;
-    rrdset_foreach_read(st, host) {
-        st->green = NAN;
-        st->red = NAN;
-    }
-    rrdset_foreach_done(st);
-
-    // load the new alarms
-    health_readdir(host, user_path, stock_path, NULL);
-
-    //Discard alarms with labels that do not apply to host
-    rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
-
-    // link the loaded alarms to their charts
-    rrdset_foreach_write(st, host) {
-        rrdcalc_link_matching_alerts_to_rrdset(st);
-        rrdcalctemplate_link_matching_templates_to_rrdset(st);
-    }
-    rrdset_foreach_done(st);
-
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_enabled) {
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (likely(wc)) {
-            wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
-        }
-    }
-#endif
+    health_globals.rrdvars = NULL;
 }
 
 /**
@@ -413,14 +348,11 @@ static void health_reload_host(RRDHOST *host) {
  *
  * Reload the host configuration for all hosts.
  */
-void health_reload(void) {
-    sql_refresh_hashes();
+void health_plugin_reload(void) {
+    sql_hashes_refresh();
 
-    RRDHOST *host;
-    dfe_start_reentrant(rrdhost_root_index, host){
-        health_reload_host(host);
-    }
-    dfe_done(host);
+    health_reload_prototypes();
+    health_apply_prototypes_to_all_hosts();
 }
 
 // ----------------------------------------------------------------------------
@@ -810,93 +742,6 @@ static void health_main_cleanup(void *ptr) {
            "Health thread ended.");
 }
 
-static void initialize_health(RRDHOST *host)
-{
-    if(!host->health.health_enabled ||
-        rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
-        !service_running(SERVICE_HEALTH))
-        return;
-
-    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "[%s]: Initializing health.",
-           rrdhost_hostname(host));
-
-    host->health.health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
-    host->health.health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
-
-    host->health_log.next_log_id = 1;
-    host->health_log.next_alarm_id = 1;
-    host->health_log.max = 1000;
-    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
-    host->health_log.next_alarm_id = 0;
-
-    long n = config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", host->health_log.max);
-    if(n < 10) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Host '%s': health configuration has invalid max log entries %ld. "
-               "Using default %u",
-               rrdhost_hostname(host), n, host->health_log.max);
-
-        config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries", (long)host->health_log.max);
-    }
-    else
-        host->health_log.max = (unsigned int)n;
-
-    uint32_t m = config_get_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
-    if (m < HEALTH_LOG_MINIMUM_HISTORY) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Host '%s': health configuration has invalid health log history %u. "
-               "Using minimum %d",
-               rrdhost_hostname(host), m, HEALTH_LOG_MINIMUM_HISTORY);
-
-        config_set_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_MINIMUM_HISTORY);
-        m = HEALTH_LOG_MINIMUM_HISTORY;
-    }
-
-    //default health log history is 5 days and not less than a day
-    if (host->health_log.health_log_history) {
-        if (host->health_log.health_log_history < HEALTH_LOG_MINIMUM_HISTORY)
-            host->health_log.health_log_history = HEALTH_LOG_MINIMUM_HISTORY;
-    } else
-        host->health_log.health_log_history = m;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "[%s]: Health log history is set to %u seconds (%u days)",
-           rrdhost_hostname(host), host->health_log.health_log_history, host->health_log.health_log_history / 86400);
-
-    conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL,
-                                                SIMPLE_PATTERN_EXACT, true);
-
-    rw_spinlock_init(&host->health_log.spinlock);
-
-    char filename[FILENAME_MAX + 1];
-
-    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
-    host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
-    host->health.health_default_recipient = string_strdupz("root");
-    host->health.use_summary_for_notifications = config_get_boolean(CONFIG_SECTION_HEALTH, "use summary for notifications", CONFIG_BOOLEAN_YES);
-
-    sql_health_alarm_log_load(host);
-
-    // ------------------------------------------------------------------------
-    // load health configuration
-
-    health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
-
-    // link the loaded alarms to their charts
-    RRDSET *st;
-    rrdset_foreach_reentrant(st, host) {
-        rrdcalc_link_matching_alerts_to_rrdset(st);
-        rrdcalctemplate_link_matching_templates_to_rrdset(st);
-    }
-    rrdset_foreach_done(st);
-
-    //Discard alarms with labels that do not apply to host
-    rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
-}
-
 static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
@@ -1029,7 +874,7 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
             }
             foreach_rrdcalctemplate_done(rt);
 
-            if (health_variable_check(health_rrdvars, st, rd) || rrdset_flag_check(st, RRDSET_FLAG_HAS_RRDCALC_LINKED))
+            if (health_variable_check(health_globals.rrdvars, st, rd) || rrdset_flag_check(st, RRDSET_FLAG_HAS_RRDCALC_LINKED))
                 rrdvar_store_for_chart(host, st);
         }
         rrddim_foreach_done(rd);
@@ -1115,7 +960,7 @@ void *health_main(void *ptr) {
                 continue;
 
             if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
-                initialize_health(host);
+                health_initialize_rrdhost(host);
 
             health_execute_delayed_initializations(host);
 

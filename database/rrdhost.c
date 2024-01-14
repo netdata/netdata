@@ -1046,7 +1046,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         dbengine_enabled = true;
     }
     else {
-        health_init();
+        health_plugin_init();
         rrdpush_init();
 
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
@@ -1094,7 +1094,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             , default_rrd_update_every
             , default_rrd_history_entries
             , default_rrd_memory_mode
-            , default_health_enabled
+            , health_plugin_enabled()
             , default_rrdpush_enabled
             , default_rrdpush_destination
             , default_rrdpush_api_key
@@ -1325,7 +1325,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrd_functions_host_destroy(host);
     rrdvariables_destroy(host->rrdvars);
     if (host == localhost)
-        rrdvariables_destroy(health_rrdvars);
+        health_plugin_destroy();
 
     rrdhost_destroy_rrdcontexts(host);
 

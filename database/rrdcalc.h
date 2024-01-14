@@ -39,12 +39,25 @@ typedef enum {
 #define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
 
 struct rrd_alert_match {
+    bool enabled;
+
+    bool is_template;
+    union {
+        STRING *chart;
+        STRING *context;
+    } on;
+
+    STRING *os;
+    STRING *host;
+
     STRING *charts;                         // the charts that should be linked to (for templates)
     STRING *plugin;                         // the plugin name that should be linked to
     STRING *module;                         // the module name that should be linked to
     STRING *host_labels;                    // the label read from an alarm file
     STRING *chart_labels;                   // the chart label read from an alarm file
 
+    SIMPLE_PATTERN *os_pattern;
+    SIMPLE_PATTERN *host_pattern;
     SIMPLE_PATTERN *charts_pattern;         // the simple pattern of charts
     SIMPLE_PATTERN *plugin_pattern;         // the simple pattern of plugin
     SIMPLE_PATTERN *module_pattern;         // the simple pattern of module
@@ -54,6 +67,8 @@ struct rrd_alert_match {
 void rrd_alert_match_free(struct rrd_alert_match *am);
 
 struct rrd_alert_config {
+    uuid_t hash_id;
+
     STRING *name;                   // the name of this alarm
 
     STRING *exec;                   // the command to execute when this alarm switches state
@@ -104,6 +119,7 @@ struct rrd_alert_config {
     // ------------------------------------------------------------------------
     // notification repeat settings
 
+    bool has_custom_repeat_config;
     uint32_t warn_repeat_every;    // interval between repeating warning notifications
     uint32_t crit_repeat_every;    // interval between repeating critical notifications
 };
@@ -258,6 +274,17 @@ struct sql_alert_config {
     int32_t p_db_lookup_before;
     int32_t p_update_every;
 };
+void sql_alert_config_free(struct sql_alert_config *cfg);
+
+typedef struct rrd_alert_prototype {
+    struct rrd_alert_match match;
+    struct rrd_alert_config config;
+    struct sql_alert_config sql;
+
+    struct rrd_alert_prototype *prev, *next;
+} RRD_ALERT_PROTOTYPE;
+void health_prototype_free(RRD_ALERT_PROTOTYPE *ap);
+void health_add_prototype_unsafe(RRD_ALERT_PROTOTYPE *ap);
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->config.after)
 

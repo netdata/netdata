@@ -190,7 +190,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         default_rrd_update_every,
         default_rrd_history_entries,
         default_rrd_memory_mode,
-        default_health_enabled,
+        health_plugin_enabled(),
         default_rrdpush_enabled,
         default_rrdpush_destination,
         default_rrdpush_api_key,

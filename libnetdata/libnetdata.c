@@ -1474,11 +1474,14 @@ int path_is_file(const char *path, const char *subpath) {
     return is_file;
 }
 
-void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data), void *data, size_t depth) {
+void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data, bool stock_config), void *data, size_t depth) {
     if(depth > 3) {
         netdata_log_error("CONFIG: Max directory depth reached while reading user path '%s', stock path '%s', subpath '%s'", user_path, stock_path, subpath);
         return;
     }
+
+    if(!stock_path)
+        stock_path = user_path;
 
     char *udir = strdupz_path_subpath(user_path, subpath);
     char *sdir = strdupz_path_subpath(stock_path, subpath);
@@ -1513,7 +1516,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                     char *filename = strdupz_path_subpath(udir, de->d_name);
                     netdata_log_debug(D_HEALTH, "CONFIG calling callback for user file '%s'", filename);
-                    callback(filename, data);
+                    callback(filename, data, false);
                     freez(filename);
                     continue;
                 }
@@ -1561,7 +1564,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                         len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                         char *filename = strdupz_path_subpath(sdir, de->d_name);
                         netdata_log_debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
-                        callback(filename, data);
+                        callback(filename, data, true);
                         freez(filename);
                         continue;
                     }
