@@ -1266,7 +1266,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
 
 #include "gperf-hashtable.h"
 
-PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, size_t num_words) {
+PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words) {
     switch(keyword->id) {
         case PLUGINSD_KEYWORD_ID_SET2:
             return pluginsd_set_v2(words, num_words, parser);
@@ -1377,7 +1377,7 @@ int pluginsd_parser_unittest(void) {
             strncpyz(input, lines[line], PLUGINSD_LINE_MAX);
             size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);
             const char *command = get_word(words, num_words, 0);
-            PARSER_KEYWORD *keyword = parser_find_keyword(p, command);
+            const PARSER_KEYWORD *keyword = parser_find_keyword(p, command);
             if(unlikely(!keyword))
                 fatal("Cannot parse the line '%s'", lines[line]);
             count++;

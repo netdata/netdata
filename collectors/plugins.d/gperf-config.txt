@@ -51,7 +51,9 @@
 %define word-array-name gperf_keywords
 %define constants-prefix GPERF_PARSER_
 %define slot-name keyword
+%define initializer-suffix ,0,PARSER_INIT_PLUGINSD,0
 %global-table
+%readonly-tables
 %null-strings
 PARSER_KEYWORD;
 
