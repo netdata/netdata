@@ -5,36 +5,6 @@
 
 #define HEALTH_CONF_MAX_LINE 4096
 
-#define HEALTH_ALARM_KEY "alarm"
-#define HEALTH_TEMPLATE_KEY "template"
-#define HEALTH_ON_KEY "on"
-#define HEALTH_HOST_KEY "hosts"
-#define HEALTH_OS_KEY "os"
-#define HEALTH_PLUGIN_KEY "plugin"
-#define HEALTH_MODULE_KEY "module"
-#define HEALTH_CHARTS_KEY "charts"
-#define HEALTH_LOOKUP_KEY "lookup"
-#define HEALTH_CALC_KEY "calc"
-#define HEALTH_EVERY_KEY "every"
-#define HEALTH_GREEN_KEY "green"
-#define HEALTH_RED_KEY "red"
-#define HEALTH_WARN_KEY "warn"
-#define HEALTH_CRIT_KEY "crit"
-#define HEALTH_EXEC_KEY "exec"
-#define HEALTH_RECIPIENT_KEY "to"
-#define HEALTH_UNITS_KEY "units"
-#define HEALTH_SUMMARY_KEY "summary"
-#define HEALTH_INFO_KEY "info"
-#define HEALTH_CLASS_KEY "class"
-#define HEALTH_COMPONENT_KEY "component"
-#define HEALTH_TYPE_KEY "type"
-#define HEALTH_DELAY_KEY "delay"
-#define HEALTH_OPTIONS_KEY "options"
-#define HEALTH_REPEAT_KEY "repeat"
-#define HEALTH_HOST_LABEL_KEY "host labels"
-#define HEALTH_FOREACH_KEY "foreach"
-#define HEALTH_CHART_LABEL_KEY "chart labels"
-
 static inline int health_parse_delay(
         size_t line, const char *filename, char *string,
         int *delay_up_duration,
@@ -552,7 +522,6 @@ void sql_alert_config_free(struct sql_alert_config *cfg)
             string2str(ax->member), NULL, SIMPLE_PATTERN_EXACT, true);                              \
 } while(0)
 
-int sql_store_hashes = 1;
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config __maybe_unused) {
     netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
 
@@ -684,10 +653,8 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         uint32_t hash = simple_uhash(key);
 
         if((hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) || (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY))) {
-            if(ap) {
-                alert_hash_and_store_config(ap->config.hash_id, alert_cfg, sql_store_hashes);
+            if(ap)
                 health_add_prototype_unsafe(ap);
-            }
 
             ap = callocz(1, sizeof(*ap));
             am = &ap->match;
@@ -926,19 +893,9 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         }
     }
 
-    if(ap) {
-        alert_hash_and_store_config(ap->config.hash_id, alert_cfg, sql_store_hashes);
+    if(ap)
         health_add_prototype_unsafe(ap);
-    }
 
     fclose(fp);
     return 1;
-}
-
-void sql_hashes_refresh(void) {
-    sql_store_hashes = 1;
-}
-
-void sql_hashes_disable(void) {
-    sql_store_hashes = 0;
 }

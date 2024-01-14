@@ -11,7 +11,41 @@
 
 #define HEALTH_LOG_HISTORY_DEFAULT (5 * 86400)
 
+#define HEALTH_ALARM_KEY "alarm"
+#define HEALTH_TEMPLATE_KEY "template"
+#define HEALTH_CHART_KEY "chart"
+#define HEALTH_CONTEXT_KEY "context"
+#define HEALTH_ON_KEY "on"
+#define HEALTH_HOST_KEY "hosts"
+#define HEALTH_OS_KEY "os"
+#define HEALTH_PLUGIN_KEY "plugin"
+#define HEALTH_MODULE_KEY "module"
+#define HEALTH_CHARTS_KEY "charts"
+#define HEALTH_LOOKUP_KEY "lookup"
+#define HEALTH_CALC_KEY "calc"
+#define HEALTH_EVERY_KEY "every"
+#define HEALTH_GREEN_KEY "green"
+#define HEALTH_RED_KEY "red"
+#define HEALTH_WARN_KEY "warn"
+#define HEALTH_CRIT_KEY "crit"
+#define HEALTH_EXEC_KEY "exec"
+#define HEALTH_RECIPIENT_KEY "to"
+#define HEALTH_UNITS_KEY "units"
+#define HEALTH_SUMMARY_KEY "summary"
+#define HEALTH_INFO_KEY "info"
+#define HEALTH_CLASS_KEY "class"
+#define HEALTH_COMPONENT_KEY "component"
+#define HEALTH_TYPE_KEY "type"
+#define HEALTH_DELAY_KEY "delay"
+#define HEALTH_OPTIONS_KEY "options"
+#define HEALTH_REPEAT_KEY "repeat"
+#define HEALTH_HOST_LABEL_KEY "host labels"
+#define HEALTH_FOREACH_KEY "foreach"
+#define HEALTH_CHART_LABEL_KEY "chart labels"
+
 struct health_plugin_globals {
+    bool sql_store_hashes;
+
     struct {
         bool enabled;
         bool stock_enabled;
@@ -44,5 +78,12 @@ struct health_plugin_globals {
 extern struct health_plugin_globals health_globals;
 
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config __maybe_unused);
+void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae);
+void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae);
+void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void);
+
+void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae);
+void health_alarm_log_process_to_send_notifications(RRDHOST *host);
+void health_alarm_wait_for_execution(ALARM_ENTRY *ae);
 
 #endif //NETDATA_HEALTH_INTERNALS_H

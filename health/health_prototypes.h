@@ -9,10 +9,12 @@ bool health_plugin_enabled(void);
 void health_plugin_disable(void);
 
 void health_load_config_defaults(void);
-void health_initialize_rrdhost(RRDHOST *host);
 
 void health_reload_prototypes(void);
 void health_apply_prototypes_to_host(RRDHOST *host);
 void health_apply_prototypes_to_all_hosts(void);
+
+void sql_alert_config_hashes_store_enable(void);
+void sql_alert_config_hashes_store_disable(void);
 
 #endif //NETDATA_HEALTH_PROTOTYPES_H

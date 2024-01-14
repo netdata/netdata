@@ -1170,10 +1170,10 @@ bind_fail:
 #if defined ENABLE_HTTPS
 #define DIGEST_ALERT_CONFIG_VAL(v) ((v) ? EVP_DigestUpdate(evpctx, (string2str(v)), string_strlen((v))) : EVP_DigestUpdate(evpctx, "", 1))
 #endif
-int alert_hash_and_store_config(
+void sql_alert_hash_and_store_config(
     uuid_t hash_id,
     struct sql_alert_config *cfg,
-    int store_hash)
+    bool store_hash)
 {
 #if defined ENABLE_HTTPS
     EVP_MD_CTX *evpctx;
@@ -1227,8 +1227,6 @@ int alert_hash_and_store_config(
     UNUSED(cfg);
     UNUSED(store_hash);
 #endif
-
-    return 1;
 }
 
 #define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT                                                                          \

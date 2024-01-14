@@ -283,7 +283,6 @@ typedef struct rrd_alert_prototype {
 
     struct rrd_alert_prototype *prev, *next;
 } RRD_ALERT_PROTOTYPE;
-void health_prototype_free(RRD_ALERT_PROTOTYPE *ap);
 void health_add_prototype_unsafe(RRD_ALERT_PROTOTYPE *ap);
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->config.after)

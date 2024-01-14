@@ -79,8 +79,6 @@ void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 void *health_cmdapi_thread(void *ptr);
 
 char *health_edit_command_from_source(const char *source);
-void sql_hashes_refresh(void);
-void sql_hashes_disable(void);
 
 void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
 

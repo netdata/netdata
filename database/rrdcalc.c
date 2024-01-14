@@ -390,10 +390,6 @@ static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
     if (rc->match.plugin_pattern && !simple_pattern_matches_string(rc->match.plugin_pattern, st->module_name))
         return false;
 
-    if (st->rrdhost->rrdlabels && rc->match.host_labels_pattern && !rrdlabels_match_simple_pattern_parsed(
-            st->rrdhost->rrdlabels, rc->match.host_labels_pattern, '=', NULL))
-        return false;
-
     if (st->rrdlabels && rc->match.chart_labels_pattern && !rrdlabels_match_simple_pattern_parsed(
             st->rrdlabels, rc->match.chart_labels_pattern, '=', NULL))
         return false;

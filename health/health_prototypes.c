@@ -19,6 +19,7 @@
  */
 
 struct health_plugin_globals health_globals = {
+    .sql_store_hashes = true,
     .config = {
         .enabled = true,
         .stock_enabled = true,
@@ -140,35 +141,12 @@ void health_load_config_defaults(void) {
            health_globals.config.health_log_history, health_globals.config.health_log_history / 86400);
 }
 
-void health_initialize_rrdhost(RRDHOST *host) {
-    if(!host->health.health_enabled ||
-        rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
-        !service_running(SERVICE_HEALTH))
-        return;
-
-    rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
-
-    host->health.health_default_warn_repeat_every = health_globals.config.default_warn_repeat_every;
-    host->health.health_default_crit_repeat_every = health_globals.config.default_crit_repeat_every;
-    host->health_log.max = health_globals.config.health_log_entries_max;
-    host->health_log.health_log_history = health_globals.config.health_log_history;
-    host->health.health_default_exec = string_dup(health_globals.config.default_exec);
-    host->health.health_default_recipient = string_dup(health_globals.config.default_recipient);
-    host->health.use_summary_for_notifications = health_globals.config.use_summary_for_notifications;
-
-    host->health_log.next_log_id = (uint32_t)now_realtime_sec();
-    host->health_log.next_alarm_id = 0;
-
-    rw_spinlock_init(&host->health_log.spinlock);
-    sql_health_alarm_log_load(host);
-    health_apply_prototypes_to_host(host);
-}
-
 void health_add_prototype_unsafe(RRD_ALERT_PROTOTYPE *ap) {
+    sql_alert_hash_and_store_config(ap->config.hash_id, &ap->sql, health_globals.sql_store_hashes);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(health_globals.prototypes.base, ap, prev, next);
 }
 
-void health_prototype_free(RRD_ALERT_PROTOTYPE *ap) {
+static void health_prototype_free(RRD_ALERT_PROTOTYPE *ap) {
     rrd_alert_match_free(&ap->match);
     rrd_alert_config_free(&ap->config);
     sql_alert_config_free(&ap->sql);
@@ -190,12 +168,12 @@ void health_reload_prototypes(void) {
         health_readfile,
         NULL, 0);
 
-    sql_hashes_disable();
+    sql_alert_config_hashes_store_disable();
 
     spinlock_unlock(&health_globals.prototypes.spinlock);
 }
 
-void health_copy_config(struct rrd_alert_config *dst, struct rrd_alert_config *src) {
+static void health_copy_config(struct rrd_alert_config *dst, struct rrd_alert_config *src) {
     dst->name = string_dup(src->name);
 
     dst->exec = string_dup(src->exec);
@@ -252,7 +230,7 @@ void health_copy_config(struct rrd_alert_config *dst, struct rrd_alert_config *s
     dst->crit_repeat_every = src->crit_repeat_every;
 }
 
-RRDCALCTEMPLATE *health_rrdcalctemplate_from_prototype(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
+static RRDCALCTEMPLATE *health_rrdcalctemplate_from_prototype(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
     RRDCALCTEMPLATE *rt = callocz(1, sizeof(RRDCALCTEMPLATE));
 
     health_copy_config(&rt->config, &ap->config);
@@ -266,7 +244,7 @@ RRDCALCTEMPLATE *health_rrdcalctemplate_from_prototype(RRDHOST *host, RRD_ALERT_
     return rt;
 }
 
-RRDCALC *health_rrdcalc_from_prototype(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
+static RRDCALC *health_rrdcalc_from_prototype(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
     RRDCALC *rc = callocz(1, sizeof(RRDCALC));
 
     health_copy_config(&rc->config, &ap->config);
@@ -283,6 +261,20 @@ RRDCALC *health_rrdcalc_from_prototype(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
     rc->old_status = RRDCALC_STATUS_REMOVED;
 
     return rc;
+}
+
+static bool prototype_matches_host(RRDHOST *host, struct rrd_alert_prototype *ap) {
+    if(!simple_pattern_matches(health_globals.config.enabled_alerts, string2str(ap->config.name)))
+        return false;
+
+    if(ap->match.os_pattern && !simple_pattern_matches_string(ap->match.os_pattern, host->os))
+        return false;
+
+    if(host->rrdlabels && ap->match.host_labels_pattern &&
+        !rrdlabels_match_simple_pattern_parsed(host->rrdlabels, ap->match.host_labels_pattern, '=', NULL))
+        return false;
+
+    return true;
 }
 
 void health_apply_prototypes_to_host(RRDHOST *host) {
@@ -313,8 +305,8 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
 
     spinlock_lock(&health_globals.prototypes.spinlock);
     for(struct rrd_alert_prototype *ap = health_globals.prototypes.base; ap ;ap = ap->next) {
-        if(!simple_pattern_matches(health_globals.config.enabled_alerts, string2str(ap->config.name)))
-            continue;
+        if(!prototype_matches_host(host, ap))
+            return;
 
         if(ap->match.is_template) {
             RRDCALCTEMPLATE *rt = health_rrdcalctemplate_from_prototype(host, ap);
@@ -353,4 +345,13 @@ void health_apply_prototypes_to_all_hosts(void) {
         health_apply_prototypes_to_host(host);
     }
     dfe_done(host);
+}
+
+
+void sql_alert_config_hashes_store_enable(void) {
+    health_globals.sql_store_hashes = true;
+}
+
+void sql_alert_config_hashes_store_disable(void) {
+    health_globals.sql_store_hashes = false;
 }

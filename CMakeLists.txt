@@ -595,8 +595,6 @@ set(LIBNETDATA_FILES
         libnetdata/functions_evloop/functions_evloop.h
         libnetdata/gorilla/gorilla.cc
         libnetdata/gorilla/gorilla.h
-        libnetdata/health/health.c
-        libnetdata/health/health.h
         libnetdata/july/july.c
         libnetdata/july/july.h
         libnetdata/inlined.h
@@ -863,7 +861,6 @@ set(API_PLUGIN_FILES
         web/api/formatters/charts2json.h
         web/api/formatters/rrdset2json.c
         web/api/formatters/rrdset2json.h
-        web/api/health/health_cmdapi.c
         web/api/ilove/ilove.c
         web/api/ilove/ilove.h
         web/rtc/webrtc.c
@@ -901,6 +898,7 @@ set(HEALTH_PLUGIN_FILES
         health/health_silencers.c
         health/health_silencers.h
         health/health_internals.h
+        health/health_notifications.c
 )
 
 set(IDLEJITTER_PLUGIN_FILES collectors/idlejitter.plugin/plugin_idlejitter.c)
