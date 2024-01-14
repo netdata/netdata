@@ -730,18 +730,6 @@ static inline int check_if_resumed_from_suspension(void) {
     return ret;
 }
 
-static void health_main_cleanup(void *ptr) {
-    worker_unregister();
-
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-    netdata_log_info("cleaning up...");
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "Health thread ended.");
-}
-
 static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
@@ -895,26 +883,7 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
  * @return It always returns NULL
  */
 
-void *health_main(void *ptr) {
-    worker_register("HEALTH");
-    worker_register_job_name(WORKER_HEALTH_JOB_RRD_LOCK, "rrd lock");
-    worker_register_job_name(WORKER_HEALTH_JOB_HOST_LOCK, "host lock");
-    worker_register_job_name(WORKER_HEALTH_JOB_DB_QUERY, "db lookup");
-    worker_register_job_name(WORKER_HEALTH_JOB_CALC_EVAL, "calc eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_WARNING_EVAL, "warning eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_CRITICAL_EVAL, "critical eval");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alarm log entry");
-    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alarm log process");
-    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
-    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
-
-    netdata_thread_cleanup_push(health_main_cleanup, ptr);
-
-    int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
-    if(min_run_every < 1) min_run_every = 1;
-
-    time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
-
+static void health_event_loop(void) {
     bool health_running_logged = false;
 
     rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
@@ -927,7 +896,7 @@ void *health_main(void *ptr) {
 
         time_t now = now_realtime_sec();
         int runnable = 0, apply_hibernation_delay = 0;
-        time_t next_run = now + min_run_every;
+        time_t next_run = now + health_globals.config.run_at_least_every_seconds;
         RRDCALC *rc;
         RRDHOST *host;
 
@@ -935,9 +904,9 @@ void *health_main(void *ptr) {
             apply_hibernation_delay = 1;
 
             nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                       "Postponing alarm checks for %"PRId64" seconds, "
+                       "Postponing alarm checks for %"PRId32" seconds, "
                        "because it seems that the system was just resumed from suspension.",
-                       (int64_t)hibernation_delay);
+                       (int32_t)health_globals.config.postpone_alarms_during_hibernation_for_seconds);
         }
 
         if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
@@ -968,11 +937,12 @@ void *health_main(void *ptr) {
 
             if (unlikely(apply_hibernation_delay)) {
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                           "[%s]: Postponing health checks for %"PRId64" seconds.",
+                           "[%s]: Postponing health checks for %"PRId32" seconds.",
                            rrdhost_hostname(host),
-                           (int64_t)hibernation_delay);
+                           health_globals.config.postpone_alarms_during_hibernation_for_seconds);
 
-                host->health.health_delay_up_to = now + hibernation_delay;
+                host->health.health_delay_up_to =
+                    now + health_globals.config.postpone_alarms_during_hibernation_for_seconds;
             }
 
             if (unlikely(host->health.health_delay_up_to)) {
@@ -1029,32 +999,18 @@ void *health_main(void *ptr) {
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         time_t now = now_realtime_sec();
 
-                        ALARM_ENTRY *ae = health_create_alarm_entry(
-                                                                    host,
-                                                                    rc->id,
-                                                                    rc->next_event_id++,
-                                                                    rc->config_hash_id,
-                                                                    now,
-                                                                    rc->config.name,
-                                                                    rc->rrdset->id,
-                                                                    rc->rrdset->context,
-                                                                    rc->rrdset->name,
-                                                                    rc->config.classification,
-                                                                    rc->config.component,
-                                                                    rc->config.type,
-                                                                    rc->config.exec,
-                                                                    rc->config.recipient,
-                                                                    now - rc->last_status_change,
-                                                                    rc->value,
-                                                                    NAN,
-                                                                    rc->status,
-                                                                    RRDCALC_STATUS_REMOVED,
-                                                                    rc->config.source,
-                                                                    rc->config.units,
-                                                                    rc->config.summary,
-                                                                    rc->config.info,
-                                                                    0,
-                                                                    rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
+                        ALARM_ENTRY *ae =
+                            health_create_alarm_entry(
+                                host,
+                                rc,
+                                now,
+                                now - rc->last_status_change,
+                                rc->value,
+                                NAN,
+                                rc->status,
+                                RRDCALC_STATUS_REMOVED,
+                                0,
+                                rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
                         if (ae) {
                             health_log_alert(host, ae);
@@ -1297,37 +1253,23 @@ void *health_main(void *ptr) {
                         rc->delay_last = delay;
                         rc->delay_up_to_timestamp = now + delay;
 
-                        ALARM_ENTRY *ae = health_create_alarm_entry(
-                                                                    host,
-                                                                    rc->id,
-                                                                    rc->next_event_id++,
-                                                                    rc->config_hash_id,
-                                                                    now,
-                                                                    rc->config.name,
-                                                                    rc->rrdset->id,
-                                                                    rc->rrdset->context,
-                                                                    rc->rrdset->name,
-                                                                    rc->config.classification,
-                                                                    rc->config.component,
-                                                                    rc->config.type,
-                                                                    rc->config.exec,
-                                                                    rc->config.recipient,
-                                                                    now - rc->last_status_change,
-                                                                    rc->old_value,
-                                                                    rc->value,
-                                                                    rc->status,
-                                                                    status,
-                                                                    rc->config.source,
-                                                                    rc->config.units,
-                                                                    rc->config.summary,
-                                                                    rc->config.info,
-                                                                    rc->delay_last,
-                                                                    (
-                                                                     ((rc->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-                                                                     ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
-                                                                     (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
-                                                                     )
-                                                                    );
+                        ALARM_ENTRY *ae =
+                            health_create_alarm_entry(
+                                host,
+                                rc,
+                                now,
+                                now - rc->last_status_change,
+                                rc->old_value,
+                                rc->value,
+                                rc->status,
+                                status,
+                                rc->delay_last,
+                                (
+                                    ((rc->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                    ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
+                                    (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
+                                    )
+                                );
 
                         health_log_alert(host, ae);
                         health_alarm_log_add_entry(host, ae);
@@ -1388,37 +1330,23 @@ void *health_main(void *ptr) {
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         rc->last_repeat = now;
                         if (likely(rc->times_repeat < UINT32_MAX)) rc->times_repeat++;
-                        ALARM_ENTRY *ae = health_create_alarm_entry(
-                                                                    host,
-                                                                    rc->id,
-                                                                    rc->next_event_id++,
-                                                                    rc->config_hash_id,
-                                                                    now,
-                                                                    rc->config.name,
-                                                                    rc->rrdset->id,
-                                                                    rc->rrdset->context,
-                                                                    rc->rrdset->name,
-                                                                    rc->config.classification,
-                                                                    rc->config.component,
-                                                                    rc->config.type,
-                                                                    rc->config.exec,
-                                                                    rc->config.recipient,
-                                                                    now - rc->last_status_change,
-                                                                    rc->old_value,
-                                                                    rc->value,
-                                                                    rc->old_status,
-                                                                    rc->status,
-                                                                    rc->config.source,
-                                                                    rc->config.units,
-                                                                    rc->config.summary,
-                                                                    rc->config.info,
-                                                                    rc->delay_last,
-                                                                    (
-                                                                     ((rc->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-                                                                     ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
-                                                                     (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
-                                                                     )
-                                                                    );
+                        ALARM_ENTRY *ae =
+                            health_create_alarm_entry(
+                                host,
+                                rc,
+                                now,
+                                now - rc->last_status_change,
+                                rc->old_value,
+                                rc->value,
+                                rc->old_status,
+                                rc->status,
+                                rc->delay_last,
+                                (
+                                    ((rc->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                    ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
+                                    (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
+                                    )
+                                );
 
                         health_log_alert(host, ae);
                         ae->last_repeat = rc->last_repeat;
@@ -1491,7 +1419,37 @@ void *health_main(void *ptr) {
         health_sleep(next_run, loop);
 
     } // forever
+}
 
+static void health_main_cleanup(void *ptr) {
+    worker_unregister();
+
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+    netdata_log_info("cleaning up...");
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    nd_log(NDLS_DAEMON, NDLP_DEBUG,
+           "Health thread ended.");
+}
+
+void *health_main(void *ptr) {
+    worker_register("HEALTH");
+    worker_register_job_name(WORKER_HEALTH_JOB_RRD_LOCK, "rrd lock");
+    worker_register_job_name(WORKER_HEALTH_JOB_HOST_LOCK, "host lock");
+    worker_register_job_name(WORKER_HEALTH_JOB_DB_QUERY, "db lookup");
+    worker_register_job_name(WORKER_HEALTH_JOB_CALC_EVAL, "calc eval");
+    worker_register_job_name(WORKER_HEALTH_JOB_WARNING_EVAL, "warning eval");
+    worker_register_job_name(WORKER_HEALTH_JOB_CRITICAL_EVAL, "critical eval");
+    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY, "alarm log entry");
+    worker_register_job_name(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS, "alarm log process");
+    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
+    worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
+
+    netdata_thread_cleanup_push(health_main_cleanup, ptr);
+    {
+        health_event_loop();
+    }
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

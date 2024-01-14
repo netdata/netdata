@@ -29,6 +29,9 @@ struct health_plugin_globals health_globals = {
 
         .default_warn_repeat_every = 0,
         .default_crit_repeat_every = 0,
+
+        .run_at_least_every_seconds = 10,
+        .postpone_alarms_during_hibernation_for_seconds = 60,
     },
     .prototypes = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
@@ -83,11 +86,24 @@ void health_load_config_defaults(void) {
         simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"),
                               NULL, SIMPLE_PATTERN_EXACT, true);
 
+    health_globals.config.run_at_least_every_seconds =
+        (int)config_get_number(CONFIG_SECTION_HEALTH,
+                               "run at least every seconds",
+                               health_globals.config.run_at_least_every_seconds);
+
+    health_globals.config.postpone_alarms_during_hibernation_for_seconds =
+        config_get_number(CONFIG_SECTION_HEALTH,
+                          "postpone alarms during hibernation for seconds",
+                          health_globals.config.postpone_alarms_during_hibernation_for_seconds);
+
     health_globals.config.default_recipient =
         string_strdupz("root");
 
     // ------------------------------------------------------------------------
     // verify after loading
+
+    if(health_globals.config.run_at_least_every_seconds < 1)
+        health_globals.config.run_at_least_every_seconds = 1;
 
     if(health_globals.config.health_log_entries_max < HEALTH_LOG_ENTRIES_MIN) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,

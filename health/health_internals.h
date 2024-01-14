@@ -28,6 +28,9 @@ struct health_plugin_globals {
 
         uint32_t default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
         uint32_t default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
+
+        int32_t run_at_least_every_seconds;
+        int32_t postpone_alarms_during_hibernation_for_seconds;
     } config;
 
     struct {
