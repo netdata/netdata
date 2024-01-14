@@ -40,11 +40,10 @@ static inline void mountinfo_reload(int force) {
 struct mount_point_metadata {
     int do_space;
     int do_inodes;
-    int shown_error;
-    int updated;
-    int slow;
 
-    bool function_ready;
+    bool shown_error;
+    bool updated;
+    bool slow;
 
     STRING *filesystem;
     STRING *mountroot;
@@ -68,48 +67,44 @@ static DICTIONARY *dict_mountpoints = NULL;
 
 #define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete___safe_from_collector_thread(st); (st) = NULL; } } while(st)
 
-int mount_point_cleanup(const char *name, void *entry, int slow) {
-    (void)name;
-    
-    struct mount_point_metadata *mp = (struct mount_point_metadata *)entry;
-    if(!mp) return 0;
+static void mount_points_cleanup(bool slow) {
+    struct mount_point_metadata *mp;
+    dfe_start_write(dict_mountpoints, mp) {
+        if(mp->slow != slow) continue;
 
-    if (slow != mp->slow)
-        return 0;
-
-    if(likely(mp->updated)) {
-        mp->updated = 0;
-        return 0;
+        if(mp->updated)
+            mp->updated = false;
+        else if(cleanup_mount_points)
+            dictionary_del(dict_mountpoints, mp_dfe.name);
     }
+    dfe_done(mp);
 
-    if(likely(cleanup_mount_points && mp->collected)) {
-        mp->function_ready = false;
-        mp->collected = 0;
-        mp->updated = 0;
-        mp->shown_error = 0;
-
-        string_freez(mp->filesystem);
-        string_freez(mp->mountroot);
-
-        rrdset_obsolete_and_pointer_null(mp->st_space);
-        rrdset_obsolete_and_pointer_null(mp->st_inodes);
-
-        mp->rd_space_avail = NULL;
-        mp->rd_space_used = NULL;
-        mp->rd_space_reserved = NULL;
-
-        mp->rd_inodes_avail = NULL;
-        mp->rd_inodes_used = NULL;
-        mp->rd_inodes_reserved = NULL;
-    }
-
-    return 0;
+    dictionary_garbage_collect(dict_mountpoints);
 }
 
-int mount_point_cleanup_cb(const DICTIONARY_ITEM *item, void *entry, void *data __maybe_unused) {
-    const char *name = dictionary_acquired_item_name(item);
+void mountpoint_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {
+    struct mount_point_metadata *mp = (struct mount_point_metadata *)entry;
 
-    return mount_point_cleanup(name, (struct mount_point_metadata *)entry, 0);
+    mp->collected = 0;
+    mp->updated = false;
+    mp->shown_error = false;
+
+    string_freez(mp->filesystem);
+    mp->filesystem = NULL;
+
+    string_freez(mp->mountroot);
+    mp->mountroot = NULL;
+
+    rrdset_obsolete_and_pointer_null(mp->st_space);
+    rrdset_obsolete_and_pointer_null(mp->st_inodes);
+
+    mp->rd_space_avail = NULL;
+    mp->rd_space_used = NULL;
+    mp->rd_space_reserved = NULL;
+
+    mp->rd_inodes_avail = NULL;
+    mp->rd_inodes_used = NULL;
+    mp->rd_inodes_reserved = NULL;
 }
 
 // a copy of basic mountinfo fields
@@ -297,8 +292,6 @@ static void calculate_values_and_show_charts(
         rendered++;
     }
 
-    m->function_ready = rendered > 0;
-
     if(likely(rendered))
         m->collected++;
 }
@@ -341,11 +334,12 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             true);
 
         dict_mountpoints = dictionary_create_advanced(DICT_OPTION_NONE, &dictionary_stats_category_collectors, 0);
+        dictionary_register_delete_callback(dict_mountpoints, mountpoint_delete_cb, NULL);
     }
 
-    struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
-    if(unlikely(!m)) {
-        int slow = 0;
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dict_mountpoints, mi->mount_point);
+    if(unlikely(!item)) {
+        bool slow = false;
 
         int def_space = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "space usage for all disks", CONFIG_BOOLEAN_AUTO);
         int def_inodes = config_get_boolean_ondemand(CONFIG_SECTION_DISKSPACE, "inodes usage for all disks", CONFIG_BOOLEAN_AUTO);
@@ -393,7 +387,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             }
 
             if ((now_monotonic_high_precision_usec() - start_time) > slow_timeout)
-                slow = 1;
+                slow = true;
         }
 
         char var_name[4096 + 1];
@@ -408,55 +402,55 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             do_inodes = config_get_boolean_ondemand(var_name, "inodes usage", def_inodes);
 
         struct mount_point_metadata mp = {
-                .do_space = do_space,
-                .do_inodes = do_inodes,
-                .shown_error = 0,
-                .updated = 0,
-                .slow = 0,
+            .do_space = do_space,
+            .do_inodes = do_inodes,
+            .shown_error = false,
+            .updated = false,
+            .slow = slow,
 
-                .collected = 0,
+            .collected = 0,
+            .filesystem = string_strdupz(mi->filesystem),
+            .mountroot = string_strdupz(mi->root),
+            .chart_labels = rrdlabels_create(),
 
-                .st_space = NULL,
-                .rd_space_avail = NULL,
-                .rd_space_used = NULL,
-                .rd_space_reserved = NULL,
+            .st_space = NULL,
+            .rd_space_avail = NULL,
+            .rd_space_used = NULL,
+            .rd_space_reserved = NULL,
 
-                .st_inodes = NULL,
-                .rd_inodes_avail = NULL,
-                .rd_inodes_used = NULL,
-                .rd_inodes_reserved = NULL
+            .st_inodes = NULL,
+            .rd_inodes_avail = NULL,
+            .rd_inodes_used = NULL,
+            .rd_inodes_reserved = NULL
         };
 
-        mp.filesystem = string_strdupz(mi->filesystem);
-        mp.mountroot = string_strdupz(mi->root);
-
-        mp.chart_labels = rrdlabels_create();
         rrdlabels_add(mp.chart_labels, "mount_point", mi->mount_point, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mp.chart_labels, "filesystem", mi->filesystem, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mp.chart_labels, "mount_root", mi->root, RRDLABEL_SRC_AUTO);
 
-        m = dictionary_set(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
-
-        m->slow = slow;
+        item = dictionary_set_and_acquire_item(dict_mountpoints, mi->mount_point, &mp, sizeof(struct mount_point_metadata));
     }
 
+    struct mount_point_metadata *m = dictionary_acquired_item_value(item);
     if (m->slow) {
         add_basic_mountinfo(&slow_mountinfo_tmp_root, mi);
-        return;
+        goto cleanup;
     }
 
-    m->updated = 1;
+    m->updated = true;
 
-    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
-        return;
+    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO)) {
+        goto cleanup;
+    }
 
     if (unlikely(
             mi->flags & MOUNTINFO_READONLY &&
             !(mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST) &&
             !m->collected &&
             m->do_space != CONFIG_BOOLEAN_YES &&
-            m->do_inodes != CONFIG_BOOLEAN_YES))
-        return;
+            m->do_inodes != CONFIG_BOOLEAN_YES)) {
+        goto cleanup;
+    }
 
     usec_t start_time = now_monotonic_high_precision_usec();
     struct statvfs buff_statvfs;
@@ -469,15 +463,15 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                             , mi->filesystem?mi->filesystem:""
                             , mi->root?mi->root:""
                             );
-            m->shown_error = 1;
+            m->shown_error = true;
         }
-        return;
+        goto cleanup;
     }
 
     if ((now_monotonic_high_precision_usec() - start_time) > slow_timeout)
-        m->slow = 1;
+        m->slow = true;
 
-    m->shown_error = 0;
+    m->shown_error = false;
 
     struct basic_mountinfo bmi;
     bmi.mount_point = mi->mount_point;
@@ -486,12 +480,17 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     bmi.root = mi->root;
 
     calculate_values_and_show_charts(&bmi, m, &buff_statvfs, update_every);
+
+cleanup:
+    dictionary_acquired_item_release(dict_mountpoints, item);
 }
 
 static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int update_every) {
-    struct mount_point_metadata *m = dictionary_get(dict_mountpoints, mi->mount_point);
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dict_mountpoints, mi->mount_point);
+    if(!item) return;
 
-    m->updated = 1;
+    struct mount_point_metadata *m = dictionary_acquired_item_value(item);
+    m->updated = true;
 
     struct statvfs buff_statvfs;
     if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
@@ -502,13 +501,16 @@ static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int upda
                             , mi->filesystem?mi->filesystem:""
                             , mi->root?mi->root:""
                            );
-            m->shown_error = 1;
+            m->shown_error = true;
         }
-        return;
+        goto cleanup;
     }
-    m->shown_error = 0;
+    m->shown_error = false;
 
     calculate_values_and_show_charts(mi, m, &buff_statvfs, update_every);
+
+cleanup:
+    dictionary_acquired_item_release(dict_mountpoints, item);
 }
 
 static void diskspace_slow_worker_cleanup(void *ptr)
@@ -584,13 +586,9 @@ void *diskspace_slow_worker(void *ptr)
 
         if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
-        worker_is_busy(WORKER_JOB_SLOW_CLEANUP);
-
-        for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
-            struct mount_point_metadata *m = dictionary_get(dict_mountpoints, bmi->mount_point);
-
-            if (m)
-                mount_point_cleanup(bmi->mount_point, m, 1);
+        if(dict_mountpoints) {
+            worker_is_busy(WORKER_JOB_SLOW_CLEANUP);
+            mount_points_cleanup(true);
         }
 
         usec_t dt = now_monotonic_high_precision_usec() - start_time;
@@ -661,8 +659,8 @@ int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unu
     double max_inodes_reserved = 0.0;
 
     struct mount_point_metadata *mp;
-    dfe_start_write(dict_mountpoints, mp) {
-        if (!mp->function_ready)
+    dfe_start_read(dict_mountpoints, mp) {
+        if (!mp->collected)
             continue;
 
         buffer_json_add_array_item_array(wb);
@@ -923,9 +921,8 @@ void *diskspace_main(void *ptr) {
 
         if(dict_mountpoints) {
             worker_is_busy(WORKER_JOB_CLEANUP);
-            dictionary_walkthrough_read(dict_mountpoints, mount_point_cleanup_cb, NULL);
+            mount_points_cleanup(false);
         }
-
     }
     worker_unregister();
 
