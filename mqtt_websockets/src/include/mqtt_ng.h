@@ -19,7 +19,7 @@ struct mqtt_ng_client;
  * @param output pointer to memory where output will be written to. Must allow up to 4 bytes to be written.
  * @return number of bytes written to output or <= 0 if error in which case contents of output are undefined
  */
-int uint32_to_mqtt_vbi(uint32_t input, char *output);
+int uint32_to_mqtt_vbi(uint32_t input, unsigned char *output);
 
 struct mqtt_lwt_properties {
     char *will_topic;

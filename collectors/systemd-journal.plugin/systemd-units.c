@@ -1831,7 +1831,7 @@ void function_systemd_units(const char *transaction, char *function,
                 case SD_BUS_TYPE_UINT32:
                 case SD_BUS_TYPE_INT64:
                 case SD_BUS_TYPE_UINT64: {
-                    double m;
+                    double m = 0.0;
                     if(unit_attributes[i].value_type == SD_BUS_TYPE_UINT64)
                         m = (double)max[i].uint64;
                     else if(unit_attributes[i].value_type == SD_BUS_TYPE_INT64)

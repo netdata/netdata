@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "daemon/common.h"
 #include "streaming/common.h"
 #include "http_server.h"
 
@@ -233,14 +234,19 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
         web_client_api_request_v1(*host, &w, path_unescaped);
     freez(path_unescaped);
 
-    h2o_iovec_t body = buffer_to_h2o_iovec(w.response.data);
-
     // we move msg body to req->pool managed memory as it has to
     // live until whole response has been encrypted and sent
     // when req is finished memory will be freed with the pool
-    void *managed = h2o_mem_alloc_shared(&req->pool, body.len, NULL);
-    memcpy(managed, body.base, body.len);
-    body.base = managed;
+    h2o_iovec_t body;
+    {
+        BUFFER *wb = w.response.data;
+        body.base = wb->buffer;
+        body.len = wb->len;
+
+        void *managed = h2o_mem_alloc_shared(&req->pool, body.len, NULL);
+        memcpy(managed, body.base, body.len);
+        body.base = managed;
+    }
 
     req->res.status = HTTP_RESP_OK;
     req->res.reason = "OK";

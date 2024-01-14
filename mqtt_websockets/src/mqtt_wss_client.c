@@ -682,11 +682,6 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         }
     }
 
-    uint8_t mqtt_flags = (mqtt_params->will_flags & MQTT_WSS_PUB_QOSMASK) << 3;
-    if (mqtt_params->will_flags & MQTT_WSS_PUB_RETAIN)
-        mqtt_flags |= MQTT_CONNECT_WILL_RETAIN;
-    mqtt_flags |= MQTT_CONNECT_CLEAN_SESSION;
-
     client->mqtt_keepalive = (mqtt_params->keep_alive ? mqtt_params->keep_alive : 400);
 
     mws_info(client->log, "Going to connect using internal MQTT 5 implementation");

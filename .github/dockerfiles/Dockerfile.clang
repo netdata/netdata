@@ -9,7 +9,8 @@ RUN /tmp/install-required-packages.sh --dont-wait --non-interactive netdata-all
 
 # Install Clang and set as default CC
 RUN apt-get install -y clang && \
-    update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100
+    update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 && \
+    update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++ 100
 
 WORKDIR /netdata
 COPY . .
