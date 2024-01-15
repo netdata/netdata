@@ -66,7 +66,8 @@ def build_alpine_3_18(client, platform):
 
     return ctr
 
-def build_alpine_3_19(client, platform):
+
+def build_alpine_3_19(client, platform: dagger.Platform):
     ctr = client.container(platform=platform).from_("alpine:3.19")
 
     pkgs = [pkg for pkg in _ALPINE_COMMON_PACKAGES]
