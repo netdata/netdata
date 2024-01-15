@@ -11,6 +11,8 @@
 
 #define HEALTH_LOG_HISTORY_DEFAULT (5 * 86400)
 
+#define HEALTH_CONF_MAX_LINE 4096
+
 #define HEALTH_ALARM_KEY "alarm"
 #define HEALTH_TEMPLATE_KEY "template"
 #define HEALTH_CHART_KEY "chart"
@@ -42,6 +44,16 @@
 #define HEALTH_HOST_LABEL_KEY "host labels"
 #define HEALTH_FOREACH_KEY "foreach"
 #define HEALTH_CHART_LABEL_KEY "chart labels"
+
+typedef struct rrd_alert_prototype {
+    struct rrd_alert_match match;
+    struct rrd_alert_config config;
+    struct sql_alert_config sql;
+
+    size_t uses;
+    struct rrd_alert_prototype *prev, *next;
+} RRD_ALERT_PROTOTYPE;
+void health_add_prototype_unsafe(RRD_ALERT_PROTOTYPE *ap);
 
 struct health_plugin_globals {
     bool sql_store_hashes;

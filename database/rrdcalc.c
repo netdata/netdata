@@ -299,6 +299,9 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         rc->original_summary = string_dup(rc->config.name);
     }
 
+    string_freez(rc->config.dyncfg_key);
+    rc->config.dyncfg_key = health_alert_config_dyncfg_key(&rc->match, string2str(rc->config.name), host, st);
+
     time_t now = now_realtime_sec();
 
     ALARM_ENTRY *ae = health_create_alarm_entry(
@@ -821,6 +824,8 @@ void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc) {
 }
 
 void rrd_alert_match_free(struct rrd_alert_match *am) {
+    string_freez(am->dyncfg_prototype);
+
     if(am->is_template)
         string_freez(am->on.context);
     else
@@ -849,6 +854,8 @@ void rrd_alert_match_free(struct rrd_alert_match *am) {
 }
 
 void rrd_alert_config_free(struct rrd_alert_config *ac) {
+    string_freez(ac->dyncfg_key);
+
     string_freez(ac->name);
 
     string_freez(ac->exec);

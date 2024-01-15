@@ -396,7 +396,7 @@ extern int simple_pattern_is_potential_name(SIMPLE_PATTERN *p)
     return (alpha || wildcards) && !colon;
 }
 
-char *simple_pattern_trim_around_equal(char *src) {
+char *simple_pattern_trim_around_equal(const char *src) {
     char *store = mallocz(strlen(src) + 1);
 
     char *dst = store;

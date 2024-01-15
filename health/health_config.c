@@ -3,8 +3,6 @@
 #include "health.h"
 #include "health_internals.h"
 
-#define HEALTH_CONF_MAX_LINE 4096
-
 static inline int health_parse_delay(
         size_t line, const char *filename, char *string,
         int *delay_up_duration,
@@ -162,49 +160,6 @@ static inline int isvariableterm(const char s) {
         return 0;
 
     return 1;
-}
-
-// If needed, add a prefix key to all possible values in the range
-static inline char *health_config_add_key_to_values(char *value) {
-    BUFFER *wb = buffer_create(HEALTH_CONF_MAX_LINE + 1, NULL);
-    char key[HEALTH_CONF_MAX_LINE + 1];
-    char data[HEALTH_CONF_MAX_LINE + 1];
-
-    char *s = value;
-    size_t i = 0;
-
-    key[0] = '\0';
-    while(*s) {
-        if (*s == '=') {
-            //hold the key
-            data[i]='\0';
-            strncpyz(key, data, HEALTH_CONF_MAX_LINE);
-            i=0;
-        } else if (*s == ' ') {
-            data[i]='\0';
-            if (data[0]=='!')
-                buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
-            else
-                buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
-            i=0;
-        } else {
-            data[i++] = *s;
-        }
-        s++;
-    }
-
-    data[i]='\0';
-    if (data[0]) {
-        if (data[0]=='!')
-            buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
-        else
-            buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
-    }
-
-    char *final = strdupz(buffer_tostring(wb));
-    buffer_free(wb);
-
-    return final;
 }
 
 static inline void parse_variables_and_store_in_health_rrdvars(char *value, size_t len) {
@@ -495,34 +450,7 @@ void sql_alert_config_free(struct sql_alert_config *cfg)
     PARSE_HEALTH_CONFIG_LINE_STRING_NO_SQL_CFG(ax, member);                                         \
 } while(0)
 
-#define PARSE_HEALTH_CONFIG_LINE_PATTERN(ax, member) do {                                           \
-    SQL_ALERT_CONFIG_TXT(alert_cfg, member, value);                                                 \
-    if(ax->member) {                                                                                \
-        PARSE_HEALTH_CONFIG_DUPLICATE_STRING_MSG(ax, member);                                       \
-        simple_pattern_free(ax->member ## _pattern);                                                \
-        string_freez(ax->member);                                                                   \
-    }                                                                                               \
-    ax->member = string_strdupz(value);                                                             \
-    ax->member ## _pattern = simple_pattern_create(                                                 \
-            string2str(ax->member), NULL, SIMPLE_PATTERN_EXACT, true);                              \
-} while(0)
-
-#define PARSE_HEALTH_CONFIG_LINE_LABELS_PATTERN(ax, member) do {                                    \
-    SQL_ALERT_CONFIG_TXT(alert_cfg, member, value);                                                 \
-                                                                                                    \
-    if(ax->member) {                                                                                \
-        PARSE_HEALTH_CONFIG_DUPLICATE_STRING_MSG(ax, member);                                       \
-        string_freez(ax->member);                                                                   \
-        simple_pattern_free(ax->member ## _pattern);                                                \
-    }                                                                                               \
-    char *_tmp = simple_pattern_trim_around_equal(value);                                           \
-    ax->member = string_strdupz(_tmp);                                                              \
-    freez(_tmp);                                                                                    \
-    ax->member ## _pattern = simple_pattern_create(                                                 \
-            string2str(ax->member), NULL, SIMPLE_PATTERN_EXACT, true);                              \
-} while(0)
-
-int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config __maybe_unused) {
+int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
     netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
 
     static uint32_t
@@ -672,6 +600,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
 
             ap->match.is_template = (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY));
             ap->config.source = health_source_file(line, filename);
+            ap->config.source_type = stock_config ? DYNCFG_SOURCE_TYPE_STOCK : DYNCFG_SOURCE_TYPE_USER;
             ap->config.green = NAN;
             ap->config.red = NAN;
             ap->config.delay_multiplier = 1;
@@ -700,46 +629,25 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_STRING_NO_SQL_CFG(am, on.context);
         }
         else if(am->is_template && hash == hash_charts && !strcasecmp(key, HEALTH_CHARTS_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, charts);
+            PARSE_HEALTH_CONFIG_LINE_STRING(am, charts);
         }
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, os);
+            PARSE_HEALTH_CONFIG_LINE_STRING(am, os);
         }
         else if(hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, host);
+            PARSE_HEALTH_CONFIG_LINE_STRING(am, host);
         }
         else if(hash == hash_host_label && !strcasecmp(key, HEALTH_HOST_LABEL_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_LABELS_PATTERN(am, host_labels);
+            PARSE_HEALTH_CONFIG_LINE_STRING(am, host_labels);
         }
         else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_LABELS_PATTERN(am, plugin);
+            PARSE_HEALTH_CONFIG_LINE_STRING(am, plugin);
         }
         else if(hash == hash_module && !strcasecmp(key, HEALTH_MODULE_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_LABELS_PATTERN(am, module);
+            PARSE_HEALTH_CONFIG_LINE_STRING(am, module);
         }
         else if(hash == hash_chart_label && !strcasecmp(key, HEALTH_CHART_LABEL_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, chart_labels, value);
-            if(am->chart_labels) {
-                if(strcmp(string2str(am->chart_labels), value) != 0)
-                    netdata_log_error(
-                        "Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, "
-                        "once with value '%s' and later with value '%s'. Using ('%s').",
-                        line, filename, string2str(ac->name),
-                        key, string2str(am->chart_labels), value, value);
-
-                string_freez(am->chart_labels);
-                simple_pattern_free(am->chart_labels_pattern);
-            }
-
-            {
-                char *tmp = simple_pattern_trim_around_equal(value);
-                char *tmp_2 = health_config_add_key_to_values(tmp);
-                am->chart_labels = string_strdupz(tmp_2);
-                freez(tmp);
-                freez(tmp_2);
-            }
-            am->chart_labels_pattern = simple_pattern_create(
-                string2str(am->chart_labels), NULL, SIMPLE_PATTERN_EXACT, true);
+            PARSE_HEALTH_CONFIG_LINE_STRING(am, chart_labels);
         }
         else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
             strip_quotes(value);

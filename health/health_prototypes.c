@@ -141,7 +141,107 @@ void health_load_config_defaults(void) {
            health_globals.config.health_log_history, health_globals.config.health_log_history / 86400);
 }
 
+static inline void buffer_append_prototype_key(BUFFER *wb, const char *key, const char *txt) {
+    if(unlikely(!txt || !*txt || strcmp(txt, "*") == 0 || strcmp(txt, "!*") == 0 || strcmp(txt, "!* *") == 0)) return;
+
+    if(key) {
+        buffer_putc(wb, ',');
+        buffer_strcat(wb, key);
+        buffer_putc(wb, '[');
+    }
+
+    while(txt && *txt) {
+        if(*txt <= ' ' || *txt == ':' || *txt == '"' || *txt == '\'') {
+            buffer_putc(wb, ',');
+            txt++;
+            while(*txt && (*txt <= ' ' || *txt == ':' || *txt == '"' || *txt == '\'')) txt++;
+        }
+        else {
+            buffer_putc(wb, *txt);
+            txt++;
+        }
+    }
+    if(key) {
+        buffer_putc(wb, ']');
+    }
+}
+
+STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *name, RRDHOST *host, RRDSET *st) {
+    CLEAN_BUFFER *buffer = buffer_create(1024, NULL);
+
+    if(!host && st)
+        host = st->rrdhost;
+
+    if(host && st) {
+        buffer_sprintf(buffer, "health:alert:host[%s]:", rrdhost_hostname(host));
+        buffer_append_prototype_key(buffer, NULL, name);
+        buffer_append_prototype_key(buffer, "on", rrdset_name(st));
+    }
+    else if(host && !st) {
+        if (am->is_template)
+            buffer_sprintf(buffer, "health:alert:prototype:host[%s]:template:", rrdhost_hostname(host));
+        else
+            buffer_sprintf(buffer, "health:alert:prototype:host[%s]:alert:", rrdhost_hostname(host));
+
+        buffer_append_prototype_key(buffer, NULL, name);
+
+        if (am->is_template)
+            buffer_append_prototype_key(buffer, "on", string2str(am->on.context));
+        else
+            buffer_append_prototype_key(buffer, "on", string2str(am->on.chart));
+
+        if (am->plugin)
+            buffer_append_prototype_key(buffer, "plugin", string2str(am->plugin));
+
+        if (am->module)
+            buffer_append_prototype_key(buffer, "module", string2str(am->module));
+
+        if (am->chart_labels)
+            buffer_append_prototype_key(buffer, "chart_labels", string2str(am->chart_labels));
+    }
+    else {
+        // both rrdhost and rrdset are missing
+        const char *type;
+        if (am->is_template)
+            type = "health:alert:prototype:global:template:";
+        else
+            type = "health:alert:prototype:global:alert:";
+
+        buffer_strcat(buffer, type);
+        buffer_append_prototype_key(buffer, NULL, name);
+
+        if (am->is_template)
+            buffer_append_prototype_key(buffer, "on", string2str(am->on.context));
+        else
+            buffer_append_prototype_key(buffer, "on", string2str(am->on.chart));
+
+        if (am->host)
+            buffer_append_prototype_key(buffer, "host", string2str(am->host));
+
+        if (am->os)
+            buffer_append_prototype_key(buffer, "os", string2str(am->os));
+
+        if (am->host_labels)
+            buffer_append_prototype_key(buffer, "host_labels", string2str(am->host_labels));
+
+        if (am->plugin)
+            buffer_append_prototype_key(buffer, "plugin", string2str(am->plugin));
+
+        if (am->module)
+            buffer_append_prototype_key(buffer, "module", string2str(am->module));
+
+        if (am->chart_labels)
+            buffer_append_prototype_key(buffer, "chart_labels", string2str(am->chart_labels));
+    }
+
+    const char *final = buffer_tostring(buffer);
+    return string_strdupz(final);
+}
+
 void health_add_prototype_unsafe(RRD_ALERT_PROTOTYPE *ap) {
+    ap->match.dyncfg_prototype = health_alert_config_dyncfg_key(&ap->match, string2str(ap->config.name), NULL, NULL);
+    ap->config.dyncfg_key = string_dup(ap->match.dyncfg_prototype);
+
     sql_alert_hash_and_store_config(ap->config.hash_id, &ap->sql, health_globals.sql_store_hashes);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(health_globals.prototypes.base, ap, prev, next);
 }
@@ -173,7 +273,29 @@ void health_reload_prototypes(void) {
     spinlock_unlock(&health_globals.prototypes.spinlock);
 }
 
+static void health_copy_match_without_patterns(struct rrd_alert_match *dst, struct rrd_alert_match *src) {
+    dst->dyncfg_prototype = string_dup(src->dyncfg_prototype);
+
+    dst->enabled = src->enabled;
+    dst->is_template = src->is_template;
+
+    if(dst->is_template)
+        dst->on.context = string_dup(src->on.context);
+    else
+        dst->on.chart = string_dup(src->on.chart);
+
+    dst->os = string_dup(src->os);
+    dst->host = string_dup(src->host);
+    dst->charts = string_dup(src->charts);
+    dst->plugin = string_dup(src->plugin);
+    dst->module = string_dup(src->module);
+    dst->host_labels = string_dup(src->host_labels);
+    dst->chart_labels = string_dup(src->chart_labels);
+}
+
 static void health_copy_config(struct rrd_alert_config *dst, struct rrd_alert_config *src) {
+    dst->dyncfg_key = string_dup(src->dyncfg_key);
+
     dst->name = string_dup(src->name);
 
     dst->exec = string_dup(src->exec);
@@ -183,6 +305,7 @@ static void health_copy_config(struct rrd_alert_config *dst, struct rrd_alert_co
     dst->component = string_dup(src->component);
     dst->type = string_dup(src->type);
 
+    dst->source_type = src->source_type;
     dst->source = string_dup(src->source);
     dst->units = string_dup(src->units);
     dst->summary = string_dup(src->summary);
@@ -198,8 +321,8 @@ static void health_copy_config(struct rrd_alert_config *dst, struct rrd_alert_co
     if(src->foreach_dimension) {
         dst->foreach_dimension = string_dup(src->foreach_dimension);
         dst->foreach_dimension_pattern =
-            simple_pattern_create(string2str(dst->foreach_dimension), NULL,
-                                  SIMPLE_PATTERN_EXACT, true);
+            simple_pattern_create(string2str(dst->foreach_dimension),
+                                  NULL, SIMPLE_PATTERN_EXACT, true);
     }
 
     dst->group = src->group;
@@ -230,11 +353,128 @@ static void health_copy_config(struct rrd_alert_config *dst, struct rrd_alert_co
     dst->crit_repeat_every = src->crit_repeat_every;
 }
 
+// If needed, add a prefix key to all possible values in the range
+static inline char *health_config_add_key_to_values(char *value) {
+    BUFFER *wb = buffer_create(HEALTH_CONF_MAX_LINE + 1, NULL);
+    char key[HEALTH_CONF_MAX_LINE + 1];
+    char data[HEALTH_CONF_MAX_LINE + 1];
+
+    char *s = value;
+    size_t i = 0;
+
+    key[0] = '\0';
+    while(*s) {
+        if (*s == '=') {
+            //hold the key
+            data[i]='\0';
+            strncpyz(key, data, HEALTH_CONF_MAX_LINE);
+            i=0;
+        } else if (*s == ' ') {
+            data[i]='\0';
+            if (data[0]=='!')
+                buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
+            else
+                buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+            i=0;
+        } else {
+            data[i++] = *s;
+        }
+        s++;
+    }
+
+    data[i]='\0';
+    if (data[0]) {
+        if (data[0]=='!')
+            buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
+        else
+            buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+    }
+
+    char *final = strdupz(buffer_tostring(wb));
+    buffer_free(wb);
+
+    return final;
+}
+
+void health_activate_match_patterns(struct rrd_alert_match *am) {
+    if(am->os) {
+        simple_pattern_free(am->os_pattern);
+
+        char *tmp = simple_pattern_trim_around_equal(string2str(am->os));
+        am->os_pattern = simple_pattern_create(
+            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
+        freez(tmp);
+    }
+
+    if(am->host) {
+        simple_pattern_free(am->host_pattern);
+
+        char *tmp = simple_pattern_trim_around_equal(string2str(am->host));
+        am->host_pattern = simple_pattern_create(
+            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
+        freez(tmp);
+    }
+
+    if(am->charts) {
+        simple_pattern_free(am->charts_pattern);
+
+        char *tmp = simple_pattern_trim_around_equal(string2str(am->charts));
+        am->charts_pattern = simple_pattern_create(
+            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
+        freez(tmp);
+    }
+
+    if(am->plugin) {
+        simple_pattern_free(am->plugin_pattern);
+
+        char *tmp = simple_pattern_trim_around_equal(string2str(am->plugin));
+        am->plugin_pattern = simple_pattern_create(
+            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
+        freez(tmp);
+    }
+
+    if(am->module) {
+        simple_pattern_free(am->module_pattern);
+
+        char *tmp = simple_pattern_trim_around_equal(string2str(am->module));
+        am->module_pattern = simple_pattern_create(
+            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
+        freez(tmp);
+    }
+
+    if(am->host_labels) {
+        simple_pattern_free(am->host_labels_pattern);
+
+        char *tmp = simple_pattern_trim_around_equal(string2str(am->host_labels));
+        am->host_labels_pattern = simple_pattern_create(
+            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
+        freez(tmp);
+    }
+
+    if(am->chart_labels) {
+        simple_pattern_free(am->chart_labels_pattern);
+
+        char *tmp = simple_pattern_trim_around_equal(string2str(am->chart_labels));
+        char *tmp2 = health_config_add_key_to_values(tmp);
+        am->chart_labels_pattern = simple_pattern_create(
+            tmp2, NULL, SIMPLE_PATTERN_EXACT, true);
+        freez(tmp2);
+        freez(tmp);
+    }
+}
+
 static RRDCALCTEMPLATE *health_rrdcalctemplate_from_prototype(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
+    ap->uses++;
+
     RRDCALCTEMPLATE *rt = callocz(1, sizeof(RRDCALCTEMPLATE));
 
     health_copy_config(&rt->config, &ap->config);
+    health_copy_match_without_patterns(&rt->match, &ap->match);
+    health_activate_match_patterns(&rt->match);
     rt->context = ap->match.is_template ? ap->match.on.context : ap->match.on.chart;
+
+    string_freez(rt->config.dyncfg_key);
+    rt->config.dyncfg_key = health_alert_config_dyncfg_key(&ap->match, string2str(ap->config.name), host, NULL);
 
     if(!ap->config.has_custom_repeat_config) {
         rt->config.warn_repeat_every = host->health.health_default_warn_repeat_every;
@@ -245,10 +485,17 @@ static RRDCALCTEMPLATE *health_rrdcalctemplate_from_prototype(RRDHOST *host, RRD
 }
 
 static RRDCALC *health_rrdcalc_from_prototype(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
+    ap->uses++;
+
     RRDCALC *rc = callocz(1, sizeof(RRDCALC));
 
     health_copy_config(&rc->config, &ap->config);
+    health_copy_match_without_patterns(&rc->match, &ap->match);
+    health_activate_match_patterns(&rc->match);
     rc->chart = ap->match.is_template ? ap->match.on.context : ap->match.on.chart;
+
+    string_freez(rc->config.dyncfg_key);
+    rc->config.dyncfg_key = health_alert_config_dyncfg_key(&ap->match, string2str(ap->config.name), host, NULL);
 
     if(!ap->config.has_custom_repeat_config) {
         rc->config.warn_repeat_every = host->health.health_default_warn_repeat_every;

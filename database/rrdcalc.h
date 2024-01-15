@@ -39,6 +39,7 @@ typedef enum {
 #define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
 
 struct rrd_alert_match {
+    STRING *dyncfg_prototype;
     bool enabled;
 
     bool is_template;
@@ -49,7 +50,6 @@ struct rrd_alert_match {
 
     STRING *os;
     STRING *host;
-
     STRING *charts;                         // the charts that should be linked to (for templates)
     STRING *plugin;                         // the plugin name that should be linked to
     STRING *module;                         // the module name that should be linked to
@@ -65,9 +65,12 @@ struct rrd_alert_match {
     SIMPLE_PATTERN *chart_labels_pattern;   // the simple pattern of chart labels
 };
 void rrd_alert_match_free(struct rrd_alert_match *am);
+STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *name, RRDHOST *host, RRDSET *st);
 
 struct rrd_alert_config {
     uuid_t hash_id;
+
+    STRING *dyncfg_key;
 
     STRING *name;                   // the name of this alarm
 
@@ -78,6 +81,7 @@ struct rrd_alert_config {
     STRING *component;              // the component that this alarm refers to
     STRING *type;                   // type of the alarm
 
+    DYNCFG_SOURCE_TYPE source_type;
     STRING *source;                 // the source of this alarm
     STRING *units;                  // the units of the alarm
     STRING *summary;                // a short alert summary
@@ -275,15 +279,6 @@ struct sql_alert_config {
     int32_t p_update_every;
 };
 void sql_alert_config_free(struct sql_alert_config *cfg);
-
-typedef struct rrd_alert_prototype {
-    struct rrd_alert_match match;
-    struct rrd_alert_config config;
-    struct sql_alert_config sql;
-
-    struct rrd_alert_prototype *prev, *next;
-} RRD_ALERT_PROTOTYPE;
-void health_add_prototype_unsafe(RRD_ALERT_PROTOTYPE *ap);
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->config.after)
 
