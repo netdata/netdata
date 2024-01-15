@@ -119,7 +119,7 @@ SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
                 break;
             case SQLITE_BUSY:
             case SQLITE_LOCKED:
-                global_statistics_sqlite3_query_completed(rc == SQLITE_DONE, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
+                global_statistics_sqlite3_query_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
                 usleep(SQLITE_INSERT_DELAY * USEC_PER_MS);
                 continue;
             default:
@@ -201,7 +201,7 @@ int execute_insert(sqlite3_stmt *res)
     return rc;
 }
 
-int configure_sqlite_database(sqlite3 *database, int target_version)
+int configure_sqlite_database(sqlite3 *database, int target_version, const char *description)
 {
     char buf[1024 + 1] = "";
     const char *list[2] = { buf, NULL };
@@ -209,42 +209,42 @@ int configure_sqlite_database(sqlite3 *database, int target_version)
     // https://www.sqlite.org/pragma.html#pragma_auto_vacuum
     // PRAGMA schema.auto_vacuum = 0 | NONE | 1 | FULL | 2 | INCREMENTAL;
     snprintfz(buf, sizeof(buf) - 1, "PRAGMA auto_vacuum=%s", config_get(CONFIG_SECTION_SQLITE, "auto vacuum", "INCREMENTAL"));
-    if (init_database_batch(database, list))
+    if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_synchronous
     // PRAGMA schema.synchronous = 0 | OFF | 1 | NORMAL | 2 | FULL | 3 | EXTRA;
     snprintfz(buf, sizeof(buf) - 1, "PRAGMA synchronous=%s", config_get(CONFIG_SECTION_SQLITE, "synchronous", "NORMAL"));
-    if (init_database_batch(database, list))
+    if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_mode
     // PRAGMA schema.journal_mode = DELETE | TRUNCATE | PERSIST | MEMORY | WAL | OFF
     snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_mode=%s", config_get(CONFIG_SECTION_SQLITE, "journal mode", "WAL"));
-    if (init_database_batch(database, list))
+    if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_temp_store
     // PRAGMA temp_store = 0 | DEFAULT | 1 | FILE | 2 | MEMORY;
     snprintfz(buf, sizeof(buf) - 1, "PRAGMA temp_store=%s", config_get(CONFIG_SECTION_SQLITE, "temp store", "MEMORY"));
-    if (init_database_batch(database, list))
+    if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_journal_size_limit
     // PRAGMA schema.journal_size_limit = N ;
     snprintfz(buf, sizeof(buf) - 1, "PRAGMA journal_size_limit=%lld", config_get_number(CONFIG_SECTION_SQLITE, "journal size limit", 16777216));
-    if (init_database_batch(database, list))
+    if (init_database_batch(database, list, description))
         return 1;
 
     // https://www.sqlite.org/pragma.html#pragma_cache_size
     // PRAGMA schema.cache_size = pages;
     // PRAGMA schema.cache_size = -kibibytes;
     snprintfz(buf, sizeof(buf) - 1, "PRAGMA cache_size=%lld", config_get_number(CONFIG_SECTION_SQLITE, "cache size", -2000));
-    if (init_database_batch(database, list))
+    if (init_database_batch(database, list, description))
         return 1;
 
     snprintfz(buf, sizeof(buf) - 1, "PRAGMA user_version=%d", target_version);
-    if (init_database_batch(database, list))
+    if (init_database_batch(database, list, description))
         return 1;
 
     return 0;
@@ -315,7 +315,21 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
     return rc;
 }
 
-int init_database_batch(sqlite3 *database, const char *batch[])
+char *get_database_extented_error(sqlite3 *database, int i, const char *description)
+{
+    const char *err = sqlite3_errstr(sqlite3_extended_errcode(database));
+
+    if (!err)
+        return NULL;
+
+    size_t len = strlen(err)+ strlen(description) + 32;
+    char *full_err = mallocz(len);
+
+    snprintfz(full_err, len - 1, "%s: %d: %s", description, i,  err);
+    return full_err;
+}
+
+int init_database_batch(sqlite3 *database, const char *batch[], const char *description)
 {
     int rc;
     char *err_msg = NULL;
@@ -324,8 +338,11 @@ int init_database_batch(sqlite3 *database, const char *batch[])
         if (rc != SQLITE_OK) {
             error_report("SQLite error during database initialization, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", batch[i]);
-            analytics_set_data_str(&analytics_data.netdata_fail_reason, sqlite3_errstr(sqlite3_extended_errcode(database)));
+            char *error_str = get_database_extented_error(database, i, description);
+            if (error_str)
+                analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
             sqlite3_free(err_msg);
+            freez(error_str);
             if (SQLITE_CORRUPT == rc) {
                 if (mark_database_to_recover(NULL, database))
                     error_report("Database is corrupted will attempt to fix");
@@ -408,7 +425,10 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
-        analytics_set_data_str(&analytics_data.netdata_fail_reason, sqlite3_errstr(sqlite3_extended_errcode(db_meta)));
+        char *error_str = get_database_extented_error(db_meta, 0, "meta_open");
+        if (error_str)
+            analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
+        freez(error_str);
         sqlite3_close(db_meta);
         db_meta = NULL;
         return 1;
@@ -447,13 +467,13 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
     if (likely(!memory))
         target_version = perform_database_migration(db_meta, DB_METADATA_VERSION);
 
-   if (configure_sqlite_database(db_meta, target_version))
+   if (configure_sqlite_database(db_meta, target_version, "meta_config"))
         return 1;
 
-    if (init_database_batch(db_meta, &database_config[0]))
+    if (init_database_batch(db_meta, &database_config[0], "meta_init"))
         return 1;
 
-    if (init_database_batch(db_meta, &database_cleanup[0]))
+    if (init_database_batch(db_meta, &database_cleanup[0], "meta_cleanup"))
         return 1;
 
     netdata_log_info("SQLite database initialization completed");

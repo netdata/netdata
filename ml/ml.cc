@@ -1787,7 +1787,7 @@ void ml_init()
     // create table
     if (db) {
         int target_version = perform_ml_database_migration(db, ML_METADATA_VERSION);
-        if (configure_sqlite_database(db, target_version)) {
+        if (configure_sqlite_database(db, target_version, "ml_config")) {
             error_report("Failed to setup ML database");
             sqlite3_close(db);
             db = NULL;
