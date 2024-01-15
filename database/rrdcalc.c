@@ -328,7 +328,6 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         0,
         rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
-    rc->ae = ae;
     health_alarm_log_add_entry(host, ae);
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
 }
@@ -374,7 +373,6 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
             0,
             0);
 
-        rc->ae = ae;
         health_alarm_log_add_entry(host, ae);
     }
 

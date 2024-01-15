@@ -319,7 +319,7 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     struct alert_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
     t->name = rc->name;
-    t->summary = rc->summary;
+    t->summary = rc->original_summary;
     t->ati = ctl->alerts.ati++;
 
     t->nodes = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_VALUE_LINK_DONT_CLONE|DICT_OPTION_NAME_LINK_DONT_CLONE);
@@ -368,12 +368,11 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->host = rc->rrdset->rrdhost;
     t->alarm_id = rc->id;
     t->ni = ctl->nodes.ni;
-    t->global_id = rc->ae ? rc->ae->global_id : 0;
     t->name = rc->name;
 
     uuid_copy(t->config_hash_id, rc->config_hash_id);
-    if(rc->ae)
-        uuid_copy(t->last_transition_id, rc->ae->transition_id);
+
+    health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(rc, &t->global_id, &t->last_transition_id);
 }
 
 static bool alert_instances_v2_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value __maybe_unused, void *data __maybe_unused) {
