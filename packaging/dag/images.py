@@ -66,6 +66,17 @@ def build_alpine_3_18(client, platform):
 
     return ctr
 
+def build_alpine_3_19(client, platform):
+    ctr = client.container(platform=platform).from_("alpine:3.19")
+
+    pkgs = [pkg for pkg in _ALPINE_COMMON_PACKAGES]
+
+    ctr = (
+        ctr.with_exec(["apk", "add", "--no-cache"] + pkgs)
+    )
+
+    return ctr
+
 
 def static_build_openssl(client: dagger.Client, ctr: dagger.Container):
     tree = (
@@ -1278,6 +1289,7 @@ class Image:
 
 SUPPORTED_IMAGES = {
     Image("alpine_3_18", "alpine:3.18", build_alpine_3_18),
+    Image("alpine_3_19", "alpine:3.19", build_alpine_3_19),
     Image("amazonlinux2", "amazonlinux:2", build_amazon_linux_2),
     # amazonlinux2023
     Image("centos7", "centos:7", build_centos_7),
