@@ -52,7 +52,7 @@ int sql_init_context_database(int memory)
     if (likely(!memory))
         target_version = perform_context_database_migration(db_context_meta, DB_CONTEXT_METADATA_VERSION);
 
-    if (configure_sqlite_database(db_context_meta, target_version))
+    if (configure_sqlite_database(db_context_meta, target_version, "context_config"))
         return 1;
 
     if (likely(!memory))
@@ -60,12 +60,12 @@ int sql_init_context_database(int memory)
     else
         snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE ':memory:' as meta");
 
-    if(init_database_batch(db_context_meta, list)) return 1;
+    if(init_database_batch(db_context_meta, list, "context")) return 1;
 
-    if (init_database_batch(db_context_meta, &database_context_config[0]))
+    if (init_database_batch(db_context_meta, &database_context_config[0], "context_init"))
         return 1;
 
-    if (init_database_batch(db_context_meta, &database_context_cleanup[0]))
+    if (init_database_batch(db_context_meta, &database_context_cleanup[0], "context_cleanup"))
         return 1;
 
     return 0;
