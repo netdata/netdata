@@ -530,13 +530,17 @@ static void prometheus_print_os_info(
     BUFFER *wb,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
-    FILE *fp = fopen("/etc/os-release", "r");
+    FILE *fp;
+    char filename[FILENAME_MAX + 1];
     char buf[BUFSIZ];
     int first_line = 1;
 
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/etc/os-release");
+    fp = fopen(filename, "r");
     if (!fp) {
         /* Fallback to lsb-release */
-        fp = fopen("/etc/lsb-release", "r");
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/etc/lsb-release");
+        fp = fopen(filename, "r");
     }
     if (!fp) {
         return;
