@@ -1307,7 +1307,7 @@ static void start_all_host_load_context(uv_work_t *req __maybe_unused)
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Using %zu threads for context loading", max_threads);
     struct host_context_load_thread *hclt = max_threads > 1 ? callocz(max_threads, sizeof(*hclt)) : NULL;
 
-    size_t thread_index;
+    size_t thread_index = 0;
     dfe_start_reentrant(rrdhost_root_index, host) {
        if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
            continue;
