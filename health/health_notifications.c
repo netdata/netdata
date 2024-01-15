@@ -398,7 +398,7 @@ void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               ae_info(ae),
                               ae_new_value_string(ae),
                               ae_old_value_string(ae),
-                              (expr && expr->source)?expr->source:"NOSOURCE",
+                              (expr && expr->source)?string2str(expr->source):"NOSOURCE",
                               (expr && expr->error_msg)?buffer_tostring(expr->error_msg):"NOERRMSG",
                               n_warn,
                               n_crit,

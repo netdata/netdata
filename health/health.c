@@ -515,19 +515,22 @@ static void health_event_loop(void) {
                         rc->value = NAN;
                         rc->run_flags |= RRDCALC_FLAG_CALC_ERROR;
 
-                        netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
-                              rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                              rc->config.calculation->parsed_as, buffer_tostring(rc->config.calculation->error_msg)
-                              );
-                    } else {
+                        netdata_log_debug(
+                            D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
+                            rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
+                            string2str(rc->config.calculation->parsed_as), buffer_tostring(rc->config.calculation->error_msg)
+                            );
+                    }
+                    else {
                         rc->run_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
-                        netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
-                              NETDATA_DOUBLE_FORMAT
-                              ": %s (source: %s)", rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
-                              rc->config.calculation->parsed_as, rc->config.calculation->result,
-                              buffer_tostring(rc->config.calculation->error_msg), rrdcalc_source(rc)
-                              );
+                        netdata_log_debug(
+                            D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' gave value "
+                            NETDATA_DOUBLE_FORMAT": %s (source: %s)",
+                            rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc),
+                            string2str(rc->config.calculation->parsed_as), rc->config.calculation->result,
+                            buffer_tostring(rc->config.calculation->error_msg), rrdcalc_source(rc)
+                            );
 
                         rc->value = rc->config.calculation->result;
                     }

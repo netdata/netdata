@@ -1137,8 +1137,8 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 
     EVAL_EXPRESSION *exp = callocz(1, sizeof(EVAL_EXPRESSION));
 
-    exp->source = strdupz(string);
-    exp->parsed_as = strdupz(buffer_tostring(out));
+    exp->source = string_strdupz(string);
+    exp->parsed_as = string_strdupz(buffer_tostring(out));
     buffer_free(out);
 
     exp->error_msg = buffer_create(100, NULL);
@@ -1151,8 +1151,8 @@ void expression_free(EVAL_EXPRESSION *expression) {
     if(!expression) return;
 
     if(expression->nodes) eval_node_free((EVAL_NODE *)expression->nodes);
-    freez((void *)expression->source);
-    freez((void *)expression->parsed_as);
+    string_freez((void *)expression->source);
+    string_freez((void *)expression->parsed_as);
     buffer_free(expression->error_msg);
     freez(expression);
 }

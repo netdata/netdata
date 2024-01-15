@@ -138,18 +138,18 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     }
 
     if(rc->config.calculation) {
-        health_string2json(wb, "\t\t\t", "calc", rc->config.calculation->source, ",\n");
-        health_string2json(wb, "\t\t\t", "calc_parsed", rc->config.calculation->parsed_as, ",\n");
+        health_string2json(wb, "\t\t\t", "calc", string2str(rc->config.calculation->source), ",\n");
+        health_string2json(wb, "\t\t\t", "calc_parsed", string2str(rc->config.calculation->parsed_as), ",\n");
     }
 
     if(rc->config.warning) {
-        health_string2json(wb, "\t\t\t", "warn", rc->config.warning->source, ",\n");
-        health_string2json(wb, "\t\t\t", "warn_parsed", rc->config.warning->parsed_as, ",\n");
+        health_string2json(wb, "\t\t\t", "warn", string2str(rc->config.warning->source), ",\n");
+        health_string2json(wb, "\t\t\t", "warn_parsed", string2str(rc->config.warning->parsed_as), ",\n");
     }
 
     if(rc->config.critical) {
-        health_string2json(wb, "\t\t\t", "crit", rc->config.critical->source, ",\n");
-        health_string2json(wb, "\t\t\t", "crit_parsed", rc->config.critical->parsed_as, ",\n");
+        health_string2json(wb, "\t\t\t", "crit", string2str(rc->config.critical->source), ",\n");
+        health_string2json(wb, "\t\t\t", "crit_parsed", string2str(rc->config.critical->parsed_as), ",\n");
     }
 
     buffer_strcat(wb, "\t\t\t\"green\":");

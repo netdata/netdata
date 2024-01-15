@@ -505,19 +505,25 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         rc->config.type = string_dup(rt->config.type);
 
         if(rt->config.calculation) {
-            rc->config.calculation = expression_parse(rt->config.calculation->source, NULL, NULL);
+            rc->config.calculation = expression_parse(string2str(rt->config.calculation->source), NULL, NULL);
             if(!rc->config.calculation)
-                netdata_log_error("Health alarm '%s.%s': failed to parse calculation expression '%s'", rrdset_id(st), rrdcalctemplate_name(rt), rt->config.calculation->source);
+                netdata_log_error(
+                    "Health alarm '%s.%s': failed to parse calculation expression '%s'",
+                    rrdset_id(st), rrdcalctemplate_name(rt), string2str(rt->config.calculation->source));
         }
         if(rt->config.warning) {
-            rc->config.warning = expression_parse(rt->config.warning->source, NULL, NULL);
+            rc->config.warning = expression_parse(string2str(rt->config.warning->source), NULL, NULL);
             if(!rc->config.warning)
-                netdata_log_error("Health alarm '%s.%s': failed to re-parse warning expression '%s'", rrdset_id(st), rrdcalctemplate_name(rt), rt->config.warning->source);
+                netdata_log_error(
+                    "Health alarm '%s.%s': failed to re-parse warning expression '%s'",
+                    rrdset_id(st), rrdcalctemplate_name(rt), string2str(rt->config.warning->source));
         }
         if(rt->config.critical) {
-            rc->config.critical = expression_parse(rt->config.critical->source, NULL, NULL);
+            rc->config.critical = expression_parse(string2str(rt->config.critical->source), NULL, NULL);
             if(!rc->config.critical)
-                netdata_log_error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", rrdset_id(st), rrdcalctemplate_name(rt), rt->config.critical->source);
+                netdata_log_error(
+                    "Health alarm '%s.%s': failed to re-parse critical expression '%s'",
+                    rrdset_id(st), rrdcalctemplate_name(rt), string2str(rt->config.critical->source));
         }
     }
     else if(ctr->from_config) {
@@ -568,9 +574,9 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
           (rc->config.dimensions)?rrdcalc_dimensions(rc):"NONE",
           (rc->config.foreach_dimension)?rrdcalc_foreachdim(rc):"NONE",
           rc->config.update_every,
-          (rc->config.calculation)?rc->config.calculation->parsed_as:"NONE",
-          (rc->config.warning)?rc->config.warning->parsed_as:"NONE",
-          (rc->config.critical)?rc->config.critical->parsed_as:"NONE",
+          (rc->config.calculation)?string2str(rc->config.calculation->parsed_as):"NONE",
+          (rc->config.warning)?string2str(rc->config.warning->parsed_as):"NONE",
+          (rc->config.critical)?string2str(rc->config.critical->parsed_as):"NONE",
           rrdcalc_source(rc),
           rc->config.delay_up_duration,
           rc->config.delay_down_duration,

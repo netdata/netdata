@@ -23,8 +23,8 @@ typedef struct eval_variable {
 } EVAL_VARIABLE;
 
 typedef struct eval_expression {
-    const char *source;
-    const char *parsed_as;
+    STRING *source;
+    STRING *parsed_as;
 
     RRDCALC_STATUS *status;
     NETDATA_DOUBLE *myself;
