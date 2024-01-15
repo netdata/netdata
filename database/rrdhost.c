@@ -1739,7 +1739,7 @@ void rrdhost_status(RRDHOST *host, time_t now, RRDHOST_STATUS *s) {
     s->db.instances = host->rrdctx.instances;
     s->db.contexts = dictionary_entries(host->rrdctx.contexts);
     if(!s->db.first_time_s || !s->db.last_time_s || !s->db.metrics || !s->db.instances || !s->db.contexts ||
-            (flags & (RRDHOST_FLAG_PENDING_CONTEXT_LOAD|RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS)))
+            (flags & (RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
         s->db.status = RRDHOST_DB_STATUS_INITIALIZING;
     else
         s->db.status = RRDHOST_DB_STATUS_QUERYABLE;
