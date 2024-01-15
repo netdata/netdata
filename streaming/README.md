@@ -464,6 +464,24 @@ In addition, edit `netdata.conf` on each child node to disable the database and 
     enabled = no
 ```
 
+## Replication
+
+Netdata streaming works by default with replication, this means that netdata parent will sync with children filling the
+possible gaps from the last time a child connected with it until the present.
+
+
+```bash
+[11111111-2222-3333-4444-555555555555]
+    #Enable replication for all hosts using this api key. Default: enabled
+    enable replication = yes
+
+    # How many seconds to replicate from each child. Default: a day
+    seconds to replicate = 86400
+
+    # The duration we want to replicate per each step.
+    seconds per replication step = 600
+```
+
 ## Troubleshooting
 
 Both parent and child nodes log information at `/var/log/netdata/error.log`.
