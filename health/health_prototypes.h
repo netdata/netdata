@@ -14,7 +14,4 @@ void health_reload_prototypes(void);
 void health_apply_prototypes_to_host(RRDHOST *host);
 void health_apply_prototypes_to_all_hosts(void);
 
-void sql_alert_config_hashes_store_enable(void);
-void sql_alert_config_hashes_store_disable(void);
-
 #endif //NETDATA_HEALTH_PROTOTYPES_H

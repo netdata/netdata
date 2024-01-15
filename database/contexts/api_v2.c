@@ -319,7 +319,7 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     struct alert_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
     t->name = rc->config.name;
-    t->summary = rc->original_summary;
+    t->summary = rc->config.summary; // the original summary
     t->ati = ctl->alerts.ati++;
 
     t->nodes = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_VALUE_LINK_DONT_CLONE|DICT_OPTION_NAME_LINK_DONT_CLONE);

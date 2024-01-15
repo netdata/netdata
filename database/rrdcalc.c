@@ -154,20 +154,20 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
 }
 
 void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
-    if(!rc->rrdset || !rc->original_info || !rc->rrdset->rrdlabels) return;
+    if(!rc->rrdset || !rc->info || !rc->rrdset->rrdlabels) return;
 
     size_t labels_version = rrdlabels_version(rc->rrdset->rrdlabels);
     if(rc->labels_version != labels_version) {
 
-        if (rc->original_info) {
+        if (rc->info) {
             STRING *old = rc->config.info;
-            rc->config.info = rrdcalc_replace_variables_with_rrdset_labels(rrdcalc_original_info(rc), rc);
+            rc->info = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.info), rc);
             string_freez(old);
         }
 
-         if (rc->original_summary) {
-            STRING *old = rc->config.summary;
-            rc->config.summary = rrdcalc_replace_variables_with_rrdset_labels(rrdcalc_original_summary(rc), rc);
+         if (rc->summary) {
+            STRING *old = rc->summary;
+            rc->summary = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.summary), rc);
             string_freez(old);
         }
 
@@ -296,7 +296,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
 
     if(!rc->config.summary) {
         rc->config.summary = string_dup(rc->config.name);
-        rc->original_summary = string_dup(rc->config.name);
+        rc->summary = string_dup(rc->config.name);
     }
 
     string_freez(rc->config.dyncfg_key);
@@ -491,12 +491,12 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         rc->config.source = string_dup(rt->config.source);
         rc->config.units = string_dup(rt->config.units);
         rc->config.info = string_dup(rt->config.info);
-        rc->original_info = string_dup(rt->config.info);
+        rc->info = string_dup(rt->config.info);
 
         if (!rt->config.summary)
             rt->config.summary = string_dup(rc->config.name);
         rc->config.summary = string_dup(rt->config.summary);
-        rc->original_summary = string_dup(rt->config.summary);
+        rc->summary = string_dup(rt->config.summary);
 
         rc->config.classification = string_dup(rt->config.classification);
         rc->config.component = string_dup(rt->config.component);
@@ -627,8 +627,8 @@ static void rrdcalc_free_internals(RRDCALC *rc) {
     string_freez(rc->key);
     string_freez(rc->chart);
 
-    string_freez(rc->original_info);
-    string_freez(rc->original_summary);
+    string_freez(rc->info);
+    string_freez(rc->summary);
 }
 
 static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdhost __maybe_unused) {
@@ -705,8 +705,8 @@ bool rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc) {
         return false;
     }
 
-    rc->original_summary = string_dup(rc->config.summary);
-    rc->original_info = string_dup(rc->config.info);
+    rc->summary = string_dup(rc->config.summary);
+    rc->info = string_dup(rc->config.info);
 
     char key[RRDCALC_MAX_KEY_SIZE + 1];
     size_t key_len = rrdcalc_key(key, RRDCALC_MAX_KEY_SIZE, string2str(rc->chart), string2str(rc->config.name));

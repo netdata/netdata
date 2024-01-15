@@ -56,8 +56,6 @@ typedef struct rrd_alert_prototype {
 void health_prototype_add_unsafe(RRD_ALERT_PROTOTYPE *ap);
 
 struct health_plugin_globals {
-    bool sql_store_hashes;
-
     struct {
         bool enabled;
         bool stock_enabled;

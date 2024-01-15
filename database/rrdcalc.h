@@ -142,8 +142,8 @@ struct rrdcalc {
     // ------------------------------------------------------------------------
     // runtime information
 
-    STRING *original_summary;       // the original summary field before any variable replacement
-    STRING *original_info;          // the original info field before any variable replacement
+    STRING *summary;       // the original summary field before any variable replacement
+    STRING *info;          // the original info field before any variable replacement
 
     RRDCALC_STATUS old_status;      // the old status of the alarm
     RRDCALC_STATUS status;          // the current status of the alarm
@@ -197,9 +197,8 @@ struct rrdcalc {
 #define rrdcalc_module_match(rc) string2str((rc)->match.module)
 #define rrdcalc_source(rc) string2str((rc)->config.source)
 #define rrdcalc_units(rc) string2str((rc)->config.units)
-#define rrdcalc_original_summary(rc) string2str((rc)->original_summary)
 #define rrdcalc_summary(rc) string2str((rc)->config.summary)
-#define rrdcalc_original_info(rc) string2str((rc)->original_info)
+#define rrdcalc_original_info(rc) string2str((rc)->original_info2)
 #define rrdcalc_info(rc) string2str((rc)->config.info)
 #define rrdcalc_dimensions(rc) string2str((rc)->config.dimensions)
 #define rrdcalc_foreachdim(rc) string2str((rc)->config.foreach_dimension)

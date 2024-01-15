@@ -2,145 +2,6 @@
 
 #include "health_internals.h"
 
-/*
- * [health]
- *    enabled = yes
- *    silencers file = /var/lib/netdata/health.silencers.json
- *    run at least every seconds = 10
- *    postpone alarms during hibernation for seconds = 60
- *    default repeat warning = never
- *    default repeat critical = never
- *    in memory max health log entries = 1000
- *    health log history = 432000
- *    enabled alarms = *
- *    script to execute on alarm = /usr/libexec/netdata/plugins.d/alarm-notify.sh
- *    use summary for notifications = yes
- *    enable stock health configuration = yes
- */
-
-struct health_plugin_globals health_globals = {
-    .sql_store_hashes = true,
-    .config = {
-        .enabled = true,
-        .stock_enabled = true,
-        .use_summary_for_notifications = true,
-
-        .health_log_entries_max = HEALTH_LOG_ENTRIES_DEFAULT,
-        .health_log_history = HEALTH_LOG_HISTORY_DEFAULT,
-
-        .default_warn_repeat_every = 0,
-        .default_crit_repeat_every = 0,
-
-        .run_at_least_every_seconds = 10,
-        .postpone_alarms_during_hibernation_for_seconds = 60,
-    },
-    .prototypes = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-        .base = NULL,
-    }
-};
-
-bool health_plugin_enabled(void) {
-    return health_globals.config.enabled;
-}
-
-void health_plugin_disable(void) {
-    health_globals.config.enabled = false;
-}
-
-void health_load_config_defaults(void) {
-    char filename[FILENAME_MAX + 1];
-
-    health_globals.config.enabled =
-        config_get_boolean(CONFIG_SECTION_HEALTH,
-                           "enabled",
-                           health_globals.config.enabled);
-
-    health_globals.config.stock_enabled =
-        config_get_boolean(CONFIG_SECTION_HEALTH,
-                           "enable stock health configuration",
-                           health_globals.config.stock_enabled);
-
-    health_globals.config.use_summary_for_notifications =
-        config_get_boolean(CONFIG_SECTION_HEALTH,
-                           "use summary for notifications",
-                           health_globals.config.use_summary_for_notifications);
-
-    health_globals.config.default_warn_repeat_every =
-        config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
-
-    health_globals.config.default_crit_repeat_every =
-        config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
-
-    health_globals.config.health_log_entries_max =
-        config_get_number(CONFIG_SECTION_HEALTH, "in memory max health log entries",
-                          health_globals.config.health_log_entries_max);
-
-    health_globals.config.health_log_history =
-        config_get_number(CONFIG_SECTION_HEALTH, "health log history", HEALTH_LOG_DEFAULT_HISTORY);
-
-    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
-    health_globals.config.default_exec =
-        string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
-
-    health_globals.config.enabled_alerts =
-        simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"),
-                              NULL, SIMPLE_PATTERN_EXACT, true);
-
-    health_globals.config.run_at_least_every_seconds =
-        (int)config_get_number(CONFIG_SECTION_HEALTH,
-                               "run at least every seconds",
-                               health_globals.config.run_at_least_every_seconds);
-
-    health_globals.config.postpone_alarms_during_hibernation_for_seconds =
-        config_get_number(CONFIG_SECTION_HEALTH,
-                          "postpone alarms during hibernation for seconds",
-                          health_globals.config.postpone_alarms_during_hibernation_for_seconds);
-
-    health_globals.config.default_recipient =
-        string_strdupz("root");
-
-    // ------------------------------------------------------------------------
-    // verify after loading
-
-    if(health_globals.config.run_at_least_every_seconds < 1)
-        health_globals.config.run_at_least_every_seconds = 1;
-
-    if(health_globals.config.health_log_entries_max < HEALTH_LOG_ENTRIES_MIN) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Health configuration has invalid max log entries %u, using minimum of %u",
-               health_globals.config.health_log_entries_max,
-            HEALTH_LOG_ENTRIES_MIN);
-
-        health_globals.config.health_log_entries_max = HEALTH_LOG_ENTRIES_MIN;
-        config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries",
-                          (long)health_globals.config.health_log_entries_max);
-    }
-    else if(health_globals.config.health_log_entries_max > HEALTH_LOG_ENTRIES_MAX) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Health configuration has invalid max log entries %u, using maximum of %u",
-               health_globals.config.health_log_entries_max,
-            HEALTH_LOG_ENTRIES_MAX);
-
-        health_globals.config.health_log_entries_max = HEALTH_LOG_ENTRIES_MAX;
-        config_set_number(CONFIG_SECTION_HEALTH, "in memory max health log entries",
-                          (long)health_globals.config.health_log_entries_max);
-    }
-
-    if (health_globals.config.health_log_history < HEALTH_LOG_MINIMUM_HISTORY) {
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Health configuration has invalid health log history %u. Using minimum %d",
-               health_globals.config.health_log_history, HEALTH_LOG_MINIMUM_HISTORY);
-
-        health_globals.config.health_log_history = HEALTH_LOG_MINIMUM_HISTORY;
-        config_set_number(CONFIG_SECTION_HEALTH, "health log history", health_globals.config.health_log_history);
-    }
-
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "Health log history is set to %u seconds (%u days)",
-           health_globals.config.health_log_history, health_globals.config.health_log_history / 86400);
-}
-
 static inline void buffer_append_prototype_key(BUFFER *wb, const char *key, const char *txt) {
     if(unlikely(!txt || !*txt || strcmp(txt, "*") == 0 || strcmp(txt, "!*") == 0 || strcmp(txt, "!* *") == 0)) return;
 
@@ -248,7 +109,7 @@ void health_prototype_add_unsafe(RRD_ALERT_PROTOTYPE *ap) {
     ap->match.dyncfg_prototype = health_alert_config_dyncfg_key(&ap->match, string2str(ap->config.name), NULL, NULL);
     ap->config.dyncfg_key = string_dup(ap->match.dyncfg_prototype);
 
-    sql_alert_hash_and_store_config(ap->config.hash_id, &ap->sql, health_globals.sql_store_hashes);
+    sql_alert_hash_and_store_config(ap->config.hash_id, &ap->sql, true);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(health_globals.prototypes.base, ap, prev, next);
 
 //    dyncfg_add(localhost, string2str(ap->config.dyncfg_key), "/health/alerts/global/prototypes", DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE);
@@ -283,8 +144,6 @@ void health_reload_prototypes(void) {
         NULL,
         health_readfile,
         NULL, 0);
-
-    sql_alert_config_hashes_store_disable();
 
     spinlock_unlock(&health_globals.prototypes.spinlock);
 }
@@ -612,13 +471,4 @@ void health_apply_prototypes_to_all_hosts(void) {
         health_apply_prototypes_to_host(host);
     }
     dfe_done(host);
-}
-
-
-void sql_alert_config_hashes_store_enable(void) {
-    health_globals.sql_store_hashes = true;
-}
-
-void sql_alert_config_hashes_store_disable(void) {
-    health_globals.sql_store_hashes = false;
 }
