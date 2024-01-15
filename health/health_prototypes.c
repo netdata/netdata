@@ -173,15 +173,15 @@ STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *n
         host = st->rrdhost;
 
     if(host && st) {
-        buffer_sprintf(buffer, "health:alert:host[%s]:", rrdhost_hostname(host));
+        buffer_sprintf(buffer, "health:alert:node[%s]:", rrdhost_hostname(host));
         buffer_append_prototype_key(buffer, NULL, name);
         buffer_append_prototype_key(buffer, "on", rrdset_name(st));
     }
     else if(host && !st) {
         if (am->is_template)
-            buffer_sprintf(buffer, "health:alert:prototype:host[%s]:template:", rrdhost_hostname(host));
+            buffer_sprintf(buffer, "health:alert:prototype:node[%s]:template:", rrdhost_hostname(host));
         else
-            buffer_sprintf(buffer, "health:alert:prototype:host[%s]:alert:", rrdhost_hostname(host));
+            buffer_sprintf(buffer, "health:alert:prototype:node[%s]:alert:", rrdhost_hostname(host));
 
         buffer_append_prototype_key(buffer, NULL, name);
 
