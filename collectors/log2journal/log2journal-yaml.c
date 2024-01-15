@@ -464,6 +464,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rewrite key");
                                     errors++;
                                 } else {
+                                    freez(key);
                                     key = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
@@ -498,6 +499,7 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                                     yaml_error(parser, &sub_event, "Expected scalar for rewrite value");
                                     errors++;
                                 } else {
+                                    freez(replace_pattern);
                                     replace_pattern = strndupz((char *)sub_event.data.scalar.value, sub_event.data.scalar.length);
                                     yaml_event_delete(&sub_event);
                                 }
@@ -563,6 +565,8 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                 }
                 freez(replace_pattern);
                 replace_pattern = NULL;
+                freez(search_pattern);
+                search_pattern = NULL;
             }
                 break;
 
