@@ -55,7 +55,7 @@ The following options can be defined for this notification
 |:----|:-----------|:-------|:--------:|
 | SEND_TELEGRAM | Set `SEND_TELEGRAM` to YES | YES | yes |
 | TELEGRAM_BOT_TOKEN | set `TELEGRAM_BOT_TOKEN` to your bot token. |  | yes |
-| DEFAULT_RECIPIENT_TELEGRAM | Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert notifications to be sent to. You can define multiple chat IDs like this: -49999333322 -10099992222. |  | yes |
+| DEFAULT_RECIPIENT_TELEGRAM | Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert notifications to be sent to. You can define multiple chat IDs like this: -49999333322 -1009999222255. |  | yes |
 
 ##### DEFAULT_RECIPIENT_TELEGRAM
 
@@ -66,8 +66,8 @@ The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bot
 ```conf
 role_recipients_telegram[sysadmin]="-49999333324"
 role_recipients_telegram[domainadmin]="-49999333389"
-role_recipients_telegram[dba]="-1009999222255"
-role_recipients_telegram[webmaster]="-1009999222255 -49999333389"
+role_recipients_telegram[dba]="-10099992222"
+role_recipients_telegram[webmaster]="-10099992222 -49999333389"
 role_recipients_telegram[proxyadmin]="-49999333344"
 role_recipients_telegram[sitemgr]="-49999333876"
 ```
