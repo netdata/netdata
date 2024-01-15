@@ -196,6 +196,9 @@ STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *n
         if (am->module)
             buffer_append_prototype_key(buffer, "module", string2str(am->module));
 
+        if (am->charts)
+            buffer_append_prototype_key(buffer, "instances", string2str(am->charts));
+
         if (am->chart_labels)
             buffer_append_prototype_key(buffer, "instance_labels", string2str(am->chart_labels));
     }
@@ -230,6 +233,9 @@ STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *n
         if (am->module)
             buffer_append_prototype_key(buffer, "module", string2str(am->module));
 
+        if (am->charts)
+            buffer_append_prototype_key(buffer, "instances", string2str(am->charts));
+
         if (am->chart_labels)
             buffer_append_prototype_key(buffer, "instance_labels", string2str(am->chart_labels));
     }
@@ -238,27 +244,37 @@ STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *n
     return string_strdupz(final);
 }
 
-void health_add_prototype_unsafe(RRD_ALERT_PROTOTYPE *ap) {
+void health_prototype_add_unsafe(RRD_ALERT_PROTOTYPE *ap) {
     ap->match.dyncfg_prototype = health_alert_config_dyncfg_key(&ap->match, string2str(ap->config.name), NULL, NULL);
     ap->config.dyncfg_key = string_dup(ap->match.dyncfg_prototype);
 
     sql_alert_hash_and_store_config(ap->config.hash_id, &ap->sql, health_globals.sql_store_hashes);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(health_globals.prototypes.base, ap, prev, next);
+
+//    dyncfg_add(localhost, string2str(ap->config.dyncfg_key), "/health/alerts/global/prototypes", DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE);
+//
 }
 
-static void health_prototype_free(RRD_ALERT_PROTOTYPE *ap) {
+static void health_prototype_free_unsafe(RRD_ALERT_PROTOTYPE *ap) {
+//    dyncfg_del(localhost, string2str(ap->config.dyncfg_key));
+
     rrd_alert_match_free(&ap->match);
     rrd_alert_config_free(&ap->config);
     sql_alert_config_free(&ap->sql);
 }
 
 void health_reload_prototypes(void) {
+//    dyncfg_del(localhost, "health:alert:prototype:global:template");
+//    dyncfg_add(localhost, "health:alert:prototype:global:template", "/health/alerts/global",
+//               DYNCFG_STATUS_RUNNING, DYNCFG_TYPE_TEMPLATE, DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
+//               DYNCFG_CMD_ADD | DYNCFG_CMD_SCHEMA, )
+
     spinlock_lock(&health_globals.prototypes.spinlock);
 
     while(health_globals.prototypes.base) {
         RRD_ALERT_PROTOTYPE *ap = health_globals.prototypes.base;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(health_globals.prototypes.base, ap, prev, next);
-        health_prototype_free(ap);
+        health_prototype_free_unsafe(ap);
     }
 
     recursive_config_double_dir_load(
@@ -294,6 +310,8 @@ static void health_copy_match_without_patterns(struct rrd_alert_match *dst, stru
 }
 
 static void health_copy_config(struct rrd_alert_config *dst, struct rrd_alert_config *src) {
+    uuid_copy(dst->hash_id, src->hash_id);
+
     dst->dyncfg_key = string_dup(src->dyncfg_key);
 
     dst->name = string_dup(src->name);
@@ -517,6 +535,9 @@ static bool prototype_matches_host(RRDHOST *host, struct rrd_alert_prototype *ap
     if(ap->match.os_pattern && !simple_pattern_matches_string(ap->match.os_pattern, host->os))
         return false;
 
+    if(ap->match.host_pattern && !simple_pattern_matches_string(ap->match.host_pattern, host->hostname))
+        return false;
+
     if(host->rrdlabels && ap->match.host_labels_pattern &&
         !rrdlabels_match_simple_pattern_parsed(host->rrdlabels, ap->match.host_labels_pattern, '=', NULL))
         return false;
@@ -549,11 +570,10 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
 
-
     spinlock_lock(&health_globals.prototypes.spinlock);
     for(struct rrd_alert_prototype *ap = health_globals.prototypes.base; ap ;ap = ap->next) {
         if(!prototype_matches_host(host, ap))
-            return;
+            continue;
 
         if(ap->match.is_template) {
             RRDCALCTEMPLATE *rt = health_rrdcalctemplate_from_prototype(host, ap);

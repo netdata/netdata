@@ -439,7 +439,6 @@ static void health_event_loop(void) {
                             rc->last_status_change_value = rc->value;
                             rc->last_updated = now_tmp;
                             rc->value = NAN;
-                            rc->ae = ae;
 
 #ifdef ENABLE_ACLK
                             if (netdata_cloud_enabled)
@@ -704,7 +703,6 @@ static void health_event_loop(void) {
                         rc->last_status_change = now;
                         rc->old_status = rc->status;
                         rc->status = status;
-                        rc->ae = ae;
 
                         if(unlikely(rrdcalc_isrepeating(rc))) {
                             rc->last_repeat = now;

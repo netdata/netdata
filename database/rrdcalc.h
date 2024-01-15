@@ -133,8 +133,6 @@ struct rrdcalc {
     uint32_t id;                    // the unique id of this alarm
     uint32_t next_event_id;         // the next event id that will be used for this alarm
 
-    uuid_t config_hash_id;          // a predictable hash_id based on specific alert configuration
-
     STRING *key;                    // the unique key in the host's rrdcalc_root_index
     STRING *chart;                  // the chart id this should be linked to
 
@@ -169,7 +167,6 @@ struct rrdcalc {
     int delay_up_current;           // the current up notification delay duration
     int delay_down_current;         // the current down notification delay duration
     int delay_last;                 // the last delay we used
-    ALARM_ENTRY *ae;                // last alarm entry
 
     // ------------------------------------------------------------------------
     // variables this alarm exposes to the rest of the alarms

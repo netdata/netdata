@@ -53,7 +53,7 @@ typedef struct rrd_alert_prototype {
     size_t uses;
     struct rrd_alert_prototype *prev, *next;
 } RRD_ALERT_PROTOTYPE;
-void health_add_prototype_unsafe(RRD_ALERT_PROTOTYPE *ap);
+void health_prototype_add_unsafe(RRD_ALERT_PROTOTYPE *ap);
 
 struct health_plugin_globals {
     bool sql_store_hashes;

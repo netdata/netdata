@@ -9,8 +9,6 @@
 // these are to be applied to charts found dynamically
 // based on their context.
 struct rrdcalctemplate {
-    uuid_t config_hash_id;
-
     STRING *context;
 
     struct rrd_alert_match match;

@@ -582,7 +582,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
 
         if((hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) || (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY))) {
             if(ap)
-                health_add_prototype_unsafe(ap);
+                health_prototype_add_unsafe(ap);
 
             ap = callocz(1, sizeof(*ap));
             am = &ap->match;
@@ -802,7 +802,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
     }
 
     if(ap)
-        health_add_prototype_unsafe(ap);
+        health_prototype_add_unsafe(ap);
 
     fclose(fp);
     return 1;

@@ -41,7 +41,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     format_value_and_unit(value_string, 100, rc->value, rrdcalc_units(rc), -1);
 
     char hash_id[GUID_LEN + 1];
-    uuid_unparse_lower(rc->config_hash_id, hash_id);
+    uuid_unparse_lower(rc->config.hash_id, hash_id);
 
     buffer_sprintf(wb,
             "\t\t\"%s.%s\": {\n"

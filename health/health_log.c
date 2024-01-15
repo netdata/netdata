@@ -120,7 +120,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->chart_context = string_dup(chart_context);
     ae->chart_name = string_dup(chart_name);
 
-    uuid_copy(ae->config_hash_id, rc->config_hash_id);
+    uuid_copy(ae->config_hash_id, rc->config.hash_id);
 
     uuid_generate_random(ae->transition_id);
     ae->global_id = now_realtime_usec();

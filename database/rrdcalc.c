@@ -316,7 +316,6 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
         0,
         rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
-    rc->ae = ae;
     health_alarm_log_add_entry(host, ae);
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
 }
@@ -347,7 +346,6 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
             0,
             0);
 
-        rc->ae = ae;
         health_alarm_log_add_entry(host, ae);
     }
 
@@ -461,7 +459,7 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         rc->next_event_id = 1;
         rc->config.name = (ctr->overwrite_alert_name) ? string_strdupz(ctr->overwrite_alert_name) : string_dup(rt->config.name);
         rc->chart = string_dup(st->id);
-        uuid_copy(rc->config_hash_id, rt->config_hash_id);
+        uuid_copy(rc->config.hash_id, rt->config.hash_id);
 
         rc->config.dimensions = (ctr->overwrite_dimensions) ? string_strdupz(ctr->overwrite_dimensions) : string_dup(rt->config.dimensions);
         rc->config.foreach_dimension = NULL;
@@ -532,7 +530,7 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         ;
     }
 
-    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->config.name, &rc->next_event_id, &rc->config_hash_id);
+    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->config.name, &rc->next_event_id, &rc->config.hash_id);
 
     if(rc->config.calculation) {
         rc->config.calculation->status = &rc->status;

@@ -1413,17 +1413,9 @@ if(ENABLE_H2O)
         )
 
         target_compile_options(h2o PRIVATE
-                -Wno-old-style-declaration
-                -Wno-deprecated-declarations
-                -Wno-unused-parameter
-                -Wno-sign-compare
-                -Wno-missing-field-initializers
-                -Wno-unused-but-set-variable
-                -Wno-type-limits
-                -Wno-implicit-fallthrough
+                -Wno-all -Wno-extra
                 -Wno-shadow
-                -Wno-unused-function
-                -Wno-misleading-indentation
+                -Wno-deprecated-declarations
         )
 
         target_compile_options(h2o PUBLIC -DH2O_USE_LIBUV=0)
@@ -1440,8 +1432,7 @@ endif()
 add_library(judy STATIC ${LIBJUDY_SOURCES})
 
 target_compile_options(judy PRIVATE
-        -Wno-sign-compare
-        -Wno-implicit-fallthrough
+        -Wno-all -Wno-extra
         -Wno-shadow
 )
 
