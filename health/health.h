@@ -106,5 +106,6 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function);
 #define health_log_alert(host, ae) health_log_alert_transition_with_trace(host, ae, __LINE__, __FILE__, __FUNCTION__)
+bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, uuid_t *transitions_id);
 
 #endif //NETDATA_HEALTH_H

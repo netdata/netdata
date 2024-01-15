@@ -22,6 +22,34 @@ char *silencers_filename;
 SIMPLE_PATTERN *conf_enabled_alarms = NULL;
 DICTIONARY *health_rrdvars;
 
+bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, uuid_t *transitions_id) {
+    if(!rc->rrdset)
+        return false;
+
+    RRDHOST *host = rc->rrdset->rrdhost;
+
+    rw_spinlock_read_lock(&host->health_log.spinlock);
+
+    ALARM_ENTRY *ae;
+    for(ae = host->health_log.alarms; ae ; ae = ae->next) {
+        if(unlikely(ae->alarm_id == rc->id))
+            break;
+    }
+
+    if(ae) {
+        *global_id = ae->global_id;
+        uuid_copy(*transitions_id, ae->transition_id);
+    }
+    else {
+        *global_id = 0;
+        uuid_clear(*transitions_id);
+    }
+
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
+
+    return ae != NULL;
+}
+
 void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_FLAGS flags) {
     buffer_json_member_add_array(wb, key);
 
@@ -1220,7 +1248,6 @@ void *health_main(void *ptr) {
                             rc->last_status_change_value = rc->value;
                             rc->last_updated = now;
                             rc->value = NAN;
-                            rc->ae = ae;
 
 #ifdef ENABLE_ACLK
                             if (netdata_cloud_enabled)
@@ -1496,7 +1523,6 @@ void *health_main(void *ptr) {
                         rc->last_status_change = now;
                         rc->old_status = rc->status;
                         rc->status = status;
-                        rc->ae = ae;
 
                         if(unlikely(rrdcalc_isrepeating(rc))) {
                             rc->last_repeat = now;
