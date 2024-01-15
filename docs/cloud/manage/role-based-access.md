@@ -33,6 +33,8 @@ In more detail, you can find on the following tables which functionalities are a
 | Delete Space | :heavy_check_mark: | - | - | - | - | - |
 | Change name | :heavy_check_mark: | - | - | - | - | - |
 | Change description | :heavy_check_mark: | - | - | - | - | - |
+| Change slug | :heavy_check_mark: | - | - | - | - | - |
+| Change preferred nodes | :heavy_check_mark: | - | - | - | - | - |
 
 ### Node Management
 

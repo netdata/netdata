@@ -25,10 +25,9 @@ Send notifications to Telegram using Netdata's Agent alert notification feature,
 
 #### 
 
-- A bot token. To get one, contact the [@BotFather](https://t.me/BotFather) bot and send the command `/newbot` and follow the instructions. Start a conversation with your bot or invite it into a group where you want it to send messages.
-- The chat ID for every chat you want to send messages to. Contact the [@myidbot](https://t.me/myidbot) bot and send the `/getid` command to get your personal chat ID or invite it into a group and use the `/getgroupid` command to get the group chat ID. Group IDs start with a hyphen, supergroup IDs start with `-100`.
-- Alternatively, you can get the chat ID directly from the bot API. Send your bot a command in the chat you want to use, then check `https://api.telegram.org/bot{YourBotToken}/getUpdates`, eg. `https://api.telegram.org/bot111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5/getUpdates`
-- Terminal access to the Agent you wish to configure
+- A bot token. To get one, contact the [@BotFather](https://t.me/BotFather) bot and send the command `/newbot` and follow the instructions. Invite your bot to a group where you want it to send messages.
+- The chat ID for every chat you want to send messages to. Invite [@myidbot](https://t.me/myidbot) bot to the group that will receive notifications, and write the command `/getgroupid@myidbot` to get the group chat ID. Group IDs start with a hyphen, supergroup IDs start with `-100`.
+- Terminal access to the Agent you wish to configure.
 
 
 
@@ -56,7 +55,7 @@ The following options can be defined for this notification
 |:----|:-----------|:-------|:--------:|
 | SEND_TELEGRAM | Set `SEND_TELEGRAM` to YES | YES | yes |
 | TELEGRAM_BOT_TOKEN | set `TELEGRAM_BOT_TOKEN` to your bot token. |  | yes |
-| DEFAULT_RECIPIENT_TELEGRAM | Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert notifications to be sent to. You can define multiple chat IDs like this: 49999333322 -1009999222255. |  | yes |
+| DEFAULT_RECIPIENT_TELEGRAM | Set `DEFAULT_RECIPIENT_TELEGRAM` to the chat ID you want the alert notifications to be sent to. You can define multiple chat IDs like this: -49999333322 -1009999222255. |  | yes |
 
 ##### DEFAULT_RECIPIENT_TELEGRAM
 
@@ -65,12 +64,12 @@ All roles will default to this variable if left unconfigured.
 The `DEFAULT_RECIPIENT_CUSTOM` can be edited in the following entries at the bottom of the same file:
 
 ```conf
-role_recipients_telegram[sysadmin]="49999333324"
-role_recipients_telegram[domainadmin]="49999333389"
-role_recipients_telegram[dba]="-1009999222255"
-role_recipients_telegram[webmaster]="-1009999222255 49999333389"
-role_recipients_telegram[proxyadmin]="49999333344"
-role_recipients_telegram[sitemgr]="49999333876"
+role_recipients_telegram[sysadmin]="-49999333324"
+role_recipients_telegram[domainadmin]="-49999333389"
+role_recipients_telegram[dba]="-10099992222"
+role_recipients_telegram[webmaster]="-10099992222 -49999333389"
+role_recipients_telegram[proxyadmin]="-49999333344"
+role_recipients_telegram[sitemgr]="-49999333876"
 ```
 
 
@@ -88,7 +87,7 @@ role_recipients_telegram[sitemgr]="49999333876"
 
 SEND_TELEGRAM="YES"
 TELEGRAM_BOT_TOKEN="111122223:7OpFlFFRzRBbrUUmIjj5HF9Ox2pYJZy5"
-DEFAULT_RECIPIENT_TELEGRAM="-100233335555"
+DEFAULT_RECIPIENT_TELEGRAM="-49999333876"
 
 ```
 

@@ -975,19 +975,18 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
     // ACLK
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 21), // when set, we should send ACLK stream context updates
-    RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 22), // set when the receiver part is disconnected
+    RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 22), // Host should stream alerts
 
     // Metadata
     RRDHOST_FLAG_METADATA_UPDATE                = (1 << 23), // metadata needs to be stored in the database
     RRDHOST_FLAG_METADATA_LABELS                = (1 << 24), // metadata needs to be stored in the database
     RRDHOST_FLAG_METADATA_INFO                  = (1 << 25), // metadata needs to be stored in the database
-    RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 26), // metadata needs to be stored in the database
-    RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS       = (1 << 27), // metadata needs to be stored in the database
+    RRDHOST_FLAG_PENDING_CONTEXT_LOAD           = (1 << 26), // Context needs to be loaded
 
-    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
-    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 29), // set when the receiver part is disconnected
+    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 27), // metadata needs to be stored in the database
+    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 28), // set when the receiver part is disconnected
 
-    RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 30), // set when the host has updated global functions
+    RRDHOST_FLAG_GLOBAL_FUNCTIONS_UPDATED       = (1 << 29), // set when the host has updated global functions
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))

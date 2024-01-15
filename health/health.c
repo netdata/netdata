@@ -162,4 +162,3 @@ void health_plugin_reload(void) {
     health_reload_prototypes();
     health_apply_prototypes_to_all_hosts();
 }
-

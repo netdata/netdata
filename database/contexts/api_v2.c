@@ -371,7 +371,6 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->name = rc->config.name;
 
     uuid_copy(t->config_hash_id, rc->config.hash_id);
-
     health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(rc, &t->global_id, &t->last_transition_id);
 }
 
