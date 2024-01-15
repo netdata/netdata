@@ -197,7 +197,7 @@ STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *n
             buffer_append_prototype_key(buffer, "module", string2str(am->module));
 
         if (am->chart_labels)
-            buffer_append_prototype_key(buffer, "chart_labels", string2str(am->chart_labels));
+            buffer_append_prototype_key(buffer, "instance_labels", string2str(am->chart_labels));
     }
     else {
         // both rrdhost and rrdset are missing
@@ -216,13 +216,13 @@ STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *n
             buffer_append_prototype_key(buffer, "on", string2str(am->on.chart));
 
         if (am->host)
-            buffer_append_prototype_key(buffer, "host", string2str(am->host));
+            buffer_append_prototype_key(buffer, "node", string2str(am->host));
 
         if (am->os)
             buffer_append_prototype_key(buffer, "os", string2str(am->os));
 
         if (am->host_labels)
-            buffer_append_prototype_key(buffer, "host_labels", string2str(am->host_labels));
+            buffer_append_prototype_key(buffer, "node_labels", string2str(am->host_labels));
 
         if (am->plugin)
             buffer_append_prototype_key(buffer, "plugin", string2str(am->plugin));
@@ -231,7 +231,7 @@ STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *n
             buffer_append_prototype_key(buffer, "module", string2str(am->module));
 
         if (am->chart_labels)
-            buffer_append_prototype_key(buffer, "chart_labels", string2str(am->chart_labels));
+            buffer_append_prototype_key(buffer, "instance_labels", string2str(am->chart_labels));
     }
 
     const char *final = buffer_tostring(buffer);
