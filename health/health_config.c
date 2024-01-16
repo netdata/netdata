@@ -382,7 +382,7 @@ static inline void strip_quotes(char *s) {
     }                                                                                               \
     if(value && strcmp(value, "*") == 0)                                                            \
         value = NULL;                                                                               \
-    else if(value && strcmp(value, "!* *") == 0) {                                                  \
+    else if(value && (strcmp(value, "!* *") == 0 || strcmp(value, "!*") == 0)) {                    \
         value = NULL;                                                                               \
         ap->match.enabled = false;                                                                  \
     }                                                                                               \
