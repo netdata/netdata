@@ -671,6 +671,25 @@ void rrdlabels_destroy(RRDLABELS *labels)
     freez(labels);
 }
 
+static RRDLABEL *rrdlabels_find_label_with_key_value_unsafe(RRDLABELS *labels, RRDLABEL *label)
+{
+    if (unlikely(!labels))
+        return NULL;
+
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+    bool first_then_next = true;
+    RRDLABEL *found = NULL;
+    while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
+        RRDLABEL *lb = (RRDLABEL *)Index;
+        if (lb->index.key == label->index.key && lb == label) {
+            found = (RRDLABEL *)Index;
+            break;
+        }
+    }
+    return found;
+}
+
 // Check in labels to see if we have the key specified in label
 static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABEL *label)
 {
@@ -1025,6 +1044,35 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     spinlock_unlock(&src->spinlock);
     spinlock_unlock(&dst->spinlock);
 }
+
+size_t rrdlabels_common_count(RRDLABELS *dst, RRDLABELS *src)
+{
+    if (!dst || !src)
+        return 0;
+
+    if (dst == src)
+        return rrdlabels_entries(dst);
+
+    RRDLABEL *label;
+    RRDLABEL_SRC ls;
+
+    spinlock_lock(&dst->spinlock);
+    spinlock_lock(&src->spinlock);
+
+    size_t count = 0;
+    lfe_start_nolock(src, label, ls)
+    {
+        RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_value_unsafe(dst, label);
+        if (old_label_with_key)
+            count++;
+    }
+    lfe_done_nolock();
+
+    spinlock_unlock(&src->spinlock);
+    spinlock_unlock(&dst->spinlock);
+    return count;
+}
+
 
 void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
 {
@@ -1555,6 +1603,11 @@ static int rrdlabels_unittest_migrate_check()
     rrdlabels_add(labels2, "key0", "value0", RRDLABEL_SRC_CONFIG);
     rrdlabels_add(labels2, "key1", "value1", RRDLABEL_SRC_CONFIG);
     rrdlabels_add(labels2, "key2", "value2", RRDLABEL_SRC_CONFIG);
+
+    size_t count = rrdlabels_common_count(labels1, labels2);
+    fprintf(stderr, "common labels = %zu (expected 2)\n",  count);
+    if (count != 2)
+        return 1;
 
     int rc = 0;
     rc = rrdlabels_unittest_expect_value(labels1, "key1", "value1", RRDLABEL_FLAG_NEW);
