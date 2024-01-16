@@ -93,7 +93,7 @@ struct health_plugin_globals {
 
 extern struct health_plugin_globals health_globals;
 
-int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config __maybe_unused);
+int health_readfile(const char *filename, void *data, bool stock_config);
 void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae);
 void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae);
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void);
@@ -103,5 +103,13 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host);
 void health_alarm_wait_for_execution(ALARM_ENTRY *ae);
 
 bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *ap);
+
+int dyncfg_health_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd,
+                     BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled,
+                     BUFFER *result, const char *source, void *data);
+
+void health_dyncfg_unregister_all_prototypes(void);
+void health_dyncfg_register_all_prototypes(void);
+void health_prototype_to_json(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, bool for_hashing);
 
 #endif //NETDATA_HEALTH_INTERNALS_H

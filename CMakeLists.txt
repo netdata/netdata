@@ -900,6 +900,7 @@ set(HEALTH_PLUGIN_FILES
         health/health_internals.h
         health/health_notifications.c
         health/health_event_loop.c
+        health/health_dyncfg.c
 )
 
 set(IDLEJITTER_PLUGIN_FILES collectors/idlejitter.plugin/plugin_idlejitter.c)
