@@ -466,11 +466,10 @@ In addition, edit `netdata.conf` on each child node to disable the database and 
 
 ## Replication
 
-Netdata streaming works by default with replication, this means that netdata parent will sync with children filling the
-possible gaps from the last time a child connected with it until the present.
+The netdata streaming works by default with replication, this means that netdata parent will sync with children filling
+the possible gaps from the last time a child connected with it until the present.
 
-
-```bash
+```conf
 [11111111-2222-3333-4444-555555555555]
     #Enable replication for all hosts using this api key. Default: enabled
     enable replication = yes
@@ -481,6 +480,12 @@ possible gaps from the last time a child connected with it until the present.
     # The duration we want to replicate per each step.
     seconds per replication step = 600
 ```
+
+It is possible to monitor the replication metrics, accessing charts in section `Netdata Monitoring`. You can also use
+the netdata API through the link `http://localhost:19999/api/v2/node_instances` to see replication status.
+
+While the replication is happening, you will not have live data from a child, but as soon it ends, the same data available
+on child will be present on parent according to your `update evrey` configuration in your `stream.conf`.
 
 ## Troubleshooting
 
