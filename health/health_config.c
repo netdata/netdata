@@ -375,6 +375,20 @@ static inline void strip_quotes(char *s) {
     ax->member = string_strdupz(value);                                                             \
 } while(0)
 
+#define PARSE_HEALTH_CONFIG_LINE_PATTERN(ax, member) do {                                           \
+    if(ax->member) {                                                                                \
+        PARSE_HEALTH_CONFIG_DUPLICATE_STRING_MSG(ax, member);                                       \
+        string_freez(ax->member);                                                                   \
+    }                                                                                               \
+    if(value && strcmp(value, "*") == 0)                                                            \
+        value = NULL;                                                                               \
+    else if(value && strcmp(value, "!* *") == 0) {                                                  \
+        value = NULL;                                                                               \
+        ap->match.enabled = false;                                                                  \
+    }                                                                                               \
+    ax->member = string_strdupz(value);                                                             \
+} while(0)
+
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
     netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
 
@@ -546,25 +560,25 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_STRING(am, on.context);
         }
         else if(am->is_template && hash == hash_charts && !strcasecmp(key, HEALTH_CHARTS_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_STRING(am, charts);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, charts);
         }
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_STRING(am, os);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, os);
         }
         else if(hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_STRING(am, host);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, host);
         }
         else if(hash == hash_host_label && !strcasecmp(key, HEALTH_HOST_LABEL_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_STRING(am, host_labels);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, host_labels);
         }
         else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_STRING(am, plugin);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, plugin);
         }
         else if(hash == hash_module && !strcasecmp(key, HEALTH_MODULE_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_STRING(am, module);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, module);
         }
         else if(hash == hash_chart_label && !strcasecmp(key, HEALTH_CHART_LABEL_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_STRING(am, chart_labels);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, chart_labels);
         }
         else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
             strip_quotes(value);

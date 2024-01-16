@@ -9,25 +9,24 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
     {
         buffer_json_member_add_object(wb, "match");
         {
+            buffer_json_member_add_boolean(wb, "enabled", ap->match.enabled);
             buffer_json_member_add_boolean(wb, "template", ap->match.is_template);
 
             if(ap->match.is_template)
-                buffer_json_member_add_string(wb, "context", string2str(ap->match.on.context));
+                buffer_json_member_add_string(wb, "on", string2str(ap->match.on.context));
             else
-                buffer_json_member_add_string(wb, "instance", string2str(ap->match.on.chart));
+                buffer_json_member_add_string(wb, "on", string2str(ap->match.on.chart));
 
-            buffer_json_member_add_string_or_empty(wb, "os", string2str(ap->match.os));
-            buffer_json_member_add_string_or_empty(wb, "host", string2str(ap->match.host));
-
-            if(ap->match.is_template)
-                buffer_json_member_add_string_or_empty(wb, "instances", string2str(ap->match.charts));
-
-            buffer_json_member_add_string_or_empty(wb, "plugin", string2str(ap->match.plugin));
-            buffer_json_member_add_string_or_empty(wb, "module", string2str(ap->match.module));
-            buffer_json_member_add_string_or_empty(wb, "host_labels", string2str(ap->match.host_labels));
-            buffer_json_member_add_string_or_empty(wb, "instance_labels", string2str(ap->match.chart_labels));
+            buffer_json_member_add_string_or_empty(wb, "os", ap->match.os ? string2str(ap->match.os) : "*");
+            buffer_json_member_add_string_or_empty(wb, "host", ap->match.host ? string2str(ap->match.host) : "*");
+            buffer_json_member_add_string_or_empty(wb, "instances", ap->match.charts ? string2str(ap->match.charts) : "*");
+            buffer_json_member_add_string_or_empty(wb, "plugin", ap->match.charts ? string2str(ap->match.plugin) : "*");
+            buffer_json_member_add_string_or_empty(wb, "module", ap->match.module ? string2str(ap->match.module) : "*");
+            buffer_json_member_add_string_or_empty(wb, "host_labels", ap->match.host_labels ? string2str(ap->match.host_labels) : "*");
+            buffer_json_member_add_string_or_empty(wb, "instance_labels", ap->match.chart_labels ? string2str(ap->match.chart_labels) : "*");
         }
         buffer_json_object_close(wb); // match
+
         buffer_json_member_add_object(wb, "config");
         {
             if(!for_hashing) {
