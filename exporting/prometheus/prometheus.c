@@ -528,6 +528,7 @@ static void generate_as_collected_prom_metric(BUFFER *wb,
 
 static void prometheus_print_os_info(
     BUFFER *wb,
+    RRDHOST *host,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
     FILE *fp;
@@ -546,7 +547,7 @@ static void prometheus_print_os_info(
         return;
     }
 
-    buffer_sprintf(wb, "netdata_os_info{");
+    buffer_sprintf(wb, "netdata_os_info{instance=\"%s\"", rrdhost_hostname(host));
 
     while (fgets(buf, BUFSIZ-1, fp)) {
       char *in, *sanitized;
@@ -594,7 +595,7 @@ static void prometheus_print_os_info(
       if (val) {
           *val = '\0';
           val++;
-          buffer_sprintf(wb, "%s%s=\"%s\"", first_line ? "":",", key, val);
+          buffer_sprintf(wb, ",%s=\"%s\"", key, val);
           first_line = 0;
       }
     }
@@ -661,7 +662,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         buffer_flush(instance->labels_buffer);
 
     if (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS)
-        prometheus_print_os_info(wb, output_options);
+        prometheus_print_os_info(wb, host, output_options);
 
     // send custom variables set for the host
     if (output_options & PROMETHEUS_OUTPUT_VARIABLES) {
