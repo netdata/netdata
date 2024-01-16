@@ -112,6 +112,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused) 
 
     double max_pids = 0.0;
     double max_cpu = 0.0;
+    double max_cpu_throttled = 0.0;
     double max_ram = 0.0;
     double max_disk_io_read = 0.0;
     double max_disk_io_written = 0.0;
@@ -143,6 +144,9 @@ int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused) 
             max_cpu = MAX(max_cpu, cpu);
         }
 
+        double cpu_throttled = (double)cg->cpuacct_cpu_throttling.nr_throttled_perc;
+        max_cpu_throttled = MAX(max_cpu_throttled, cpu_throttled);
+
         double ram = rrddim_get_last_stored_value(cg->st_mem_rd_ram, &max_ram, 1.0);
 
         rd = cg->st_throttle_io_rd_read ? cg->st_throttle_io_rd_read : cg->st_io_rd_read;
@@ -161,6 +165,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused) 
 
         buffer_json_add_array_item_double(wb, pids_current);
         buffer_json_add_array_item_double(wb, cpu);
+        buffer_json_add_array_item_double(wb, cpu_throttled);
         buffer_json_add_array_item_double(wb, ram);
         buffer_json_add_array_item_double(wb, disk_io_read);
         buffer_json_add_array_item_double(wb, disk_io_written);
@@ -207,6 +212,13 @@ int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused) 
                 2, "%", max_cpu, RRDF_FIELD_SORT_DESCENDING, NULL,
                 RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
                 RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "CPU Throttling", "CPU Throttled Runnable Periods",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
+                0, "%", max_cpu_throttled, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                is_inside_k8s ? RRDF_FIELD_OPTS_VISIBLE : RRDF_FIELD_OPTS_NONE,
                 NULL);
 
         // RAM
