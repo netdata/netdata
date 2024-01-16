@@ -950,8 +950,6 @@ set(RRD_PLUGIN_FILES
         database/contexts/worker.c
         database/rrdcalc.c
         database/rrdcalc.h
-        database/rrdcalctemplate.c
-        database/rrdcalctemplate.h
         database/rrdcollector.c
         database/rrdcollector.h
         database/rrddim.c

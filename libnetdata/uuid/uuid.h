@@ -19,7 +19,7 @@ typedef struct {
         } parts;
     };
 } UUID;
-UUID UUID_generate_from_hash(void *payload, size_t payload_len);
+UUID UUID_generate_from_hash(const void *payload, size_t payload_len);
 
 #define UUID_COMPACT_STR_LEN 33
 void uuid_unparse_lower_compact(const uuid_t uuid, char *out);

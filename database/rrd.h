@@ -110,7 +110,6 @@ struct ml_metrics_statistics {
 #include "rrdsetvar.h"
 #include "rrddimvar.h"
 #include "rrdcalc.h"
-#include "rrdcalctemplate.h"
 #include "rrdlabels.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
@@ -1273,9 +1272,6 @@ struct rrdhost {
 
     // all RRDCALCs are primarily allocated and linked here
     DICTIONARY *rrdcalc_root_index;
-
-    // templates of alarms
-    DICTIONARY *rrdcalctemplate_root_index;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log

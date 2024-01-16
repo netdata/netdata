@@ -128,32 +128,7 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
-
-        rrdcalc_link_matching_alerts_to_rrdset(st);
-        rrdcalctemplate_link_matching_templates_to_rrdset(st);
-
-        RRDDIM *rd;
-        rrddim_foreach_read(rd, st) {
-            if(!rrddim_flag_check(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
-            rrddim_flag_clear(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
-
-            worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM);
-
-            RRDCALCTEMPLATE *rt;
-            foreach_rrdcalctemplate_read(host, rt) {
-                if(!rt->config.foreach_dimension_pattern)
-                    continue;
-
-                if(rrdcalctemplate_check_rrdset_conditions(rt, st, host)) {
-                    rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
-                }
-            }
-            foreach_rrdcalctemplate_done(rt);
-
-            if (health_variable_check(health_globals.rrdvars, st, rd) || rrdset_flag_check(st, RRDSET_FLAG_HAS_RRDCALC_LINKED))
-                rrdvar_store_for_chart(host, st);
-        }
-        rrddim_foreach_done(rd);
+        health_prototype_alerts_for_rrdset_incrementally(st);
         must_postpone = true;
     }
     rrdset_foreach_done(st);
@@ -205,8 +180,6 @@ static inline int check_if_resumed_from_suspension(void) {
 static void health_event_loop(void) {
     bool health_running_logged = false;
 
-    rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
-
     unsigned int loop = 0;
 
     while(service_running(SERVICE_HEALTH)) {
@@ -250,8 +223,6 @@ static void health_event_loop(void) {
                 health_initialize_rrdhost(host);
 
             health_execute_delayed_initializations(host);
-
-            rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
 
             if (unlikely(apply_hibernation_delay)) {
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,

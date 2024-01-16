@@ -48,12 +48,14 @@
 typedef struct rrd_alert_prototype {
     struct rrd_alert_match match;
     struct rrd_alert_config config;
-    struct sql_alert_config sql;
 
-    size_t uses;
-    struct rrd_alert_prototype *prev, *next;
+    struct {
+        uint32_t uses;
+        SPINLOCK spinlock;
+        struct rrd_alert_prototype *prev, *next;
+    } _internal;
 } RRD_ALERT_PROTOTYPE;
-void health_prototype_add_unsafe(RRD_ALERT_PROTOTYPE *ap);
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap);
 
 struct health_plugin_globals {
     struct {
@@ -78,8 +80,7 @@ struct health_plugin_globals {
     } config;
 
     struct {
-        SPINLOCK spinlock;
-        RRD_ALERT_PROTOTYPE *base;
+        DICTIONARY *dict;
     } prototypes;
 
     DICTIONARY *rrdvars;
@@ -95,5 +96,7 @@ void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_u
 void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae);
 void health_alarm_log_process_to_send_notifications(RRDHOST *host);
 void health_alarm_wait_for_execution(ALARM_ENTRY *ae);
+
+bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *ap);
 
 #endif //NETDATA_HEALTH_INTERNALS_H

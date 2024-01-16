@@ -319,6 +319,25 @@ void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, con
     buffer_json_array_close(wb);
 }
 
+void web_client_api_request_v1_rrdcalc_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDCALC_OPTIONS options) {
+    buffer_json_member_add_array(wb, key);
+
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    for(int i = 0; api_v1_data_options[i].name ; i++) {
+        if (unlikely((api_v1_data_options[i].value & (RRDR_OPTIONS)options) && !(api_v1_data_options[i].value & used))) {
+            const char *name = api_v1_data_options[i].name;
+            used |= api_v1_data_options[i].value;
+
+            buffer_json_add_array_item_string(wb, name);
+        }
+    }
+
+    if(options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
+        buffer_json_add_array_item_string(wb, "no_clear_notification");
+
+    buffer_json_array_close(wb);
+}
+
 void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options) {
     char *write = buf;
     char *end = &buf[size - 1];

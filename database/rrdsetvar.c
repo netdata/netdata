@@ -231,7 +231,7 @@ void rrdsetvar_rename_all(RRDSET *st) {
     }
     dfe_done(rs);
 
-    rrdcalc_link_matching_alerts_to_rrdset(st);
+    health_prototype_reset_alerts_for_rrdset(st);
 }
 
 void rrdsetvar_release_and_delete_all(RRDSET *st) {

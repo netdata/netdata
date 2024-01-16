@@ -410,7 +410,6 @@ int is_legacy = 1;
         error_report("Host machine GUID %s is not valid", host->machine_guid);
 
     rrdfamily_index_init(host);
-    rrdcalctemplate_index_init(host);
     rrdcalc_rrdhost_index_init(host);
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
@@ -708,7 +707,6 @@ static void rrdhost_update(RRDHOST *host
                                    rrdpush_send_charts_matching);
 
         rrdfamily_index_init(host);
-        rrdcalctemplate_index_init(host);
         rrdcalc_rrdhost_index_init(host);
 
         if(rrdpush_enable_replication)
@@ -1274,7 +1272,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     // delete all the RRDSETs of the host
     rrdset_index_destroy(host);
     rrdcalc_rrdhost_index_destroy(host);
-    rrdcalctemplate_index_destroy(host);
 
     // cleanup ML resources
     ml_host_delete(host);

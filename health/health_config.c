@@ -200,45 +200,15 @@ static inline void parse_variables_and_store_in_health_rrdvars(char *value, size
     }
 }
 
-/**
- * Health pattern from Foreach
- *
- * Create a new simple pattern using the user input
- *
- * @param s the string that will be used to create the simple pattern.
- */
-
-static void dimension_remove_pipe_comma(char *str) {
-    while(*str) {
-        if(*str == '|' || *str == ',') *str = ' ';
-        str++;
-    }
-}
-
-static SIMPLE_PATTERN *health_pattern_from_foreach(const char *s) {
-    char *convert= strdupz(s);
-    SIMPLE_PATTERN *val = NULL;
-
-    if(convert) {
-        dimension_remove_pipe_comma(convert);
-        val = simple_pattern_create(convert, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(convert);
-    }
-
-    return val;
-}
-
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
         RRDR_TIME_GROUPING *group_method, int *after, int *before, int *every,
-        RRDCALC_OPTIONS *options, STRING **dimensions, STRING **foreachdim
+        RRDCALC_OPTIONS *options, STRING **dimensions
 ) {
     netdata_log_debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
 
     if(*dimensions) string_freez(*dimensions);
-    if(*foreachdim) string_freez(*foreachdim);
     *dimensions = NULL;
-    *foreachdim = NULL;
     *after = 0;
     *before = 0;
     *every = 0;
@@ -342,10 +312,6 @@ static inline int health_parse_db_lookup(
             }
             s = ++find;
         }
-        else if(!strcasecmp(key, HEALTH_FOREACH_KEY )) {
-            *foreachdim = string_strdupz(s);
-            break;
-        }
         else {
             netdata_log_error("Health configuration at line %zu of file '%s': unknown keyword '%s'",
                               line, filename, key);
@@ -392,42 +358,6 @@ static inline void strip_quotes(char *s) {
     }
 }
 
-void sql_alert_config_free(struct sql_alert_config *cfg)
-{
-    string_freez(cfg->alarm);
-    string_freez(cfg->template_key);
-    string_freez(cfg->os);
-    string_freez(cfg->host);
-    string_freez(cfg->on);
-    string_freez(cfg->plugin);
-    string_freez(cfg->module);
-    string_freez(cfg->charts);
-    string_freez(cfg->lookup);
-    string_freez(cfg->calc);
-    string_freez(cfg->warn);
-    string_freez(cfg->crit);
-    string_freez(cfg->every);
-    string_freez(cfg->green);
-    string_freez(cfg->red);
-    string_freez(cfg->exec);
-    string_freez(cfg->recipient);
-    string_freez(cfg->units);
-    string_freez(cfg->summary);
-    string_freez(cfg->info);
-    string_freez(cfg->classification);
-    string_freez(cfg->component);
-    string_freez(cfg->type);
-    string_freez(cfg->delay);
-    string_freez(cfg->options);
-    string_freez(cfg->repeat);
-    string_freez(cfg->host_labels);
-    string_freez(cfg->p_db_lookup_dimensions);
-    string_freez(cfg->p_db_lookup_method);
-    string_freez(cfg->chart_labels);
-    string_freez(cfg->source);
-    freez(cfg);
-}
-
 #define PARSE_HEALTH_CONFIG_DUPLICATE_STRING_MSG(ax, member) do {                                   \
     if(strcmp(string2str(ax->member), value) != 0)                                                  \
         netdata_log_error(                                                                          \
@@ -437,17 +367,12 @@ void sql_alert_config_free(struct sql_alert_config *cfg)
             string2str(ax->member), value, value);                                                  \
 } while(0)
 
-#define PARSE_HEALTH_CONFIG_LINE_STRING_NO_SQL_CFG(ax, member) do {                                 \
+#define PARSE_HEALTH_CONFIG_LINE_STRING(ax, member) do {                                            \
     if(ax->member) {                                                                                \
         PARSE_HEALTH_CONFIG_DUPLICATE_STRING_MSG(ax, member);                                       \
         string_freez(ax->member);                                                                   \
     }                                                                                               \
     ax->member = string_strdupz(value);                                                             \
-} while(0)
-
-#define PARSE_HEALTH_CONFIG_LINE_STRING(ax, member) do {                                            \
-    SQL_ALERT_CONFIG_TXT(alert_cfg, member, value);                                                 \
-    PARSE_HEALTH_CONFIG_LINE_STRING_NO_SQL_CFG(ax, member);                                         \
 } while(0)
 
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
@@ -525,7 +450,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
     RRD_ALERT_PROTOTYPE *ap = NULL;
     struct rrd_alert_config *ac = NULL;
     struct rrd_alert_match *am = NULL;
-    struct sql_alert_config *alert_cfg = NULL;
 
     size_t line = 0, append = 0;
     char *s;
@@ -581,13 +505,14 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         uint32_t hash = simple_uhash(key);
 
         if((hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) || (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY))) {
-            if(ap)
-                health_prototype_add_unsafe(ap);
+            if(ap) {
+                health_prototype_add(ap);
+                freez(ap);
+            }
 
             ap = callocz(1, sizeof(*ap));
             am = &ap->match;
             ac = &ap->config;
-            alert_cfg = &ap->sql;
 
             {
                 char *tmp = strdupz(value);
@@ -598,6 +523,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                 freez(tmp);
             }
 
+            ap->match.enabled = true;
             ap->match.is_template = (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY));
             ap->config.source = health_source_file(line, filename);
             ap->config.source_type = stock_config ? DYNCFG_SOURCE_TYPE_STOCK : DYNCFG_SOURCE_TYPE_USER;
@@ -606,27 +532,18 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             ap->config.delay_multiplier = 1;
             ap->config.warn_repeat_every = health_globals.config.default_warn_repeat_every;
             ap->config.crit_repeat_every = health_globals.config.default_crit_repeat_every;
-
-            if(ap->match.is_template)
-                SQL_ALERT_CONFIG_STRING_DUP(alert_cfg, template_key, ac->name);
-            else
-                SQL_ALERT_CONFIG_STRING_DUP(alert_cfg, alarm, ac->name);
-
-            SQL_ALERT_CONFIG_VALUE(alert_cfg, source, health_source_file(line, filename));
         }
-        else if(!am || !ac || !ap || !alert_cfg) {
+        else if(!am || !ac || !ap) {
             netdata_log_error(
                 "Health configuration at line %zu of file '%s' has unknown key '%s'. "
                 "Expected either '" HEALTH_ALARM_KEY "' or '" HEALTH_TEMPLATE_KEY "'.",
                 line, filename, key);
         }
         else if(!am->is_template && hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, on, value);
-            PARSE_HEALTH_CONFIG_LINE_STRING_NO_SQL_CFG(am, on.chart);
+            PARSE_HEALTH_CONFIG_LINE_STRING(am, on.chart);
         }
         else if(am->is_template && hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, on, value);
-            PARSE_HEALTH_CONFIG_LINE_STRING_NO_SQL_CFG(am, on.context);
+            PARSE_HEALTH_CONFIG_LINE_STRING(am, on.context);
         }
         else if(am->is_template && hash == hash_charts && !strcasecmp(key, HEALTH_CHARTS_KEY)) {
             PARSE_HEALTH_CONFIG_LINE_STRING(am, charts);
@@ -662,41 +579,19 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, type);
         }
         else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, lookup, value);
             health_parse_db_lookup(line, filename, value,
                                    &ac->group, &ac->after, &ac->before,
                                    &ac->update_every, &ac->options,
-                                   &ac->dimensions, &ac->foreach_dimension);
-
-            if(ac->foreach_dimension)
-                ac->foreach_dimension_pattern = health_pattern_from_foreach(string2str(ac->foreach_dimension));
-
-            if (ac->after) {
-                if (ac->dimensions)
-                    SQL_ALERT_CONFIG_STRING_DUP(alert_cfg, p_db_lookup_dimensions, ac->dimensions);
-
-                if (ac->group)
-                    SQL_ALERT_CONFIG_TXT(alert_cfg, p_db_lookup_method, time_grouping_method2string(ac->group));
-
-                SQL_ALERT_CONFIG_VALUE(alert_cfg, p_db_lookup_options, ac->options);
-                SQL_ALERT_CONFIG_VALUE(alert_cfg, p_db_lookup_after, ac->after);
-                SQL_ALERT_CONFIG_VALUE(alert_cfg, p_db_lookup_before, ac->before);
-                SQL_ALERT_CONFIG_VALUE(alert_cfg, p_update_every, ac->update_every);
-            }
+                                   &ac->dimensions);
         }
         else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, every, value);
-
             if(!config_parse_duration(value, &ac->update_every))
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
                     "cannot parse duration: '%s'.",
                     line, filename, string2str(ac->name), key, value);
-
-            SQL_ALERT_CONFIG_VALUE(alert_cfg, p_update_every, ac->update_every);
         }
         else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, green, value);
             char *e;
             ac->green = str2ndd(value, &e);
             if(e && *e) {
@@ -707,7 +602,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             }
         }
         else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, red, value);
             char *e;
             ac->red = str2ndd(value, &e);
             if(e && *e) {
@@ -718,7 +612,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             }
         }
         else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, calc, value);
             const char *failed_at = NULL;
             int error = 0;
             ac->calculation = expression_parse(value, &failed_at, &error);
@@ -727,11 +620,11 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
                     "has non-parseable expression '%s': %s at '%s'",
                     line, filename, string2str(ac->name), key, value, expression_strerror(error), failed_at);
+                am->enabled = false;
             }
             parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
         }
         else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, warn, value);
             const char *failed_at = NULL;
             int error = 0;
             ac->warning = expression_parse(value, &failed_at, &error);
@@ -740,11 +633,11 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
                     "has non-parseable expression '%s': %s at '%s'",
                     line, filename, string2str(ac->name), key, value, expression_strerror(error), failed_at);
+                am->enabled = false;
             }
             parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
         }
         else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, crit, value);
             const char *failed_at = NULL;
             int error = 0;
             ac->critical = expression_parse(value, &failed_at, &error);
@@ -753,6 +646,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
                     "has non-parseable expression '%s': %s at '%s'",
                     line, filename, string2str(ac->name), key, value, expression_strerror(error), failed_at);
+                am->enabled = false;
             }
             parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
         }
@@ -777,17 +671,14 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, info);
         }
         else if(hash == hash_delay && !strcasecmp(key, HEALTH_DELAY_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, delay, value);
             health_parse_delay(line, filename, value,
                                &ac->delay_up_duration, &ac->delay_down_duration,
                                &ac->delay_max_duration, &ac->delay_multiplier);
         }
         else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
-            SQL_ALERT_CONFIG_TXT(alert_cfg, options, value);
             ac->options |= health_parse_options(value);
         }
         else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
-            SQL_ALERT_CONFIG_TXT(alert_cfg, repeat, value);
             health_parse_repeat(line, filename, value,
                                 &ac->warn_repeat_every,
                                 &ac->crit_repeat_every);
@@ -801,8 +692,10 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         }
     }
 
-    if(ap)
-        health_prototype_add_unsafe(ap);
+    if(ap) {
+        health_prototype_add(ap);
+        freez(ap);
+    }
 
     fclose(fp);
     return 1;

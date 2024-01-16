@@ -25,9 +25,7 @@ typedef enum {
     RRDCALC_FLAG_DISABLED                   = (1 << 7),
     RRDCALC_FLAG_SILENCED                   = (1 << 8),
     RRDCALC_FLAG_RUN_ONCE                   = (1 << 9),
-    RRDCALC_FLAG_FROM_TEMPLATE              = (1 << 10), // the rrdcalc has been created from a template
 } RRDCALC_FLAGS;
-
 void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flags);
 
 typedef enum {
@@ -36,10 +34,11 @@ typedef enum {
     RRDCALC_OPTION_NO_CLEAR_NOTIFICATION    = RRDR_OPTION_HEALTH_RSRVD1,
 } RRDCALC_OPTIONS;
 
+void web_client_api_request_v1_rrdcalc_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDCALC_OPTIONS options);
+
 #define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
 
 struct rrd_alert_match {
-    STRING *dyncfg_prototype;
     bool enabled;
 
     bool is_template;
@@ -65,12 +64,9 @@ struct rrd_alert_match {
     SIMPLE_PATTERN *chart_labels_pattern;   // the simple pattern of chart labels
 };
 void rrd_alert_match_free(struct rrd_alert_match *am);
-STRING *health_alert_config_dyncfg_key(struct rrd_alert_match *am, const char *name, RRDHOST *host, RRDSET *st);
 
 struct rrd_alert_config {
     uuid_t hash_id;
-
-    STRING *dyncfg_key;
 
     STRING *name;                   // the name of this alarm
 
@@ -97,9 +93,7 @@ struct rrd_alert_config {
     // database lookup settings
 
     STRING *dimensions;             // the chart dimensions
-    STRING *foreach_dimension;      // the group of dimensions that the `foreach` will be applied.
-    SIMPLE_PATTERN *foreach_dimension_pattern; // used if and only if there is a simple pattern for the chart.
-    RRDR_TIME_GROUPING group;            // grouping method: average, max, etc.
+    RRDR_TIME_GROUPING group;       // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
     RRDCALC_OPTIONS options;        // configuration options
@@ -193,17 +187,11 @@ struct rrdcalc {
 #define rrdcalc_classification(rc) string2str((rc)->config.classification)
 #define rrdcalc_component(rc) string2str((rc)->config.component)
 #define rrdcalc_type(rc) string2str((rc)->config.type)
-#define rrdcalc_plugin_match(rc) string2str((rc)->match.plugin)
-#define rrdcalc_module_match(rc) string2str((rc)->match.module)
 #define rrdcalc_source(rc) string2str((rc)->config.source)
 #define rrdcalc_units(rc) string2str((rc)->config.units)
 #define rrdcalc_summary(rc) string2str((rc)->config.summary)
-#define rrdcalc_original_info(rc) string2str((rc)->original_info2)
 #define rrdcalc_info(rc) string2str((rc)->config.info)
 #define rrdcalc_dimensions(rc) string2str((rc)->config.dimensions)
-#define rrdcalc_foreachdim(rc) string2str((rc)->config.foreach_dimension)
-#define rrdcalc_host_labels(rc) string2str((rc)->match.host_labels)
-#define rrdcalc_chart_labels(rc) string2str((rc)->match.chart_labels)
 
 #define foreach_rrdcalc_in_rrdhost_read(host, rc) \
     dfe_start_read((host)->rrdcalc_root_index, rc) \
@@ -214,73 +202,9 @@ struct rrdcalc {
 #define foreach_rrdcalc_in_rrdhost_done(rc) \
     dfe_done(rc)
 
-#define SQL_ALERT_CONFIG_TXT(cfg, name, value) do {     \
-    if(cfg) {                                           \
-        string_freez(cfg->name);                        \
-        cfg->name = string_strdupz(value);              \
-    }                                                   \
-} while(0)
-
-#define SQL_ALERT_CONFIG_STRING_DUP(cfg, name, value) do {  \
-    if(cfg) {                                           \
-        string_freez(cfg->name);                        \
-        cfg->name = string_dup(value);                  \
-    }                                                   \
-} while(0)
-
-#define SQL_ALERT_CONFIG_VALUE(cfg, name, value) do {  \
-    if(cfg) {                                          \
-        cfg->name = value;                             \
-    }                                                  \
-} while(0)
-
-
-struct sql_alert_config {
-    STRING *alarm;
-    STRING *template_key;
-    STRING *os;
-    STRING *host;
-    STRING *on;
-    STRING *plugin;
-    STRING *module;
-    STRING *charts;
-    STRING *lookup;
-    STRING *calc;
-    STRING *warn;
-    STRING *crit;
-    STRING *every;
-    STRING *green;
-    STRING *red;
-    STRING *exec;
-    STRING *recipient;
-    STRING *units;
-    STRING *summary;
-    STRING *info;
-    STRING *classification;
-    STRING *component;
-    STRING *type;
-    STRING *delay;
-    STRING *options;
-    STRING *repeat;
-    STRING *host_labels;
-    STRING *chart_labels;
-    STRING *source;
-
-    STRING *p_db_lookup_dimensions;
-    STRING *p_db_lookup_method;
-
-    uint32_t p_db_lookup_options;
-    int32_t p_db_lookup_after;
-    int32_t p_db_lookup_before;
-    int32_t p_update_every;
-};
-void sql_alert_config_free(struct sql_alert_config *cfg);
-
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->config.after)
 
 void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc);
-
-void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st);
 
 const RRDCALC_ACQUIRED *rrdcalc_from_rrdset_get(RRDSET *st, const char *alert_name);
 void rrdcalc_from_rrdset_release(RRDSET *st, const RRDCALC_ACQUIRED *rca);
@@ -288,14 +212,7 @@ RRDCALC *rrdcalc_acquired_to_rrdcalc(const RRDCALC_ACQUIRED *rca);
 
 const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
-void rrdcalc_free_unused_rrdcalc_loaded_from_config(RRDCALC *rc);
-
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id);
-void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st, const char *overwrite_alert_name, const char *overwrite_dimensions);
-bool rrdcalc_add_from_config(RRDHOST *host, RRDCALC *rc);
-
-void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts();
-void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->config.warn_repeat_every > 0 || rc->config.crit_repeat_every > 0)) {

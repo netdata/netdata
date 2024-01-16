@@ -3,7 +3,7 @@
 #include "../libnetdata.h"
 
 
-UUID UUID_generate_from_hash(void *payload, size_t payload_len) {
+UUID UUID_generate_from_hash(const void *payload, size_t payload_len) {
     assert(sizeof(XXH128_hash_t) == sizeof(UUID));
 
     UUID uuid;

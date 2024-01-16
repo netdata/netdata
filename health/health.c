@@ -19,8 +19,7 @@ struct health_plugin_globals health_globals = {
         .postpone_alarms_during_hibernation_for_seconds = 60,
     },
     .prototypes = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-        .base = NULL,
+        .dict = NULL,
     }
 };
 
@@ -33,7 +32,7 @@ void health_plugin_disable(void) {
 }
 
 
-void health_load_config_defaults(void) {
+static void health_load_config_defaults(void) {
     char filename[FILENAME_MAX + 1];
 
     health_globals.config.enabled =
@@ -139,6 +138,7 @@ inline char *health_stock_config_dir(void) {
 }
 
 void health_plugin_init(void) {
+    health_init_prototypes();
     health_load_config_defaults();
 
     if(!health_plugin_enabled())

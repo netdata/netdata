@@ -86,8 +86,6 @@ void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int 
 #define health_log_alert(host, ae) health_log_alert_transition_with_trace(host, ae, __LINE__, __FILE__, __FUNCTION__)
 bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, uuid_t *transitions_id);
 
-bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, uuid_t *transitions_id);
-
 #include "health_prototypes.h"
 #include "health_silencers.h"
 
