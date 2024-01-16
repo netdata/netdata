@@ -533,7 +533,7 @@ static void prometheus_print_os_info(
 {
     FILE *fp;
     char filename[FILENAME_MAX + 1];
-    char buf[BUFSIZ];
+    char buf[BUFSIZ + 1];
     int first_line = 1;
 
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/etc/os-release");
@@ -549,7 +549,7 @@ static void prometheus_print_os_info(
 
     buffer_sprintf(wb, "netdata_os_info{instance=\"%s\"", rrdhost_hostname(host));
 
-    while (fgets(buf, BUFSIZ-1, fp)) {
+    while (fgets(buf, BUFSIZ, fp)) {
       char *in, *sanitized;
       char *key, *val;
       int in_val_part = 0;
