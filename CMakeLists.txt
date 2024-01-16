@@ -57,6 +57,14 @@ project(netdata
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
 
+include(FetchContent)
+
+set(SENTRY_VERSION 0.6.6)
+set(SENTRY_BACKEND crashpad)
+set(SENTRY_BUILD_SHARED_LIBS OFF)
+FetchContent_Declare(sentry URL https://github.com/getsentry/sentry-native/releases/download/${SENTRY_VERSION}/sentry-native.zip)
+FetchContent_MakeAvailable(sentry)
+
 find_package(PkgConfig REQUIRED)
 
 set(CMAKE_C_STANDARD 11)
@@ -113,6 +121,11 @@ option(ENABLE_BUNDLED_YAML "enable bundled yaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 
 option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
+
+option(ENABLE_SENTRY "enable sentry" True)
+set(NETDATA_SENTRY_ENVIRONMENT "MY_ENV_FROM_CI")
+set(NETDATA_SENTRY_RELEASE "MY_RELEASE_FROM_CI")
+set(NETDATA_SENTRY_DIST "MY_DIST_FROM_CI")
 
 #
 # handling of extra compiler flags
@@ -1282,6 +1295,12 @@ if(LINUX)
                 ${PROC_PLUGIN_FILES}
                 ${TC_PLUGIN_FILES}
         )
+
+        if(ENABLE_SENTRY)
+            list(APPEND NETDATA_FILES
+                    daemon/sentry-native/sentry-native.c
+                    daemon/sentry-native/sentry-native.h)
+        endif()
 elseif(MACOS)
         list(APPEND NETDATA_FILES
                 daemon/static_threads_macos.c
@@ -2011,6 +2030,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
+        "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
 )
 
 #

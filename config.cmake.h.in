@@ -109,6 +109,13 @@
 #cmakedefine ENABLE_PLUGIN_CGROUP_NETWORK
 #cmakedefine ENABLE_PLUGIN_EBPF
 
+// enabled sentry
+
+#cmakedefine ENABLE_SENTRY
+#cmakedefine NETDATA_SENTRY_ENVIRONMENT "@NETDATA_SENTRY_ENVIRONMENT@"
+#cmakedefine NETDATA_SENTRY_RELEASE "@NETDATA_SENTRY_RELEASE@"
+#cmakedefine NETDATA_SENTRY_DIST "@NETDATA_SENTRY_DIST@"
+
 // enabled bundling
 
 #cmakedefine ENABLE_BUNDLED_JSONC
@@ -124,6 +131,7 @@
 #cmakedefine PLUGINS_DIR "@PLUGINS_DIR@"
 #cmakedefine WEB_DIR "@WEB_DIR@"
 #cmakedefine VARLIB_DIR "@VARLIB_DIR@"
+
 
 // config command, user and version
 

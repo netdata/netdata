@@ -60,7 +60,7 @@ override_dh_auto_configure:
 		-DENABLE_CLOUD=On \
 		-DENABLE_DBENGINE=On \
 		-DENABLE_H2O=On \
-		-DENABLE_ML=On \
+		-DENABLE_ML=Off \
 		-DENABLE_PLUGIN_APPS=On \
 		-DENABLE_PLUGIN_CGROUP_NETWORK=On \
 		-DENABLE_PLUGIN_DEBUGFS=On \
@@ -77,10 +77,21 @@ override_dh_auto_configure:
 		-DENABLE_EXPORTER_MONGODB=On \
 		-DENABLE_BUNDLED_PROTOBUF=Off \
 		-DENABLE_BUNDLED_JSONC=Off \
-		-DENABLE_BUNDLED_YAML=Off
+		-DENABLE_BUNDLED_YAML=Off \
+	  -DENABLE_SENTRY=On \
+    -DNETDATA_SENTRY_ENVIRONMENT="${ENVIRONMENT_VARIABLE_FROM_CI}" \
+    -DNETDATA_SENTRY_RELEASE="${RELEASE_VARIABLE_FROM_CI}" \
+    -DNETDATA_SENTRY_DIST="${DIST_VARIABLE_FROM_CI}"
 
 override_dh_auto_test:
 	true
+
+override_dh_strip:
+	# Upload debug symbols with sentry-cli
+	# sentry-cli ...
+
+  # continue with the strip step
+  dh_strip
 
 override_dh_install:
 	cp -v $(BASE_CONFIG) debian/netdata.conf
