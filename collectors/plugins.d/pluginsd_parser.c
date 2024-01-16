@@ -1264,117 +1264,86 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     return count;
 }
 
-PARSER_RC parser_execute(PARSER *parser, PARSER_KEYWORD *keyword, char **words, size_t num_words) {
+#include "gperf-hashtable.h"
+
+PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words) {
     switch(keyword->id) {
-        case 1:
+        case PLUGINSD_KEYWORD_ID_SET2:
             return pluginsd_set_v2(words, num_words, parser);
-
-        case 2:
+        case PLUGINSD_KEYWORD_ID_BEGIN2:
             return pluginsd_begin_v2(words, num_words, parser);
-
-        case 3:
+        case PLUGINSD_KEYWORD_ID_END2:
             return pluginsd_end_v2(words, num_words, parser);
-
-        case 11:
+        case PLUGINSD_KEYWORD_ID_SET:
             return pluginsd_set(words, num_words, parser);
-
-        case 12:
+        case PLUGINSD_KEYWORD_ID_BEGIN:
             return pluginsd_begin(words, num_words, parser);
-
-        case 13:
+        case PLUGINSD_KEYWORD_ID_END:
             return pluginsd_end(words, num_words, parser);
-
-        case 21:
+        case PLUGINSD_KEYWORD_ID_RSET:
             return pluginsd_replay_set(words, num_words, parser);
-
-        case 22:
+        case PLUGINSD_KEYWORD_ID_RBEGIN:
             return pluginsd_replay_begin(words, num_words, parser);
-
-        case 23:
+        case PLUGINSD_KEYWORD_ID_RDSTATE:
             return pluginsd_replay_rrddim_collection_state(words, num_words, parser);
-
-        case 24:
+        case PLUGINSD_KEYWORD_ID_RSSTATE:
             return pluginsd_replay_rrdset_collection_state(words, num_words, parser);
-
-        case 25:
+        case PLUGINSD_KEYWORD_ID_REND:
             return pluginsd_replay_end(words, num_words, parser);
-
-        case 31:
+        case PLUGINSD_KEYWORD_ID_DIMENSION:
             return pluginsd_dimension(words, num_words, parser);
-
-        case 32:
+        case PLUGINSD_KEYWORD_ID_CHART:
             return pluginsd_chart(words, num_words, parser);
-
-        case 33:
+        case PLUGINSD_KEYWORD_ID_CHART_DEFINITION_END:
             return pluginsd_chart_definition_end(words, num_words, parser);
-
-        case 34:
+        case PLUGINSD_KEYWORD_ID_CLABEL:
             return pluginsd_clabel(words, num_words, parser);
-
-        case 35:
+        case PLUGINSD_KEYWORD_ID_CLABEL_COMMIT:
             return pluginsd_clabel_commit(words, num_words, parser);
-
-        case 41:
+        case PLUGINSD_KEYWORD_ID_FUNCTION:
             return pluginsd_function(words, num_words, parser);
-
-        case 42:
+        case PLUGINSD_KEYWORD_ID_FUNCTION_RESULT_BEGIN:
             return pluginsd_function_result_begin(words, num_words, parser);
-
-        case 43:
+        case PLUGINSD_KEYWORD_ID_FUNCTION_PROGRESS:
             return pluginsd_function_progress(words, num_words, parser);
-
-        case 51:
+        case PLUGINSD_KEYWORD_ID_LABEL:
             return pluginsd_label(words, num_words, parser);
-
-        case 52:
+        case PLUGINSD_KEYWORD_ID_OVERWRITE:
             return pluginsd_overwrite(words, num_words, parser);
-
-        case 53:
+        case PLUGINSD_KEYWORD_ID_VARIABLE:
             return pluginsd_variable(words, num_words, parser);
-
-        case 61:
+        case PLUGINSD_KEYWORD_ID_CLAIMED_ID:
             return streaming_claimed_id(words, num_words, parser);
-
-        case 71:
+        case PLUGINSD_KEYWORD_ID_HOST:
             return pluginsd_host(words, num_words, parser);
-
-        case 72:
+        case PLUGINSD_KEYWORD_ID_HOST_DEFINE:
             return pluginsd_host_define(words, num_words, parser);
-
-        case 73:
+        case PLUGINSD_KEYWORD_ID_HOST_DEFINE_END:
             return pluginsd_host_define_end(words, num_words, parser);
-
-        case 74:
+        case PLUGINSD_KEYWORD_ID_HOST_LABEL:
             return pluginsd_host_labels(words, num_words, parser);
-
-        case 97:
+        case PLUGINSD_KEYWORD_ID_FLUSH:
             return pluginsd_flush(words, num_words, parser);
-
-        case 98:
+        case PLUGINSD_KEYWORD_ID_DISABLE:
             return pluginsd_disable(words, num_words, parser);
-
-        case 99:
+        case PLUGINSD_KEYWORD_ID_EXIT:
             return pluginsd_exit(words, num_words, parser);
-
-        case 100:
+        case PLUGINSD_KEYWORD_ID_CONFIG:
             return pluginsd_config(words, num_words, parser);
 
-        case 901:
-        case 902:
-        case 903:
-        case 904:
-        case 905:
-        case 906:
+        case PLUGINSD_KEYWORD_ID_DYNCFG_ENABLE:
+        case PLUGINSD_KEYWORD_ID_DYNCFG_REGISTER_MODULE:
+        case PLUGINSD_KEYWORD_ID_DYNCFG_REGISTER_JOB:
+        case PLUGINSD_KEYWORD_ID_DYNCFG_RESET:
+        case PLUGINSD_KEYWORD_ID_REPORT_JOB_STATUS:
+        case PLUGINSD_KEYWORD_ID_DELETE_JOB:
             return pluginsd_dyncfg_noop(words, num_words, parser);
 
         default:
-            break;
+            netdata_log_error("Unknown keyword '%s' with id %zu", keyword->keyword, keyword->id);
+            return PARSER_RC_ERROR;;
     }
-
-    fatal("Unknown keyword '%s' with id %zu", keyword->keyword, keyword->id);
 }
-
-#include "gperf-hashtable.h"
 
 void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire) {
     parser->repertoire = repertoire;
@@ -1409,7 +1378,7 @@ int pluginsd_parser_unittest(void) {
             strncpyz(input, lines[line], PLUGINSD_LINE_MAX);
             size_t num_words = quoted_strings_splitter_pluginsd(input, words, PLUGINSD_MAX_WORDS);
             const char *command = get_word(words, num_words, 0);
-            PARSER_KEYWORD *keyword = parser_find_keyword(p, command);
+            const PARSER_KEYWORD *keyword = parser_find_keyword(p, command);
             if(unlikely(!keyword))
                 fatal("Cannot parse the line '%s'", lines[line]);
             count++;
