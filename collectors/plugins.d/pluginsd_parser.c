@@ -1340,7 +1340,8 @@ PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **w
             return pluginsd_dyncfg_noop(words, num_words, parser);
 
         default:
-            fatal("Unknown keyword '%s' with id %zu", keyword->keyword, keyword->id);
+            netdata_log_error("Unknown keyword '%s' with id %zu", keyword->keyword, keyword->id);
+            return PARSER_RC_ERROR;;
     }
 }
 
