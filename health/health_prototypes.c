@@ -319,6 +319,12 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
     // activate the match patterns in it
     health_prototype_activate_match_patterns(&ap->match);
 
+    if(!ap->config.exec)
+        ap->config.exec = string_dup(health_globals.config.default_exec);
+
+    if(!ap->config.recipient)
+        ap->config.recipient = string_dup(health_globals.config.default_recipient);
+
     // add it to the prototypes
     dictionary_set(health_globals.prototypes.dict, string2str(ap->config.name), ap, sizeof(*ap));
 
@@ -327,8 +333,210 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
+#define DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX "health:alert:prototype"
+
+static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source) {
+    int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+    switch(cmd) {
+        case DYNCFG_CMD_ADD:
+            code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "add not implemented yet for prototype templates");
+            break;
+
+        case DYNCFG_CMD_SCHEMA:
+            code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "schema not implemented yet for prototype templates");
+            break;
+
+        case DYNCFG_CMD_REMOVE:
+        case DYNCFG_CMD_RESTART:
+        case DYNCFG_CMD_DISABLE:
+        case DYNCFG_CMD_ENABLE:
+        case DYNCFG_CMD_UPDATE:
+        case DYNCFG_CMD_TEST:
+        case DYNCFG_CMD_GET:
+            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "action given is not supported for prototype templates");
+            break;
+
+        case DYNCFG_CMD_NONE:
+            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "invalid action received for prototype templates");
+            break;
+    }
+
+    return code;
+}
+
+static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source, const char *alert_name) {
+    int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+    switch(cmd) {
+        case DYNCFG_CMD_ADD:
+            code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "add not implemented yet");
+            break;
+
+        case DYNCFG_CMD_SCHEMA:
+            code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "schema not implemented yet");
+            break;
+
+        case DYNCFG_CMD_GET:
+            {
+                const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(health_globals.prototypes.dict, alert_name);
+                if(!item)
+                    return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "no alert prototype is available by the name given");
+
+                RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
+                health_prototype_to_json(result, ap, false);
+                dictionary_acquired_item_release(health_globals.prototypes.dict, item);
+                code = HTTP_RESP_OK;
+            }
+            break;
+
+        case DYNCFG_CMD_REMOVE:
+        case DYNCFG_CMD_RESTART:
+        case DYNCFG_CMD_DISABLE:
+        case DYNCFG_CMD_ENABLE:
+        case DYNCFG_CMD_UPDATE:
+        case DYNCFG_CMD_TEST:
+            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "action given is not supported for the prototype template");
+            break;
+
+        case DYNCFG_CMD_NONE:
+            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "invalid action received");
+            break;
+    }
+
+    return code;
+}
+
+static int dyncfg_health_rrdcalc_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source, const char *hostname, const char *alert_name) {
+    // find the host
+
+    RRDHOST *host = rrdhost_find_by_hostname(hostname);
+    if(!host)
+        return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "the hostname given is not found");
+
+    // find the alert
+
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdcalc_root_index, alert_name);
+    if(!item)
+        return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "the alert instance given is not found");
+
+    int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+
+    RRDCALC *rc = dictionary_acquired_item_value(item);
+
+    switch(cmd) {
+        case DYNCFG_CMD_NONE:
+        case DYNCFG_CMD_ADD:
+        case DYNCFG_CMD_RESTART:
+            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "invalid action received");
+            break;
+
+        case DYNCFG_CMD_REMOVE:
+            if(rc->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG)
+                code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "remove action is not supported for not dynamically configured alerts, use disable");
+            else {
+                dictionary_del(host->rrdcalc_root_index, alert_name);
+                code = dyncfg_default_response(result, HTTP_RESP_OK, "alert removed");
+            }
+            break;
+
+        case DYNCFG_CMD_DISABLE:
+        case DYNCFG_CMD_ENABLE:
+        case DYNCFG_CMD_UPDATE:
+        case DYNCFG_CMD_TEST:
+        case DYNCFG_CMD_SCHEMA:
+            code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "action not implemented yet");
+            break;
+
+        case DYNCFG_CMD_GET:
+        {
+            RRD_ALERT_PROTOTYPE ap = { 0 };
+            ap.match = rc->match;
+            ap.config = rc->config;
+            health_prototype_to_json(result, &ap, false);
+            code = HTTP_RESP_OK;
+        }
+        break;
+    }
+
+    dictionary_acquired_item_release(host->rrdcalc_root_index, item);
+
+    return code;
+}
+
+int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYNCFG_CMDS cmd,
+                     BUFFER *payload, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+                     BUFFER *result, const char *source, void *data __maybe_unused) {
+
+    char buf[strlen(id) + 1];
+    memcpy(buf, id, sizeof(buf));
+
+    char *words[100] = { NULL };
+    size_t num_words = quoted_strings_splitter_dyncfg_id(buf, words, 100);
+    size_t i = 0;
+    int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+
+    char *health_prefix = get_word(words, num_words, i++);
+    if(!health_prefix || !*health_prefix || strcmp(health_prefix, "health") != 0)
+        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "first component of id is not 'health'");
+
+    char *alert_prefix = get_word(words, num_words, i++);
+    if(!alert_prefix || !*alert_prefix || strcmp(alert_prefix, "alert") != 0)
+        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "second component of id is not 'alert'");
+
+    char *type_prefix = get_word(words, num_words, i++);
+    if(type_prefix && *type_prefix && strcmp(type_prefix, "prototype") == 0) {
+        char *alert_name = get_word(words, num_words, i++);
+        if(!alert_name || !*alert_name) {
+            // action on the prototype template
+
+            code = dyncfg_health_prototype_template_action(result, cmd, payload, source);
+        }
+        else {
+            // action on a specific alert prototype
+
+            code = dyncfg_health_prototype_action(result, cmd, payload, source, alert_name);
+        }
+    }
+    else if(type_prefix && *type_prefix && strncmp(type_prefix, "node[", 5) == 0) {
+        // action on a specific alert instance
+
+        char *hostname = &type_prefix[5];
+        if(*hostname)
+            hostname[strlen(hostname) - 1] = '\0'; // remove the ']'
+
+        if(!*hostname)
+            return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "no hostname name found in the id");
+
+        char *alert_name = get_word(words, num_words, i++);
+        if(!alert_name || !*alert_name)
+            return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "no alert name found in the id");
+
+        code = dyncfg_health_rrdcalc_action(result, cmd, payload, source, hostname, alert_name);
+    }
+    else
+        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "third component of id is not 'prototype' or 'node'");
+
+    return code;
+}
+
 void health_reload_prototypes(void) {
+    char key[HEALTH_CONF_MAX_LINE];
+    RRD_ALERT_PROTOTYPE *ap;
+
+    // remove dyncfg
+    // it is ok if they are not added before
+
+    dfe_start_read(health_globals.prototypes.dict, ap) {
+        snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
+        dyncfg_del(localhost, key);
+    }
+    dfe_done(ap);
+    dyncfg_del(localhost, DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX);
+
+    // clear old prototypes from memory
+
     dictionary_flush(health_globals.prototypes.dict);
+
+    // load the prototypes from disk
 
     recursive_config_double_dir_load(
         health_user_config_dir(),
@@ -336,6 +544,25 @@ void health_reload_prototypes(void) {
         NULL,
         health_readfile,
         NULL, 0);
+
+    // add dyncfg
+    // this will update them with current dyncfg configuration
+
+    dyncfg_add(localhost,
+        DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX, "/health/alerts/prototypes",
+               DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE_TEMPLATE,
+               DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
+               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD, dyncfg_health_cb, NULL);
+
+    dfe_start_read(health_globals.prototypes.dict, ap) {
+        snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
+        dyncfg_add(localhost, key, "/health/alerts/prototypes",
+                   ap->match.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
+                   ap->config.source_type, string2str(ap->config.source),
+                   DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST,
+                   dyncfg_health_cb, NULL);
+    }
+    dfe_done(ap);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

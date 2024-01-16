@@ -260,12 +260,8 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     else if(c == DYNCFG_CMD_SCHEMA) {
         bool loaded = false;
         if(df->type == DYNCFG_TYPE_JOB) {
-            char template[strlen(id) + 1];
-            memcpy(template, id, sizeof(template));
-            char *colon = strrchr(template, ':');
-            if(colon) *colon = '\0';
-            if(template[0])
-                loaded = dyncfg_get_schema(template, rfe->result.wb);
+            if(df->template)
+                loaded = dyncfg_get_schema(string2str(df->template), rfe->result.wb);
         }
         else
             loaded = dyncfg_get_schema(id, rfe->result.wb);

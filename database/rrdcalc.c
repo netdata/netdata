@@ -158,7 +158,7 @@ void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
         if (rc->labels_version != labels_version) {
             STRING *old;
 
-            old = rc->config.info;
+            old = rc->info;
             rc->info = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.info), rc);
             string_freez(old);
 
@@ -185,7 +185,7 @@ void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
 
 #define RRDCALC_MAX_KEY_SIZE 1024
 static size_t rrdcalc_key(char *dst, size_t dst_len, const char *chart, const char *alert) {
-    return snprintfz(dst, dst_len, "%s/%s", chart, alert);
+    return snprintfz(dst, dst_len, "%s,on[%s]", alert, chart);
 }
 
 const RRDCALC_ACQUIRED *rrdcalc_from_rrdset_get(RRDSET *st, const char *alert_name) {

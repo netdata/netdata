@@ -4,6 +4,10 @@
 #include "health_internals.h"
 
 struct health_plugin_globals health_globals = {
+    .initialization = {
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .done = false,
+    },
     .config = {
         .enabled = true,
         .stock_enabled = true,
@@ -138,23 +142,30 @@ inline char *health_stock_config_dir(void) {
 }
 
 void health_plugin_init(void) {
+    spinlock_lock(&health_globals.initialization.spinlock);
+
+    if(health_globals.initialization.done)
+        goto cleanup;
+
+    health_globals.initialization.done = true;
+
     health_init_prototypes();
     health_load_config_defaults();
 
-    if(!health_plugin_enabled())
-        return;
+    health_globals.rrdvars = health_rrdvariables_create();
 
-    if (!health_globals.rrdvars)
-        health_globals.rrdvars = health_rrdvariables_create();
+    if(!health_plugin_enabled())
+        goto cleanup;
 
     health_reload_prototypes();
     health_silencers_init();
+
+cleanup:
+    spinlock_unlock(&health_globals.initialization.spinlock);
 }
 
 void health_plugin_destroy(void) {
-    if(health_globals.rrdvars)
-        dictionary_destroy(health_globals.rrdvars);
-
+    dictionary_destroy(health_globals.rrdvars);
     health_globals.rrdvars = NULL;
 }
 

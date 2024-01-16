@@ -641,7 +641,7 @@ const char *time_grouping_method2string(RRDR_TIME_GROUPING group) {
         }
     }
 
-    return "unknown-group-method";
+    return "";
 }
 
 RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def) {

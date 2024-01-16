@@ -59,6 +59,11 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap);
 
 struct health_plugin_globals {
     struct {
+        SPINLOCK spinlock;
+        bool done;
+    } initialization;
+
+    struct {
         bool enabled;
         bool stock_enabled;
         bool use_summary_for_notifications;

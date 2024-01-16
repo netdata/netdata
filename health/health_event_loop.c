@@ -117,6 +117,8 @@ static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
 }
 
 static void health_execute_delayed_initializations(RRDHOST *host) {
+    health_plugin_init();
+
     RRDSET *st;
     bool must_postpone = false;
 
@@ -137,6 +139,8 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 }
 
 static void health_initialize_rrdhost(RRDHOST *host) {
+    health_plugin_init();
+
     if(!host->health.health_enabled ||
         rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
         !service_running(SERVICE_HEALTH))

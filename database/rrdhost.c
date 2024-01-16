@@ -1048,7 +1048,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         dbengine_enabled = true;
     }
     else {
-        health_plugin_init();
         rrdpush_init();
 
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
@@ -1113,6 +1112,10 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         return 1;
 
     dyncfg_host_init(localhost);
+
+    if(!unittest) {
+        health_plugin_init();
+    }
 
     // we register this only on localhost
     // for the other nodes, the origin server should register it
