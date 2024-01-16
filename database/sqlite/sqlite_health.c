@@ -961,205 +961,237 @@ void sql_health_alarm_log_load(RRDHOST *host)
 
 int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
 {
-//    static __thread sqlite3_stmt *res = NULL;
-//    int rc, param = 0;
-//
-//    if (unlikely(!db_meta)) {
-//        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
-//            return 0;
-//        error_report("Database has not been initialized");
-//        return 1;
-//    }
-//
-//    if (unlikely(!res)) {
-//        rc = prepare_statement(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res);
-//        if (unlikely(rc != SQLITE_OK)) {
-//            error_report("Failed to prepare statement to store alert configuration, rc = %d", rc);
-//            return 1;
-//        }
-//    }
-//
-//    rc = sqlite3_bind_blob(res, ++param, hash_id, sizeof(*hash_id), SQLITE_STATIC);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->alarm, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->template_key, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->on, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->classification, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->component, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->type, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->os, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->host, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
+    static __thread sqlite3_stmt *res = NULL;
+    int rc, param = 0;
+    BUFFER *buf = buffer_create(128, NULL);
+
+    if (unlikely(!db_meta)) {
+        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+            return 0;
+        error_report("Database has not been initialized");
+        return 1;
+    }
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("Failed to prepare statement to store alert configuration, rc = %d", rc);
+            return 1;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, ++param, &ap->config.hash_id, sizeof(ap->config.hash_id), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (ap->match.is_template)
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, NULL, ++param);
+    else
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.name, ++param);
+
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (ap->match.is_template)
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.name, ++param);
+    else
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, NULL, ++param);
+
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (ap->match.is_template)
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.on.context, ++param);
+    else
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.on.chart, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.classification, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.component, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.type, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.os, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.host, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, NULL, ++param);
 //    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->lookup, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->every, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->units, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->calc, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->plugin, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->module, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->charts, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->green, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->red, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->warn, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->crit, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->exec, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->recipient, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->info, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->delay, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res,  ++param, ap->config.update_every);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.units, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.calculation ? ap->config.calculation->source : NULL, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.plugin, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.module, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.charts, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_double(res, ++param, ap->config.green);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_double(res, ++param, ap->config.red);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res,  ap->config.warning ? ap->config.warning->source : NULL, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.critical ? ap->config.critical->source : NULL, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.exec, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.recipient, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.info, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (ap->config.delay_up_duration)
+        buffer_sprintf(buf, "up %ds ", ap->config.delay_up_duration);
+
+    if (ap->config.delay_down_duration)
+        buffer_sprintf(buf, "down %ds ", ap->config.delay_down_duration);
+
+    if (ap->config.delay_multiplier)
+        buffer_sprintf(buf, "multiplier %.1f ", ap->config.delay_multiplier);
+
+    if (ap->config.delay_max_duration)
+        buffer_sprintf(buf, "max %ds", ap->config.delay_max_duration);
+
+    // delay
+    rc = sqlite3_bind_text(res, ++param, buffer_tostring(buf), -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (ap->config.options == RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
+        rc = sqlite3_bind_text(res, ++param, "no-clear-notification", -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, ++param);
 //    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->options, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->repeat, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->host_labels, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    if (cfg->p_db_lookup_after) {
-//        rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->p_db_lookup_dimensions, ++param);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//
-//        rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->p_db_lookup_method, ++param);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//
-//        rc = sqlite3_bind_int(res, ++param, (int) cfg->p_db_lookup_options);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//
-//        rc = sqlite3_bind_int(res, ++param, (int) cfg->p_db_lookup_after);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//
-//        rc = sqlite3_bind_int(res, ++param, (int) cfg->p_db_lookup_before);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//    } else {
-//        rc = sqlite3_bind_null(res, ++param);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//
-//        rc = sqlite3_bind_null(res, ++param);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//
-//        rc = sqlite3_bind_null(res, ++param);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//
-//        rc = sqlite3_bind_null(res, ++param);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//
-//        rc = sqlite3_bind_null(res, ++param);
-//        if (unlikely(rc != SQLITE_OK))
-//            goto bind_fail;
-//    }
-//
-//    rc = sqlite3_bind_int(res, ++param, cfg->p_update_every);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->source, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->chart_labels, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->summary, ++param);
-//    if (unlikely(rc != SQLITE_OK))
-//        goto bind_fail;
-//
-//    rc = execute_insert(res);
-//    if (unlikely(rc != SQLITE_DONE))
-//        error_report("Failed to store alert config, rc = %d", rc);
-//
-//    rc = sqlite3_reset(res);
-//    if (unlikely(rc != SQLITE_OK))
-//        error_report("Failed to reset statement in alert hash_id store function, rc = %d", rc);
-//
-//    return 0;
-//
-//bind_fail:
-//    error_report("Failed to bind parameter %d to store alert hash_id, rc = %d", param, rc);
-//    rc = sqlite3_reset(res);
-//    if (unlikely(rc != SQLITE_OK))
-//        error_report("Failed to reset statement in alert hash_id store function, rc = %d", rc);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, ap->config.update_every);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.host_labels, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    if (ap->config.after) {
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.dimensions, ++param);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        rc = sqlite3_bind_text(res, ++param, time_grouping_method2string(ap->config.group), -1, SQLITE_STATIC);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        rc = sqlite3_bind_int(res, ++param, (int) ap->config.options);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        rc = sqlite3_bind_int64(res, ++param, (int) ap->config.after);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        rc = sqlite3_bind_int64(res, ++param, (int) ap->config.before);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+    } else {
+        rc = sqlite3_bind_null(res, ++param);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        rc = sqlite3_bind_null(res, ++param);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        rc = sqlite3_bind_null(res, ++param);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        rc = sqlite3_bind_null(res, ++param);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+
+        rc = sqlite3_bind_null(res, ++param);
+        if (unlikely(rc != SQLITE_OK))
+            goto bind_fail;
+    }
+
+    rc = sqlite3_bind_int(res, ++param, ap->config.update_every);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.source, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.chart_labels, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.summary, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = execute_insert(res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store alert config, rc = %d", rc);
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement in alert hash_id store function, rc = %d", rc);
+
+    buffer_free(buf);
+    return 0;
+
+bind_fail:
+    buffer_free(buf);
+    error_report("Failed to bind parameter %d to store alert hash_id, rc = %d", param, rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement in alert hash_id store function, rc = %d", rc);
     return 1;
 }
 
@@ -1169,7 +1201,7 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
   skip hash calculations
 */
 void sql_alert_hash_and_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused) {
-    // (void)sql_store_alert_config_hash( (uuid_t *)&hash_value, cfg);
+    (void)sql_store_alert_config_hash(ap);
 }
 
 #define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT                                                                          \
