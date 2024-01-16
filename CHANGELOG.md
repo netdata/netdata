@@ -6,15 +6,22 @@
 
 **Merged pull requests:**
 
+- Add additional fail reason and source during database initialization [\#16794](https://github.com/netdata/netdata/pull/16794) ([stelfrag](https://github.com/stelfrag))
+- Use original summary for alert transition [\#16793](https://github.com/netdata/netdata/pull/16793) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations.js [\#16792](https://github.com/netdata/netdata/pull/16792) ([netdatabot](https://github.com/netdatabot))
+- Update role-based-access.md [\#16791](https://github.com/netdata/netdata/pull/16791) ([vkuznecovas](https://github.com/vkuznecovas))
+- Free key and search, replace patterns [\#16789](https://github.com/netdata/netdata/pull/16789) ([stelfrag](https://github.com/stelfrag))
 - diskspace: reworked the cleanup to fix race conditions [\#16786](https://github.com/netdata/netdata/pull/16786) ([ktsaou](https://github.com/ktsaou))
 - diskspace missing mutex use [\#16784](https://github.com/netdata/netdata/pull/16784) ([ktsaou](https://github.com/ktsaou))
 - Remove h2o header from libnetdata [\#16780](https://github.com/netdata/netdata/pull/16780) ([vkalintiris](https://github.com/vkalintiris))
+- Update telegram documentation [\#16777](https://github.com/netdata/netdata/pull/16777) ([thiagoftsm](https://github.com/thiagoftsm))
 - Delete unused variable. [\#16776](https://github.com/netdata/netdata/pull/16776) ([vkalintiris](https://github.com/vkalintiris))
 - Use unsigned char for binary data in mqtt. [\#16775](https://github.com/netdata/netdata/pull/16775) ([vkalintiris](https://github.com/vkalintiris))
 - Fix warning. [\#16774](https://github.com/netdata/netdata/pull/16774) ([vkalintiris](https://github.com/vkalintiris))
 - fix thread name on fatal and cgroup netdev rename crash [\#16771](https://github.com/netdata/netdata/pull/16771) ([ktsaou](https://github.com/ktsaou))
 - allow POST requests to be received from ACLK [\#16770](https://github.com/netdata/netdata/pull/16770) ([ktsaou](https://github.com/ktsaou))
 - Keep transaction id of request headers [\#16769](https://github.com/netdata/netdata/pull/16769) ([ktsaou](https://github.com/ktsaou))
+- Change default build directory in installer to `build`. [\#16768](https://github.com/netdata/netdata/pull/16768) ([Ferroin](https://github.com/Ferroin))
 - Fix coverity issues [\#16766](https://github.com/netdata/netdata/pull/16766) ([stelfrag](https://github.com/stelfrag))
 - Add missing call for aral\_freez \(eBPF\) [\#16765](https://github.com/netdata/netdata/pull/16765) ([thiagoftsm](https://github.com/thiagoftsm))
 - /api/v1/config tree improvements and swagger documentation [\#16764](https://github.com/netdata/netdata/pull/16764) ([ktsaou](https://github.com/ktsaou))
@@ -78,6 +85,7 @@
 - fix compiler warnings [\#16665](https://github.com/netdata/netdata/pull/16665) ([ktsaou](https://github.com/ktsaou))
 - dont exceed buffer boundaries, when the buffer is empty [\#16664](https://github.com/netdata/netdata/pull/16664) ([ktsaou](https://github.com/ktsaou))
 - set log level of too-old-data message to debug  [\#16663](https://github.com/netdata/netdata/pull/16663) ([ilyam8](https://github.com/ilyam8))
+- Improve context load  [\#16659](https://github.com/netdata/netdata/pull/16659) ([stelfrag](https://github.com/stelfrag))
 - Shutdown dbengine event loop properly [\#16658](https://github.com/netdata/netdata/pull/16658) ([stelfrag](https://github.com/stelfrag))
 - docs: Correct chart\_labels summary [\#16656](https://github.com/netdata/netdata/pull/16656) ([sepek](https://github.com/sepek))
 - Fix coverity issues [\#16655](https://github.com/netdata/netdata/pull/16655) ([stelfrag](https://github.com/stelfrag))
@@ -396,8 +404,6 @@
 - Fix statistics calculation in 32bit systems [\#16222](https://github.com/netdata/netdata/pull/16222) ([stelfrag](https://github.com/stelfrag))
 - Fix meta unittest [\#16221](https://github.com/netdata/netdata/pull/16221) ([stelfrag](https://github.com/stelfrag))
 - facets: minimize hashtable collisions [\#16215](https://github.com/netdata/netdata/pull/16215) ([ktsaou](https://github.com/ktsaou))
-- Removing support for Alpine 3.15 [\#16205](https://github.com/netdata/netdata/pull/16205) ([tkatsoulas](https://github.com/tkatsoulas))
-- Improve context load on startup [\#16203](https://github.com/netdata/netdata/pull/16203) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -421,12 +427,6 @@
 - add summary to /alerts [\#16213](https://github.com/netdata/netdata/pull/16213) ([MrZammler](https://github.com/MrZammler))
 - registry action hello should always work [\#16212](https://github.com/netdata/netdata/pull/16212) ([ktsaou](https://github.com/ktsaou))
 - apps: fix divide by zero when calc avg uptime [\#16211](https://github.com/netdata/netdata/pull/16211) ([ilyam8](https://github.com/ilyam8))
-- allow patterns in journal queries [\#16210](https://github.com/netdata/netdata/pull/16210) ([ktsaou](https://github.com/ktsaou))
-- ui-6.51.0 [\#16208](https://github.com/netdata/netdata/pull/16208) ([ktsaou](https://github.com/ktsaou))
-- add order in available histograms [\#16204](https://github.com/netdata/netdata/pull/16204) ([ktsaou](https://github.com/ktsaou))
-- update ui to 6.50.2 again [\#16202](https://github.com/netdata/netdata/pull/16202) ([ktsaou](https://github.com/ktsaou))
-- update ui to 6.50.2 [\#16201](https://github.com/netdata/netdata/pull/16201) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#16200](https://github.com/netdata/netdata/pull/16200) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
