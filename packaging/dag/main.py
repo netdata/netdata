@@ -144,16 +144,7 @@ class Distribution:
         return ctr
 
         
-class Context:
-    def __init__(self,
-                 client: dagger.Client,
-                 platform: dagger.Platform,
-                 repo_root: pathlib.Path,
-                 distribution: Distribution):
-        self.client = client
-        self.platform = platform
-        self.repo_root = repo_root
-
+    
 
 class FeatureFlags(enum.Flag):
     DBEngine = enum.auto()
@@ -166,14 +157,12 @@ class FeatureFlags(enum.Flag):
 
 class NetdataInstaller:
     def __init__(self,
-                 repo_root: pathlib.Path,
                  install_prefix: pathlib.Path,
                  features: FeatureFlags):
-        self.repo_root = repo_root
         self.install_prefix = install_prefix
         self.features = features
 
-    def install(self, ctr: dagger.Container, externaldeps: dagger.CacheVolume) -> dagger.Container:
+    def install(self, client: dagger.Client, ctr: dagger.Container, dist: Distribution) -> dagger.Container:
         args = ["--dont-wait", "--dont-start-it", "--disable-telemetry"]
 
         if FeatureFlags.DBEngine not in self.features:
@@ -196,11 +185,37 @@ class NetdataInstaller:
 
         args.extend(["--install-prefix", self.install_prefix])
 
+
         ctr = (
-            ctr.with_workdir(self.repo_root)
-               .with_mounted_cache(os.path.join(self.repo_root, "externaldeps"), externaldeps)
-               .with_env_variable('NETDATA_CMAKE_OPTIONS', '-DCMAKE_BUILD_TYPE=Debug')
+            ctr.with_env_variable('NETDATA_CMAKE_OPTIONS', '-DCMAKE_BUILD_TYPE=Debug')
                .with_exec(["./netdata-installer.sh"] + args)
+        )
+
+        return ctr
+
+
+class Context:
+    def __init__(self,
+                 client: dagger.Client,
+                 platform: dagger.Platform,
+                 distribution: Distribution):
+        self.client = client
+        self.platform = platform
+        self.distribution = distribution
+
+    def build_distro(self) -> dagger.Container:
+        return self.distribution.build(self.client, self.platform)
+
+    def mount_repo(self, ctr: dagger.Container, repo_root: pathlib.Path) -> dagger.Container:
+        host_repo_root = pathlib.Path(__file__).parent.parent.parent.as_posix()
+        exclude_dirs = ["build", "fluent-bit/build"]
+
+        externaldeps = self.distribution.cache_volume(self.client, self.platform, "externaldeps")
+
+        ctr = (
+            ctr.with_directory(repo_root, self.client.host().directory(host_repo_root))
+               .with_workdir(repo_root)
+               .with_mounted_cache(os.path.join(repo_root, "externaldeps"), externaldeps)
         )
 
         return ctr
@@ -216,29 +231,26 @@ def run_async(func):
 
 @run_async
 async def main():
-    repo_root = pathlib.Path(__file__).parent.parent.parent
+    repo_root_container = pathlib.Path('/netdata')
     install_prefix = "/opt"
+
     platform = dagger.Platform("linux/x86_64")
     dist = Distribution("debian10", "debian:10")
 
     config = dagger.Config(log_output=sys.stdout)
     async with dagger.Connection(config) as client:
+        # Create context
+        ctx = Context(client, platform, dist)
+
         # build base image with packages we need
-        ctr = dist.build(client, platform)
+        ctr = ctx.build_distro()
 
         # mount root repo from host
-        ctr = ctr.with_directory("/netdata", client.host().directory(repo_root.as_posix()), exclude=[
-            "build",
-            "fluent-bit/build",                           
-        ])
-
-        # create the cache volume for externaldeps
-        externaldeps = dist.cache_volume(client, ctr.platform(), "externaldeps")
+        ctr = ctx.mount_repo(ctr, "/netdata")
 
         # run the netdata installer
-        features = FeatureFlags.DBEngine
-        installer = NetdataInstaller("/netdata", install_prefix, FeatureFlags.DBEngine)
-        ctr = installer.install(ctr, externaldeps)
+        installer = NetdataInstaller(install_prefix, FeatureFlags.DBEngine)
+        ctr = installer.install(client, ctr, dist)
         
         await ctr
 
