@@ -14,10 +14,10 @@
 #define _GNU_SOURCE
 #endif
 
-#include "mqtt_wss_client.h"
-#include "mqtt_ng.h"
-#include "ws_client.h"
-#include "common_internal.h"
+#include "include/mqtt_wss_client.h"
+#include "include/mqtt_ng.h"
+#include "include/ws_client.h"
+#include "include/common_internal.h"
 
 #include <stdlib.h>
 #include <fcntl.h>

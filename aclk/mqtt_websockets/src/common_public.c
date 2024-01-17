@@ -1,4 +1,4 @@
-#include "common_public.h"
+#include "include/common_public.h"
 
 // this dummy exists to have a special pointer with special meaning
 // other than NULL

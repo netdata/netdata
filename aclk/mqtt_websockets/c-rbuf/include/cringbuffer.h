@@ -6,8 +6,8 @@
  *
  */
 
-#ifndef RINGBUFFER_H
-#define RINGBUFFER_H
+#ifndef CRINGBUFFER_H
+#define CRINGBUFFER_H
 
 #include <stddef.h>
 

@@ -1,4 +1,4 @@
-#include "c_rhash.h"
+#include "../include/c_rhash.h"
 
 struct bin_item {
     uint8_t key_type:4;

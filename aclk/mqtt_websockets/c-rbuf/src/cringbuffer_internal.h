@@ -6,8 +6,8 @@
  *
  */
 
-#ifndef RINGBUFFER_INTERNAL_H
-#define RINGBUFFER_INTERNAL_H
+#ifndef CRINGBUFFER_INTERNAL_H
+#define CRINGBUFFER_INTERNAL_H
 
 struct rbuf_t {
     char *data;

@@ -14,7 +14,7 @@
 #ifndef WS_CLIENT_H
 #define WS_CLIENT_H
 
-#include "ringbuffer.h"
+#include "../../c-rbuf/include/cringbuffer.h"
 #include "mqtt_wss_log.h"
 
 #include <stdint.h>

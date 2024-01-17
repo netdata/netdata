@@ -1,9 +1,9 @@
-#include "mqtt_wss_log.h"
+#include "include/mqtt_wss_log.h"
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
-#include "common_internal.h"
+#include "include/common_internal.h"
 
 struct mqtt_wss_log_ctx {
     mqtt_wss_log_callback_t extern_log_fnc;

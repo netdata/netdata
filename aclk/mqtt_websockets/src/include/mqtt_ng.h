@@ -2,7 +2,7 @@
 #include <sys/types.h>
 #include <time.h>
 
-#include "ringbuffer.h"
+#include "../../c-rbuf/include/cringbuffer.h"
 #include "common_public.h"
 
 #define MQTT_NG_MSGGEN_OK         0

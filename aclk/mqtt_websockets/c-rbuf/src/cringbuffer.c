@@ -6,8 +6,8 @@
  *
  */
 
-#include "ringbuffer.h"
-#include "ringbuffer_internal.h"
+#include "../include/cringbuffer.h"
+#include "cringbuffer_internal.h"
 
 #include <stdlib.h>
 #include <assert.h>

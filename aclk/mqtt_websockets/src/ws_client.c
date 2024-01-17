@@ -19,8 +19,8 @@
 
 #include <openssl/evp.h>
 
-#include "ws_client.h"
-#include "common_internal.h"
+#include "include/ws_client.h"
+#include "include/common_internal.h"
 
 #ifdef MQTT_WEBSOCKETS_DEBUG
 #include "../c-rbuf/src/ringbuffer_internal.h"
