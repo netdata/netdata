@@ -87,8 +87,6 @@ struct health_plugin_globals {
     struct {
         DICTIONARY *dict;
     } prototypes;
-
-    DICTIONARY *rrdvars;
 };
 
 extern struct health_plugin_globals health_globals;

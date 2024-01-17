@@ -18,17 +18,6 @@ void signals_block(void){}
 void signals_unblock(void){}
 void signals_reset(void){}
 
-#ifndef UNIT_TESTING
-// callback required by eval()
-int health_variable_lookup(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE *result)
-{
-    (void)variable;
-    (void)rc;
-    (void)result;
-    return 0;
-}
-#endif
-
 void rrdset_thread_rda_free(void){}
 void sender_thread_buffer_free(void){}
 void query_target_free(void){}

@@ -31,9 +31,6 @@ struct variable_constraints {
     RRDLABELS *rrdlabels;
 };
 
-bool rrdsetvar_get_custom_chart_variable_value(RRDSET *st, STRING *variable, NETDATA_DOUBLE *result);
-bool rrdvar_get_custom_host_variable_value(RRDHOST *host, STRING *variable, NETDATA_DOUBLE *result);
-
 struct variable_lookup_score {
 #ifdef NETDATA_INTERNAL_CHECKS
     RRDSET *st;
@@ -125,7 +122,7 @@ static bool variable_lookup_in_chart(struct variable_lookup_job *vbd, RRDSET *st
     // chart variable
     {
         NETDATA_DOUBLE n;
-        if(rrdsetvar_get_custom_chart_variable_value(st, vbd->variable, &n)) {
+        if(rrdvar_get_custom_chart_variable_value(st, vbd->variable, &n)) {
             variable_lookup_add_result_with_score(vbd, n, st, "chart variable");
             found = true;
         }

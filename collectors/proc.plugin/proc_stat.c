@@ -730,7 +730,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                     }
 
                     if(unlikely(core == 0 && cpus_var == NULL))
-                        cpus_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "active_processors");
+                        cpus_var = rrdvar_host_variable_add_and_acquire(localhost, "active_processors");
                 }
 
                 rrddim_set_by_pointer(cpu_chart->st, cpu_chart->rd_user, user);
@@ -1075,7 +1075,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     }
 
     if(cpus_var)
-        rrdvar_custom_host_variable_set(localhost, cpus_var, cores_found);
+        rrdvar_host_variable_set(localhost, cpus_var, cores_found);
 
     return 0;
 }

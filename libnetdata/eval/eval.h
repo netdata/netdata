@@ -85,6 +85,4 @@ const char *expression_strerror(int error);
 // 2 = FAILED, the error message is in: buffer_tostring(expression->error_msg)
 int expression_evaluate(EVAL_EXPRESSION *expression);
 
-int health_variable_lookup(STRING *variable, struct rrdcalc *rc, NETDATA_DOUBLE *result);
-
 #endif //NETDATA_EVAL_H

@@ -234,7 +234,6 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
 
     string_freez(rrdset_id_rrdcalc_name);
     string_freez(rrdset_name_rrdcalc_name);
-    rrdvar_store_for_chart(host, st);
 
     time_t now = now_realtime_sec();
     ALARM_ENTRY *ae = health_create_alarm_entry(

@@ -287,16 +287,16 @@ struct cgroup {
     char *filename_cpu_cfs_quota;
     unsigned long long cpu_cfs_quota;
 
-    const RRDSETVAR_ACQUIRED *chart_var_cpu_limit;
+    const RRDVAR_ACQUIRED *chart_var_cpu_limit;
     NETDATA_DOUBLE prev_cpu_usage;
 
     char *filename_memory_limit;
     unsigned long long memory_limit;
-    const RRDSETVAR_ACQUIRED *chart_var_memory_limit;
+    const RRDVAR_ACQUIRED *chart_var_memory_limit;
 
     char *filename_memoryswap_limit;
     unsigned long long memoryswap_limit;
-    const RRDSETVAR_ACQUIRED *chart_var_memoryswap_limit;
+    const RRDVAR_ACQUIRED *chart_var_memoryswap_limit;
 
     const DICTIONARY_ITEM *cgroup_netdev_link;
 

@@ -234,11 +234,8 @@ static int rrdpush_sender_thread_custom_host_variables_callback(const DICTIONARY
     struct custom_host_variables_callback *tmp = struct_ptr;
     BUFFER *wb = tmp->wb;
 
-    if(unlikely(rrdvar_flags(rv) & RRDVAR_FLAG_CUSTOM_HOST_VAR && rrdvar_type(rv) == RRDVAR_TYPE_CALCULATED)) {
-        rrdpush_sender_add_host_variable_to_buffer(wb, rv);
-        return 1;
-    }
-    return 0;
+    rrdpush_sender_add_host_variable_to_buffer(wb, rv);
+    return 1;
 }
 
 static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {

@@ -25,7 +25,6 @@ typedef struct alarm_entry ALARM_ENTRY;
 typedef struct rrdlabels RRDLABELS;
 
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
-typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
 typedef struct rrdcalc_acquired RRDCALC_ACQUIRED;
 
 typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
@@ -105,7 +104,6 @@ struct ml_metrics_statistics {
 #include "web/api/queries/query.h"
 #include "web/api/queries/rrdr.h"
 #include "rrdvar.h"
-#include "rrdsetvar.h"
 #include "rrdcalc.h"
 #include "rrdlabels.h"
 #include "streaming/rrdpush.h"
@@ -726,8 +724,6 @@ struct rrdset {
     int32_t update_every;                           // data collection frequency
 
     RRDLABELS *rrdlabels;                           // chart labels
-    DICTIONARY *rrdsetvar_root_index;               // chart variables
-                                                    // we use this dictionary to manage their allocation
 
     uint32_t version;                               // the metadata version (auto-increment)
 

@@ -152,8 +152,6 @@ void health_plugin_init(void) {
     health_init_prototypes();
     health_load_config_defaults();
 
-    health_globals.rrdvars = health_rrdvariables_create();
-
     if(!health_plugin_enabled())
         goto cleanup;
 
@@ -165,8 +163,7 @@ cleanup:
 }
 
 void health_plugin_destroy(void) {
-    dictionary_destroy(health_globals.rrdvars);
-    health_globals.rrdvars = NULL;
+    ;
 }
 
 void health_plugin_reload(void) {

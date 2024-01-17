@@ -568,20 +568,20 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
     }
 
     if (global) {
-        const RRDVAR_ACQUIRED *rva = rrdvar_custom_host_variable_add_and_acquire(host, name);
+        const RRDVAR_ACQUIRED *rva = rrdvar_host_variable_add_and_acquire(host, name);
         if (rva) {
-            rrdvar_custom_host_variable_set(host, rva, v);
-            rrdvar_custom_host_variable_release(host, rva);
+            rrdvar_host_variable_set(host, rva, v);
+            rrdvar_host_variable_release(host, rva);
         }
         else
             netdata_log_error("PLUGINSD: 'host:%s' cannot find/create HOST VARIABLE '%s'",
                               rrdhost_hostname(host),
                               name);
     } else {
-        const RRDSETVAR_ACQUIRED *rsa = rrdsetvar_custom_chart_variable_add_and_acquire(st, name);
+        const RRDVAR_ACQUIRED *rsa = rrdvar_chart_variable_add_and_acquire(st, name);
         if (rsa) {
-            rrdsetvar_custom_chart_variable_set(st, rsa, v);
-            rrdsetvar_custom_chart_variable_release(st, rsa);
+            rrdvar_chart_variable_set(st, rsa, v);
+            rrdvar_chart_variable_release(st, rsa);
         }
         else
             netdata_log_error("PLUGINSD: 'host:%s/chart:%s' cannot find/create CHART VARIABLE '%s'",

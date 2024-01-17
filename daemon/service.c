@@ -115,8 +115,6 @@ static void svc_rrdset_obsolete_to_free(RRDSET *st) {
 
     rrdcalc_unlink_all_rrdset_alerts(st);
 
-    rrdsetvar_release_and_delete_all(st);
-
     // has to be run after all dimensions are archived - or use-after-free will occur
     rrdvar_delete_all(st->rrdvars);
 

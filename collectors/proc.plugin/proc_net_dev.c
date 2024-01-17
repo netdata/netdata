@@ -237,7 +237,7 @@ static struct netdev {
     RRDDIM *rd_mtu;
 
     char *filename_speed;
-    const RRDSETVAR_ACQUIRED *chart_var_speed;
+    const RRDVAR_ACQUIRED *chart_var_speed;
 
     char *filename_duplex;
     char *filename_operstate;
@@ -1242,15 +1242,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                             d->flipped ? -d->rd_rbytes->collector.last_stored_value : d->rd_tbytes->collector.last_stored_value);
 
             if(unlikely(!d->chart_var_speed)) {
-                d->chart_var_speed =
-                    rrdsetvar_custom_chart_variable_add_and_acquire(d->st_bandwidth, "nic_speed_max");
+                d->chart_var_speed = rrdvar_chart_variable_add_and_acquire(d->st_bandwidth, "nic_speed_max");
                 if(!d->chart_var_speed) {
                     collector_error(
                         "Cannot create interface %s chart variable 'nic_speed_max'. Will not update its speed anymore.",
                         d->name);
                 }
                 else {
-                    rrdsetvar_custom_chart_variable_set(d->st_bandwidth, d->chart_var_speed, NAN);
+                    rrdvar_chart_variable_set(d->st_bandwidth, d->chart_var_speed, NAN);
                 }
             }
 
@@ -1301,7 +1300,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                             rrdset_done(d->st_speed);
                         }
 
-                        rrdsetvar_custom_chart_variable_set(
+                        rrdvar_chart_variable_set(
                             d->st_bandwidth, d->chart_var_speed, (NETDATA_DOUBLE)d->speed * KILOBITS_IN_A_MEGABIT);
 
                         if (d->speed) {

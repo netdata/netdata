@@ -162,44 +162,6 @@ static inline int isvariableterm(const char s) {
     return 1;
 }
 
-static inline void parse_variables_and_store_in_health_rrdvars(char *value, size_t len) {
-    const char *s = value;
-    char buffer[RRDVAR_MAX_LENGTH];
-
-    // $
-    while (*s) {
-        if(*s == '$') {
-            size_t i = 0;
-            s++;
-
-            if(*s == '{') {
-                // ${variable_name}
-
-                s++;
-                while (*s && *s != '}' && i < len)
-                    buffer[i++] = *s++;
-
-                if(*s == '}')
-                    s++;
-            }
-            else {
-                // $variable_name
-
-                while (*s && !isvariableterm(*s) && i < len)
-                    buffer[i++] = *s++;
-            }
-
-            buffer[i] = '\0';
-
-            //TODO: check and try to store only variables
-            STRING *name_string = rrdvar_name_to_string(buffer);
-            rrdvar_add("health", health_globals.rrdvars, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_CONFIG_VAR, NULL);
-            string_freez(name_string);
-        } else
-            s++;
-    }
-}
-
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
         RRDR_TIME_GROUPING *group_method, int *after, int *before, int *every,
@@ -636,7 +598,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                     line, filename, string2str(ac->name), key, value, expression_strerror(error), failed_at);
                 am->enabled = false;
             }
-            parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
         }
         else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
             const char *failed_at = NULL;
@@ -649,7 +610,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                     line, filename, string2str(ac->name), key, value, expression_strerror(error), failed_at);
                 am->enabled = false;
             }
-            parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
         }
         else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
             const char *failed_at = NULL;
@@ -662,7 +622,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                     line, filename, string2str(ac->name), key, value, expression_strerror(error), failed_at);
                 am->enabled = false;
             }
-            parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
         }
         else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
             strip_quotes(value);

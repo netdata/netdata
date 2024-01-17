@@ -282,13 +282,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrddim_index_init(st);
 
-    // chart variables - we need this for data collection to work (collector given chart variables) - not only health
-    rrdsetvar_index_init(st);
-
-    if (host->health.health_enabled) {
-        st->rrdvars = rrdvariables_create();
-    }
-
+    st->rrdvars = rrdvariables_create();
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
 
@@ -349,26 +343,19 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // ------------------------------------------------------------------------
     // the order of destruction is important here
 
-    // 1. delete RRDDIMVAR index - obsolete
-
-    // 2. delete RRDSETVAR index
-    rrdsetvar_index_destroy(st);                // destroy the rrdsetvar index
-
-    // 3. delete RRDVAR index after the above, to avoid triggering its garbage collector (they have references on this)
+    // 1. delete RRDVAR index after the above, to avoid triggering its garbage collector (they have references on this)
     rrdvariables_destroy(st->rrdvars);      // free all variables and destroy the rrdvar dictionary
 
-    // 4. delete RRDFAMILY - obsolete
-
-    // 5. delete RRDDIMs, now their variables are not existing, so this is fast
+    // 2. delete RRDDIMs, now their variables are not existing, so this is fast
     rrddim_index_destroy(st);                   // free all the dimensions and destroy the dimensions index
 
-    // 6. this has to be after the dimensions are freed, but before labels are freed (contexts need the labels)
+    // 3. this has to be after the dimensions are freed, but before labels are freed (contexts need the labels)
     rrdcontext_removed_rrdset(st);              // let contexts know
 
-    // 7. destroy the chart labels
+    // 4. destroy the chart labels
     rrdlabels_destroy(st->rrdlabels);  // destroy the labels, after letting the contexts know
 
-    // 8. destroy the ml handle
+    // 5. destroy the ml handle
     ml_chart_delete(st);
 
     // ------------------------------------------------------------------------
@@ -634,7 +621,6 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
         rrdset_index_del_name(host, st);
         string_freez(st->name);
         st->name = name_string;
-        rrdsetvar_rename_all(st);
     }
     else
         st->name = name_string;
