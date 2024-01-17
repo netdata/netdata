@@ -243,13 +243,6 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
 
     health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc2json_nolock);
 
-//    rrdhost_rdlock(host);
-//    buffer_strcat(wb, "\n\t},\n\t\"templates\": {");
-//    RRDCALCTEMPLATE *rt;
-//    for(rt = host->templates; rt ; rt = rt->next)
-//        health_rrdcalctemplate2json_nolock(wb, rt);
-//    rrdhost_unlock(host);
-
     buffer_strcat(wb, "\n\t}\n}\n");
 }
 

@@ -163,14 +163,6 @@ struct rrdcalc {
     int delay_last;                 // the last delay we used
 
     // ------------------------------------------------------------------------
-    // variables this alarm exposes to the rest of the alarms
-
-    const RRDVAR_ACQUIRED *rrdvar_local;
-    const RRDVAR_ACQUIRED *rrdvar_family;
-    const RRDVAR_ACQUIRED *rrdvar_host_chart_id;
-    const RRDVAR_ACQUIRED *rrdvar_host_chart_name;
-
-    // ------------------------------------------------------------------------
     // the chart this alarm it is linked to
 
     size_t labels_version;

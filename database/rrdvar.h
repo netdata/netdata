@@ -14,7 +14,7 @@ typedef enum rrdvar_type {
 
     // this is 8 bit
     // to increase it you have to set change the bitfield in
-    // rrdvar, rrdsetvar, rrddimvar
+    // rrdvar, rrdsetvar
 } RRDVAR_TYPE;
 
 typedef enum rrdvar_options {
@@ -30,7 +30,7 @@ typedef enum rrdvar_options {
 
     // this is 24 bit
     // to increase it you have to set change the bitfield in
-    // rrdvar, rrdsetvar, rrddimvar
+    // rrdvar, rrdsetvar
 } RRDVAR_FLAGS;
 
 #define RRDVAR_OPTIONS_REMOVED_ON_NEW_OBJECTS \

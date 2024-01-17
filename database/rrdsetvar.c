@@ -7,8 +7,6 @@ typedef struct rrdsetvar {
     void *value;                // we need this to maintain the allocation for custom chart variables
 
     const RRDVAR_ACQUIRED *rrdvar_local;
-    const RRDVAR_ACQUIRED *rrdvar_family_chart_id;
-    const RRDVAR_ACQUIRED *rrdvar_family_chart_name;
     const RRDVAR_ACQUIRED *rrdvar_host_chart_id;
     const RRDVAR_ACQUIRED *rrdvar_host_chart_name;
 
@@ -27,17 +25,6 @@ static inline void rrdsetvar_free_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
     if(st->rrdvars) {
         rrdvar_release_and_del(st->rrdvars, rs->rrdvar_local);
         rs->rrdvar_local = NULL;
-    }
-
-    // ------------------------------------------------------------------------
-    // FAMILY
-
-    if(st->rrdfamily) {
-        rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rs->rrdvar_family_chart_id);
-        rs->rrdvar_family_chart_id = NULL;
-
-        rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rs->rrdvar_family_chart_name);
-        rs->rrdvar_family_chart_name = NULL;
     }
 
     // ------------------------------------------------------------------------
@@ -80,14 +67,6 @@ static inline void rrdsetvar_update_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
 
     if(st->rrdvars) {
         rs->rrdvar_local = rrdvar_add_and_acquire("local", st->rrdvars, rs->name, rs->type, options, rs->value);
-    }
-
-    // ------------------------------------------------------------------------
-    // FAMILY
-
-    if(st->rrdfamily) {
-        rs->rrdvar_family_chart_id = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), key_chart_id, rs->type, options, rs->value);
-        rs->rrdvar_family_chart_name = rrdvar_add_and_acquire("family", rrdfamily_rrdvars_dict(st->rrdfamily), key_chart_name, rs->type, options, rs->value);
     }
 
     // ------------------------------------------------------------------------

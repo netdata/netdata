@@ -20,12 +20,10 @@ typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
 typedef struct rrdset RRDSET;
 typedef struct rrdcalc RRDCALC;
-typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 
 typedef struct rrdlabels RRDLABELS;
 
-typedef struct rrdfamily_acquired RRDFAMILY_ACQUIRED;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
 typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
 typedef struct rrdcalc_acquired RRDCALC_ACQUIRED;
@@ -108,7 +106,6 @@ struct ml_metrics_statistics {
 #include "web/api/queries/rrdr.h"
 #include "rrdvar.h"
 #include "rrdsetvar.h"
-#include "rrddimvar.h"
 #include "rrdcalc.h"
 #include "rrdlabels.h"
 #include "streaming/rrdpush.h"
@@ -212,16 +209,6 @@ typedef enum __attribute__ ((__packed__)) rrd_algorithm {
 
 RRD_ALGORITHM rrd_algorithm_id(const char *name);
 const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
-
-// ----------------------------------------------------------------------------
-// RRD FAMILY
-
-const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *id);
-void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa);
-void rrdfamily_index_init(RRDHOST *host);
-void rrdfamily_index_destroy(RRDHOST *host);
-DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
-
 
 // ----------------------------------------------------------------------------
 // flags & options
@@ -740,7 +727,6 @@ struct rrdset {
 
     RRDLABELS *rrdlabels;                           // chart labels
     DICTIONARY *rrdsetvar_root_index;               // chart variables
-    DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
 
     uint32_t version;                               // the metadata version (auto-increment)
@@ -832,7 +818,6 @@ struct rrdset {
     NETDATA_DOUBLE red;                             // red threshold for this chart
 
     DICTIONARY *rrdvars;                            // RRDVAR index for this chart
-    const RRDFAMILY_ACQUIRED *rrdfamily;            // pointer to RRDFAMILY dictionary item, this chart belongs to
 
     struct {
         RW_SPINLOCK spinlock;                       // protection for RRDCALC *base
@@ -1302,7 +1287,6 @@ struct rrdhost {
     DICTIONARY *rrdset_root_index;                  // the host's charts index (by id)
     DICTIONARY *rrdset_root_index_name;             // the host's charts index (by name)
 
-    DICTIONARY *rrdfamily_root_index;               // the host's chart families index
     DICTIONARY *rrdvars;                            // the host's chart variables index
                                                     // this includes custom host variables
 

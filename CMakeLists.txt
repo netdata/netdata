@@ -955,9 +955,6 @@ set(RRD_PLUGIN_FILES
         database/rrdcollector.c
         database/rrdcollector.h
         database/rrddim.c
-        database/rrddimvar.c
-        database/rrddimvar.h
-        database/rrdfamily.c
         database/rrdfunctions.c
         database/rrdfunctions.h
         database/rrdfunctions-inline.c

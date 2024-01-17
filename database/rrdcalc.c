@@ -232,38 +232,6 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
     snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rrdcalc_name(rc));
     STRING *rrdset_id_rrdcalc_name = string_strdupz(buf);
 
-    rc->rrdvar_local = rrdvar_add_and_acquire(
-        "local",
-        st->rrdvars,
-        rc->config.name,
-        RRDVAR_TYPE_CALCULATED,
-        RRDVAR_FLAG_RRDCALC_LOCAL_VAR,
-        &rc->value);
-
-    rc->rrdvar_family = rrdvar_add_and_acquire(
-        "family",
-        rrdfamily_rrdvars_dict(st->rrdfamily),
-        rc->config.name,
-        RRDVAR_TYPE_CALCULATED,
-        RRDVAR_FLAG_RRDCALC_FAMILY_VAR,
-        &rc->value);
-
-    rc->rrdvar_host_chart_name = rrdvar_add_and_acquire(
-        "host",
-        host->rrdvars,
-        rrdset_name_rrdcalc_name,
-        RRDVAR_TYPE_CALCULATED,
-        RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR,
-        &rc->value);
-
-    rc->rrdvar_host_chart_id = rrdvar_add_and_acquire(
-        "host",
-        host->rrdvars,
-        rrdset_id_rrdcalc_name,
-        RRDVAR_TYPE_CALCULATED,
-        RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR | ((rc->rrdvar_host_chart_name) ? 0 : RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR),
-        &rc->value);
-
     string_freez(rrdset_id_rrdcalc_name);
     string_freez(rrdset_name_rrdcalc_name);
     rrdvar_store_for_chart(host, st);
@@ -327,18 +295,6 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
         rw_spinlock_write_unlock(&st->alerts.spinlock);
 
     rc->rrdset = NULL;
-
-    rrdvar_release_and_del(st->rrdvars, rc->rrdvar_local);
-    rc->rrdvar_local = NULL;
-
-    rrdvar_release_and_del(rrdfamily_rrdvars_dict(st->rrdfamily), rc->rrdvar_family);
-    rc->rrdvar_family = NULL;
-
-    rrdvar_release_and_del(host->rrdvars, rc->rrdvar_host_chart_id);
-    rc->rrdvar_host_chart_id = NULL;
-
-    rrdvar_release_and_del(host->rrdvars, rc->rrdvar_host_chart_name);
-    rc->rrdvar_host_chart_name = NULL;
 }
 
 static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
@@ -363,7 +319,7 @@ static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
 // RRDCALC rrdhost index management - constructor
 
 struct rrdcalc_constructor {
-    RRDSET *rrdset;                         // when this comes from rrdcalctemplate, we have a matching rrdset
+    RRDSET *rrdset;
     RRD_ALERT_PROTOTYPE *ap;
 
     enum {
@@ -532,14 +488,8 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
     dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)key_len,
                             NULL, sizeof(RRDCALC), &tmp);
 
-    if(tmp.react_action != RRDCALC_REACT_NEW) {
-        netdata_log_error(
-            "RRDCALC: from config '%s' on chart '%s' failed to be added to host '%s'. "
-            "It already exists.",
-            string2str(ap->config.name), string2str(st->id), rrdhost_hostname(host));
-
+    if(tmp.react_action != RRDCALC_REACT_NEW)
         ret = false;
-    }
 
     return ret;
 }

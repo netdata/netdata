@@ -2,11 +2,6 @@
 
 #include "rrd.h"
 
-// the variables as stored in the variables indexes
-// there are 3 indexes:
-// 1. at each chart   (RRDSET.rrdvar_root_index)
-// 2. at each context (RRDFAMILY.rrdvar_root_index)
-// 3. at each host    (RRDHOST.rrdvar_root_index)
 typedef struct rrdvar {
     STRING *name;
     void *value;
@@ -269,29 +264,16 @@ bool rrdvar_get_custom_host_variable_value(RRDHOST *host, STRING *variable, NETD
     return found;
 }
 
-void rrdvar_store_for_chart(RRDHOST *host, RRDSET *st) {
+void rrdvar_store_for_chart(RRDHOST *host __maybe_unused, RRDSET *st) {
     if (!st) return;
-
-    if(!st->rrdfamily)
-        st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
 
     if(!st->rrdvars)
         st->rrdvars = rrdvariables_create();
-
-    rrddimvar_index_init(st);
 
     rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
     rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
     rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
     rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
-
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->collector.last_stored_value, RRDVAR_FLAG_NONE);
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->collector.last_collected_value, RRDVAR_FLAG_NONE);
-        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->collector.last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-    }
-    rrddim_foreach_done(rd);
 }
 
 int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result) {
@@ -305,13 +287,6 @@ int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result
     if(rva) {
         *result = rrdvar2number(rva);
         dictionary_acquired_item_release(st->rrdvars, (const DICTIONARY_ITEM *)rva);
-        return 1;
-    }
-
-    rva = rrdvar_get_and_acquire(rrdfamily_rrdvars_dict(st->rrdfamily), variable);
-    if(rva) {
-        *result = rrdvar2number(rva);
-        dictionary_acquired_item_release(rrdfamily_rrdvars_dict(st->rrdfamily), (const DICTIONARY_ITEM *)rva);
         return 1;
     }
 
@@ -372,12 +347,6 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     }
 
     buffer_json_member_add_string(buf, "family", rrdset_family(st));
-
-    {
-        buffer_json_member_add_object(buf, "family_variables");
-        rrdvar_walkthrough_read(rrdfamily_rrdvars_dict(st->rrdfamily), single_variable2json_callback, &helper);
-        buffer_json_object_close(buf);
-    }
 
     buffer_json_member_add_string(buf, "host", rrdhost_hostname(host));
 

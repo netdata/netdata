@@ -20,6 +20,17 @@
 //};
 //
 
+struct variable_constraints {
+    enum {
+        VAR_LOOKUP_SELF,
+        VAR_LOOKUP_CONTEXT,
+        VAR_LOOKUP_HOST,
+    } from;
+    const char *context;
+
+    RRDLABELS *rrdlabels;
+};
+
 bool rrdsetvar_get_custom_chart_variable_value(RRDSET *st, STRING *variable, NETDATA_DOUBLE *result);
 bool rrdvar_get_custom_host_variable_value(RRDHOST *host, STRING *variable, NETDATA_DOUBLE *result);
 
