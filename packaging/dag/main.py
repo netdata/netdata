@@ -5,6 +5,7 @@ import click
 import os
 from pathlib import Path
 import sys
+import time
 
 import anyio
 
@@ -52,7 +53,7 @@ def netdata_installer(enable_ml=True, enable_ebpf=False, enable_go=False):
     return cmd
 
 
-def build_image_for_platform(client, image_name, platform: dagger.Platform, ctr : dagger.Container):
+def build_image_for_platform(client: dagger.Client, image_name, platform: dagger.Platform, ctr : dagger.Container) -> dagger.Container:
     repo_path = str(Path(__file__).parent.parent.parent)
     exclude_dirs = exclude=["build", "fluent-bit/build"]
 
@@ -72,11 +73,21 @@ def build_image_for_platform(client, image_name, platform: dagger.Platform, ctr 
     shell_cmd = "/opt/netdata/usr/sbin/netdata -W buildinfo | tee /opt/netdata/buildinfo.log"
     buildinfo_task = build_task.with_exec(["sh", "-c", shell_cmd])
 
-    build_dir = buildinfo_task.directory('/opt/netdata')
-    artifact_dir = os.path.join(Path.home(), f'ci/{tag}')
-    output_task = build_dir.export(artifact_dir)
+    # build_dir = buildinfo_task.directory('/opt/netdata')
+    # artifact_dir = os.path.join(Path.home(), f'ci/{tag}')
+    # output_task = build_dir.export(artifact_dir)
 
-    return output_task
+    return buildinfo_task
+
+
+def build_service(ctr: dagger.Container) -> dagger.Container:
+    ctr = (
+        ctr.with_exec(["/opt/netdata/usr/sbin/netdata", "-D", "-i", "0.0.0.0"])
+           .with_exposed_port(19999)
+    )
+
+    return ctr
+    
 
 def run_async(func):
     """
@@ -97,7 +108,16 @@ async def main():
     async with dagger.Connection(config) as client:
         ctr = oci_images.build_debian_12(client, platform)
         ctr = build_image_for_platform(client, "debian_12", platform, ctr)
-        await ctr
+        ctr = build_service(ctr)
+
+        tunnel = await client.host().tunnel(ctr.as_service(), native=True).start()
+
+        # get HTTP service address
+        endpoint = tunnel.endpoint()
+        print(f"GVD >>> The endpoint is: {endpoint=} <<<")
+        await endpoint
+        time.sleep(600)
+
         # await oci_images.static_build(client, repo_path)
     
 if __name__ == '__main__':

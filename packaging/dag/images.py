@@ -1091,7 +1091,7 @@ def build_debian_11(client, platform):
 
     return ctr
 
-def build_debian_12(client, platform):
+def build_debian_12(client, platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("debian:bookworm")
 
     pkgs = [pkg for pkg in _DEBIAN_COMMON_PACKAGES]
