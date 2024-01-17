@@ -11,6 +11,7 @@
 - Regenerate integrations.js [\#16792](https://github.com/netdata/netdata/pull/16792) ([netdatabot](https://github.com/netdatabot))
 - Update role-based-access.md [\#16791](https://github.com/netdata/netdata/pull/16791) ([vkuznecovas](https://github.com/vkuznecovas))
 - Free key and search, replace patterns [\#16789](https://github.com/netdata/netdata/pull/16789) ([stelfrag](https://github.com/stelfrag))
+- Use named constants for keyword tokens. [\#16787](https://github.com/netdata/netdata/pull/16787) ([vkalintiris](https://github.com/vkalintiris))
 - diskspace: reworked the cleanup to fix race conditions [\#16786](https://github.com/netdata/netdata/pull/16786) ([ktsaou](https://github.com/ktsaou))
 - diskspace missing mutex use [\#16784](https://github.com/netdata/netdata/pull/16784) ([ktsaou](https://github.com/ktsaou))
 - Remove h2o header from libnetdata [\#16780](https://github.com/netdata/netdata/pull/16780) ([vkalintiris](https://github.com/vkalintiris))
@@ -425,8 +426,6 @@
 - update bundled UI to v6.52.0 [\#16216](https://github.com/netdata/netdata/pull/16216) ([ilyam8](https://github.com/ilyam8))
 - disable logging to syslog by default [\#16214](https://github.com/netdata/netdata/pull/16214) ([ilyam8](https://github.com/ilyam8))
 - add summary to /alerts [\#16213](https://github.com/netdata/netdata/pull/16213) ([MrZammler](https://github.com/MrZammler))
-- registry action hello should always work [\#16212](https://github.com/netdata/netdata/pull/16212) ([ktsaou](https://github.com/ktsaou))
-- apps: fix divide by zero when calc avg uptime [\#16211](https://github.com/netdata/netdata/pull/16211) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
