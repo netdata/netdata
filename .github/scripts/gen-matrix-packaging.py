@@ -28,7 +28,8 @@ for i, v in enumerate(data['include']):
                     'format': data['include'][i]['packages']['type'],
                     'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else ':'.join([data['include'][i]['distro'], data['include'][i]['version']]),
                     'platform': data['platform_map'][arch],
-                    'arch': arch
+                    'arch': arch,
+                    'bundle_sentry': data['include'][i]['bundle_sentry']
                 })
 
 entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))
