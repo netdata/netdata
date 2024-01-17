@@ -1,4 +1,4 @@
-# c-rbuf [![run-tests](https://github.com/underhood/c-rbuf/workflows/run-tests/badge.svg)](https://github.com/underhood/c-rbuf/actions)
+# c-rbuf
 
 Simple C ringbuffer implementation with API allowing usage without intermediate buffer. Meant to be as simple as possible to use and integrate. You can copy the files into your project, use it as a static lib, or shared lib depending on what is most convenient for you.
 
@@ -14,7 +14,3 @@ read(fd, ptr, bytes);
 **Multiple tail support:** Only single tail is supported but multiple tail support might be implemented in the future.
 
 **Thread Safety:** Currently you will have to ensure only a single thread accesses the buffer at a time yourself.
-
-## License
-
-The Project is released under LGPL v3 license. See [License](LICENSE)
