@@ -143,8 +143,6 @@ class Distribution:
 
         return ctr
 
-        
-    
 
 class FeatureFlags(enum.Flag):
     DBEngine = enum.auto()
@@ -210,6 +208,10 @@ class Context:
         host_repo_root = pathlib.Path(__file__).parent.parent.parent.as_posix()
         exclude_dirs = ["build", "fluent-bit/build"]
 
+        # The installer builds/stores intermediate artifacts under externaldeps/
+        # We add a volume to speed up rebuilds. The volume has to be unique
+        # per platform/distro in order to avoid mixing unrelated artifacts
+        # together.
         externaldeps = self.distribution.cache_volume(self.client, self.platform, "externaldeps")
 
         ctr = (
@@ -231,15 +233,12 @@ def run_async(func):
 
 @run_async
 async def main():
-    repo_root_container = pathlib.Path('/netdata')
-    install_prefix = "/opt"
-
-    platform = dagger.Platform("linux/x86_64")
-    dist = Distribution("debian10", "debian:10")
 
     config = dagger.Config(log_output=sys.stdout)
     async with dagger.Connection(config) as client:
         # Create context
+        platform = dagger.Platform("linux/x86_64")
+        dist = Distribution("debian10", "debian:10")
         ctx = Context(client, platform, dist)
 
         # build base image with packages we need
@@ -249,11 +248,11 @@ async def main():
         ctr = ctx.mount_repo(ctr, "/netdata")
 
         # run the netdata installer
-        installer = NetdataInstaller(install_prefix, FeatureFlags.DBEngine)
+        installer = NetdataInstaller("/opt", FeatureFlags.DBEngine)
         ctr = installer.install(client, ctr, dist)
-        
+
         await ctr
 
-   
+
 if __name__ == '__main__':
     main()

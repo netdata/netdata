@@ -209,7 +209,7 @@ def static_build_libnetfilter_acct(client: dagger.Client, ctr: dagger.Container)
         client.git(url="git://git.netfilter.org/libnetfilter_acct", keep_git_dir=True)
               .tag("libnetfilter_acct-1.0.3").tree()
     )
-    
+
     ctr = (
         ctr.with_directory("/libnetfilter_acct", tree)
            .with_workdir("/libnetfilter_acct")
@@ -321,7 +321,7 @@ def static_build(client, repo_path):
     )
 
     # TODO: link bin/sbin
-    
+
     ctr = static_build_netdata(client, ctr)
 
     build_dir = ctr.directory('/opt/netdata')
