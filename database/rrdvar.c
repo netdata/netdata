@@ -171,6 +171,10 @@ void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf) {
 }
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
+
+    // FIXME this list is incomplete
+    // alerts can also access {context}.{dimension} from the entire host database
+
     RRDHOST *host = st->rrdhost;
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -253,8 +257,6 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
         } tmp, *z;
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
 
-        bool trace = false;
-
         RRDCALC *rc;
         dfe_start_read(st->rrdhost->rrdcalc_root_index, rc) {
             tmp = (struct scored) {
@@ -267,9 +269,6 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
             z = dictionary_set(dict, string2str(rc->config.name), &tmp, sizeof(tmp));
 
             if(z->existing) {
-                if(strcmp(string2str(rc->config.name), "10min_disk_backlog") == 0)
-                    trace = true;
-
                 if(tmp.score > z->score)
                     SWAP(*z, tmp);
                 z->existing = true;
