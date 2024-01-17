@@ -1,3 +1,5 @@
+// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+
 #include "../include/c_rhash.h"
 
 struct bin_item {

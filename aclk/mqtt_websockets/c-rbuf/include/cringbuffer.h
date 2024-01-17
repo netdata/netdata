@@ -1,10 +1,4 @@
-/*
- *
- * Copyright: SPDX-License-Identifier:  LGPL-3.0-only
- *
- * Author: Timotej Šiškovič <timotejs@gmail.com>
- *
- */
+// Copyright: SPDX-License-Identifier:  GPL-3.0-only
 
 #ifndef CRINGBUFFER_H
 #define CRINGBUFFER_H

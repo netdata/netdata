@@ -1,3 +1,5 @@
+// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+
 #include "c_rhash_internal.h"
 
 #include <stdlib.h>

@@ -1,3 +1,5 @@
+// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+
 #include <stdint.h>
 #include <sys/types.h>
 #include <time.h>

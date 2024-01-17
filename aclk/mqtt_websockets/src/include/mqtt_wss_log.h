@@ -1,3 +1,5 @@
+// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+
 #ifndef MQTT_WSS_LOG_H
 #define MQTT_WSS_LOG_H
 

@@ -1,3 +1,5 @@
+// Copyright: SPDX-License-Identifier:  GPL-3.0-only
+
 #include "include/mqtt_wss_log.h"
 #include <stdlib.h>
 #include <stdarg.h>
