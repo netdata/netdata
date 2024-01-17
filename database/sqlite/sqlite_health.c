@@ -963,7 +963,6 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0;
-    BUFFER *buf = buffer_create(128, NULL);
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
@@ -979,6 +978,7 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
             return 1;
         }
     }
+    BUFFER *buf = buffer_create(128, NULL);
 
     rc = sqlite3_bind_blob(res, ++param, &ap->config.hash_id, sizeof(ap->config.hash_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
