@@ -73,7 +73,6 @@ static inline void ebpf_fd_disable_probes(struct fd_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kretprobe, false);
-    bpf_program__set_autoload(obj->progs.netdata_release_task_fd_kprobe, false);
     if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kretprobe, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kprobe, false);
@@ -118,7 +117,6 @@ static inline void ebpf_disable_trampoline(struct fd_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_close_fd_fexit, false);
     bpf_program__set_autoload(obj->progs.netdata___close_fd_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata___close_fd_fexit, false);
-    bpf_program__set_autoload(obj->progs.netdata_release_task_fd_fentry, false);
 }
 
 /*
@@ -150,7 +148,6 @@ static void ebpf_set_trampoline_target(struct fd_bpf *obj)
 {
     bpf_program__set_attach_target(obj->progs.netdata_sys_open_fentry, 0, fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
     bpf_program__set_attach_target(obj->progs.netdata_sys_open_fexit, 0, fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
-    bpf_program__set_attach_target(obj->progs.netdata_release_task_fd_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
 
     if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_attach_target(
@@ -184,13 +181,6 @@ static int ebpf_fd_attach_probe(struct fd_bpf *obj)
     obj->links.netdata_sys_open_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_sys_open_kretprobe, true,
                                                                        fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
     ret = libbpf_get_error(obj->links.netdata_sys_open_kretprobe);
-    if (ret)
-        return -1;
-
-    obj->links.netdata_release_task_fd_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_release_task_fd_kprobe,
-                                                                           false,
-                                                                           EBPF_COMMON_FNCT_CLEAN_UP);
-    ret = libbpf_get_error(obj->links.netdata_release_task_fd_kprobe);
     if (ret)
         return -1;
 
@@ -302,19 +292,6 @@ static void ebpf_fd_adjust_map(struct fd_bpf *obj, ebpf_module_t *em)
 }
 
 /**
- *  Disable Release Task
- *
- *  Disable release task when apps is not enabled.
- *
- *  @param obj is the main structure for bpf objects.
- */
-static void ebpf_fd_disable_release_task(struct fd_bpf *obj)
-{
-    bpf_program__set_autoload(obj->progs.netdata_release_task_fd_kprobe, false);
-    bpf_program__set_autoload(obj->progs.netdata_release_task_fd_fentry, false);
-}
-
-/**
  * Load and attach
  *
  * Load and attach the eBPF code in kernel.
@@ -339,17 +316,12 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
         ebpf_disable_specific_trampoline(obj);
 
         ebpf_set_trampoline_target(obj);
-        // TODO: Remove this in next PR, because this specific trampoline has an error.
-        bpf_program__set_autoload(obj->progs.netdata_release_task_fd_fentry, false);
     } else {
         ebpf_disable_trampoline(obj);
         ebpf_disable_specific_probes(obj);
     }
 
     ebpf_fd_adjust_map(obj, em);
-
-    if (!em->apps_charts && !em->cgroup_charts)
-        ebpf_fd_disable_release_task(obj);
 
     int ret = fd_bpf__load(obj);
     if (ret) {
