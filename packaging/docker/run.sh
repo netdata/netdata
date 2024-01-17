@@ -14,6 +14,28 @@ if [ ! -w / ] && [ "${EUID}" -eq 0 ]; then
   echo >&2 "WARNING: For more information, see https://learn.netdata.cloud/docs/agent/claim#known-issues-on-older-hosts-with-seccomp-enabled"
 fi
 
+# Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
+function add_netdata_to_proxmox_conf_files_group() {
+  group_guid="$(stat -c %g /host/etc/pve 2>/dev/null || true)"
+  [ -z "${group_guid}" ] && return
+
+  if ! getent group "${group_guid}" >/dev/null; then
+    echo "Creating proxmox-etc-pve group with GID ${group_guid}"
+    if ! addgroup -g "${group_guid}" "proxmox-etc-pve"; then
+      echo >&2 "Failed to add group proxmox-etc-pve with GID ${group_guid}."
+      return
+    fi
+  fi
+
+  if ! getent group "${group_guid}" | grep -q netdata; then
+    echo "Assign netdata user to group ${group_guid}"
+    if ! usermod -a -G "${group_guid}" "${DOCKER_USR}"; then
+      echo >&2 "Failed to add netdata user to group with GID ${group_guid}."
+      return
+    fi
+  fi
+}
+
 if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
   [ -n "$DISABLE_TELEMETRY" ] ||
   [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
@@ -66,36 +88,13 @@ if [ "${EUID}" -eq 0 ]; then
     echo "Assign netdata user to docker group ${PGID}"
     usermod --append --groups "docker" "${DOCKER_USR}" || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
   fi
+
+  if [ -d "/host/etc/pve" ]; then
+    add_netdata_to_proxmox_conf_files_group || true
+  fi
 else
   echo >&2 "WARNING: Entrypoint started as non-root user. This is not officially supported and some features may not be available."
 fi
-
-# Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
-function add_netdata_to_proxmox_conf_files_group() {
-  group_guid="$(stat -c %g /host/etc/pve 2>/dev/null || true)"
-  [ -z "${group_guid}" ] && return
-
-  if ! getent group "${group_guid}" >/dev/null; then
-    echo "Creating proxmox-etc-pve group with GID ${group_guid}"
-    if ! addgroup -g "${group_guid}" "proxmox-etc-pve"; then
-      echo >&2 "Failed to add group proxmox-etc-pve with GID ${group_guid}."
-      return
-    fi
-  fi
-
-  if ! getent group "${group_guid}" | grep -q netdata; then
-    echo "Assign netdata user to group ${group_guid}"
-    if ! usermod -a -G "${group_guid}" "${DOCKER_USR}"; then
-      echo >&2 "Failed to add netdata user to group with GID ${group_guid}."
-      return
-    fi
-  fi
-}
-
-if [ -d "/host/etc/pve" ]; then
-  add_netdata_to_proxmox_conf_files_group || true
-fi
-
 
 if mountpoint -q /etc/netdata; then
   echo "Copying stock configuration to /etc/netdata"
