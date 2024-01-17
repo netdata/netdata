@@ -113,7 +113,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
@@ -202,9 +202,9 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: static-archive
+          name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
           retention-days: 30
       - name: Failure Notification
@@ -345,7 +345,7 @@ jobs:
           tags: test:${{ matrix.artifact_key }}
       - name: Upload image artifact
         id: upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_key }}-test-env
           path: /tmp/image.tar
@@ -401,9 +401,14 @@ jobs:
       - name: Fetch test environment
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v3
+        uses: Wandalen/wretry.action@v1
         with:
-          name: ${{ matrix.artifact_key }}-test-env
+          action: actions/download-artifact@v4
+          with: |
+            name: ${{ matrix.artifact_key }}-test-env
+            path: .
+          attempt_limit: 3
+          attempt_delay: 2000
       - name: Load test environment
         id: load
         if: needs.file-check.outputs.run == 'true'
@@ -484,10 +489,14 @@ jobs:
       - name: Fetch dist tarball artifacts
         id: fetch-tarball
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v3
+        uses: Wandalen/wretry.action@v1
         with:
-          name: dist-tarball
-          path: dist-tarball
+          action: actions/download-artifact@v4
+          with: |
+            name: dist-tarball
+            path: dist-tarball
+          attempt_limit: 3
+          attempt_delay: 2000
       - name: Prepare artifact directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
@@ -506,9 +515,14 @@ jobs:
       - name: Fetch test environment
         id: fetch-test-environment
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v3
+        uses: Wandalen/wretry.action@v1
         with:
-          name: ${{ matrix.artifact_key }}-test-env
+          action: actions/download-artifact@v4
+          with: |
+            name: ${{ matrix.artifact_key }}-test-env
+            path: .
+          attempt_limit: 3
+          attempt_delay: 2000
       - name: Load test environment
         id: load
         if: needs.file-check.outputs.run == 'true'
@@ -565,27 +579,24 @@ jobs:
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: mkdir -p artifacts
-      - name: Retrieve Dist Tarball
+      - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v3
+        uses: Wandalen/wretry.action@v1
         with:
-          name: dist-tarball
-          path: dist-tarball
-      - name: Retrieve Static Build Artifacts
-        id: fetch-static
-        if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v3
-        with:
-          name: static-archive
-          path: static-archive
+          action: actions/download-artifact@v4
+          with: |
+            pattern: dist-*
+            path: dist-artifacts
+            merge-multiple: true
+          attempt_limit: 3
+          attempt_delay: 2000
       - name: Prepare Artifacts
         id: consolidate
         if: needs.file-check.outputs.run == 'true'
         working-directory: ./artifacts/
         run: |
-          mv ../dist-tarball/* . || exit 1
-          mv ../static-archive/* . || exit 1
+          mv ../dist-artifacts/* . || exit 1
           ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
           cp ../packaging/version ./latest-version.txt || exit 1
           cp ../integrations/integrations.js ./integrations.js || exit 1
@@ -594,7 +605,7 @@ jobs:
       - name: Store Artifacts
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: final-artifacts
           path: artifacts/*
@@ -650,16 +661,21 @@ jobs:
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v3
+        uses: Wandalen/wretry.action@v1
         with:
-          name: final-artifacts
-          path: artifacts
+          action: actions/download-artifact@v4
+          with: |
+            name: final-artifacts
+            path: artifacts
+          attempt_limit: 3
+          attempt_delay: 2000
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
           mkdir -p download/latest
           mv artifacts/* download/latest
+          ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
         if: needs.file-check.outputs.run == 'true'
@@ -714,16 +730,21 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v3
+        uses: Wandalen/wretry.action@v1
         with:
-          name: final-artifacts
-          path: artifacts
+          action: actions/download-artifact@v4
+          with: |
+            name: final-artifacts
+            path: artifacts
+          attempt_limit: 3
+          attempt_delay: 2000
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
           mkdir -p download/latest
           mv artifacts/* download/latest
+          ls -al download/latest
       - name: Verify that artifacts work with installer
         id: verify
         if: needs.file-check.outputs.run == 'true'
@@ -763,10 +784,14 @@ jobs:
     steps:
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v3
+        uses: Wandalen/wretry.action@v1
         with:
-          name: final-artifacts
-          path: final-artifacts
+          action: actions/download-artifact@v4
+          with: |
+            name: final-artifacts
+            path: final-artifacts
+          attempt_limit: 3
+          attempt_delay: 2000
       - name: Authenticate to GCS
         id: gcs-auth
         uses: google-github-actions/auth@v2
@@ -828,10 +853,14 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v3
+        uses: Wandalen/wretry.action@v1
         with:
-          name: final-artifacts
-          path: final-artifacts
+          action: actions/download-artifact@v4
+          with: |
+            name: final-artifacts
+            path: final-artifacts
+          attempt_limit: 3
+          attempt_delay: 2000
       - name: Prepare version info
         id: version
         run: |
@@ -942,10 +971,14 @@ jobs:
         uses: actions/checkout@v4
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v3
+        uses: Wandalen/wretry.action@v1
         with:
-          name: final-artifacts
-          path: final-artifacts
+          action: actions/download-artifact@v4
+          with: |
+            name: final-artifacts
+            path: final-artifacts
+          attempt_limit: 3
+          attempt_delay: 2000
       - name: Create Release
         id: create-release
         uses: ncipollo/release-action@v1
