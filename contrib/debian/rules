@@ -78,10 +78,10 @@ override_dh_auto_configure:
 		-DENABLE_BUNDLED_PROTOBUF=Off \
 		-DENABLE_BUNDLED_JSONC=Off \
 		-DENABLE_BUNDLED_YAML=Off \
-	  -DENABLE_SENTRY=On \
-    -DNETDATA_SENTRY_ENVIRONMENT="${ENVIRONMENT_VARIABLE_FROM_CI}" \
-    -DNETDATA_SENTRY_RELEASE="${RELEASE_VARIABLE_FROM_CI}" \
-    -DNETDATA_SENTRY_DIST="${DIST_VARIABLE_FROM_CI}"
+		-DENABLE_SENTRY="${ENABLE_SENTRY}"" \
+		-DNETDATA_SENTRY_ENVIRONMENT="${BUILDING_ENVIRONMENT}" \
+		-DNETDATA_SENTRY_RELEASE="${VERSION}" \
+		-DNETDATA_SENTRY_DIST="${BUILD_DESTINATION}"
 
 override_dh_auto_test:
 	true
@@ -89,6 +89,8 @@ override_dh_auto_test:
 override_dh_strip:
 	# Upload debug symbols with sentry-cli
 	# sentry-cli ...
+	# if [ "${SENTRY_UPLOAD}" = "true" ]; then
+	#  sentry-cli . . .
 
   # continue with the strip step
   dh_strip

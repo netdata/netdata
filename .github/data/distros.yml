@@ -132,6 +132,7 @@ include:
     notes: ''
     base_image: debian:bookworm
     eol_check: true
+    bundle_sentry: true
     env_prep: |
       apt-get update
     jsonc_removal: |
@@ -149,6 +150,7 @@ include:
   - <<: *debian
     version: "11"
     base_image: debian:bullseye
+    bundle_sentry: false
     packages:
       <<: *debian_packages
       repo_distro: debian/bullseye
@@ -157,6 +159,7 @@ include:
   - <<: *debian
     version: "10"
     base_image: debian:buster
+    bundle_sentry: false
     packages:
       <<: *debian_packages
       repo_distro: debian/buster
