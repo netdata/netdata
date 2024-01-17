@@ -1,93 +1,205 @@
 #!/usr/bin/env python3
 
 import asyncio
+import enum
 import click
 import os
-from pathlib import Path
 import sys
 import time
 
 import anyio
 
 import dagger
-from typing import List
+from typing import Callable, List, Tuple
 
 import images as oci_images
 
-
-SUPPORTED_PLATFORMS = [
-    "linux/x86_64",
-    "linux/arm64",
-    "linux/i386",
-    "linux/arm/v7",
-    "linux/arm/v6",
-    "linux/ppc64le",
-    "linux/s390x",
-    "linux/riscv64",
-]
+import pathlib
 
 
-def netdata_installer(enable_ml=True, enable_ebpf=False, enable_go=False):
-    cmd = [
-        "./netdata-installer.sh",
-        "--disable-telemetry",
-        "--disable-logsmanagement"
-    ]
+class Platform:
+    def __init__(self, platform: str):
+        self.platform = dagger.Platform(platform)
 
-    if not enable_ebpf:
-        cmd.append("--disable-ebpf")
+    def escaped(self) -> str:
+        return str(self.platform).removeprefix("linux/").replace('/', '_')
 
-    if not enable_ml:
-        cmd.append("--disable-ml")
+    def __eq__(self, other):
+        if isinstance(other, Platform):
+            return self.platform == other.platform
+        elif isinstance(other, dagger.Platform):
+            return self.platform == other
+        else:
+            return NotImplemented
 
-    if not enable_go:
-        cmd.append('--disable-go')
+    def __ne__(self, other):
+        return not (self == other)
 
-    cmd.extend([
-        "--dont-wait",
-        "--dont-start-it",
-        "--install-prefix",
-        "/opt"
-    ])
-
-    return cmd
+    def __hash__(self):
+        return hash(self.platform)
 
 
-def build_image_for_platform(client: dagger.Client, image_name, platform: dagger.Platform, ctr : dagger.Container) -> dagger.Container:
-    repo_path = str(Path(__file__).parent.parent.parent)
-    exclude_dirs = exclude=["build", "fluent-bit/build"]
-
-    tag = image_name + "_" + str(platform).replace('/', '_')
-
-    externaldeps_cache = client.cache_volume(f"{tag}-externaldeps")
-
-    source = (
-        ctr.with_directory("/netdata", client.host().directory(repo_path), exclude=exclude_dirs)
-           .with_mounted_cache("/netdata/externaldeps", externaldeps_cache)
-           .with_env_variable('NETDATA_CMAKE_OPTIONS', '-DCMAKE_BUILD_TYPE=Debug')
-    )
-
-    enable_ml = "centos7" not in image_name
-    build_task = source.with_workdir("/netdata").with_exec(netdata_installer(enable_ml=enable_ml))
-
-    shell_cmd = "/opt/netdata/usr/sbin/netdata -W buildinfo | tee /opt/netdata/buildinfo.log"
-    buildinfo_task = build_task.with_exec(["sh", "-c", shell_cmd])
-
-    # build_dir = buildinfo_task.directory('/opt/netdata')
-    # artifact_dir = os.path.join(Path.home(), f'ci/{tag}')
-    # output_task = build_dir.export(artifact_dir)
-
-    return buildinfo_task
+SUPPORTED_PLATFORMS = set([
+    Platform("linux/x86_64"),
+    Platform("linux/arm64"),
+    Platform("linux/i386"),
+    Platform("linux/arm/v7"),
+    Platform("linux/arm/v6"),
+    Platform("linux/ppc64le"),
+    Platform("linux/s390x"),
+    Platform("linux/riscv64"),
+])
 
 
-def build_service(ctr: dagger.Container) -> dagger.Container:
-    ctr = (
-        ctr.with_exec(["/opt/netdata/usr/sbin/netdata", "-D", "-i", "0.0.0.0"])
-           .with_exposed_port(19999)
-    )
+class Distribution:
+    def __init__(self, display_name: str, docker_tag: str):
+        self.display_name = display_name
+        self.docker_tag = docker_tag
 
-    return ctr
-    
+        if self.display_name == "alpine_3_18":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_alpine_3_18
+        elif self.display_name == "alpine_3_19":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_alpine_3_19
+        elif self.display_name == "amazonlinux2":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_amazon_linux_2
+        elif self.display_name == "centos7":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_centos_7
+        elif self.display_name == "centos-stream8":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_centos_stream_8
+        elif self.display_name == "centos-stream9":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_centos_stream_9
+        elif self.display_name == "debian10":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_debian_10
+        elif self.display_name == "debian11":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_debian_11
+        elif self.display_name == "debian12":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_debian_12
+        elif self.display_name == "fedora37":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_fedora_37
+        elif self.display_name == "fedora38":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_fedora_38
+        elif self.display_name == "fedora39":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_fedora_39
+        elif self.display_name == "opensuse15.4":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_opensuse_15_4
+        elif self.display_name == "opensuse15.5":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_opensuse_15_5
+        elif self.display_name == "opensusetumbleweed":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_opensuse_tumbleweed
+        elif self.display_name == "oraclelinux8":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_oracle_linux_8
+        elif self.display_name == "oraclelinux9":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_oracle_linux_9
+        elif self.display_name == "rockylinux8":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_rocky_linux_8
+        elif self.display_name == "rockylinux9":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_rocky_linux_9
+        elif self.display_name == "ubuntu20.04":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_ubuntu_20_04
+        elif self.display_name == "ubuntu22.04":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_ubuntu_22_04
+        elif self.display_name == "ubuntu23.04":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_ubuntu_23_04
+        elif self.display_name == "ubuntu23.10":
+            self.platforms = SUPPORTED_PLATFORMS
+            self.builder = oci_images.build_ubuntu_23_10
+        else:
+            raise ValueError(f"Unknown distribution: {self.display_name}")
+
+
+    def cache_volume(self, client: dagger.Client, platform: dagger.Platform, path: str) -> dagger.CacheVolume:
+        tag = "_".join([self.display_name, Platform(platform).escaped()])
+        return client.cache_volume(f"{path}-{tag}")
+
+
+    def build(self, client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
+        if platform not in self.platforms:
+            raise ValueError(f"Building {self.display_name} is not supported on {platform}.")
+
+        ctr = self.builder(client, platform)
+        ctr = oci_images.install_cargo(ctr)
+
+        return ctr
+
+        
+class Context:
+    def __init__(self,
+                 client: dagger.Client,
+                 platform: dagger.Platform,
+                 repo_root: pathlib.Path,
+                 distribution: Distribution):
+        self.client = client
+        self.platform = platform
+        self.repo_root = repo_root
+
+
+class FeatureFlags(enum.Flag):
+    DBEngine = enum.auto()
+    GoPlugin = enum.auto()
+    ExtendedBPF = enum.auto()
+    LogsManagement = enum.auto()
+    MachineLearning = enum.auto()
+
+
+class NetdataInstaller:
+    def __init__(self,
+                 repo_root: pathlib.Path,
+                 install_prefix: pathlib.Path,
+                 features: FeatureFlags):
+        self.repo_root = repo_root
+        self.install_prefix = install_prefix
+        self.features = features
+
+    def install(self, ctr: dagger.Container, externaldeps: dagger.CacheVolume) -> dagger.Container:
+        args = ["--dont-wait", "--dont-start-it", "--disable-telemetry"]
+
+        if FeatureFlags.DBEngine not in self.features:
+            args.append("--disable-dbengine")
+
+        if FeatureFlags.GoPlugin not in self.features:
+            args.append("--disable-go")
+
+        if FeatureFlags.ExtendedBPF not in self.features:
+            args.append("--disable-ebpf")
+
+        if FeatureFlags.LogsManagement not in self.features:
+            args.append("--disable-logsmanagement")
+
+        if FeatureFlags.MachineLearning not in self.features:
+            args.append("--disable-ml")
+
+        args.extend(["--install-prefix", self.install_prefix])
+
+        ctr = (
+            ctr.with_workdir(self.repo_root)
+               .with_mounted_cache(os.path.join(self.repo_root, "externaldeps"), externaldeps)
+               .with_env_variable('NETDATA_CMAKE_OPTIONS', '-DCMAKE_BUILD_TYPE=Debug')
+               .with_exec(["./netdata-installer.sh"] + args)
+        )
+
+        return ctr
 
 def run_async(func):
     """
@@ -100,25 +212,32 @@ def run_async(func):
 
 @run_async
 async def main():
-    repo_path = str(Path(__file__).parent.parent.parent)
-
+    repo_root = pathlib.Path(__file__).parent.parent.parent
+    install_prefix = "/opt"
     platform = dagger.Platform("linux/x86_64")
+    dist = Distribution("debian10", "debian:10")
 
     config = dagger.Config(log_output=sys.stdout)
     async with dagger.Connection(config) as client:
-        ctr = oci_images.build_debian_12(client, platform)
-        ctr = build_image_for_platform(client, "debian_12", platform, ctr)
-        ctr = build_service(ctr)
+        # build base image with packages we need
+        ctr = dist.build(client, platform)
 
-        tunnel = await client.host().tunnel(ctr.as_service(), native=True).start()
+        # mount root repo from host
+        ctr = ctr.with_directory("/netdata", client.host().directory(repo_root.as_posix()), exclude=[
+            "build",
+            "fluent-bit/build",                           
+        ])
 
-        # get HTTP service address
-        endpoint = tunnel.endpoint()
-        print(f"GVD >>> The endpoint is: {endpoint=} <<<")
-        await endpoint
-        time.sleep(600)
+        # create the cache volume for externaldeps
+        externaldeps = dist.cache_volume(client, ctr.platform(), "externaldeps")
 
-        # await oci_images.static_build(client, repo_path)
-    
+        # run the netdata installer
+        features = FeatureFlags.DBEngine
+        installer = NetdataInstaller("/netdata", install_prefix, FeatureFlags.DBEngine)
+        ctr = installer.install(ctr, externaldeps)
+        
+        await ctr
+
+   
 if __name__ == '__main__':
     main()

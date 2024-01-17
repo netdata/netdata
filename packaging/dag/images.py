@@ -55,7 +55,7 @@ _ALPINE_COMMON_PACKAGES = [
 ]
 
 
-def build_alpine_3_18(client, platform):
+def build_alpine_3_18(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("alpine:3.18")
 
     pkgs = [pkg for pkg in _ALPINE_COMMON_PACKAGES]
@@ -67,7 +67,7 @@ def build_alpine_3_18(client, platform):
     return ctr
 
 
-def build_alpine_3_19(client, platform: dagger.Platform):
+def build_alpine_3_19(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("alpine:3.19")
 
     pkgs = [pkg for pkg in _ALPINE_COMMON_PACKAGES]
@@ -79,7 +79,7 @@ def build_alpine_3_19(client, platform: dagger.Platform):
     return ctr
 
 
-def static_build_openssl(client: dagger.Client, ctr: dagger.Container):
+def static_build_openssl(client: dagger.Client, ctr: dagger.Container) -> dagger.Container:
     tree = (
         client.git(url="https://github.com/openssl/openssl", keep_git_dir=True)
               .tag("openssl-3.1.4").tree()
@@ -105,7 +105,7 @@ def static_build_openssl(client: dagger.Client, ctr: dagger.Container):
     return ctr
 
 
-def static_build_bash(client: dagger.Client, ctr: dagger.Container):
+def static_build_bash(client: dagger.Client, ctr: dagger.Container) -> dagger.Container:
     tree = (
         client.git(url="https://git.savannah.gnu.org/git/bash.git", keep_git_dir=True)
               .tag("bash-5.1").tree()
@@ -138,7 +138,7 @@ def static_build_bash(client: dagger.Client, ctr: dagger.Container):
 
     return ctr
 
-def static_build_curl(client: dagger.Client, ctr: dagger.Container):
+def static_build_curl(client: dagger.Client, ctr: dagger.Container) -> dagger.Container:
     tree = (
         client.git(url="https://github.com/curl/curl", keep_git_dir=True)
               .tag("curl-8_4_0").tree()
@@ -185,7 +185,7 @@ def static_build_curl(client: dagger.Client, ctr: dagger.Container):
     return ctr
 
 
-def static_build_ioping(client: dagger.Client, ctr: dagger.Container):
+def static_build_ioping(client: dagger.Client, ctr: dagger.Container) -> dagger.Container:
     tree = (
         client.git(url="https://github.com/koct9i/ioping", keep_git_dir=True)
               .tag("v1.3").tree()
@@ -204,7 +204,7 @@ def static_build_ioping(client: dagger.Client, ctr: dagger.Container):
     return ctr
 
 
-def static_build_libnetfilter_acct(client: dagger.Client, ctr: dagger.Container):
+def static_build_libnetfilter_acct(client: dagger.Client, ctr: dagger.Container) -> dagger.Container:
     tree = (
         client.git(url="git://git.netfilter.org/libnetfilter_acct", keep_git_dir=True)
               .tag("libnetfilter_acct-1.0.3").tree()
@@ -228,7 +228,7 @@ def static_build_libnetfilter_acct(client: dagger.Client, ctr: dagger.Container)
 
     return ctr
 
-def static_build_netdata(client: dagger.Client, ctr: dagger.Container):
+def static_build_netdata(client: dagger.Client, ctr: dagger.Container) -> dagger.Container:
     CFLAGS = [
         "-ffunction-sections",
         "-fdata-sections",
@@ -383,7 +383,7 @@ _CENTOS_COMMON_PACKAGES = [
     "zlib-devel",
 ]
 
-def build_amazon_linux_2(client, platform):
+def build_amazon_linux_2(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("amazonlinux:2")
 
     pkgs = [pkg for pkg in _CENTOS_COMMON_PACKAGES]
@@ -427,7 +427,7 @@ def build_amazon_linux_2(client, platform):
     return ctr
 
 
-def build_centos_7(client, platform):
+def build_centos_7(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("centos:7")
 
     pkgs = [pkg for pkg in _CENTOS_COMMON_PACKAGES] + ["bash"]
@@ -526,7 +526,7 @@ _ROCKY_LINUX_COMMON_PACKAGES = [
 ]
 
 
-def build_rocky_linux_8(client, platform):
+def build_rocky_linux_8(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("rockylinux:8")
 
     pkgs = [pkg for pkg in _ROCKY_LINUX_COMMON_PACKAGES] + ["autogen"]
@@ -554,7 +554,7 @@ def build_rocky_linux_8(client, platform):
     return ctr
 
 
-def build_rocky_linux_9(client, platform):
+def build_rocky_linux_9(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("rockylinux:9")
 
     pkgs = [pkg for pkg in _ROCKY_LINUX_COMMON_PACKAGES]
@@ -636,7 +636,7 @@ _CENTOS_STREAM_COMMON_PACKAGES = [
 ]
 
 
-def build_centos_stream_8(client, platform):
+def build_centos_stream_8(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("quay.io/centos/centos:stream8")
 
     pkgs = [pkg for pkg in _CENTOS_STREAM_COMMON_PACKAGES] + ["autogen"]
@@ -664,7 +664,7 @@ def build_centos_stream_8(client, platform):
     return ctr
 
 
-def build_centos_stream_9(client, platform):
+def build_centos_stream_9(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("quay.io/centos/centos:stream9")
 
     pkgs = [pkg for pkg in _CENTOS_STREAM_COMMON_PACKAGES]
@@ -695,7 +695,7 @@ def build_centos_stream_9(client, platform):
 _ORACLE_LINUX_COMMON_PACKAGES = list(_ROCKY_LINUX_COMMON_PACKAGES)
 
 
-def build_oracle_linux_9(client, platform):
+def build_oracle_linux_9(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("oraclelinux:9")
 
     pkgs = [pkg for pkg in _ORACLE_LINUX_COMMON_PACKAGES]
@@ -727,7 +727,7 @@ def build_oracle_linux_9(client, platform):
     return ctr
 
 
-def build_oracle_linux_8(client, platform):
+def build_oracle_linux_8(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("oraclelinux:8")
 
     pkgs = [pkg for pkg in _ORACLE_LINUX_COMMON_PACKAGES] + ["autogen"]
@@ -807,7 +807,7 @@ _OPENSUSE_COMMON_PACKAGES = [
     "xen-devel",
 ]
 
-def build_opensuse_tumbleweed(client, platform):
+def build_opensuse_tumbleweed(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("opensuse/tumbleweed:latest")
 
     pkgs = [pkg for pkg in _OPENSUSE_COMMON_PACKAGES] + ["protobuf-c"]
@@ -833,7 +833,7 @@ def build_opensuse_tumbleweed(client, platform):
     return ctr
 
 
-def build_opensuse_15_5(client, platform):
+def build_opensuse_15_5(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("opensuse/leap:15.5")
 
     pkgs = [pkg for pkg in _OPENSUSE_COMMON_PACKAGES] + ["libprotobuf-c-devel"]
@@ -859,7 +859,7 @@ def build_opensuse_15_5(client, platform):
     return ctr
 
 
-def build_opensuse_15_4(client, platform):
+def build_opensuse_15_4(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     crt = client.container(platform=platform).from_("opensuse/leap:15.4")
 
     pkgs = [pkg for pkg in _OPENSUSE_COMMON_PACKAGES] + ["libprotobuf-c-devel"]
@@ -926,7 +926,7 @@ _FEDORA_COMMON_PACKAGES = [
 ]
 
 
-def build_fedora_37(client, platform):
+def build_fedora_37(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("fedora:37")
 
     pkgs = [pkg for pkg in _FEDORA_COMMON_PACKAGES]
@@ -952,7 +952,7 @@ def build_fedora_37(client, platform):
     return ctr
 
 
-def build_fedora_38(client, platform):
+def build_fedora_38(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("fedora:38")
 
     pkgs = [pkg for pkg in _FEDORA_COMMON_PACKAGES]
@@ -978,7 +978,7 @@ def build_fedora_38(client, platform):
     return ctr
 
 
-def build_fedora_39(client, platform):
+def build_fedora_39(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("fedora:39")
 
     pkgs = [pkg for pkg in _FEDORA_COMMON_PACKAGES]
@@ -1056,7 +1056,7 @@ _DEBIAN_COMMON_PACKAGES = [
 ]
 
 
-def build_debian_10(client, platform):
+def build_debian_10(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("debian:buster")
 
     pkgs = [pkg for pkg in _DEBIAN_COMMON_PACKAGES] + ["dh-systemd", "libxen-dev"]
@@ -1074,7 +1074,7 @@ def build_debian_10(client, platform):
     return ctr
 
 
-def build_debian_11(client, platform):
+def build_debian_11(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("debian:bullseye")
 
     pkgs = [pkg for pkg in _DEBIAN_COMMON_PACKAGES] + ["libxen-dev"]
@@ -1091,7 +1091,7 @@ def build_debian_11(client, platform):
 
     return ctr
 
-def build_debian_12(client, platform) -> dagger.Container:
+def build_debian_12(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("debian:bookworm")
 
     pkgs = [pkg for pkg in _DEBIAN_COMMON_PACKAGES]
@@ -1164,7 +1164,7 @@ _UBUNTU_COMMON_PACKAGES = [
     "zlib1g-dev",
 ]
 
-def build_ubuntu_20_04(client, platform):
+def build_ubuntu_20_04(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("ubuntu:20.04")
 
     pkgs = [pkg for pkg in _UBUNTU_COMMON_PACKAGES] + ["dh-systemd"]
@@ -1186,7 +1186,7 @@ def build_ubuntu_20_04(client, platform):
     return ctr
 
 
-def build_ubuntu_22_04(client, platform):
+def build_ubuntu_22_04(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("ubuntu:22.04")
 
     pkgs = [pkg for pkg in _UBUNTU_COMMON_PACKAGES]
@@ -1204,7 +1204,7 @@ def build_ubuntu_22_04(client, platform):
     return ctr
 
 
-def build_ubuntu_23_04(client, platform):
+def build_ubuntu_23_04(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("ubuntu:23.04")
 
     pkgs = [pkg for pkg in _UBUNTU_COMMON_PACKAGES]
@@ -1222,7 +1222,7 @@ def build_ubuntu_23_04(client, platform):
     return ctr
 
 
-def build_ubuntu_23_10(client, platform):
+def build_ubuntu_23_10(client: dagger.Client, platform: dagger.Platform) -> dagger.Container:
     ctr = client.container(platform=platform).from_("ubuntu:23.10")
 
     pkgs = [pkg for pkg in _UBUNTU_COMMON_PACKAGES]
@@ -1240,77 +1240,24 @@ def build_ubuntu_23_10(client, platform):
     return ctr
 
 
-class Image:
-    def __init__(self, cli_name, docker_name, deps_fn, supported_platforms=None):
-        self.cli_name = cli_name
-        self.docker_name = docker_name
-        self.supported_platforms = supported_platforms
-        self.deps_fn = deps_fn
+def install_cargo(ctr: dagger.Container) -> dagger.Container:
+    bin_paths = [
+        "/root/.cargo/bin",
+        "/usr/local/sbin",
+        "/usr/local/bin",
+        "/usr/sbin",
+        "/usr/bin",
+        "/sbin",
+        "/bin",
+    ]
 
-    def __hash__(self):
-        return hash(self.cli_name)
+    ctr = (
+        ctr.with_workdir("/")
+           .with_exec(["sh", "-c", "curl https://sh.rustup.rs -sSf | sh -s -- -y"])
+           .with_env_variable("PATH", ":".join(bin_paths))
+           .with_exec(["cargo", "new", "--bin", "hello"])
+           .with_workdir("/hello")
+           .with_exec(["cargo", "run", "-v", "-v"])
+    )
 
-    def __eq__(self, other):
-        return isinstance(other, Image) and self.cli_name == other.cli_name
-
-    def __lt__(self, other):
-        return self.cli_name < other.cli_name
-
-    def __str__(self):
-        return self.cli_name
-
-    def build(self, client, platform):
-        ctr = self.deps_fn(client, platform)
-
-        ctr = (
-            ctr.with_workdir("/")
-               .with_exec(["sh", "-c", "curl https://sh.rustup.rs -sSf | sh -s -- -y"])
-        )
-
-        bin_paths = [
-            "/root/.cargo/bin",
-            "/usr/local/sbin",
-            "/usr/local/bin",
-            "/usr/sbin",
-            "/usr/bin",
-            "/sbin",
-            "/bin",
-        ]
-
-        ctr = ctr.with_env_variable("PATH", ":".join(bin_paths))
-
-        ctr = (
-            ctr.with_exec(["cargo", "new", "--bin", "hello"])
-               .with_workdir("/hello")
-               .with_exec(["cargo", "run", "-v", "-v"])
-        )
-
-        return ctr
-
-
-SUPPORTED_IMAGES = {
-    Image("alpine_3_18", "alpine:3.18", build_alpine_3_18),
-    Image("alpine_3_19", "alpine:3.19", build_alpine_3_19),
-    Image("amazonlinux2", "amazonlinux:2", build_amazon_linux_2),
-    # amazonlinux2023
-    Image("centos7", "centos:7", build_centos_7),
-    Image("centos-stream8", "quay.io/centos/centos:stream8", build_centos_stream_8),
-    Image("centos-stream9", "quay.io/centos/centos:stream9", build_centos_stream_9),
-    Image("debian10", "debian:buster", build_debian_10),
-    Image("debian11", "debian:bullseye", build_debian_11),
-    Image("debian12", "debian:bookworm", build_debian_12),
-    Image("fedora37", "fedora:37", build_fedora_37),
-    Image("fedora38", "fedora:38", build_fedora_38),
-    Image("fedora39", "fedora:39", build_fedora_39),
-    Image("opensuse15.4", "opensuse/leap:15.4", build_opensuse_15_4),
-    Image("opensuse15.5", "opensuse/leap:15.5", build_opensuse_15_5),
-    Image("opensusetumbleweed", "opensuse/tumbleweed:latest", build_opensuse_tumbleweed),
-    Image("oraclelinux8", "oraclelinux:8", build_oracle_linux_8),
-    Image("oraclelinux9", "oraclelinux:9", build_oracle_linux_9),
-    Image("rockylinux8", "rockylinux:8", build_rocky_linux_8),
-    Image("rockylinux9", "rockylinux:9", build_rocky_linux_9),
-    Image("ubuntu20.04", "ubuntu:20.04", build_ubuntu_20_04),
-    Image("ubuntu22.04", "ubuntu:22.04", build_ubuntu_22_04),
-    Image("ubuntu23.04", "ubuntu:23.04", build_ubuntu_23_04),
-    Image("ubuntu23.10", "ubuntu:23.10", build_ubuntu_23_10),
-}
+    return ctr
