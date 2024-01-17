@@ -2,40 +2,10 @@
 
 #include "health.h"
 #include "health_internals.h"
-//
-//struct var {
-//    void *value;
-//    RRDVAR_FLAGS flags:24;
-//    RRDVAR_TYPE type:8;
-//    int16_t refcount;
-//    void *owner;
-//};
-//
-//struct varname {
-//    STRING *name;
-//    SPINLOCK spinlock;
-//    uint16_t size;
-//    uint16_t used;
-//    struct var *array;
-//};
-//
-
-struct variable_constraints {
-    enum {
-        VAR_LOOKUP_SELF,
-        VAR_LOOKUP_CONTEXT,
-        VAR_LOOKUP_HOST,
-    } from;
-    const char *context;
-
-    RRDLABELS *rrdlabels;
-};
 
 struct variable_lookup_score {
-#ifdef NETDATA_INTERNAL_CHECKS
     RRDSET *st;
     const char *source;
-#endif
     NETDATA_DOUBLE value;
     size_t score;
 };
@@ -82,10 +52,8 @@ static void variable_lookup_add_result_with_score(struct variable_lookup_job *vb
     vbd->result.array[vbd->result.used++] = (struct variable_lookup_score) {
         .value = n,
         .score = vbd->score.last_score,
-#ifdef NETDATA_INTERNAL_CHECKS
         .st = st,
         .source = source,
-#endif
     };
 }
 
@@ -144,7 +112,7 @@ static bool variable_lookup_context(struct variable_lookup_job *vbd, const char 
     vbd->dimension = dim_id_or_name;
     vbd->dim = string_strdupz(vbd->dimension);
     vbd->dimension_length = string_strlen(vbd->dim);
-    vbd->dimension_selection = DIM_SELECT_NORMAL;
+    // vbd->dimension_selection = DIM_SELECT_NORMAL;
 
     bool found = false;
 
@@ -167,7 +135,7 @@ static bool variable_lookup_context(struct variable_lookup_job *vbd, const char 
     vbd->dimension = vbd_back.dimension;
     vbd->dim = vbd_back.dim;
     vbd->dimension_length = vbd_back.dimension_length;
-    vbd->dimension_selection = vbd_back.dimension_selection;
+    // vbd->dimension_selection = vbd_back.dimension_selection;
 
     return found;
 }
@@ -185,9 +153,8 @@ bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
     return found;
 }
 
-bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result) {
+bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE *result, BUFFER *wb) {
     static STRING *last_collected_t = NULL, *green = NULL, *red = NULL, *update_every = NULL;
-
     struct variable_lookup_job vbd = { 0 };
 
 //    const char *v_name = string2str(variable);
@@ -197,10 +164,8 @@ bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result)
 
     bool found = false;
 
-#ifdef NETDATA_INTERNAL_CHECKS
     const char *source = NULL;
     RRDSET *source_st = NULL;
-#endif
 
     RRDCALC *rc = data;
     RRDSET *st = rc->rrdset;
@@ -217,40 +182,32 @@ bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result)
 
     if(variable == last_collected_t) {
         *result = (NETDATA_DOUBLE)st->last_collected_time.tv_sec;
-#ifdef NETDATA_INTERNAL_CHECKS
         source = "last_collected_t";
         source_st = st;
-#endif
         found = true;
         goto log;
     }
 
     if(variable == update_every) {
         *result = (NETDATA_DOUBLE)st->update_every;
-#ifdef NETDATA_INTERNAL_CHECKS
         source = "update_every";
         source_st = st;
-#endif
         found = true;
         goto log;
     }
 
     if(variable == green) {
         *result = (NETDATA_DOUBLE)rc->config.green;
-#ifdef NETDATA_INTERNAL_CHECKS
         source = "green";
         source_st = st;
-#endif
         found = true;
         goto log;
     }
 
     if(variable == red) {
         *result = (NETDATA_DOUBLE)rc->config.red;
-#ifdef NETDATA_INTERNAL_CHECKS
         source = "red";
         source_st = st;
-#endif
         found = true;
         goto log;
     }
@@ -326,10 +283,8 @@ find_best_scored:
             if (vbd.result.array[i].score > best->score)
                 best = &vbd.result.array[i];
 
-#ifdef NETDATA_INTERNAL_CHECKS
         source = best->source;
         source_st = best->st;
-#endif
         *result = best->value;
         freez(vbd.result.array);
     }
@@ -367,7 +322,50 @@ log:
     }
 #endif
 
+    if(unlikely(wb)) {
+        buffer_json_member_add_string(wb, "variable", string2str(variable));
+        buffer_json_member_add_string(wb, "instance", string2str(st->id));
+        buffer_json_member_add_string(wb, "context", string2str(st->context));
+        buffer_json_member_add_boolean(wb, "found", found);
+
+        if (found) {
+            buffer_json_member_add_double(wb, "value", *result);
+            buffer_json_member_add_object(wb, "source");
+            {
+                buffer_json_member_add_string(wb, "description", source);
+                buffer_json_member_add_string(wb, "instance", string2str(source_st->id));
+                buffer_json_member_add_string(wb, "context", string2str(source_st->context));
+                buffer_json_member_add_uint64(wb, "candidates", vbd.result.used ? vbd.result.used : 1);
+            }
+            buffer_json_object_close(wb); // source
+        }
+    }
+
     string_freez(vbd.dim);
 
     return found;
+}
+
+bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result) {
+    return alert_variable_lookup_internal(variable, data, result, NULL);
+}
+
+int alert_variable_lookup_trace(RRDHOST *host __maybe_unused, RRDSET *st, const char *variable, BUFFER *wb) {
+    int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    STRING *v = string_strdupz(variable);
+    RRDCALC rc = {
+        .rrdset = st,
+    };
+
+    NETDATA_DOUBLE n;
+    alert_variable_lookup_internal(v, &rc, &n, wb);
+
+    string_freez(v);
+
+    buffer_json_finalize(wb);
+    return code;
 }

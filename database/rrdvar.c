@@ -158,57 +158,149 @@ bool rrdvar_get_custom_chart_variable_value(RRDSET *st, STRING *variable, NETDAT
 // ----------------------------------------------------------------------------
 // RRDVAR to JSON
 
-struct variable2json_helper {
-    BUFFER *buf;
-};
-
-static int single_variable2json_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry __maybe_unused, void *helper_data) {
-    struct variable2json_helper *helper = (struct variable2json_helper *)helper_data;
-    const RRDVAR_ACQUIRED *rva = (const RRDVAR_ACQUIRED *)item;
-    NETDATA_DOUBLE value = rrdvar2number(rva);
-
-    if(unlikely(isnan(value) || isinf(value)))
-        buffer_json_member_add_string(helper->buf, rrdvar_name(rva), NULL);
-    else
-        buffer_json_member_add_double(helper->buf, rrdvar_name(rva), (NETDATA_DOUBLE)value);
-
-    return 0;
+void rrdvar_to_json_members(DICTIONARY *dict, BUFFER *wb) {
+    RRDVAR *rv;
+    dfe_start_read(dict, rv) {
+        buffer_json_member_add_double(wb, rv_dfe.name, rv->value);
+    }
+    dfe_done(rv);
 }
 
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf) {
-    struct variable2json_helper helper = {.buf = buf };
-
-    rrdvar_walkthrough_read(st->rrdvars, single_variable2json_callback, &helper);
+    rrdvar_to_json_members(st->rrdvars, buf);
 }
 
-void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
+void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
     RRDHOST *host = st->rrdhost;
 
-    struct variable2json_helper helper = {.buf = buf };
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
-    buffer_json_initialize(buf, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_member_add_string(wb, "chart", rrdset_id(st));
+    buffer_json_member_add_string(wb, "chart_name", rrdset_name(st));
+    buffer_json_member_add_string(wb, "chart_context", rrdset_context(st));
+    buffer_json_member_add_string(wb, "family", rrdset_family(st));
+    buffer_json_member_add_string(wb, "host", rrdhost_hostname(host));
 
-    buffer_json_member_add_string(buf, "chart", rrdset_id(st));
-    buffer_json_member_add_string(buf, "chart_name", rrdset_name(st));
-    buffer_json_member_add_string(buf, "chart_context", rrdset_context(st));
-
+    buffer_json_member_add_object(wb, "dimensions_last_stored_values");
     {
-        buffer_json_member_add_object(buf, "chart_variables");
-        rrdvar_walkthrough_read(st->rrdvars, single_variable2json_callback, &helper);
-        buffer_json_object_close(buf);
+        RRDDIM *rd;
+        dfe_start_read(st->rrddim_root_index, rd) {
+            buffer_json_member_add_double(wb, string2str(rd->id), rd->collector.last_stored_value);
+            if(rd->name != rd->id)
+                buffer_json_member_add_double(wb, string2str(rd->name), rd->collector.last_stored_value);
+        }
+        dfe_done(rd);
     }
+    buffer_json_object_close(wb);
 
-    buffer_json_member_add_string(buf, "family", rrdset_family(st));
-
-    buffer_json_member_add_string(buf, "host", rrdhost_hostname(host));
-
+    buffer_json_member_add_object(wb, "dimensions_last_collected_values");
     {
-        buffer_json_member_add_object(buf, "host_variables");
-        rrdvar_walkthrough_read(host->rrdvars, single_variable2json_callback, &helper);
-        buffer_json_object_close(buf);
+        char name[RRD_ID_LENGTH_MAX + 1 + 100];
+        RRDDIM *rd;
+        dfe_start_read(st->rrddim_root_index, rd) {
+            snprintfz(name, sizeof(name), "%s_raw", string2str(rd->id));
+            buffer_json_member_add_int64(wb, name, rd->collector.last_collected_value);
+            if(rd->name != rd->id) {
+                snprintfz(name, sizeof(name), "%s_raw", string2str(rd->name));
+                buffer_json_member_add_int64(wb, name, rd->collector.last_collected_value);
+            }
+        }
+        dfe_done(rd);
     }
+    buffer_json_object_close(wb);
 
-    buffer_json_finalize(buf);
+    buffer_json_member_add_object(wb, "dimensions_last_collected_time");
+    {
+        char name[RRD_ID_LENGTH_MAX + 1 + 100];
+        RRDDIM *rd;
+        dfe_start_read(st->rrddim_root_index, rd) {
+            snprintfz(name, sizeof(name), "%s_last_collected_t", string2str(rd->id));
+            buffer_json_member_add_int64(wb, name, rd->collector.last_collected_time.tv_sec);
+            if(rd->name != rd->id) {
+                snprintfz(name, sizeof(name), "%s_last_collected_t", string2str(rd->name));
+                buffer_json_member_add_int64(wb, name, rd->collector.last_collected_time.tv_sec);
+            }
+        }
+        dfe_done(rd);
+    }
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_object(wb, "chart_variables");
+    {
+        buffer_json_member_add_int64(wb, "update_every", st->update_every);
+        buffer_json_member_add_double(wb, "green", st->green);
+        buffer_json_member_add_double(wb, "red", st->red);
+        buffer_json_member_add_uint64(wb, "last_collected_t", st->last_collected_time.tv_sec);
+
+        rrdvar_to_json_members(st->rrdvars, wb);
+    }
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_object(wb, "host_variables");
+    {
+        rrdvar_to_json_members(st->rrdhost->rrdvars, wb);
+    }
+    buffer_json_object_close(wb);
+
+    buffer_json_member_add_object(wb, "alerts");
+    {
+        struct scored {
+            bool existing;
+            STRING *chart;
+            STRING *context;
+            NETDATA_DOUBLE value;
+            size_t score;
+        } tmp, *z;
+        DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+        bool trace = false;
+
+        RRDCALC *rc;
+        dfe_start_read(st->rrdhost->rrdcalc_root_index, rc) {
+            tmp = (struct scored) {
+                .existing = false,
+                .chart = string_dup(rc->rrdset->id),
+                .context = string_dup(rc->rrdset->context),
+                .value = rc->value,
+                .score = rrdlabels_common_count(rc->rrdset->rrdlabels, st->rrdlabels),
+            };
+            z = dictionary_set(dict, string2str(rc->config.name), &tmp, sizeof(tmp));
+
+            if(z->existing) {
+                if(strcmp(string2str(rc->config.name), "10min_disk_backlog") == 0)
+                    trace = true;
+
+                if(tmp.score > z->score)
+                    SWAP(*z, tmp);
+                z->existing = true;
+                string_freez(tmp.chart);
+                string_freez(tmp.context);
+            }
+            else
+                z->existing = true;
+        }
+        dfe_done(rc);
+
+        dfe_start_read(dict, z) {
+            buffer_json_member_add_object(wb, z_dfe.name);
+            {
+                buffer_json_member_add_double(wb, "value", z->value);
+                buffer_json_member_add_string(wb, "instance", string2str(z->chart));
+                buffer_json_member_add_string(wb, "context", string2str(z->context));
+                buffer_json_member_add_uint64(wb, "score", z->score);
+            }
+            buffer_json_object_close(wb);
+
+            string_freez(z->chart);
+            string_freez(z->context);
+        }
+        dfe_done(z);
+
+        dictionary_destroy(dict);
+    }
+    buffer_json_object_close(wb);
+
+    buffer_json_finalize(wb);
 }
 
 // ----------------------------------------------------------------------------
@@ -217,7 +309,6 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
 const char *rrdvar_name(const RRDVAR_ACQUIRED *rva) {
     return dictionary_acquired_item_name((const DICTIONARY_ITEM *)rva);
 }
-
 
 void rrdvar_print_to_streaming_custom_chart_variables(RRDSET *st, BUFFER *wb) {
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_SEND_VARIABLES);
