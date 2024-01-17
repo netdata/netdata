@@ -195,7 +195,6 @@ usage() {
   netdata_banner
   progress "installer command line options"
   cat << HEREDOC
-
 USAGE: ${PROGRAM} [options]
        where options include:
 
@@ -244,37 +243,6 @@ USAGE: ${PROGRAM} [options]
   --skip-available-ram-check Skip checking the amount of RAM the system has and pretend it has enough to build safely.
   --disable-logsmanagement   Disable the logs management plugin. Default: autodetect.
   --enable-logsmanagement-tests Enable the logs management tests. Default: disabled.
-
-Netdata will by default be compiled with gcc optimization -O2
-If you need to pass different CFLAGS, use something like this:
-
-  CFLAGS="<gcc options>" ${PROGRAM} [options]
-
-If you also need to provide different LDFLAGS, use something like this:
-
-  LDFLAGS="<extra ldflag options>" ${PROGRAM} [options]
-
-or use the following if both LDFLAGS and CFLAGS need to be overridden:
-
-  CFLAGS="<gcc options>" LDFLAGS="<extra ld options>" ${PROGRAM} [options]
-
-For the installer to complete successfully, you will need these packages installed:
-
-  gcc
-  make
-  autoconf
-  automake
-  pkg-config
-  zlib1g-dev (or zlib-devel)
-  uuid-dev (or libuuid-devel)
-
-For the plugins, you will at least need:
-
-  curl
-  bash (v4+)
-  python (v2 or v3)
-  node.js
-
 HEREDOC
 }
 

@@ -74,9 +74,11 @@
 #define NETDATA_EBPF_VFS_ARAL_NAME "ebpf_vfs"
 
 typedef struct netdata_publish_vfs {
-    uint64_t pid_tgid;
-    uint32_t pid;
-    uint32_t pad;
+    uint64_t ct;
+    uint32_t tgid;
+    uint32_t uid;
+    uint32_t gid;
+    char name[TASK_COMM_LEN];
 
     //Counter
     uint32_t write_call;
