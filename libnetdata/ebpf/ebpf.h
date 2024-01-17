@@ -428,7 +428,7 @@ typedef struct ebpf_filesystem_partitions {
 #else
     void *fs_obj;
 #endif
-    const char *functions[NETDATA_FS_BTF_END];
+    netdata_ebpf_targets_t functions[NETDATA_FS_BTF_END + 1];
 } ebpf_filesystem_partitions_t;
 
 typedef struct ebpf_sync_syscalls {
@@ -483,5 +483,6 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em);
 void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio);
 void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em);
+void ebpf_update_target_value(ebpf_module_t *em, netdata_ebpf_program_loaded_t value);
 
 #endif /* NETDATA_EBPF_H */

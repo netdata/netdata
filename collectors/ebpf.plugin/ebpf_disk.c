@@ -36,6 +36,11 @@ static ebpf_local_maps_t disk_maps[] = {{.name = "tbl_disk_iocall", .internal_in
 static avl_tree_lock disk_tree;
 netdata_ebpf_disks_t *disk_list = NULL;
 
+netdata_ebpf_targets_t disk_targets[] = { {.name = "tracepoint/block/block_rq_issue", .mode = EBPF_LOAD_TRACEPOINT},
+                                          {.name = "tracepoint/block/block_rq_complete", .mode = EBPF_LOAD_TRACEPOINT},
+                                          {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}
+                                          };
+
 char *tracepoint_block_type = { "block"} ;
 char *tracepoint_block_issue = { "block_rq_issue" };
 char *tracepoint_block_rq_complete = { "block_rq_complete" };

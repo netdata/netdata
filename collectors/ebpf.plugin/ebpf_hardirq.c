@@ -43,6 +43,11 @@ static ebpf_local_maps_t hardirq_maps[] = {
     }
 };
 
+netdata_ebpf_targets_t hardirq_targets[] = { {.name = "tracepoint/irq/irq_handler_entry", .mode = EBPF_LOAD_TRACEPOINT},
+                                             {.name = "tracepoint/irq/irq_handler_exit", .mode = EBPF_LOAD_TRACEPOINT},
+                                             {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}
+                                           };
+
 #define HARDIRQ_TP_CLASS_IRQ "irq"
 #define HARDIRQ_TP_CLASS_IRQ_VECTORS "irq_vectors"
 static ebpf_tracepoint_t hardirq_tracepoints[] = {

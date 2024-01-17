@@ -37,6 +37,11 @@ enum hardirq_ebpf_static {
     HARDIRQ_EBPF_STATIC_END
 };
 
+enum hardirq_ebpf_target_enum {
+    HARDIRQ_EBPF_ENTRY,
+    HARDIRQ_EBPF_EXIT
+};
+
 enum hardirq_maps {
     HARDIRQ_MAP_LATENCY,
     HARDIRQ_MAP_LATENCY_STATIC
@@ -76,5 +81,6 @@ typedef struct hardirq_static_val {
 
 extern struct config hardirq_config;
 void *ebpf_hardirq_thread(void *ptr);
+extern netdata_ebpf_targets_t hardirq_targets[];
 
 #endif /* NETDATA_EBPF_HARDIRQ_H */
