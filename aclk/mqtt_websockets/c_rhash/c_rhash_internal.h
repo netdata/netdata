@@ -1,6 +1,6 @@
 // Copyright: SPDX-License-Identifier:  GPL-3.0-only
 
-#include "../include/c_rhash.h"
+#include "c_rhash.h"
 
 struct bin_item {
     uint8_t key_type:4;

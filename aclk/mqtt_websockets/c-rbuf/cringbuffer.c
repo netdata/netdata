@@ -1,6 +1,6 @@
 // Copyright: SPDX-License-Identifier:  GPL-3.0-only
 
-#include "../include/cringbuffer.h"
+#include "cringbuffer.h"
 #include "cringbuffer_internal.h"
 
 #include <stdlib.h>

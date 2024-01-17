@@ -10,12 +10,12 @@
 #include <pthread.h>
 #include <inttypes.h>
 
-#include "../c_rhash/include/c_rhash.h"
+#include "c_rhash/c_rhash.h"
 
-#include "include/common_internal.h"
-#include "include/mqtt_constants.h"
-#include "include/mqtt_wss_log.h"
-#include "include/mqtt_ng.h"
+#include "common_internal.h"
+#include "mqtt_constants.h"
+#include "mqtt_wss_log.h"
+#include "mqtt_ng.h"
 
 #define UNIT_LOG_PREFIX "mqtt_client: "
 #define FATAL(fmt, ...) mws_fatal(client->log, UNIT_LOG_PREFIX fmt, ##__VA_ARGS__)

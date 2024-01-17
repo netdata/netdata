@@ -1295,23 +1295,23 @@ elseif(FREEBSD)
 endif()
 
 set(MQTT_WEBSOCKETS_FILES
-        aclk/mqtt_websockets/src/mqtt_wss_client.c
-        aclk/mqtt_websockets/src/include/mqtt_wss_client.h
-        aclk/mqtt_websockets/src/mqtt_wss_log.c
-        aclk/mqtt_websockets/src/include/mqtt_wss_log.h
-        aclk/mqtt_websockets/src/ws_client.c
-        aclk/mqtt_websockets/src/include/ws_client.h
-        aclk/mqtt_websockets/src/mqtt_ng.c
-        aclk/mqtt_websockets/src/include/mqtt_ng.h
-        aclk/mqtt_websockets/src/common_public.c
-        aclk/mqtt_websockets/src/include/common_public.h
-        aclk/mqtt_websockets/src/include/common_internal.h
-        aclk/mqtt_websockets/c-rbuf/src/cringbuffer.c
-        aclk/mqtt_websockets/c-rbuf/include/cringbuffer.h
-        aclk/mqtt_websockets/c-rbuf/src/cringbuffer_internal.h
-        aclk/mqtt_websockets/c_rhash/src/c_rhash.c
-        aclk/mqtt_websockets/c_rhash/include/c_rhash.h
-        aclk/mqtt_websockets/c_rhash/src/c_rhash_internal.h
+        aclk/mqtt_websockets/mqtt_wss_client.c
+        aclk/mqtt_websockets/mqtt_wss_client.h
+        aclk/mqtt_websockets/mqtt_wss_log.c
+        aclk/mqtt_websockets/mqtt_wss_log.h
+        aclk/mqtt_websockets/ws_client.c
+        aclk/mqtt_websockets/ws_client.h
+        aclk/mqtt_websockets/mqtt_ng.c
+        aclk/mqtt_websockets/mqtt_ng.h
+        aclk/mqtt_websockets/common_public.c
+        aclk/mqtt_websockets/common_public.h
+        aclk/mqtt_websockets/common_internal.h
+        aclk/mqtt_websockets/c-rbuf/cringbuffer.c
+        aclk/mqtt_websockets/c-rbuf/cringbuffer.h
+        aclk/mqtt_websockets/c-rbuf/cringbuffer_internal.h
+        aclk/mqtt_websockets/c_rhash/c_rhash.c
+        aclk/mqtt_websockets/c_rhash/c_rhash.h
+        aclk/mqtt_websockets/c_rhash/c_rhash_internal.h
 )
 
 set(ACLK_PROTO_DEFS

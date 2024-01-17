@@ -3,7 +3,7 @@
 #ifndef HTTPD_STREAMING_H
 #define HTTPD_STREAMING_H
 
-#include "aclk/mqtt_websockets/c-rbuf/include/cringbuffer.h"
+#include "aclk/mqtt_websockets/c-rbuf/cringbuffer.h"
 #include "h2o.h"
 
 typedef enum {
