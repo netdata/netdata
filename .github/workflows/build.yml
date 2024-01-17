@@ -492,14 +492,17 @@ jobs:
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p artifacts/download/latest || exit 1
-          echo "9999.0.0-0" > artifacts/download/latest/latest-version.txt || exit 1
-          cp dist-tarball/* artifacts/download/latest || exit 1
-          cd artifacts/download/latest || exit 1
+          mkdir -p artifacts/download/v9999.0.0 || exit 1
+          mkdir -p artifacts/latest || exit 1
+          echo "v9999.0.0" > artifacts/latest/latest-version.txt || exit 1
+          cp dist-tarball/* artifacts/download/v9999.0.0 || exit 1
+          cd artifacts/download/v9999.0.0 || exit 1
           ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
           ls -lFh
           sha256sum -b ./* > "sha256sums.txt" || exit 1
           cat sha256sums.txt
+          cd ../.. || exit 1
+          ls -lR
       - name: Fetch test environment
         id: fetch-test-environment
         if: needs.file-check.outputs.run == 'true'

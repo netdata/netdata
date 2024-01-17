@@ -204,6 +204,8 @@ The following configuration options are currently supported:
   as a scheduled task. This random delay helps avoid issues resulting from too many nodes trying to reconnect to
   the Cloud at the same time. The default value is 3600, which corresponds to one hour. Most users should not ever
   need to change this.
+- `NETDATA_MAJOR_VERSION_UPDATES`: If set to a value other than 0, then new major versions will be installed
+  without user confirmation. Must be set to a  non-zero value for automated updates to install new major versions.
 - `NETDATA_NO_SYSTEMD_JOURNAL`: If set to a value other than 0, skip attempting to install the
   `netdata-plugin-systemd-journal` package on supported systems on update. This optional package will be installed
   by default on supported systems by the updater if this option is not set. Only affects systems using native packages.
