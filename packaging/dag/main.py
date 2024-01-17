@@ -161,6 +161,7 @@ class FeatureFlags(enum.Flag):
     ExtendedBPF = enum.auto()
     LogsManagement = enum.auto()
     MachineLearning = enum.auto()
+    BundledProtobuf = enum.auto()
 
 
 class NetdataInstaller:
@@ -189,6 +190,9 @@ class NetdataInstaller:
 
         if FeatureFlags.MachineLearning not in self.features:
             args.append("--disable-ml")
+
+        if FeatureFlags.BundledProtobuf not in self.features:
+            args.append("--use-system-protobuf")
 
         args.extend(["--install-prefix", self.install_prefix])
 
