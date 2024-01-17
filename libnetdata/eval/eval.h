@@ -39,9 +39,6 @@ typedef struct eval_expression {
     // hidden EVAL_NODE *
     void *nodes;
 
-    // custom data to be used for looking up variables
-    struct rrdcalc *rrdcalc;
-
     void *variable_lookup_cb_data;
     bool (*variable_lookup_cb)(STRING *variable, void *data, NETDATA_DOUBLE *result);
 } EVAL_EXPRESSION;
