@@ -1241,20 +1241,21 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                                             d->flipped ? d->rd_tbytes->collector.last_stored_value : -d->rd_rbytes->collector.last_stored_value,
                                             d->flipped ? -d->rd_rbytes->collector.last_stored_value : d->rd_tbytes->collector.last_stored_value);
 
+            if(unlikely(!d->chart_var_speed)) {
+                d->chart_var_speed =
+                    rrdsetvar_custom_chart_variable_add_and_acquire(d->st_bandwidth, "nic_speed_max");
+                if(!d->chart_var_speed) {
+                    collector_error(
+                        "Cannot create interface %s chart variable 'nic_speed_max'. Will not update its speed anymore.",
+                        d->name);
+                }
+                else {
+                    rrdsetvar_custom_chart_variable_set(d->st_bandwidth, d->chart_var_speed, NAN);
+                }
+            }
+
             // update the interface speed
             if(d->filename_speed) {
-                if(unlikely(!d->chart_var_speed)) {
-                    d->chart_var_speed =
-                        rrdsetvar_custom_chart_variable_add_and_acquire(d->st_bandwidth, "nic_speed_max");
-                    if(!d->chart_var_speed) {
-                        collector_error(
-                            "Cannot create interface %s chart variable 'nic_speed_max'. Will not update its speed anymore.",
-                            d->name);
-                        freez(d->filename_speed);
-                        d->filename_speed = NULL;
-                    }
-                }
-
                 if (d->filename_speed && d->chart_var_speed) {
                     int ret = 0;
 

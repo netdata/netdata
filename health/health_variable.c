@@ -24,6 +24,10 @@ bool rrdsetvar_get_custom_chart_variable_value(RRDSET *st, STRING *variable, NET
 bool rrdvar_get_custom_host_variable_value(RRDHOST *host, STRING *variable, NETDATA_DOUBLE *result);
 
 struct variable_lookup_score {
+#ifdef NETDATA_INTERNAL_CHECKS
+    RRDSET *st;
+    const char *source;
+#endif
     NETDATA_DOUBLE value;
     size_t score;
 };
@@ -53,7 +57,7 @@ struct variable_lookup_job {
     } score;
 };
 
-static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st) {
+static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st, const char *source __maybe_unused) {
     if(vbd->score.last_rrdset != st) {
         vbd->score.last_rrdset = st;
         vbd->score.last_score = rrdlabels_common_count(vbd->rc->rrdset->rrdlabels, st->rrdlabels);
@@ -70,6 +74,10 @@ static void variable_lookup_add_result_with_score(struct variable_lookup_job *vb
     vbd->result.array[vbd->result.used++] = (struct variable_lookup_score) {
         .value = n,
         .score = vbd->score.last_score,
+#ifdef NETDATA_INTERNAL_CHECKS
+        .st = st,
+        .source = source,
+#endif
     };
 }
 
@@ -88,13 +96,13 @@ static bool variable_lookup_in_chart(struct variable_lookup_job *vbd, RRDSET *st
     if (item) {
         switch (vbd->dimension_selection) {
             case DIM_SELECT_NORMAL:
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_stored_value, st);
+                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_stored_value, st, "last stored value of dimension");
                 break;
             case DIM_SELECT_RAW:
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_value, st);
+                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_value, st, "last collected value of dimension");
                 break;
             case DIM_SELECT_LAST_COLLECTED:
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_time.tv_sec, st);
+                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_time.tv_sec, st, "last collected time of dimension");
                 break;
         }
 
@@ -107,23 +115,9 @@ static bool variable_lookup_in_chart(struct variable_lookup_job *vbd, RRDSET *st
     {
         NETDATA_DOUBLE n;
         if(rrdsetvar_get_custom_chart_variable_value(st, vbd->variable, &n)) {
-            variable_lookup_add_result_with_score(vbd, n, st);
+            variable_lookup_add_result_with_score(vbd, n, st, "chart variable");
             found = true;
         }
-    }
-    if(found && stop_on_match) goto cleanup;
-
-    // alert names
-    {
-        rw_spinlock_read_lock(&st->alerts.spinlock);
-        for(RRDCALC *rc = st->alerts.base ; rc ; rc = rc->next) {
-            if(rc->config.name == vbd->variable) {
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, st);
-                found = true;
-                break;
-            }
-        }
-        rw_spinlock_read_unlock(&st->alerts.spinlock);
     }
     if(found && stop_on_match) goto cleanup;
 
@@ -161,14 +155,44 @@ static bool variable_lookup_context(struct variable_lookup_job *vbd, const char 
         found = true;
 
     string_freez(vbd->dim);
-    *vbd = vbd_back;
+
+    vbd->dimension = vbd_back.dimension;
+    vbd->dim = vbd_back.dim;
+    vbd->dimension_length = vbd_back.dimension_length;
+    vbd->dimension_selection = vbd_back.dimension_selection;
+
+    return found;
+}
+
+bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
+    bool found = false;
+    RRDCALC *rc;
+    foreach_rrdcalc_in_rrdhost_read(vbd->host, rc) {
+        if(rc->config.name == vbd->variable) {
+            variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, rc->rrdset, "alarm value");
+            found = true;
+        }
+    }
+    foreach_rrdcalc_in_rrdhost_done(rc);
     return found;
 }
 
 bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result) {
     static STRING *last_collected_t = NULL, *green = NULL, *red = NULL, *update_every = NULL;
 
-    const char *v_name = string2str(variable);
+    struct variable_lookup_job vbd = { 0 };
+
+//    const char *v_name = string2str(variable);
+//    bool trace_this = false;
+//    if(strcmp(v_name, "btrfs_allocated") == 0)
+//        trace_this = true;
+
+    bool found = false;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    const char *source = NULL;
+    RRDSET *source_st = NULL;
+#endif
 
     RRDCALC *rc = data;
     RRDSET *st = rc->rrdset;
@@ -185,27 +209,47 @@ bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result)
 
     if(variable == last_collected_t) {
         *result = (NETDATA_DOUBLE)st->last_collected_time.tv_sec;
-        return true;
+#ifdef NETDATA_INTERNAL_CHECKS
+        source = "last_collected_t";
+        source_st = st;
+#endif
+        found = true;
+        goto log;
     }
 
     if(variable == update_every) {
         *result = (NETDATA_DOUBLE)st->update_every;
-        return true;
+#ifdef NETDATA_INTERNAL_CHECKS
+        source = "update_every";
+        source_st = st;
+#endif
+        found = true;
+        goto log;
     }
 
     if(variable == green) {
         *result = (NETDATA_DOUBLE)rc->config.green;
-        return true;
+#ifdef NETDATA_INTERNAL_CHECKS
+        source = "green";
+        source_st = st;
+#endif
+        found = true;
+        goto log;
     }
 
     if(variable == red) {
         *result = (NETDATA_DOUBLE)rc->config.red;
-        return true;
+#ifdef NETDATA_INTERNAL_CHECKS
+        source = "red";
+        source_st = st;
+#endif
+        found = true;
+        goto log;
     }
 
     // find the dimension id/name
 
-    struct variable_lookup_job vbd = {
+    vbd = (struct variable_lookup_job){
         .rc = rc,
         .host = st->rrdhost,
         .variable = variable,
@@ -225,14 +269,25 @@ bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result)
         vbd.dim = string_strndupz(vbd.dimension, vbd.dimension_length);
     }
 
-    bool found = variable_lookup_in_chart(&vbd, st, true);
-    if(found) goto find_best_scored;
+    if(variable_lookup_in_chart(&vbd, st, true)) {
+        found = true;
+        goto find_best_scored;
+    }
 
     // host variables
     {
         NETDATA_DOUBLE n;
         found = rrdvar_get_custom_host_variable_value(vbd.host,  vbd.variable, &n);
-        if(found) goto find_best_scored;
+        if(found) {
+            variable_lookup_add_result_with_score(&vbd, n, st, "host variable");
+            goto find_best_scored;
+        }
+    }
+
+    // alert names
+    if(alert_variable_from_running_alerts(&vbd)) {
+        found = true;
+        goto find_best_scored;
     }
 
     // find the components of the variable
@@ -263,6 +318,10 @@ find_best_scored:
             if (vbd.result.array[i].score > best->score)
                 best = &vbd.result.array[i];
 
+#ifdef NETDATA_INTERNAL_CHECKS
+        source = best->source;
+        source_st = best->st;
+#endif
         *result = best->value;
         freez(vbd.result.array);
     }
@@ -270,6 +329,35 @@ find_best_scored:
         found = false;
         *result = NAN;
     }
+
+log:
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(found) {
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "HEALTH_VARIABLE_LOOKUP: variable '%s' of alert '%s' of chart '%s', context '%s', host '%s' "
+               "resolved with %s of chart '%s' and context '%s'",
+               string2str(variable),
+               string2str(rc->config.name),
+               string2str(rc->rrdset->id),
+               string2str(rc->rrdset->context),
+               string2str(rc->rrdset->rrdhost->hostname),
+               source,
+               string2str(source_st->id),
+               string2str(source_st->context)
+               );
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_INFO,
+               "HEALTH_VARIABLE_LOOKUP: variable '%s' of alert '%s' of chart '%s', context '%s', host '%s' "
+               "could not be resolved",
+               string2str(variable),
+               string2str(rc->config.name),
+               string2str(rc->rrdset->id),
+               string2str(rc->rrdset->context),
+               string2str(rc->rrdset->rrdhost->hostname)
+        );
+    }
+#endif
 
     string_freez(vbd.dim);
 
