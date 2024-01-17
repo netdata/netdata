@@ -892,8 +892,10 @@ detect_existing_install() {
       fatal "Multiple installs of Netdata agent detected (located at '${ndpath}' and '${_ndpath}'). Such a setup is not generally supported. If you are certain you want to operate on one of them despite this, use the '--install-prefix' option to specifiy the install you want to operate on." F0517
     fi
 
-    if [ -n "${INSTALL_PREFIX}" ]; then
+    if [ -n "${INSTALL_PREFIX}" ] && [ -n "${ndpath}" ]; then
       break
+    elif echo "${searchpath}" | grep -v ':'; then
+      searchpath=""
     else
       searchpath="$(echo "${searchpath}" | cut -f 2- -d ':')"
     fi
