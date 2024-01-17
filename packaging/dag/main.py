@@ -155,9 +155,9 @@ class FeatureFlags(enum.Flag):
 
 class NetdataInstaller:
     def __init__(self,
-                 install_prefix: pathlib.Path,
+                 prefix: pathlib.Path,
                  features: FeatureFlags):
-        self.install_prefix = install_prefix
+        self.prefix = prefix
         self.features = features
 
     def install(self, client: dagger.Client, ctr: dagger.Container, dist: Distribution) -> dagger.Container:
@@ -181,13 +181,16 @@ class NetdataInstaller:
         if FeatureFlags.BundledProtobuf not in self.features:
             args.append("--use-system-protobuf")
 
-        args.extend(["--install-prefix", self.install_prefix])
+        args.extend(["--install-prefix", self.prefix])
 
 
         ctr = (
             ctr.with_env_variable('NETDATA_CMAKE_OPTIONS', '-DCMAKE_BUILD_TYPE=Debug')
                .with_exec(["./netdata-installer.sh"] + args)
         )
+
+        # The installer will place everything under "<install-prefix>/netdata"
+        self.prefix = os.path.join(self.prefix, "netdata")
 
         return ctr
 
@@ -222,6 +225,31 @@ class Context:
 
         return ctr
 
+
+class Agent:
+    def __init__(self, installer: NetdataInstaller):
+        self.installer = installer
+
+    def buildinfo(self, ctr: dagger.Container) -> dagger.Container:
+        binary = os.path.join(self.installer.prefix, "usr/sbin/netdata")
+        output = os.path.join(self.installer.prefix, "buildinfo.log")
+
+        ctr = (
+            ctr.with_exec([binary, "-W", "buildinfo"], redirect_stdout=output)
+        )
+
+        return ctr
+
+    def unittest(self, ctr: dagger.Container) -> dagger.Container:
+        binary = os.path.join(self.installer.prefix, "usr/sbin/netdata")
+
+        ctr = (
+            ctr.with_exec([binary, "-W", "unittest"])
+        )
+
+        return ctr
+
+
 def run_async(func):
     """
     Decorator to create an asynchronous runner for the main function.
@@ -233,8 +261,8 @@ def run_async(func):
 
 @run_async
 async def main():
-
     config = dagger.Config(log_output=sys.stdout)
+
     async with dagger.Connection(config) as client:
         # Create context
         platform = dagger.Platform("linux/x86_64")
@@ -250,6 +278,10 @@ async def main():
         # run the netdata installer
         installer = NetdataInstaller("/opt", FeatureFlags.DBEngine)
         ctr = installer.install(client, ctr, dist)
+
+        agent = Agent(installer)
+        ctr = agent.buildinfo(ctr)
+        ctr = agent.unittest(ctr)
 
         await ctr
 
