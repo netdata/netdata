@@ -251,7 +251,7 @@ jobs:
         shell: bash
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
-                    -e ENABLE_SENTRY=${{matrix.enable_sentry}} -e BUILDING_ENVIRONMENT=${{env.BUILDING_ENVIRONMENT}} \
+                    -e ENABLE_SENTRY=${{matrix.bundle_sentry}} -e BUILDING_ENVIRONMENT=${{env.BUILDING_ENVIRONMENT}} \
                     -e SENTRY_AUTH_TOKEN=${{secrets.SENTRY_API}} -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.platform }} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-v1
       - name: Save Packages
