@@ -112,4 +112,6 @@ void health_dyncfg_unregister_all_prototypes(void);
 void health_dyncfg_register_all_prototypes(void);
 void health_prototype_to_json(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, bool for_hashing);
 
+bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result);
+
 #endif //NETDATA_HEALTH_INTERNALS_H

@@ -20,6 +20,9 @@
 //};
 //
 
+bool rrdsetvar_get_custom_chart_variable_value(RRDSET *st, STRING *variable, NETDATA_DOUBLE *result);
+bool rrdvar_get_custom_host_variable_value(RRDHOST *host, STRING *variable, NETDATA_DOUBLE *result);
+
 struct variable_lookup_score {
     NETDATA_DOUBLE value;
     size_t score;
@@ -43,9 +46,19 @@ struct variable_lookup_job {
         size_t used;
         struct variable_lookup_score *array;
     } result;
+
+    struct {
+        RRDSET *last_rrdset;
+        size_t last_score;
+    } score;
 };
 
-static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, size_t score) {
+static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st) {
+    if(vbd->score.last_rrdset != st) {
+        vbd->score.last_rrdset = st;
+        vbd->score.last_score = rrdlabels_common_count(vbd->rc->rrdset->rrdlabels, st->rrdlabels);
+    }
+
     if(vbd->result.used >= vbd->result.size) {
         if(!vbd->result.size)
             vbd->result.size = 1;
@@ -56,11 +69,11 @@ static void variable_lookup_add_result_with_score(struct variable_lookup_job *vb
 
     vbd->result.array[vbd->result.used++] = (struct variable_lookup_score) {
         .value = n,
-        .score = score,
+        .score = vbd->score.last_score,
     };
 }
 
-bool variable_lookup_in_chart_dimensions(struct variable_lookup_job *vbd, RRDSET *st) {
+static bool variable_lookup_in_chart(struct variable_lookup_job *vbd, RRDSET *st, bool stop_on_match) {
     bool found = false;
     const DICTIONARY_ITEM *item = NULL;
     RRDDIM *rd = NULL;
@@ -73,45 +86,55 @@ bool variable_lookup_in_chart_dimensions(struct variable_lookup_job *vbd, RRDSET
     dfe_done(rd);
 
     if (item) {
-        size_t score = rrdlabels_common_count(vbd->rc->rrdset->rrdlabels, st->rrdlabels);
-
         switch (vbd->dimension_selection) {
             case DIM_SELECT_NORMAL:
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_stored_value, score);
+                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_stored_value, st);
                 break;
             case DIM_SELECT_RAW:
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_value, score);
+                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_value, st);
                 break;
             case DIM_SELECT_LAST_COLLECTED:
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_time.tv_sec, score);
+                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rd->collector.last_collected_time.tv_sec, st);
                 break;
         }
 
         dictionary_acquired_item_release(st->rrddim_root_index, item);
         found = true;
     }
+    if(found && stop_on_match) goto cleanup;
 
-    // TODO find the chart variables
+    // chart variable
     {
-        ;
+        NETDATA_DOUBLE n;
+        if(rrdsetvar_get_custom_chart_variable_value(st, vbd->variable, &n)) {
+            variable_lookup_add_result_with_score(vbd, n, st);
+            found = true;
+        }
     }
+    if(found && stop_on_match) goto cleanup;
 
     // alert names
     {
         rw_spinlock_read_lock(&st->alerts.spinlock);
         for(RRDCALC *rc = st->alerts.base ; rc ; rc = rc->next) {
             if(rc->config.name == vbd->variable) {
-                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, SIZE_MAX);
+                variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, st);
                 found = true;
                 break;
             }
         }
         rw_spinlock_read_unlock(&st->alerts.spinlock);
     }
+    if(found && stop_on_match) goto cleanup;
 
+cleanup:
     return found;
 }
 
+static int foreach_instance_in_context_cb(RRDSET *st, void *data) {
+    struct variable_lookup_job *vbd = data;
+    return variable_lookup_in_chart(vbd, st, false) ? 1 : 0;
+}
 
 static bool variable_lookup_context(struct variable_lookup_job *vbd, const char *chart_or_context, const char *dim_id_or_name) {
     struct variable_lookup_job vbd_back = *vbd;
@@ -127,21 +150,25 @@ static bool variable_lookup_context(struct variable_lookup_job *vbd, const char 
 
     RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(vbd->host, chart_or_context);
     if(rsa) {
-        found = variable_lookup_in_chart_dimensions(vbd, rrdset_acquired_to_rrdset(rsa));
+        if(variable_lookup_in_chart(vbd, rrdset_acquired_to_rrdset(rsa), false))
+            found = true;
         rrdset_acquired_release(rsa);
-        if(found) goto cleanup;
     }
 
-    // TODO lookup context in contexts, then foreach chart
+    // lookup context in contexts, then foreach chart
 
-cleanup:
+    if(rrdcontext_foreach_instance_with_rrdset_in_context(vbd->host, chart_or_context, foreach_instance_in_context_cb, vbd) > 0)
+        found = true;
+
     string_freez(vbd->dim);
     *vbd = vbd_back;
     return found;
 }
 
-bool variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result) {
+bool alert_variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result) {
     static STRING *last_collected_t = NULL, *green = NULL, *red = NULL, *update_every = NULL;
+
+    const char *v_name = string2str(variable);
 
     RRDCALC *rc = data;
     RRDSET *st = rc->rrdset;
@@ -198,10 +225,15 @@ bool variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result) {
         vbd.dim = string_strndupz(vbd.dimension, vbd.dimension_length);
     }
 
-    bool found = variable_lookup_in_chart_dimensions(&vbd, st);
+    bool found = variable_lookup_in_chart(&vbd, st, true);
     if(found) goto find_best_scored;
 
-    // TODO find the host variables
+    // host variables
+    {
+        NETDATA_DOUBLE n;
+        found = rrdvar_get_custom_host_variable_value(vbd.host,  vbd.variable, &n);
+        if(found) goto find_best_scored;
+    }
 
     // find the components of the variable
     {
@@ -210,12 +242,13 @@ bool variable_lookup(STRING *variable, void *data, NETDATA_DOUBLE *result) {
         id[string_strlen(vbd.dim)] = '\0';
 
         char *dot = strrchr(id, '.');
-        while(dot && !found) {
+        while(dot) {
             *dot = '\0';
 
             if(strchr(id, '.') == NULL) break;
 
-            found = variable_lookup_context(&vbd, id, dot + 1);
+            if(variable_lookup_context(&vbd, id, dot + 1))
+                found = true;
 
             char *dot2 = strrchr(id, '.');
             *dot = '.';

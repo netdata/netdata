@@ -421,6 +421,9 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         rc->config.calculation->after = &rc->db_after;
         rc->config.calculation->before = &rc->db_before;
         rc->config.calculation->rrdcalc = rc;
+
+        rc->config.calculation->variable_lookup_cb_data = rc;
+        rc->config.calculation->variable_lookup_cb = alert_variable_lookup;
     }
 
     if(rc->config.warning) {
@@ -429,6 +432,9 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         rc->config.warning->after = &rc->db_after;
         rc->config.warning->before = &rc->db_before;
         rc->config.warning->rrdcalc = rc;
+
+        rc->config.warning->variable_lookup_cb_data = rc;
+        rc->config.warning->variable_lookup_cb = alert_variable_lookup;
     }
 
     if(rc->config.critical) {
@@ -437,6 +443,9 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
         rc->config.critical->after = &rc->db_after;
         rc->config.critical->before = &rc->db_before;
         rc->config.critical->rrdcalc = rc;
+
+        rc->config.critical->variable_lookup_cb_data = rc;
+        rc->config.critical->variable_lookup_cb = alert_variable_lookup;
     }
 
     rrdcalc_update_info_using_rrdset_labels(rc);

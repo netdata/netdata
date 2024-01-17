@@ -216,6 +216,45 @@ const RRDSETVAR_ACQUIRED *rrdsetvar_add_and_acquire(RRDSET *st, const char *name
     return rsa;
 }
 
+bool rrdsetvar_get_custom_chart_variable_value(RRDSET *st, STRING *variable, NETDATA_DOUBLE *result) {
+    bool found = false;
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item_advanced(st->rrdsetvar_root_index, string2str(variable), string_strlen(variable));
+    if(item) {
+        RRDSETVAR *rs = dictionary_acquired_item_value(item);
+        if(rs->flags & RRDVAR_FLAG_CUSTOM_CHART_VAR) {
+            found = true;
+            switch (rs->type) {
+                case RRDVAR_TYPE_CALCULATED:
+                    *result = (NETDATA_DOUBLE)(*((NETDATA_DOUBLE *)rs->value));
+                    break;
+
+                case RRDVAR_TYPE_TIME_T:
+                    *result = (NETDATA_DOUBLE)(*((time_t *)rs->value));
+                    break;
+
+                case RRDVAR_TYPE_COLLECTED:
+                    *result = (NETDATA_DOUBLE)(*((collected_number *)rs->value));
+                    break;
+
+                case RRDVAR_TYPE_TOTAL:
+                    *result = (NETDATA_DOUBLE)(*((total_number *)rs->value));
+                    break;
+
+                case RRDVAR_TYPE_INT:
+                    *result = (NETDATA_DOUBLE)(*((int *)rs->value));
+                    break;
+
+                default:
+                    netdata_log_error("I don't know how to convert RRDSETVAR type %u to NETDATA_DOUBLE", rs->type);
+                    *result = NAN;
+            }
+        }
+        dictionary_acquired_item_release(st->rrdsetvar_root_index, item);
+    }
+
+    return found;
+}
+
 void rrdsetvar_add_and_leave_released(RRDSET *st, const char *name, RRDVAR_TYPE type, void *value, RRDVAR_FLAGS flags) {
     const RRDSETVAR_ACQUIRED *rsa = rrdsetvar_add_and_acquire(st, name, type, value, flags);
     dictionary_acquired_item_release(st->rrdsetvar_root_index, (const DICTIONARY_ITEM *)rsa);

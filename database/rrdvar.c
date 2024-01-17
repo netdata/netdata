@@ -254,6 +254,21 @@ int health_variable_check(DICTIONARY *dict, RRDSET *st, RRDDIM *rd) {
     return 0;
 }
 
+bool rrdvar_get_custom_host_variable_value(RRDHOST *host, STRING *variable, NETDATA_DOUBLE *result) {
+    bool found = false;
+
+    const RRDVAR_ACQUIRED *rva = rrdvar_get_and_acquire(host->rrdvars, variable);
+    if(rva) {
+        if(rrdvar_flags(rva) & RRDVAR_FLAG_CUSTOM_HOST_VAR) {
+            *result = rrdvar2number(rva);
+            found = true;
+        }
+        dictionary_acquired_item_release(host->rrdvars, (const DICTIONARY_ITEM *)rva);
+    }
+
+    return found;
+}
+
 void rrdvar_store_for_chart(RRDHOST *host, RRDSET *st) {
     if (!st) return;
 
