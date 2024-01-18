@@ -52,79 +52,101 @@ SUPPORTED_PLATFORMS = set([
 
 
 class Distribution:
-    def __init__(self, display_name: str, docker_tag: str):
+    def __init__(self, display_name):
         self.display_name = display_name
-        self.docker_tag = docker_tag
 
         if self.display_name == "alpine_3_18":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "alpine:3.18"
             self.builder = oci_images.build_alpine_3_18
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "alpine_3_19":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "alpine:3.19"
             self.builder = oci_images.build_alpine_3_19
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "amazonlinux2":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "amazonlinux:2"
             self.builder = oci_images.build_amazon_linux_2
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "centos7":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "centos:7"
             self.builder = oci_images.build_centos_7
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "centos-stream8":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "quay.io/centos/centos:stream8"
             self.builder = oci_images.build_centos_stream_8
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "centos-stream9":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "quay.io/centos/centos:stream9"
             self.builder = oci_images.build_centos_stream_9
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "debian10":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "debian:10"
             self.builder = oci_images.build_debian_10
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "debian11":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "debian:11"
             self.builder = oci_images.build_debian_11
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "debian12":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "debian:12"
             self.builder = oci_images.build_debian_12
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "fedora37":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "fedora:37"
             self.builder = oci_images.build_fedora_37
-        elif self.display_name == "fedora38":
             self.platforms = SUPPORTED_PLATFORMS
+        elif self.display_name == "fedora38":
+            self.docker_tag = "fedora:38"
             self.builder = oci_images.build_fedora_38
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "fedora39":
+            self.docker_tag = "fedora:39"
             self.platforms = SUPPORTED_PLATFORMS
             self.builder = oci_images.build_fedora_39
         elif self.display_name == "opensuse15.4":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "opensuse/leap:15.4"
             self.builder = oci_images.build_opensuse_15_4
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "opensuse15.5":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "opensuse/leap:15.5"
             self.builder = oci_images.build_opensuse_15_5
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "opensusetumbleweed":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "opensuse/tumbleweed:latest"
             self.builder = oci_images.build_opensuse_tumbleweed
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "oraclelinux8":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "oraclelinux:8"
             self.builder = oci_images.build_oracle_linux_8
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "oraclelinux9":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "oraclelinux:9"
             self.builder = oci_images.build_oracle_linux_9
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "rockylinux8":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "rockylinux:8"
             self.builder = oci_images.build_rocky_linux_8
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "rockylinux9":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "rockylinux:9"
             self.builder = oci_images.build_rocky_linux_9
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "ubuntu20.04":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "ubuntu:20.04"
             self.builder = oci_images.build_ubuntu_20_04
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "ubuntu22.04":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "ubuntu:22.04"
             self.builder = oci_images.build_ubuntu_22_04
+            self.platforms = SUPPORTED_PLATFORMS
         elif self.display_name == "ubuntu23.04":
-            self.platforms = SUPPORTED_PLATFORMS
+            self.docker_tag = "ubuntu:23.04"
             self.builder = oci_images.build_ubuntu_23_04
-        elif self.display_name == "ubuntu23.10":
             self.platforms = SUPPORTED_PLATFORMS
+        elif self.display_name == "ubuntu23.10":
+            self.docker_tag = "ubuntu:23.10"
             self.builder = oci_images.build_ubuntu_23_10
+            self.platforms = SUPPORTED_PLATFORMS
         else:
             raise ValueError(f"Unknown distribution: {self.display_name}")
 
@@ -283,9 +305,6 @@ class Context:
 
 
 def run_async(func):
-    """
-    Decorator to create an asynchronous runner for the main function.
-    """
     def wrapper(*args, **kwargs):
         return asyncio.run(func(*args, **kwargs))
     return wrapper
@@ -297,7 +316,7 @@ async def main():
 
     async with dagger.Connection(config) as client:
         platform = dagger.Platform("linux/x86_64")
-        distro = Distribution("debian10", "debian:10")
+        distro = Distribution("debian10")
         installer = NetdataInstaller(platform, distro, "/netdata", "/opt", FeatureFlags.DBEngine)
         agent = Agent(installer)
 
@@ -309,9 +328,11 @@ async def main():
         # build agent from source
         ctr = ctx.build_agent(ctr)
 
+        # get the buildinfo
         output = os.path.join(installer.prefix, "buildinfo.log")
         ctr = ctx.buildinfo(ctr, output)
 
+        # run unittests
         ctr = agent.unittest(ctr)
 
         await ctr
