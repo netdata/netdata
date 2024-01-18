@@ -5,6 +5,11 @@
 // ----------------------------------------------------------------------------
 // data structures for storing the parsed expression in memory
 
+typedef struct eval_variable {
+    STRING *name;
+    struct eval_variable *next;
+} EVAL_VARIABLE;
+
 typedef struct eval_value {
     int type;
 
@@ -23,6 +28,21 @@ typedef struct eval_node {
     int count;
     EVAL_VALUE ops[];
 } EVAL_NODE;
+
+struct eval_expression {
+    STRING *source;
+    STRING *parsed_as;
+
+    NETDATA_DOUBLE result;
+
+    int error;
+    BUFFER *error_msg;
+
+    EVAL_NODE *nodes;
+
+    void *variable_lookup_cb_data;
+    eval_expression_variable_lookup_t variable_lookup_cb;
+};
 
 // these are used for EVAL_NODE.operator
 // they are used as internal IDs to identify an operator
@@ -959,7 +979,7 @@ int expression_evaluate(EVAL_EXPRESSION *expression) {
     expression->error = EVAL_ERROR_OK;
 
     buffer_reset(expression->error_msg);
-    expression->result = eval_node(expression, (EVAL_NODE *)expression->nodes, &expression->error);
+    expression->result = eval_node(expression, expression->nodes, &expression->error);
 
     if(unlikely(isnan(expression->result))) {
         if(expression->error == EVAL_ERROR_OK)
@@ -989,6 +1009,9 @@ int expression_evaluate(EVAL_EXPRESSION *expression) {
 }
 
 EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, int *error) {
+    if(!string || !*string)
+        return NULL;
+
     const char *s = string;
     int err = EVAL_ERROR_OK;
 
@@ -1027,7 +1050,7 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
     buffer_free(out);
 
     exp->error_msg = buffer_create(100, NULL);
-    exp->nodes = (void *)op;
+    exp->nodes = op;
 
     return exp;
 }
@@ -1035,7 +1058,7 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 void expression_free(EVAL_EXPRESSION *expression) {
     if(!expression) return;
 
-    if(expression->nodes) eval_node_free((EVAL_NODE *)expression->nodes);
+    if(expression->nodes) eval_node_free(expression->nodes);
     string_freez((void *)expression->source);
     string_freez((void *)expression->parsed_as);
     buffer_free(expression->error_msg);
@@ -1083,4 +1106,40 @@ const char *expression_strerror(int error) {
         default:
             return "unknown error";
     }
+}
+
+const char *expression_source(EVAL_EXPRESSION *expression) {
+    if(!expression)
+        return string2str(NULL);
+
+    return string2str(expression->source);
+}
+
+const char *expression_parsed_as(EVAL_EXPRESSION *expression) {
+    if(!expression)
+        return string2str(NULL);
+
+    return string2str(expression->parsed_as);
+}
+
+const char *expression_error_msg(EVAL_EXPRESSION *expression) {
+    if(!expression || !expression->error_msg)
+        return "";
+
+    return buffer_tostring(expression->error_msg);
+}
+
+NETDATA_DOUBLE expression_result(EVAL_EXPRESSION *expression) {
+    if(!expression)
+        return NAN;
+
+    return expression->result;
+}
+
+void expression_set_variable_lookup_callback(EVAL_EXPRESSION *expression, eval_expression_variable_lookup_t cb, void *data) {
+    if(!expression)
+        return;
+
+    expression->variable_lookup_cb = cb;
+    expression->variable_lookup_cb_data = data;
 }

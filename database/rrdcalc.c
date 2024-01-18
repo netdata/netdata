@@ -370,20 +370,9 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     if(!isnan(rc->config.red) && isnan(st->red))
         st->red = rc->config.red;
 
-    if(rc->config.calculation) {
-        rc->config.calculation->variable_lookup_cb_data = rc;
-        rc->config.calculation->variable_lookup_cb = alert_variable_lookup;
-    }
-
-    if(rc->config.warning) {
-        rc->config.warning->variable_lookup_cb_data = rc;
-        rc->config.warning->variable_lookup_cb = alert_variable_lookup;
-    }
-
-    if(rc->config.critical) {
-        rc->config.critical->variable_lookup_cb_data = rc;
-        rc->config.critical->variable_lookup_cb = alert_variable_lookup;
-    }
+    expression_set_variable_lookup_callback(rc->config.calculation, alert_variable_lookup, rc);
+    expression_set_variable_lookup_callback(rc->config.warning, alert_variable_lookup, rc);
+    expression_set_variable_lookup_callback(rc->config.critical, alert_variable_lookup, rc);
 
     rrdcalc_update_info_using_rrdset_labels(rc);
 

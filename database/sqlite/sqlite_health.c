@@ -1040,7 +1040,7 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.calculation ? ap->config.calculation->source : NULL, ++param);
+    rc = sqlite3_bind_text(res, ++param, ap->config.calculation ? expression_source(ap->config.calculation) : NULL, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1064,11 +1064,11 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res,  ap->config.warning ? ap->config.warning->source : NULL, ++param);
+    rc = sqlite3_bind_text(res, ++param, ap->config.warning ? expression_source(ap->config.warning) : NULL, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.critical ? ap->config.critical->source : NULL, ++param);
+    rc = sqlite3_bind_text(res, ++param, ap->config.critical ? expression_source(ap->config.critical) : NULL, -1, SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 

@@ -349,15 +349,9 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
     const char *failed_at = NULL;
     int error = 0;
 
-    if(src->calculation)
-        dst->calculation = expression_parse(string2str(src->calculation->source), &failed_at, &error);
-
-    if(src->warning)
-        dst->warning = expression_parse(string2str(src->warning->source), &failed_at, &error);
-
-    if(src->critical)
-        dst->critical = expression_parse(string2str(src->critical->source), &failed_at, &error);
-
+    dst->calculation = expression_parse(expression_source(src->calculation), &failed_at, &error);
+    dst->warning = expression_parse(expression_source(src->warning), &failed_at, &error);
+    dst->critical = expression_parse(expression_source(src->critical), &failed_at, &error);
 
     dst->delay_up_duration = src->delay_up_duration;
     dst->delay_down_duration = src->delay_down_duration;

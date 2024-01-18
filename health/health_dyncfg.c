@@ -54,7 +54,7 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
                 }
                 buffer_json_object_close(wb); // database lookup
 
-                buffer_json_member_add_string(wb, "calculation", ap->config.calculation ? string2str(ap->config.calculation->source) : "");
+                buffer_json_member_add_string(wb, "calculation", expression_source(ap->config.calculation));
                 buffer_json_member_add_string(wb, "units", string2str(ap->config.units));
             }
             buffer_json_object_close(wb); // value
@@ -63,8 +63,8 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
             {
                 buffer_json_member_add_double(wb, "green", ap->config.green);
                 buffer_json_member_add_double(wb, "red", ap->config.red);
-                buffer_json_member_add_string(wb, "warning_condition", ap->config.warning ? string2str(ap->config.warning->source) : "");
-                buffer_json_member_add_string(wb, "critical_condition", ap->config.critical ? string2str(ap->config.critical->source) : "");
+                buffer_json_member_add_string(wb, "warning_condition", expression_source(ap->config.warning));
+                buffer_json_member_add_string(wb, "critical_condition", expression_source(ap->config.critical));
             }
             buffer_json_object_close(wb); // conditions
 

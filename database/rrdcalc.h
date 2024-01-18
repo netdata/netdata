@@ -14,6 +14,16 @@
 // Then are also linked to RRDSET (of course only when a
 // matching chart is found).
 
+typedef enum rrdcalc_status {
+    RRDCALC_STATUS_REMOVED       = -2,
+    RRDCALC_STATUS_UNDEFINED     = -1,
+    RRDCALC_STATUS_UNINITIALIZED =  0,
+    RRDCALC_STATUS_CLEAR         =  1,
+    RRDCALC_STATUS_RAISED        =  2, // DO NOT CHANGE THESE NUMBERS
+    RRDCALC_STATUS_WARNING       =  3, // DO NOT CHANGE THESE NUMBERS
+    RRDCALC_STATUS_CRITICAL      =  4, // DO NOT CHANGE THESE NUMBERS
+} RRDCALC_STATUS;
+
 typedef enum {
     RRDCALC_FLAG_DB_ERROR                   = (1 << 0),
     RRDCALC_FLAG_DB_NAN                     = (1 << 1),
