@@ -122,10 +122,7 @@ option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 
 option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
-option(ENABLE_SENTRY "enable sentry" True)
-set(NETDATA_SENTRY_ENVIRONMENT "MY_ENV_FROM_CI")
-set(NETDATA_SENTRY_RELEASE "MY_RELEASE_FROM_CI")
-set(NETDATA_SENTRY_DIST "MY_DIST_FROM_CI")
+option(ENABLE_SENTRY "enable sentry" False)
 
 #
 # handling of extra compiler flags
