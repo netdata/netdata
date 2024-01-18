@@ -191,8 +191,6 @@ struct rrdcalc {
 #define rrdcalc_type(rc) string2str((rc)->config.type)
 #define rrdcalc_source(rc) string2str((rc)->config.source)
 #define rrdcalc_units(rc) string2str((rc)->config.units)
-#define rrdcalc_summary(rc) string2str((rc)->config.summary)
-#define rrdcalc_info(rc) string2str((rc)->config.info)
 #define rrdcalc_dimensions(rc) string2str((rc)->config.dimensions)
 
 #define foreach_rrdcalc_in_rrdhost_read(host, rc) \

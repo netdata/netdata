@@ -109,8 +109,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     STRING *recipient = rc->config.recipient;
     STRING *source = rc->config.source;
     STRING *units = rc->config.units;
-    STRING *summary = rc->config.summary;
-    STRING *info = rc->config.info;
+    STRING *summary = rc->summary;
+    STRING *info = rc->info;
 
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
