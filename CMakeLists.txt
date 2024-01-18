@@ -1295,23 +1295,23 @@ elseif(FREEBSD)
 endif()
 
 set(MQTT_WEBSOCKETS_FILES
-        mqtt_websockets/src/mqtt_wss_client.c
-        mqtt_websockets/src/include/mqtt_wss_client.h
-        mqtt_websockets/src/mqtt_wss_log.c
-        mqtt_websockets/src/include/mqtt_wss_log.h
-        mqtt_websockets/src/ws_client.c
-        mqtt_websockets/src/include/ws_client.h
-        mqtt_websockets/src/mqtt_ng.c
-        mqtt_websockets/src/include/mqtt_ng.h
-        mqtt_websockets/src/common_public.c
-        mqtt_websockets/src/include/common_public.h
-        mqtt_websockets/src/include/common_internal.h
-        mqtt_websockets/c-rbuf/src/ringbuffer.c
-        mqtt_websockets/c-rbuf/include/ringbuffer.h
-        mqtt_websockets/c-rbuf/src/ringbuffer_internal.h
-        mqtt_websockets/c_rhash/src/c_rhash.c
-        mqtt_websockets/c_rhash/include/c_rhash.h
-        mqtt_websockets/c_rhash/src/c_rhash_internal.h
+        aclk/mqtt_websockets/mqtt_wss_client.c
+        aclk/mqtt_websockets/mqtt_wss_client.h
+        aclk/mqtt_websockets/mqtt_wss_log.c
+        aclk/mqtt_websockets/mqtt_wss_log.h
+        aclk/mqtt_websockets/ws_client.c
+        aclk/mqtt_websockets/ws_client.h
+        aclk/mqtt_websockets/mqtt_ng.c
+        aclk/mqtt_websockets/mqtt_ng.h
+        aclk/mqtt_websockets/common_public.c
+        aclk/mqtt_websockets/common_public.h
+        aclk/mqtt_websockets/common_internal.h
+        aclk/mqtt_websockets/c-rbuf/cringbuffer.c
+        aclk/mqtt_websockets/c-rbuf/cringbuffer.h
+        aclk/mqtt_websockets/c-rbuf/cringbuffer_internal.h
+        aclk/mqtt_websockets/c_rhash/c_rhash.c
+        aclk/mqtt_websockets/c_rhash/c_rhash.h
+        aclk/mqtt_websockets/c_rhash/c_rhash_internal.h
 )
 
 set(ACLK_PROTO_DEFS
@@ -1637,11 +1637,11 @@ if (ENABLE_H2O OR ENABLE_ACLK)
 endif()
 
 if(ENABLE_MQTTWEBSOCKETS)
-        include_directories(BEFORE
-                ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include
-                ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include
-                ${CMAKE_SOURCE_DIR}/mqtt_websockets/c_rhash/include
-        )
+        # include_directories(BEFORE
+        #         ${CMAKE_SOURCE_DIR}/aclk/mqtt_websockets/src/include
+        #         ${CMAKE_SOURCE_DIR}/aclk/mqtt_websockets/c-rbuf/include
+        #         ${CMAKE_SOURCE_DIR}/aclk/mqtt_websockets/c_rhash/include
+        # )
 
         add_library(mqttwebsockets STATIC ${MQTT_WEBSOCKETS_FILES})
 
@@ -1995,8 +1995,6 @@ target_compile_definitions(netdata PRIVATE
 target_include_directories(netdata PRIVATE
         "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/aclk/aclk-schemas>"
-        "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include>"
-        "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include>"
         "$<$<BOOL:${ENABLE_ML}>:${CMAKE_SOURCE_DIR}/ml/dlib>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"

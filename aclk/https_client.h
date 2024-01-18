@@ -5,8 +5,8 @@
 
 #include "libnetdata/libnetdata.h"
 
-#include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
-#include "mqtt_websockets/c_rhash/include/c_rhash.h"
+#include "mqtt_websockets/c-rbuf/cringbuffer.h"
+#include "mqtt_websockets/c_rhash/c_rhash.h"
 
 typedef enum http_req_type {
     HTTP_REQ_GET = 0,
