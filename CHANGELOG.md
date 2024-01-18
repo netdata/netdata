@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Remove help text that no longer applies. [\#16805](https://github.com/netdata/netdata/pull/16805) ([vkalintiris](https://github.com/vkalintiris))
+- cgroups: containers-vms add CPU throttling % [\#16800](https://github.com/netdata/netdata/pull/16800) ([ilyam8](https://github.com/ilyam8))
 - Add additional fail reason and source during database initialization [\#16794](https://github.com/netdata/netdata/pull/16794) ([stelfrag](https://github.com/stelfrag))
 - Use original summary for alert transition [\#16793](https://github.com/netdata/netdata/pull/16793) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#16792](https://github.com/netdata/netdata/pull/16792) ([netdatabot](https://github.com/netdatabot))
@@ -15,6 +17,7 @@
 - diskspace: reworked the cleanup to fix race conditions [\#16786](https://github.com/netdata/netdata/pull/16786) ([ktsaou](https://github.com/ktsaou))
 - diskspace missing mutex use [\#16784](https://github.com/netdata/netdata/pull/16784) ([ktsaou](https://github.com/ktsaou))
 - Remove h2o header from libnetdata [\#16780](https://github.com/netdata/netdata/pull/16780) ([vkalintiris](https://github.com/vkalintiris))
+- Update replication documentation [\#16778](https://github.com/netdata/netdata/pull/16778) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update telegram documentation [\#16777](https://github.com/netdata/netdata/pull/16777) ([thiagoftsm](https://github.com/thiagoftsm))
 - Delete unused variable. [\#16776](https://github.com/netdata/netdata/pull/16776) ([vkalintiris](https://github.com/vkalintiris))
 - Use unsigned char for binary data in mqtt. [\#16775](https://github.com/netdata/netdata/pull/16775) ([vkalintiris](https://github.com/vkalintiris))
@@ -59,6 +62,8 @@
 - Add info to distros.yml for handling of legacy platforms. [\#16718](https://github.com/netdata/netdata/pull/16718) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#16716](https://github.com/netdata/netdata/pull/16716) ([netdatabot](https://github.com/netdatabot))
 - Add the Mobile App notification Integration [\#16715](https://github.com/netdata/netdata/pull/16715) ([sashwathn](https://github.com/sashwathn))
+- Update GHA steps that handle artifacts to use latest versions of upload/download actions. [\#16714](https://github.com/netdata/netdata/pull/16714) ([Ferroin](https://github.com/Ferroin))
+- CI runtime check cleanup [\#16713](https://github.com/netdata/netdata/pull/16713) ([Ferroin](https://github.com/Ferroin))
 - disable logsmanagement when installing on macOS [\#16708](https://github.com/netdata/netdata/pull/16708) ([ilyam8](https://github.com/ilyam8))
 - dyncfg v2 [\#16702](https://github.com/netdata/netdata/pull/16702) ([ktsaou](https://github.com/ktsaou))
 - delay collecting double linked network interfaces [\#16701](https://github.com/netdata/netdata/pull/16701) ([ilyam8](https://github.com/ilyam8))
@@ -82,6 +87,7 @@
 - update bundled UI to v6.75.2 [\#16674](https://github.com/netdata/netdata/pull/16674) ([ilyam8](https://github.com/ilyam8))
 - kickstart: add a note on how to access the UI to the success banner [\#16673](https://github.com/netdata/netdata/pull/16673) ([ilyam8](https://github.com/ilyam8))
 - remove contrib/rhel [\#16672](https://github.com/netdata/netdata/pull/16672) ([ilyam8](https://github.com/ilyam8))
+- Update binaries \(eBPF\) [\#16671](https://github.com/netdata/netdata/pull/16671) ([thiagoftsm](https://github.com/thiagoftsm))
 - eBPF socket \(eBPF\) [\#16669](https://github.com/netdata/netdata/pull/16669) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix compiler warnings [\#16665](https://github.com/netdata/netdata/pull/16665) ([ktsaou](https://github.com/ktsaou))
 - dont exceed buffer boundaries, when the buffer is empty [\#16664](https://github.com/netdata/netdata/pull/16664) ([ktsaou](https://github.com/ktsaou))
@@ -404,7 +410,6 @@
 - Changes to `systemd-journal` docs [\#16225](https://github.com/netdata/netdata/pull/16225) ([Ancairon](https://github.com/Ancairon))
 - Fix statistics calculation in 32bit systems [\#16222](https://github.com/netdata/netdata/pull/16222) ([stelfrag](https://github.com/stelfrag))
 - Fix meta unittest [\#16221](https://github.com/netdata/netdata/pull/16221) ([stelfrag](https://github.com/stelfrag))
-- facets: minimize hashtable collisions [\#16215](https://github.com/netdata/netdata/pull/16215) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
@@ -417,15 +422,6 @@
 ## [v1.43.0](https://github.com/netdata/netdata/tree/v1.43.0) (2023-10-16)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.42.4...v1.43.0)
-
-**Merged pull requests:**
-
-- update bundled UI to v6.52.2 [\#16219](https://github.com/netdata/netdata/pull/16219) ([ilyam8](https://github.com/ilyam8))
-- dynamic meta queue size [\#16218](https://github.com/netdata/netdata/pull/16218) ([ktsaou](https://github.com/ktsaou))
-- update bundled UI to v6.52.1 [\#16217](https://github.com/netdata/netdata/pull/16217) ([ilyam8](https://github.com/ilyam8))
-- update bundled UI to v6.52.0 [\#16216](https://github.com/netdata/netdata/pull/16216) ([ilyam8](https://github.com/ilyam8))
-- disable logging to syslog by default [\#16214](https://github.com/netdata/netdata/pull/16214) ([ilyam8](https://github.com/ilyam8))
-- add summary to /alerts [\#16213](https://github.com/netdata/netdata/pull/16213) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.42.4](https://github.com/netdata/netdata/tree/v1.42.4) (2023-09-18)
 
