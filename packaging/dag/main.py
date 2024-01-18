@@ -129,7 +129,7 @@ class Distribution:
             raise ValueError(f"Unknown distribution: {self.display_name}")
 
 
-    def cache_volume(self, client: dagger.Client, platform: dagger.Platform, path: str) -> dagger.CacheVolume:
+    def _cache_volume(self, client: dagger.Client, platform: dagger.Platform, path: str) -> dagger.CacheVolume:
         tag = "_".join([self.display_name, Platform(platform).escaped()])
         return client.cache_volume(f"{path}-{tag}")
 
@@ -155,12 +155,36 @@ class FeatureFlags(enum.Flag):
 
 class NetdataInstaller:
     def __init__(self,
+                 platform: Platform,
+                 distro: Distribution,
+                 repo_root: pathlib.Path,
                  prefix: pathlib.Path,
                  features: FeatureFlags):
+        self.platform = platform
+        self.distro = distro
+        self.repo_root = repo_root
         self.prefix = prefix
         self.features = features
 
-    def install(self, client: dagger.Client, ctr: dagger.Container, dist: Distribution) -> dagger.Container:
+    def _mount_repo(self, client: dagger.Client, ctr: dagger.Container, repo_root: pathlib.Path) -> dagger.Container:
+        host_repo_root = pathlib.Path(__file__).parent.parent.parent.as_posix()
+        exclude_dirs = ["build", "fluent-bit/build"]
+
+        # The installer builds/stores intermediate artifacts under externaldeps/
+        # We add a volume to speed up rebuilds. The volume has to be unique
+        # per platform/distro in order to avoid mixing unrelated artifacts
+        # together.
+        externaldeps = self.distro._cache_volume(client, self.platform, "externaldeps")
+
+        ctr = (
+            ctr.with_directory(self.repo_root, client.host().directory(host_repo_root))
+               .with_workdir(self.repo_root)
+               .with_mounted_cache(os.path.join(self.repo_root, "externaldeps"), externaldeps)
+        )
+
+        return ctr
+
+    def install(self, client: dagger.Client, ctr: dagger.Container) -> dagger.Container:
         args = ["--dont-wait", "--dont-start-it", "--disable-telemetry"]
 
         if FeatureFlags.DBEngine not in self.features:
@@ -184,44 +208,16 @@ class NetdataInstaller:
         args.extend(["--install-prefix", self.prefix])
 
 
+        ctr = self._mount_repo(client, ctr, self.repo_root)
+
         ctr = (
             ctr.with_env_variable('NETDATA_CMAKE_OPTIONS', '-DCMAKE_BUILD_TYPE=Debug')
                .with_exec(["./netdata-installer.sh"] + args)
         )
 
         # The installer will place everything under "<install-prefix>/netdata"
-        self.prefix = os.path.join(self.prefix, "netdata")
-
-        return ctr
-
-
-class Context:
-    def __init__(self,
-                 client: dagger.Client,
-                 platform: dagger.Platform,
-                 distribution: Distribution):
-        self.client = client
-        self.platform = platform
-        self.distribution = distribution
-
-    def build_distro(self) -> dagger.Container:
-        return self.distribution.build(self.client, self.platform)
-
-    def mount_repo(self, ctr: dagger.Container, repo_root: pathlib.Path) -> dagger.Container:
-        host_repo_root = pathlib.Path(__file__).parent.parent.parent.as_posix()
-        exclude_dirs = ["build", "fluent-bit/build"]
-
-        # The installer builds/stores intermediate artifacts under externaldeps/
-        # We add a volume to speed up rebuilds. The volume has to be unique
-        # per platform/distro in order to avoid mixing unrelated artifacts
-        # together.
-        externaldeps = self.distribution.cache_volume(self.client, self.platform, "externaldeps")
-
-        ctr = (
-            ctr.with_directory(repo_root, self.client.host().directory(host_repo_root))
-               .with_workdir(repo_root)
-               .with_mounted_cache(os.path.join(repo_root, "externaldeps"), externaldeps)
-        )
+        if self.prefix != "/":
+            self.prefix = os.path.join(self.prefix, "netdata")
 
         return ctr
 
@@ -230,9 +226,8 @@ class Agent:
     def __init__(self, installer: NetdataInstaller):
         self.installer = installer
 
-    def buildinfo(self, ctr: dagger.Container) -> dagger.Container:
-        binary = os.path.join(self.installer.prefix, "usr/sbin/netdata")
-        output = os.path.join(self.installer.prefix, "buildinfo.log")
+    def buildinfo(self, ctr: dagger.Container, installer: NetdataInstaller, output: pathlib.Path) -> dagger.Container:
+        binary = os.path.join(installer.prefix, "usr/sbin/netdata")
 
         ctr = (
             ctr.with_exec([binary, "-W", "buildinfo"], redirect_stdout=output)
@@ -250,6 +245,43 @@ class Agent:
         return ctr
 
 
+class Context:
+    def __init__(self,
+                 client: dagger.Client,
+                 platform: dagger.Platform,
+                 distro: Distribution,
+                 installer: NetdataInstaller,
+                 agent: Agent):
+        self.client = client
+        self.platform = platform
+        self.distro = distro
+        self.installer = installer
+        self.agent = agent
+
+        self.built_distro = False
+        self.built_agent = False
+
+    def build_distro(self) -> dagger.Container:
+        ctr = self.distro.build(self.client, self.platform)
+        self.built_distro = True
+        return ctr
+
+    def build_agent(self, ctr: dagger.Container) -> dagger.Container:
+        if not self.built_distro:
+            ctr = self.build_distro()
+
+        ctr = self.installer.install(self.client, ctr)
+        self.built_agent = True
+        return ctr
+
+    def buildinfo(self, ctr: dagger.Container, output: pathlib.Path) -> dagger.Container:
+        if self.built_agent == False:
+            self.build_agent(ctr)
+
+        ctr = self.agent.buildinfo(ctr, self.installer, output)
+        return ctr
+
+
 def run_async(func):
     """
     Decorator to create an asynchronous runner for the main function.
@@ -264,23 +296,22 @@ async def main():
     config = dagger.Config(log_output=sys.stdout)
 
     async with dagger.Connection(config) as client:
-        # Create context
         platform = dagger.Platform("linux/x86_64")
-        dist = Distribution("debian10", "debian:10")
-        ctx = Context(client, platform, dist)
+        distro = Distribution("debian10", "debian:10")
+        installer = NetdataInstaller(platform, distro, "/netdata", "/opt", FeatureFlags.DBEngine)
+        agent = Agent(installer)
+
+        ctx = Context(client, platform, distro, installer, agent)
 
         # build base image with packages we need
         ctr = ctx.build_distro()
 
-        # mount root repo from host
-        ctr = ctx.mount_repo(ctr, "/netdata")
+        # build agent from source
+        ctr = ctx.build_agent(ctr)
 
-        # run the netdata installer
-        installer = NetdataInstaller("/opt", FeatureFlags.DBEngine)
-        ctr = installer.install(client, ctr, dist)
+        output = os.path.join(installer.prefix, "buildinfo.log")
+        ctr = ctx.buildinfo(ctr, output)
 
-        agent = Agent(installer)
-        ctr = agent.buildinfo(ctr)
         ctr = agent.unittest(ctr)
 
         await ctr
