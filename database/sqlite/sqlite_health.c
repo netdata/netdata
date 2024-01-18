@@ -9,6 +9,9 @@
 #define SQLITE3_BIND_STRING_OR_NULL(res, key, param)                                                                   \
     ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
 
+#define SQLITE3_BIND_TEXT_OR_NULL(res, key, param)                                                                   \
+    ((key) ? sqlite3_bind_text((res), (param), (key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
+
 #define SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, param)                                                                   \
     ({                                                                                                                 \
         int _param = (param);                                                                                          \
@@ -1040,7 +1043,10 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, ++param, ap->config.calculation ? expression_source(ap->config.calculation) : NULL, -1, SQLITE_STATIC);
+    if (ap->config.calculation)
+        rc = sqlite3_bind_text(res, ++param, expression_source(ap->config.calculation), -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1064,11 +1070,17 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, ++param, ap->config.warning ? expression_source(ap->config.warning) : NULL, -1, SQLITE_STATIC);
+    if (ap->config.warning)
+        rc = sqlite3_bind_text(res, ++param, expression_source(ap->config.warning), -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_text(res, ++param, ap->config.critical ? expression_source(ap->config.critical) : NULL, -1, SQLITE_STATIC);
+    if (ap->config.critical)
+        rc = sqlite3_bind_text(res, ++param, expression_source(ap->config.critical), -1, SQLITE_STATIC);
+    else
+        rc = sqlite3_bind_null(res, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
