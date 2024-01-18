@@ -1412,6 +1412,7 @@ if(ENABLE_H2O)
                 -Wno-all -Wno-extra
                 -Wno-shadow
                 -Wno-deprecated-declarations
+                -Wformat
         )
 
         target_compile_options(h2o PUBLIC -DH2O_USE_LIBUV=0)
@@ -1430,6 +1431,7 @@ add_library(judy STATIC ${LIBJUDY_SOURCES})
 target_compile_options(judy PRIVATE
         -Wno-all -Wno-extra
         -Wno-shadow
+        -Wformat
 )
 
 target_compile_definitions(judy PRIVATE
