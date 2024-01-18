@@ -348,7 +348,7 @@ static void health_event_loop(void) {
                                                   &rc->db_after,&rc->db_before,
                                                   NULL, NULL, NULL,
                                                   &value_is_null, NULL, 0, 0,
-                                                  QUERY_SOURCE_HEALTH, STORAGE_PRIORITY_LOW);
+                                                  QUERY_SOURCE_HEALTH, STORAGE_PRIORITY_SYNCHRONOUS);
 
                     if (unlikely(ret != 200)) {
                         // database lookup failed
