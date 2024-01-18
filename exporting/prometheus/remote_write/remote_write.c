@@ -145,7 +145,7 @@ static int format_remote_write_label_callback(const char *name, const char *valu
 
     if (!should_send_label(d->instance, ls)) return 0;
     if (name[0] == '_' && !sending_labels_internal(d->instance)) return 0;
-    
+
     char k[PROMETHEUS_ELEMENT_MAX + 1];
     char v[PROMETHEUS_ELEMENT_MAX + 1];
 

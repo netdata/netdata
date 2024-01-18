@@ -121,12 +121,14 @@ You can configure each connector individually using the available [options](#opt
     enabled = yes
     send configured labels = no
     send automatic labels = no
+    send internal labels = yes
     update every = 10
 
 [prometheus:exporter]
     send names instead of ids = yes
     send configured labels = yes
     send automatic labels = no
+    send internal labels = yes
     send charts matching = *
     send hosts matching = localhost *
     prefix = netdata
@@ -288,6 +290,9 @@ Configure individual connectors and override any global settings with the follow
     should be sent to the external database
 
 -   `send automatic labels = yes | no` controls if automatically created labels, like `_os_name` or `_architecture`
+    should be sent to the external database
+
+-   `send internal labels = yes | no` controls if internal created labels (just with `_` prefix), like `_os_name` or `_architecture`, 
     should be sent to the external database
 
 ## HTTPS

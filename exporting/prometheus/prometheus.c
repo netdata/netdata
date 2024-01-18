@@ -333,7 +333,7 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
  */
 
 struct format_prometheus_chart_label_callback {
-    struct instance *instance; 
+    struct instance *instance;
     BUFFER *wb;
 };
 
