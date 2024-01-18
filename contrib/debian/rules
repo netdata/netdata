@@ -93,13 +93,7 @@ override_dh_auto_test:
 	true
 
 override_dh_strip:
-	# Upload debug symbols with sentry-cli
-	# sentry-cli ...
-	# if [ "${SENTRY_UPLOAD}" = "true" ]; then
-	#  sentry-cli . . .
-
-  # continue with the strip step
-  dh_strip
+	dh_strip
 
 override_dh_install:
 	cp -v $(BASE_CONFIG) debian/netdata.conf
