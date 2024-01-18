@@ -16,6 +16,13 @@ extern "C" {
 
 #define CONFIG_SECTION_PROFILE "plugin:profile"
 
+static void foo(void) {
+    for (size_t i = 0; i != 30; i++) {
+        sleep(1);
+        abort();
+    }
+}
+
 class Generator {
 public:
     Generator(size_t N) : Offset(0) {
@@ -158,6 +165,8 @@ public:
             if (CollectionTV.tv_sec >= NowTV.tv_sec) {
                 worker_is_idle();
                 heartbeat_next(&HB, UpdateEvery * USEC_PER_SEC);
+
+                foo();
             }
         }
     }
