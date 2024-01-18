@@ -19,8 +19,8 @@ extern "C" {
 static void foo(void) {
     for (size_t i = 0; i != 22; i++) {
         sleep(1);
-        abort();
     }
+    abort();
 }
 
 class Generator {
