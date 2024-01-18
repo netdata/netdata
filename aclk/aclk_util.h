@@ -5,7 +5,7 @@
 #include "libnetdata/libnetdata.h"
 
 #ifdef ENABLE_ACLK
-#include "mqtt_wss_client.h"
+#include "mqtt_websockets/mqtt_wss_client.h"
 
 #define CLOUD_EC_MALFORMED_NODE_ID   1
 #define CLOUD_EMSG_MALFORMED_NODE_ID "URL requests node_id but there is not enough chars following (for it to be valid uuid)."

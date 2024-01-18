@@ -6,7 +6,7 @@
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
 #include "aclk_query_queue.h"
-#include "mqtt_wss_client.h"
+#include "mqtt_websockets/mqtt_wss_client.h"
 
 extern netdata_mutex_t aclk_stats_mutex;
 

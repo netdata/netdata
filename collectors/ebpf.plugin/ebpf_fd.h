@@ -38,6 +38,12 @@
 #define NETDATA_EBPF_FD_ARAL_NAME "ebpf_fd"
 
 typedef struct netdata_fd_stat {
+    uint64_t ct;
+    uint32_t tgid;
+    uint32_t uid;
+    uint32_t gid;
+    char name[TASK_COMM_LEN];
+
     uint32_t open_call;                    // Open syscalls (open and openat)
     uint32_t close_call;                   // Close syscall (close)
 

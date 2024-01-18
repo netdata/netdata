@@ -1329,7 +1329,7 @@ netdata_avail_check() {
       ;;
     centos|fedora|ol|amzn)
       # shellcheck disable=SC2086
-      ${pm_cmd} search --nogpgcheck -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
+      LC_ALL=C ${pm_cmd} search --nogpgcheck -v netdata | grep -qE 'Repo *: netdata(-edge)?$'
       return $?
       ;;
     opensuse)
@@ -1345,7 +1345,7 @@ check_special_native_deps() {
   if [ "${DISTRO_COMPAT_NAME}" = "centos" ] && [ "${SYSVERSION}" -gt 6 ]; then
     progress "EPEL is required on this system, checking if it’s available."
 
-    if ${pm_cmd} search --nogpgcheck -v epel-release | grep -q "No matches found"; then
+    if LC_ALL=C ${pm_cmd} search --nogpgcheck -v epel-release | grep -q "No matches found"; then
       warning "Unable to find a suitable source for libuv, cannot install using native packages on this system."
       return 1
     else
