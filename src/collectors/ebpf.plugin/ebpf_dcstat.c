@@ -585,12 +585,10 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_
         ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid, 0);
         if (pid_stat) {
             netdata_publish_dcstat_t *w = &pid_stat->dc;
-            if (w) {
-                netdata_dcstat_pid_t *src = &w->curr;
-                dst->cache_access += src->cache_access;
-                dst->file_system += src->file_system;
-                dst->not_found += src->not_found;
-            }
+            netdata_dcstat_pid_t *src = &w->curr;
+            dst->cache_access += src->cache_access;
+            dst->file_system += src->file_system;
+            dst->not_found += src->not_found;
         }
 
         root = root->next;
