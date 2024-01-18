@@ -9,9 +9,6 @@
 #define SQLITE3_BIND_STRING_OR_NULL(res, key, param)                                                                   \
     ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
 
-#define SQLITE3_BIND_TEXT_OR_NULL(res, key, param)                                                                   \
-    ((key) ? sqlite3_bind_text((res), (param), (key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
-
 #define SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, param)                                                                   \
     ({                                                                                                                 \
         int _param = (param);                                                                                          \
