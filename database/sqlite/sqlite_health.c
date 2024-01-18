@@ -1617,10 +1617,9 @@ static uint32_t get_next_alarm_event_id(uint64_t health_log_id, uint32_t alarm_i
 }
 
 #define SQL_GET_ALARM_ID                                                                                               \
-    "SELECT alarm_id, health_log_id FROM health_log WHERE host_id = @host_id AND chart = @chart "                      \
-    "AND name = @name AND config_hash_id = @config_hash_id"
+    "SELECT alarm_id, health_log_id FROM health_log WHERE host_id = @host_id AND chart = @chart AND name = @name"
 
-uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id)
+uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id)
 {
     int rc = 0;
     sqlite3_stmt *res = NULL;
@@ -1654,13 +1653,6 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
         return alarm_id;
     }
 
-    rc = sqlite3_bind_blob(res, 4, config_hash_id, sizeof(*config_hash_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind config_hash_id parameter for SQL_GET_ALARM_ID.");
-        sqlite3_finalize(res);
-        return alarm_id;
-    }
-
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         alarm_id = (uint32_t) sqlite3_column_int64(res, 0);
         health_log_id = (uint64_t) sqlite3_column_int64(res, 1);
@@ -1672,111 +1664,6 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
 
      if (alarm_id)
            *next_event_id = get_next_alarm_event_id(health_log_id, alarm_id);
-
-     return alarm_id;
-}
-
-#define SQL_UPDATE_ALARM_ID_WITH_CONFIG_HASH                                                                           \
-     "UPDATE health_log SET config_hash_id = @config_hash_id WHERE host_id = @host_id AND alarm_id = @alarm_id "       \
-     "AND health_log_id = @health_log_id"
-
-void sql_update_alarm_with_config_hash(RRDHOST *host, uint32_t alarm_id, uint64_t health_log_id, uuid_t *config_hash_id)
-{
-    int rc = 0;
-    sqlite3_stmt *res = NULL;
-
-    rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_ALARM_ID_WITH_CONFIG_HASH, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to update an alarm id with a config hash.");
-        return;
-    }
-
-    rc = sqlite3_bind_blob(res, 1, config_hash_id, sizeof(*config_hash_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind config_hash_id parameter for SQL_UPDATE_ALARM_ID_WITH_CONFIG_HASH.");
-        goto done;
-    }
-
-    rc = sqlite3_bind_blob(res, 2, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter for SQL_UPDATE_ALARM_ID_WITH_CONFIG_HASH.");
-        goto done;
-    }
-
-    rc = sqlite3_bind_int64(res, 3, (sqlite3_int64) alarm_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind alarm_id parameter for SQL_GET_ALARM_ID.");
-        goto done;
-    }
-
-    rc = sqlite3_bind_int64(res, 4, (sqlite3_int64) health_log_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind alarm_id parameter for SQL_GET_ALARM_ID.");
-        goto done;
-    }
-
-    rc = execute_insert(res);
-    if (unlikely(rc != SQLITE_DONE))
-        error_report("Failed to execute SQL_UPDATE_ALARM_ID_WITH_CONFIG_HASH, rc = %d", rc);
-
-done:
-     rc = sqlite3_finalize(res);
-     if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to update health log detail table with config hash ids, rc = %d", rc);
-
-}
-
-#define SQL_GET_ALARM_ID_CHECK_ZERO_HASH                                                                               \
-     "SELECT alarm_id, health_log_id FROM health_log WHERE host_id = @host_id AND chart = @chart "                     \
-     "AND name = @name AND (config_hash_id IS NULL OR config_hash_id = ZEROBLOB(16))"
-
-uint32_t sql_get_alarm_id_check_zero_hash(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id)
-{
-    int rc = 0;
-    sqlite3_stmt *res = NULL;
-    uint32_t alarm_id = 0;
-    uint64_t health_log_id = 0;
-
-    rc = sqlite3_prepare_v2(db_meta, SQL_GET_ALARM_ID_CHECK_ZERO_HASH, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to get an alarm id with zero hash");
-        return alarm_id;
-    }
-
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter for SQL_GET_ALARM_ID_CHECK_ZERO_HASH.");
-        sqlite3_finalize(res);
-        return alarm_id;
-    }
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, chart, 2);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind char parameter for SQL_GET_ALARM_ID_CHECK_ZERO_HASH.");
-        sqlite3_finalize(res);
-        return alarm_id;
-    }
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, name, 3);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind name parameter for SQL_GET_ALARM_ID_CHECK_ZERO_HASH.");
-        sqlite3_finalize(res);
-        return alarm_id;
-    }
-
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        alarm_id = (uint32_t) sqlite3_column_int64(res, 0);
-        health_log_id = (uint64_t) sqlite3_column_int64(res, 1);
-    }
-
-     rc = sqlite3_finalize(res);
-     if (unlikely(rc != SQLITE_OK))
-         error_report("Failed to finalize the statement while getting an alarm id.");
-
-     if (alarm_id) {
-         sql_update_alarm_with_config_hash(host, alarm_id, health_log_id, config_hash_id);
-         *next_event_id = get_next_alarm_event_id(health_log_id, alarm_id);
-     }
 
      return alarm_id;
 }
