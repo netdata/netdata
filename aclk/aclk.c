@@ -4,7 +4,7 @@
 
 #ifdef ENABLE_ACLK
 #include "aclk_stats.h"
-#include "mqtt_wss_client.h"
+#include "mqtt_websockets/mqtt_wss_client.h"
 #include "aclk_otp.h"
 #include "aclk_tx_msgs.h"
 #include "aclk_query.h"

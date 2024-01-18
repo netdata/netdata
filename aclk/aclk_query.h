@@ -5,7 +5,7 @@
 
 #include "libnetdata/libnetdata.h"
 
-#include "mqtt_wss_client.h"
+#include "mqtt_websockets/mqtt_wss_client.h"
 
 #include "aclk_query_queue.h"
 
