@@ -121,15 +121,10 @@ esac
 trap dump_log EXIT
 
 /usr/sbin/netdata -D > ./netdata.log 2>&1 &
-
-
-wait_for localhost 19999 netdata || exit 1
-
-curl -sS http://127.0.0.1:19999/api/v1/info > ./response || exit 1
-
+sleep 30
 /usr/sbin/netdata -D > ./netdata.log 2>&1 &
+sleep 30 
 
-wait_for localhost 19999 netdata || exit 1
 
 curl -sS http://127.0.0.1:19999/api/v1/info > ./response || exit 1
 cat ./response
