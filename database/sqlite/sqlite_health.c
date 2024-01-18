@@ -102,7 +102,8 @@ failed:
     "config_hash_id, name, chart, exec, recipient, units, chart_context, last_transition_id, chart_name) "             \
     "VALUES (@host_id,@alarm_id, @config_hash_id,@name,@chart,@exec,@recipient,@units,@chart_context,"                 \
     "@last_transition_id,@chart_name) ON CONFLICT (host_id, alarm_id) DO UPDATE "                                      \
-    "SET last_transition_id = excluded.last_transition_id, chart_name = excluded.chart_name RETURNING health_log_id"
+    "SET last_transition_id = excluded.last_transition_id, chart_name = excluded.chart_name, "                         \
+    "config_hash_id=excluded.config_hash_id RETURNING health_log_id"
 
 #define SQL_INSERT_HEALTH_LOG_DETAIL                                                                                         \
     "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, "                                    \
