@@ -414,6 +414,8 @@ static void health_event_loop(void) {
             }
             foreach_rrdcalc_in_rrdhost_done(rc);
 
+            struct health_raised_summary *hrm = alerts_raised_summary_create(host);
+
             if (unlikely(runnable && service_running(SERVICE_HEALTH))) {
                 foreach_rrdcalc_in_rrdhost_read(host, rc) {
                     if(unlikely(!service_running(SERVICE_HEALTH)))
@@ -603,6 +605,8 @@ static void health_event_loop(void) {
                 }
                 foreach_rrdcalc_in_rrdhost_done(rc);
 
+                alerts_raised_summary_populate(hrm);
+
                 // process repeating alarms
                 foreach_rrdcalc_in_rrdhost_read(host, rc) {
                     if(unlikely(!service_running(SERVICE_HEALTH)))
@@ -655,7 +659,7 @@ static void health_event_loop(void) {
                             ae->flags |= HEALTH_ENTRY_RUN_ONCE;
                         }
                         rc->run_flags |= RRDCALC_FLAG_RUN_ONCE;
-                        health_send_notification(host, ae);
+                        health_send_notification(host, ae, hrm);
                         netdata_log_debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
                         health_alarm_wait_for_execution(ae);
                         health_alarm_log_free_one_nochecks_nounlink(ae);
@@ -669,8 +673,10 @@ static void health_event_loop(void) {
 
             // execute notifications
             // and cleanup
+
             worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS);
-            health_alarm_log_process_to_send_notifications(host);
+            health_alarm_log_process_to_send_notifications(host, hrm);
+            alerts_raised_summary_free(hrm);
 
             if (unlikely(!service_running(SERVICE_HEALTH))) {
                 // wait for all notifications to finish before allowing health to be cleaned up

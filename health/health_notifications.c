@@ -11,18 +11,16 @@ static struct {
     ALARM_ENTRY *tail; // latest
 } alarm_notifications_in_progress = {NULL, NULL};
 
-typedef struct active_alerts {
-    char *name;
-    time_t last_status_change;
-    RRDCALC_STATUS status;
-} active_alerts_t;
+struct health_raised_summary {
+    RRDHOST *host;
+    DICTIONARY *rrdcalc_dict;
 
-static inline int compare_active_alerts(const void * a, const void * b) {
-    active_alerts_t *active_alerts_a = (active_alerts_t *)a;
-    active_alerts_t *active_alerts_b = (active_alerts_t *)b;
-
-    return (int) ( active_alerts_b->last_status_change - active_alerts_a->last_status_change );
-}
+    struct {
+        size_t size;
+        size_t used;
+        const DICTIONARY_ITEM **array;
+    } active_alerts;
+};
 
 void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     if (!(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
@@ -245,7 +243,109 @@ static bool prepare_command(BUFFER *wb,
     return true;
 }
 
-void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
+static inline int compare_raised_alerts(const void *a, const void *b) {
+    const DICTIONARY_ITEM *item1 = *(const DICTIONARY_ITEM **)a;
+    const DICTIONARY_ITEM *item2 = *(const DICTIONARY_ITEM **)b;
+
+    RRDCALC *rc1 = dictionary_acquired_item_value(item1);
+    RRDCALC *rc2 = dictionary_acquired_item_value(item2);
+
+    return (int)(rc2->last_status_change - rc1->last_status_change);
+}
+
+static void health_raised_summary_add_alert(struct health_raised_summary *hrm, const DICTIONARY_ITEM  *item) {
+    if(hrm->active_alerts.used >= hrm->active_alerts.size) {
+        if(hrm->active_alerts.size == 0)
+            hrm->active_alerts.size = 2;
+
+        hrm->active_alerts.size *= 2;
+        hrm->active_alerts.array = reallocz(hrm->active_alerts.array, sizeof(const DICTIONARY_ITEM *) * hrm->active_alerts.size);
+    }
+
+    hrm->active_alerts.array[hrm->active_alerts.used++] = dictionary_acquired_item_dup(hrm->rrdcalc_dict, item);
+}
+
+void alerts_raised_summary_free(struct health_raised_summary *hrm) {
+    for(size_t i = 0; i < hrm->active_alerts.used ;i++)
+        dictionary_acquired_item_release(hrm->rrdcalc_dict, hrm->active_alerts.array[i]);
+
+    freez(hrm->active_alerts.array);
+    freez(hrm);
+}
+
+struct health_raised_summary *alerts_raised_summary_create(RRDHOST *host) {
+    struct health_raised_summary *hrm = callocz(1, sizeof(*hrm));
+    hrm->rrdcalc_dict = host->rrdcalc_root_index;
+    hrm->host = host;
+    return hrm;
+}
+
+void alerts_raised_summary_populate(struct health_raised_summary *hrm) {
+    RRDCALC *rc;
+    foreach_rrdcalc_in_rrdhost_read(hrm->host, rc) {
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec)) continue;
+        health_raised_summary_add_alert(hrm, rc_dfe.item);
+    }
+    foreach_rrdcalc_in_rrdhost_done(rc);
+
+    if (hrm->active_alerts.used > 1)
+        qsort(hrm->active_alerts.array, hrm->active_alerts.used, sizeof(const DICTIONARY_ITEM *), compare_raised_alerts);
+}
+
+static size_t
+health_raised_summary_entries(struct health_raised_summary *hrm, BUFFER *dst, ALARM_ENTRY *ae, RRDCALC_STATUS status) {
+    buffer_flush(dst);
+
+    size_t count = 0;
+    for(size_t i = 0; i < hrm->active_alerts.used ;i++) {
+        RRDCALC *rc = dictionary_acquired_item_value(hrm->active_alerts.array[i]);
+        if(rc->status != status) continue;
+        if(rc->id == ae->alarm_id) continue;
+
+        count++;
+        if(buffer_strlen(dst)) buffer_putc(dst, ',');
+        buffer_sprintf(dst, "%s=%" PRId64, string2str(rc->config.name), (int64_t)rc->last_status_change);
+    }
+
+    return count;
+}
+
+static const char *health_raised_summary_my_expression_source(struct health_raised_summary *hrm, ALARM_ENTRY *ae) {
+    for(size_t i = 0; i < hrm->active_alerts.used ;i++) {
+        RRDCALC *rc = dictionary_acquired_item_value(hrm->active_alerts.array[i]);
+        if(rc->id != ae->alarm_id) continue;
+
+        if(rc->status == RRDCALC_STATUS_CRITICAL)
+            return expression_source(rc->config.critical);
+        else
+            return expression_source(rc->config.warning);
+    }
+
+    return "";
+}
+
+static const char *health_raised_summary_my_expression_error(struct health_raised_summary *hrm, ALARM_ENTRY *ae) {
+    for(size_t i = 0; i < hrm->active_alerts.used ;i++) {
+        RRDCALC *rc = dictionary_acquired_item_value(hrm->active_alerts.array[i]);
+        if(rc->id != ae->alarm_id) continue;
+
+        if(rc->status == RRDCALC_STATUS_CRITICAL)
+            return expression_error_msg(rc->config.critical);
+        else
+            return expression_error_msg(rc->config.warning);
+    }
+
+    return "";
+}
+
+void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm) {
+    netdata_log_debug(D_HEALTH, "Health alarm '%s.%s' = " NETDATA_DOUBLE_FORMAT_AUTO " - changed status from %s to %s",
+                      ae->chart?ae_chart_id(ae):"NOCHART", ae_name(ae),
+                      ae->new_value,
+                      rrdcalc_status2string(ae->old_status),
+                      rrdcalc_status2string(ae->new_status)
+    );
+
     ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
 
     if(unlikely(ae->new_status < RRDCALC_STATUS_CLEAR)) {
@@ -312,69 +412,13 @@ void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.health_default_exec);
     const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.health_default_recipient);
 
-    int n_warn=0, n_crit=0;
-    RRDCALC *rc;
-    EVAL_EXPRESSION *expr=NULL;
-    BUFFER *warn_alarms, *crit_alarms;
-    active_alerts_t *active_alerts = callocz(ACTIVE_ALARMS_LIST_EXAMINE, sizeof(active_alerts_t));
-
-    warn_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_health);
-    crit_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_health);
-
-    foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
-            continue;
-
-        if(unlikely((n_warn + n_crit) >= ACTIVE_ALARMS_LIST_EXAMINE))
-            break;
-
-        if (unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
-            if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
-                active_alerts[n_warn+n_crit].name = (char *)rrdcalc_name(rc);
-                active_alerts[n_warn+n_crit].last_status_change = rc->last_status_change;
-                active_alerts[n_warn+n_crit].status = rc->status;
-                n_warn++;
-            } else if (ae->alarm_id == rc->id)
-                expr = rc->config.warning;
-        } else if (unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
-            if (likely(ae->alarm_id != rc->id) || likely(ae->alarm_event_id != rc->next_event_id - 1)) {
-                active_alerts[n_warn+n_crit].name = (char *)rrdcalc_name(rc);
-                active_alerts[n_warn+n_crit].last_status_change = rc->last_status_change;
-                active_alerts[n_warn+n_crit].status = rc->status;
-                n_crit++;
-            } else if (ae->alarm_id == rc->id)
-                expr = rc->config.critical;
-        } else if (unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
-            if (ae->alarm_id == rc->id)
-                expr = rc->config.warning;
-        }
-    }
-    foreach_rrdcalc_in_rrdhost_done(rc);
-
-    if (n_warn+n_crit>1)
-        qsort (active_alerts, n_warn+n_crit, sizeof(active_alerts_t), compare_active_alerts);
-
-    int count_w = 0, count_c = 0;
-    while (count_w + count_c < n_warn + n_crit && count_w + count_c < ACTIVE_ALARMS_LIST) {
-        if (active_alerts[count_w+count_c].status == RRDCALC_STATUS_WARNING) {
-            if (count_w)
-                buffer_strcat(warn_alarms, ",");
-            buffer_strcat(warn_alarms, active_alerts[count_w+count_c].name);
-            buffer_strcat(warn_alarms, "=");
-            buffer_snprintf(warn_alarms, 11, "%"PRId64"", (int64_t)active_alerts[count_w+count_c].last_status_change);
-            count_w++;
-        }
-        else if (active_alerts[count_w+count_c].status == RRDCALC_STATUS_CRITICAL) {
-            if (count_c)
-                buffer_strcat(crit_alarms, ",");
-            buffer_strcat(crit_alarms, active_alerts[count_w+count_c].name);
-            buffer_strcat(crit_alarms, "=");
-            buffer_snprintf(crit_alarms, 11, "%"PRId64"", (int64_t)active_alerts[count_w+count_c].last_status_change);
-            count_c++;
-        }
-    }
-
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
+
+    BUFFER *warn_alarms = buffer_create(1024, &netdata_buffers_statistics.buffers_health);
+    BUFFER *crit_alarms = buffer_create(1024, &netdata_buffers_statistics.buffers_health);
+
+    size_t n_warn = health_raised_summary_entries(hrm, warn_alarms, ae, RRDCALC_STATUS_WARNING);
+    size_t n_crit = health_raised_summary_entries(hrm, crit_alarms, ae, RRDCALC_STATUS_CRITICAL);
 
     BUFFER *wb = buffer_create(8192, &netdata_buffers_statistics.buffers_health);
     bool ok = prepare_command(wb,
@@ -398,8 +442,8 @@ void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               ae_info(ae),
                               ae_new_value_string(ae),
                               ae_old_value_string(ae),
-                              expression_source(expr),
-                              expression_error_msg(expr),
+                              health_raised_summary_my_expression_source(hrm, ae),
+                              health_raised_summary_my_expression_error(hrm, ae),
                               n_warn,
                               n_crit,
                               buffer_tostring(warn_alarms),
@@ -428,26 +472,14 @@ void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         netdata_log_error("Failed to format command arguments");
     }
 
-    buffer_free(wb);
-    freez(edit_command);
     buffer_free(warn_alarms);
     buffer_free(crit_alarms);
-    freez(active_alerts);
+    buffer_free(wb);
+    freez(edit_command);
 
     return; //health_alarm_wait_for_execution
 done:
     health_alarm_log_save(host, ae);
-}
-
-void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae) {
-    netdata_log_debug(D_HEALTH, "Health alarm '%s.%s' = " NETDATA_DOUBLE_FORMAT_AUTO " - changed status from %s to %s",
-                      ae->chart?ae_chart_id(ae):"NOCHART", ae_name(ae),
-                      ae->new_value,
-                      rrdcalc_status2string(ae->old_status),
-                      rrdcalc_status2string(ae->new_status)
-    );
-
-    health_alarm_execute(host, ae);
 }
 
 bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, uuid_t *transitions_id) {
@@ -478,7 +510,7 @@ bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, u
     return ae != NULL;
 }
 
-void health_alarm_log_process_to_send_notifications(RRDHOST *host) {
+void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm) {
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
     time_t now = now_realtime_sec();
 
@@ -494,7 +526,7 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host) {
                 first_waiting = ae->unique_id;
 
             if(likely(now >= ae->delay_up_to_timestamp))
-                health_send_notification(host, ae);
+                health_send_notification(host, ae, hrm);
         }
     }
 

@@ -821,7 +821,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 #endif
 
 #ifdef ENABLE_ACLK
-static bool have_recent_alarm(RRDHOST *host, int64_t alarm_id, int64_t mark)
+static bool have_recent_alarm_unsafe(RRDHOST *host, int64_t alarm_id, int64_t mark)
 {
     ALARM_ENTRY *ae = host->health_log.alarms;
 
@@ -882,7 +882,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         if (unlikely(ae->new_status == RRDCALC_STATUS_UNINITIALIZED))
             continue;
 
-        if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
+        if (have_recent_alarm_unsafe(host, ae->alarm_id, ae->unique_id))
             continue;
 
         if (is_event_from_alert_variable_config(ae->unique_id, &host->host_uuid))
@@ -911,7 +911,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
             if (likely(ae->updated_by_id) || unlikely(ae->new_status == RRDCALC_STATUS_UNINITIALIZED))
                 continue;
 
-            if (have_recent_alarm(host, ae->alarm_id, ae->unique_id))
+            if (have_recent_alarm_unsafe(host, ae->alarm_id, ae->unique_id))
                 continue;
 
             if (is_event_from_alert_variable_config(ae->unique_id, &host->host_uuid))
