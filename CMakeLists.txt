@@ -59,6 +59,8 @@ project(netdata
 
 include(FetchContent)
 
+set(FETCHCONTENT_FULLY_DISCONNECTED Off)
+
 set(SENTRY_VERSION 0.6.6)
 set(SENTRY_BACKEND crashpad)
 set(SENTRY_BUILD_SHARED_LIBS OFF)
