@@ -26,11 +26,6 @@ typedef struct eval_expression {
     STRING *source;
     STRING *parsed_as;
 
-    RRDCALC_STATUS *status;
-    NETDATA_DOUBLE *myself;
-    time_t *after;
-    time_t *before;
-
     NETDATA_DOUBLE result;
 
     int error;

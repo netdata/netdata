@@ -185,6 +185,26 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
     buffer_json_member_add_string(wb, "family", rrdset_family(st));
     buffer_json_member_add_string(wb, "host", rrdhost_hostname(host));
 
+    time_t now = now_realtime_sec();
+
+    buffer_json_member_add_object(wb, "current_alert_values");
+    {
+        buffer_json_member_add_double(wb, "this", NAN);
+        buffer_json_member_add_double(wb, "after", (NETDATA_DOUBLE)now - 1);
+        buffer_json_member_add_double(wb, "before", (NETDATA_DOUBLE)now);
+        buffer_json_member_add_double(wb, "now", (NETDATA_DOUBLE)now);
+        buffer_json_member_add_double(wb, "status", (NETDATA_DOUBLE)RRDCALC_STATUS_REMOVED);
+        buffer_json_member_add_double(wb, "removed", (NETDATA_DOUBLE)RRDCALC_STATUS_REMOVED);
+        buffer_json_member_add_double(wb, "uninitialized", (NETDATA_DOUBLE)RRDCALC_STATUS_UNINITIALIZED);
+        buffer_json_member_add_double(wb, "undefined", (NETDATA_DOUBLE)RRDCALC_STATUS_UNDEFINED);
+        buffer_json_member_add_double(wb, "clear", (NETDATA_DOUBLE)RRDCALC_STATUS_CLEAR);
+        buffer_json_member_add_double(wb, "warning", (NETDATA_DOUBLE)RRDCALC_STATUS_WARNING);
+        buffer_json_member_add_double(wb, "critical", (NETDATA_DOUBLE)RRDCALC_STATUS_CRITICAL);
+        buffer_json_member_add_double(wb, "green", NAN);
+        buffer_json_member_add_double(wb, "red", NAN);
+    }
+    buffer_json_object_close(wb);
+
     buffer_json_member_add_object(wb, "dimensions_last_stored_values");
     {
         RRDDIM *rd;
@@ -232,8 +252,6 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
     buffer_json_member_add_object(wb, "chart_variables");
     {
         buffer_json_member_add_int64(wb, "update_every", st->update_every);
-        buffer_json_member_add_double(wb, "green", st->green);
-        buffer_json_member_add_double(wb, "red", st->red);
         buffer_json_member_add_uint64(wb, "last_collected_t", st->last_collected_time.tv_sec);
 
         rrdvar_to_json_members(st->rrdvars, wb);

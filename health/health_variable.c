@@ -154,7 +154,23 @@ bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
 }
 
 bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE *result, BUFFER *wb) {
-    static STRING *last_collected_t = NULL, *green = NULL, *red = NULL, *update_every = NULL;
+    static STRING *this_string = NULL,
+                  *now_string = NULL,
+                  *after_string = NULL,
+                  *before_string = NULL,
+                  *status_string = NULL,
+                  *removed_string = NULL,
+                  *uninitialized_string = NULL,
+                  *undefined_string = NULL,
+                  *clear_string = NULL,
+                  *warning_string = NULL,
+                  *critical_string = NULL,
+                  *last_collected_t_string = NULL,
+                  *green_string = NULL,
+                  *red_string = NULL,
+                  *update_every_string = NULL;
+
+
     struct variable_lookup_job vbd = { 0 };
 
 //    const char *v_name = string2str(variable);
@@ -173,40 +189,139 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
     if(!st)
         return false;
 
-    if(unlikely(!last_collected_t)) {
-        last_collected_t = string_strdupz("last_collected_t");
-        green = string_strdupz("green");
-        red = string_strdupz("red");
-        update_every = string_strdupz("update_every");
+    if(unlikely(!last_collected_t_string)) {
+        this_string = string_strdupz("this");
+        now_string = string_strdupz("now");
+        after_string = string_strdupz("after");
+        before_string = string_strdupz("before");
+        status_string = string_strdupz("status");
+        removed_string = string_strdupz("REMOVED");
+        uninitialized_string = string_strdupz("UNINITIALIZED");
+        undefined_string = string_strdupz("UNDEFINED");
+        clear_string = string_strdupz("CLEAR");
+        warning_string = string_strdupz("WARNING");
+        critical_string = string_strdupz("CRITICAL");
+        last_collected_t_string = string_strdupz("last_collected_t");
+        green_string = string_strdupz("green");
+        red_string = string_strdupz("red");
+        update_every_string = string_strdupz("update_every");
     }
 
-    if(variable == last_collected_t) {
+    if(unlikely(variable == this_string)) {
+        *result = (NETDATA_DOUBLE)rc->value;
+        source = "current alert value";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == after_string)) {
+        *result = (NETDATA_DOUBLE)rc->db_after;
+        source = "current alert query start time";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == before_string)) {
+        *result = (NETDATA_DOUBLE)rc->db_before;
+        source = "current alert query end time";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == now_string)) {
+        *result = (NETDATA_DOUBLE)now_realtime_sec();
+        source = "current wall-time clock timestamp";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == status_string)) {
+        *result = (NETDATA_DOUBLE)rc->status;
+        source = "current alert status";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == removed_string)) {
+        *result = (NETDATA_DOUBLE)RRDCALC_STATUS_REMOVED;
+        source = "removed status constant";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == uninitialized_string)) {
+        *result = (NETDATA_DOUBLE)RRDCALC_STATUS_UNINITIALIZED;
+        source = "uninitialized status constant";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == undefined_string)) {
+        *result = (NETDATA_DOUBLE)RRDCALC_STATUS_UNDEFINED;
+        source = "undefined status constant";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == clear_string)) {
+        *result = (NETDATA_DOUBLE)RRDCALC_STATUS_CLEAR;
+        source = "clear status constant";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == warning_string)) {
+        *result = (NETDATA_DOUBLE)RRDCALC_STATUS_WARNING;
+        source = "warning status constant";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == critical_string)) {
+        *result = (NETDATA_DOUBLE)RRDCALC_STATUS_CRITICAL;
+        source = "critical status constant";
+        source_st = st;
+        found = true;
+        goto log;
+    }
+
+    if(unlikely(variable == last_collected_t_string)) {
         *result = (NETDATA_DOUBLE)st->last_collected_time.tv_sec;
-        source = "last_collected_t";
+        source = "current instance last_collected_t";
         source_st = st;
         found = true;
         goto log;
     }
 
-    if(variable == update_every) {
+    if(unlikely(variable == update_every_string)) {
         *result = (NETDATA_DOUBLE)st->update_every;
-        source = "update_every";
+        source = "current instance update_every";
         source_st = st;
         found = true;
         goto log;
     }
 
-    if(variable == green) {
+    if(unlikely(variable == green_string)) {
         *result = (NETDATA_DOUBLE)rc->config.green;
-        source = "green";
+        source = "current alert green threshold";
         source_st = st;
         found = true;
         goto log;
     }
 
-    if(variable == red) {
+    if(unlikely(variable == red_string)) {
         *result = (NETDATA_DOUBLE)rc->config.red;
-        source = "red";
+        source = "current alert red threshold";
         source_st = st;
         found = true;
         goto log;
