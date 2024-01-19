@@ -600,7 +600,7 @@ update_available() {
         update_safe=0
 
         for v in ${NETDATA_ACCEPT_MAJOR_VERSIONS}; do
-          if [ "${current_major}" -eq "${v}" ]; then
+          if [ "${latest_major}" -eq "${v}" ]; then
             update_safe=1
             break
           fi
@@ -910,7 +910,7 @@ update_binpkg() {
     update_safe=0
 
     for v in ${NETDATA_ACCEPT_MAJOR_VERSIONS}; do
-      if [ "${current_major}" -eq "${v}" ]; then
+      if [ "${latest_major}" -eq "${v}" ]; then
         update_safe=1
         break
       fi
