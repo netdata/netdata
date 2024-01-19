@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------------------------------------------------
 // parse the json object of an alert definition
 
-#define JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(member, dst) do {                                                  \
+#define JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                                  \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_boolean))             \
         dst = json_object_get_boolean(_j);                                                                      \
@@ -17,23 +17,26 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(member, dst) do {                                            \
+#define JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                            \
     json_object *_j;                                                                                            \
-    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string))              \
+    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
+        string_freez(dst);                                                                                      \
         dst = string_strdupz(json_object_get_string(_j));                                                       \
+    }                                                                                                           \
     else {                                                                                                      \
         buffer_sprintf(error, "missing or invalid type for '%s' string", member);                               \
         return false;                                                                                           \
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(member, dst) do {                                        \
+#define JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                        \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
         const char *_t = json_object_get_string(_j);                                                            \
         if(_t && *_t && strcmp(_t, "*") != 0) {                                                                 \
             const char *_failed_at = NULL;                                                                      \
             int _err = 0;                                                                                       \
+            expression_free(dst);                                                                               \
             dst = expression_parse(_t, &_failed_at, &_err);                                                     \
             if(!dst) {                                                                                          \
                 buffer_sprintf(error, "expression '%s' has a non-parseable expression '%s': %s at '%s'",        \
@@ -48,7 +51,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(member, converter, dst) do {                        \
+#define JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, member, converter, dst) do {                        \
     json_object *_jarray;                                                                                       \
     if (json_object_object_get_ex(jobj, member, &_jarray) && json_object_is_type(_jarray, json_type_array)) {   \
         size_t _num_options = json_object_array_length(_jarray);                                                \
@@ -74,7 +77,7 @@
 } while(0)
 
 
-#define JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(member, converter, dst) do {                                   \
+#define JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, member, converter, dst) do {                                   \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string))              \
         dst = converter(json_object_get_string(_j));                                                            \
@@ -84,7 +87,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_INT_OR_ERROR_AND_RETURN(member, dst) do {                                                   \
+#define JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                                   \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         if (_j != NULL && json_object_is_type(_j, json_type_int))                                               \
@@ -103,7 +106,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(member, dst) do {                                                \
+#define JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                                \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         if (_j != NULL && json_object_is_type(_j, json_type_double))                                            \
@@ -122,7 +125,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_SUBOBJECT(member, dst, callback) do { \
+#define JSONC_PARSE_SUBOBJECT(jobj, member, dst, callback) do { \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         if (!callback(_j, dst, error)) {                                                                        \
@@ -135,89 +138,119 @@
 } while(0)
 
 static bool parse_match(json_object *jobj, struct rrd_alert_match *match, BUFFER *error) {
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN("enabled", match->enabled);
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN("template", match->is_template);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, "enabled", match->enabled);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, "template", match->is_template);
 
     STRING *on = NULL;
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("on", on);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "on", on);
     if(match->is_template)
         match->on.context = on;
     else
         match->on.chart = on;
 
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("os", match->os);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("host", match->host);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("instances", match->charts);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("plugin", match->plugin);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("module", match->module);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("host_labels", match->host_labels);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("instance_labels", match->chart_labels);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "os", match->os);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "host", match->host);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "instances", match->charts);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "plugin", match->plugin);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "module", match->module);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "host_labels", match->host_labels);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "instance_labels", match->chart_labels);
 
     return true;
 }
 
 static bool parse_config_value_database_lookup(json_object *jobj, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN("after", config->after);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN("before", config->before);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN("grouping", time_grouping_txt2id, config->group);
-    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN("options", rrdr_options_parse_one, config->options);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("dimensions", config->dimensions);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, "after", config->after);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, "before", config->before);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "grouping", time_grouping_txt2id, config->group);
+    JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, "options", rrdr_options_parse_one, config->options);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "dimensions", config->dimensions);
     return true;
 }
 static bool parse_config_value(json_object *jobj, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_SUBOBJECT("database_lookup", config, parse_config_value_database_lookup);
-    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN("calculation", config->calculation);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("units", config->units);
+    JSONC_PARSE_SUBOBJECT(jobj, "database_lookup", config, parse_config_value_database_lookup);
+    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, "calculation", config->calculation);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "units", config->units);
     return true;
 }
 
 static bool parse_config_conditions(json_object *jobj, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN("green", config->green);
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN("red", config->red);
-    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN("warning_condition", config->warning);
-    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN("critical_condition", config->critical);
+    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, "green", config->green);
+    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, "red", config->red);
+    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, "warning_condition", config->warning);
+    JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, "critical_condition", config->critical);
     return true;
 }
 
 static bool parse_config_action_delay(json_object *jobj, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN("up", config->delay_up_duration);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN("down", config->delay_down_duration);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN("max", config->delay_max_duration);
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN("multiplier", config->delay_multiplier);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, "up", config->delay_up_duration);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, "down", config->delay_down_duration);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, "max", config->delay_max_duration);
+    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, "multiplier", config->delay_multiplier);
     return true;
 }
 static bool parse_config_action_repeat(json_object *jobj, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN("enabled", config->has_custom_repeat_config);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN("warning", config->warn_repeat_every);
-    JSONC_PARSE_INT_OR_ERROR_AND_RETURN("critical", config->crit_repeat_every);
+    JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, "enabled", config->has_custom_repeat_config);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, "warning", config->warn_repeat_every);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, "critical", config->crit_repeat_every);
     return true;
 }
 
 static bool parse_config_action(json_object *jobj, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("execute", config->exec);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("recipient", config->recipient);
-    JSONC_PARSE_SUBOBJECT("delay", config, parse_config_action_delay);
-    JSONC_PARSE_SUBOBJECT("repeat", config, parse_config_action_repeat);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "execute", config->exec);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "recipient", config->recipient);
+    JSONC_PARSE_SUBOBJECT(jobj, "delay", config, parse_config_action_delay);
+    JSONC_PARSE_SUBOBJECT(jobj, "repeat", config, parse_config_action_repeat);
     return true;
 }
 
 static bool parse_config(json_object *jobj, struct rrd_alert_config *config, BUFFER *error) {
-    // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN("source_type", dyncfg_source_type2id, config->source_type);
-    // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("source", config->source);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("summary", config->summary);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("info", config->info);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("type", config->type);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("component", config->component);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN("classification", config->classification);
+    // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "source_type", dyncfg_source_type2id, config->source_type);
+    // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "source", config->source);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "summary", config->summary);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "info", config->info);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "type", config->type);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "component", config->component);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "classification", config->classification);
 
-    JSONC_PARSE_SUBOBJECT("value", config, parse_config_value);
-    JSONC_PARSE_SUBOBJECT("conditions", config, parse_config_conditions);
-    JSONC_PARSE_SUBOBJECT("action", config, parse_config_action);
+    JSONC_PARSE_SUBOBJECT(jobj, "value", config, parse_config_value);
+    JSONC_PARSE_SUBOBJECT(jobj, "conditions", config, parse_config_conditions);
+    JSONC_PARSE_SUBOBJECT(jobj, "action", config, parse_config_action);
 
     return true;
 }
 
-static RRD_ALERT_PROTOTYPE *parse_json_prototype(const char *payload, size_t payload_len, BUFFER *error) {
+static bool parse_prototype(json_object *jobj, RRD_ALERT_PROTOTYPE *base, BUFFER *error) {
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "name", base->config.name);
+
+    json_object *rules;
+    if (json_object_object_get_ex(jobj, "rules", &rules)) {
+        size_t rules_len = json_object_array_length(rules);
+
+        RRD_ALERT_PROTOTYPE *ap = base; // fill the first entry
+        for (size_t i = 0; i < rules_len; i++) {
+            if(!ap) {
+                ap = callocz(1, sizeof(*base));
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base->_internal.next, ap, _internal.prev, _internal.next);
+            }
+
+            json_object *rule = json_object_array_get_idx(rules, i);
+
+            JSONC_PARSE_SUBOBJECT(rule, "match", &ap->match, parse_match);
+            JSONC_PARSE_SUBOBJECT(rule, "config", &ap->config, parse_config);
+
+            ap = NULL; // so that we will create another one, if available
+        }
+    }
+    else {
+        buffer_sprintf(error, "the rules array is missing");
+        return false;
+    }
+
+    return true;
+}
+
+static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, size_t payload_len, BUFFER *error) {
     RRD_ALERT_PROTOTYPE *base = callocz(1, sizeof(*base));
     CLEAN_JSON_OBJECT *jobj = NULL;
 
@@ -236,55 +269,8 @@ static RRD_ALERT_PROTOTYPE *parse_json_prototype(const char *payload, size_t pay
     }
     json_tokener_free(tokener);
 
-    // Parse and set the name
-    json_object *jname;
-    if (json_object_object_get_ex(jobj, "name", &jname))
-        base->config.name = string_strdupz(json_object_get_string(jname));
-
-    if (!base->config.name) {
-        buffer_sprintf(error, "the name of the alert is missing");
+    if(!parse_prototype(jobj, base, error))
         goto cleanup;
-    }
-
-    json_object *rules;
-    if (json_object_object_get_ex(jobj, "rules", &rules)) {
-        size_t rules_len = json_object_array_length(rules);
-
-        RRD_ALERT_PROTOTYPE *ap = base; // fill the first entry
-        for (size_t i = 0; i < rules_len; i++) {
-            if(!ap) {
-                ap = callocz(1, sizeof(*base));
-                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base->_internal.next, ap, _internal.prev, _internal.next);
-            }
-
-            json_object *rule = json_object_array_get_idx(rules, i);
-            json_object *match, *config;
-
-            if (json_object_object_get_ex(rule, "match", &match)) {
-                if(!parse_match(match, &ap->match, error))
-                    goto cleanup;
-            }
-            else {
-                buffer_sprintf(error, "the index %zu of the rules array does not contain a match object", i + 1);
-                goto cleanup;
-            }
-
-            if (json_object_object_get_ex(rule, "config", &config)) {
-                if(!parse_config(config, &ap->config, error))
-                    goto cleanup;
-            }
-            else {
-                buffer_sprintf(error, "the index %zu of the rules array does not contain a config object", i + 1);
-                goto cleanup;
-            }
-
-            ap = NULL; // so that we will create another one, if available
-        }
-    }
-    else {
-        buffer_sprintf(error, "the rules array is missing");
-        goto cleanup;
-    }
 
     return base;
 
@@ -629,7 +615,7 @@ void health_dyncfg_register_all_prototypes(void) {
             CLEAN_BUFFER *parsed = buffer_create(0, NULL);
             CLEAN_BUFFER *error = buffer_create(0, NULL);
             health_prototype_to_json(original, ap, true);
-            RRD_ALERT_PROTOTYPE *t = parse_json_prototype(buffer_tostring(original), buffer_strlen(original), error);
+            RRD_ALERT_PROTOTYPE *t = health_prototype_payload_parse(buffer_tostring(original), buffer_strlen(original), error);
             if(!t)
                 fatal("hey! cannot parse: %s", buffer_tostring(error));
 
