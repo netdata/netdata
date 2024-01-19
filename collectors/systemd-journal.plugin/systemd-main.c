@@ -23,7 +23,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(verify_netdata_host_prefix() == -1) exit(1);
+    if(verify_netdata_host_prefix(true) == -1) exit(1);
 
     // ------------------------------------------------------------------------
     // initialization
