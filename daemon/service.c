@@ -113,7 +113,7 @@ static void svc_rrdset_obsolete_to_free(RRDSET *st) {
 
     worker_is_busy(WORKER_JOB_FREE_CHART);
 
-    rrdcalc_unlink_all_rrdset_alerts(st);
+    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
 
     // has to be run after all dimensions are archived - or use-after-free will occur
     rrdvar_delete_all(st->rrdvars);

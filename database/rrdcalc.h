@@ -214,11 +214,13 @@ static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     return 0;
 }
 
-void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st);
+void rrdcalc_unlink_and_delete_all_rrdset_alerts(RRDSET *st);
 void rrdcalc_delete_all(RRDHOST *host);
 
 void rrdcalc_rrdhost_index_init(RRDHOST *host);
 void rrdcalc_rrdhost_index_destroy(RRDHOST *host);
+
+void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock);
 
 #define RRDCALC_VAR_MAX 100
 #define RRDCALC_VAR_FAMILY "${family}"

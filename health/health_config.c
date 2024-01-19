@@ -482,7 +482,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
 
         if((hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) || (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY))) {
             if(ap) {
-                health_prototype_add(ap);
+                health_prototype_add(ap, false);
                 freez(ap);
             }
 
@@ -667,7 +667,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
     }
 
     if(ap) {
-        health_prototype_add(ap);
+        health_prototype_add(ap, false);
         freez(ap);
     }
 

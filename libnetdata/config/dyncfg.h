@@ -65,7 +65,7 @@ char *dyncfg_escape_id_for_filename(const char *id);
 #include "../buffer/buffer.h"
 #include "../dictionary/dictionary.h"
 
-typedef int (*dyncfg_cb_t)(const char *transaction, const char *id, DYNCFG_CMDS cmd, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *result, const char *source, void *data);
+typedef int (*dyncfg_cb_t)(const char *transaction, const char *id, DYNCFG_CMDS cmd, const char *add_name, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *result, const char *source, void *data);
 
 struct dyncfg_node {
     DYNCFG_TYPE type;

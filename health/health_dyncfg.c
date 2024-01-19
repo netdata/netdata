@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------------------------------------------------
 // parse the json object of an alert definition
 
-#define JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                                  \
+#define JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                            \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_boolean))             \
         dst = json_object_get_boolean(_j);                                                                      \
@@ -17,7 +17,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                            \
+#define JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                      \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
         string_freez(dst);                                                                                      \
@@ -29,7 +29,23 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                        \
+#define JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                     \
+    json_object *_j;                                                                                            \
+    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
+        string_freez(dst);                                                                                      \
+        const char *_v = json_object_get_string(_j);                                                            \
+        if(strcmp(_v, "*") == 0)                                                                                \
+            dst = NULL;                                                                                         \
+        else                                                                                                    \
+            dst = string_strdupz(_v);                                                                           \
+    }                                                                                                           \
+    else {                                                                                                      \
+        buffer_sprintf(error, "missing or invalid type for '%s' string", member);                               \
+        return false;                                                                                           \
+    }                                                                                                           \
+} while(0)
+
+#define JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                  \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
         const char *_t = json_object_get_string(_j);                                                            \
@@ -51,7 +67,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, member, converter, dst) do {                        \
+#define JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, member, converter, dst) do {                  \
     json_object *_jarray;                                                                                       \
     if (json_object_object_get_ex(jobj, member, &_jarray) && json_object_is_type(_jarray, json_type_array)) {   \
         size_t _num_options = json_object_array_length(_jarray);                                                \
@@ -77,7 +93,7 @@
 } while(0)
 
 
-#define JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, member, converter, dst) do {                                   \
+#define JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, member, converter, dst) do {                             \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string))              \
         dst = converter(json_object_get_string(_j));                                                            \
@@ -87,7 +103,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                                   \
+#define JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                             \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         if (_j != NULL && json_object_is_type(_j, json_type_int))                                               \
@@ -106,7 +122,7 @@
     }                                                                                                           \
 } while(0)
 
-#define JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                                \
+#define JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, member, dst) do {                                          \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
         if (_j != NULL && json_object_is_type(_j, json_type_double))                                            \
@@ -148,13 +164,13 @@ static bool parse_match(json_object *jobj, struct rrd_alert_match *match, BUFFER
     else
         match->on.chart = on;
 
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "os", match->os);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "host", match->host);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "instances", match->charts);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "plugin", match->plugin);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "module", match->module);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "host_labels", match->host_labels);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "instance_labels", match->chart_labels);
+    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, "os", match->os);
+    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, "host", match->host);
+    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, "instances", match->charts);
+    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, "plugin", match->plugin);
+    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, "module", match->module);
+    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, "host_labels", match->host_labels);
+    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, "instance_labels", match->chart_labels);
 
     return true;
 }
@@ -231,6 +247,7 @@ static bool parse_prototype(json_object *jobj, RRD_ALERT_PROTOTYPE *base, BUFFER
         for (size_t i = 0; i < rules_len; i++) {
             if(!ap) {
                 ap = callocz(1, sizeof(*base));
+                ap->config.name = string_dup(base->config.name);
                 DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base->_internal.next, ap, _internal.prev, _internal.next);
             }
 
@@ -391,12 +408,63 @@ void health_prototype_to_json(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, bool for_hash
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source) {
+static size_t dyncfg_health_remove_all_rrdcalc_of_prototype(STRING *alert_name) {
+    size_t removed = 0;
+
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host) {
+        RRDCALC *rc;
+        foreach_rrdcalc_in_rrdhost_read(host, rc) {
+            if(rc->config.name != alert_name)
+                continue;
+
+            rrdcalc_unlink_and_delete(host, rc, false);
+            removed++;
+        }
+        foreach_rrdcalc_in_rrdhost_done(rc);
+    }
+    dfe_done(host);
+
+    return removed;
+}
+
+static void dyncfg_health_prototype_reapply(RRD_ALERT_PROTOTYPE *ap) {
+    dyncfg_health_remove_all_rrdcalc_of_prototype(ap->config.name);
+    health_prototype_apply_to_all_hosts(ap);
+}
+
+static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS cmd, const char *add_name, BUFFER *payload, const char *source __maybe_unused) {
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
     switch(cmd) {
-        case DYNCFG_CMD_ADD:
-            code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "add not implemented yet for prototype templates");
-            break;
+        case DYNCFG_CMD_ADD: {
+            CLEAN_BUFFER *error = buffer_create(0, NULL);
+            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error);
+            if(!nap)
+                code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
+            else if(string_strcmp(nap->config.name, add_name) != 0) {
+                code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "the name of the alert in the payload does not match the name of alert trying to add");
+                health_prototype_free(nap);
+            }
+            else {
+                bool added = health_prototype_add(nap, true); // this swaps ap <-> nap
+                health_prototype_free(nap);
+
+                if(!added)
+                    return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "required attributes are missing");
+
+                const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(health_globals.prototypes.dict, add_name);
+                if(!item)
+                    return dyncfg_default_response(result, HTTP_RESP_INTERNAL_SERVER_ERROR, "added prototype is not found");
+
+                RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
+
+                dyncfg_health_prototype_reapply(ap);
+                dictionary_acquired_item_release(health_globals.prototypes.dict, item);
+
+                code = dyncfg_default_response(result, HTTP_RESP_OK, "updated");
+            }
+        }
+        break;
 
         case DYNCFG_CMD_SCHEMA:
             code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "schema not implemented yet for prototype templates");
@@ -420,105 +488,84 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
     return code;
 }
 
-static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source, const char *alert_name) {
-    int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
-    switch(cmd) {
-        case DYNCFG_CMD_ADD:
-            code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "add not implemented yet");
-            break;
+static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source __maybe_unused, const char *alert_name) {
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(health_globals.prototypes.dict, alert_name);
+    if(!item)
+        return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "no alert prototype is available by the name given");
 
+    RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
+
+    int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+
+    switch(cmd) {
         case DYNCFG_CMD_SCHEMA:
             code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "schema not implemented yet");
             break;
 
         case DYNCFG_CMD_GET:
-        {
-            const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(health_globals.prototypes.dict, alert_name);
-            if(!item)
-                return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "no alert prototype is available by the name given");
-
-            RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
             health_prototype_to_json(result, ap, false);
-            dictionary_acquired_item_release(health_globals.prototypes.dict, item);
-            code = HTTP_RESP_OK;
-        }
-        break;
+            break;
 
-        case DYNCFG_CMD_REMOVE:
-        case DYNCFG_CMD_RESTART:
         case DYNCFG_CMD_DISABLE:
+            if(ap->match.enabled) {
+                ap->match.enabled = false;
+                dyncfg_health_prototype_reapply(ap);
+                dyncfg_status(localhost, alert_name, DYNCFG_STATUS_DISABLED);
+            }
+            else
+                code = dyncfg_default_response(result, HTTP_RESP_OK, "already disabled");
+            break;
+
         case DYNCFG_CMD_ENABLE:
-        case DYNCFG_CMD_UPDATE:
-        case DYNCFG_CMD_TEST:
-            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "action given is not supported for the prototype template");
-            break;
-
-        case DYNCFG_CMD_NONE:
-            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "invalid action received");
-            break;
-    }
-
-    return code;
-}
-
-static int dyncfg_health_rrdcalc_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source, const char *hostname, const char *alert_name) {
-    // find the host
-
-    RRDHOST *host = rrdhost_find_by_hostname(hostname);
-    if(!host)
-        return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "the hostname given is not found");
-
-    // find the alert
-
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(host->rrdcalc_root_index, alert_name);
-    if(!item)
-        return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "the alert instance given is not found");
-
-    int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
-
-    RRDCALC *rc = dictionary_acquired_item_value(item);
-
-    switch(cmd) {
-        case DYNCFG_CMD_NONE:
-        case DYNCFG_CMD_ADD:
-        case DYNCFG_CMD_RESTART:
-            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "invalid action received");
-            break;
-
-        case DYNCFG_CMD_REMOVE:
-            if(rc->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG)
-                code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "remove action is not supported for not dynamically configured alerts, use disable");
+            if(ap->match.enabled)
+                code = dyncfg_default_response(result, HTTP_RESP_OK, "already enabled");
             else {
-                dictionary_del(host->rrdcalc_root_index, alert_name);
-                code = dyncfg_default_response(result, HTTP_RESP_OK, "alert removed");
+                ap->match.enabled = true;
+                dyncfg_health_prototype_reapply(ap);
+                dyncfg_status(localhost, alert_name, DYNCFG_STATUS_ACCEPTED);
             }
             break;
 
-        case DYNCFG_CMD_DISABLE:
-        case DYNCFG_CMD_ENABLE:
-        case DYNCFG_CMD_UPDATE:
-        case DYNCFG_CMD_TEST:
-        case DYNCFG_CMD_SCHEMA:
-            code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "action not implemented yet");
+        case DYNCFG_CMD_UPDATE: {
+                CLEAN_BUFFER *error = buffer_create(0, NULL);
+                RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error);
+                if(!nap)
+                    code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
+                else if(ap->config.name != nap->config.name) {
+                    code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "name cannot be changed, add a new alert and remove the old one");
+                    health_prototype_free(nap);
+                }
+                else {
+                    health_prototype_add(nap, true); // this swaps ap <-> nap
+                    health_prototype_free(nap);
+                    dyncfg_health_prototype_reapply(ap);
+                    code = dyncfg_default_response(result, HTTP_RESP_OK, "updated");
+                }
+            }
             break;
 
-        case DYNCFG_CMD_GET:
-        {
-            RRD_ALERT_PROTOTYPE ap = { 0 };
-            ap.match = rc->match;
-            ap.config = rc->config;
-            health_prototype_to_json(result, &ap, false);
-            code = HTTP_RESP_OK;
-        }
-        break;
+        case DYNCFG_CMD_REMOVE:
+            dyncfg_health_remove_all_rrdcalc_of_prototype(ap->config.name);
+            dictionary_del(health_globals.prototypes.dict, dictionary_acquired_item_name(item));
+            code = dyncfg_default_response(result, HTTP_RESP_OK, "deleted");
+            break;
+
+        case DYNCFG_CMD_TEST:
+        case DYNCFG_CMD_ADD:
+        case DYNCFG_CMD_RESTART:
+            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "action given is not supported for the prototype job");
+            break;
+
+        case DYNCFG_CMD_NONE:
+            code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "invalid action received");
+            break;
     }
 
-    dictionary_acquired_item_release(host->rrdcalc_root_index, item);
-
+    dictionary_acquired_item_release(health_globals.prototypes.dict, item);
     return code;
 }
 
-int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYNCFG_CMDS cmd,
+int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYNCFG_CMDS cmd, const char *add_name,
                      BUFFER *payload, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                      BUFFER *result, const char *source, void *data __maybe_unused) {
 
@@ -539,38 +586,20 @@ int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYN
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "second component of id is not 'alert'");
 
     char *type_prefix = get_word(words, num_words, i++);
-    if(type_prefix && *type_prefix && strcmp(type_prefix, "prototype") == 0) {
-        char *alert_name = get_word(words, num_words, i++);
-        if(!alert_name || !*alert_name) {
-            // action on the prototype template
+    if(!type_prefix || !*type_prefix || strcmp(type_prefix, "prototype") != 0)
+        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "third component of id is not 'prototype'");
 
-            code = dyncfg_health_prototype_template_action(result, cmd, payload, source);
-        }
-        else {
-            // action on a specific alert prototype
+    char *alert_name = get_word(words, num_words, i++);
+    if(!alert_name || !*alert_name) {
+        // action on the prototype template
 
-            code = dyncfg_health_prototype_action(result, cmd, payload, source, alert_name);
-        }
+        code = dyncfg_health_prototype_template_action(result, cmd, add_name, payload, source);
     }
-    else if(type_prefix && *type_prefix && strncmp(type_prefix, "node[", 5) == 0) {
-        // action on a specific alert instance
+    else {
+        // action on a specific alert prototype
 
-        char *hostname = &type_prefix[5];
-        if(*hostname)
-            hostname[strlen(hostname) - 1] = '\0'; // remove the ']'
-
-        if(!*hostname)
-            return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "no hostname name found in the id");
-
-        char *alert_name = get_word(words, num_words, i++);
-        if(!alert_name || !*alert_name)
-            return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "no alert name found in the id");
-
-        code = dyncfg_health_rrdcalc_action(result, cmd, payload, source, hostname, alert_name);
+        code = dyncfg_health_prototype_action(result, cmd, payload, source, alert_name);
     }
-    else
-        return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "third component of id is not 'prototype' or 'node'");
-
     return code;
 }
 

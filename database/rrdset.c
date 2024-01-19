@@ -338,7 +338,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // release the collector info
     dictionary_destroy(st->functions_view);
 
-    rrdcalc_unlink_all_rrdset_alerts(st);
+    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
 
     // ------------------------------------------------------------------------
     // the order of destruction is important here

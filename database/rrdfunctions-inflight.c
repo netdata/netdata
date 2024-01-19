@@ -414,7 +414,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 
         return code;
     }
-    
+
     // ------------------------------------------------------------------------
     // find the function
 

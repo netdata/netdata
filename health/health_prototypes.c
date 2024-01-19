@@ -35,14 +35,31 @@ void health_prototype_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     spinlock_init(&ap->_internal.spinlock);
 }
 
-bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
+    bool replace = data ? *(bool *)data : false;
     RRD_ALERT_PROTOTYPE *ap = old_value;
-    RRD_ALERT_PROTOTYPE *nap = callocz(1, sizeof(*nap));
-    memcpy(nap, new_value, sizeof(*nap));
 
-    spinlock_lock(&ap->_internal.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, nap, _internal.prev, _internal.next);
-    spinlock_unlock(&ap->_internal.spinlock);
+    if(!replace) {
+        // alerts with the same name are appended to the existing one
+        RRD_ALERT_PROTOTYPE *nap = callocz(1, sizeof(*nap));
+        memcpy(nap, new_value, sizeof(*nap));
+
+        spinlock_lock(&ap->_internal.spinlock);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, nap, _internal.prev, _internal.next);
+        spinlock_unlock(&ap->_internal.spinlock);
+    }
+    else {
+        // alerts with the same name replace the existing one
+        RRD_ALERT_PROTOTYPE *nap = new_value;
+        spinlock_init(&nap->_internal.spinlock);
+        nap->_internal.uses = ap->_internal.uses;
+
+        spinlock_lock(&nap->_internal.spinlock);
+        spinlock_lock(&ap->_internal.spinlock);
+        SWAP(*ap, *nap);
+        spinlock_unlock(&ap->_internal.spinlock);
+        spinlock_unlock(&nap->_internal.spinlock);
+    }
 
     return true;
 }
@@ -174,8 +191,16 @@ static void health_prototype_activate_match_patterns(struct rrd_alert_match *am)
     }
 }
 
-bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
+void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
+    CLEAN_BUFFER *wb = buffer_create(100, NULL);
+    health_prototype_to_json(wb, ap, true);
+    UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
+    uuid_copy(ap->config.hash_id, uuid.uuid);
 
+    (void) sql_alert_store_config(ap);
+}
+
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, bool replace) {
     if(!ap->match.is_template) {
         if(!ap->match.on.chart) {
             netdata_log_error(
@@ -208,25 +233,41 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
     }
 
     // generate the hash id
-    CLEAN_BUFFER *wb = buffer_create(100, NULL);
-    health_prototype_to_json(wb, ap, true);
-    UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
-    uuid_copy(ap->config.hash_id, uuid.uuid);
-
-    // store it in SQL
-    (void) sql_alert_store_config(ap);
+    health_prototype_hash_id(ap);
 
     // activate the match patterns in it
-    health_prototype_activate_match_patterns(&ap->match);
+    for(RRD_ALERT_PROTOTYPE *t = ap; t ;t = t->_internal.next) {
+        // we need to generate config_hash_id for each instance included
+        // so, let's break the linked list for this iteration
 
-    if(!ap->config.exec)
-        ap->config.exec = string_dup(health_globals.config.default_exec);
+        RRD_ALERT_PROTOTYPE *prev = t->_internal.prev;
+        RRD_ALERT_PROTOTYPE *next = t->_internal.next;
+        t->_internal.prev = t;
+        t->_internal.next = NULL;
 
-    if(!ap->config.recipient)
-        ap->config.recipient = string_dup(health_globals.config.default_recipient);
+        if(!t->config.name)
+            t->config.name = string_dup(ap->config.name);
+
+        health_prototype_hash_id(t);
+
+        health_prototype_activate_match_patterns(&t->match);
+
+        if (!t->config.exec)
+            t->config.exec = string_dup(health_globals.config.default_exec);
+
+        if (!t->config.recipient)
+            t->config.recipient = string_dup(health_globals.config.default_recipient);
+
+        // restore the linked list
+        t->_internal.prev = prev;
+        t->_internal.next = next;
+    }
 
     // add it to the prototypes
-    dictionary_set(health_globals.prototypes.dict, string2str(ap->config.name), ap, sizeof(*ap));
+    dictionary_set_advanced(health_globals.prototypes.dict,
+                            string2str(ap->config.name), string_strlen(ap->config.name),
+                            ap, sizeof(*ap),
+                            &replace);
 
     return true;
 }
@@ -373,34 +414,56 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
     dst->crit_repeat_every = src->crit_repeat_every;
 }
 
-void health_prototype_alerts_for_rrdset_incrementally(RRDSET *st) {
-    RRDHOST *host = st->rrdhost;
+static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
+    spinlock_lock(&ap->_internal.spinlock);
+    for(RRD_ALERT_PROTOTYPE *t = ap; t ; t = t->_internal.next) {
+        if(!t->match.enabled)
+            continue;
 
+        if(!prototype_matches_host(st->rrdhost, t))
+            continue;
+
+        if(!prototype_matches_rrdset(st, t))
+            continue;
+
+        if(rrdcalc_add_from_prototype(st->rrdhost, st, ap))
+            ap->_internal.uses++;
+    }
+    spinlock_unlock(&ap->_internal.spinlock);
+}
+
+void health_prototype_alerts_for_rrdset_incrementally(RRDSET *st) {
     RRD_ALERT_PROTOTYPE *ap;
     dfe_start_read(health_globals.prototypes.dict, ap) {
-        RRD_ALERT_PROTOTYPE *t;
-
-        spinlock_lock(&ap->_internal.spinlock);
-        for(t = ap; t ; t = t->_internal.next) {
-            if(!t->match.enabled)
-                continue;
-
-            if(!prototype_matches_host(host, t))
-                continue;
-
-            if(!prototype_matches_rrdset(st, t))
-                continue;
-
-            rrdcalc_add_from_prototype(host, st, ap);
-        }
-        spinlock_unlock(&ap->_internal.spinlock);
+        health_prototype_apply_to_rrdset(st, ap);
     }
     dfe_done(ap);
 }
 
 void health_prototype_reset_alerts_for_rrdset(RRDSET *st) {
-    rrdcalc_unlink_all_rrdset_alerts(st);
+    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
     health_prototype_alerts_for_rrdset_incrementally(st);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
+void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
+    if(unlikely(!host->health.health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
+        return;
+
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        health_prototype_apply_to_rrdset(st, ap);
+    }
+    rrdset_foreach_done(st);
+}
+
+void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap) {
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host){
+        health_apply_prototype_to_host(host, ap);
+    }
+    dfe_done(host);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -421,12 +484,9 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
     }
     rw_spinlock_read_unlock(&host->health_log.spinlock);
 
-    // reset all thresholds to all charts
+    // apply all the prototypes for the charts of the host
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        st->green = NAN;
-        st->red = NAN;
-
         health_prototype_reset_alerts_for_rrdset(st);
     }
     rrdset_foreach_done(st);

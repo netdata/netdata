@@ -248,7 +248,7 @@ bool dyncfg_job_has_registered_template(const char *id) {
     return ret;
 }
 
-static void dyncfg_link_all_jobs_to_host(RRDHOST *host, DYNCFG *df_template) {
+static void dyncfg_link_all_jobs_to_host(RRDHOST *host) {
     DYNCFG *df;
     dfe_start_read(dyncfg_globals.nodes, df) {
         if(!df->host && df->type == DYNCFG_TYPE_JOB) {
@@ -318,7 +318,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
     DYNCFG *df = dictionary_acquired_item_value(item);
 
     if(df->type == DYNCFG_TYPE_TEMPLATE)
-        dyncfg_link_all_jobs_to_host(host, df);
+        dyncfg_link_all_jobs_to_host(host);
 
 //    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)
 //        nd_log(NDLS_DAEMON, NDLP_WARNING, "DYNCFG: configuration '%s' is created with source type dyncfg, but we don't have a saved configuration for it", id);
@@ -337,7 +337,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         dyncfg_function_intercept_cb,
         NULL);
 
-    DYNCFG_CMDS status_to_send_to_plugin = df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
+    DYNCFG_CMDS status_to_send_to_plugin = (df->user_disabled || df->status == DYNCFG_STATUS_DISABLED) ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
     if(status_to_send_to_plugin == DYNCFG_CMD_ENABLE && dyncfg_is_user_disabled(string2str(df->template)))
         status_to_send_to_plugin = DYNCFG_CMD_DISABLE;
 

@@ -457,7 +457,7 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
     return ret;
 }
 
-static void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock) {
+void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock) {
     if(rc->rrdset)
         rrdcalc_unlink_from_rrdset(rc, having_ll_wrlock);
 
@@ -468,7 +468,7 @@ static void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll
 // ----------------------------------------------------------------------------
 // RRDCALC cleanup API functions
 
-void rrdcalc_unlink_all_rrdset_alerts(RRDSET *st) {
+void rrdcalc_unlink_and_delete_all_rrdset_alerts(RRDSET *st) {
     RRDCALC *rc, *last = NULL;
     rw_spinlock_write_lock(&st->alerts.spinlock);
     while((rc = st->alerts.base)) {

@@ -55,7 +55,7 @@ typedef struct rrd_alert_prototype {
         struct rrd_alert_prototype *prev, *next;
     } _internal;
 } RRD_ALERT_PROTOTYPE;
-bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap);
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, bool replace);
 void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_free(RRD_ALERT_PROTOTYPE *ap);
 
@@ -101,7 +101,7 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae);
 
 bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *ap);
 
-int dyncfg_health_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd,
+int dyncfg_health_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd, const char *add_name,
                      BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled,
                      BUFFER *result, const char *source, void *data);
 
@@ -117,5 +117,8 @@ void alerts_raised_summary_populate(struct health_raised_summary *hrm);
 void alerts_raised_summary_free(struct health_raised_summary *hrm);
 void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm);
 void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm);
+
+void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap);
+void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap);
 
 #endif //NETDATA_HEALTH_INTERNALS_H
