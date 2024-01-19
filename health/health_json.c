@@ -129,7 +129,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                         "\t\t\t\"lookup_options\": \"",
                        (unsigned long) rc->db_after,
                        (unsigned long) rc->db_before,
-                       time_grouping_method2string(rc->config.group),
+            time_grouping_id2txt(rc->config.group),
                        rc->config.after,
                        rc->config.before
         );

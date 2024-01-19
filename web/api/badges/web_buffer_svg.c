@@ -926,7 +926,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "options")) {
-            options |= web_client_api_request_v1_data_options(value);
+            options |= rrdr_options_parse(value);
         }
         else if(!strcmp(name, "label")) label = value;
         else if(!strcmp(name, "units")) units = value;

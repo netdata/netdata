@@ -4,9 +4,30 @@
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-static void health_prototype_free_unsafe(RRD_ALERT_PROTOTYPE *ap) {
+static void health_prototype_cleanup_one_unsafe(RRD_ALERT_PROTOTYPE *ap) {
     rrd_alert_match_free(&ap->match);
     rrd_alert_config_free(&ap->config);
+}
+
+void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap) {
+    spinlock_lock(&ap->_internal.spinlock);
+
+    while(ap->_internal.next) {
+        RRD_ALERT_PROTOTYPE *t = ap->_internal.next;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ap->_internal.next, t, _internal.prev, _internal.next);
+        health_prototype_cleanup_one_unsafe(t);
+        freez(t);
+    }
+
+    spinlock_unlock(&ap->_internal.spinlock);
+
+    health_prototype_cleanup_one_unsafe(ap);
+}
+
+void health_prototype_free(RRD_ALERT_PROTOTYPE *ap) {
+    if(!ap) return;
+    health_prototype_cleanup(ap);
+    freez(ap);
 }
 
 void health_prototype_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -28,18 +49,7 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
 
 void health_prototype_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     RRD_ALERT_PROTOTYPE *ap = value;
-    spinlock_lock(&ap->_internal.spinlock);
-
-    while(ap->_internal.next) {
-        RRD_ALERT_PROTOTYPE *t = ap->_internal.next;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ap->_internal.next, t, _internal.prev, _internal.next);
-        health_prototype_free_unsafe(t);
-        freez(t);
-    }
-
-    spinlock_unlock(&ap->_internal.spinlock);
-
-    health_prototype_free_unsafe(ap);
+    health_prototype_cleanup(ap);
 }
 
 void health_init_prototypes(void) {

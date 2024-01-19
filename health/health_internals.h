@@ -56,6 +56,8 @@ typedef struct rrd_alert_prototype {
     } _internal;
 } RRD_ALERT_PROTOTYPE;
 bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap);
+void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap);
+void health_prototype_free(RRD_ALERT_PROTOTYPE *ap);
 
 struct health_plugin_globals {
     struct {

@@ -1111,7 +1111,7 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    if (ap->config.options == RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
+    if (ap->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
         rc = sqlite3_bind_text(res, ++param, "no-clear-notification", -1, SQLITE_STATIC);
     else
         rc = sqlite3_bind_null(res, ++param);
@@ -1132,7 +1132,7 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
-        rc = sqlite3_bind_text(res, ++param, time_grouping_method2string(ap->config.group), -1, SQLITE_STATIC);
+        rc = sqlite3_bind_text(res, ++param, time_grouping_id2txt(ap->config.group), -1, SQLITE_STATIC);
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 

@@ -887,7 +887,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_time_t(wb, "after", r->view.after);
     buffer_json_member_add_time_t(wb, "before", r->view.before);
     buffer_json_member_add_string(wb, "group", time_grouping_tostring(qt->request.time_group_method));
-    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
+    rrdr_options_to_buffer_json_array(wb, "options", options);
 
     if(!rrdr_dimension_names(wb, "dimension_names", r, options))
         rows = 0;
@@ -1299,7 +1299,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         buffer_json_member_add_object(wb, "request");
         {
             buffer_json_member_add_string(wb, "format", rrdr_format_to_string(qt->request.format));
-            web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", qt->request.options);
+            rrdr_options_to_buffer_json_array(wb, "options", qt->request.options);
 
             buffer_json_member_add_object(wb, "scope");
             buffer_json_member_add_string(wb, "scope_nodes", qt->request.scope_nodes);
@@ -1538,7 +1538,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
 
         if(options & RRDR_OPTION_DEBUG) {
             buffer_json_member_add_string(wb, "format", rrdr_format_to_string(format));
-            web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
+            rrdr_options_to_buffer_json_array(wb, "options", options);
             buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(qt->request.time_group_method));
         }
 

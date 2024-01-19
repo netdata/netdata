@@ -165,7 +165,7 @@ static inline int isvariableterm(const char s) {
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
         RRDR_TIME_GROUPING *group_method, int *after, int *before, int *every,
-        RRDCALC_OPTIONS *options, STRING **dimensions
+        RRDR_OPTIONS *options, STRING **dimensions
 ) {
     netdata_log_debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
 

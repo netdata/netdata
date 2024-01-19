@@ -38,14 +38,6 @@ typedef enum {
 } RRDCALC_FLAGS;
 void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flags);
 
-typedef enum {
-    // This list uses several other options from RRDR_OPTIONS for db lookups.
-    // To add an item here, you need to reserve a bit in RRDR_OPTIONS.
-    RRDCALC_OPTION_NO_CLEAR_NOTIFICATION    = RRDR_OPTION_HEALTH_RSRVD1,
-} RRDCALC_OPTIONS;
-
-void web_client_api_request_v1_rrdcalc_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDCALC_OPTIONS options);
-
 #define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
 
 struct rrd_alert_match {
@@ -106,7 +98,7 @@ struct rrd_alert_config {
     RRDR_TIME_GROUPING group;       // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
-    RRDCALC_OPTIONS options;        // configuration options
+    RRDR_OPTIONS options;           // configuration options
 
     // ------------------------------------------------------------------------
     // expressions related to the alarm

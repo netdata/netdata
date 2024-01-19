@@ -1252,7 +1252,7 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
                     buffer_json_member_add_time_t(wb, "before", t->value.db.before);
                     buffer_json_member_add_string(wb, "method", t->value.db.method);
                     buffer_json_member_add_string(wb, "dimensions", t->value.db.dimensions);
-                    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options",(RRDR_OPTIONS) t->value.db.options);
+                    rrdr_options_to_buffer_json_array(wb, "options", (RRDR_OPTIONS)t->value.db.options);
                 }
                 buffer_json_object_close(wb); // db
             }

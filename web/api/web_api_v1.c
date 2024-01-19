@@ -8,7 +8,7 @@ static struct {
     const char *name;
     uint32_t hash;
     RRDR_OPTIONS value;
-} api_v1_data_options[] = {
+} rrdr_options[] = {
         {  "nonzero"           , 0    , RRDR_OPTION_NONZERO}
         , {"flip"              , 0    , RRDR_OPTION_REVERSED}
         , {"reversed"          , 0    , RRDR_OPTION_REVERSED}
@@ -47,6 +47,7 @@ static struct {
         , {"minify"            , 0    , RRDR_OPTION_MINIFY}
         , {"group-by-labels"   , 0    , RRDR_OPTION_GROUP_BY_LABELS}
         , {"label-quotes"      , 0    , RRDR_OPTION_LABEL_QUOTES}
+        , { "no_clear_notification", 0, RRDCALC_OPTION_NO_CLEAR_NOTIFICATION}
         , {NULL                , 0    , 0}
 };
 
@@ -125,8 +126,8 @@ void web_client_api_v1_init(void) {
     for(i = 0; contexts_v2_alert_status[i].name ; i++)
         contexts_v2_alert_status[i].hash = simple_hash(contexts_v2_alert_status[i].name);
 
-    for(i = 0; api_v1_data_options[i].name ; i++)
-        api_v1_data_options[i].hash = simple_hash(api_v1_data_options[i].name);
+    for(i = 0; rrdr_options[i].name ; i++)
+        rrdr_options[i].hash = simple_hash(rrdr_options[i].name);
 
     for(i = 0; contexts_v2_options[i].name ; i++)
         contexts_v2_options[i].hash = simple_hash(contexts_v2_options[i].name);
@@ -211,21 +212,30 @@ void web_client_api_v1_management_init(void) {
 	api_secret = get_mgmt_api_key();
 }
 
-inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
+inline RRDR_OPTIONS rrdr_options_parse_one(const char *o) {
+    RRDR_OPTIONS ret = 0;
+
+    if(!o || !*o) return ret;
+
+    uint32_t hash = simple_hash(o);
+    int i;
+    for(i = 0; rrdr_options[i].name ; i++) {
+        if (unlikely(hash == rrdr_options[i].hash && !strcmp(o, rrdr_options[i].name))) {
+            ret |= rrdr_options[i].value;
+            break;
+        }
+    }
+
+    return ret;
+}
+
+inline RRDR_OPTIONS rrdr_options_parse(char *o) {
     RRDR_OPTIONS ret = 0;
     char *tok;
 
     while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
         if(!*tok) continue;
-
-        uint32_t hash = simple_hash(tok);
-        int i;
-        for(i = 0; api_v1_data_options[i].name ; i++) {
-            if (unlikely(hash == api_v1_data_options[i].hash && !strcmp(tok, api_v1_data_options[i].name))) {
-                ret |= api_v1_data_options[i].value;
-                break;
-            }
-        }
+        ret |= rrdr_options_parse_one(tok);
     }
 
     return ret;
@@ -303,37 +313,18 @@ void web_client_api_request_v2_contexts_options_to_buffer_json_array(BUFFER *wb,
     buffer_json_array_close(wb);
 }
 
-void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options) {
+void rrdr_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options) {
     buffer_json_member_add_array(wb, key);
 
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
-    for(int i = 0; api_v1_data_options[i].name ; i++) {
-        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
-            const char *name = api_v1_data_options[i].name;
-            used |= api_v1_data_options[i].value;
+    for(int i = 0; rrdr_options[i].name ; i++) {
+        if (unlikely((rrdr_options[i].value & options) && !(rrdr_options[i].value & used))) {
+            const char *name = rrdr_options[i].name;
+            used |= rrdr_options[i].value;
 
             buffer_json_add_array_item_string(wb, name);
         }
     }
-
-    buffer_json_array_close(wb);
-}
-
-void web_client_api_request_v1_rrdcalc_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDCALC_OPTIONS options) {
-    buffer_json_member_add_array(wb, key);
-
-    RRDR_OPTIONS used = 0; // to prevent adding duplicates
-    for(int i = 0; api_v1_data_options[i].name ; i++) {
-        if (unlikely((api_v1_data_options[i].value & (RRDR_OPTIONS)options) && !(api_v1_data_options[i].value & used))) {
-            const char *name = api_v1_data_options[i].name;
-            used |= api_v1_data_options[i].value;
-
-            buffer_json_add_array_item_string(wb, name);
-        }
-    }
-
-    if(options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
-        buffer_json_add_array_item_string(wb, "no_clear_notification");
 
     buffer_json_array_close(wb);
 }
@@ -344,10 +335,10 @@ void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RR
 
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
     int added = 0;
-    for(int i = 0; api_v1_data_options[i].name ; i++) {
-        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
-            const char *name = api_v1_data_options[i].name;
-            used |= api_v1_data_options[i].value;
+    for(int i = 0; rrdr_options[i].name ; i++) {
+        if (unlikely((rrdr_options[i].value & options) && !(rrdr_options[i].value & used))) {
+            const char *name = rrdr_options[i].name;
+            used |= rrdr_options[i].value;
 
             if(added && write < end)
                 *write++ = ',';
@@ -788,7 +779,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             format = web_client_api_request_v1_data_format(value);
         }
         else if(!strcmp(name, "options")) {
-            options |= web_client_api_request_v1_data_options(value);
+            options |= rrdr_options_parse(value);
         }
         else if(!strcmp(name, "callback")) {
             responseHandler = value;
