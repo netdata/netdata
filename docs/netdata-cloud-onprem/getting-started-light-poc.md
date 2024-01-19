@@ -13,7 +13,7 @@ To install the whole environment, log in to the designated host and run:
 ```shell
 curl https://netdata-cloud-netdata-static-content.s3.amazonaws.com/provision.sh -o provision.sh
 chmod +x provision.sh
-sudo ./provision.sh --install \
+sudo ./provision.sh install \
       -key-id "" \
       -access-key "" \
       -onprem-license-key "" \
@@ -49,11 +49,11 @@ Because this is a PoC with 0 configurations required, only log in by mail can wo
 4. You are now logged into the netdata. Add your first nodes!
 
 ##### How to remove Netdata Cloud On-Prem PoC?
-To uninstall the whole PoC, use the same script that installed it, with the `--uninstall` switch.
+To uninstall the whole PoC, use the same script that installed it, with the `uninstall` switch.
 
 ```shell
 cd <script dir>
-sudo ./provision.sh --uninstall
+sudo ./provision.sh uninstall
 ```
 
 #### WARNING
