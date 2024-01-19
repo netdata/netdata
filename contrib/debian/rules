@@ -41,10 +41,15 @@ ifeq ($(ENABLE_SENTRY),true)
     BUILDING_ENVIRONMENT ?= Unknown
     VERSION ?= Unknown
     BUILD_DESTINATION ?= Unknown
-    SENTRY_CONFIG := -DENABLE_SENTRY=On -DNETDATA_SENTRY_ENVIRONMENT=$(BUILDING_ENVIRONMENT) -DNETDATA_SENTRY_RELEASE=$(VERSION) -DNETDATA_SENTRY_DIST=$(BUILD_DESTINATION)
+    SENTRY_CONFIG := -DENABLE_SENTRY=On \
+        -DNETDATA_SENTRY_ENVIRONMENT=$(BUILDING_ENVIRONMENT) \
+        -DNETDATA_SENTRY_RELEASE=$(VERSION) \
+        -DNETDATA_SENTRY_DIST=$(BUILD_DESTINATION) \
+        -DNETDATA_SENTRY_DSN=$(SENTRY_DSN)
 else
     SENTRY_CONFIG := -DENABLE_SENTRY=Off
 endif
+
 
 %:
 	dh $@ --builddirectory=$(BUILDDIR)
@@ -93,6 +98,9 @@ override_dh_auto_test:
 	true
 
 override_dh_strip:
+	if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then
+		sentry-cli debug-files upload -o netdata-inc -p netdata-agent ${TOP}/usr/sbin/netdata
+	fi
 	dh_strip
 
 override_dh_install:

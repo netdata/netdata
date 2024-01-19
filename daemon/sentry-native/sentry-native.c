@@ -8,7 +8,7 @@ void sentry_native_init(void)
     sentry_options_t *options = sentry_options_new();
 
     // we should get this from CI (SENTRY_DSN)
-    sentry_options_set_dsn(options, "https://4c37747b97164e9bbfc9fa426e9200b4@o382276.ingest.sentry.io/4505069981401088");
+    sentry_options_set_dsn(options, NETDATA_SENTRY_DSN);
 
     // where to save sentry files
     char path[FILENAME_MAX];

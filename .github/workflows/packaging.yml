@@ -209,19 +209,19 @@ jobs:
         id: set-telemetry-env-vars
         run: |
           if [[ "${{ github.repository }}" == 'netdata/netdata' ]] && [[ "${{ matrix.bundle_sentry }}" == true ]]; then
-            if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]] || [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/sentry-upload') }}" == "true" ]]; then
-              echo "BUILDING_ENVIRONMENT=Production" >> $GITHUB_ENV
-              echo "UPLOAD_SENTRY=true" >> $GITHUB_ENV
-            elif [[ "${{ github.event_name }}" == "pull_request" ]] && [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/sentry-upload') }}" == "true" ]]; then
-              echo "BUILDING_ENVIRONMENT=Development-CI" >> $GITHUB_ENV
-              echo "UPLOAD_SENTRY=true" >> $GITHUB_ENV
-            else
-              echo "BUILDING_ENVIRONMENT=Development" >> $GITHUB_ENV
-              echo "UPLOAD_SENTRY=false" >> $GITHUB_ENV
-            fi
+              if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]; then
+                  echo "BUILDING_ENVIRONMENT=Production" >> $GITHUB_ENV
+                  echo "UPLOAD_SENTRY=true" >> $GITHUB_ENV
+              elif [[ "${{ github.event_name }}" == "pull_request" ]] && [[ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/sentry-upload') }}" == "true" ]]; then
+                  echo "BUILDING_ENVIRONMENT=Development-CI" >> $GITHUB_ENV
+                  echo "UPLOAD_SENTRY=true" >> $GITHUB_ENV
+              else
+                  echo "BUILDING_ENVIRONMENT=Development" >> $GITHUB_ENV
+                  echo "UPLOAD_SENTRY=false" >> $GITHUB_ENV
+              fi
           else
-            echo "BUILDING_ENVIRONMENT=Unknown" >> $GITHUB_ENV
-            echo "UPLOAD_SENTRY=false" >> $GITHUB_ENV
+              echo "BUILDING_ENVIRONMENT=Unknown" >> $GITHUB_ENV
+              echo "UPLOAD_SENTRY=false" >> $GITHUB_ENV
           fi
       - name: Setup QEMU
         id: qemu
@@ -252,7 +252,8 @@ jobs:
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
                     -e ENABLE_SENTRY=${{ matrix.bundle_sentry }} -e BUILDING_ENVIRONMENT=${{ env.BUILDING_ENVIRONMENT }} \
-                    -e SENTRY_AUTH_TOKEN=${{secrets.SENTRY_API}} -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.platform }} \
+                    -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.arch }} -e UPLOAD_SENTRY=${{ env.UPLOAD_SENTRY }} \
+                    -e SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_CLI_TOKEN }} -e SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-v1
       - name: Save Packages
         id: artifacts
