@@ -84,6 +84,7 @@ struct rrd_alert_config {
     STRING *units;                  // the units of the alarm
     STRING *summary;                // a short alert summary
     STRING *info;                   // a description of the alarm
+    STRING *lookup;                 // the lookup field
 
     int update_every;               // update frequency for the alarm
 

@@ -2,9 +2,6 @@
 
 #include "health_internals.h"
 
-#define ACTIVE_ALARMS_LIST_EXAMINE 500
-#define ACTIVE_ALARMS_LIST 15
-
 // the queue of executed alarm notifications that haven't been waited for yet
 static struct {
     ALARM_ENTRY *head; // oldest

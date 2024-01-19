@@ -960,7 +960,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
     "@p_db_lookup_dimensions,@p_db_lookup_method,@p_db_lookup_options,@p_db_lookup_after,"                              \
     "@p_db_lookup_before,@p_update_every,@source,@chart_labels,@summary)"
 
-int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
+int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc, param = 0;
@@ -1028,8 +1028,7 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, NULL, ++param);
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->lookup, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.lookup, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1115,7 +1114,6 @@ int sql_store_alert_config_hash(RRD_ALERT_PROTOTYPE *ap)
         rc = sqlite3_bind_text(res, ++param, "no-clear-notification", -1, SQLITE_STATIC);
     else
         rc = sqlite3_bind_null(res, ++param);
-//    rc = SQLITE3_BIND_STRING_OR_NULL(res, cfg->options, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1203,15 +1201,6 @@ bind_fail:
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset statement in alert hash_id store function, rc = %d", rc);
     return 1;
-}
-
-/*
-  alert hashes are used for cloud communication.
-  if cloud is disabled or openssl is not available (which will prevent cloud connectivity)
-  skip hash calculations
-*/
-void sql_alert_hash_and_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused) {
-    (void)sql_store_alert_config_hash(ap);
 }
 
 #define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT                                                                          \

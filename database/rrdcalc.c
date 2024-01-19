@@ -529,6 +529,7 @@ void rrd_alert_config_free(struct rrd_alert_config *ac) {
     string_freez(ac->units);
     string_freez(ac->summary);
     string_freez(ac->info);
+    string_freez(ac->lookup);
 
     string_freez(ac->dimensions);
 

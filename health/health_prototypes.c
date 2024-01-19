@@ -214,7 +214,7 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
     uuid_copy(ap->config.hash_id, uuid.uuid);
 
     // store it in SQL
-    sql_alert_hash_and_store_config(ap);
+    (void) sql_alert_store_config(ap);
 
     // activate the match patterns in it
     health_prototype_activate_match_patterns(&ap->match);
