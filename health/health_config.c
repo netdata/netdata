@@ -555,7 +555,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, type);
         }
         else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-            ap->config.lookup = string_strdupz(value);
+            ac->lookup = string_strdupz(value);
             health_parse_db_lookup(line, filename, value,
                                    &ac->group, &ac->after, &ac->before,
                                    &ac->update_every, &ac->options,
