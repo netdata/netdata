@@ -151,7 +151,7 @@ int do_sys_devices_virtual_powercap(int update_every, const char *name __maybe_u
                     update_every);
 
             fprintf(stdout,
-                    "CLABEL 'zone' '%s' 0\n"
+                    "CLABEL 'zone' '%s' 1\n"
                     "CLABEL_COMMIT\n",
                     zone->name);
 
@@ -171,7 +171,7 @@ int do_sys_devices_virtual_powercap(int update_every, const char *name __maybe_u
                     update_every);
 
             fprintf(stdout,
-                    "CLABEL 'zone' '%s' 0\n"
+                    "CLABEL 'zone' '%s' 1\n"
                     "CLABEL_COMMIT\n",
                     zone->name);
 
