@@ -2056,7 +2056,7 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 
          // grouping
          , (aligned) ? "aligned" : "unaligned"
-         , time_grouping_method2string(group_method)
+         , time_grouping_id2txt(group_method)
          , group
          , resampling_time
          , resampling_group
