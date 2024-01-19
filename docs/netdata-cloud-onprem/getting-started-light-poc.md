@@ -13,16 +13,25 @@ To install the whole environment, log in to the designated host and run:
 ```shell
 curl https://netdata-cloud-netdata-static-content.s3.amazonaws.com/provision.sh -o provision.sh
 chmod +x provision.sh
-sudo ./provision.sh --install
+sudo ./provision.sh install \
+      -key-id "" \
+      -access-key "" \
+      -onprem-license-key "" \
+      -onprem-license-subject "" \
+      -onprem-url "" \
+      -certificate-path "" \
+      -private-key-path ""
 ```
 
 What does the script do during installation?
-1. Prompts user to provide:
-   - ID and KEY for accessing the AWS (to pull helm charts and container images)
-   - License Key
-   - URL under which Netdata Cloud Onprem PoC is going to function (without protocol like `https://`)
-   - Path for certificate file (PEM format)
-   - Path for private key file (PEM format)
+1. Prompts for user to provide:
+   - `-key-id` - AWS ECR access key ID.
+   - `-access-key` - AWS ECR Access Key.
+   - `-onprem-license-key` - Netdata Cloud On-Prem license key.
+   - `-onprem-license-subject` - Netdata Cloud On-Prem license subject.
+   - `-onprem-url` - URL for the On-prem (without http(s) protocol).
+   - `-certificate-path` - path to your PEM encoded certificate.
+   - `-private-key-path` - path to your PEM encoded key.
 2. After getting all of the information installation is starting. The script will install:
    - Helm
    - Kubectl
@@ -40,11 +49,11 @@ Because this is a PoC with 0 configurations required, only log in by mail can wo
 4. You are now logged into the netdata. Add your first nodes!
 
 ##### How to remove Netdata Cloud On-Prem PoC?
-To uninstall the whole PoC, use the same script that installed it, with the `--uninstall` switch.
+To uninstall the whole PoC, use the same script that installed it, with the `uninstall` switch.
 
 ```shell
 cd <script dir>
-sudo ./provision.sh --uninstall
+sudo ./provision.sh uninstall
 ```
 
 #### WARNING
