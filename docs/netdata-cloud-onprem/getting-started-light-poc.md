@@ -25,13 +25,13 @@ sudo ./provision.sh install \
 
 What does the script do during installation?
 1. Prompts for user to provide:
-   - `-key-id` - AWS ECR access key ID
-   - `-access-key` - AWS ECR Access Key
-   - `-onprem-license-key` - Netdata Cloud On-Prem license key
-   - `-onprem-license-subject` - Netdata Cloud On-Prem license subject
-   - `-onprem-url` - URL for the onprem (without http(s) protocol)
-   - `-certificate-path` - Path to your PEM encoded certificate
-   - `-private-key-path` - Path to your PEM encoded key
+   - `-key-id` - AWS ECR access key ID.
+   - `-access-key` - AWS ECR Access Key.
+   - `-onprem-license-key` - Netdata Cloud On-Prem license key.
+   - `-onprem-license-subject` - Netdata Cloud On-Prem license subject.
+   - `-onprem-url` - URL for the On-prem (without http(s) protocol).
+   - `-certificate-path` - path to your PEM encoded certificate.
+   - `-private-key-path` - path to your PEM encoded key.
 2. After getting all of the information installation is starting. The script will install:
    - Helm
    - Kubectl
