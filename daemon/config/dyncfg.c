@@ -196,21 +196,26 @@ static void dyncfg_send_updates(const char *id) {
     DYNCFG *df = dictionary_acquired_item_value(item);
 
     if(df->type == DYNCFG_TYPE_SINGLE || df->type == DYNCFG_TYPE_JOB) {
-        if (df->cmds & DYNCFG_CMD_UPDATE)
+        if (df->cmds & DYNCFG_CMD_UPDATE && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG)
             dyncfg_echo_update(item, df, id);
     }
     else if(df->type == DYNCFG_TYPE_TEMPLATE && (df->cmds & DYNCFG_CMD_ADD)) {
         STRING *template = string_strdupz(id);
 
         size_t len = strlen(id);
-        DYNCFG *tf;
-        dfe_start_reentrant(dyncfg_globals.nodes, tf) {
-            const char *t_id = tf_dfe.name;
-            if(tf->type == DYNCFG_TYPE_JOB && tf->template == template && strncmp(t_id, id, len) == 0 && t_id[len] == ':' && t_id[len + 1]) {
-                dyncfg_echo_add(item, df, id, &t_id[len + 1]);
+        DYNCFG *df_job;
+        dfe_start_reentrant(dyncfg_globals.nodes, df_job) {
+            const char *id_template = df_job_dfe.name;
+            if(df_job->type == DYNCFG_TYPE_JOB &&                   // it is a job
+                df_job->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && // it is dynamically configured
+                df_job->template == template &&                     // it has the same template name
+                strncmp(id_template, id, len) == 0 &&               // the template name matches (redundant)
+                id_template[len] == ':' &&                          // immediately after the template there is ':'
+                id_template[len + 1]) {                             // and there is something else after the ':'
+                dyncfg_echo_add(item, df_job_dfe.item, df, df_job, id, &id_template[len + 1]);
             }
         }
-        dfe_done(tf);
+        dfe_done(df_job);
 
         string_freez(template);
     }
@@ -337,11 +342,16 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         dyncfg_function_intercept_cb,
         NULL);
 
-    DYNCFG_CMDS status_to_send_to_plugin = (df->user_disabled || df->status == DYNCFG_STATUS_DISABLED) ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
-    if(status_to_send_to_plugin == DYNCFG_CMD_ENABLE && dyncfg_is_user_disabled(string2str(df->template)))
-        status_to_send_to_plugin = DYNCFG_CMD_DISABLE;
+    if(df->type != DYNCFG_TYPE_TEMPLATE) {
+        DYNCFG_CMDS status_to_send_to_plugin =
+            (df->user_disabled || df->status == DYNCFG_STATUS_DISABLED) ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
 
-    dyncfg_echo(item, df, id, status_to_send_to_plugin);
+        if (status_to_send_to_plugin == DYNCFG_CMD_ENABLE && dyncfg_is_user_disabled(string2str(df->template)))
+            status_to_send_to_plugin = DYNCFG_CMD_DISABLE;
+
+        dyncfg_echo(item, df, id, status_to_send_to_plugin);
+    }
+
     dyncfg_send_updates(id);
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 

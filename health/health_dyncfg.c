@@ -4,6 +4,8 @@
 
 #define DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX "health:alert:prototype"
 
+static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap);
+
 // ---------------------------------------------------------------------------------------------------------------------
 // parse the json object of an alert definition
 
@@ -187,6 +189,7 @@ static bool parse_config_value(json_object *jobj, struct rrd_alert_config *confi
     JSONC_PARSE_SUBOBJECT(jobj, "database_lookup", config, parse_config_value_database_lookup);
     JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, "calculation", config->calculation);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "units", config->units);
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, "update_every", config->update_every);
     return true;
 }
 
@@ -351,6 +354,7 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
 
                 buffer_json_member_add_string(wb, "calculation", expression_source(ap->config.calculation));
                 buffer_json_member_add_string(wb, "units", string2str(ap->config.units));
+                buffer_json_member_add_uint64(wb, "update_every", ap->config.update_every);
             }
             buffer_json_object_close(wb); // value
 
@@ -446,11 +450,15 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
                 health_prototype_free(nap);
             }
             else {
-                bool added = health_prototype_add(nap, true); // this swaps ap <-> nap
-                health_prototype_free(nap);
+                nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
+                bool added = health_prototype_add(nap); // this swaps ap <-> nap
 
-                if(!added)
+                if(!added) {
+                    health_prototype_free(nap);
                     return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "required attributes are missing");
+                }
+                else
+                    freez(nap);
 
                 const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(health_globals.prototypes.dict, add_name);
                 if(!item)
@@ -459,9 +467,10 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
                 RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
 
                 dyncfg_health_prototype_reapply(ap);
+                health_dyncfg_register_prototype(ap);
                 dictionary_acquired_item_release(health_globals.prototypes.dict, item);
 
-                code = dyncfg_default_response(result, HTTP_RESP_OK, "updated");
+                code = dyncfg_default_response(result, HTTP_RESP_OK, "added");
             }
         }
         break;
@@ -504,6 +513,7 @@ static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFE
 
         case DYNCFG_CMD_GET:
             health_prototype_to_json(result, ap, false);
+            code = HTTP_RESP_OK;
             break;
 
         case DYNCFG_CMD_DISABLE:
@@ -536,8 +546,16 @@ static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFE
                     health_prototype_free(nap);
                 }
                 else {
-                    health_prototype_add(nap, true); // this swaps ap <-> nap
-                    health_prototype_free(nap);
+                    nap->config.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
+                    bool added = health_prototype_add(nap); // this swaps ap <-> nap
+
+                    if(!added) {
+                        health_prototype_free(nap);
+                        return dyncfg_default_response( result, HTTP_RESP_BAD_REQUEST, "required attributes are missing");
+                    }
+                    else
+                        freez(nap);
+
                     dyncfg_health_prototype_reapply(ap);
                     code = dyncfg_default_response(result, HTTP_RESP_OK, "updated");
                 }
@@ -548,6 +566,11 @@ static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFE
             dyncfg_health_remove_all_rrdcalc_of_prototype(ap->config.name);
             dictionary_del(health_globals.prototypes.dict, dictionary_acquired_item_name(item));
             code = dyncfg_default_response(result, HTTP_RESP_OK, "deleted");
+            {
+                char key[strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX) + strlen(alert_name) + 10];
+                snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
+                dyncfg_del(localhost, key);
+            }
             break;
 
         case DYNCFG_CMD_TEST:
@@ -618,8 +641,39 @@ void health_dyncfg_unregister_all_prototypes(void) {
     dyncfg_del(localhost, DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX);
 }
 
-void health_dyncfg_register_all_prototypes(void) {
+static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
     char key[HEALTH_CONF_MAX_LINE];
+
+    snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
+    dyncfg_add(localhost, key, "/health/alerts/prototypes",
+               ap->match.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
+               ap->config.source_type, string2str(ap->config.source),
+               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
+                   DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
+                   (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG ? DYNCFG_CMD_REMOVE : 0),
+               dyncfg_health_cb, NULL);
+
+#ifdef NETDATA_TEST_HEALTH_PROTOTYPES_JSON_AND_PARSING
+    {
+        // make sure we can generate valid json, parse it back and come up to the same object
+
+        CLEAN_BUFFER *original = buffer_create(0, NULL);
+        CLEAN_BUFFER *parsed = buffer_create(0, NULL);
+        CLEAN_BUFFER *error = buffer_create(0, NULL);
+        health_prototype_to_json(original, ap, true);
+        RRD_ALERT_PROTOTYPE *t = health_prototype_payload_parse(buffer_tostring(original), buffer_strlen(original), error);
+        if(!t)
+            fatal("hey! cannot parse: %s", buffer_tostring(error));
+
+        health_prototype_to_json(parsed, t, true);
+
+        if(strcmp(buffer_tostring(original), buffer_tostring(parsed)) != 0)
+            fatal("hey! they are different!");
+    }
+#endif
+}
+
+void health_dyncfg_register_all_prototypes(void) {
     RRD_ALERT_PROTOTYPE *ap;
 
     dyncfg_add(localhost,
@@ -629,33 +683,7 @@ void health_dyncfg_register_all_prototypes(void) {
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD, dyncfg_health_cb, NULL);
 
     dfe_start_read(health_globals.prototypes.dict, ap) {
-        snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
-        dyncfg_add(localhost, key, "/health/alerts/prototypes",
-                   ap->match.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
-                   ap->config.source_type, string2str(ap->config.source),
-                   DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST,
-                   dyncfg_health_cb, NULL);
-
-#ifdef NETDATA_TEST_HEALTH_PROTOTYPES_JSON_AND_PARSING
-        {
-            // make sure we can generate valid json, parse it back and come up to the same object
-
-            CLEAN_BUFFER *original = buffer_create(0, NULL);
-            CLEAN_BUFFER *parsed = buffer_create(0, NULL);
-            CLEAN_BUFFER *error = buffer_create(0, NULL);
-            health_prototype_to_json(original, ap, true);
-            RRD_ALERT_PROTOTYPE *t = health_prototype_payload_parse(buffer_tostring(original), buffer_strlen(original), error);
-            if(!t)
-                fatal("hey! cannot parse: %s", buffer_tostring(error));
-
-            health_prototype_to_json(parsed, t, true);
-
-            if(strcmp(buffer_tostring(original), buffer_tostring(parsed)) != 0)
-                fatal("hey! they are different!");
-        }
-#endif
-
+        health_dyncfg_register_prototype(ap);
     }
     dfe_done(ap);
-
 }

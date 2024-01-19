@@ -83,6 +83,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                     df->user_disabled = true;
                 } else if (dc->cmd == DYNCFG_CMD_REMOVE) {
                     dyncfg_file_delete(dc->id);
+                    dictionary_del(dyncfg_globals.nodes, dc->id);
                 }
 
                 if(dc->cmd != DYNCFG_CMD_ADD && code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)

@@ -409,7 +409,7 @@ find_best_scored:
     }
 
 log:
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_LOG_HEALTH_VARIABLES_LOOKUP
     if(found) {
         nd_log(NDLS_DAEMON, NDLP_INFO,
                "HEALTH_VARIABLE_LOOKUP: variable '%s' of alert '%s' of chart '%s', context '%s', host '%s' "

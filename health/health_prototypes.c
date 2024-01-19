@@ -35,22 +35,29 @@ void health_prototype_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void
     spinlock_init(&ap->_internal.spinlock);
 }
 
-bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
-    bool replace = data ? *(bool *)data : false;
+bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
     RRD_ALERT_PROTOTYPE *ap = old_value;
+    RRD_ALERT_PROTOTYPE *nap = new_value;
+
+    bool replace = nap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG;
 
     if(!replace) {
-        // alerts with the same name are appended to the existing one
-        RRD_ALERT_PROTOTYPE *nap = callocz(1, sizeof(*nap));
-        memcpy(nap, new_value, sizeof(*nap));
+        if(ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG) {
+            // the existing is a dyncfg and the new one is read from the config
+            health_prototype_cleanup(nap);
+        }
+        else {
+            // alerts with the same name are appended to the existing one
+            nap = callocz(1, sizeof(*nap));
+            memcpy(nap, new_value, sizeof(*nap));
 
-        spinlock_lock(&ap->_internal.spinlock);
-        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, nap, _internal.prev, _internal.next);
-        spinlock_unlock(&ap->_internal.spinlock);
+            spinlock_lock(&ap->_internal.spinlock);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, nap, _internal.prev, _internal.next);
+            spinlock_unlock(&ap->_internal.spinlock);
+        }
     }
     else {
         // alerts with the same name replace the existing one
-        RRD_ALERT_PROTOTYPE *nap = new_value;
         spinlock_init(&nap->_internal.spinlock);
         nap->_internal.uses = ap->_internal.uses;
 
@@ -59,6 +66,8 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
         SWAP(*ap, *nap);
         spinlock_unlock(&ap->_internal.spinlock);
         spinlock_unlock(&nap->_internal.spinlock);
+
+        health_prototype_cleanup(nap);
     }
 
     return true;
@@ -200,7 +209,7 @@ void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
     (void) sql_alert_store_config(ap);
 }
 
-bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, bool replace) {
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
     if(!ap->match.is_template) {
         if(!ap->match.on.chart) {
             netdata_log_error(
@@ -232,9 +241,6 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, bool replace) {
         return false;
     }
 
-    // generate the hash id
-    health_prototype_hash_id(ap);
-
     // activate the match patterns in it
     for(RRD_ALERT_PROTOTYPE *t = ap; t ;t = t->_internal.next) {
         // we need to generate config_hash_id for each instance included
@@ -263,11 +269,13 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, bool replace) {
         t->_internal.next = next;
     }
 
+
+
     // add it to the prototypes
     dictionary_set_advanced(health_globals.prototypes.dict,
                             string2str(ap->config.name), string_strlen(ap->config.name),
                             ap, sizeof(*ap),
-                            &replace);
+                            NULL);
 
     return true;
 }
