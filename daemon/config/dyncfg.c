@@ -248,6 +248,17 @@ bool dyncfg_job_has_registered_template(const char *id) {
     return ret;
 }
 
+static void dyncfg_link_all_jobs_to_host(RRDHOST *host, DYNCFG *df_template) {
+    DYNCFG *df;
+    dfe_start_read(dyncfg_globals.nodes, df) {
+        if(!df->host && df->type == DYNCFG_TYPE_JOB) {
+            if(uuid_memcmp(&df->host_uuid, &host->host_uuid) == 0)
+                df->host = host;
+        }
+    }
+    dfe_done(df);
+}
+
 bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
@@ -305,6 +316,9 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
 
     const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds, created_ut, modified_ut, sync, execute_cb, execute_cb_data, true);
     DYNCFG *df = dictionary_acquired_item_value(item);
+
+    if(df->type == DYNCFG_TYPE_TEMPLATE)
+        dyncfg_link_all_jobs_to_host(host, df);
 
 //    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)
 //        nd_log(NDLS_DAEMON, NDLP_WARNING, "DYNCFG: configuration '%s' is created with source type dyncfg, but we don't have a saved configuration for it", id);
