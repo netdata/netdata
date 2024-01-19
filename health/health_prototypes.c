@@ -33,6 +33,8 @@ void health_prototype_free(RRD_ALERT_PROTOTYPE *ap) {
 void health_prototype_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     RRD_ALERT_PROTOTYPE *ap = value;
     spinlock_init(&ap->_internal.spinlock);
+    if(ap->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG)
+        ap->_internal.is_on_disk = true;
 }
 
 bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
@@ -41,10 +43,14 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     bool replace = nap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG;
 
+    if(ap->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG || nap->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG)
+        ap->_internal.is_on_disk = nap->_internal.is_on_disk = true;
+
     if(!replace) {
         if(ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG) {
             // the existing is a dyncfg and the new one is read from the config
             health_prototype_cleanup(nap);
+            memset(nap, 0, sizeof(*nap));
         }
         else {
             // alerts with the same name are appended to the existing one
@@ -68,6 +74,7 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
         spinlock_unlock(&nap->_internal.spinlock);
 
         health_prototype_cleanup(nap);
+        memset(nap, 0, sizeof(*nap));
     }
 
     return true;
@@ -423,6 +430,9 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
 }
 
 static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
+    if(!ap->_internal.enabled)
+        return;
+
     spinlock_lock(&ap->_internal.spinlock);
     for(RRD_ALERT_PROTOTYPE *t = ap; t ; t = t->_internal.next) {
         if(!t->match.enabled)
@@ -456,6 +466,9 @@ void health_prototype_reset_alerts_for_rrdset(RRDSET *st) {
 // ---------------------------------------------------------------------------------------------------------------------
 
 void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
+    if(!ap->_internal.enabled)
+        return;
+
     if(unlikely(!host->health.health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
         return;
 
@@ -467,6 +480,9 @@ void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
 }
 
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap) {
+    if(!ap->_internal.enabled)
+        return;
+
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host){
         health_apply_prototype_to_host(host, ap);

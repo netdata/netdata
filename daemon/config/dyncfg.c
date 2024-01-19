@@ -196,7 +196,7 @@ static void dyncfg_send_updates(const char *id) {
     DYNCFG *df = dictionary_acquired_item_value(item);
 
     if(df->type == DYNCFG_TYPE_SINGLE || df->type == DYNCFG_TYPE_JOB) {
-        if (df->cmds & DYNCFG_CMD_UPDATE && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG)
+        if (df->cmds & DYNCFG_CMD_UPDATE && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && df->payload && buffer_strlen(df->payload))
             dyncfg_echo_update(item, df, id);
     }
     else if(df->type == DYNCFG_TYPE_TEMPLATE && (df->cmds & DYNCFG_CMD_ADD)) {
@@ -295,11 +295,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
     }
 
     // remove
-    if(source_type == DYNCFG_SOURCE_TYPE_DYNCFG && type == DYNCFG_TYPE_JOB) {
-        // remove is only available for dyncfg jobs
-        cmds |= DYNCFG_CMD_REMOVE;
-    }
-    else {
+    if(source_type != DYNCFG_SOURCE_TYPE_DYNCFG || type != DYNCFG_TYPE_JOB) {
         // remove is only available for dyncfg jobs
         cmds &= ~DYNCFG_CMD_REMOVE;
     }

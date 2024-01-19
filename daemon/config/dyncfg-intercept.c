@@ -28,6 +28,12 @@ DYNCFG_STATUS dyncfg_status_from_successful_response(int code) {
     return status;
 }
 
+static void dyncfg_function_intercept_keep_source(DYNCFG *df, const char *source) {
+    STRING *old = df->source;
+    df->source = string_strdupz(source);
+    string_freez(old);
+}
+
 void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_data) {
     struct dyncfg_call *dc = result_cb_data;
 
@@ -70,8 +76,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                     dictionary_acquired_item_release(dyncfg_globals.nodes, new_item);
                 } else if (dc->cmd == DYNCFG_CMD_UPDATE) {
                     df->source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
-                    string_freez(df->source);
-                    df->source = string_strdupz(dc->source);
+                    dyncfg_function_intercept_keep_source(df, dc->source);
 
                     df->status = dyncfg_status_from_successful_response(code);
                     SWAP(df->payload, dc->payload);
@@ -79,8 +84,10 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                     save_required = true;
                 } else if (dc->cmd == DYNCFG_CMD_ENABLE) {
                     df->user_disabled = false;
+                    dyncfg_function_intercept_keep_source(df, dc->source);
                 } else if (dc->cmd == DYNCFG_CMD_DISABLE) {
                     df->user_disabled = true;
+                    dyncfg_function_intercept_keep_source(df, dc->source);
                 } else if (dc->cmd == DYNCFG_CMD_REMOVE) {
                     dyncfg_file_delete(dc->id);
                     dictionary_del(dyncfg_globals.nodes, dc->id);

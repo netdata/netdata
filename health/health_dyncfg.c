@@ -470,7 +470,7 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
                 health_dyncfg_register_prototype(ap);
                 dictionary_acquired_item_release(health_globals.prototypes.dict, item);
 
-                code = dyncfg_default_response(result, HTTP_RESP_OK, "added");
+                code = dyncfg_default_response(result, DYNCFG_RESP_ACCEPTED, "accepted");
             }
         }
         break;
@@ -504,6 +504,9 @@ static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFE
 
     RRD_ALERT_PROTOTYPE *ap = dictionary_acquired_item_value(item);
 
+    char alert_name_dyncfg[strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX) + strlen(alert_name) + 10];
+    snprintfz(alert_name_dyncfg, sizeof(alert_name_dyncfg), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
+
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
     switch(cmd) {
@@ -517,22 +520,24 @@ static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFE
             break;
 
         case DYNCFG_CMD_DISABLE:
-            if(ap->match.enabled) {
-                ap->match.enabled = false;
+            if(ap->_internal.enabled) {
+                ap->_internal.enabled = false;
                 dyncfg_health_prototype_reapply(ap);
-                dyncfg_status(localhost, alert_name, DYNCFG_STATUS_DISABLED);
+                dyncfg_status(localhost, alert_name_dyncfg, DYNCFG_STATUS_DISABLED);
+                code = dyncfg_default_response(result, HTTP_RESP_OK, "disabled");
             }
             else
                 code = dyncfg_default_response(result, HTTP_RESP_OK, "already disabled");
             break;
 
         case DYNCFG_CMD_ENABLE:
-            if(ap->match.enabled)
+            if(ap->_internal.enabled)
                 code = dyncfg_default_response(result, HTTP_RESP_OK, "already enabled");
             else {
-                ap->match.enabled = true;
+                ap->_internal.enabled = true;
                 dyncfg_health_prototype_reapply(ap);
-                dyncfg_status(localhost, alert_name, DYNCFG_STATUS_ACCEPTED);
+                dyncfg_status(localhost, alert_name_dyncfg, DYNCFG_STATUS_ACCEPTED);
+                code = dyncfg_default_response(result, DYNCFG_RESP_ACCEPTED, "enabled");
             }
             break;
 
@@ -557,7 +562,7 @@ static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFE
                         freez(nap);
 
                     dyncfg_health_prototype_reapply(ap);
-                    code = dyncfg_default_response(result, HTTP_RESP_OK, "updated");
+                    code = dyncfg_default_response(result, DYNCFG_RESP_ACCEPTED, "updated");
                 }
             }
             break;
@@ -566,11 +571,7 @@ static int dyncfg_health_prototype_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFE
             dyncfg_health_remove_all_rrdcalc_of_prototype(ap->config.name);
             dictionary_del(health_globals.prototypes.dict, dictionary_acquired_item_name(item));
             code = dyncfg_default_response(result, HTTP_RESP_OK, "deleted");
-            {
-                char key[strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX) + strlen(alert_name) + 10];
-                snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", alert_name);
-                dyncfg_del(localhost, key);
-            }
+            dyncfg_del(localhost, alert_name_dyncfg);
             break;
 
         case DYNCFG_CMD_TEST:
@@ -644,13 +645,17 @@ void health_dyncfg_unregister_all_prototypes(void) {
 static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
     char key[HEALTH_CONF_MAX_LINE];
 
+//    bool trace = false;
+//    if(string_strcmp(ap->config.name, "ram_available") == 0)
+//        trace = true;
+
     snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
     dyncfg_add(localhost, key, "/health/alerts/prototypes",
                ap->match.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
                ap->config.source_type, string2str(ap->config.source),
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
                    DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
-                   (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG ? DYNCFG_CMD_REMOVE : 0),
+                   (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !ap->_internal.is_on_disk ? DYNCFG_CMD_REMOVE : 0),
                dyncfg_health_cb, NULL);
 
 #ifdef NETDATA_TEST_HEALTH_PROTOTYPES_JSON_AND_PARSING
@@ -680,10 +685,12 @@ void health_dyncfg_register_all_prototypes(void) {
                DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX, "/health/alerts/prototypes",
                DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE_TEMPLATE,
                DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
-               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD, dyncfg_health_cb, NULL);
+               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+               dyncfg_health_cb, NULL);
 
     dfe_start_read(health_globals.prototypes.dict, ap) {
-        health_dyncfg_register_prototype(ap);
+        if(ap->config.source_type != DYNCFG_SOURCE_TYPE_DYNCFG)
+            health_dyncfg_register_prototype(ap);
     }
     dfe_done(ap);
 }
