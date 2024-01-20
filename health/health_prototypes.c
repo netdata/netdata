@@ -534,3 +534,11 @@ void health_apply_prototypes_to_all_hosts(void) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+
+void health_prototype_metadata_foreach(void *data, prototype_metadata_cb_t cb) {
+    RRD_ALERT_PROTOTYPE *ap;
+    dfe_start_read(health_globals.prototypes.dict, ap) {
+        cb(data, ap->config.type, ap->config.component, ap->config.classification, ap->config.recipient);
+    }
+    dfe_done(ap);
+}

@@ -92,4 +92,7 @@ int alert_variable_lookup_trace(RRDHOST *host, RRDSET *st, const char *variable,
 #include "health_prototypes.h"
 #include "health_silencers.h"
 
+typedef void (*prototype_metadata_cb_t)(void *data, STRING *type, STRING *component, STRING *classification, STRING *recipient);
+void health_prototype_metadata_foreach(void *data, prototype_metadata_cb_t cb);
+
 #endif //NETDATA_HEALTH_H
