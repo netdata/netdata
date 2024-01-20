@@ -65,7 +65,7 @@ struct rrd_alert_match {
     SIMPLE_PATTERN *host_labels_pattern;    // the simple pattern of labels
     SIMPLE_PATTERN *chart_labels_pattern;   // the simple pattern of chart labels
 };
-void rrd_alert_match_free(struct rrd_alert_match *am);
+void rrd_alert_match_cleanup(struct rrd_alert_match *am);
 
 struct rrd_alert_config {
     uuid_t hash_id;
@@ -124,7 +124,7 @@ struct rrd_alert_config {
     uint32_t warn_repeat_every;    // interval between repeating warning notifications
     uint32_t crit_repeat_every;    // interval between repeating critical notifications
 };
-void rrd_alert_config_free(struct rrd_alert_config *ac);
+void rrd_alert_config_cleanup(struct rrd_alert_config *ac);
 
 struct rrdcalc {
     uint32_t id;                    // the unique id of this alarm

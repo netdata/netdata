@@ -392,8 +392,8 @@ static void rrdcalc_rrdhost_react_callback(const DICTIONARY_ITEM *item __maybe_u
 static void rrdcalc_free_internals(RRDCALC *rc) {
     if(unlikely(!rc)) return;
 
-    rrd_alert_match_free(&rc->match);
-    rrd_alert_config_free(&rc->config);
+    rrd_alert_match_cleanup(&rc->match);
+    rrd_alert_config_cleanup(&rc->config);
 
     string_freez(rc->key);
     string_freez(rc->chart);
@@ -487,7 +487,7 @@ void rrdcalc_delete_all(RRDHOST *host) {
     dictionary_flush(host->rrdcalc_root_index);
 }
 
-void rrd_alert_match_free(struct rrd_alert_match *am) {
+void rrd_alert_match_cleanup(struct rrd_alert_match *am) {
     if(am->is_template)
         string_freez(am->on.context);
     else
@@ -515,7 +515,7 @@ void rrd_alert_match_free(struct rrd_alert_match *am) {
     simple_pattern_free(am->chart_labels_pattern);
 }
 
-void rrd_alert_config_free(struct rrd_alert_config *ac) {
+void rrd_alert_config_cleanup(struct rrd_alert_config *ac) {
     string_freez(ac->name);
 
     string_freez(ac->exec);

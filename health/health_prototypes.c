@@ -5,8 +5,8 @@
 // ---------------------------------------------------------------------------------------------------------------------
 
 static void health_prototype_cleanup_one_unsafe(RRD_ALERT_PROTOTYPE *ap) {
-    rrd_alert_match_free(&ap->match);
-    rrd_alert_config_free(&ap->config);
+    rrd_alert_match_cleanup(&ap->match);
+    rrd_alert_config_cleanup(&ap->config);
 }
 
 void health_prototype_cleanup(RRD_ALERT_PROTOTYPE *ap) {
