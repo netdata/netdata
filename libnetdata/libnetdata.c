@@ -1303,27 +1303,53 @@ int snprintfz(char *dst, size_t n, const char *fmt, ...) {
     return ret;
 }
 
-static int is_virtual_filesystem(const char *path, char **reason) {
-
+static int is_procfs(const char *path, char **reason) {
 #if defined(__APPLE__) || defined(__FreeBSD__)
     (void)path;
     (void)reason;
 #else
     struct statfs stat;
-    // stat.f_fsid.__val[0] is a file system id
-    // stat.f_fsid.__val[1] is the inode
-    // so their combination uniquely identifies the file/dir
 
     if (statfs(path, &stat) == -1) {
-        if(reason) *reason = "failed to statfs()";
+        if (reason)
+            *reason = "failed to statfs()";
         return -1;
     }
 
-    if(stat.f_fsid.__val[0] != 0 || stat.f_fsid.__val[1] != 0) {
-        errno = EINVAL;
-        if(reason) *reason = "is not a virtual file system";
+#if defined PROC_SUPER_MAGIC
+    if (stat.f_type != PROC_SUPER_MAGIC) {
+        if (reason)
+            *reason = "type is not procfs";
         return -1;
     }
+#endif
+
+#endif
+
+    return 0;
+}
+
+static int is_sysfs(const char *path, char **reason) {
+#if defined(__APPLE__) || defined(__FreeBSD__)
+    (void)path;
+    (void)reason;
+#else
+    struct statfs stat;
+
+    if (statfs(path, &stat) == -1) {
+        if (reason)
+            *reason = "failed to statfs()";
+        return -1;
+    }
+
+#if defined SYSFS_MAGIC
+    if (stat.f_type != SYSFS_MAGIC) {
+        if (reason)
+            *reason = "type is not sysfs";
+        return -1;
+    }
+#endif
+
 #endif
 
     return 0;
@@ -1355,11 +1381,11 @@ int verify_netdata_host_prefix(bool log_msg) {
 
     path = buffer;
     snprintfz(path, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
-    if(is_virtual_filesystem(path, &reason) == -1)
+    if(is_procfs(path, &reason) == -1)
         goto failed;
 
     snprintfz(path, FILENAME_MAX, "%s/sys", netdata_configured_host_prefix);
-    if(is_virtual_filesystem(path, &reason) == -1)
+    if(is_sysfs(path, &reason) == -1)
         goto failed;
 
     if (netdata_configured_host_prefix && *netdata_configured_host_prefix) {
