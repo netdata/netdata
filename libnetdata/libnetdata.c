@@ -1329,7 +1329,7 @@ static int is_virtual_filesystem(const char *path, char **reason) {
     return 0;
 }
 
-int verify_netdata_host_prefix() {
+int verify_netdata_host_prefix(bool log_msg) {
     if(!netdata_configured_host_prefix)
         netdata_configured_host_prefix = "";
 
@@ -1362,13 +1362,16 @@ int verify_netdata_host_prefix() {
     if(is_virtual_filesystem(path, &reason) == -1)
         goto failed;
 
-    if(netdata_configured_host_prefix && *netdata_configured_host_prefix)
-        netdata_log_info("Using host prefix directory '%s'", netdata_configured_host_prefix);
+    if (netdata_configured_host_prefix && *netdata_configured_host_prefix) {
+        if (log_msg)
+            netdata_log_info("Using host prefix directory '%s'", netdata_configured_host_prefix);
+    }
 
     return 0;
 
 failed:
-    netdata_log_error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
+    if (log_msg)
+        netdata_log_error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
     netdata_configured_host_prefix = "";
     return -1;
 }

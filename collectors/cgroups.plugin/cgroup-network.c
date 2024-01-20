@@ -666,7 +666,7 @@ int main(int argc, char **argv) {
     // make sure NETDATA_HOST_PREFIX is safe
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(verify_netdata_host_prefix() == -1) exit(1);
+    if(verify_netdata_host_prefix(false) == -1) exit(1);
 
     if(netdata_configured_host_prefix[0] != '\0' && verify_path(netdata_configured_host_prefix) == -1)
         fatal("invalid NETDATA_HOST_PREFIX '%s'", netdata_configured_host_prefix);
