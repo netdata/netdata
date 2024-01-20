@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- updates to light onprem docs [\#16811](https://github.com/netdata/netdata/pull/16811) ([M4itee](https://github.com/M4itee))
+- set app\_group label automatically [\#16810](https://github.com/netdata/netdata/pull/16810) ([boxjan](https://github.com/boxjan))
 - Apply ASCII-based comparisons to commands in kickstart script that rely on a particular language setting [\#16806](https://github.com/netdata/netdata/pull/16806) ([tkatsoulas](https://github.com/tkatsoulas))
 - Remove help text that no longer applies. [\#16805](https://github.com/netdata/netdata/pull/16805) ([vkalintiris](https://github.com/vkalintiris))
 - Move mqtt\_websockets under aclk/ [\#16804](https://github.com/netdata/netdata/pull/16804) ([vkalintiris](https://github.com/vkalintiris))
@@ -408,9 +410,6 @@
 - uninstaller: remove /etc/cron.d/netdata-updater-daily [\#16233](https://github.com/netdata/netdata/pull/16233) ([ilyam8](https://github.com/ilyam8))
 - Add Erlang to Apps configuration [\#16231](https://github.com/netdata/netdata/pull/16231) ([andyundso](https://github.com/andyundso))
 - remove charts.d/nut [\#16230](https://github.com/netdata/netdata/pull/16230) ([ilyam8](https://github.com/ilyam8))
-- kickstart: rename auto-update-method to auto-update-type [\#16229](https://github.com/netdata/netdata/pull/16229) ([ilyam8](https://github.com/ilyam8))
-- update go.d plugin version to v0.56.3 [\#16228](https://github.com/netdata/netdata/pull/16228) ([ilyam8](https://github.com/ilyam8))
-- Add document outlining our versioning policy and public API. [\#16227](https://github.com/netdata/netdata/pull/16227) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
