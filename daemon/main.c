@@ -873,37 +873,21 @@ static void log_init(void) {
 
     nd_log_set_priority_level(config_get(CONFIG_SECTION_LOGS, "level", NDLP_INFO_STR));
 
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", filename));
+    // char filename[FILENAME_MAX + 1];
+    // snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
+    nd_log_set_user_settings(NDLS_DEBUG, config_get(CONFIG_SECTION_LOGS, "debug", "stderr"));
 
-    bool with_journal = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */;
-    if(with_journal)
-        snprintfz(filename, FILENAME_MAX, "journal");
-    else
-        snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "daemon", filename));
-
-    if(with_journal)
-        snprintfz(filename, FILENAME_MAX, "journal");
-    else
-        snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", filename));
-
-    snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", filename));
-
-    if(with_journal)
-        snprintfz(filename, FILENAME_MAX, "journal");
-    else
-        snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
-    nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", filename));
+    // bool with_journal = is_stderr_connected_to_journal() /* || nd_log_journal_socket_available() */;
+    
+    nd_log_set_user_settings(NDLS_DAEMON, config_get(CONFIG_SECTION_LOGS, "daemon", "stderr"));
+    nd_log_set_user_settings(NDLS_COLLECTORS, config_get(CONFIG_SECTION_LOGS, "collector", "stderr"));
+    nd_log_set_user_settings(NDLS_ACCESS, config_get(CONFIG_SECTION_LOGS, "access", "stderr"));
+    nd_log_set_user_settings(NDLS_HEALTH, config_get(CONFIG_SECTION_LOGS, "health", "stderr"));
 
 #ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
     if (aclklog_enabled) {
-        snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
-        nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", filename));
+        nd_log_set_user_settings(NDLS_ACLK, config_get(CONFIG_SECTION_CLOUD, "conversation log file", "stderr"));
     }
 #endif
 }
