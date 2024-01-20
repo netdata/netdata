@@ -488,6 +488,12 @@ You can monitor the replication process in two ways:
 1. **Netdata Monitoring**: access the Netdata Monitoring section and look for the Replication charts. 
 2. **Streaming Function**: use the Streaming function (Top) to see the replication status of children nodes. This function provides real-time insights into the replication status of each child node.
 
+### Replication and storage
+
+When netdata replicates data from child to parent, the agent will replicate data stored in [tier 0](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics#effect-of-storage-tiers-and-disk-space-on-retention),
+because other tiers are calculated from its data. The default storage values allow `tier 0` to have `12 days` of retention.
+To have more data replicated, it is necessary to change both parent and child [configuration](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics). 
+
 ## Troubleshooting
 
 Both parent and child nodes log information at `/var/log/netdata/error.log`.
