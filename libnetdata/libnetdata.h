@@ -559,7 +559,7 @@ extern int enable_ksm;
 
 char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 
-int verify_netdata_host_prefix();
+int verify_netdata_host_prefix(bool log_msg);
 
 extern volatile sig_atomic_t netdata_exit;
 
