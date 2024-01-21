@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- fix verify\_netdata\_host\_prefix log spam [\#16814](https://github.com/netdata/netdata/pull/16814) ([ilyam8](https://github.com/ilyam8))
+- use fs type to veryfiy procfs/sysfs [\#16813](https://github.com/netdata/netdata/pull/16813) ([ilyam8](https://github.com/ilyam8))
 - updates to light onprem docs [\#16811](https://github.com/netdata/netdata/pull/16811) ([M4itee](https://github.com/M4itee))
 - set app\_group label automatically [\#16810](https://github.com/netdata/netdata/pull/16810) ([boxjan](https://github.com/boxjan))
 - Apply ASCII-based comparisons to commands in kickstart script that rely on a particular language setting [\#16806](https://github.com/netdata/netdata/pull/16806) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -407,9 +409,6 @@
 - Active journal centralization guide no encryption [\#16236](https://github.com/netdata/netdata/pull/16236) ([tkatsoulas](https://github.com/tkatsoulas))
 - journal: script to generate self-signed-certificates [\#16235](https://github.com/netdata/netdata/pull/16235) ([ktsaou](https://github.com/ktsaou))
 - Fix dimension HETEROGENEOUS check [\#16234](https://github.com/netdata/netdata/pull/16234) ([stelfrag](https://github.com/stelfrag))
-- uninstaller: remove /etc/cron.d/netdata-updater-daily [\#16233](https://github.com/netdata/netdata/pull/16233) ([ilyam8](https://github.com/ilyam8))
-- Add Erlang to Apps configuration [\#16231](https://github.com/netdata/netdata/pull/16231) ([andyundso](https://github.com/andyundso))
-- remove charts.d/nut [\#16230](https://github.com/netdata/netdata/pull/16230) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
