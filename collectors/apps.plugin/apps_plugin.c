@@ -5270,7 +5270,7 @@ int main(int argc, char **argv) {
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
-    if(verify_netdata_host_prefix() == -1) exit(1);
+    if(verify_netdata_host_prefix(true) == -1) exit(1);
 
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     if(user_config_dir == NULL) {
