@@ -655,6 +655,7 @@ set(LIBNETDATA_FILES
         libnetdata/http/content_type.h
         libnetdata/config/dyncfg.c
         libnetdata/config/dyncfg.h
+        libnetdata/json/json-c-parser-inline.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

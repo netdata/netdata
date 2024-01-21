@@ -744,6 +744,7 @@ extern char *netdata_configured_host_prefix;
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
 #include "url/url.h"
 #include "json/json.h"
+#include "json/json-c-parser-inline.h"
 #include "string/utf8.h"
 #include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
