@@ -1006,8 +1006,9 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
         if(unlikely(!PValue || PValue == PJERR))
             fatal("RRDLABELS migrate: corrupted labels array");
 
-        RRDLABEL_SRC flag = RRDLABEL_FLAG_NEW;
+        RRDLABEL_SRC flag;
         if (!*PValue) {
+            flag = (ls & ~(RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_NEW;
             dup_label(label);
             size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
             STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
