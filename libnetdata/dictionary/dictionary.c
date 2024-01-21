@@ -115,17 +115,17 @@ struct dictionary_hooks {
     REFCOUNT links;
     usec_t last_master_deletion_us;
 
-    void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
-    void *ins_callback_data;
+    dict_cb_insert_t insert_callback;
+    void *insert_callback_data;
 
-    bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data);
+    dict_cb_conflict_t conflict_callback;
     void *conflict_callback_data;
 
-    void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
+    dict_cb_react_t react_callback;
     void *react_callback_data;
 
-    void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data);
-    void *del_callback_data;
+    dict_cb_delete_t delete_callback;
+    void *delelte_callback_data;
 };
 
 struct dictionary_stats dictionary_stats_category_other = {
@@ -305,16 +305,16 @@ static inline size_t dictionary_hooks_free(DICTIONARY *dict) {
     return 0;
 }
 
-void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
+void dictionary_register_insert_callback(DICTIONARY *dict, dict_cb_insert_t insert_callback, void *data) {
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     dictionary_hooks_allocate(dict);
-    dict->hooks->ins_callback = ins_callback;
-    dict->hooks->ins_callback_data = data;
+    dict->hooks->insert_callback = insert_callback;
+    dict->hooks->insert_callback_data = data;
 }
 
-void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data) {
+void dictionary_register_conflict_callback(DICTIONARY *dict, dict_cb_conflict_t conflict_callback, void *data) {
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
@@ -326,7 +326,7 @@ void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_cal
     dict->hooks->conflict_callback_data = data;
 }
 
-void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
+void dictionary_register_react_callback(DICTIONARY *dict, dict_cb_react_t react_callback, void *data) {
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
@@ -335,13 +335,13 @@ void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)
     dict->hooks->react_callback_data = data;
 }
 
-void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data) {
+void dictionary_register_delete_callback(DICTIONARY *dict, dict_cb_delete_t delete_callback,  void *data) {
     if(unlikely(is_view_dictionary(dict)))
         fatal("DICTIONARY: called %s() on a view.", __FUNCTION__ );
 
     dictionary_hooks_allocate(dict);
-    dict->hooks->del_callback = del_callback;
-    dict->hooks->del_callback_data = data;
+    dict->hooks->delete_callback = delete_callback;
+    dict->hooks->delelte_callback_data = data;
 }
 
 // ----------------------------------------------------------------------------
@@ -591,7 +591,7 @@ static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET_SOLE(DICTIONARY_ITEM *item) 
 // callbacks execution
 
 static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
-    if(likely(!dict->hooks || !dict->hooks->ins_callback))
+    if(likely(!dict->hooks || !dict->hooks->insert_callback))
         return;
 
     if(unlikely(is_view_dictionary(dict)))
@@ -604,7 +604,7 @@ static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM
                    dict->creation_line,
                    dict->creation_file);
 
-    dict->hooks->ins_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->ins_callback_data);
+    dict->hooks->insert_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->insert_callback_data);
     DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(dict);
 }
 
@@ -652,7 +652,7 @@ static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM 
 }
 
 static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    if(likely(!dict->hooks || !dict->hooks->del_callback))
+    if(likely(!dict->hooks || !dict->hooks->delete_callback))
         return;
 
     // We may execute delete callback on items deleted from a view,
@@ -666,7 +666,7 @@ static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM
                    dict->creation_line,
                    dict->creation_file);
 
-    dict->hooks->del_callback(item, item->shared->value, dict->hooks->del_callback_data);
+    dict->hooks->delete_callback(item, item->shared->value, dict->hooks->delelte_callback_data);
 
     DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict);
 }
@@ -2450,8 +2450,8 @@ void dictionary_foreach_done(DICTFE *dfe) {
 // The dictionary is locked for reading while this happens
 // do not use other dictionary calls while walking the dictionary - deadlock!
 
-int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data) {
-    if(unlikely(!dict || !callback)) return 0;
+int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data) {
+    if(unlikely(!dict || !walkthrough_callback)) return 0;
 
     if(unlikely(is_dictionary_destroyed(dict))) {
         internal_error(true, "DICTIONARY: attempted to dictionary_walkthrough_rw() on a destroyed dictionary");
@@ -2477,7 +2477,7 @@ int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const D
         if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
             ll_recursive_unlock(dict, rw);
 
-        int r = callback(item, item->shared->value, data);
+        int r = walkthrough_callback(item, item->shared->value, data);
 
         if(unlikely(rw == DICTIONARY_LOCK_REENTRANT))
             ll_recursive_lock(dict, rw);
@@ -2513,8 +2513,8 @@ static int dictionary_sort_compar(const void *item1, const void *item2) {
     return strcmp(item_get_name((*(DICTIONARY_ITEM **)item1)), item_get_name((*(DICTIONARY_ITEM **)item2)));
 }
 
-int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data, dictionary_sorted_compar compar) {
-    if(unlikely(!dict || !callback)) return 0;
+int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data, dict_item_comparator_t item_comparator) {
+    if(unlikely(!dict || !walkthrough_callback)) return 0;
 
     if(unlikely(is_dictionary_destroyed(dict))) {
         internal_error(true, "DICTIONARY: attempted to dictionary_sorted_walkthrough_rw() on a destroyed dictionary");
@@ -2538,8 +2538,8 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
     if(unlikely(i != entries))
         entries = i;
 
-    if(compar)
-        qsort(array, entries, sizeof(DICTIONARY_ITEM *), (qsort_compar)compar);
+    if(item_comparator)
+        qsort(array, entries, sizeof(DICTIONARY_ITEM *), (qsort_compar) item_comparator);
     else
         qsort(array, entries, sizeof(DICTIONARY_ITEM *), dictionary_sort_compar);
 
@@ -2549,7 +2549,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
         item = array[i];
 
         if(callit)
-            r = callback(item, item->shared->value, data);
+            r = walkthrough_callback(item, item->shared->value, data);
 
         dict_item_release_and_check_if_it_is_deleted_and_can_be_removed_under_this_lock_mode(dict, item, rw);
         // item_release(dict, item);

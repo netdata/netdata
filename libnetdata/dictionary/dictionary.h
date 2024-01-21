@@ -130,22 +130,26 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master);
 
 // an insert callback to be called just after an item is added to the dictionary
 // this callback is called while the dictionary is write locked!
-void dictionary_register_insert_callback(DICTIONARY *dict, void (*ins_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
+typedef void (*dict_cb_insert_t)(const DICTIONARY_ITEM *item, void *value, void *data);
+void dictionary_register_insert_callback(DICTIONARY *dict, dict_cb_insert_t insert_callback, void *data);
 
 // a delete callback to be called just before an item is deleted forever
 // this callback is called while the dictionary is write locked!
-void dictionary_register_delete_callback(DICTIONARY *dict, void (*del_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
+typedef void (*dict_cb_delete_t)(const DICTIONARY_ITEM *item, void *value, void *data);
+void dictionary_register_delete_callback(DICTIONARY *dict, dict_cb_delete_t delete_callback, void *data);
 
 // a merge callback to be called when DICT_OPTION_DONT_OVERWRITE_VALUE
 // and an item is already found in the dictionary - the dictionary does nothing else in this case
 // the old_value will remain in the dictionary - the new_value is ignored
 // The callback should return true if the value has been updated (it increases the dictionary version).
-void dictionary_register_conflict_callback(DICTIONARY *dict, bool (*conflict_callback)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data), void *data);
+typedef bool (*dict_cb_conflict_t)(const DICTIONARY_ITEM *item, void *old_value, void *new_value, void *data);
+void dictionary_register_conflict_callback(DICTIONARY *dict, dict_cb_conflict_t conflict_callback, void *data);
 
 // a reaction callback to be called after every item insertion or conflict
 // after the constructors have finished and the items are fully available for use
 // and the dictionary is not write locked anymore
-void dictionary_register_react_callback(DICTIONARY *dict, void (*react_callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
+typedef void (*dict_cb_react_t)(const DICTIONARY_ITEM *item, void *value, void *data);
+void dictionary_register_react_callback(DICTIONARY *dict, dict_cb_react_t react_callback, void *data);
 
 // Destroy a dictionary
 // Returns the number of bytes freed
@@ -236,15 +240,17 @@ size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item
 // You cannot alter the dictionary from inside a dictionary_walkthrough_read() - deadlock!
 // You can only delete the current item from inside a dictionary_walkthrough_write() - you can add as many as you want.
 //
+typedef int (*dict_walkthrough_callback_t)(const DICTIONARY_ITEM *item, void *value, void *data);
+
 #define dictionary_walkthrough_read(dict, callback, data) dictionary_walkthrough_rw(dict, 'r', callback, data)
 #define dictionary_walkthrough_write(dict, callback, data) dictionary_walkthrough_rw(dict, 'w', callback, data)
-int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
+int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data);
 
-typedef int (*dictionary_sorted_compar)(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2);
+typedef int (*dict_item_comparator_t)(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2);
 
 #define dictionary_sorted_walkthrough_read(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'r', callback, data, NULL)
 #define dictionary_sorted_walkthrough_write(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'w', callback, data, NULL)
-int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data, dictionary_sorted_compar compar);
+int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, dict_walkthrough_callback_t walkthrough_callback, void *data, dict_item_comparator_t item_comparator_callback);
 
 // ----------------------------------------------------------------------------
 // Traverse with foreach
