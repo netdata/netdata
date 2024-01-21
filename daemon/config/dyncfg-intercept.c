@@ -159,10 +159,20 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
 
 // ----------------------------------------------------------------------------
 
-static void dyncfg_apply_action_on_all_template_jobs(const char *template_id, DYNCFG_CMDS c) {
+static void dyncfg_apply_action_on_all_template_jobs(struct rrd_function_execute *rfe, const char *template_id, DYNCFG_CMDS c) {
     STRING *template = string_strdupz(template_id);
-
     DYNCFG *df;
+
+    size_t all = 0, done = 0;
+    dfe_start_read(dyncfg_globals.nodes, df) {
+        if(df->template == template && df->type == DYNCFG_TYPE_JOB)
+            all++;
+    }
+    dfe_done(df);
+
+    if(rfe->progress.cb)
+        rfe->progress.cb(rfe->progress.data, done, all);
+
     dfe_start_reentrant(dyncfg_globals.nodes, df) {
         if(df->template == template && df->type == DYNCFG_TYPE_JOB) {
             DYNCFG_CMDS cmd_to_send_to_plugin = c;
@@ -173,6 +183,9 @@ static void dyncfg_apply_action_on_all_template_jobs(const char *template_id, DY
                 cmd_to_send_to_plugin = DYNCFG_CMD_DISABLE;
 
             dyncfg_echo(df_dfe.item, df, df_dfe.name, cmd_to_send_to_plugin);
+
+            if(rfe->progress.cb)
+                rfe->progress.cb(rfe->progress.data, ++done, all);
         }
     }
     dfe_done(df);
@@ -293,7 +306,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
                 dyncfg_file_save(id, df);
         }
 
-        dyncfg_apply_action_on_all_template_jobs(id, c);
+        dyncfg_apply_action_on_all_template_jobs(rfe, id, c);
 
         rc = HTTP_RESP_OK;
         dyncfg_default_response(rfe->result.wb, rc, "applied");
