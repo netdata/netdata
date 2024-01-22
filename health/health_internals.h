@@ -45,6 +45,10 @@
 #define HEALTH_FOREACH_KEY "foreach"
 #define HEALTH_CHART_LABEL_KEY "chart labels"
 
+void alert_action_options_to_buffer_json_array(BUFFER *wb, const char *key, ALERT_ACTION_OPTIONS options);
+ALERT_ACTION_OPTIONS alert_action_options_parse(char *o);
+ALERT_ACTION_OPTIONS alert_action_options_parse_one(const char *o);
+
 typedef struct rrd_alert_prototype {
     struct rrd_alert_match match;
     struct rrd_alert_config config;

@@ -47,7 +47,6 @@ static struct {
         , {"minify"            , 0    , RRDR_OPTION_MINIFY}
         , {"group-by-labels"   , 0    , RRDR_OPTION_GROUP_BY_LABELS}
         , {"label-quotes"      , 0    , RRDR_OPTION_LABEL_QUOTES}
-        , { "no_clear_notification", 0, RRDCALC_OPTION_NO_CLEAR_NOTIFICATION}
         , {NULL                , 0    , 0}
 };
 

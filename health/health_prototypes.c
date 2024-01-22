@@ -4,6 +4,70 @@
 
 // ---------------------------------------------------------------------------------------------------------------------
 
+static struct {
+    const char *name;
+    uint32_t hash;
+    ALERT_ACTION_OPTIONS value;
+} alert_action_options[] = {
+    {  "no-clear-notification", 0    , ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION}
+
+    // terminator
+    , {NULL, 0, 0}
+};
+
+inline ALERT_ACTION_OPTIONS alert_action_options_parse_one(const char *o) {
+    ALERT_ACTION_OPTIONS ret = 0;
+
+    if(!o || !*o) return ret;
+
+    uint32_t hash = simple_hash(o);
+    int i;
+    for(i = 0; alert_action_options[i].name ; i++) {
+        if (unlikely(hash == alert_action_options[i].hash && !strcmp(o, alert_action_options[i].name))) {
+            ret |= alert_action_options[i].value;
+            break;
+        }
+    }
+
+    return ret;
+}
+
+inline ALERT_ACTION_OPTIONS alert_action_options_parse(char *o) {
+    ALERT_ACTION_OPTIONS ret = 0;
+    char *tok;
+
+    while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
+        if(!*tok) continue;
+        ret |= alert_action_options_parse_one(tok);
+    }
+
+    return ret;
+}
+
+void alert_action_options_to_buffer_json_array(BUFFER *wb, const char *key, ALERT_ACTION_OPTIONS options) {
+    buffer_json_member_add_array(wb, key);
+
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    for(int i = 0; alert_action_options[i].name ; i++) {
+        if (unlikely((alert_action_options[i].value & options) && !(alert_action_options[i].value & used))) {
+            const char *name = alert_action_options[i].name;
+            used |= alert_action_options[i].value;
+
+            buffer_json_add_array_item_string(wb, name);
+        }
+    }
+
+    buffer_json_array_close(wb);
+}
+
+static void alert_action_options_init(void) {
+    for(int i = 0; alert_action_options[i].name ; i++)
+        alert_action_options[i].hash = simple_hash(alert_action_options[i].name);
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------------
+
 static void health_prototype_cleanup_one_unsafe(RRD_ALERT_PROTOTYPE *ap) {
     rrd_alert_match_cleanup(&ap->match);
     rrd_alert_config_cleanup(&ap->config);
@@ -93,6 +157,8 @@ void health_init_prototypes(void) {
     dictionary_register_insert_callback(health_globals.prototypes.dict, health_prototype_insert_cb, NULL);
     dictionary_register_conflict_callback(health_globals.prototypes.dict, health_prototype_conflict_cb, NULL);
     dictionary_register_delete_callback(health_globals.prototypes.dict, health_prototype_delete_cb, NULL);
+
+    alert_action_options_init();
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

@@ -83,8 +83,8 @@ static inline int health_parse_delay(
     return 1;
 }
 
-static inline uint32_t health_parse_options(const char *s) {
-    uint32_t options = 0;
+static inline ALERT_ACTION_OPTIONS health_parse_options(const char *s) {
+    ALERT_ACTION_OPTIONS options = ALERT_ACTION_OPTION_NONE;
     char buf[100+1] = "";
 
     while(*s) {
@@ -103,7 +103,7 @@ static inline uint32_t health_parse_options(const char *s) {
             buf[count] = '\0';
 
             if(!strcasecmp(buf, "no-clear-notification") || !strcasecmp(buf, "no-clear"))
-                options |= RRDCALC_OPTION_NO_CLEAR_NOTIFICATION;
+                options |= ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION;
             else
                 netdata_log_error("Ignoring unknown alarm option '%s'", buf);
         }
@@ -174,7 +174,7 @@ static inline int health_parse_db_lookup(
     *after = 0;
     *before = 0;
     *every = 0;
-    *options = (*options) & RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES; // preserve rrdcalc options
+    *options = 0;
 
     char *s = string, *key;
 
@@ -650,7 +650,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                                &ac->delay_max_duration, &ac->delay_multiplier);
         }
         else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
-            ac->options |= health_parse_options(value);
+            ac->alert_action_options |= health_parse_options(value);
         }
         else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
             health_parse_repeat(line, filename, value,

@@ -5,6 +5,11 @@
 
 #include "../web/api/queries/rrdr.h"
 
+typedef enum __attribute__((packed)) {
+    ALERT_ACTION_OPTION_NONE = 0,
+    ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION = (1 << 0),
+} ALERT_ACTION_OPTIONS;
+
 struct rrd_alert_match {
     bool enabled;
 
@@ -52,6 +57,8 @@ struct rrd_alert_config {
     STRING *lookup;                 // the lookup field
 
     int update_every;               // update frequency for the alarm
+
+    ALERT_ACTION_OPTIONS alert_action_options;
 
     // the red and green threshold of this alarm (to be set to the chart)
     NETDATA_DOUBLE green;

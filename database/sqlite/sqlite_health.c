@@ -1110,7 +1110,7 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    if (ap->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
+    if (ap->config.alert_action_options & ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION)
         rc = sqlite3_bind_text(res, ++param, "no-clear-notification", -1, SQLITE_STATIC);
     else
         rc = sqlite3_bind_null(res, ++param);

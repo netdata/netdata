@@ -47,7 +47,6 @@ typedef enum rrdr_options {
     RRDR_OPTION_GROUP_BY_LABELS = (1 << 26), // v2 returns flattened labels per dimension of the chart
 
     // internal ones - not to be exposed to the API
-    RRDCALC_OPTION_NO_CLEAR_NOTIFICATION = (1 << 30), // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
     RRDR_OPTION_INTERNAL_AR              = (1 << 31), // internal use only, to let the formatters know we want to render the anomaly rate
 } RRDR_OPTIONS;
 

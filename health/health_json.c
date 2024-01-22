@@ -112,7 +112,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , (unsigned long)rc->times_repeat
     );
 
-    if(unlikely(rc->config.options & RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)) {
+    if(unlikely(rc->config.alert_action_options & ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION)) {
         buffer_strcat(wb, "\t\t\t\"no_clear_notification\": true,\n");
     }
 

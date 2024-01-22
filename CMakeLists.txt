@@ -2438,6 +2438,7 @@ install(FILES
 
 install(FILES
         collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
+        health/schema.d/health:alert:prototype.json
         DESTINATION usr/lib/netdata/conf.d/schema.d)
 
 #
