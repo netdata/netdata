@@ -9,7 +9,7 @@
 
 int rrdvar_fix_name(char *variable);
 
-#include "rrd.h"
+#include "database/rrd.h"
 
 STRING *rrdvar_name_to_string(const char *name);
 

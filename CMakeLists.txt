@@ -903,6 +903,10 @@ set(HEALTH_PLUGIN_FILES
         health/health_event_loop.c
         health/health_dyncfg.c
         health/health_variable.c
+        health/rrdcalc.c
+        health/rrdcalc.h
+        health/rrdvar.c
+        health/rrdvar.h
 )
 
 set(IDLEJITTER_PLUGIN_FILES collectors/idlejitter.plugin/plugin_idlejitter.c)
@@ -951,8 +955,6 @@ set(RRD_PLUGIN_FILES
         database/contexts/rrdcontext.c
         database/contexts/rrdcontext.h
         database/contexts/worker.c
-        database/rrdcalc.c
-        database/rrdcalc.h
         database/rrdcollector.c
         database/rrdcollector.h
         database/rrddim.c
@@ -969,8 +971,6 @@ set(RRD_PLUGIN_FILES
         database/rrd.c
         database/rrd.h
         database/rrdset.c
-        database/rrdvar.c
-        database/rrdvar.h
         database/storage_engine.c
         database/storage_engine.h
         database/ram/rrddim_mem.c

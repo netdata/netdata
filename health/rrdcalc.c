@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrd.h"
-#include "../health/health_internals.h"
+#include "database/rrd.h"
+#include "health_internals.h"
 
 // ----------------------------------------------------------------------------
 // RRDCALC helpers

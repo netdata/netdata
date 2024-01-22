@@ -38,6 +38,9 @@
 
 #include "global_statistics.h"
 
+// health monitoring and alarm notifications
+#include "health/health.h"
+
 // the netdata database
 #include "database/rrd.h"
 
@@ -52,8 +55,6 @@
 // streaming metrics between netdata servers
 #include "streaming/rrdpush.h"
 
-// health monitoring and alarm notifications
-#include "health/health.h"
 
 // anomaly detection
 #include "ml/ml.h"

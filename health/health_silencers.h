@@ -43,6 +43,7 @@ int health_initialize_global_silencers();
 
 void free_silencers(SILENCER *t);
 
+struct web_client;
 int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, char *url);
 
 const char *health_silencers_filename(void);

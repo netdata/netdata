@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "rrd.h"
+#include "database/rrd.h"
 
 typedef struct rrdvar {
     NETDATA_DOUBLE value;

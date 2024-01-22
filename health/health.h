@@ -4,7 +4,7 @@
 #define NETDATA_HEALTH_H 1
 
 #include "daemon/common.h"
-#include "../database/rrdcalc.h"
+#include "rrdcalc.h"
 
 typedef enum __attribute__((packed)) {
     HEALTH_ENTRY_FLAG_PROCESSED             = 0x00000001, // notifications engine has processed this
