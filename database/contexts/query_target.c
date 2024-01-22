@@ -82,6 +82,14 @@ void query_target_release(QUERY_TARGET *qt) {
 
     simple_pattern_free(qt->instances.labels_pattern);
     qt->instances.labels_pattern = NULL;
+    {
+        for(size_t i = 0; i < qt->instances.labels_pattern_array.size; i++)
+            simple_pattern_free(qt->instances.labels_pattern_array.labels_pattern[i]);
+
+        freez(qt->instances.labels_pattern_array.labels_pattern);
+        qt->instances.labels_pattern_array.labels_pattern = NULL;
+        qt->instances.labels_pattern_array.size = 0;
+    }
 
     simple_pattern_free(qt->query.pattern);
     qt->query.pattern = NULL;
@@ -725,11 +733,26 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
     return ret;
 }
 
-static inline bool query_instance_matches_labels(RRDINSTANCE *ri, SIMPLE_PATTERN *chart_label_key_sp, SIMPLE_PATTERN *labels_sp) {
-    if ((chart_label_key_sp && !rrdlabels_match_simple_pattern_parsed(
-            ri->rrdlabels, chart_label_key_sp, '\0', NULL)) ||
-        (labels_sp && !rrdlabels_match_simple_pattern_parsed(
-                ri->rrdlabels, labels_sp, ':', NULL)))
+static inline bool query_instance_matches_labels(
+    RRDINSTANCE *ri,
+    SIMPLE_PATTERN *chart_label_key_sp,
+    SIMPLE_PATTERN *labels_sp,
+    SIMPLE_PATTERN **labels_sp_list,
+    size_t labels_sp_list_count)
+{
+
+    if (chart_label_key_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, chart_label_key_sp, '\0', NULL))
+        return false;
+
+    if (labels_sp_list) {
+        for (size_t i = 0; i < labels_sp_list_count; i++) {
+            if (!rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, labels_sp_list[i], ':', NULL))
+                return false;
+        }
+        return true;
+    }
+
+    if (labels_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, labels_sp, ':', NULL))
         return false;
 
     return true;
@@ -752,7 +775,12 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
                 qi, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qt->request.version, qtl->host_node_id_str));
 
     if(queryable_instance)
-        queryable_instance = query_instance_matches_labels(ri, qt->instances.chart_label_key_pattern, qt->instances.labels_pattern);
+        queryable_instance = query_instance_matches_labels(
+            ri,
+            qt->instances.chart_label_key_pattern,
+            qt->instances.labels_pattern,
+            qt->instances.labels_pattern_array.labels_pattern,
+            qt->instances.labels_pattern_array.size);
 
     if(queryable_instance) {
         if(qt->instances.alerts_pattern && !query_target_match_alert_pattern(ria, qt->instances.alerts_pattern))
@@ -1021,6 +1049,72 @@ void query_target_generate_name(QUERY_TARGET *qt) {
     json_fix_string(qt->id);
 }
 
+static void add_label_pattern(QUERY_TARGET *qt, char *label_key_value)
+{
+    char *label_key;
+
+    if (unlikely(!label_key_value || !(label_key = strchr(label_key_value, ':'))))
+        return;
+
+    *label_key = '\0';
+    STRING *key_match = string_strdupz(label_key_value);
+    *label_key = ':';
+
+    size_t index = -1;
+    bool need_to_add = true;
+    for (size_t i = 0; i < qt->instances.labels_pattern_array.size; i++) {
+        if (qt->instances.labels_pattern_array.key[i] == key_match) {
+            index = i;
+            need_to_add = false;
+            break;
+        }
+    }
+
+    // Need to allocate
+    if (need_to_add) {
+        size_t new_size = qt->instances.labels_pattern_array.size + 1;
+        index = new_size - 1;
+        qt->instances.labels_pattern_array.buffer_list =
+            reallocz(qt->instances.labels_pattern_array.buffer_list, new_size * sizeof(BUFFER *));
+        qt->instances.labels_pattern_array.key =
+            reallocz(qt->instances.labels_pattern_array.key, new_size * sizeof(STRING *));
+
+        qt->instances.labels_pattern_array.buffer_list[index] = buffer_create(128, NULL);
+        qt->instances.labels_pattern_array.key[index] = key_match;
+        qt->instances.labels_pattern_array.size = new_size;
+    } else
+        buffer_strncat(qt->instances.labels_pattern_array.buffer_list[index], ",", 1);
+
+    buffer_strcat(qt->instances.labels_pattern_array.buffer_list[index], label_key_value);
+}
+
+static void build_pattern_list(QUERY_TARGET *qt)
+{
+    SIMPLE_PATTERN *pattern = qt->instances.labels_pattern;
+
+    if (unlikely(!pattern))
+        return;
+
+    char *label_key = NULL;
+
+    while (pattern && (label_key = simple_pattern_iterate(&pattern)))
+        add_label_pattern(qt, label_key);
+
+    qt->instances.labels_pattern_array.labels_pattern = callocz(qt->instances.labels_pattern_array.size, sizeof(SIMPLE_PATTERN *));
+
+    for (size_t i = 0; i < qt->instances.labels_pattern_array.size; i++) {
+        qt->instances.labels_pattern_array.labels_pattern[i] =
+            string_to_simple_pattern(buffer_tostring(qt->instances.labels_pattern_array.buffer_list[i]));
+        buffer_free(qt->instances.labels_pattern_array.buffer_list[i]);
+        string_freez(qt->instances.labels_pattern_array.key[i]);
+    }
+    freez(qt->instances.labels_pattern_array.buffer_list);
+    qt->instances.labels_pattern_array.buffer_list = NULL;
+
+    freez(qt->instances.labels_pattern_array.key);
+    qt->instances.labels_pattern_array.key = NULL;
+}
+
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     if(!service_running(ABILITY_DATA_QUERIES))
         return NULL;
@@ -1085,6 +1179,10 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->query.pattern = string_to_simple_pattern(qtl.dimensions);
     qt->instances.chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);
     qt->instances.labels_pattern = string_to_simple_pattern(qtl.labels);
+
+    if (qt->instances.labels_pattern)
+        build_pattern_list(qt);
+
     qt->instances.alerts_pattern = string_to_simple_pattern(qtl.alerts);
 
     qtl.match_ids = qt->request.options & RRDR_OPTION_MATCH_IDS;
@@ -1172,7 +1270,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                         continue;
                 }
 
-                if(!query_instance_matches_labels(ri, chart_label_key_sp, labels_sp))
+                if(!query_instance_matches_labels(ri, chart_label_key_sp, labels_sp, NULL, 0))
                     continue;
 
                 if(alerts_sp && !query_target_match_alert_pattern(ria, alerts_sp))

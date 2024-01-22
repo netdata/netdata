@@ -379,6 +379,12 @@ typedef struct query_target {
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
         SIMPLE_PATTERN *labels_pattern;
+        struct {
+            BUFFER **buffer_list;
+            STRING **key;
+            SIMPLE_PATTERN **labels_pattern;
+            size_t size;
+        } labels_pattern_array;
         SIMPLE_PATTERN *alerts_pattern;
         SIMPLE_PATTERN *chart_label_key_pattern;
     } instances;
