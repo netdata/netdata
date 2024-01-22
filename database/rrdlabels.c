@@ -1009,8 +1009,9 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
         if(unlikely(!PValue || PValue == PJERR))
             fatal("RRDLABELS migrate: corrupted labels array");
 
-        RRDLABEL_SRC flag = RRDLABEL_FLAG_NEW;
+        RRDLABEL_SRC flag;
         if (!*PValue) {
+            flag = (ls & ~(RRDLABEL_FLAG_OLD | RRDLABEL_FLAG_NEW)) | RRDLABEL_FLAG_NEW;
             dup_label(label);
             size_t mem_after_judyl = JudyLMemUsed(dst->JudyL);
             STATS_PLUS_MEMORY(&dictionary_stats_category_rrdlabels, 0, mem_after_judyl - mem_before_judyl, 0);
@@ -1374,7 +1375,7 @@ RRDLABEL *rrdlabels_find_label_with_key(RRDLABELS *labels, const char *key, RRDL
         if (lb->index.key == this_key) {
             if (source)
                 *source = ls;
-           break;
+            break;
         }
     }
     lfe_done(labels);
@@ -1490,7 +1491,7 @@ static int rrdlabels_unittest_expect_value(RRDLABELS *labels, const char *key, c
 {
     RRDLABEL_SRC source;
     RRDLABEL *label = rrdlabels_find_label_with_key(labels, key, &source);
-    return (!label || strcmp(string2str(label->index.value), value) != 0 || !(source & required_source));
+    return (!label || strcmp(string2str(label->index.value), value) != 0 || (source != required_source));
 }
 
 static int rrdlabels_unittest_double_check()
@@ -1501,15 +1502,15 @@ static int rrdlabels_unittest_double_check()
     RRDLABELS *labels = rrdlabels_create();
 
     rrdlabels_add(labels, "key1", "value1", RRDLABEL_SRC_CONFIG);
-    ret += rrdlabels_unittest_expect_value(labels, "key1", "value1", RRDLABEL_FLAG_NEW);
+    ret += rrdlabels_unittest_expect_value(labels, "key1", "value1", RRDLABEL_FLAG_NEW | RRDLABEL_SRC_CONFIG);
 
-    rrdlabels_add(labels, "key1", "value2", RRDLABEL_SRC_K8S);
-    ret += !rrdlabels_unittest_expect_value(labels, "key1", "value2", RRDLABEL_FLAG_OLD);
+    rrdlabels_add(labels, "key1", "value2", RRDLABEL_SRC_CONFIG);
+    ret += !rrdlabels_unittest_expect_value(labels, "key1", "value2", RRDLABEL_FLAG_OLD | RRDLABEL_SRC_CONFIG);
 
-    rrdlabels_add(labels, "key1", "value3", RRDLABEL_SRC_ACLK);
-    ret += !rrdlabels_unittest_expect_value(labels, "key1", "value3", RRDLABEL_FLAG_OLD);
+    rrdlabels_add(labels, "key2", "value1", RRDLABEL_SRC_ACLK|RRDLABEL_SRC_AUTO);
+    ret += !rrdlabels_unittest_expect_value(labels, "key1", "value3", RRDLABEL_FLAG_NEW | RRDLABEL_SRC_ACLK);
 
-    ret += (rrdlabels_entries(labels) != 1);
+    ret += (rrdlabels_entries(labels) != 2);
 
     rrdlabels_destroy(labels);
 
@@ -1569,6 +1570,12 @@ static int rrdlabels_unittest_migrate_check()
     fprintf(stderr, "Labels2 entries found %zu  (should be 3)\n",  rrdlabels_entries(labels2));
 
     rrdlabels_migrate_to_these(labels1, labels2);
+
+    int rc = 0;
+    rc = rrdlabels_unittest_expect_value(labels1, "key1", "value2", RRDLABEL_FLAG_OLD | RRDLABEL_SRC_CONFIG);
+    if (rc)
+        return rc;
+
     fprintf(stderr, "labels1 (migrated) entries found %zu (should be 3)\n",  rrdlabels_entries(labels1));
     size_t entries = rrdlabels_entries(labels1);
 
@@ -1592,24 +1599,18 @@ static int rrdlabels_unittest_migrate_check()
     rrdlabels_add(labels2, "key1", "value1", RRDLABEL_SRC_CONFIG);
     rrdlabels_add(labels2, "key2", "value2", RRDLABEL_SRC_CONFIG);
 
-    size_t count = rrdlabels_common_count(labels1, labels2);
-    fprintf(stderr, "common labels = %zu (expected 2)\n",  count);
-    if (count != 2)
-        return 1;
-
-    int rc = 0;
-    rc = rrdlabels_unittest_expect_value(labels1, "key1", "value1", RRDLABEL_FLAG_NEW);
+    rc = rrdlabels_unittest_expect_value(labels1, "key1", "value1", RRDLABEL_FLAG_NEW | RRDLABEL_SRC_CONFIG);
     if (rc)
         return rc;
 
     rrdlabels_walkthrough_index_read(labels2, unittest_dump_labels, "\nlabels2");
 
     rrdlabels_copy(labels1, labels2); // labels1 should have 5 keys
-    rc = rrdlabels_unittest_expect_value(labels1, "key1", "value1", RRDLABEL_FLAG_OLD);
+    rc = rrdlabels_unittest_expect_value(labels1, "key1", "value1", RRDLABEL_FLAG_OLD  | RRDLABEL_SRC_CONFIG);
     if (rc)
         return rc;
 
-    rc = rrdlabels_unittest_expect_value(labels1, "key0", "value0", RRDLABEL_FLAG_NEW);
+    rc = rrdlabels_unittest_expect_value(labels1, "key0", "value0", RRDLABEL_FLAG_NEW | RRDLABEL_SRC_CONFIG);
     if (rc)
         return rc;
 
@@ -1621,7 +1622,7 @@ static int rrdlabels_unittest_migrate_check()
         return 1;
 
     rrdlabels_add(labels1, "key0", "value0", RRDLABEL_SRC_CONFIG);
-    rc = rrdlabels_unittest_expect_value(labels1, "key0", "value0", RRDLABEL_FLAG_OLD);
+    rc = rrdlabels_unittest_expect_value(labels1, "key0", "value0", RRDLABEL_FLAG_OLD | RRDLABEL_SRC_CONFIG);
 
     rrdlabels_destroy(labels1);
     rrdlabels_destroy(labels2);
