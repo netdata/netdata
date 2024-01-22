@@ -184,7 +184,7 @@ jobs:
       - name: Cache
         if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')) && needs.file-check.outputs.run == 'true'
         id: cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: artifacts/cache
           key: ${{ steps.cache-key.outputs.key }}
