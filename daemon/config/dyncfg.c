@@ -348,7 +348,9 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         dyncfg_echo(item, df, id, status_to_send_to_plugin);
     }
 
-    dyncfg_send_updates(id);
+    if(!(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && df->type == DYNCFG_TYPE_JOB))
+        dyncfg_send_updates(id);
+
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 
     return true;

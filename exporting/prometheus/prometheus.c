@@ -530,7 +530,6 @@ static void prometheus_print_os_info(
     FILE *fp;
     char filename[FILENAME_MAX + 1];
     char buf[BUFSIZ + 1];
-    int first_line = 1;
 
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/etc/os-release");
     fp = fopen(filename, "r");
@@ -592,7 +591,6 @@ static void prometheus_print_os_info(
           *val = '\0';
           val++;
           buffer_sprintf(wb, ",%s=\"%s\"", key, val);
-          first_line = 0;
       }
     }
 
