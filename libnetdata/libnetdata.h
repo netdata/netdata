@@ -572,7 +572,7 @@ void recursive_config_double_dir_load(
         const char *user_path
         , const char *stock_path
         , const char *subpath
-        , int (*callback)(const char *filename, void *data)
+        , int (*callback)(const char *filename, void *data, bool stock_config)
         , void *data
         , size_t depth
 );
@@ -744,7 +744,7 @@ extern char *netdata_configured_host_prefix;
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
 #include "url/url.h"
 #include "json/json.h"
-#include "health/health.h"
+#include "json/json-c-parser-inline.h"
 #include "string/utf8.h"
 #include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
@@ -902,7 +902,7 @@ extern bool unittest_running;
 #define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now);
-bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running);
+bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest);
 
 int netdata_base64_decode(const char *encoded, char *decoded, size_t decoded_size);
 

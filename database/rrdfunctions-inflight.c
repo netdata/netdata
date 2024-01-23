@@ -403,6 +403,19 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
     rrd_functions_sanitize(sanitized_source, source ? source : "", sizeof(sanitized_source));
 
     // ------------------------------------------------------------------------
+    // check for the host
+    if(!host) {
+        code = HTTP_RESP_INTERNAL_SERVER_ERROR;
+
+        rrd_call_function_error(result_wb, "no host given for running the function", code);
+
+        if(result_cb)
+            result_cb(result_wb, code, result_cb_data);
+
+        return code;
+    }
+
+    // ------------------------------------------------------------------------
     // find the function
 
     size_t sanitized_cmd_length = rrd_functions_sanitize(sanitized_cmd, cmd, sizeof(sanitized_cmd));

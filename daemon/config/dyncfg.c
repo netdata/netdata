@@ -5,6 +5,21 @@
 
 struct dyncfg_globals dyncfg_globals = { 0 };
 
+RRDHOST *dyncfg_rrdhost_by_uuid(UUID *uuid) {
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower(uuid->uuid, uuid_str);
+
+    RRDHOST *host = rrdhost_find_by_guid(uuid_str);
+    if(!host)
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot find host with UUID '%s'", uuid_str);
+
+    return host;
+}
+
+RRDHOST *dyncfg_rrdhost(DYNCFG *df) {
+    return dyncfg_rrdhost_by_uuid(&df->host_uuid);
+}
+
 void dyncfg_cleanup(DYNCFG *v) {
     buffer_free(v->payload);
     v->payload = NULL;
@@ -69,8 +84,8 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
     dyncfg_normalize(nv);
 
-    if(v->host != nv->host) {
-        SWAP(v->host, nv->host);
+    if(!UUIDeq(v->host_uuid, nv->host_uuid)) {
+        SWAP(v->host_uuid, nv->host_uuid);
         changes++;
     }
 
@@ -164,7 +179,7 @@ void dyncfg_init_low_level(bool load_saved) {
 
 const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data, bool overwrite_cb) {
     DYNCFG tmp = {
-        .host = host,
+        .host_uuid = uuid2UUID(host->host_uuid),
         .path = string_strdupz(path),
         .status = status,
         .type = type,
@@ -181,7 +196,6 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
         .execute_cb_data = execute_cb_data,
         .overwrite_cb = overwrite_cb,
     };
-    uuid_copy(tmp.host_uuid, host->host_uuid);
 
     return dictionary_set_and_acquire_item_advanced(dyncfg_globals.nodes, id, -1, &tmp, sizeof(tmp), NULL);
 }
@@ -196,21 +210,26 @@ static void dyncfg_send_updates(const char *id) {
     DYNCFG *df = dictionary_acquired_item_value(item);
 
     if(df->type == DYNCFG_TYPE_SINGLE || df->type == DYNCFG_TYPE_JOB) {
-        if (df->cmds & DYNCFG_CMD_UPDATE)
+        if (df->cmds & DYNCFG_CMD_UPDATE && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && df->payload && buffer_strlen(df->payload))
             dyncfg_echo_update(item, df, id);
     }
     else if(df->type == DYNCFG_TYPE_TEMPLATE && (df->cmds & DYNCFG_CMD_ADD)) {
         STRING *template = string_strdupz(id);
 
         size_t len = strlen(id);
-        DYNCFG *tf;
-        dfe_start_reentrant(dyncfg_globals.nodes, tf) {
-            const char *t_id = tf_dfe.name;
-            if(tf->type == DYNCFG_TYPE_JOB && tf->template == template && strncmp(t_id, id, len) == 0 && t_id[len] == ':' && t_id[len + 1]) {
-                dyncfg_echo_add(item, df, id, &t_id[len + 1]);
+        DYNCFG *df_job;
+        dfe_start_reentrant(dyncfg_globals.nodes, df_job) {
+            const char *id_template = df_job_dfe.name;
+            if(df_job->type == DYNCFG_TYPE_JOB &&                   // it is a job
+                df_job->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && // it is dynamically configured
+                df_job->template == template &&                     // it has the same template name
+                strncmp(id_template, id, len) == 0 &&               // the template name matches (redundant)
+                id_template[len] == ':' &&                          // immediately after the template there is ':'
+                id_template[len + 1]) {                             // and there is something else after the ':'
+                dyncfg_echo_add(item, df_job_dfe.item, df, df_job, id, &id_template[len + 1]);
             }
         }
-        dfe_done(tf);
+        dfe_done(df_job);
 
         string_freez(template);
     }
@@ -279,11 +298,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
     }
 
     // remove
-    if(source_type == DYNCFG_SOURCE_TYPE_DYNCFG && type == DYNCFG_TYPE_JOB) {
-        // remove is only available for dyncfg jobs
-        cmds |= DYNCFG_CMD_REMOVE;
-    }
-    else {
+    if(source_type != DYNCFG_SOURCE_TYPE_DYNCFG || type != DYNCFG_TYPE_JOB) {
         // remove is only available for dyncfg jobs
         cmds &= ~DYNCFG_CMD_REMOVE;
     }
@@ -323,12 +338,19 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         dyncfg_function_intercept_cb,
         NULL);
 
-    DYNCFG_CMDS status_to_send_to_plugin = df->user_disabled ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
-    if(status_to_send_to_plugin == DYNCFG_CMD_ENABLE && dyncfg_is_user_disabled(string2str(df->template)))
-        status_to_send_to_plugin = DYNCFG_CMD_DISABLE;
+    if(df->type != DYNCFG_TYPE_TEMPLATE) {
+        DYNCFG_CMDS status_to_send_to_plugin =
+            (df->user_disabled || df->status == DYNCFG_STATUS_DISABLED) ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
 
-    dyncfg_echo(item, df, id, status_to_send_to_plugin);
-    dyncfg_send_updates(id);
+        if (status_to_send_to_plugin == DYNCFG_CMD_ENABLE && dyncfg_is_user_disabled(string2str(df->template)))
+            status_to_send_to_plugin = DYNCFG_CMD_DISABLE;
+
+        dyncfg_echo(item, df, id, status_to_send_to_plugin);
+    }
+
+    if(!(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && df->type == DYNCFG_TYPE_JOB))
+        dyncfg_send_updates(id);
+
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 
     return true;

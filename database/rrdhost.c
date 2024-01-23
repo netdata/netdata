@@ -230,8 +230,8 @@ static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, co
 
 void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode,
                          const char *registry_hostname, const char *os, const char *tags,
-                         const char *tzone, const char *abbrev_tzone, int32_t utc_offset, const char *program_name,
-                         const char *program_version)
+                         const char *tzone, const char *abbrev_tzone, int32_t utc_offset, const char *prog_name,
+                         const char *prog_version)
 {
 
     host->rrd_update_every = update_every;
@@ -241,8 +241,8 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
     rrdhost_init_timezone(host, tzone, abbrev_tzone, utc_offset);
     rrdhost_init_tags(host, tags);
 
-    host->program_name = string_strdupz((program_name && *program_name) ? program_name : "unknown");
-    host->program_version = string_strdupz((program_version && *program_version) ? program_version : "unknown");
+    host->program_name = string_strdupz((prog_name && *prog_name) ? prog_name : "unknown");
+    host->program_version = string_strdupz((prog_version && *prog_version) ? prog_version : "unknown");
     host->registry_hostname = string_strdupz((registry_hostname && *registry_hostname) ? registry_hostname : rrdhost_hostname(host));
 }
 
@@ -288,8 +288,8 @@ static RRDHOST *rrdhost_create(
         const char *abbrev_timezone,
         int32_t utc_offset,
         const char *tags,
-        const char *program_name,
-        const char *program_version,
+        const char *prog_name,
+        const char *prog_version,
         int update_every,
         long entries,
         RRD_MEMORY_MODE memory_mode,
@@ -326,7 +326,9 @@ int is_legacy = 1;
     strncpyz(host->machine_guid, guid, GUID_LEN + 1);
 
     set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, registry_hostname, os,
-                        tags, timezone, abbrev_timezone, utc_offset, program_name, program_version);
+                        tags, timezone, abbrev_timezone, utc_offset,
+        prog_name,
+        prog_version);
 
     rrdhost_init_hostname(host, hostname, false);
 
@@ -407,8 +409,6 @@ int is_legacy = 1;
     else
         error_report("Host machine GUID %s is not valid", host->machine_guid);
 
-    rrdfamily_index_init(host);
-    rrdcalctemplate_index_init(host);
     rrdcalc_rrdhost_index_init(host);
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
@@ -583,28 +583,28 @@ int is_legacy = 1;
 }
 
 static void rrdhost_update(RRDHOST *host
-                    , const char *hostname
-                    , const char *registry_hostname
-                    , const char *guid
-                    , const char *os
-                    , const char *timezone
-                    , const char *abbrev_timezone
-                    , int32_t utc_offset
-                    , const char *tags
-                    , const char *program_name
-                    , const char *program_version
-                    , int update_every
-                    , long history
-                    , RRD_MEMORY_MODE mode
-                    , unsigned int health_enabled
-                    , unsigned int rrdpush_enabled
-                    , char *rrdpush_destination
-                    , char *rrdpush_api_key
-                    , char *rrdpush_send_charts_matching
-                    , bool rrdpush_enable_replication
-                    , time_t rrdpush_seconds_to_replicate
-                    , time_t rrdpush_replication_step
-                    , struct rrdhost_system_info *system_info
+                           , const char *hostname
+                           , const char *registry_hostname
+                           , const char *guid
+                           , const char *os
+                           , const char *timezone
+                           , const char *abbrev_timezone
+                           , int32_t utc_offset
+                           , const char *tags
+                           , const char *prog_name
+                           , const char *prog_version
+                           , int update_every
+                           , long history
+                           , RRD_MEMORY_MODE mode
+                           , unsigned int health_enabled
+                           , unsigned int rrdpush_enabled
+                           , char *rrdpush_destination
+                           , char *rrdpush_api_key
+                           , char *rrdpush_send_charts_matching
+                           , bool rrdpush_enable_replication
+                           , time_t rrdpush_seconds_to_replicate
+                           , time_t rrdpush_replication_step
+                           , struct rrdhost_system_info *system_info
 )
 {
     UNUSED(guid);
@@ -636,23 +636,25 @@ static void rrdhost_update(RRDHOST *host
         rrdhost_index_add_hostname(host);
     }
 
-    if(strcmp(rrdhost_program_name(host), program_name) != 0) {
+    if(strcmp(rrdhost_program_name(host), prog_name) != 0) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "Host '%s' switched program name from '%s' to '%s'",
-               rrdhost_hostname(host), rrdhost_program_name(host), program_name);
+               rrdhost_hostname(host), rrdhost_program_name(host),
+            prog_name);
 
         STRING *t = host->program_name;
-        host->program_name = string_strdupz(program_name);
+        host->program_name = string_strdupz(prog_name);
         string_freez(t);
     }
 
-    if(strcmp(rrdhost_program_version(host), program_version) != 0) {
+    if(strcmp(rrdhost_program_version(host), prog_version) != 0) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "Host '%s' switched program version from '%s' to '%s'",
-               rrdhost_hostname(host), rrdhost_program_version(host), program_version);
+               rrdhost_hostname(host), rrdhost_program_version(host),
+            prog_version);
 
         STRING *t = host->program_version;
-        host->program_version = string_strdupz(program_version);
+        host->program_version = string_strdupz(prog_version);
         string_freez(t);
     }
 
@@ -703,8 +705,6 @@ static void rrdhost_update(RRDHOST *host
                                    rrdpush_api_key,
                                    rrdpush_send_charts_matching);
 
-        rrdfamily_index_init(host);
-        rrdcalctemplate_index_init(host);
         rrdcalc_rrdhost_index_init(host);
 
         if(rrdpush_enable_replication)
@@ -727,29 +727,29 @@ static void rrdhost_update(RRDHOST *host
 }
 
 RRDHOST *rrdhost_find_or_create(
-          const char *hostname
-        , const char *registry_hostname
-        , const char *guid
-        , const char *os
-        , const char *timezone
-        , const char *abbrev_timezone
-        , int32_t utc_offset
-        , const char *tags
-        , const char *program_name
-        , const char *program_version
-        , int update_every
-        , long history
-        , RRD_MEMORY_MODE mode
-        , unsigned int health_enabled
-        , unsigned int rrdpush_enabled
-        , char *rrdpush_destination
-        , char *rrdpush_api_key
-        , char *rrdpush_send_charts_matching
-        , bool rrdpush_enable_replication
-        , time_t rrdpush_seconds_to_replicate
-        , time_t rrdpush_replication_step
-        , struct rrdhost_system_info *system_info
-        , bool archived
+      const char *hostname
+    , const char *registry_hostname
+    , const char *guid
+    , const char *os
+    , const char *timezone
+    , const char *abbrev_timezone
+    , int32_t utc_offset
+    , const char *tags
+    , const char *prog_name
+    , const char *prog_version
+    , int update_every
+    , long history
+    , RRD_MEMORY_MODE mode
+    , unsigned int health_enabled
+    , unsigned int rrdpush_enabled
+    , char *rrdpush_destination
+    , char *rrdpush_api_key
+    , char *rrdpush_send_charts_matching
+    , bool rrdpush_enable_replication
+    , time_t rrdpush_seconds_to_replicate
+    , time_t rrdpush_replication_step
+    , struct rrdhost_system_info *system_info
+    , bool archived
 ) {
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
@@ -780,9 +780,9 @@ RRDHOST *rrdhost_find_or_create(
                 , abbrev_timezone
                 , utc_offset
                 , tags
-                , program_name
-                , program_version
-                , update_every
+                ,
+            prog_name,
+            prog_version, update_every
                 , history
                 , mode
                 , health_enabled
@@ -809,9 +809,9 @@ RRDHOST *rrdhost_find_or_create(
                , abbrev_timezone
                , utc_offset
                , tags
-               , program_name
-               , program_version
-               , update_every
+               ,
+                prog_name,
+                prog_version, update_every
                , history
                , mode
                , health_enabled
@@ -1046,7 +1046,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         dbengine_enabled = true;
     }
     else {
-        health_init();
         rrdpush_init();
 
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
@@ -1094,7 +1093,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             , default_rrd_update_every
             , default_rrd_history_entries
             , default_rrd_memory_mode
-            , default_health_enabled
+            , health_plugin_enabled()
             , default_rrdpush_enabled
             , default_rrdpush_destination
             , default_rrdpush_api_key
@@ -1111,6 +1110,10 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
         return 1;
 
     dyncfg_host_init(localhost);
+
+    if(!unittest) {
+        health_plugin_init();
+    }
 
     // we register this only on localhost
     // for the other nodes, the origin server should register it
@@ -1270,7 +1273,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     // delete all the RRDSETs of the host
     rrdset_index_destroy(host);
     rrdcalc_rrdhost_index_destroy(host);
-    rrdcalctemplate_index_destroy(host);
 
     // cleanup ML resources
     ml_host_delete(host);
@@ -1321,11 +1323,10 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     simple_pattern_free(host->rrdpush_send_charts_matching);
     freez(host->node_id);
 
-    rrdfamily_index_destroy(host);
     rrd_functions_host_destroy(host);
     rrdvariables_destroy(host->rrdvars);
     if (host == localhost)
-        rrdvariables_destroy(health_rrdvars);
+        health_plugin_destroy();
 
     rrdhost_destroy_rrdcontexts(host);
 

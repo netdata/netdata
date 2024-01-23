@@ -142,7 +142,7 @@ static cmd_status_t cmd_reload_health_execute(char *args, char **message)
 
     nd_log_limits_unlimited();
     netdata_log_info("COMMAND: Reloading HEALTH configuration.");
-    health_reload();
+    health_plugin_reload();
     nd_log_limits_reset();
 
     return CMD_STATUS_SUCCESS;

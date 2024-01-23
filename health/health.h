@@ -4,8 +4,7 @@
 #define NETDATA_HEALTH_H 1
 
 #include "daemon/common.h"
-
-extern unsigned int default_health_enabled;
+#include "rrdcalc.h"
 
 typedef enum __attribute__((packed)) {
     HEALTH_ENTRY_FLAG_PROCESSED             = 0x00000001, // notifications engine has processed this
@@ -41,20 +40,17 @@ void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_
 
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
-extern char *silencers_filename;
-extern SIMPLE_PATTERN *conf_enabled_alarms;
-extern DICTIONARY *health_rrdvars;
+void health_plugin_init(void);
+void health_plugin_destroy(void);
 
-void health_init(void);
-
-void health_reload(void);
+void health_plugin_reload(void);
 
 void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
 void health_alert2json_conf(RRDHOST *host, BUFFER *wb, CONTEXTS_V2_OPTIONS all);
 void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
 
-void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
+void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
 int health_alarm_log_open(RRDHOST *host);
@@ -63,34 +59,18 @@ void health_alarm_log_load(RRDHOST *host);
 
 ALARM_ENTRY* health_create_alarm_entry(
     RRDHOST *host,
-    uint32_t alarm_id,
-    uint32_t alarm_event_id,
-    const uuid_t config_hash_id,
+    RRDCALC *rc,
     time_t when,
-    STRING *name,
-    STRING *chart,
-    STRING *chart_context,
-    STRING *chart_id,
-    STRING *classification,
-    STRING *component,
-    STRING *type,
-    STRING *exec,
-    STRING *recipient,
     time_t duration,
     NETDATA_DOUBLE old_value,
     NETDATA_DOUBLE new_value,
     RRDCALC_STATUS old_status,
     RRDCALC_STATUS new_status,
-    STRING *source,
-    STRING *units,
-    STRING *summary,
-    STRING *info,
     int delay,
     HEALTH_ENTRY_FLAGS flags);
 
 void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
-void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 char *health_user_config_dir(void);
 char *health_stock_config_dir(void);
 void health_alarm_log_free(RRDHOST *host);
@@ -100,12 +80,19 @@ void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 void *health_cmdapi_thread(void *ptr);
 
 char *health_edit_command_from_source(const char *source);
-void sql_refresh_hashes(void);
 
 void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function);
 #define health_log_alert(host, ae) health_log_alert_transition_with_trace(host, ae, __LINE__, __FILE__, __FUNCTION__)
 bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, uuid_t *transitions_id);
+
+int alert_variable_lookup_trace(RRDHOST *host, RRDSET *st, const char *variable, BUFFER *wb);
+
+#include "health_prototypes.h"
+#include "health_silencers.h"
+
+typedef void (*prototype_metadata_cb_t)(void *data, STRING *type, STRING *component, STRING *classification, STRING *recipient);
+void health_prototype_metadata_foreach(void *data, prototype_metadata_cb_t cb);
 
 #endif //NETDATA_HEALTH_H

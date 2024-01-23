@@ -435,23 +435,23 @@ static void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, co
             qm = tqm;
         }
 
-        const char *key, *id, *name;
+        const char *k, *id, *name;
 
         if(v2) {
-            key = rrdmetric_acquired_name(rma);
-            id = key;
-            name = key;
+            k = rrdmetric_acquired_name(rma);
+            id = k;
+            name = k;
         }
         else {
             snprintfz(buf, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
                       rrdmetric_acquired_id(rma),
                       rrdmetric_acquired_name(rma));
-            key = buf;
+            k = buf;
             id = rrdmetric_acquired_id(rma);
             name = rrdmetric_acquired_name(rma);
         }
 
-        z = dictionary_set(dict, key, NULL, sizeof(*z));
+        z = dictionary_set(dict, k, NULL, sizeof(*z));
         if(!z->id) {
             z->id = id;
             z->name = name;
@@ -618,7 +618,7 @@ static void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const c
             rw_spinlock_read_lock(&st->alerts.spinlock);
             if (st->alerts.base) {
                 for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-                    z = dictionary_set(dict, string2str(rc->name), NULL, sizeof(*z));
+                    z = dictionary_set(dict, string2str(rc->config.name), NULL, sizeof(*z));
 
                     switch(rc->status) {
                         case RRDCALC_STATUS_CLEAR:
@@ -887,7 +887,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb) {
     buffer_json_member_add_time_t(wb, "after", r->view.after);
     buffer_json_member_add_time_t(wb, "before", r->view.before);
     buffer_json_member_add_string(wb, "group", time_grouping_tostring(qt->request.time_group_method));
-    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
+    rrdr_options_to_buffer_json_array(wb, "options", options);
 
     if(!rrdr_dimension_names(wb, "dimension_names", r, options))
         rows = 0;
@@ -939,10 +939,10 @@ static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
                 if(rc->status < RRDCALC_STATUS_CLEAR)
                     continue;
 
-                buffer_json_member_add_object(wb, string2str(rc->name));
+                buffer_json_member_add_object(wb, string2str(rc->config.name));
                 buffer_json_member_add_string(wb, "st", rrdcalc_status2string(rc->status));
                 buffer_json_member_add_double(wb, "vl", rc->value);
-                buffer_json_member_add_string(wb, "un", string2str(rc->units));
+                buffer_json_member_add_string(wb, "un", string2str(rc->config.units));
                 buffer_json_object_close(wb);
             }
             buffer_json_object_close(wb);
@@ -1299,7 +1299,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         buffer_json_member_add_object(wb, "request");
         {
             buffer_json_member_add_string(wb, "format", rrdr_format_to_string(qt->request.format));
-            web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", qt->request.options);
+            rrdr_options_to_buffer_json_array(wb, "options", qt->request.options);
 
             buffer_json_member_add_object(wb, "scope");
             buffer_json_member_add_string(wb, "scope_nodes", qt->request.scope_nodes);
@@ -1538,7 +1538,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
 
         if(options & RRDR_OPTION_DEBUG) {
             buffer_json_member_add_string(wb, "format", rrdr_format_to_string(format));
-            web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
+            rrdr_options_to_buffer_json_array(wb, "options", options);
             buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(qt->request.time_group_method));
         }
 

@@ -60,15 +60,15 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
     if(id && *id)
         template = string_strdupz(id);
 
+    UUID host_uuid = uuid2UUID(host->host_uuid);
+
     size_t path_len = strlen(path);
     DYNCFG *df;
     dfe_start_read(dyncfg_globals.nodes, df) {
-        if(!df->host) {
-            if(uuid_memcmp(&df->host_uuid, &host->host_uuid) == 0)
-                df->host = host;
-        }
+        if(!UUIDeq(df->host_uuid, host_uuid))
+            continue;
 
-        if(df->host != host || strncmp(string2str(df->path), path, path_len) != 0)
+        if(strncmp(string2str(df->path), path, path_len) != 0)
             continue;
 
         if(!rrd_function_available(host, string2str(df->function)))

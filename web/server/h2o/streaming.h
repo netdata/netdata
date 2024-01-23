@@ -4,7 +4,13 @@
 #define HTTPD_STREAMING_H
 
 #include "aclk/mqtt_websockets/c-rbuf/cringbuffer.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wtype-limits"
 #include "h2o.h"
+#pragma GCC diagnostic pop
 
 typedef enum {
     STREAM_X_HTTP_1_1 = 0,

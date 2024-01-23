@@ -926,7 +926,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "options")) {
-            options |= web_client_api_request_v1_data_options(value);
+            options |= rrdr_options_parse(value);
         }
         else if(!strcmp(name, "label")) label = value;
         else if(!strcmp(name, "units")) units = value;
@@ -996,7 +996,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     int refresh = 0;
     if(refresh_str && *refresh_str) {
         if(!strcmp(refresh_str, "auto")) {
-            if(rc) refresh = rc->update_every;
+            if(rc) refresh = rc->config.update_every;
             else if(options & RRDR_OPTION_NOT_ALIGNED)
                 refresh = st->update_every;
             else {
@@ -1029,7 +1029,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     }
     if(!units) {
         if(alarm) {
-            if(rc->units)
+            if(rc->config.units)
                 units = rrdcalc_units(rc);
             else
                 units = "";

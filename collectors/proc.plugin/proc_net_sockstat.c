@@ -32,9 +32,9 @@ static int read_tcp_mem(void) {
                   *tcp_mem_high_threshold = NULL;
 
     if(unlikely(!tcp_mem_low_threshold)) {
-        tcp_mem_low_threshold      = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_mem_low");
-        tcp_mem_pressure_threshold = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_mem_pressure");
-        tcp_mem_high_threshold     = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_mem_high");
+        tcp_mem_low_threshold      = rrdvar_host_variable_add_and_acquire(localhost, "tcp_mem_low");
+        tcp_mem_pressure_threshold = rrdvar_host_variable_add_and_acquire(localhost, "tcp_mem_pressure");
+        tcp_mem_high_threshold     = rrdvar_host_variable_add_and_acquire(localhost, "tcp_mem_high");
     }
 
     if(unlikely(!filename)) {
@@ -60,9 +60,9 @@ static int read_tcp_mem(void) {
 
     // fprintf(stderr, "TCP MEM low = %llu, pressure = %llu, high = %llu\n", low, pressure, high);
 
-    rrdvar_custom_host_variable_set(localhost, tcp_mem_low_threshold, low * sysconf(_SC_PAGESIZE) / 1024.0);
-    rrdvar_custom_host_variable_set(localhost, tcp_mem_pressure_threshold, pressure * sysconf(_SC_PAGESIZE) / 1024.0);
-    rrdvar_custom_host_variable_set(localhost, tcp_mem_high_threshold, high * sysconf(_SC_PAGESIZE) / 1024.0);
+    rrdvar_host_variable_set(localhost, tcp_mem_low_threshold, low * sysconf(_SC_PAGESIZE) / 1024.0);
+    rrdvar_host_variable_set(localhost, tcp_mem_pressure_threshold, pressure * sysconf(_SC_PAGESIZE) / 1024.0);
+    rrdvar_host_variable_set(localhost, tcp_mem_high_threshold, high * sysconf(_SC_PAGESIZE) / 1024.0);
 
     return 0;
 }
@@ -81,9 +81,9 @@ static kernel_uint_t read_tcp_max_orphans(void) {
     if(read_single_number_file(filename, &tcp_max_orphans) == 0) {
 
         if(unlikely(!tcp_max_orphans_var))
-            tcp_max_orphans_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_max_orphans");
+            tcp_max_orphans_var = rrdvar_host_variable_add_and_acquire(localhost, "tcp_max_orphans");
 
-        rrdvar_custom_host_variable_set(localhost, tcp_max_orphans_var, tcp_max_orphans);
+        rrdvar_host_variable_set(localhost, tcp_max_orphans_var, tcp_max_orphans);
         return  tcp_max_orphans;
     }
 

@@ -50,7 +50,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         if(!do_sockets && !read_full)
             return 1;
 
-        rrdvar_max = rrdvar_custom_host_variable_add_and_acquire(localhost, "netfilter_conntrack_max");
+        rrdvar_max = rrdvar_host_variable_add_and_acquire(localhost, "netfilter_conntrack_max");
     }
 
     if(likely(read_full)) {
@@ -125,7 +125,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
 
         unsigned long long max;
         if(likely(!read_single_number_file(nf_conntrack_max_filename, &max)))
-            rrdvar_custom_host_variable_set(localhost, rrdvar_max, max);
+            rrdvar_host_variable_set(localhost, rrdvar_max, max);
     }
 
     // --------------------------------------------------------------------

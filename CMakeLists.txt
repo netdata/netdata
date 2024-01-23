@@ -595,8 +595,6 @@ set(LIBNETDATA_FILES
         libnetdata/functions_evloop/functions_evloop.h
         libnetdata/gorilla/gorilla.cc
         libnetdata/gorilla/gorilla.h
-        libnetdata/health/health.c
-        libnetdata/health/health.h
         libnetdata/july/july.c
         libnetdata/july/july.h
         libnetdata/inlined.h
@@ -657,6 +655,7 @@ set(LIBNETDATA_FILES
         libnetdata/http/content_type.h
         libnetdata/config/dyncfg.c
         libnetdata/config/dyncfg.h
+        libnetdata/json/json-c-parser-inline.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -863,7 +862,6 @@ set(API_PLUGIN_FILES
         web/api/formatters/charts2json.h
         web/api/formatters/rrdset2json.c
         web/api/formatters/rrdset2json.h
-        web/api/health/health_cmdapi.c
         web/api/ilove/ilove.c
         web/api/ilove/ilove.h
         web/rtc/webrtc.c
@@ -896,6 +894,19 @@ set(HEALTH_PLUGIN_FILES
         health/health_config.c
         health/health_json.c
         health/health_log.c
+        health/health_prototypes.c
+        health/health_prototypes.h
+        health/health_silencers.c
+        health/health_silencers.h
+        health/health_internals.h
+        health/health_notifications.c
+        health/health_event_loop.c
+        health/health_dyncfg.c
+        health/health_variable.c
+        health/rrdcalc.c
+        health/rrdcalc.h
+        health/rrdvar.c
+        health/rrdvar.h
 )
 
 set(IDLEJITTER_PLUGIN_FILES collectors/idlejitter.plugin/plugin_idlejitter.c)
@@ -944,16 +955,9 @@ set(RRD_PLUGIN_FILES
         database/contexts/rrdcontext.c
         database/contexts/rrdcontext.h
         database/contexts/worker.c
-        database/rrdcalc.c
-        database/rrdcalc.h
-        database/rrdcalctemplate.c
-        database/rrdcalctemplate.h
         database/rrdcollector.c
         database/rrdcollector.h
         database/rrddim.c
-        database/rrddimvar.c
-        database/rrddimvar.h
-        database/rrdfamily.c
         database/rrdfunctions.c
         database/rrdfunctions.h
         database/rrdfunctions-inline.c
@@ -967,10 +971,6 @@ set(RRD_PLUGIN_FILES
         database/rrd.c
         database/rrd.h
         database/rrdset.c
-        database/rrdsetvar.c
-        database/rrdsetvar.h
-        database/rrdvar.c
-        database/rrdvar.h
         database/storage_engine.c
         database/storage_engine.h
         database/ram/rrddim_mem.c
@@ -1410,11 +1410,11 @@ if(ENABLE_H2O)
         )
 
         target_compile_options(h2o PRIVATE
-                -Wno-old-style-declaration
+                -Wno-all -Wno-extra
+                -Wno-shadow
                 -Wno-deprecated-declarations
-                -Wno-unused-parameter
-                -Wno-sign-compare
-                -Wno-missing-field-initializers)
+                -Wformat
+        )
 
         target_compile_options(h2o PUBLIC -DH2O_USE_LIBUV=0)
 
@@ -1429,12 +1429,13 @@ endif()
 
 add_library(judy STATIC ${LIBJUDY_SOURCES})
 
-target_compile_options(judy PUBLIC
-        -Wno-sign-compare
-        -Wno-implicit-fallthrough
+target_compile_options(judy PRIVATE
+        -Wno-all -Wno-extra
+        -Wno-shadow
+        -Wformat
 )
 
-target_compile_definitions(judy PUBLIC
+target_compile_definitions(judy PRIVATE
         JUDYL
         $<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:JU_64BIT>
 )
@@ -2437,6 +2438,7 @@ install(FILES
 
 install(FILES
         collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
+        health/schema.d/health:alert:prototype.json
         DESTINATION usr/lib/netdata/conf.d/schema.d)
 
 #

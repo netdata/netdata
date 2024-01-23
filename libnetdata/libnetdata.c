@@ -1503,11 +1503,14 @@ int path_is_file(const char *path, const char *subpath) {
     return is_file;
 }
 
-void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data), void *data, size_t depth) {
+void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data, bool stock_config), void *data, size_t depth) {
     if(depth > 3) {
         netdata_log_error("CONFIG: Max directory depth reached while reading user path '%s', stock path '%s', subpath '%s'", user_path, stock_path, subpath);
         return;
     }
+
+    if(!stock_path)
+        stock_path = user_path;
 
     char *udir = strdupz_path_subpath(user_path, subpath);
     char *sdir = strdupz_path_subpath(stock_path, subpath);
@@ -1542,7 +1545,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                     char *filename = strdupz_path_subpath(udir, de->d_name);
                     netdata_log_debug(D_HEALTH, "CONFIG calling callback for user file '%s'", filename);
-                    callback(filename, data);
+                    callback(filename, data, false);
                     freez(filename);
                     continue;
                 }
@@ -1590,7 +1593,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                         len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                         char *filename = strdupz_path_subpath(sdir, de->d_name);
                         netdata_log_debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
-                        callback(filename, data);
+                        callback(filename, data, true);
                         freez(filename);
                         continue;
                     }
@@ -1997,7 +2000,7 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now)
 }
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
-bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running) {
+bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest) {
     time_t now = now_realtime_sec() - 1;
 
     if(now_ptr)
@@ -2011,16 +2014,16 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
     time_t absolute_minimum_time = now - (10 * 365 * 86400);
     time_t absolute_maximum_time = now + (1 * 365 * 86400);
 
-    if (after_requested < absolute_minimum_time && !unittest_running)
+    if (after_requested < absolute_minimum_time && !unittest)
         after_requested = absolute_minimum_time;
 
-    if (after_requested > absolute_maximum_time && !unittest_running)
+    if (after_requested > absolute_maximum_time && !unittest)
         after_requested = absolute_maximum_time;
 
-    if (before_requested < absolute_minimum_time && !unittest_running)
+    if (before_requested < absolute_minimum_time && !unittest)
         before_requested = absolute_minimum_time;
 
-    if (before_requested > absolute_maximum_time && !unittest_running)
+    if (before_requested > absolute_maximum_time && !unittest)
         before_requested = absolute_maximum_time;
 
     *before = before_requested;

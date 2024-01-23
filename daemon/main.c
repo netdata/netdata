@@ -1369,12 +1369,6 @@ int get_system_info(struct rrdhost_system_info *system_info) {
     return 0;
 }
 
-void set_silencers_filename() {
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/health.silencers.json", netdata_configured_varlib_dir);
-    silencers_filename = config_get(CONFIG_SECTION_HEALTH, "silencers file", filename);
-}
-
 /* Any config setting that can be accessed without a default value i.e. configget(...,...,NULL) *MUST*
    be set in this procedure to be called in all the relevant code paths.
 */
@@ -1407,7 +1401,7 @@ int unittest_prepare_rrd(char **user) {
     get_netdata_configured_variables();
     default_rrd_update_every = 1;
     default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
-    default_health_enabled = 0;
+    health_plugin_disable();
     storage_tiers = 1;
     registry_init();
     if(rrd_init("unittest", NULL, true)) {
@@ -2006,7 +2000,7 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // This is the safest place to start the SILENCERS structure
 
-        set_silencers_filename();
+        health_set_silencers_filename();
         health_initialize_global_silencers();
 
         // --------------------------------------------------------------------
@@ -2071,9 +2065,9 @@ int main(int argc, char **argv) {
 
 #ifdef ENABLE_H2O
         delta_startup_time("initialize h2o server");
-        for (int i = 0; static_threads[i].name; i++) {
-            if (static_threads[i].start_routine == h2o_main)
-                static_threads[i].enabled = httpd_is_enabled();
+        for (int t = 0; static_threads[t].name; t++) {
+            if (static_threads[t].start_routine == h2o_main)
+                static_threads[t].enabled = httpd_is_enabled();
         }
 #endif
     }

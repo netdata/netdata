@@ -627,7 +627,7 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
     rw_spinlock_read_lock(&st->alerts.spinlock);
     if (st->alerts.base) {
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-            SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_string_extract(pattern, rc->name, NULL, 0);
+            SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_string_extract(pattern, rc->config.name, NULL, 0);
 
             if(ret == SP_MATCHED_POSITIVE) {
                 matched = true;
@@ -641,7 +641,7 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
             else
                 buffer_flush(wb);
 
-            buffer_fast_strcat(wb, string2str(rc->name), string_strlen(rc->name));
+            buffer_fast_strcat(wb, string2str(rc->config.name), string_strlen(rc->config.name));
             buffer_fast_strcat(wb, ":", 1);
             buffer_strcat(wb, rrdcalc_status2string(rc->status));
 

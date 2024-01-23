@@ -1635,40 +1635,40 @@ int unit_test(long delay, long shift)
 
 int test_sqlite(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
-    sqlite3  *db_meta;
+    sqlite3  *db_mt;
     fprintf(stderr, "Testing SQLIte\n");
 
-    int rc = sqlite3_open(":memory:", &db_meta);
+    int rc = sqlite3_open(":memory:", &db_mt);
     if (rc != SQLITE_OK) {
         fprintf(stderr,"Failed to test SQLite: DB init failed\n");
         return 1;
     }
 
-    rc = sqlite3_exec_monitored(db_meta, "CREATE TABLE IF NOT EXISTS mine (id1, id2);", 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_mt, "CREATE TABLE IF NOT EXISTS mine (id1, id2);", 0, 0, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr,"Failed to test SQLite: Create table failed\n");
         return 1;
     }
 
-    rc = sqlite3_exec_monitored(db_meta, "DELETE FROM MINE LIMIT 1;", 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_mt, "DELETE FROM MINE LIMIT 1;", 0, 0, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr,"Failed to test SQLite: Delete with LIMIT failed\n");
         return 1;
     }
 
-    rc = sqlite3_exec_monitored(db_meta, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_mt, "UPDATE MINE SET id1=1 LIMIT 1;", 0, 0, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr,"Failed to test SQLite: Update with LIMIT failed\n");
         return 1;
     }
 
-    rc = sqlite3_create_function(db_meta, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
+    rc = sqlite3_create_function(db_mt, "now_usec", 1, SQLITE_ANY, 0, sqlite_now_usec, 0, 0);
     if (unlikely(rc != SQLITE_OK)) {
         fprintf(stderr, "Failed to register internal now_usec function");
         return 1;
     }
 
-    rc = sqlite3_exec_monitored(db_meta, "UPDATE MINE SET id1=now_usec(0);", 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_mt, "UPDATE MINE SET id1=now_usec(0);", 0, 0, NULL);
     if (rc != SQLITE_OK) {
         fprintf(stderr,"Failed to test SQLite: Update with now_usec() failed\n");
         return 1;
@@ -1678,16 +1678,16 @@ int test_sqlite(void) {
     char *uuid_str = "0000_000";
 
     buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
-    rc = sqlite3_exec_monitored(db_meta, buffer_tostring(sql), 0, 0, NULL);
+    rc = sqlite3_exec_monitored(db_mt, buffer_tostring(sql), 0, 0, NULL);
     if (rc != SQLITE_OK)
         goto error;
 
     buffer_free(sql);
     fprintf(stderr,"SQLite is OK\n");
-    rc = sqlite3_close_v2(db_meta);
+    rc = sqlite3_close_v2(db_mt);
     return 0;
 error:
-    rc = sqlite3_close_v2(db_meta);
+    rc = sqlite3_close_v2(db_mt);
     fprintf(stderr,"SQLite statement failed: %s\n", buffer_tostring(sql));
     buffer_free(sql);
     fprintf(stderr,"SQLite tests failed\n");
@@ -1837,7 +1837,7 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
         default_rrd_update_every,
         default_rrd_history_entries,
         RRD_MEMORY_MODE_DBENGINE,
-        default_health_enabled,
+        health_plugin_enabled(),
         default_rrdpush_enabled,
         default_rrdpush_destination,
         default_rrdpush_api_key,

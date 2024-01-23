@@ -1647,7 +1647,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
         arl_expect(arl_udplite, "InCsumErrors", &snmp_root.udplite_InCsumErrors);
         arl_expect(arl_udplite, "IgnoredMulti", &snmp_root.udplite_IgnoredMulti);
 
-        tcp_max_connections_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_max_connections");
+        tcp_max_connections_var = rrdvar_host_variable_add_and_acquire(localhost, "tcp_max_connections");
     }
 
     size_t lines, l, words;
@@ -2713,7 +2713,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
     // snmp Tcp charts
 
     // this is smart enough to update it, only when it is changed
-    rrdvar_custom_host_variable_set(localhost, tcp_max_connections_var, snmp_root.tcp_MaxConn);
+    rrdvar_host_variable_set(localhost, tcp_max_connections_var, snmp_root.tcp_MaxConn);
 
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
     if(do_tcp_sockets == CONFIG_BOOLEAN_YES || (do_tcp_sockets == CONFIG_BOOLEAN_AUTO &&

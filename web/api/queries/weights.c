@@ -158,7 +158,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
 
     buffer_json_member_add_string(wb, "group", time_grouping_tostring(group));
     buffer_json_member_add_string(wb, "method", weights_method_to_string(method));
-    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
+    rrdr_options_to_buffer_json_array(wb, "options", options);
 }
 
 static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
@@ -372,7 +372,7 @@ static void results_header_to_json_v2(DICTIONARY *results __maybe_unused, BUFFER
 
     buffer_json_member_add_object(wb, "request");
     buffer_json_member_add_string(wb, "method", weights_method_to_string(method));
-    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", options);
+    rrdr_options_to_buffer_json_array(wb, "options", options);
 
     buffer_json_member_add_object(wb, "scope");
     buffer_json_member_add_string(wb, "scope_nodes", qwd->qwr->scope_nodes ? qwd->qwr->scope_nodes : "*");

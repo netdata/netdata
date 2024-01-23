@@ -355,7 +355,7 @@ static int web_client_api_request_v2_data(RRDHOST *host __maybe_unused, struct w
                 aggregation_idx = MAX_QUERY_GROUP_BY_PASSES - 1;
         }
         else if(!strcmp(name, "format")) format = web_client_api_request_v1_data_format(value);
-        else if(!strcmp(name, "options")) options |= web_client_api_request_v1_data_options(value);
+        else if(!strcmp(name, "options")) options |= rrdr_options_parse(value);
         else if(!strcmp(name, "time_group")) time_group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         else if(!strcmp(name, "time_group_options")) time_group_options = value;
         else if(!strcmp(name, "time_resampling")) resampling_time_str = value;

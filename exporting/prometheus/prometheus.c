@@ -374,59 +374,55 @@ static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unu
 
     struct host_variables_callback_options *opts = data;
 
-    if (rrdvar_flags(rv) & (RRDVAR_FLAG_CUSTOM_HOST_VAR | RRDVAR_FLAG_CUSTOM_CHART_VAR)) {
-        if (!opts->host_header_printed) {
-            opts->host_header_printed = 1;
+    if (!opts->host_header_printed) {
+        opts->host_header_printed = 1;
 
-            if (opts->output_options & PROMETHEUS_OUTPUT_HELP) {
-                buffer_sprintf(opts->wb, "\n# COMMENT global host and chart variables\n");
-            }
+        if (opts->output_options & PROMETHEUS_OUTPUT_HELP) {
+            buffer_sprintf(opts->wb, "\n# COMMENT global host and chart variables\n");
         }
-
-        NETDATA_DOUBLE value = rrdvar2number(rv);
-        if (isnan(value) || isinf(value)) {
-            if (opts->output_options & PROMETHEUS_OUTPUT_HELP)
-                buffer_sprintf(
-                    opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rrdvar_name(rv), (isnan(value)) ? "NAN" : "INF");
-
-            return 0;
-        }
-
-        char *label_pre = "";
-        char *label_post = "";
-        if (opts->labels && *opts->labels) {
-            label_pre = "{";
-            label_post = "}";
-        }
-
-        prometheus_name_copy(opts->name, rrdvar_name(rv), sizeof(opts->name));
-
-        if (opts->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-            buffer_sprintf(
-                opts->wb,
-                "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
-                opts->prefix,
-                opts->name,
-                label_pre,
-                opts->labels,
-                label_post,
-                value,
-                opts->now * 1000ULL);
-        else
-            buffer_sprintf(
-                opts->wb,
-                "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT "\n",
-                opts->prefix,
-                opts->name,
-                label_pre,
-                opts->labels,
-                label_post,
-                value);
-
-        return 1;
     }
 
-    return 0;
+    NETDATA_DOUBLE value = rrdvar2number(rv);
+    if (isnan(value) || isinf(value)) {
+        if (opts->output_options & PROMETHEUS_OUTPUT_HELP)
+            buffer_sprintf(
+                opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rrdvar_name(rv), (isnan(value)) ? "NAN" : "INF");
+
+        return 0;
+    }
+
+    char *label_pre = "";
+    char *label_post = "";
+    if (opts->labels && *opts->labels) {
+        label_pre = "{";
+        label_post = "}";
+    }
+
+    prometheus_name_copy(opts->name, rrdvar_name(rv), sizeof(opts->name));
+
+    if (opts->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
+        buffer_sprintf(
+            opts->wb,
+            "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
+            opts->prefix,
+            opts->name,
+            label_pre,
+            opts->labels,
+            label_post,
+            value,
+            opts->now * 1000ULL);
+    else
+        buffer_sprintf(
+            opts->wb,
+            "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT "\n",
+            opts->prefix,
+            opts->name,
+            label_pre,
+            opts->labels,
+            label_post,
+            value);
+
+    return 1;
 }
 
 struct gen_parameters {
@@ -534,7 +530,6 @@ static void prometheus_print_os_info(
     FILE *fp;
     char filename[FILENAME_MAX + 1];
     char buf[BUFSIZ + 1];
-    int first_line = 1;
 
     snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/etc/os-release");
     fp = fopen(filename, "r");
@@ -596,7 +591,6 @@ static void prometheus_print_os_info(
           *val = '\0';
           val++;
           buffer_sprintf(wb, ",%s=\"%s\"", key, val);
-          first_line = 0;
       }
     }
 

@@ -10,8 +10,7 @@
 #include "../../database/rrdcollector-internals.h"
 
 typedef struct dyncfg {
-    RRDHOST *host;
-    uuid_t host_uuid;
+    UUID host_uuid;
     STRING *function;
     STRING *template;
     STRING *path;
@@ -54,12 +53,15 @@ bool dyncfg_get_schema(const char *id, BUFFER *dst);
 void dyncfg_echo_cb(BUFFER *wb, int code, void *result_cb_data);
 void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, DYNCFG_CMDS cmd);
 void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id);
-void dyncfg_echo_add(const DICTIONARY_ITEM *template_item, DYNCFG *template_df, const char *template_id, const char *job_name);
+void dyncfg_echo_add(const DICTIONARY_ITEM *item_template, const DICTIONARY_ITEM *item_job, DYNCFG *df_template, DYNCFG *df_job, const char *template_id, const char *job_name);
 
 const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data, bool overwrite_cb);
 int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data);
 void dyncfg_cleanup(DYNCFG *v);
 
 bool dyncfg_is_user_disabled(const char *id);
+
+RRDHOST *dyncfg_rrdhost_by_uuid(UUID *uuid);
+RRDHOST *dyncfg_rrdhost(DYNCFG *df);
 
 #endif //NETDATA_DYNCFG_INTERNALS_H

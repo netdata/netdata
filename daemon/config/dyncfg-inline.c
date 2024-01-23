@@ -29,21 +29,22 @@ static int dyncfg_inline_callback(struct rrd_function_execute *rfe, void *data _
 
 bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data) {
 
-    if(dyncfg_add_low_level(host, id, path, status, type, source_type, source, cmds,
+    struct dyncfg_node tmp = {
+        .cmds = cmds,
+        .type = type,
+        .cb = cb,
+        .data = data,
+    };
+    dictionary_set(dyncfg_nodes, id, &tmp, sizeof(tmp));
+
+    if(!dyncfg_add_low_level(host, id, path, status, type, source_type, source, cmds,
                              0, 0, true,
                              dyncfg_inline_callback, NULL)) {
-        struct dyncfg_node tmp = {
-            .cmds = cmds,
-            .type = type,
-            .cb = cb,
-            .data = data,
-        };
-        dictionary_set(dyncfg_nodes, id, &tmp, sizeof(tmp));
-
-        return true;
+        dictionary_del(dyncfg_nodes, id);
+        return false;
     }
 
-    return false;
+    return true;
 }
 
 void dyncfg_del(RRDHOST *host, const char *id) {

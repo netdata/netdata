@@ -263,6 +263,7 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
 
     const char *id = get_word(words, num_words, 1);
     const char *action = get_word(words, num_words, 2);
+    const char *add_name = get_word(words, num_words, 3);
 
     if(!id || !*id)
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "dyncfg node: id is missing from the request");
@@ -283,7 +284,7 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
     buffer_flush(result);
     result->content_type = CT_APPLICATION_JSON;
 
-    int code = df->cb(transaction, id, cmd, payload, stop_monotonic_ut, cancelled, result, source, df->data);
+    int code = df->cb(transaction, id, cmd, add_name, payload, stop_monotonic_ut, cancelled, result, source, df->data);
 
     if(!result->expires)
         result->expires = now_realtime_sec();

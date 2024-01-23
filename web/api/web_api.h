@@ -9,7 +9,6 @@
 #include "web/api/badges/web_buffer_svg.h"
 #include "web/api/ilove/ilove.h"
 #include "web/api/formatters/rrd2json.h"
-#include "web/api/health/health_cmdapi.h"
 #include "web/api/queries/weights.h"
 
 struct web_api_command {

@@ -5,6 +5,11 @@
 // ----------------------------------------------------------------------------
 // data structures for storing the parsed expression in memory
 
+typedef struct eval_variable {
+    STRING *name;
+    struct eval_variable *next;
+} EVAL_VARIABLE;
+
 typedef struct eval_value {
     int type;
 
@@ -23,6 +28,21 @@ typedef struct eval_node {
     int count;
     EVAL_VALUE ops[];
 } EVAL_NODE;
+
+struct eval_expression {
+    STRING *source;
+    STRING *parsed_as;
+
+    NETDATA_DOUBLE result;
+
+    int error;
+    BUFFER *error_msg;
+
+    EVAL_NODE *nodes;
+
+    void *variable_lookup_cb_data;
+    eval_expression_variable_lookup_t variable_lookup_cb;
+};
 
 // these are used for EVAL_NODE.operator
 // they are used as internal IDs to identify an operator
@@ -62,124 +82,9 @@ static inline void print_parsed_as_constant(BUFFER *out, NETDATA_DOUBLE n);
 // evaluation of expressions
 
 static inline NETDATA_DOUBLE eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABLE *v, int *error) {
-    static STRING
-        *this_string = NULL,
-        *now_string = NULL,
-        *after_string = NULL,
-        *before_string = NULL,
-        *status_string = NULL,
-        *removed_string = NULL,
-        *uninitialized_string = NULL,
-        *undefined_string = NULL,
-        *clear_string = NULL,
-        *warning_string = NULL,
-        *critical_string = NULL;
-
     NETDATA_DOUBLE n;
 
-    if(unlikely(this_string == NULL)) {
-        this_string = string_strdupz("this");
-        now_string = string_strdupz("now");
-        after_string = string_strdupz("after");
-        before_string = string_strdupz("before");
-        status_string = string_strdupz("status");
-        removed_string = string_strdupz("REMOVED");
-        uninitialized_string = string_strdupz("UNINITIALIZED");
-        undefined_string = string_strdupz("UNDEFINED");
-        clear_string = string_strdupz("CLEAR");
-        warning_string = string_strdupz("WARNING");
-        critical_string = string_strdupz("CRITICAL");
-    }
-
-    if(unlikely(v->name == this_string)) {
-        n = (exp->myself)?*exp->myself:NAN;
-        buffer_strcat(exp->error_msg, "[ $this = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == after_string)) {
-        n = (exp->after && *exp->after)?*exp->after:NAN;
-        buffer_strcat(exp->error_msg, "[ $after = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == before_string)) {
-        n = (exp->before && *exp->before)?*exp->before:NAN;
-        buffer_strcat(exp->error_msg, "[ $before = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == now_string)) {
-        n = (NETDATA_DOUBLE)now_realtime_sec();
-        buffer_strcat(exp->error_msg, "[ $now = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == status_string)) {
-        n = (exp->status)?*exp->status:RRDCALC_STATUS_UNINITIALIZED;
-        buffer_strcat(exp->error_msg, "[ $status = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == removed_string)) {
-        n = RRDCALC_STATUS_REMOVED;
-        buffer_strcat(exp->error_msg, "[ $REMOVED = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == uninitialized_string)) {
-        n = RRDCALC_STATUS_UNINITIALIZED;
-        buffer_strcat(exp->error_msg, "[ $UNINITIALIZED = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == undefined_string)) {
-        n = RRDCALC_STATUS_UNDEFINED;
-        buffer_strcat(exp->error_msg, "[ $UNDEFINED = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == clear_string)) {
-        n = RRDCALC_STATUS_CLEAR;
-        buffer_strcat(exp->error_msg, "[ $CLEAR = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == warning_string)) {
-        n = RRDCALC_STATUS_WARNING;
-        buffer_strcat(exp->error_msg, "[ $WARNING = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(unlikely(v->name == critical_string)) {
-        n = RRDCALC_STATUS_CRITICAL;
-        buffer_strcat(exp->error_msg, "[ $CRITICAL = ");
-        print_parsed_as_constant(exp->error_msg, n);
-        buffer_strcat(exp->error_msg, " ] ");
-        return n;
-    }
-
-    if(exp->rrdcalc && health_variable_lookup(v->name, exp->rrdcalc, &n)) {
+    if(exp->variable_lookup_cb && exp->variable_lookup_cb(v->name, exp->variable_lookup_cb_data, &n)) {
         buffer_sprintf(exp->error_msg, "[ ${%s} = ", string2str(v->name));
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");
@@ -1074,7 +979,7 @@ int expression_evaluate(EVAL_EXPRESSION *expression) {
     expression->error = EVAL_ERROR_OK;
 
     buffer_reset(expression->error_msg);
-    expression->result = eval_node(expression, (EVAL_NODE *)expression->nodes, &expression->error);
+    expression->result = eval_node(expression, expression->nodes, &expression->error);
 
     if(unlikely(isnan(expression->result))) {
         if(expression->error == EVAL_ERROR_OK)
@@ -1104,6 +1009,9 @@ int expression_evaluate(EVAL_EXPRESSION *expression) {
 }
 
 EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, int *error) {
+    if(!string || !*string)
+        return NULL;
+
     const char *s = string;
     int err = EVAL_ERROR_OK;
 
@@ -1137,12 +1045,12 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 
     EVAL_EXPRESSION *exp = callocz(1, sizeof(EVAL_EXPRESSION));
 
-    exp->source = strdupz(string);
-    exp->parsed_as = strdupz(buffer_tostring(out));
+    exp->source = string_strdupz(string);
+    exp->parsed_as = string_strdupz(buffer_tostring(out));
     buffer_free(out);
 
     exp->error_msg = buffer_create(100, NULL);
-    exp->nodes = (void *)op;
+    exp->nodes = op;
 
     return exp;
 }
@@ -1150,9 +1058,9 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
 void expression_free(EVAL_EXPRESSION *expression) {
     if(!expression) return;
 
-    if(expression->nodes) eval_node_free((EVAL_NODE *)expression->nodes);
-    freez((void *)expression->source);
-    freez((void *)expression->parsed_as);
+    if(expression->nodes) eval_node_free(expression->nodes);
+    string_freez((void *)expression->source);
+    string_freez((void *)expression->parsed_as);
     buffer_free(expression->error_msg);
     freez(expression);
 }
@@ -1198,4 +1106,40 @@ const char *expression_strerror(int error) {
         default:
             return "unknown error";
     }
+}
+
+const char *expression_source(EVAL_EXPRESSION *expression) {
+    if(!expression)
+        return string2str(NULL);
+
+    return string2str(expression->source);
+}
+
+const char *expression_parsed_as(EVAL_EXPRESSION *expression) {
+    if(!expression)
+        return string2str(NULL);
+
+    return string2str(expression->parsed_as);
+}
+
+const char *expression_error_msg(EVAL_EXPRESSION *expression) {
+    if(!expression || !expression->error_msg)
+        return "";
+
+    return buffer_tostring(expression->error_msg);
+}
+
+NETDATA_DOUBLE expression_result(EVAL_EXPRESSION *expression) {
+    if(!expression)
+        return NAN;
+
+    return expression->result;
+}
+
+void expression_set_variable_lookup_callback(EVAL_EXPRESSION *expression, eval_expression_variable_lookup_t cb, void *data) {
+    if(!expression)
+        return;
+
+    expression->variable_lookup_cb = cb;
+    expression->variable_lookup_cb_data = data;
 }

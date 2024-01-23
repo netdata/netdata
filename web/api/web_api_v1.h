@@ -12,8 +12,10 @@ CONTEXTS_V2_ALERT_STATUS web_client_api_request_v2_alert_status(char *o);
 void web_client_api_request_v2_contexts_options_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS_V2_OPTIONS options);
 void web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(BUFFER *wb, const char *key, CONTEXTS_V2_ALERT_STATUS options);
 
-RRDR_OPTIONS web_client_api_request_v1_data_options(char *o);
-void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options);
+RRDR_OPTIONS rrdr_options_parse(char *o);
+RRDR_OPTIONS rrdr_options_parse_one(const char *o);
+
+void rrdr_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options);
 void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options);
 
 uint32_t web_client_api_request_v1_data_format(char *name);

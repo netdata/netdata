@@ -20,14 +20,11 @@ typedef struct rrdhost RRDHOST;
 typedef struct rrddim RRDDIM;
 typedef struct rrdset RRDSET;
 typedef struct rrdcalc RRDCALC;
-typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 
 typedef struct rrdlabels RRDLABELS;
 
-typedef struct rrdfamily_acquired RRDFAMILY_ACQUIRED;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
-typedef struct rrdsetvar_acquired RRDSETVAR_ACQUIRED;
 typedef struct rrdcalc_acquired RRDCALC_ACQUIRED;
 
 typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
@@ -106,11 +103,8 @@ struct ml_metrics_statistics {
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
 #include "web/api/queries/rrdr.h"
-#include "rrdvar.h"
-#include "rrdsetvar.h"
-#include "rrddimvar.h"
-#include "rrdcalc.h"
-#include "rrdcalctemplate.h"
+#include "health/rrdvar.h"
+#include "health/rrdcalc.h"
 #include "rrdlabels.h"
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
@@ -213,16 +207,6 @@ typedef enum __attribute__ ((__packed__)) rrd_algorithm {
 
 RRD_ALGORITHM rrd_algorithm_id(const char *name);
 const char *rrd_algorithm_name(RRD_ALGORITHM algorithm);
-
-// ----------------------------------------------------------------------------
-// RRD FAMILY
-
-const RRDFAMILY_ACQUIRED *rrdfamily_add_and_acquire(RRDHOST *host, const char *id);
-void rrdfamily_release(RRDHOST *host, const RRDFAMILY_ACQUIRED *rfa);
-void rrdfamily_index_init(RRDHOST *host);
-void rrdfamily_index_destroy(RRDHOST *host);
-DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
-
 
 // ----------------------------------------------------------------------------
 // flags & options
@@ -740,9 +724,6 @@ struct rrdset {
     int32_t update_every;                           // data collection frequency
 
     RRDLABELS *rrdlabels;                           // chart labels
-    DICTIONARY *rrdsetvar_root_index;               // chart variables
-    DICTIONARY *rrddimvar_root_index;               // dimension variables
-                                                    // we use this dictionary to manage their allocation
 
     uint32_t version;                               // the metadata version (auto-increment)
 
@@ -833,7 +814,6 @@ struct rrdset {
     NETDATA_DOUBLE red;                             // red threshold for this chart
 
     DICTIONARY *rrdvars;                            // RRDVAR index for this chart
-    const RRDFAMILY_ACQUIRED *rrdfamily;            // pointer to RRDFAMILY dictionary item, this chart belongs to
 
     struct {
         RW_SPINLOCK spinlock;                       // protection for RRDCALC *base
@@ -1274,9 +1254,6 @@ struct rrdhost {
     // all RRDCALCs are primarily allocated and linked here
     DICTIONARY *rrdcalc_root_index;
 
-    // templates of alarms
-    DICTIONARY *rrdcalctemplate_root_index;
-
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
@@ -1306,7 +1283,6 @@ struct rrdhost {
     DICTIONARY *rrdset_root_index;                  // the host's charts index (by id)
     DICTIONARY *rrdset_root_index_name;             // the host's charts index (by name)
 
-    DICTIONARY *rrdfamily_root_index;               // the host's chart families index
     DICTIONARY *rrdvars;                            // the host's chart variables index
                                                     // this includes custom host variables
 
@@ -1414,8 +1390,8 @@ RRDHOST *rrdhost_find_or_create(
     const char *abbrev_timezone,
     int32_t utc_offset,
     const char *tags,
-    const char *program_name,
-    const char *program_version,
+    const char *prog_name,
+    const char *prog_version,
     int update_every,
     long history,
     RRD_MEMORY_MODE mode,
@@ -1606,7 +1582,7 @@ void rrdset_reset(RRDSET *st);
 void set_host_properties(
     RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *registry_hostname,
     const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
-    const char *program_name, const char *program_version);
+    const char *prog_name, const char *prog_version);
 
 size_t get_tier_grouping(size_t tier);
 void store_metric_collection_completed(void);

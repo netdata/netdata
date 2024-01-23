@@ -671,8 +671,11 @@ void rrdlabels_destroy(RRDLABELS *labels)
     freez(labels);
 }
 
+//
 // Check in labels to see if we have the key specified in label
-static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABEL *label)
+// same_value indicates if the value should also be matched
+//
+static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABEL *label, bool same_value)
 {
     if (unlikely(!labels))
         return NULL;
@@ -683,7 +686,7 @@ static RRDLABEL *rrdlabels_find_label_with_key_unsafe(RRDLABELS *labels, RRDLABE
     RRDLABEL *found = NULL;
     while ((PValue = JudyLFirstThenNext(labels->JudyL, &Index, &first_then_next))) {
         RRDLABEL *lb = (RRDLABEL *)Index;
-        if (lb->index.key == label->index.key && lb != label) {
+        if (lb->index.key == label->index.key && ((lb == label) == same_value)) {
             found = (RRDLABEL *)Index;
             break;
         }
@@ -718,7 +721,7 @@ static void labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
         new_ls |= RRDLABEL_FLAG_NEW;
         *((RRDLABEL_SRC *)PValue) = new_ls;
 
-        RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(labels, new_label);
+        RRDLABEL *old_label_with_same_key = rrdlabels_find_label_with_key_unsafe(labels, new_label, false);
         if (old_label_with_same_key) {
             (void) JudyLDel(&labels->JudyL, (Word_t) old_label_with_same_key, PJE0);
             delete_label(old_label_with_same_key);
@@ -1027,6 +1030,39 @@ void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     spinlock_unlock(&dst->spinlock);
 }
 
+//
+//
+// Return the common labels count in labels1, labels2
+//
+size_t rrdlabels_common_count(RRDLABELS *labels1, RRDLABELS *labels2)
+{
+    if (!labels1 || !labels2)
+        return 0;
+
+    if (labels1 == labels2)
+        return rrdlabels_entries(labels1);
+
+    RRDLABEL *label;
+    RRDLABEL_SRC ls;
+
+    spinlock_lock(&labels1->spinlock);
+    spinlock_lock(&labels2->spinlock);
+
+    size_t count = 0;
+    lfe_start_nolock(labels2, label, ls)
+    {
+        RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(labels1, label, true);
+        if (old_label_with_key)
+            count++;
+    }
+    lfe_done_nolock();
+
+    spinlock_unlock(&labels2->spinlock);
+    spinlock_unlock(&labels1->spinlock);
+    return count;
+}
+
+
 void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
 {
     if (!dst || !src || (dst == src))
@@ -1042,7 +1078,7 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
     bool update_statistics = false;
     lfe_start_nolock(src, label, ls)
     {
-        RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label);
+        RRDLABEL *old_label_with_key = rrdlabels_find_label_with_key_unsafe(dst, label, false);
         Pvoid_t *PValue = JudyLIns(&dst->JudyL, (Word_t)label, PJE0);
         if(unlikely(!PValue || PValue == PJERR))
             fatal("RRDLABELS: corrupted labels array");
