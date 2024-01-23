@@ -66,27 +66,37 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                     char id[strlen(dc->id) + 1 + strlen(dc->add_name) + 1];
                     snprintfz(id, sizeof(id), "%s:%s", dc->id, dc->add_name);
 
-                    const DICTIONARY_ITEM *new_item = dyncfg_add_internal(
-                        df->host,
-                        id,
-                        string2str(df->path),
-                        dyncfg_status_from_successful_response(code),
-                        DYNCFG_TYPE_JOB,
-                        DYNCFG_SOURCE_TYPE_DYNCFG,
-                        dc->source,
-                        (df->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
-                        0,
-                        0,
-                        df->sync,
-                        df->execute_cb, df->execute_cb_data, false);
+                    RRDHOST *host = dyncfg_rrdhost(df);
+                    if(!host) {
+                        nd_log(NDLS_DAEMON, NDLP_ERR,
+                               "DYNCFG: cannot add job '%s' because host is missing", id);
+                    }
+                    else {
+                        const DICTIONARY_ITEM *new_item = dyncfg_add_internal(
+                            host,
+                            id,
+                            string2str(df->path),
+                            dyncfg_status_from_successful_response(code),
+                            DYNCFG_TYPE_JOB,
+                            DYNCFG_SOURCE_TYPE_DYNCFG,
+                            dc->source,
+                            (df->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
+                                DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
+                            0,
+                            0,
+                            df->sync,
+                            df->execute_cb,
+                            df->execute_cb_data,
+                            false);
 
-                    DYNCFG *new_df = dictionary_acquired_item_value(new_item);
-                    SWAP(new_df->payload, dc->payload);
-                    if(code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
-                        new_df->restart_required = true;
+                        DYNCFG *new_df = dictionary_acquired_item_value(new_item);
+                        SWAP(new_df->payload, dc->payload);
+                        if (code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
+                            new_df->restart_required = true;
 
-                    dyncfg_file_save(id, new_df);
-                    dictionary_acquired_item_release(dyncfg_globals.nodes, new_item);
+                        dyncfg_file_save(id, new_df);
+                        dictionary_acquired_item_release(dyncfg_globals.nodes, new_item);
+                    }
                 } else if (dc->cmd == DYNCFG_CMD_UPDATE) {
                     df->source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
                     dyncfg_function_intercept_keep_source(df, dc->source);

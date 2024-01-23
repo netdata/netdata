@@ -21,6 +21,13 @@ typedef struct {
 } UUID;
 UUID UUID_generate_from_hash(const void *payload, size_t payload_len);
 
+#define UUIDeq(a, b) ((a).parts.hig64 == (b).parts.hig64 && (a).parts.low64 == (b).parts.low64)
+
+static inline UUID uuid2UUID(uuid_t uu1) {
+    UUID *ret = (UUID *)uu1;
+    return *ret;
+}
+
 #define UUID_COMPACT_STR_LEN 33
 void uuid_unparse_lower_compact(const uuid_t uuid, char *out);
 int uuid_parse_compact(const char *in, uuid_t uuid);

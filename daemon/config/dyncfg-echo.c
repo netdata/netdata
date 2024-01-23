@@ -39,6 +39,12 @@ void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code __maybe_unused, void *re
 // ----------------------------------------------------------------------------
 
 void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe_unused, DYNCFG_CMDS cmd) {
+    RRDHOST *host = dyncfg_rrdhost(df);
+    if(!host) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot find host of configuration id '%s'", id);
+        return;
+    }
+
     if(!(df->cmds & cmd)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: attempted to echo a cmd that is not supported");
         return;
@@ -59,16 +65,23 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
     char buf[string_strlen(df->function) + strlen(cmd_str) + 20];
     snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), cmd_str);
 
-    rrd_function_run(df->host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
-                     dyncfg_echo_cb, e,
-                     NULL, NULL,
-                     NULL, NULL,
-                     NULL, string2str(df->source));
+    rrd_function_run(
+        host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
+        dyncfg_echo_cb, e,
+        NULL, NULL,
+        NULL, NULL,
+        NULL, string2str(df->source));
 }
 
 // ----------------------------------------------------------------------------
 
 static void dyncfg_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, const char *cmd) {
+    RRDHOST *host = dyncfg_rrdhost(df);
+    if(!host) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot find host of configuration id '%s'", id);
+        return;
+    }
+
     if(!df->payload) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: requested to send a '%s' to '%s', but there is no payload", cmd, id);
         return;
@@ -84,10 +97,10 @@ static void dyncfg_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const c
     snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), cmd);
 
     rrd_function_run(
-        df->host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
-                     dyncfg_echo_cb, e,
-                     NULL, NULL,
-                     NULL, NULL,
+        host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
+        dyncfg_echo_cb, e,
+        NULL, NULL,
+        NULL, NULL,
         df->payload, string2str(df->source));
 }
 
@@ -98,6 +111,12 @@ void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id)
 // ----------------------------------------------------------------------------
 
 static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe_unused, const DICTIONARY_ITEM *item_job, DYNCFG *df_template, DYNCFG *df_job, const char *id_template, const char *cmd) {
+    RRDHOST *host = dyncfg_rrdhost(df_template);
+    if(!host) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot find host of configuration id '%s'", id_template);
+        return;
+    }
+
     if(!df_job->payload) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "DYNCFG: requested to send a '%s' to '%s', but there is no payload",
@@ -115,7 +134,7 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
     snprintfz(buf, sizeof(buf), "%s %s", string2str(df_template->function), cmd);
 
     rrd_function_run(
-        df_template->host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
+        host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,

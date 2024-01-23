@@ -10,8 +10,7 @@
 #include "../../database/rrdcollector-internals.h"
 
 typedef struct dyncfg {
-    RRDHOST *host;
-    uuid_t host_uuid;
+    UUID host_uuid;
     STRING *function;
     STRING *template;
     STRING *path;
@@ -61,5 +60,8 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data);
 void dyncfg_cleanup(DYNCFG *v);
 
 bool dyncfg_is_user_disabled(const char *id);
+
+RRDHOST *dyncfg_rrdhost_by_uuid(UUID *uuid);
+RRDHOST *dyncfg_rrdhost(DYNCFG *df);
 
 #endif //NETDATA_DYNCFG_INTERNALS_H

@@ -5,6 +5,21 @@
 
 struct dyncfg_globals dyncfg_globals = { 0 };
 
+RRDHOST *dyncfg_rrdhost_by_uuid(UUID *uuid) {
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower(uuid->uuid, uuid_str);
+
+    RRDHOST *host = rrdhost_find_by_guid(uuid_str);
+    if(!host)
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot find host with UUID '%s'", uuid_str);
+
+    return host;
+}
+
+RRDHOST *dyncfg_rrdhost(DYNCFG *df) {
+    return dyncfg_rrdhost_by_uuid(&df->host_uuid);
+}
+
 void dyncfg_cleanup(DYNCFG *v) {
     buffer_free(v->payload);
     v->payload = NULL;
@@ -69,8 +84,8 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
     dyncfg_normalize(nv);
 
-    if(v->host != nv->host) {
-        SWAP(v->host, nv->host);
+    if(!UUIDeq(v->host_uuid, nv->host_uuid)) {
+        SWAP(v->host_uuid, nv->host_uuid);
         changes++;
     }
 
@@ -164,7 +179,7 @@ void dyncfg_init_low_level(bool load_saved) {
 
 const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data, bool overwrite_cb) {
     DYNCFG tmp = {
-        .host = host,
+        .host_uuid = uuid2UUID(host->host_uuid),
         .path = string_strdupz(path),
         .status = status,
         .type = type,
@@ -181,7 +196,6 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
         .execute_cb_data = execute_cb_data,
         .overwrite_cb = overwrite_cb,
     };
-    uuid_copy(tmp.host_uuid, host->host_uuid);
 
     return dictionary_set_and_acquire_item_advanced(dyncfg_globals.nodes, id, -1, &tmp, sizeof(tmp), NULL);
 }
@@ -253,17 +267,6 @@ bool dyncfg_job_has_registered_template(const char *id) {
     return ret;
 }
 
-static void dyncfg_link_all_jobs_to_host(RRDHOST *host) {
-    DYNCFG *df;
-    dfe_start_read(dyncfg_globals.nodes, df) {
-        if(!df->host && df->type == DYNCFG_TYPE_JOB) {
-            if(uuid_memcmp(&df->host_uuid, &host->host_uuid) == 0)
-                df->host = host;
-        }
-    }
-    dfe_done(df);
-}
-
 bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
@@ -317,9 +320,6 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
 
     const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds, created_ut, modified_ut, sync, execute_cb, execute_cb_data, true);
     DYNCFG *df = dictionary_acquired_item_value(item);
-
-    if(df->type == DYNCFG_TYPE_TEMPLATE)
-        dyncfg_link_all_jobs_to_host(host);
 
 //    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)
 //        nd_log(NDLS_DAEMON, NDLP_WARNING, "DYNCFG: configuration '%s' is created with source type dyncfg, but we don't have a saved configuration for it", id);
