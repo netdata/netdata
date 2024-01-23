@@ -1066,14 +1066,12 @@ static void add_label_pattern(struct label_pattern_list *lpl, char *label_key_va
     }
 
     if (need_to_add) {
-        size_t new_size = lpl->size + 1;
-        index = new_size - 1;
-        lpl->buffer_list = reallocz(lpl->buffer_list, new_size * sizeof(BUFFER *));
-        lpl->key = reallocz(lpl->key, new_size * sizeof(STRING *));
+        index = lpl->size++;
+        lpl->buffer_list = reallocz(lpl->buffer_list, lpl->size * sizeof(BUFFER *));
+        lpl->key = reallocz(lpl->key, lpl->size * sizeof(STRING *));
 
         lpl->buffer_list[index] = buffer_create(128, NULL);
         lpl->key[index] = key_match;
-        lpl->size = new_size;
     } else
         buffer_strncat(lpl->buffer_list[index], ",", 1);
 
