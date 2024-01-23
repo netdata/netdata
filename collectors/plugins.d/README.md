@@ -693,7 +693,8 @@ When responding to additions and updates, Netdata uses the following success res
 
 - `200`, responding with 200, means the configuration has been accepted and it is running.
 - `202`, responding with 202, means the configuration has been accepted but it is not yet running. A subsequent `status` action will update it.
-- `299`, responding with 299, means the configuration has been accepted but a restart is required to apply it. 
+- `298`, responding with 298, means the configuration has been accepted but it is disabled for some reason (probably because it matches nothing or the contents are not useful - use the `message` to provide additional information).
+- `299`, responding with 299, means the configuration has been accepted but a restart is required to apply it.
 
 ## Data collection
 

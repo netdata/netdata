@@ -8,6 +8,7 @@
 #define DYNCFG_RESP_SUCCESS(code) (code >= 200 && code <= 299)
 #define DYNCFG_RESP_RUNNING                   200 // accepted and running
 #define DYNCFG_RESP_ACCEPTED                  202 // accepted, but not running yet
+#define DYNCFG_RESP_ACCEPTED_DISABLED         298 // accepted, but is disabled
 #define DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED 299 // accepted, but restart is required to apply it
 
 typedef enum __attribute__((packed)) {

@@ -19,11 +19,24 @@ struct dyncfg_call {
 };
 
 DYNCFG_STATUS dyncfg_status_from_successful_response(int code) {
-    DYNCFG_STATUS status;
-    if(code == DYNCFG_RESP_RUNNING)
-        status = DYNCFG_STATUS_RUNNING;
-    else if(code == DYNCFG_RESP_ACCEPTED || code == DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
-        status = DYNCFG_STATUS_ACCEPTED;
+    DYNCFG_STATUS status = DYNCFG_STATUS_ACCEPTED;
+
+    switch(code) {
+        default:
+        case DYNCFG_RESP_ACCEPTED:
+        case DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED:
+            status = DYNCFG_STATUS_ACCEPTED;
+            break;
+
+        case DYNCFG_RESP_ACCEPTED_DISABLED:
+            status = DYNCFG_STATUS_DISABLED;
+            break;
+
+        case DYNCFG_RESP_RUNNING:
+            status = DYNCFG_STATUS_RUNNING;
+            break;
+
+    }
 
     return status;
 }

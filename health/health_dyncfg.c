@@ -176,6 +176,9 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
             buffer_sprintf(error, "the rule No %d has neither database lookup nor calculation", i);
             goto cleanup;
         }
+
+        if(ap->match.enabled)
+            base->_internal.enabled = true;
     }
 
     if(string_strcmp(base->config.name, name) != 0) {
@@ -358,9 +361,10 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
 
                 dyncfg_health_prototype_reapply(ap);
                 health_dyncfg_register_prototype(ap);
+                code = ap->_internal.enabled ? DYNCFG_RESP_ACCEPTED : DYNCFG_RESP_ACCEPTED_DISABLED;
                 dictionary_acquired_item_release(health_globals.prototypes.dict, item);
 
-                code = dyncfg_default_response(result, DYNCFG_RESP_ACCEPTED, "accepted");
+                code = dyncfg_default_response(result, code, "accepted");
             }
         }
         break;
@@ -448,7 +452,8 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                         freez(nap);
 
                     dyncfg_health_prototype_reapply(ap);
-                    code = dyncfg_default_response(result, DYNCFG_RESP_ACCEPTED, "updated");
+                    code = ap->_internal.enabled ? DYNCFG_RESP_ACCEPTED : DYNCFG_RESP_ACCEPTED_DISABLED;
+                    code = dyncfg_default_response(result, code, "updated");
                 }
             }
             break;
@@ -537,7 +542,7 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
 
     snprintfz(key, sizeof(key), DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX ":%s", string2str(ap->config.name));
     dyncfg_add(localhost, key, "/health/alerts/prototypes",
-               ap->match.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
+               ap->_internal.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
                ap->config.source_type, string2str(ap->config.source),
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
                    DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
