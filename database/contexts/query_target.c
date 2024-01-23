@@ -11,6 +11,7 @@ static void query_dimension_release(QUERY_DIMENSION *qd);
 static void query_instance_release(QUERY_INSTANCE *qi);
 static void query_context_release(QUERY_CONTEXT *qc);
 static void query_node_release(QUERY_NODE *qn);
+static void free_label_pattern_list(struct label_pattern_list *lpl);
 
 static __thread QUERY_TARGET *thread_qt = NULL;
 static struct {
@@ -82,14 +83,9 @@ void query_target_release(QUERY_TARGET *qt) {
 
     simple_pattern_free(qt->instances.labels_pattern);
     qt->instances.labels_pattern = NULL;
-    {
-        for(size_t i = 0; i < qt->instances.labels_pattern_array.size; i++)
-            simple_pattern_free(qt->instances.labels_pattern_array.labels_pattern[i]);
 
-        freez(qt->instances.labels_pattern_array.labels_pattern);
-        qt->instances.labels_pattern_array.labels_pattern = NULL;
-        qt->instances.labels_pattern_array.size = 0;
-    }
+    free_label_pattern_list(qt->instances.label_pattern_list);
+    qt->instances.label_pattern_list = NULL;
 
     simple_pattern_free(qt->query.pattern);
     qt->query.pattern = NULL;
@@ -737,16 +733,15 @@ static inline bool query_instance_matches_labels(
     RRDINSTANCE *ri,
     SIMPLE_PATTERN *chart_label_key_sp,
     SIMPLE_PATTERN *labels_sp,
-    SIMPLE_PATTERN **labels_sp_list,
-    size_t labels_sp_list_count)
+    struct label_pattern_list *lpl)
 {
 
     if (chart_label_key_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, chart_label_key_sp, '\0', NULL))
         return false;
 
-    if (labels_sp_list) {
-        for (size_t i = 0; i < labels_sp_list_count; i++) {
-            if (!rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, labels_sp_list[i], ':', NULL))
+    if (lpl) {
+        for (size_t i = 0; i < lpl->size; i++) {
+            if (!rrdlabels_match_simple_pattern_parsed(ri->rrdlabels,  lpl->labels_pattern[i], ':', NULL))
                 return false;
         }
         return true;
@@ -779,8 +774,7 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
             ri,
             qt->instances.chart_label_key_pattern,
             qt->instances.labels_pattern,
-            qt->instances.labels_pattern_array.labels_pattern,
-            qt->instances.labels_pattern_array.size);
+            qt->instances.label_pattern_list);
 
     if(queryable_instance) {
         if(qt->instances.alerts_pattern && !query_target_match_alert_pattern(ria, qt->instances.alerts_pattern))
@@ -1049,7 +1043,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
     json_fix_string(qt->id);
 }
 
-static void add_label_pattern(QUERY_TARGET *qt, char *label_key_value)
+static void add_label_pattern(struct label_pattern_list *lpl, char *label_key_value)
 {
     char *label_key;
 
@@ -1060,60 +1054,71 @@ static void add_label_pattern(QUERY_TARGET *qt, char *label_key_value)
     STRING *key_match = string_strdupz(label_key_value);
     *label_key = ':';
 
-    size_t index = -1;
+    size_t index;
     bool need_to_add = true;
-    for (size_t i = 0; i < qt->instances.labels_pattern_array.size; i++) {
-        if (qt->instances.labels_pattern_array.key[i] == key_match) {
+
+    for (size_t i = 0; i < lpl->size; i++) {
+        if (lpl->key[i] == key_match) {
             index = i;
             need_to_add = false;
             break;
         }
     }
 
-    // Need to allocate
     if (need_to_add) {
-        size_t new_size = qt->instances.labels_pattern_array.size + 1;
+        size_t new_size = lpl->size + 1;
         index = new_size - 1;
-        qt->instances.labels_pattern_array.buffer_list =
-            reallocz(qt->instances.labels_pattern_array.buffer_list, new_size * sizeof(BUFFER *));
-        qt->instances.labels_pattern_array.key =
-            reallocz(qt->instances.labels_pattern_array.key, new_size * sizeof(STRING *));
+        lpl->buffer_list = reallocz(lpl->buffer_list, new_size * sizeof(BUFFER *));
+        lpl->key = reallocz(lpl->key, new_size * sizeof(STRING *));
 
-        qt->instances.labels_pattern_array.buffer_list[index] = buffer_create(128, NULL);
-        qt->instances.labels_pattern_array.key[index] = key_match;
-        qt->instances.labels_pattern_array.size = new_size;
+        lpl->buffer_list[index] = buffer_create(128, NULL);
+        lpl->key[index] = key_match;
+        lpl->size = new_size;
     } else
-        buffer_strncat(qt->instances.labels_pattern_array.buffer_list[index], ",", 1);
+        buffer_strncat(lpl->buffer_list[index], ",", 1);
 
-    buffer_strcat(qt->instances.labels_pattern_array.buffer_list[index], label_key_value);
+    buffer_strcat(lpl->buffer_list[index], label_key_value);
 }
 
-static void build_pattern_list(QUERY_TARGET *qt)
+static struct label_pattern_list *build_pattern_list(SIMPLE_PATTERN *pattern)
 {
-    SIMPLE_PATTERN *pattern = qt->instances.labels_pattern;
-
     if (unlikely(!pattern))
-        return;
+        return NULL;
 
     char *label_key = NULL;
 
+    struct label_pattern_list *lpl = callocz(1, sizeof(*lpl));
+
     while (pattern && (label_key = simple_pattern_iterate(&pattern)))
-        add_label_pattern(qt, label_key);
+        add_label_pattern(lpl, label_key);
 
-    qt->instances.labels_pattern_array.labels_pattern = callocz(qt->instances.labels_pattern_array.size, sizeof(SIMPLE_PATTERN *));
+    lpl->labels_pattern = callocz(lpl->size, sizeof(SIMPLE_PATTERN *));
 
-    for (size_t i = 0; i < qt->instances.labels_pattern_array.size; i++) {
-        qt->instances.labels_pattern_array.labels_pattern[i] =
-            string_to_simple_pattern(buffer_tostring(qt->instances.labels_pattern_array.buffer_list[i]));
-        buffer_free(qt->instances.labels_pattern_array.buffer_list[i]);
-        string_freez(qt->instances.labels_pattern_array.key[i]);
+    for (size_t i = 0; i < lpl->size; i++) {
+        lpl->labels_pattern[i] = string_to_simple_pattern(buffer_tostring(lpl->buffer_list[i]));
+        buffer_free(lpl->buffer_list[i]);
+        string_freez(lpl->key[i]);
     }
-    freez(qt->instances.labels_pattern_array.buffer_list);
-    qt->instances.labels_pattern_array.buffer_list = NULL;
 
-    freez(qt->instances.labels_pattern_array.key);
-    qt->instances.labels_pattern_array.key = NULL;
+    freez(lpl->buffer_list);
+    lpl->buffer_list = NULL;
+
+    freez(lpl->key);
+    lpl->key = NULL;
 }
+
+static void free_label_pattern_list(struct label_pattern_list *lpl)
+{
+    if (unlikely(!lpl))
+        return;
+
+    for(size_t i = 0; i < lpl->size; i++)
+        simple_pattern_free(lpl->labels_pattern[i]);
+
+    freez(lpl->labels_pattern);
+    freez(lpl);
+}
+
 
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     if(!service_running(ABILITY_DATA_QUERIES))
@@ -1181,7 +1186,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->instances.labels_pattern = string_to_simple_pattern(qtl.labels);
 
     if (qt->instances.labels_pattern)
-        build_pattern_list(qt);
+        qt->instances.label_pattern_list = build_pattern_list(qt->instances.labels_pattern);
 
     qt->instances.alerts_pattern = string_to_simple_pattern(qtl.alerts);
 
@@ -1254,6 +1259,11 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 
     ssize_t count = 0;
     RRDINSTANCE *ri;
+
+    struct label_pattern_list *lpl = NULL;
+    if (labels_sp)
+        lpl = build_pattern_list(labels_sp);
+
     dfe_start_read(rc->rrdinstances, ri) {
                 if(rrd_flag_is_deleted(ri))
                     continue;
@@ -1270,7 +1280,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                         continue;
                 }
 
-                if(!query_instance_matches_labels(ri, chart_label_key_sp, labels_sp, NULL, 0))
+                if(!query_instance_matches_labels(ri, chart_label_key_sp, labels_sp, lpl))
                     continue;
 
                 if(alerts_sp && !query_target_match_alert_pattern(ria, alerts_sp))
