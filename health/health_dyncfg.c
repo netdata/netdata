@@ -99,6 +99,9 @@ static bool parse_config(json_object *jobj, const char *path, struct rrd_alert_c
 static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *base, BUFFER *error) {
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "name", base->config.name, error, false);
 
+    int64_t version;
+    JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "format_version", version, error);
+
     json_object *rules;
     if (json_object_object_get_ex(jobj, "rules", &rules)) {
         size_t rules_len = json_object_array_length(rules);
@@ -297,6 +300,7 @@ void health_prototype_to_json(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, bool for_hash
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
+    buffer_json_member_add_uint64(wb, "format_version", 1);
     buffer_json_member_add_string(wb, "name", string2str(ap->config.name));
     buffer_json_member_add_array(wb, "rules");
     {
@@ -428,10 +432,22 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
             if(ap->_internal.enabled)
                 code = dyncfg_default_response(result, HTTP_RESP_OK, "already enabled");
             else {
-                ap->_internal.enabled = true;
-                dyncfg_health_prototype_reapply(ap);
-                dyncfg_status(localhost, alert_name_dyncfg, DYNCFG_STATUS_ACCEPTED);
-                code = dyncfg_default_response(result, DYNCFG_RESP_ACCEPTED, "enabled");
+                size_t matches_enabled = 0;
+                spinlock_lock(&ap->_internal.spinlock);
+                for(RRD_ALERT_PROTOTYPE *t = ap; t ;t = t->_internal.next)
+                    if(t->match.enabled)
+                        matches_enabled++;
+                spinlock_unlock(&ap->_internal.spinlock);
+
+                if(!matches_enabled) {
+                    code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "all rules in this alert are disabled, so enabling the alert has no effect");
+                }
+                else {
+                    ap->_internal.enabled = true;
+                    dyncfg_health_prototype_reapply(ap);
+                    dyncfg_status(localhost, alert_name_dyncfg, DYNCFG_STATUS_ACCEPTED);
+                    code = dyncfg_default_response(result, DYNCFG_RESP_ACCEPTED, "enabled");
+                }
             }
             break;
 

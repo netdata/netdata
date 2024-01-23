@@ -196,8 +196,8 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
         before_string = string_strdupz("before");
         status_string = string_strdupz("status");
         removed_string = string_strdupz("REMOVED");
-        uninitialized_string = string_strdupz("UNINITIALIZED");
         undefined_string = string_strdupz("UNDEFINED");
+        uninitialized_string = string_strdupz("UNINITIALIZED");
         clear_string = string_strdupz("CLEAR");
         warning_string = string_strdupz("WARNING");
         critical_string = string_strdupz("CRITICAL");

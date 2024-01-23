@@ -194,12 +194,12 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
         buffer_json_member_add_double(wb, "before", (NETDATA_DOUBLE)now);
         buffer_json_member_add_double(wb, "now", (NETDATA_DOUBLE)now);
         buffer_json_member_add_double(wb, "status", (NETDATA_DOUBLE)RRDCALC_STATUS_REMOVED);
-        buffer_json_member_add_double(wb, "removed", (NETDATA_DOUBLE)RRDCALC_STATUS_REMOVED);
-        buffer_json_member_add_double(wb, "uninitialized", (NETDATA_DOUBLE)RRDCALC_STATUS_UNINITIALIZED);
-        buffer_json_member_add_double(wb, "undefined", (NETDATA_DOUBLE)RRDCALC_STATUS_UNDEFINED);
-        buffer_json_member_add_double(wb, "clear", (NETDATA_DOUBLE)RRDCALC_STATUS_CLEAR);
-        buffer_json_member_add_double(wb, "warning", (NETDATA_DOUBLE)RRDCALC_STATUS_WARNING);
-        buffer_json_member_add_double(wb, "critical", (NETDATA_DOUBLE)RRDCALC_STATUS_CRITICAL);
+        buffer_json_member_add_double(wb, "REMOVED", (NETDATA_DOUBLE)RRDCALC_STATUS_REMOVED);
+        buffer_json_member_add_double(wb, "UNDEFINED", (NETDATA_DOUBLE)RRDCALC_STATUS_UNDEFINED);
+        buffer_json_member_add_double(wb, "UNINITIALIZED", (NETDATA_DOUBLE)RRDCALC_STATUS_UNINITIALIZED);
+        buffer_json_member_add_double(wb, "CLEAR", (NETDATA_DOUBLE)RRDCALC_STATUS_CLEAR);
+        buffer_json_member_add_double(wb, "WARNING", (NETDATA_DOUBLE)RRDCALC_STATUS_WARNING);
+        buffer_json_member_add_double(wb, "CRITICAL", (NETDATA_DOUBLE)RRDCALC_STATUS_CRITICAL);
         buffer_json_member_add_double(wb, "green", NAN);
         buffer_json_member_add_double(wb, "red", NAN);
     }

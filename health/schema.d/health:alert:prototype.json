@@ -426,6 +426,10 @@
       "name": {
         "type": "string"
       },
+      "format_version": {
+        "type": "integer",
+        "default": 1
+      },
       "rules": {
         "type": "array",
         "items": {
@@ -477,6 +481,9 @@
     ]
   },
   "uiSchema": {
+    "format_version": {
+      "ui:widget": "hidden"
+    },
     "name": {
       "ui:widget": "hidden"
     },
@@ -487,13 +494,13 @@
         },
         "config": {
           "hash": {
-            "ui:disabled": true
+            "ui:widget": "hidden"
           },
           "source_type": {
-            "ui:disabled": true
+            "ui:widget": "hidden"
           },
           "source": {
-            "ui:disabled": true
+            "ui:widget": "hidden"
           }
         }
       }

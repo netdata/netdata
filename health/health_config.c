@@ -499,6 +499,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                 freez(tmp);
             }
 
+            ap->_internal.enabled = true;
             ap->match.enabled = true;
             ap->match.is_template = (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY));
             ap->config.source = health_source_file(line, filename);

@@ -124,6 +124,9 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
             spinlock_lock(&ap->_internal.spinlock);
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, nap, _internal.prev, _internal.next);
             spinlock_unlock(&ap->_internal.spinlock);
+
+            if(nap->_internal.enabled)
+                ap->_internal.enabled = true;
         }
     }
     else {
@@ -315,6 +318,7 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
     }
 
     // activate the match patterns in it
+    bool enabled = false;
     for(RRD_ALERT_PROTOTYPE *t = ap; t ;t = t->_internal.next) {
         // we need to generate config_hash_id for each instance included
         // so, let's break the linked list for this iteration
@@ -323,6 +327,9 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
         RRD_ALERT_PROTOTYPE *next = t->_internal.next;
         t->_internal.prev = t;
         t->_internal.next = NULL;
+
+        if(t->match.enabled)
+            enabled = true;
 
         if(!t->config.name)
             t->config.name = string_dup(ap->config.name);
@@ -341,8 +348,7 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
         t->_internal.prev = prev;
         t->_internal.next = next;
     }
-
-
+    ap->_internal.enabled = enabled;
 
     // add it to the prototypes
     dictionary_set_advanced(health_globals.prototypes.dict,
