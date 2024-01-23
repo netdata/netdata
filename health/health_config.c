@@ -294,24 +294,44 @@ char *health_edit_command_from_source(const char *source)
     char buffer[FILENAME_MAX + 1];
     char *temp = strdupz(source);
     char *line_num = strchr(temp, '@');
+    char *line_p = temp;
     char *file_no_path = strrchr(temp, '/');
 
+    // Check for the 'line=' format if '@' is not found
+    if (!line_num) {
+        line_num = strstr(temp, "line=");
+        file_no_path = strstr(temp, "file=/");
+    }
+
     if (likely(file_no_path && line_num)) {
-        *line_num = '\0';
+        if (line_num == strchr(temp, '@')) {
+            *line_num = '\0';  // Handle the old format
+        } else {
+            line_num += strlen("line=");
+            file_no_path = strrchr(file_no_path + strlen("file="), '/');
+            char *line_end = strchr(line_num, ',');
+            if (line_end) {
+                line_p = line_num;
+                *line_end = '\0';
+            }
+        }
+
         snprintfz(
             buffer,
             FILENAME_MAX,
             "sudo %s/edit-config health.d/%s=%s=%s",
             netdata_configured_user_config_dir,
             file_no_path + 1,
-            temp,
+            line_p,
             rrdhost_registry_hostname(localhost));
-    } else
+    } else {
         buffer[0] = '\0';
+    }
 
     freez(temp);
     return strdupz(buffer);
 }
+
 
 static inline void strip_quotes(char *s) {
     while(*s) {
