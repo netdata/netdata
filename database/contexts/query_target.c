@@ -1105,6 +1105,7 @@ static struct label_pattern_list *build_pattern_list(SIMPLE_PATTERN *pattern)
 
     freez(lpl->key);
     lpl->key = NULL;
+    return lpl;
 }
 
 static void free_label_pattern_list(struct label_pattern_list *lpl)
