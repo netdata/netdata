@@ -17,6 +17,8 @@ GOLANG_MIN_MAJOR_VERSION='1'
 GOLANG_MIN_MINOR_VERSION='21'
 GOLANG_MIN_PATCH_VERSION='0'
 
+GOLANG_TEMP_PATH="${TMPDIR}/go-toolchain"
+
 check_go_version() {
     version="$("${go}" version | awk '{ print $3 }' | sed 's/^go//')"
     version_major="$(echo "${version}" | cut -f 1 -d '.')"
@@ -43,7 +45,6 @@ check_go_version() {
 }
 
 install_go_toolchain() {
-    GOLANG_TEMP_PATH="${TMPDIR}/go-toolchain"
     GOLANG_ARCHIVE_NAME="${GOLANG_TEMP_PATH}/golang.tar.gz"
     GOLANG_CHECKSUM_FILE="${GOLANG_TEMP_PATH}/golang.sha256sums"
 
@@ -92,7 +93,9 @@ install_go_toolchain() {
         return 1
     fi
 
-    if ! curl --fail -q -sSL --connect-timeout 10 --retry 3 --output "/tmp/${GOLANG_ARCHIVE_NAME}" "${GOLANG_ARCHIVE_URL}"; then
+    mkdir -p "${GOLANG_TEMP_PATH}"
+
+    if ! curl --fail -q -sSL --connect-timeout 10 --retry 3 --output "${GOLANG_ARCHIVE_NAME}" "${GOLANG_ARCHIVE_URL}"; then
         GOLANG_FAILURE_REASON="Failed to download Go toolchain."
         return 1
     fi
@@ -127,6 +130,8 @@ ensure_go_toolchain() {
         if ! install_go_toolchain; then
             return 1
         fi
+
+        rm -rf "${GOLANG_TEMP_PATH}" || true
     fi
 
     return 0
