@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Improve container detection logic for edit-config. [\#16825](https://github.com/netdata/netdata/pull/16825) ([Ferroin](https://github.com/Ferroin))
+- Preserve label source during migration [\#16821](https://github.com/netdata/netdata/pull/16821) ([stelfrag](https://github.com/stelfrag))
+- Add script to ensure a usable Go toolchain is installed. [\#16815](https://github.com/netdata/netdata/pull/16815) ([Ferroin](https://github.com/Ferroin))
 - fix verify\_netdata\_host\_prefix log spam [\#16814](https://github.com/netdata/netdata/pull/16814) ([ilyam8](https://github.com/ilyam8))
 - use fs type to veryfiy procfs/sysfs [\#16813](https://github.com/netdata/netdata/pull/16813) ([ilyam8](https://github.com/ilyam8))
 - updates to light onprem docs [\#16811](https://github.com/netdata/netdata/pull/16811) ([M4itee](https://github.com/M4itee))
@@ -42,6 +45,7 @@
 - Fix sanitizer errors [\#16759](https://github.com/netdata/netdata/pull/16759) ([ktsaou](https://github.com/ktsaou))
 - report timestamps with progress [\#16758](https://github.com/netdata/netdata/pull/16758) ([ktsaou](https://github.com/ktsaou))
 - add schemas to /usr/lib/netdata/conf.d/schema.d [\#16757](https://github.com/netdata/netdata/pull/16757) ([ktsaou](https://github.com/ktsaou))
+- Add netdata\_os\_info metric [\#16756](https://github.com/netdata/netdata/pull/16756) ([colinleroy](https://github.com/colinleroy))
 - Recursively merge mqtt\_websockets [\#16755](https://github.com/netdata/netdata/pull/16755) ([vkalintiris](https://github.com/vkalintiris))
 - packaging: add cap\_dac\_read\_search to go.d.plugin [\#16754](https://github.com/netdata/netdata/pull/16754) ([ilyam8](https://github.com/ilyam8))
 - Name storage engine variables consistently. [\#16753](https://github.com/netdata/netdata/pull/16753) ([vkalintiris](https://github.com/vkalintiris))
@@ -400,15 +404,6 @@
 - added systemd-journal forward\_secure\_sealing [\#16247](https://github.com/netdata/netdata/pull/16247) ([ktsaou](https://github.com/ktsaou))
 - Terminate cgroups discovery thread faster during shutdown [\#16246](https://github.com/netdata/netdata/pull/16246) ([stelfrag](https://github.com/stelfrag))
 - python.d\(smartd\_log\): collect Total LBAs written/read [\#16245](https://github.com/netdata/netdata/pull/16245) ([watsonbox](https://github.com/watsonbox))
-- fix apps plugin metric names in meta [\#16243](https://github.com/netdata/netdata/pull/16243) ([ilyam8](https://github.com/ilyam8))
-- Drop an unused index from aclk\_alert table [\#16242](https://github.com/netdata/netdata/pull/16242) ([stelfrag](https://github.com/stelfrag))
-- add DYNCFG\_RESET  [\#16241](https://github.com/netdata/netdata/pull/16241) ([underhood](https://github.com/underhood))
-- Reuse ML load prepared statement [\#16240](https://github.com/netdata/netdata/pull/16240) ([stelfrag](https://github.com/stelfrag))
-- update bundled UI to v6.53.0 [\#16239](https://github.com/netdata/netdata/pull/16239) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#16237](https://github.com/netdata/netdata/pull/16237) ([netdatabot](https://github.com/netdatabot))
-- Active journal centralization guide no encryption [\#16236](https://github.com/netdata/netdata/pull/16236) ([tkatsoulas](https://github.com/tkatsoulas))
-- journal: script to generate self-signed-certificates [\#16235](https://github.com/netdata/netdata/pull/16235) ([ktsaou](https://github.com/ktsaou))
-- Fix dimension HETEROGENEOUS check [\#16234](https://github.com/netdata/netdata/pull/16234) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
