@@ -530,6 +530,9 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
         if (unlikely(rc))
             error_report(
                 "Failed to create ACLK alert table index 2 for host %s", host ? string2str(host->hostname) : host_guid);
+
+        snprintfz(sql, sizeof(sql) - 1, TABLE_ACLK_ALERT_ANALYZE, uuid_str);
+        (void) db_execute(db_meta, sql);
     }
     if (likely(host) && unlikely(host->aclk_config))
         return;
