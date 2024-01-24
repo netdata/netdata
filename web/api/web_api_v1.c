@@ -1478,7 +1478,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
     CLEAN_BUFFER *source = buffer_create(100, NULL);
     web_client_source2buffer(w, source);
 
-    return rrd_function_run(host, wb, timeout, w->user_role, function, true, transaction,
+    return rrd_function_run(host, wb, timeout, w->access, function, true, transaction,
                             NULL, NULL,
                             web_client_progress_functions_update, w,
                             web_client_interrupt_callback, w, NULL,
@@ -1509,17 +1509,21 @@ void web_client_source2buffer(struct web_client *w, BUFFER *source) {
     else
         buffer_sprintf(source, "method=api");
 
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD) || web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_BEARER)) {
-        buffer_sprintf(source, ",role=%s", http_id2user_role(w->user_role));
-
-        char uuid_str[UUID_COMPACT_STR_LEN];
-        uuid_unparse_lower_compact(w->auth.cloud_account_id, uuid_str);
-        buffer_sprintf(source, ",user=%s,account=%s", w->auth.client_name, uuid_str);
-    }
-    else if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_GOD))
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_GOD))
         buffer_strcat(source, ",role=god");
     else
         buffer_sprintf(source, ",role=%s", http_id2user_role(w->user_role));
+
+    buffer_sprintf(source, ",permissions=0x%"PRIx64, (uint64_t)w->access);
+
+    if(w->auth.client_name[0])
+        buffer_sprintf(source, ",user=%s", w->auth.client_name);
+
+    if(!uuid_is_null(w->auth.cloud_account_id)) {
+        char uuid_str[UUID_COMPACT_STR_LEN];
+        uuid_unparse_lower_compact(w->auth.cloud_account_id, uuid_str);
+        buffer_sprintf(source, ",account=%s", uuid_str);
+    }
 
     if(w->client_ip[0])
         buffer_sprintf(source, ",ip=%s", w->client_ip);
@@ -1594,7 +1598,7 @@ static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w,
     web_client_source2buffer(w, source);
 
     buffer_flush(w->response.data);
-    int code = rrd_function_run(host, w->response.data, timeout, w->user_role, cmd,
+    int code = rrd_function_run(host, w->response.data, timeout, w->access, cmd,
                                 true, transaction,
                                 NULL, NULL,
                                 web_client_progress_functions_update, w,

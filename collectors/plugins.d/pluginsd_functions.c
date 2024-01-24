@@ -25,10 +25,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     if(pf->payload && buffer_strlen(pf->payload)) {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \"%s\" \"%s\"\n",
+            PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \"0x%"PRIx64"\" \"%s\" \"%s\"\n",
             transaction,
             pf->timeout_s,
             string2str(pf->function),
+            (uint64_t)pf->access,
             pf->source ? pf->source : "",
             content_type_id2string(pf->payload->content_type)
             );
@@ -39,10 +40,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     else {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \"%s\"\n",
+            PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \"0x%"PRIx64"\" \"%s\"\n",
             transaction,
             pf->timeout_s,
             string2str(pf->function),
+            (uint64_t)pf->access,
             pf->source ? pf->source : ""
             );
     }
@@ -211,6 +213,7 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
             .timeout_s = timeout_s,
             .function = string_strdupz(rfe->function),
             .payload = buffer_dup(rfe->payload),
+            .access = rfe->user_access,
             .source = rfe->source ? strdupz(rfe->source) : NULL,
             .parser = parser,
 
@@ -313,7 +316,7 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     }
 
     rrd_function_add(host, st, name, timeout_s, priority, help, tags,
-        http_user_role2id(access_str), false,
+                     http_access_from_hex(access_str), false,
                      pluginsd_function_execute_cb, parser);
 
     parser->user.data_collections_count++;

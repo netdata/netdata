@@ -96,14 +96,14 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     netdata_mutex_lock(&stdout_mutex);
 
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"members\" %d\n",
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"0x%"PRIx64"\" %d\n",
             SYSTEMD_JOURNAL_FUNCTION_NAME, SYSTEMD_JOURNAL_DEFAULT_TIMEOUT, SYSTEMD_JOURNAL_FUNCTION_DESCRIPTION,
-            RRDFUNCTIONS_PRIORITY_DEFAULT);
+            (uint64_t)(HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_SENSITIVE_DATA), RRDFUNCTIONS_PRIORITY_DEFAULT);
 
 #ifdef ENABLE_SYSTEMD_DBUS
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" \"members\" %d\n",
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" \"0x%"PRIx64"\" %d\n",
             SYSTEMD_UNITS_FUNCTION_NAME, SYSTEMD_UNITS_DEFAULT_TIMEOUT, SYSTEMD_UNITS_FUNCTION_DESCRIPTION,
-            RRDFUNCTIONS_PRIORITY_DEFAULT);
+            (uint64_t)(HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_SENSITIVE_DATA), RRDFUNCTIONS_PRIORITY_DEFAULT);
 #endif
 
     fflush(stdout);

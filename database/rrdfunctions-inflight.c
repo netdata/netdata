@@ -20,6 +20,8 @@ struct rrd_function_inflight {
     bool cancelled;
     usec_t stop_monotonic_ut;
 
+    HTTP_ACCESS user_access;
+
     BUFFER *payload;
 
     const DICTIONARY_ITEM *host_function_acquired;
@@ -198,6 +200,7 @@ static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_infl
         .transaction = &r->transaction_uuid,
         .function = r->sanitized_cmd,
         .payload = r->payload,
+        .user_access = r->user_access,
         .source = r->source,
         .stop_monotonic_ut = &r->stop_monotonic_ut,
         .result = {
@@ -248,6 +251,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
         .transaction = &r->transaction_uuid,
         .function = r->sanitized_cmd,
         .payload = r->payload,
+        .user_access = r->user_access,
         .source = r->source,
         .stop_monotonic_ut = &r->stop_monotonic_ut,
         .result = {
@@ -389,7 +393,7 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
 // ----------------------------------------------------------------------------
 
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
-                     HTTP_USER_ROLE user_role, const char *cmd,
+                     HTTP_ACCESS user_access, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
@@ -433,16 +437,23 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
-    if(!web_client_has_enough_access_level(user_role, rdcf->user_role)) {
+    if(!web_client_has_enough_access_level(user_access, rdcf->access)) {
 
         if(!aclk_connected)
-            rrd_call_function_error(result_wb, "This Netdata must be connected to Netdata Cloud to access this function.", HTTP_RESP_PRECOND_FAIL);
-        else if(user_role >= HTTP_USER_ROLE_ANY)
-            rrd_call_function_error(result_wb, "You need to login to the Netdata Cloud space this agent is claimed to, to access this function.", HTTP_RESP_PRECOND_FAIL);
-        else if(rdcf->user_role < user_role)
-            rrd_call_function_error(result_wb, "To access this function you need a higher role in this Netdata Cloud space.", HTTP_RESP_PRECOND_FAIL);
+            rrd_call_function_error(result_wb,
+                                    "This Netdata must be connected to Netdata Cloud to access this function.",
+                                    HTTP_RESP_PRECOND_FAIL);
+
+        else if((rdcf->access & HTTP_ACCESS_SIGNED_IN) && !(user_access & HTTP_ACCESS_SIGNED_IN))
+            rrd_call_function_error(result_wb,
+                                    "You need to login to the Netdata Cloud space this agent is claimed to, "
+                                    "to access this function.",
+                                    HTTP_RESP_PRECOND_FAIL);
+
         else
-            rrd_call_function_error(result_wb, "You don't have enough permissions to access this function.", HTTP_RESP_PRECOND_FAIL);
+            rrd_call_function_error(result_wb,
+                                    "You don't have the permissions required to access this function.",
+                                    HTTP_RESP_PRECOND_FAIL);
 
         dictionary_acquired_item_release(host->functions, host_function_acquired);
 
@@ -478,6 +489,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         .sanitized_cmd = strdupz(sanitized_cmd),
         .sanitized_cmd_length = sanitized_cmd_length,
         .transaction = strdupz(transaction),
+        .user_access = user_access,
         .source = strdupz(sanitized_source),
         .payload = buffer_dup(payload),
         .timeout = timeout_s,
@@ -527,6 +539,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
             .transaction = &r->transaction_uuid,
             .function = r->sanitized_cmd,
             .payload = r->payload,
+            .user_access = r->user_access,
             .source = r->source,
             .stop_monotonic_ut = &r->stop_monotonic_ut,
             .result = {

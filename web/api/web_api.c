@@ -3,12 +3,15 @@
 #include "web_api.h"
 
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
-    if(!web_client_flags_check_auth(w))
+    if(!web_client_flags_check_auth(w)) {
         w->user_role = HTTP_USER_ROLE_ANY;
+        w->access = HTTP_ACCESS_NONE;
+    }
 
 #ifdef NETDATA_GOD_MODE
     web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_GOD);
     w->user_role = HTTP_USER_ROLE_ADMIN;
+    w->access = HTTP_ACCESS_ALL;
 #endif
 
     buffer_no_cacheable(w->response.data);

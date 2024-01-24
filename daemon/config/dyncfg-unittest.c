@@ -466,7 +466,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
 
     should_be_saved(t, c);
 
-    int rc = rrd_function_run(localhost, wb, 10, HTTP_USER_ROLE_ADMIN, cmd,
+    int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ALL, cmd,
                               true, NULL,
                               NULL, NULL,
                               NULL, NULL,

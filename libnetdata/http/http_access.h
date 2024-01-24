@@ -43,12 +43,17 @@ typedef enum : uint32_t {
 #define HTTP_ACCESS_ACLK_DEFAULT                                                                                       \
     (HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_ANONYMOUS_DATA|HTTP_ACCESS_VIEW_SENSITIVE_DATA)
 
+#define HTTP_ACCESS_ALL ((HTTP_ACCESS)(0xFFFFFFFF))
+
 HTTP_ACCESS http_access2id_one(const char *str);
 HTTP_ACCESS http_access2id(char *str);
 struct web_buffer;
 void http_access2buffer_json_array(struct web_buffer *wb, const char *key, HTTP_ACCESS access);
 void http_access2txt(char *buf, size_t size, char separator, HTTP_ACCESS access);
 HTTP_ACCESS https_access_from_base64_bitmap(const char *str);
+HTTP_ACCESS http_access_from_hex(const char *str);
+HTTP_ACCESS http_access_from_source(const char *str);
+bool log_cb_http_access_to_hex(struct web_buffer *wb, void *data);
 
 typedef enum __attribute__((packed)) {
     HTTP_ACL_NONE                   = (0),

@@ -67,6 +67,7 @@ typedef enum __attribute__((__packed__)) {
     NDF_ACCOUNT_ID,
     NDF_USER_NAME,
     NDF_USER_ROLE,
+    NDF_USER_ACCESS,
 
     // web server and stream receiver
     NDF_SRC_IP,                                 // the streaming / web server source IP

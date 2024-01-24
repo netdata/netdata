@@ -27,6 +27,12 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
 
         buffer_json_member_add_string(wb, "status", dyncfg_id2status(df->status));
         dyncfg_cmds2json_array(df->cmds, "cmds", wb);
+        buffer_json_member_add_object(wb, "access");
+        {
+            http_access2buffer_json_array(wb, "view", df->view_access);
+            http_access2buffer_json_array(wb, "edit", df->edit_access);
+        }
+        buffer_json_object_close(wb);
         buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(df->source_type));
         buffer_json_member_add_string(wb, "source", string2str(df->source));
         buffer_json_member_add_boolean(wb, "sync", df->sync);
@@ -209,6 +215,6 @@ cleanup:
 void dyncfg_host_init(RRDHOST *host) {
     rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120,
                      1000, "Dynamic configuration", "config",
-        HTTP_USER_ROLE_ADMIN,
+                     HTTP_ACCESS_NONE,
                      true, dyncfg_config_execute_cb, host);
 }

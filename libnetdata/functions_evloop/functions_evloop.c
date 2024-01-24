@@ -14,6 +14,7 @@ struct functions_evloop_worker_job {
     time_t timeout;
 
     BUFFER *payload;
+    HTTP_ACCESS access;
     const char *source;
 
     functions_evloop_worker_execute_t cb;
@@ -101,7 +102,7 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
     return NULL;
 }
 
-static void worker_add_job(struct functions_evloop_globals *wg, const char *keyword, char *transaction, char *function, char *timeout_s, BUFFER *payload, const char *source) {
+static void worker_add_job(struct functions_evloop_globals *wg, const char *keyword, char *transaction, char *function, char *timeout_s, BUFFER *payload, const char *access, const char *source) {
     if(!transaction || !*transaction || !timeout_s || !*timeout_s || !function || !*function) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Received incomplete %s (transaction = '%s', timeout = '%s', function = '%s'). Ignoring it.",
                keyword,
@@ -129,6 +130,7 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                     .stop_monotonic_ut = now_monotonic_usec() + (timeout * USEC_PER_SEC),
                     .used = false,
                     .payload = buffer_dup(payload),
+                    .access = http_access_from_hex(access),
                     .source = source ? strdupz(source) : NULL,
                     .cb = we->cb,
                     .cb_data = we->cb_data,
@@ -164,6 +166,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
         char *transaction;
         char *function;
         char *timeout_s;
+        char *access;
         char *source;
         char *content_type;
     } deferred = { 0 };
@@ -198,12 +201,14 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
                 s[deferred.last_len] = '\0';
                 buffer->len = deferred.last_len;
                 buffer->content_type = content_type_string2id(deferred.content_type);
-                worker_add_job(wg, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD, deferred.transaction, deferred.function, deferred.timeout_s, buffer, deferred.source);
+                worker_add_job(wg, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD, deferred.transaction, deferred.function,
+                               deferred.timeout_s, buffer, deferred.access, deferred.source);
                 buffer_flush(buffer);
 
                 freez(deferred.transaction);
                 freez(deferred.function);
                 freez(deferred.timeout_s);
+                freez(deferred.access);
                 freez(deferred.source);
                 freez(deferred.content_type);
                 memset(&deferred, 0, sizeof(deferred));
@@ -223,19 +228,22 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             char *transaction = get_word(words, num_words, 1);
             char *timeout_s = get_word(words, num_words, 2);
             char *function = get_word(words, num_words, 3);
-            char *source = get_word(words, num_words, 4);
-            worker_add_job(wg, keyword, transaction, function, timeout_s, NULL, source);
+            char *access = get_word(words, num_words, 4);
+            char *source = get_word(words, num_words, 5);
+            worker_add_job(wg, keyword, transaction, function, timeout_s, NULL, access, source);
         }
         else if(keyword && (strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0)) {
             char *transaction = get_word(words, num_words, 1);
             char *timeout_s = get_word(words, num_words, 2);
             char *function = get_word(words, num_words, 3);
-            char *source = get_word(words, num_words, 4);
-            char *content_type = get_word(words, num_words, 5);
+            char *access = get_word(words, num_words, 4);
+            char *source = get_word(words, num_words, 5);
+            char *content_type = get_word(words, num_words, 6);
 
             deferred.transaction = strdupz(transaction ? transaction : "");
             deferred.timeout_s = strdupz(timeout_s ? timeout_s : "");
             deferred.function = strdupz(function ? function : "");
+            deferred.access = strdupz(access ? access : "");
             deferred.source = strdupz(source ? source : "");
             deferred.content_type = strdupz(content_type ? content_type : "");
             deferred.last_len = 0;

@@ -14,15 +14,13 @@ void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
         if(t->options & RRD_FUNCTION_DYNCFG) continue;
 
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" \"%s\" %d\n"
+                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" \"0x%"PRIx64"\" %d\n"
                        , t_dfe.name
                        , t->timeout
                        , string2str(t->help)
                        , string2str(t->tags)
-                       ,
-            http_id2user_role(t->user_role)
-                       ,
-            t->priority
+                       , (uint64_t)t->access
+                       , t->priority
         );
     }
     dfe_done(t);
@@ -43,13 +41,12 @@ void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb, bool dyncfg)
         }
 
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" \"%s\" %d\n"
+                       , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" \"0x%"PRIx64"\" %d\n"
                        , tmp_dfe.name
                        , tmp->timeout
                        , string2str(tmp->help)
                        , string2str(tmp->tags)
-                       ,
-            http_id2user_role(tmp->user_role)
+                       , (uint64_t)tmp->access
                        , tmp->priority
         );
     }
@@ -80,7 +77,7 @@ static void functions2json(DICTIONARY *functions, BUFFER *wb) {
 
             buffer_json_member_add_string_or_empty(wb, "options", options);
             buffer_json_member_add_string_or_empty(wb, "tags", string2str(t->tags));
-            buffer_json_member_add_string(wb, "access", http_id2user_role(t->user_role));
+            http_access2buffer_json_array(wb, "access", t->access);
             buffer_json_member_add_uint64(wb, "priority", t->priority);
         }
         buffer_json_object_close(wb);
@@ -117,7 +114,7 @@ void host_functions2json(RRDHOST *host, BUFFER *wb) {
             }
             buffer_json_array_close(wb);
             buffer_json_member_add_string(wb, "tags", string2str(t->tags));
-            buffer_json_member_add_string(wb, "access", http_id2user_role(t->user_role));
+            http_access2buffer_json_array(wb, "access", t->access);
             buffer_json_member_add_uint64(wb, "priority", t->priority);
         }
         buffer_json_object_close(wb);
@@ -140,8 +137,8 @@ void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst,
     dfe_done(t);
 }
 
-void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size, STRING **help, STRING **tags,
-    HTTP_USER_ROLE *user_role, int *priority) {
+void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t value_size,
+                            STRING **help, STRING **tags, HTTP_ACCESS *access, int *priority) {
     if(!host || !host->functions || !dictionary_entries(host->functions) || !dst) return;
 
     struct rrd_host_function *t;
@@ -155,8 +152,8 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
         if(tags)
             *tags = t->tags;
 
-        if(user_role)
-            *user_role = t->user_role;
+        if(access)
+            *access = t->access;
 
         if(priority)
             *priority = t->priority;

@@ -23,8 +23,9 @@
 #include "libnetdata/required_dummies.h"
 
 #define FREEIPMI_GLOBAL_FUNCTION_SENSORS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\" \"top\" \"any\" %d\n", \
-                5, "Displays current sensor state and readings", 100); \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\" \"top\" \"0x%"PRIx64"\" %d\n", \
+                5, "Displays current sensor state and readings",                                                     \
+                (uint64_t)(HTTP_ACCESS_NONE), 100); \
     } while(0)
 
 // component names, based on our patterns

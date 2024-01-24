@@ -84,7 +84,7 @@ void dyncfg_function_intercept_result_cb(BUFFER *wb, int code, void *result_cb_d
                                 DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
                             0,
                             0,
-                            df->sync,
+                            df->sync, df->view_access, df->edit_access,
                             df->execute_cb,
                             df->execute_cb_data,
                             false);
@@ -363,6 +363,45 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
                                 "dyncfg functions intercept: this job belongs to disabled template");
 
         make_the_call_to_plugin = false;
+    }
+
+    // check the permissions of this command
+    switch(c) {
+        case DYNCFG_CMD_GET:
+        case DYNCFG_CMD_SCHEMA:
+            if((df->view_access & rfe->user_access) != df->view_access) {
+                rc = HTTP_RESP_FORBIDDEN;
+                dyncfg_default_response(
+                    rfe->result.wb, rc, "dyncfg: you don't have enough view permissions to execute this command");
+
+                make_the_call_to_plugin = false;
+            }
+            break;
+
+        case DYNCFG_CMD_ENABLE:
+        case DYNCFG_CMD_DISABLE:
+        case DYNCFG_CMD_ADD:
+        case DYNCFG_CMD_TEST:
+        case DYNCFG_CMD_UPDATE:
+        case DYNCFG_CMD_REMOVE:
+        case DYNCFG_CMD_RESTART:
+            if((df->view_access & rfe->user_access) != df->view_access) {
+                rc = HTTP_RESP_FORBIDDEN;
+                dyncfg_default_response(
+                    rfe->result.wb, rc, "dyncfg: you don't have enough edit permissions to execute this command");
+
+                make_the_call_to_plugin = false;
+            }
+            break;
+
+        default: {
+                rc = HTTP_RESP_INTERNAL_SERVER_ERROR;
+                dyncfg_default_response(
+                    rfe->result.wb, rc, "dyncfg: permissions for this command are not set");
+
+                make_the_call_to_plugin = false;
+            }
+            break;
     }
 
     if(make_the_call_to_plugin) {

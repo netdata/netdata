@@ -18,7 +18,7 @@ typedef enum __attribute__((packed)) {
 struct rrd_host_function {
     bool sync;                      // when true, the function is called synchronously
     RRD_FUNCTION_OPTIONS options;   // RRD_FUNCTION_OPTIONS
-    HTTP_USER_ROLE user_role;
+    HTTP_ACCESS access;
     STRING *help;
     STRING *tags;
     int timeout;                    // the default timeout of the function

@@ -701,10 +701,11 @@ struct functions_evloop_globals *logsmanagement_func_facets_init(bool *p_logsman
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     netdata_mutex_lock(&stdout_mut);
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"members\" %d\n",
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"0x%"PRIx64"\" %d\n",
                     LOGS_MANAG_FUNC_NAME, 
                     LOGS_MANAG_QUERY_TIMEOUT_DEFAULT, 
                     FUNCTION_LOGSMANAGEMENT_HELP_SHORT,
+                    (uint64_t)(HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_SENSITIVE_DATA),
                     RRDFUNCTIONS_PRIORITY_DEFAULT + 1);
     netdata_mutex_unlock(&stdout_mut);
 

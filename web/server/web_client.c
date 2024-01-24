@@ -226,6 +226,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
             ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
             ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -634,6 +635,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
             ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
             ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -1168,6 +1170,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
             ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
             ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -1394,6 +1397,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
             ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
             ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);

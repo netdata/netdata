@@ -46,6 +46,8 @@ const char *http_id2user_role(HTTP_USER_ROLE role) {
     return "none";
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+
 static struct {
     const char *name;
     uint32_t hash;
@@ -162,4 +164,24 @@ HTTP_ACCESS https_access_from_base64_bitmap(const char *str) {
         permissions = (permissions << 6) | base64_char_value(str[i]);
 
     return (HTTP_ACCESS)permissions;
+}
+
+HTTP_ACCESS http_access_from_hex(const char *str) {
+    return (HTTP_ACCESS)strtoull(str, NULL, 16);
+}
+
+HTTP_ACCESS http_access_from_source(const char *str) {
+    HTTP_ACCESS access = 0;
+
+    const char *permissions = strstr(str, "permissions=");
+    if(permissions)
+        access = (HTTP_ACCESS)strtoull(permissions + 12, NULL, 16);
+
+    return access;
+}
+
+bool log_cb_http_access_to_hex(BUFFER *wb, void *data) {
+    HTTP_ACCESS access = *((HTTP_ACCESS *)data);
+    buffer_sprintf(wb, "0x%"PRIx64, (uint64_t)access);
+    return true;
 }
