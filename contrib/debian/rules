@@ -71,6 +71,7 @@ override_dh_auto_configure:
 	dh_auto_configure -- -G Ninja \
 		-DCMAKE_INSTALL_PREFIX=/ \
 		-DWEB_DIR=/var/lib/netdata/www \
+		-DCMAKE_C_FLAGS='-ffile-prefix-map=/usr/src/netdata=/usr/src/netdata' \
 		-DENABLE_ACLK=On \
 		-DENABLE_CLOUD=On \
 		-DENABLE_DBENGINE=On \
@@ -100,12 +101,7 @@ override_dh_auto_test:
 
 override_dh_strip:
 	if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then \
-		sleep 10000; \
-		sentry-cli debug-files bundle-sources  -o /sentry-sources $(CURDIR); \
-		sentry-cli debug-files upload --include-sources -o netdata-inc -p netdata-agent  /usr/src/netdata/debian/netdata/ ; \
-		sentry-cli debug-files upload --include-sources -o netdata-inc -p netdata-agent  /usr/src/netdata/debian/netdata-plugin-apps/ ; \
-		sentry-cli debug-files upload --include-sources -o netdata-inc -p netdata-agent  /usr/src/netdata/debian/netdata-plugin-chartsd/ ; \
-		sentry-cli debug-files upload -o netdata-inc -p netdata-agent --include-sources --type sourcebundle /sentry-sources; \
+		sentry-cli debug-files upload -o netdata-inc -p netdata-agent --force-foreground --log-level=debug --wait --include-sources /usr/src/netdata/debian/netdata/usr/sbin/netdata \
 		ls -la /sentry-sources; \
 		rm -rf /sentry-sources; \
 	fi
