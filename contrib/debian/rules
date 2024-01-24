@@ -99,10 +99,6 @@ override_dh_auto_test:
 	true
 
 override_dh_strip:
-<<<<<<< HEAD
-	if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then
-		sentry-cli debug-files upload -o netdata-inc -p netdata-agent --log-level debug --include-sources ${TOP}/usr/sbin/netdata
-=======
 	if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then \
 		sleep 10000; \
 		sentry-cli debug-files bundle-sources  -o /sentry-sources $(CURDIR); \
@@ -112,7 +108,6 @@ override_dh_strip:
 		sentry-cli debug-files upload -o netdata-inc -p netdata-agent --include-sources --type sourcebundle /sentry-sources; \
 		ls -la /sentry-sources; \
 		rm -rf /sentry-sources; \
->>>>>>> d53678ee3 (WIP, debug, expected to fail in CMake config)
 	fi
 	dh_strip
 
