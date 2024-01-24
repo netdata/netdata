@@ -307,12 +307,18 @@ void *service_main(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = USEC_PER_SEC * SERVICE_HEARTBEAT;
+    usec_t real_step = USEC_PER_SEC;
 
     netdata_log_debug(D_SYSTEM, "Service thread starts");
 
     while (service_running(SERVICE_MAINTENANCE)) {
         worker_is_idle();
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb, USEC_PER_SEC);
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
 
         svc_rrd_cleanup_obsolete_charts_from_all_hosts();
         svc_rrdhost_cleanup_orphan_hosts(localhost);
