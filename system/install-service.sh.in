@@ -589,14 +589,36 @@ check_dinit() {
   echo "${IS_DINIT}"
 }
 
+_run_dinitctl() {
+  opts=''
+
+  if [ "$(check_dinit)" = "OFFLINE" ]; then
+    opts="-o"
+  fi
+
+  # shellcheck disable=SC2086
+  dinitctl ${opts} "${@}"
+}
+
+enable_dinit() {
+  _run_dinitctl enable netdata
+}
+
+enable_dinit() {
+  _run_dinitctl disable netdata
+}
+
 install_dinit_service() {
-  echo "${DINIT_ERROR_MSG}"
-  exit 3
+  install_generic_service dinit/netdata "dinit" /etc/dinit.d enable_dinit disable_dinit
 }
 
 dinit_cmds() {
-  echo "${DINIT_ERROR_MSG}"
-  exit 3
+  if [ "$(check_dinit)" = "YES" ]; then
+    NETDATA_START_CMD='dinitctl start netdata'
+    NETDATA_STOP_CMD='dinitct stop netdata'
+  else # Not booted using dinit, use external defaults by not providing commands.
+    warning "Detected dinit, but the system is not booted using dinit. Unable to provide commands to start or stop Netdata using the service manager."
+  fi
 }
 
 # =====================================================================
