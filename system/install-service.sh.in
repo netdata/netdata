@@ -29,7 +29,7 @@ DUMP_CMDS=0
 ENABLE="auto"
 EXPORT_CMDS=0
 INSTALL=1
-LINUX_INIT_TYPES="systemd openrc lsb initd runit"
+LINUX_INIT_TYPES="systemd openrc lsb initd runit dinit"
 PLATFORM="$(uname -s)"
 SHOW_SVC_TYPE=0
 SVC_SOURCE="@libsysdir_POST@"
@@ -560,6 +560,43 @@ install_runit_service() {
 runit_cmds() {
   NETDATA_START_CMD="sv start netdata"
   NETDATA_STOP_CMD="sv stop netdata"
+}
+
+# =====================================================================
+# dinit support functions
+
+_check_dinit() {
+  # if /etc/dinit.d does not exist, it’s not dinit
+  [ ! -d /etc/dinit.d ] && echo "NO" && return 0
+
+  # if PID 1 is dinit, it’s dinit
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "dinit" ] && echo "YES" && return 0
+
+  # if /run/dinitctl exists and is a socket, it’s dinit
+  [ -S /run/dinitctl ] && echo "YES" && return 0
+
+  # if the dinitctl command exists despite getting to this point, it’s dinit, but not booted as such
+  [ -n "$(command -v dinitctl 2>/dev/null || true)" ] && echo "OFFLINE" && return 0
+
+  echo "NO" && return 0
+}
+
+check_dinit() {
+  if [ -z "${IS_DINIT}" ]; then
+    IS_DINIT="$(_check_dinit)"
+  fi
+
+  echo "${IS_DINIT}"
+}
+
+install_dinit_service() {
+  echo "${DINIT_ERROR_MSG}"
+  exit 3
+}
+
+dinit_cmds() {
+  echo "${DINIT_ERROR_MSG}"
+  exit 3
 }
 
 # =====================================================================
