@@ -67,12 +67,14 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_LZ4,
     BIB_LIB_ZSTD,
     BIB_LIB_ZLIB,
+    BIB_LIB_BROTLI,
     BIB_LIB_PROTOBUF,
     BIB_LIB_OPENSSL,
     BIB_LIB_LIBDATACHANNEL,
     BIB_LIB_JSONC,
     BIB_LIB_LIBCAP,
     BIB_LIB_LIBCRYPTO,
+    BIB_LIB_LIBYAML,
     BIB_PLUGIN_APPS,
     BIB_PLUGIN_LINUX_CGROUPS,
     BIB_PLUGIN_LINUX_CGROUP_NETWORK,
@@ -632,6 +634,14 @@ static struct {
                 .json = "zlib",
                 .value = NULL,
         },
+        [BIB_LIB_BROTLI] = {
+            .category = BIC_LIBS,
+            .type = BIT_BOOLEAN,
+            .analytics = NULL,
+            .print = "Brotli (generic-purpose lossless compression algorithm)",
+            .json = "brotli",
+            .value = NULL,
+        },
         [BIB_LIB_PROTOBUF] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
@@ -679,6 +689,14 @@ static struct {
                 .print = "libcrypto (cryptographic functions)",
                 .json = "libcrypto",
                 .value = NULL,
+        },
+        [BIB_LIB_LIBYAML] = {
+            .category = BIC_LIBS,
+            .type = BIT_BOOLEAN,
+            .analytics = "libyaml",
+            .print = "libyaml (library for parsing and emitting YAML)",
+            .json = "libyaml",
+            .value = NULL,
         },
         [BIB_PLUGIN_APPS] = {
                 .category = BIC_PLUGINS,
@@ -1060,9 +1078,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
     build_info_set_status(BIB_FEATURE_STREAMING_COMPRESSION, true);
 
-#ifdef ENABLE_BROTLI
-    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "brotli");
-#endif
 #ifdef ENABLE_ZSTD
     build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "zstd");
 #endif
@@ -1070,6 +1085,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "lz4");
 #endif
     build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "gzip");
+#ifdef ENABLE_BROTLI
+    build_info_append_value(BIB_FEATURE_STREAMING_COMPRESSION, "brotli");
+#endif
 
     build_info_set_status(BIB_FEATURE_CONTEXTS, true);
     build_info_set_status(BIB_FEATURE_TIERING, true);
@@ -1105,6 +1123,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef ENABLE_ZSTD
     build_info_set_status(BIB_LIB_ZSTD, true);
 #endif
+#ifdef ENABLE_BROTLI
+    build_info_set_status(BIB_LIB_BROTLI, true);
+#endif
 
     build_info_set_status(BIB_LIB_ZLIB, true);
 
@@ -1136,6 +1157,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef HAVE_CRYPTO
     build_info_set_status(BIB_LIB_LIBCRYPTO, true);
+#endif
+#ifdef HAVE_LIBYAML
+    build_info_set_status(BIB_LIB_LIBYAML, true);
 #endif
 
 #ifdef ENABLE_PLUGIN_APPS
