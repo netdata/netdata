@@ -45,7 +45,8 @@ ifeq ($(ENABLE_SENTRY),true)
         -DNETDATA_SENTRY_ENVIRONMENT=$(BUILDING_ENVIRONMENT) \
         -DNETDATA_SENTRY_RELEASE=$(VERSION) \
         -DNETDATA_SENTRY_DIST=$(BUILD_DESTINATION) \
-        -DNETDATA_SENTRY_DSN=$(SENTRY_DSN)
+        -DNETDATA_SENTRY_DSN=$(SENTRY_DSN) \
+        -DCMAKE_BUILD_TYPE=Debug
 else
     SENTRY_CONFIG := -DENABLE_SENTRY=Off
 endif
@@ -98,8 +99,20 @@ override_dh_auto_test:
 	true
 
 override_dh_strip:
+<<<<<<< HEAD
 	if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then
 		sentry-cli debug-files upload -o netdata-inc -p netdata-agent --log-level debug --include-sources ${TOP}/usr/sbin/netdata
+=======
+	if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then \
+		sleep 10000; \
+		sentry-cli debug-files bundle-sources  -o /sentry-sources $(CURDIR); \
+		sentry-cli debug-files upload --include-sources -o netdata-inc -p netdata-agent  /usr/src/netdata/debian/netdata/ ; \
+		sentry-cli debug-files upload --include-sources -o netdata-inc -p netdata-agent  /usr/src/netdata/debian/netdata-plugin-apps/ ; \
+		sentry-cli debug-files upload --include-sources -o netdata-inc -p netdata-agent  /usr/src/netdata/debian/netdata-plugin-chartsd/ ; \
+		sentry-cli debug-files upload -o netdata-inc -p netdata-agent --include-sources --type sourcebundle /sentry-sources; \
+		ls -la /sentry-sources; \
+		rm -rf /sentry-sources; \
+>>>>>>> d53678ee3 (WIP, debug, expected to fail in CMake config)
 	fi
 	dh_strip
 
