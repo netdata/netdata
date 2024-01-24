@@ -9,6 +9,6 @@ typedef int (*rrd_function_execute_inline_cb_t)(BUFFER *wb, const char *function
 
 void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
                              const char *help, const char *tags,
-                             HTTP_ACCESS access, rrd_function_execute_inline_cb_t execute_cb);
+                             HTTP_USER_ROLE user_role, rrd_function_execute_inline_cb_t execute_cb);
 
 #endif //NETDATA_RRDFUNCTIONS_INLINE_H

@@ -66,7 +66,8 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
     snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), cmd_str);
 
     rrd_function_run(
-        host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
+        host, e->wb, 10,
+        HTTP_USER_ROLE_ADMIN, buf, false, NULL,
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,
@@ -97,7 +98,8 @@ static void dyncfg_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const c
     snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), cmd);
 
     rrd_function_run(
-        host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
+        host, e->wb, 10,
+        HTTP_USER_ROLE_ADMIN, buf, false, NULL,
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,
@@ -134,7 +136,8 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
     snprintfz(buf, sizeof(buf), "%s %s", string2str(df_template->function), cmd);
 
     rrd_function_run(
-        host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
+        host, e->wb, 10,
+        HTTP_USER_ROLE_ADMIN, buf, false, NULL,
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,

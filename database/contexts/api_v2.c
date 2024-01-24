@@ -168,7 +168,7 @@ struct function_v2_entry {
     size_t *node_ids;
     STRING *help;
     STRING *tags;
-    HTTP_ACCESS access;
+    HTTP_USER_ROLE user_role;
     int priority;
 };
 
@@ -1016,10 +1016,10 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
                 .node_ids = &ctl->nodes.ni,
                 .help = NULL,
                 .tags = NULL,
-                .access = HTTP_ACCESS_MEMBER,
+                .user_role = HTTP_USER_ROLE_MEMBER,
                 .priority = RRDFUNCTIONS_PRIORITY_DEFAULT,
         };
-        host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.access, &t.priority);
+        host_functions_to_dict(host, ctl->functions.dict, &t, sizeof(t), &t.help, &t.tags, &t.user_role, &t.priority);
     }
 
     if(ctl->mode & CONTEXTS_V2_NODES) {
@@ -2249,7 +2249,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
                         }
                         buffer_json_array_close(wb);
                         buffer_json_member_add_string(wb, "tags", string2str(t->tags));
-                        buffer_json_member_add_string(wb, "access", http_id2access(t->access));
+                        buffer_json_member_add_string(wb, "access", http_id2user_role(t->user_role));
                         buffer_json_member_add_uint64(wb, "priority", t->priority);
                     }
                     buffer_json_object_close(wb);

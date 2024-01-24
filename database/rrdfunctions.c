@@ -174,12 +174,12 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
         changed = true;
     }
 
-    if(rdcf->access != new_rdcf->access) {
+    if(rdcf->user_role != new_rdcf->user_role) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "FUNCTIONS: function '%s' of host '%s' changed access level",
                dictionary_acquired_item_name(item), rrdhost_hostname(host));
 
-        rdcf->access = new_rdcf->access;
+        rdcf->user_role = new_rdcf->user_role;
         changed = true;
     }
 
@@ -240,7 +240,8 @@ static inline bool is_function_dyncfg(const char *name) {
 }
 
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
-                      const char *help, const char *tags, HTTP_ACCESS access, bool sync,
+                      const char *help, const char *tags,
+                      HTTP_USER_ROLE user_role, bool sync,
                       rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
 
     // RRDSET *st may be NULL in this function
@@ -263,7 +264,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
         .sync = sync,
         .timeout = timeout,
         .options = st ? RRD_FUNCTION_LOCAL: (is_function_dyncfg(name) ? RRD_FUNCTION_DYNCFG : RRD_FUNCTION_GLOBAL),
-        .access = access,
+        .user_role = user_role,
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
         .help = string_strdupz(help),

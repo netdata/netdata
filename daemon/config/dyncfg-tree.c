@@ -209,6 +209,6 @@ cleanup:
 void dyncfg_host_init(RRDHOST *host) {
     rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120,
                      1000, "Dynamic configuration", "config",
-                     HTTP_ACCESS_ADMIN,
+        HTTP_USER_ROLE_ADMIN,
                      true, dyncfg_config_execute_cb, host);
 }

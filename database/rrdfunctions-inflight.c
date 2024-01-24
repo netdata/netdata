@@ -388,7 +388,8 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
 
 // ----------------------------------------------------------------------------
 
-int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCESS access, const char *cmd,
+int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
+                     HTTP_USER_ROLE user_role, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
@@ -432,14 +433,16 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
-    if(!web_client_has_enough_access_level(access, rdcf->access)) {
+    if(!web_client_has_enough_access_level(user_role, rdcf->user_role)) {
 
         if(!aclk_connected)
             rrd_call_function_error(result_wb, "This Netdata must be connected to Netdata Cloud to access this function.", HTTP_RESP_PRECOND_FAIL);
-        else if(access >= HTTP_ACCESS_ANY)
+        else if(user_role >= HTTP_USER_ROLE_ANY)
             rrd_call_function_error(result_wb, "You need to login to the Netdata Cloud space this agent is claimed to, to access this function.", HTTP_RESP_PRECOND_FAIL);
-        else /* if(access < HTTP_ACCESS_ANY && rdcf->access < access) */
-            rrd_call_function_error(result_wb, "To access this function you need to be an admin in this Netdata Cloud space.", HTTP_RESP_PRECOND_FAIL);
+        else if(rdcf->user_role < user_role)
+            rrd_call_function_error(result_wb, "To access this function you need a higher role in this Netdata Cloud space.", HTTP_RESP_PRECOND_FAIL);
+        else
+            rrd_call_function_error(result_wb, "You don't have enough permissions to access this function.", HTTP_RESP_PRECOND_FAIL);
 
         dictionary_acquired_item_release(host->functions, host_function_acquired);
 

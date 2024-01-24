@@ -3,41 +3,163 @@
 #include "../libnetdata.h"
 
 static struct {
-    HTTP_ACCESS access;
+    HTTP_USER_ROLE access;
     const char *name;
-} access_levels[] = {
-    { .access = HTTP_ACCESS_NONE, .name = "none" },
-    { .access = HTTP_ACCESS_MEMBER, .name = "member" },
-    { .access = HTTP_ACCESS_ADMIN, .name = "admin" },
-    { .access = HTTP_ACCESS_ANY, .name = "any" },
+} user_roles[] = {
+    { .access = HTTP_USER_ROLE_NONE, .name = "none" },
+    { .access = HTTP_USER_ROLE_ADMIN, .name = "admin" },
+    { .access = HTTP_USER_ROLE_MANAGER, .name = "manager" },
+    { .access = HTTP_USER_ROLE_TROUBLESHOOTER, .name = "troubleshooter" },
+    { .access = HTTP_USER_ROLE_OBSERVER, .name = "observer" },
+    { .access = HTTP_USER_ROLE_MEMBER, .name = "member" },
+    { .access = HTTP_USER_ROLE_BILLING, .name = "billing" },
+    { .access = HTTP_USER_ROLE_ANY, .name = "any" },
 
-    { .access = HTTP_ACCESS_MEMBER, .name = "members" },
-    { .access = HTTP_ACCESS_ADMIN, .name = "admins" },
-    { .access = HTTP_ACCESS_ANY, .name = "all" },
+    { .access = HTTP_USER_ROLE_MEMBER, .name = "members" },
+    { .access = HTTP_USER_ROLE_ADMIN, .name = "admins" },
+    { .access = HTTP_USER_ROLE_ANY, .name = "all" },
 
     // terminator
     { .access = 0, .name = NULL },
 };
 
-HTTP_ACCESS http_access2id(const char *access) {
-    if(!access || !*access)
-        return HTTP_ACCESS_MEMBER;
+HTTP_USER_ROLE http_user_role2id(const char *role) {
+    if(!role || !*role)
+        return HTTP_USER_ROLE_MEMBER;
 
-    for(size_t i = 0; access_levels[i].name ;i++) {
-        if(strcmp(access_levels[i].name, access) == 0)
-            return access_levels[i].access;
+    for(size_t i = 0; user_roles[i].name ;i++) {
+        if(strcmp(user_roles[i].name, role) == 0)
+            return user_roles[i].access;
     }
 
-    nd_log(NDLS_DAEMON, NDLP_WARNING, "HTTP access level '%s' is not valid", access);
-    return HTTP_ACCESS_NONE;
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "HTTP user role '%s' is not valid", role);
+    return HTTP_USER_ROLE_NONE;
 }
 
-const char *http_id2access(HTTP_ACCESS access) {
-    for(size_t i = 0; access_levels[i].name ;i++) {
-        if(access == access_levels[i].access)
-            return access_levels[i].name;
+const char *http_id2user_role(HTTP_USER_ROLE role) {
+    for(size_t i = 0; user_roles[i].name ;i++) {
+        if(role == user_roles[i].access)
+            return user_roles[i].name;
     }
 
-    nd_log(NDLS_DAEMON, NDLP_WARNING, "HTTP access level %d is not valid", access);
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "HTTP user role %d is not valid", role);
     return "none";
+}
+
+static struct {
+    const char *name;
+    uint32_t hash;
+    HTTP_ACCESS value;
+} http_accesses[] = {
+      {"none"                       , 0    , HTTP_ACCESS_NONE}
+    , {"claim"                      , 0    , HTTP_ACCESS_CLAIM_AGENT}
+    , {"signed-in"                  , 0    , HTTP_ACCESS_SIGNED_IN}
+    , {"anonymous-data"             , 0    , HTTP_ACCESS_VIEW_ANONYMOUS_DATA}
+    , {"sensitive-data"             , 0    , HTTP_ACCESS_VIEW_SENSITIVE_DATA}
+    , {"view-config"                , 0    , HTTP_ACCESS_VIEW_AGENT_CONFIG}
+    , {"edit-config"                , 0    , HTTP_ACCESS_EDIT_AGENT_CONFIG}
+    , {"view-collectors-config"     , 0    , HTTP_ACCESS_VIEW_COLLECTION_CONFIG}
+    , {"edit-collectors-config"     , 0    , HTTP_ACCESS_EDIT_COLLECTION_CONFIG}
+    , {"view-alerts-config"         , 0    , HTTP_ACCESS_VIEW_ALERTS_CONFIG}
+    , {"edit-alerts-config"         , 0    , HTTP_ACCESS_EDIT_ALERTS_CONFIG}
+    , {"view-notifications-config"  , 0    , HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG}
+    , {"edit-notifications-config"  , 0    , HTTP_ACCESS_EDIT_NOTIFICATIONS_CONFIG}
+    , {"view-alerts-silencing"      , 0    , HTTP_ACCESS_VIEW_ALERTS_SILENCING}
+    , {"edit-alerts-silencing"      , 0    , HTTP_ACCESS_EDIT_ALERTS_SILENCING}
+    , {"view-streaming-config"      , 0    , HTTP_ACCESS_VIEW_STREAMING_CONFIG}
+    , {"edit-streaming-config"      , 0    , HTTP_ACCESS_EDIT_STREAMING_CONFIG}
+    , {"view-exporting-config"      , 0    , HTTP_ACCESS_VIEW_EXPORTING_CONFIG}
+    , {"edit-exporting-config"      , 0    , HTTP_ACCESS_EDIT_EXPORTING_CONFIG}
+
+    , {NULL                , 0    , 0}
+};
+
+inline HTTP_ACCESS http_access2id_one(const char *str) {
+    HTTP_ACCESS ret = 0;
+
+    if(!str || !*str) return ret;
+
+    uint32_t hash = simple_hash(str);
+    int i;
+    for(i = 0; http_accesses[i].name ; i++) {
+        if(unlikely(!http_accesses[i].hash))
+            http_accesses[i].hash = simple_hash(http_accesses[i].name);
+
+        if (unlikely(hash == http_accesses[i].hash && !strcmp(str, http_accesses[i].name))) {
+            ret |= http_accesses[i].value;
+            break;
+        }
+    }
+
+    return ret;
+}
+
+inline HTTP_ACCESS http_access2id(char *str) {
+    HTTP_ACCESS ret = 0;
+    char *tok;
+
+    while(str && *str && (tok = strsep_skip_consecutive_separators(&str, ", |"))) {
+        if(!*tok) continue;
+        ret |= http_access2id_one(tok);
+    }
+
+    return ret;
+}
+
+void http_access2buffer_json_array(BUFFER *wb, const char *key, HTTP_ACCESS access) {
+    buffer_json_member_add_array(wb, key);
+
+    HTTP_ACCESS used = 0; // to prevent adding duplicates
+    for(int i = 0; http_accesses[i].name ; i++) {
+        if (unlikely((http_accesses[i].value & access) && !(http_accesses[i].value & used))) {
+            const char *name = http_accesses[i].name;
+            used |= http_accesses[i].value;
+
+            buffer_json_add_array_item_string(wb, name);
+        }
+    }
+
+    buffer_json_array_close(wb);
+}
+
+void http_access2txt(char *buf, size_t size, char separator, HTTP_ACCESS access) {
+    char *write = buf;
+    char *end = &buf[size - 1];
+
+    HTTP_ACCESS used = 0; // to prevent adding duplicates
+    int added = 0;
+    for(int i = 0; http_accesses[i].name ; i++) {
+        if (unlikely((http_accesses[i].value & access) && !(http_accesses[i].value & used))) {
+            const char *name = http_accesses[i].name;
+            used |= http_accesses[i].value;
+
+            if(added && write < end)
+                *write++ = separator;
+
+            while(*name && write < end)
+                *write++ = *name++;
+
+            added++;
+        }
+    }
+    *write = *end = '\0';
+}
+
+static inline uint64_t base64_char_value(char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return 0; // Padding character '=' is treated as 0
+}
+
+HTTP_ACCESS https_access_from_base64_bitmap(const char *str) {
+    uint64_t permissions = 0;
+
+    // decode each character and shift it into the number
+    for (size_t i = 0; str[i] ; i++)
+        permissions = (permissions << 6) | base64_char_value(str[i]);
+
+    return (HTTP_ACCESS)permissions;
 }

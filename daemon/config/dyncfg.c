@@ -333,7 +333,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         1000,
         "Dynamic configuration",
         "config",
-        HTTP_ACCESS_ADMIN,
+        HTTP_USER_ROLE_ADMIN,
         sync,
         dyncfg_function_intercept_cb,
         NULL);
@@ -411,7 +411,8 @@ void dyncfg_add_streaming(BUFFER *wb) {
                    , 120
                    , "Dynamic configuration"
                    , "config"
-                   , http_id2access(HTTP_ACCESS_ADMIN)
+                   ,
+        http_id2user_role(HTTP_USER_ROLE_ADMIN)
                    , 1000
     );
 }
