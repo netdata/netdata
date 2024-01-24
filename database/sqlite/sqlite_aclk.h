@@ -40,8 +40,6 @@ static inline int claimed()
     return localhost->aclk_state.claimed_id != NULL;
 }
 
-#define TABLE_ACLK_ALERT_ANALYZE "ANALYZE aclk_alert_%s"
-
 #define TABLE_ACLK_ALERT                                                                                               \
     "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, "                                      \
     "alert_unique_id, date_created, date_submitted, date_cloud_ack, filtered_alert_unique_id NOT NULL, "               \
