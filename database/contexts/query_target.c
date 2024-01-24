@@ -1324,5 +1324,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
             }
     dfe_done(ri);
 
+    free_label_pattern_list(lpl);
+
     return count;
 }
