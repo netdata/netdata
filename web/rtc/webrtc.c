@@ -248,7 +248,7 @@ static size_t webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t si
                             message_size,
                             chunk,
                             total_chunks,
-                            web_content_type_to_string(content_type)
+                            content_type_id2string(content_type)
         );
 
         internal_fatal((size_t)len != strlen(send_buffer), "WEBRTC compressed header line mismatch");
