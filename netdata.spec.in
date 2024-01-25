@@ -20,12 +20,14 @@ AutoReqProv: yes
 %global _lto_cflags %nil
 
 # Disable go.d.plugin build on outdated golang distros
+%if 0
 %if 0%{?centos_ver:1}
 %if 0%{?centos_ver} >= 10 && 0%{?almalinux_ver:1} && 0%{?rocky_ver:1}
 %global _golang_build 1
 %else
 %global _golang_build 0
 %global _missing_build_ids_terminate_build 0
+%endif
 %endif
 %endif
 
@@ -213,10 +215,12 @@ BuildRequires: cups-devel >= 1.7
 # end - cups plugin dependencies
 
 # go.d.plugin dependencies
+%if 0%{?_golang_build}
 %if 0%{?suse_version}
 BuildRequires: go
 %else
 BuildRequires: golang
+%endif
 %endif
 # end - go.d.plugin plugin dependencies
 
