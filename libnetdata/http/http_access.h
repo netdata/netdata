@@ -18,7 +18,7 @@ typedef enum __attribute__((packed)) {
 const char *http_id2user_role(HTTP_USER_ROLE role);
 HTTP_USER_ROLE http_user_role2id(const char *role);
 
-typedef enum : uint32_t {
+typedef enum __attribute__((packed)) {
     HTTP_ACCESS_NONE                        = 0,
     HTTP_ACCESS_SIGNED_IN                   = (1 << 0),
     HTTP_ACCESS_CLAIM_AGENT                 = (1 << 1),
