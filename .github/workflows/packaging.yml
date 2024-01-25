@@ -208,14 +208,18 @@ jobs:
       - name: Set Sentry telemetry env vars
         id: set-telemetry-env-vars
         run: |
-          if [[ "${{ github.repository }}" == 'netdata/netdata' && "${{ matrix.bundle_sentry }}" == 'true' ]]; then
-            if [[ "${{ github.event_name }}" == 'workflow_dispatch' ]]; then
-                echo "RELEASE_PIPELINE=Production" >> $GITHUB_ENV
-                echo "UPLOAD_SENTRY=true" >> $GITHUB_ENV
-            fi
+          if [[ "${{ github.repository }}" == 'netdata/netdata' && \
+                  "${{ matrix.bundle_sentry }}" == 'true' && \
+                  "${{ github.event_name }}" == 'workflow_dispatch' ]]; then
+
+              echo "RELEASE_PIPELINE=Production" >> $GITHUB_ENV
+              echo "UPLOAD_SENTRY=true" >> $GITHUB_ENV
+
           else
-            echo "RELEASE_PIPELINE=Unknown" >> $GITHUB_ENV
-            echo "UPLOAD_SENTRY=false" >> $GITHUB_ENV
+
+              echo "RELEASE_PIPELINE=Unknown" >> $GITHUB_ENV
+              echo "UPLOAD_SENTRY=false" >> $GITHUB_ENV
+
           fi
       - name: Setup QEMU
         id: qemu
