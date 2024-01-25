@@ -101,7 +101,7 @@ override_dh_auto_test:
 
 override_dh_strip:
 	if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then \
-		sentry-cli debug-files upload -o netdata-inc -p netdata-agent --force-foreground --log-level=debug --wait --include-sources /usr/src/netdata/debian/netdata/usr/sbin/netdata \
+		sentry-cli debug-files upload -o netdata-inc -p netdata-agent --force-foreground --log-level=debug --wait --include-sources /usr/src/netdata/debian/netdata/usr/sbin/netdata; \
 		ls -la /sentry-sources; \
 		rm -rf /sentry-sources; \
 	fi
