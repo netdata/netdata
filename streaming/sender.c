@@ -1183,7 +1183,7 @@ static void execute_commands_function(struct sender_state *s, const char *comman
         BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_functions);
 
         int code = rrd_function_run(s->host, wb, timeout,
-                                    http_access_from_hex(access), function, false, transaction,
+                                    http_access_from_hex_mapping_old_roles(access), function, false, transaction,
                                     stream_execute_function_callback, tmp,
                                     stream_has_capability(s, STREAM_CAP_PROGRESS) ? stream_execute_function_progress_callback : NULL,
                                     stream_has_capability(s, STREAM_CAP_PROGRESS) ? tmp : NULL,
@@ -1233,8 +1233,9 @@ void execute_commands(struct sender_state *s) {
         s->line.count++;
 
         if(s->functions.intercept_input) {
-            if(strcmp(start, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END "\n") == 0) {
-                execute_commands_function(s, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END,
+            if(strcmp(start, PLUGINSD_CALL_FUNCTION_PAYLOAD_END "\n") == 0) {
+                execute_commands_function(s,
+                    PLUGINSD_CALL_FUNCTION_PAYLOAD_END,
                                           s->functions.transaction, s->functions.timeout_s,
                                           s->functions.function, s->functions.payload,
                                           s->functions.access, s->functions.source);
@@ -1252,7 +1253,7 @@ void execute_commands(struct sender_state *s) {
         s->line.num_words = quoted_strings_splitter_pluginsd(start, s->line.words, PLUGINSD_MAX_WORDS);
         const char *command = get_word(s->line.words, s->line.num_words, 0);
 
-        if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION) == 0) {
+        if(command && strcmp(command, PLUGINSD_CALL_FUNCTION) == 0) {
             char *transaction  = get_word(s->line.words, s->line.num_words, 1);
             char *timeout_s    = get_word(s->line.words, s->line.num_words, 2);
             char *function     = get_word(s->line.words, s->line.num_words, 3);
@@ -1261,7 +1262,7 @@ void execute_commands(struct sender_state *s) {
 
             execute_commands_function(s, command, transaction, timeout_s, function, NULL, access, source);
         }
-        else if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0) {
+        else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) == 0) {
             char *transaction  = get_word(s->line.words, s->line.num_words, 1);
             char *timeout_s    = get_word(s->line.words, s->line.num_words, 2);
             char *function     = get_word(s->line.words, s->line.num_words, 3);
@@ -1278,7 +1279,7 @@ void execute_commands(struct sender_state *s) {
             s->functions.payload->content_type = content_type_string2id(content_type);
             s->functions.intercept_input = true;
         }
-        else if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
+        else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_CANCEL) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 
@@ -1286,7 +1287,7 @@ void execute_commands(struct sender_state *s) {
             if(transaction && *transaction)
                 rrd_function_cancel(transaction);
         }
-        else if(command && strcmp(command, PLUGINSD_KEYWORD_FUNCTION_PROGRESS) == 0) {
+        else if(command && strcmp(command, PLUGINSD_CALL_FUNCTION_PROGRESS) == 0) {
             worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
             nd_log(NDLS_ACCESS, NDLP_DEBUG, NULL);
 

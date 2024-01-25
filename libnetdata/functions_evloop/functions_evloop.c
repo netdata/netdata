@@ -195,7 +195,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
         if(deferred.enabled) {
             char *s = (char *)buffer_tostring(buffer);
 
-            if(strstr(&s[deferred.last_len], PLUGINSD_KEYWORD_FUNCTION_PAYLOAD_END "\n") != NULL) {
+            if(strstr(&s[deferred.last_len], PLUGINSD_CALL_FUNCTION_PAYLOAD_END "\n") != NULL) {
                 if(deferred.last_len > 0)
                     // remove the trailing newline from the buffer
                     deferred.last_len--;
@@ -203,7 +203,8 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
                 s[deferred.last_len] = '\0';
                 buffer->len = deferred.last_len;
                 buffer->content_type = content_type_string2id(deferred.content_type);
-                worker_add_job(wg, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD, deferred.transaction, deferred.function,
+                worker_add_job(wg,
+                    PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN, deferred.transaction, deferred.function,
                                deferred.timeout_s, buffer, deferred.access, deferred.source);
                 buffer_flush(buffer);
 
@@ -226,7 +227,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
 
         const char *keyword = get_word(words, num_words, 0);
 
-        if(keyword && (strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0)) {
+        if(keyword && (strcmp(keyword, PLUGINSD_CALL_FUNCTION) == 0)) {
             char *transaction = get_word(words, num_words, 1);
             char *timeout_s = get_word(words, num_words, 2);
             char *function = get_word(words, num_words, 3);
@@ -234,7 +235,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             char *source = get_word(words, num_words, 5);
             worker_add_job(wg, keyword, transaction, function, timeout_s, NULL, access, source);
         }
-        else if(keyword && (strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_PAYLOAD) == 0)) {
+        else if(keyword && (strcmp(keyword, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) == 0)) {
             char *transaction = get_word(words, num_words, 1);
             char *timeout_s = get_word(words, num_words, 2);
             char *function = get_word(words, num_words, 3);
@@ -251,7 +252,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             deferred.last_len = 0;
             deferred.enabled = true;
         }
-        else if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_CANCEL) == 0) {
+        else if(keyword && strcmp(keyword, PLUGINSD_CALL_FUNCTION_CANCEL) == 0) {
             char *transaction = get_word(words, num_words, 1);
             const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(wg->worker_queue, transaction);
             if(acquired) {
@@ -264,7 +265,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
             else
                 nd_log(NDLS_COLLECTORS, NDLP_NOTICE, "Received CANCEL for transaction '%s', but it not available here", transaction);
         }
-        else if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION_PROGRESS) == 0) {
+        else if(keyword && strcmp(keyword, PLUGINSD_CALL_FUNCTION_PROGRESS) == 0) {
             char *transaction = get_word(words, num_words, 1);
             const DICTIONARY_ITEM *acquired = dictionary_get_and_acquire_item(wg->worker_queue, transaction);
             if(acquired) {

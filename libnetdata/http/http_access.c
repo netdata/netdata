@@ -55,7 +55,7 @@ static struct {
 } http_accesses[] = {
       {"none"                       , 0    , HTTP_ACCESS_NONE}
     , {"claim"                      , 0    , HTTP_ACCESS_CLAIM_AGENT}
-    , {"signed-in"                  , 0    , HTTP_ACCESS_SAME_SPACE}
+    , {"same-space"                 , 0    , HTTP_ACCESS_SAME_SPACE}
     , {"anonymous-data"             , 0    , HTTP_ACCESS_VIEW_ANONYMOUS_DATA}
     , {"sensitive-data"             , 0    , HTTP_ACCESS_VIEW_SENSITIVE_DATA}
     , {"view-config"                , 0    , HTTP_ACCESS_VIEW_AGENT_CONFIG}
@@ -144,13 +144,13 @@ HTTP_ACCESS http_access_from_hex_mapping_old_roles(const char *str) {
         return HTTP_ACCESS_NONE;
 
     if(strcmp(str, "any") == 0 || strcmp(str, "all") == 0)
-        return HTTP_ACCESS_NONE;
+        return HTTP_ACCESS_MAP_OLD_ANY;
 
     if(strcmp(str, "member") == 0 || strcmp(str, "members") == 0)
-        return HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_VIEW_SENSITIVE_DATA;
+        return HTTP_ACCESS_MAP_OLD_MEMBER;
 
     else if(strcmp(str, "admin") == 0 || strcmp(str, "admins") == 0)
-        return HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_VIEW_SENSITIVE_DATA|HTTP_ACCESS_VIEW_AGENT_CONFIG|HTTP_ACCESS_EDIT_AGENT_CONFIG;
+        return HTTP_ACCESS_MAP_OLD_ADMIN;
 
     return (HTTP_ACCESS)strtoull(str, NULL, 16);
 }

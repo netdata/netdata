@@ -25,7 +25,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     if(pf->payload && buffer_strlen(pf->payload)) {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \""HTTP_ACCESS_FORMAT"\" \"%s\" \"%s\"\n",
+            PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN " %s %d \"%s\" \""HTTP_ACCESS_FORMAT"\" \"%s\" \"%s\"\n",
             transaction,
             pf->timeout_s,
             string2str(pf->function),
@@ -40,7 +40,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     else {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \""HTTP_ACCESS_FORMAT"\" \"%s\"\n",
+            PLUGINSD_CALL_FUNCTION " %s %d \"%s\" \""HTTP_ACCESS_FORMAT"\" \"%s\"\n",
             transaction,
             pf->timeout_s,
             string2str(pf->function),
@@ -149,7 +149,7 @@ static void pluginsd_function_cancel(void *data) {
             internal_error(true, "PLUGINSD: sending function cancellation to plugin for transaction '%s'", transaction);
 
             char buffer[2048];
-            snprintfz(buffer, sizeof(buffer), PLUGINSD_KEYWORD_FUNCTION_CANCEL " %s\n", transaction);
+            snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_CANCEL " %s\n", transaction);
 
             // send the command to the plugin
             ssize_t ret = send_to_plugin(buffer, t->parser);
@@ -177,7 +177,7 @@ static void pluginsd_function_progress_to_plugin(void *data) {
             internal_error(true, "PLUGINSD: sending function progress to plugin for transaction '%s'", transaction);
 
             char buffer[2048];
-            snprintfz(buffer, sizeof(buffer), PLUGINSD_KEYWORD_FUNCTION_PROGRESS " %s\n", transaction);
+            snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_PROGRESS " %s\n", transaction);
 
             // send the command to the plugin
             ssize_t ret = send_to_plugin(buffer, t->parser);

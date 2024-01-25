@@ -35,13 +35,45 @@ typedef enum __attribute__((packed)) {
                                                          //                                     P  = commercial plan
                                                          //                                     SR = same room (Us+Ag)
 
-#define HTTP_ACCESS_FORMAT "0x%" PRIx32
-#define HTTP_ACCESS_FORMAT_CAST uint32_t
+#define HTTP_ACCESS_FORMAT "0x%" PRIx16
+#define HTTP_ACCESS_FORMAT_CAST uint16_t
 
-#define HTTP_ACCESS_ACLK_DEFAULT                                                                                       \
-    (HTTP_ACCESS_SAME_SPACE |HTTP_ACCESS_VIEW_ANONYMOUS_DATA|HTTP_ACCESS_VIEW_SENSITIVE_DATA)
+#define HTTP_ACCESS_ALL (HTTP_ACCESS)( \
+      HTTP_ACCESS_SAME_SPACE \
+    | HTTP_ACCESS_CLAIM_AGENT \
+    | HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
+    | HTTP_ACCESS_VIEW_SENSITIVE_DATA \
+    | HTTP_ACCESS_VIEW_AGENT_CONFIG \
+    | HTTP_ACCESS_EDIT_AGENT_CONFIG \
+    | HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG \
+    | HTTP_ACCESS_EDIT_NOTIFICATIONS_CONFIG \
+    | HTTP_ACCESS_VIEW_ALERTS_SILENCING \
+    | HTTP_ACCESS_EDIT_ALERTS_SILENCING \
+)
 
-#define HTTP_ACCESS_ALL ((HTTP_ACCESS)(0xFFFFFFFF))
+#define HTTP_ACCESS_ACLK_DEFAULT (HTTP_ACCESS)( \
+      HTTP_ACCESS_SAME_SPACE \
+    | HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
+    | HTTP_ACCESS_VIEW_SENSITIVE_DATA \
+)
+
+#define HTTP_ACCESS_MAP_OLD_ANY (HTTP_ACCESS)( \
+    HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
+)
+
+#define HTTP_ACCESS_MAP_OLD_MEMBER (HTTP_ACCESS)( \
+      HTTP_ACCESS_SAME_SPACE \
+    | HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
+    | HTTP_ACCESS_VIEW_SENSITIVE_DATA \
+)
+
+#define HTTP_ACCESS_MAP_OLD_ADMIN (HTTP_ACCESS)( \
+      HTTP_ACCESS_SAME_SPACE \
+    | HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
+    | HTTP_ACCESS_VIEW_SENSITIVE_DATA \
+    | HTTP_ACCESS_VIEW_AGENT_CONFIG \
+    | HTTP_ACCESS_EDIT_AGENT_CONFIG \
+)
 
 HTTP_ACCESS http_access2id_one(const char *str);
 HTTP_ACCESS http_access2id(char *str);
