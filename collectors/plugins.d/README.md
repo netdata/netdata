@@ -625,7 +625,7 @@ Where:
 When the `action` is `create`, the following additional parameters are expected:
 
 ```
-CONFIG id action status type "path" source_type "source" "supported commands"
+CONFIG id action status type "path" source_type "source" "supported commands" "view permissions" "edit permissions"
 ```
 
 Where:
@@ -659,6 +659,7 @@ Where:
   - `remove`, to remove a configuration. Only `jobs` should support this command.
   - `enable` and `disable`, to receive user requests to enable and disable this entity. Adding only one of `enable` or `disable` to the supported commands, Netdata will add both of them. The plugin should expose these commands on `templates` only when it wants to receive `enable` and `disable` commands for all the `jobs` of this `template`.
   - `restart`, to restart a job.
+- `view permissions` and `edit permissions` are bitmaps of the Netdata permission system to control access to the configuration. If set to zero, Netdata will require a signed in user with view and edit permissions to the Netdata's configuration system.
 
 The plugin receives commands as if it had exposed a `FUNCTION` named `config`. Netdata formats all these calls like this:
 

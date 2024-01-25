@@ -109,7 +109,7 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
 
 int dyncfg_health_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd, const char *add_name,
                      BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled,
-                     BUFFER *result, const char *source, void *data);
+                     BUFFER *result, HTTP_ACCESS access, const char *source, void *data);
 
 void health_dyncfg_unregister_all_prototypes(void);
 void health_dyncfg_register_all_prototypes(void);

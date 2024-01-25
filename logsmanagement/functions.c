@@ -162,7 +162,7 @@ typedef struct function_query_status {
 
 static void logsmanagement_function_facets(const char *transaction, char *function,
                                            usec_t *stop_monotonic_ut, bool *cancelled,
-                                           BUFFER *payload __maybe_unused,
+                                           BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
                                            const char *src __maybe_unused, void *data __maybe_unused){
 
     struct rusage start, end;

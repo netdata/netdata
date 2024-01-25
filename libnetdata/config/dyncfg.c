@@ -251,7 +251,7 @@ int dyncfg_default_response(BUFFER *wb, int code, const char *msg) {
 
 int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction, const char *function,
                               usec_t *stop_monotonic_ut, bool *cancelled,
-                              BUFFER *payload, const char *source, BUFFER *result) {
+                              BUFFER *payload, HTTP_ACCESS access, const char *source, BUFFER *result) {
     if(!function || !*function)
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "command received is empty");
 
@@ -284,7 +284,7 @@ int dyncfg_node_find_and_call(DICTIONARY *dyncfg_nodes, const char *transaction,
     buffer_flush(result);
     result->content_type = CT_APPLICATION_JSON;
 
-    int code = df->cb(transaction, id, cmd, add_name, payload, stop_monotonic_ut, cancelled, result, source, df->data);
+    int code = df->cb(transaction, id, cmd, add_name, payload, stop_monotonic_ut, cancelled, result, access, source, df->data);
 
     if(!result->expires)
         result->expires = now_realtime_sec();

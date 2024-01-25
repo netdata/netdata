@@ -157,6 +157,9 @@ static inline uint64_t base64_char_value(char c) {
 }
 
 HTTP_ACCESS https_access_from_base64_bitmap(const char *str) {
+    if(!str || !*str)
+        return HTTP_ACCESS_NONE;
+
     uint64_t permissions = 0;
 
     // decode each character and shift it into the number
@@ -167,11 +170,17 @@ HTTP_ACCESS https_access_from_base64_bitmap(const char *str) {
 }
 
 HTTP_ACCESS http_access_from_hex(const char *str) {
+    if(!str || !*str)
+        return HTTP_ACCESS_NONE;
+
     return (HTTP_ACCESS)strtoull(str, NULL, 16);
 }
 
 HTTP_ACCESS http_access_from_source(const char *str) {
-    HTTP_ACCESS access = 0;
+    if(!str || !*str)
+        return HTTP_ACCESS_NONE;
+
+    HTTP_ACCESS access = HTTP_ACCESS_NONE;
 
     const char *permissions = strstr(str, "permissions=");
     if(permissions)

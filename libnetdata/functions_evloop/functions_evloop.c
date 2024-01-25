@@ -2,7 +2,9 @@
 
 #include "functions_evloop.h"
 
-static void functions_evloop_config_cb(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, const char *source, void *data);
+static void functions_evloop_config_cb(const char *transaction, char *function, usec_t *stop_monotonic_ut,
+                                       bool *cancelled, BUFFER *payload, HTTP_ACCESS access,
+                                       const char *source, void *data);
 
 struct functions_evloop_worker_job {
     bool used;
@@ -91,7 +93,7 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
 
             last_acquired = true;
             j = dictionary_acquired_item_value(acquired);
-            j->cb(j->transaction, j->cmd, &j->stop_monotonic_ut, &j->cancelled, j->payload, j->source, j->cb_data);
+            j->cb(j->transaction, j->cmd, &j->stop_monotonic_ut, &j->cancelled, j->payload, j->access, j->source, j->cb_data);
             dictionary_del(wg->worker_queue, j->transaction);
             dictionary_acquired_item_release(wg->worker_queue, acquired);
             dictionary_garbage_collect(wg->worker_queue);
@@ -346,11 +348,12 @@ void functions_evloop_cancel_threads(struct functions_evloop_globals *wg){
 // ----------------------------------------------------------------------------
 
 static void functions_evloop_config_cb(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled,
-                                       BUFFER *payload, const char *source, void *data) {
+                                       BUFFER *payload, HTTP_ACCESS access, const char *source, void *data) {
     struct functions_evloop_globals *wg = data;
 
     CLEAN_BUFFER *result = buffer_create(1024, NULL);
-    int code = dyncfg_node_find_and_call(wg->dyncfg.nodes, transaction, function, stop_monotonic_ut, cancelled, payload, source, result);
+    int code = dyncfg_node_find_and_call(wg->dyncfg.nodes, transaction, function, stop_monotonic_ut,
+                                         cancelled, payload, access, source, result);
 
     netdata_mutex_lock(wg->stdout_mutex);
     pluginsd_function_result_begin_to_stdout(transaction, code, content_type_id2string(result->content_type), result->expires);
@@ -360,7 +363,12 @@ static void functions_evloop_config_cb(const char *transaction, char *function, 
     netdata_mutex_unlock(wg->stdout_mutex);
 }
 
-void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data) {
+void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path,
+                                 DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type,
+                                 const char *source, DYNCFG_CMDS cmds,
+                                 HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
+                                 dyncfg_cb_t cb, void *data) {
+
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
         return;
@@ -380,9 +388,15 @@ void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char
     netdata_mutex_lock(wg->stdout_mutex);
 
     fprintf(stdout,
-            PLUGINSD_KEYWORD_CONFIG " '%s' " PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE " '%s' '%s' '%s' '%s' '%s' '%s'\n",
-            id, dyncfg_id2status(status), dyncfg_id2type(type), path,
-            dyncfg_id2source_type(source_type), source, buffer_tostring(c)
+            PLUGINSD_KEYWORD_CONFIG " '%s' " PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE " '%s' '%s' '%s' '%s' '%s' '%s' "HTTP_ACCESS_FORMAT" "HTTP_ACCESS_FORMAT"\n",
+            id,
+            dyncfg_id2status(status),
+            dyncfg_id2type(type), path,
+            dyncfg_id2source_type(source_type),
+            source,
+            buffer_tostring(c),
+            (HTTP_ACCESS_FORMAT_CAST)view_access,
+            (HTTP_ACCESS_FORMAT_CAST)edit_access
     );
     fflush(stdout);
 

@@ -275,9 +275,17 @@ bool dyncfg_job_has_registered_template(const char *id) {
     return ret;
 }
 
-bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
-    HTTP_ACCESS view_access = HTTP_ACCESS_SIGNED_IN | HTTP_ACCESS_VIEW_AGENT_CONFIG;
-    HTTP_ACCESS edit_access = HTTP_ACCESS_SIGNED_IN | HTTP_ACCESS_EDIT_AGENT_CONFIG;
+bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
+                          DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source,
+                          DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync,
+                          HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
+                          rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
+
+    if(view_access == HTTP_ACCESS_NONE)
+        view_access = HTTP_ACCESS_SIGNED_IN | HTTP_ACCESS_VIEW_AGENT_CONFIG;
+
+    if(edit_access == HTTP_ACCESS_NONE)
+        edit_access = HTTP_ACCESS_SIGNED_IN | HTTP_ACCESS_EDIT_AGENT_CONFIG;
 
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);

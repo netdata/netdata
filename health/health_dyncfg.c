@@ -498,7 +498,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 
 int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYNCFG_CMDS cmd, const char *add_name,
                      BUFFER *payload, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-                     BUFFER *result, const char *source, void *data __maybe_unused) {
+                     BUFFER *result, HTTP_ACCESS access __maybe_unused, const char *source, void *data __maybe_unused) {
 
     char buf[strlen(id) + 1];
     memcpy(buf, id, sizeof(buf));
@@ -563,6 +563,8 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
                    DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
                    (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !ap->_internal.is_on_disk ? DYNCFG_CMD_REMOVE : 0),
+               HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_ALERTS_CONFIG,
+               HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_EDIT_ALERTS_CONFIG,
                dyncfg_health_cb, NULL);
 
 #ifdef NETDATA_TEST_HEALTH_PROTOTYPES_JSON_AND_PARSING
@@ -593,6 +595,8 @@ void health_dyncfg_register_all_prototypes(void) {
                DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE_TEMPLATE,
                DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+               HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_ALERTS_CONFIG,
+               HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_EDIT_ALERTS_CONFIG,
                dyncfg_health_cb, NULL);
 
     dfe_start_read(health_globals.prototypes.dict, ap) {

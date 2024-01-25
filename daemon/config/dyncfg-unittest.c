@@ -125,6 +125,7 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
         dyncfg_add_low_level(localhost, t2->id, "/unittests",
                              DYNCFG_STATUS_RUNNING, t2->type, t2->source_type, t2->source,
                              t2->cmds, 0, 0, t2->sync,
+                             HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
                              dyncfg_unittest_execute_cb, t2);
     }
     else {
@@ -549,8 +550,10 @@ static TEST *dyncfg_unittest_add(TEST t) {
     TEST *ret = dictionary_set(dyncfg_unittest_data.nodes, t.id, &t, sizeof(t));
 
     if(!dyncfg_add_low_level(localhost, t.id, "/unittests", DYNCFG_STATUS_RUNNING, t.type,
-        t.source_type, t.source,
-        t.cmds, 0, 0, t.sync, dyncfg_unittest_execute_cb, ret)) {
+                              t.source_type, t.source,
+                              t.cmds, 0, 0, t.sync,
+                              HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
+                              dyncfg_unittest_execute_cb, ret)) {
         dyncfg_unittest_register_error(t.id, "addition of job failed");
     }
 
