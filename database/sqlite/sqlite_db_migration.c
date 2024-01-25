@@ -395,6 +395,12 @@ static int do_migration_v14_v15(sqlite3 *database)
     return 0;
 }
 
+static int do_migration_v15_v16(sqlite3 *database)
+{
+    (void) db_execute(database, "ANALYZE");
+    return 0;
+}
+
 static int do_migration_v12_v13(sqlite3 *database)
 {
     int rc = 0;
@@ -491,6 +497,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v12 to v13",  .func = do_migration_v12_v13},
     {.name = "v13 to v14",  .func = do_migration_v13_v14},
     {.name = "v14 to v15",  .func = do_migration_v14_v15},
+    {.name = "v14 to v15",  .func = do_migration_v15_v16},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
