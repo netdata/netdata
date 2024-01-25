@@ -159,7 +159,8 @@
         "distro",
         "version",
         "support_type",
-        "notes"
+        "notes", 
+        "bundle_sentry"
       ]
     }
   }

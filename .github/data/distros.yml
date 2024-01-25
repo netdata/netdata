@@ -137,7 +137,7 @@ include:
     notes: ''
     base_image: debian:bookworm
     eol_check: true
-    bundle_sentry: true
+    bundle_sentry: false
     env_prep: |
       apt-get update
     jsonc_removal: |

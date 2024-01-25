@@ -17,7 +17,6 @@ with open('.github/data/distros.yml') as f:
 if bool(int(SHORT_RUN)):
     run_limited = True
 
-"""
 for i, v in enumerate(data['include']):
     if 'packages' in data['include'][i]:
         for arch in data['include'][i]['packages']['arches']:
@@ -29,21 +28,9 @@ for i, v in enumerate(data['include']):
                     'format': data['include'][i]['packages']['type'],
                     'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else ':'.join([data['include'][i]['distro'], data['include'][i]['version']]),
                     'platform': data['platform_map'][arch],
-                    'arch': arch,
-                    'bundle_sentry': data['include'][i]['bundle_sentry']
+                    'bundle_sentry': data['include'][i]['bundle_sentry'],
+                    'arch': arch
                 })
-"""
-
-entries.append({
-    'distro': "debian",
-    'version': "12",
-    'repo_distro': "debian/bookworm",
-    'format': "deb",
-    'base_image': "debian:bookworm",
-    'platform': "linux/amd64",
-    'arch': "amd64",
-    'bundle_sentry': "true"
-})
 
 entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))
 matrix = json.dumps({'include': entries}, sort_keys=True)

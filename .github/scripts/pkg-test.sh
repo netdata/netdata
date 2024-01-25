@@ -121,15 +121,7 @@ esac
 trap dump_log EXIT
 
 /usr/sbin/netdata -D > ./netdata.log 2>&1 &
-sleep 30
-/usr/sbin/netdata -D > ./netdata.log 2>&1 &
-sleep 30 
 
-
-curl -sS http://127.0.0.1:19999/api/v1/info > ./response || exit 1
-cat ./response
-
-jq '.version' ./response || exit 1
-
+"${SCRIPT_DIR}/../../packaging/runtime-check.sh" || exit 1
 
 trap - EXIT

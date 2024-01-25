@@ -2,6 +2,7 @@
 
 # Find the arch we are building for, as this determines
 # the location of plugins in /usr/lib
+SRC_DIR = /usr/src/netdata
 TOP = $(CURDIR)/debian/netdata
 TEMPTOP = $(CURDIR)/debian/tmp
 BUILDDIR = $(CURDIR)/debian/build
@@ -38,11 +39,11 @@ XENSTAT_CONFIG = -DENABLE_PLUGIN_XENSTAT=On
 endif
 
 ifeq ($(ENABLE_SENTRY),true)
-    BUILDING_ENVIRONMENT ?= Unknown
+    RELEASE_PIPELINE ?= Unknown
     VERSION ?= Unknown
     BUILD_DESTINATION ?= Unknown
     SENTRY_CONFIG := -DENABLE_SENTRY=On \
-        -DNETDATA_SENTRY_ENVIRONMENT=$(BUILDING_ENVIRONMENT) \
+        -DNETDATA_SENTRY_ENVIRONMENT=$(RELEASE_PIPELINE) \
         -DNETDATA_SENTRY_RELEASE=$(VERSION) \
         -DNETDATA_SENTRY_DIST=$(BUILD_DESTINATION) \
         -DNETDATA_SENTRY_DSN=$(SENTRY_DSN) \
@@ -71,7 +72,7 @@ override_dh_auto_configure:
 	dh_auto_configure -- -G Ninja \
 		-DCMAKE_INSTALL_PREFIX=/ \
 		-DWEB_DIR=/var/lib/netdata/www \
-		-DCMAKE_C_FLAGS='-ffile-prefix-map=/usr/src/netdata=/usr/src/netdata' \
+		-DCMAKE_C_FLAGS='-ffile-prefix-map=${SRC_DIR}=${SRC_DIR}' \
 		-DENABLE_ACLK=On \
 		-DENABLE_CLOUD=On \
 		-DENABLE_DBENGINE=On \
