@@ -526,7 +526,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v12 to v13",  .func = do_migration_v12_v13},
     {.name = "v13 to v14",  .func = do_migration_v13_v14},
     {.name = "v14 to v15",  .func = do_migration_v14_v15},
-    {.name = "v14 to v15",  .func = do_migration_v15_v16},
+    {.name = "v15 to v65",  .func = do_migration_v15_v16},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
