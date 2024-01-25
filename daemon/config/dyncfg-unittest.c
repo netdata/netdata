@@ -282,7 +282,7 @@ cleanup:
     return rc;
 }
 
-static bool dyncfg_unittest_check(TEST *t, const char *cmd, bool received) {
+static bool dyncfg_unittest_check(TEST *t, DYNCFG_CMDS c, const char *cmd, bool received) {
     size_t errors = 0;
 
     fprintf(stderr, "CHECK '%s' after cmd '%s'...", t->id, cmd);
@@ -359,11 +359,11 @@ static bool dyncfg_unittest_check(TEST *t, const char *cmd, bool received) {
         fprintf(stderr, "\n  - DYNCFG disabled config has no saves!");
         errors++;
     }
-    else if(t->source && string_strcmp(df->current.source, t->source) != 0) {
+    else if((c & (DYNCFG_CMD_ADD | DYNCFG_CMD_UPDATE)) && t->source && string_strcmp(df->current.source, t->source) != 0) {
         fprintf(stderr, "\n  - source does not match!");
         errors++;
     }
-    else if(df->current.source && !t->source) {
+    else if((c & (DYNCFG_CMD_ADD | DYNCFG_CMD_UPDATE)) && df->current.source && !t->source) {
         fprintf(stderr, "\n  - there is a source but it shouldn't be any!");
         errors++;
     }
@@ -478,7 +478,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
         dyncfg_unittest_register_error(NULL, NULL);
     }
 
-    dyncfg_unittest_check(t, cmd, true);
+    dyncfg_unittest_check(t, c, cmd, true);
 
     if(rc == HTTP_RESP_OK && t->type == DYNCFG_TYPE_TEMPLATE) {
         if(c == DYNCFG_CMD_ADD) {
@@ -491,7 +491,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
                        id, cmd);
                 dyncfg_unittest_register_error(NULL, NULL);
             }
-            dyncfg_unittest_check(tt, cmd, true);
+            dyncfg_unittest_check(tt, c, cmd, true);
         }
         else {
             STRING *template = string_strdupz(t->id);
@@ -509,7 +509,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
                             tt->expected.enabled = false;
                         if(c == DYNCFG_CMD_ENABLE)
                             tt->expected.enabled = true;
-                        dyncfg_unittest_check(tt, cmd, true);
+                        dyncfg_unittest_check(tt, c, cmd, true);
                     }
                 }
             }
@@ -557,7 +557,7 @@ static TEST *dyncfg_unittest_add(TEST t) {
         dyncfg_unittest_register_error(t.id, "addition of job failed");
     }
 
-    dyncfg_unittest_check(ret, "plugin create", t.type != DYNCFG_TYPE_TEMPLATE);
+    dyncfg_unittest_check(ret, DYNCFG_CMD_NONE, "plugin create", t.type != DYNCFG_TYPE_TEMPLATE);
 
     return ret;
 }

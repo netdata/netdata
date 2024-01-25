@@ -47,12 +47,19 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
             df_template->execute_cb_data,
             false);
 
+        // adding does not create df->dyncfg
+        // we have to do it here
+
         DYNCFG *df = dictionary_acquired_item_value(item);
         SWAP(df->dyncfg.payload, dc->payload);
+        dyncfg_set_dyncfg_source_from_txt(df, dc->source);
+        df->dyncfg.user_disabled = false;
+        df->dyncfg.source_type = DYNCFG_SOURCE_TYPE_DYNCFG;
+        df->dyncfg.status = dyncfg_status_from_successful_response(code);
 
+        dyncfg_file_save(id, df); // updates also the df->dyncfg timestamps
         dyncfg_update_status_on_successful_add_or_update(df, code);
 
-        dyncfg_file_save(id, df);
         dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     }
 }
