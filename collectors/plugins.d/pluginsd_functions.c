@@ -25,11 +25,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     if(pf->payload && buffer_strlen(pf->payload)) {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \"0x%"PRIx64"\" \"%s\" \"%s\"\n",
+            PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \""HTTP_ACCESS_FORMAT"\" \"%s\" \"%s\"\n",
             transaction,
             pf->timeout_s,
             string2str(pf->function),
-            (uint64_t)pf->access,
+            (HTTP_ACCESS_FORMAT_CAST)pf->access,
             pf->source ? pf->source : "",
             content_type_id2string(pf->payload->content_type)
             );
@@ -40,11 +40,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     else {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \"0x%"PRIx64"\" \"%s\"\n",
+            PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \""HTTP_ACCESS_FORMAT"\" \"%s\"\n",
             transaction,
             pf->timeout_s,
             string2str(pf->function),
-            (uint64_t)pf->access,
+            (HTTP_ACCESS_FORMAT_CAST)pf->access,
             pf->source ? pf->source : ""
             );
     }

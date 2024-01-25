@@ -420,11 +420,11 @@ void dyncfg_add_streaming(BUFFER *wb) {
     // this way the parent does not need to receive removals of config functions;
 
     buffer_sprintf(wb
-                   , PLUGINSD_KEYWORD_FUNCTION " GLOBAL " PLUGINSD_FUNCTION_CONFIG " %d \"%s\" \"%s\" \"0x%"PRIx64"\" %d\n"
+                   , PLUGINSD_KEYWORD_FUNCTION " GLOBAL " PLUGINSD_FUNCTION_CONFIG " %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d\n"
                    , 120
                    , "Dynamic configuration"
                    , "config"
-                   , (uint64_t)(HTTP_ACCESS_SIGNED_IN)
+                   , (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_IN)
                    , 1000
     );
 }

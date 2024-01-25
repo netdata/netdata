@@ -1514,7 +1514,7 @@ void web_client_source2buffer(struct web_client *w, BUFFER *source) {
     else
         buffer_sprintf(source, ",role=%s", http_id2user_role(w->user_role));
 
-    buffer_sprintf(source, ",permissions=0x%"PRIx64, (uint64_t)w->access);
+    buffer_sprintf(source, ",permissions="HTTP_ACCESS_FORMAT, (HTTP_ACCESS_FORMAT_CAST)w->access);
 
     if(w->auth.client_name[0])
         buffer_sprintf(source, ",user=%s", w->auth.client_name);

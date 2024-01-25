@@ -14,12 +14,12 @@ void rrd_chart_functions_expose_rrdpush(RRDSET *st, BUFFER *wb) {
         if(t->options & RRD_FUNCTION_DYNCFG) continue;
 
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" \"0x%"PRIx64"\" %d\n"
+                       , PLUGINSD_KEYWORD_FUNCTION " \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d\n"
                        , t_dfe.name
                        , t->timeout
                        , string2str(t->help)
                        , string2str(t->tags)
-                       , (uint64_t)t->access
+                       , (HTTP_ACCESS_FORMAT_CAST)t->access
                        , t->priority
         );
     }
@@ -41,12 +41,12 @@ void rrd_global_functions_expose_rrdpush(RRDHOST *host, BUFFER *wb, bool dyncfg)
         }
 
         buffer_sprintf(wb
-                       , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" \"0x%"PRIx64"\" %d\n"
+                       , PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d\n"
                        , tmp_dfe.name
                        , tmp->timeout
                        , string2str(tmp->help)
                        , string2str(tmp->tags)
-                       , (uint64_t)tmp->access
+                       , (HTTP_ACCESS_FORMAT_CAST)tmp->access
                        , tmp->priority
         );
     }

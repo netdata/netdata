@@ -5,9 +5,9 @@
 
 // Common
 static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC, int update_every) {
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" \"0x%"PRIx64"\" %d\n",
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
             NAME, update_every, DESC,
-            (uint64_t)(HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_SENSITIVE_DATA), RRDFUNCTIONS_PRIORITY_DEFAULT);
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_SENSITIVE_DATA), RRDFUNCTIONS_PRIORITY_DEFAULT);
 }
 
 // configuration file & description

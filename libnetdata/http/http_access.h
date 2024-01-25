@@ -40,6 +40,9 @@ typedef enum : uint32_t {
     HTTP_ACCESS_EDIT_EXPORTING_CONFIG       = (1 << 17),
 } HTTP_ACCESS;
 
+#define HTTP_ACCESS_FORMAT "0x%" PRIx32
+#define HTTP_ACCESS_FORMAT_CAST uint32_t
+
 #define HTTP_ACCESS_ACLK_DEFAULT                                                                                       \
     (HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_ANONYMOUS_DATA|HTTP_ACCESS_VIEW_SENSITIVE_DATA)
 

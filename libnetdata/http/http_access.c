@@ -182,6 +182,6 @@ HTTP_ACCESS http_access_from_source(const char *str) {
 
 bool log_cb_http_access_to_hex(BUFFER *wb, void *data) {
     HTTP_ACCESS access = *((HTTP_ACCESS *)data);
-    buffer_sprintf(wb, "0x%"PRIx64, (uint64_t)access);
+    buffer_sprintf(wb, HTTP_ACCESS_FORMAT, (HTTP_ACCESS_FORMAT_CAST)access);
     return true;
 }
