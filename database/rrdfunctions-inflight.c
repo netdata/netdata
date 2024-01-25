@@ -437,7 +437,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
-    if(!web_client_has_enough_access_level(user_access, rdcf->access)) {
+    if(!http_access_user_has_enough_access_level_for_endpoint(user_access, rdcf->access)) {
 
         if(!aclk_connected)
             rrd_call_function_error(result_wb,

@@ -347,31 +347,31 @@ static bool dyncfg_unittest_check(TEST *t, const char *cmd, bool received) {
         fprintf(stderr, "\n");
         errors++;
     }
-    else if(df->type == DYNCFG_TYPE_JOB && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves) {
+    else if(df->type == DYNCFG_TYPE_JOB && df->current.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->dyncfg.saves) {
         fprintf(stderr, "\n  - DYNCFG job has no saves!");
         errors++;
     }
-    else if(df->type == DYNCFG_TYPE_JOB && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && (!df->payload || !buffer_strlen(df->payload))) {
+    else if(df->type == DYNCFG_TYPE_JOB && df->current.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && (!df->dyncfg.payload || !buffer_strlen(df->dyncfg.payload))) {
         fprintf(stderr, "\n  - DYNCFG job has no payload!");
         errors++;
     }
-    else if(df->user_disabled && !df->saves) {
+    else if(df->dyncfg.user_disabled && !df->dyncfg.saves) {
         fprintf(stderr, "\n  - DYNCFG disabled config has no saves!");
         errors++;
     }
-    else if(t->source && string_strcmp(df->source, t->source) != 0) {
+    else if(t->source && string_strcmp(df->current.source, t->source) != 0) {
         fprintf(stderr, "\n  - source does not match!");
         errors++;
     }
-    else if(df->source && !t->source) {
+    else if(df->current.source && !t->source) {
         fprintf(stderr, "\n  - there is a source but it shouldn't be any!");
         errors++;
     }
-    else if(t->needs_save && df->saves <= t->last_saves) {
+    else if(t->needs_save && df->dyncfg.saves <= t->last_saves) {
         fprintf(stderr, "\n  - should be saved, but it is not saved!");
         errors++;
     }
-    else if(!t->needs_save && df->saves > t->last_saves) {
+    else if(!t->needs_save && df->dyncfg.saves > t->last_saves) {
         fprintf(stderr, "\n  - should be not be saved, but it saved!");
         errors++;
     }
@@ -399,7 +399,7 @@ static void dyncfg_unittest_reset(void) {
             dyncfg_unittest_register_error(NULL, NULL);
         }
         else
-            t->last_saves = df->saves;
+            t->last_saves = df->dyncfg.saves;
     }
     dfe_done(t);
 }
@@ -409,7 +409,7 @@ void should_be_saved(TEST *t, DYNCFG_CMDS c) {
 
     if(t->type == DYNCFG_TYPE_TEMPLATE) {
         df = dictionary_get(dyncfg_globals.nodes, t->id);
-        t->current.enabled = !df->user_disabled;
+        t->current.enabled = !df->dyncfg.user_disabled;
     }
 
     t->needs_save =

@@ -49,7 +49,8 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
             if(!acl_allows)
                 return web_client_permission_denied(w);
 
-            bool permissions_allows = web_client_has_enough_access_level(w->access, api_commands[i].access);
+            bool permissions_allows =
+                http_access_user_has_enough_access_level_for_endpoint(w->access, api_commands[i].access);
             if(!permissions_allows)
                 return web_client_permission_denied(w);
 
