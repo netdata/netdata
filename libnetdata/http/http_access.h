@@ -100,9 +100,10 @@ typedef enum __attribute__((packed)) {
     HTTP_ACL_STREAMING              = (1 << 14),
     HTTP_ACL_NETDATACONF            = (1 << 15),
 
-    HTTP_ACL_SSL_OPTIONAL           = (1 << 10),
-    HTTP_ACL_SSL_FORCE              = (1 << 11),
-    HTTP_ACL_SSL_DEFAULT            = (1 << 12),
+    // SSL related
+    HTTP_ACL_SSL_OPTIONAL           = (1 << 28),
+    HTTP_ACL_SSL_FORCE              = (1 << 29),
+    HTTP_ACL_SSL_DEFAULT            = (1 << 30),
 } HTTP_ACL;
 
 #define HTTP_ACL_TRANSPORTS (HTTP_ACL)(                                 \
