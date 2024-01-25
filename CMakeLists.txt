@@ -57,16 +57,6 @@ project(netdata
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
 
-include(FetchContent)
-
-set(FETCHCONTENT_FULLY_DISCONNECTED Off)
-
-set(SENTRY_VERSION 0.6.6)
-set(SENTRY_BACKEND "breakpad")
-set(SENTRY_BUILD_SHARED_LIBS OFF)
-FetchContent_Declare(sentry URL https://github.com/getsentry/sentry-native/releases/download/${SENTRY_VERSION}/sentry-native.zip)
-FetchContent_MakeAvailable(sentry)
-
 find_package(PkgConfig REQUIRED)
 
 set(CMAKE_C_STANDARD 11)
@@ -125,6 +115,20 @@ option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
 option(ENABLE_SENTRY "enable sentry" False)
+
+if(ENABLE_SENTRY)
+        include(FetchContent)
+
+        # ignore debhelper
+        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
+
+        set(SENTRY_VERSION 0.6.6)
+        set(SENTRY_BACKEND "breakpad")
+        set(SENTRY_BUILD_SHARED_LIBS OFF)
+
+        FetchContent_Declare(sentry URL https://github.com/getsentry/sentry-native/releases/download/${SENTRY_VERSION}/sentry-native.zip)
+        FetchContent_MakeAvailable(sentry)
+endif()
 
 #
 # handling of extra compiler flags

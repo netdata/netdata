@@ -132,7 +132,6 @@
 #cmakedefine WEB_DIR "@WEB_DIR@"
 #cmakedefine VARLIB_DIR "@VARLIB_DIR@"
 
-
 // config command, user and version
 
 #cmakedefine CONFIGURE_COMMAND "@CONFIGURE_COMMAND@"
