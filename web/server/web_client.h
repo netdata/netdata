@@ -166,9 +166,9 @@ struct web_client {
     WEB_CLIENT_FLAGS flags;             // status flags for the client
     HTTP_REQUEST_MODE mode;             // the operational mode of the client
     HTTP_ACL acl;                       // the access list of the client
+    HTTP_ACL port_acl;                  // the operations permitted on the port the client connected to
     HTTP_ACCESS access;                 // the access permissions of the client
     HTTP_USER_ROLE user_role;           // the user role of the client
-    int port_acl;                       // the operations permitted on the port the client connected to
     size_t header_parse_tries;
     size_t header_parse_last_size;
 

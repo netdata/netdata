@@ -528,8 +528,8 @@ HTTP_ACL read_acl(char *st) {
 
     if (!strcmp(st,"dashboard")) ret |= HTTP_ACL_DASHBOARD;
     if (!strcmp(st,"registry")) ret |= HTTP_ACL_REGISTRY;
-    if (!strcmp(st,"badges")) ret |= HTTP_ACL_BADGE;
-    if (!strcmp(st,"management")) ret |= HTTP_ACL_MGMT;
+    if (!strcmp(st,"badges")) ret |= HTTP_ACL_BADGES;
+    if (!strcmp(st,"management")) ret |= HTTP_ACL_MANAGEMENT;
     if (!strcmp(st,"streaming")) ret |= HTTP_ACL_STREAMING;
     if (!strcmp(st,"netdata.conf")) ret |= HTTP_ACL_NETDATACONF;
 
@@ -559,12 +559,14 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         protocol = IPPROTO_TCP;
         socktype = SOCK_STREAM;
         protocol_str = "tcp";
+        acl_flags |= HTTP_ACL_API;
     }
     else if(strncmp(ip, "udp:", 4) == 0) {
         ip += 4;
         protocol = IPPROTO_UDP;
         socktype = SOCK_DGRAM;
         protocol_str = "udp";
+        acl_flags |= HTTP_ACL_API_UDP;
     }
     else if(strncmp(ip, "unix:", 5) == 0) {
         char *path = ip + 5;
@@ -578,7 +580,8 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
 
             sockets->failed++;
         } else {
-            acl_flags = HTTP_ACL_DASHBOARD | HTTP_ACL_REGISTRY | HTTP_ACL_BADGE | HTTP_ACL_MGMT | HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_SSL_DEFAULT;
+            acl_flags = HTTP_ACL_API_UNIX | HTTP_ACL_DASHBOARD | HTTP_ACL_REGISTRY | HTTP_ACL_BADGES |
+                        HTTP_ACL_MANAGEMENT | HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_SSL_DEFAULT;
             listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
             added++;
         }
@@ -628,7 +631,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         }
         acl_flags |= read_acl(portconfig);
     } else {
-        acl_flags = HTTP_ACL_DASHBOARD | HTTP_ACL_REGISTRY | HTTP_ACL_BADGE | HTTP_ACL_MGMT | HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_SSL_DEFAULT;
+        acl_flags |= HTTP_ACL_DASHBOARD | HTTP_ACL_REGISTRY | HTTP_ACL_BADGES | HTTP_ACL_MANAGEMENT | HTTP_ACL_NETDATACONF | HTTP_ACL_STREAMING | HTTP_ACL_SSL_DEFAULT;
     }
 
     //Case the user does not set the option SSL in the "bind to", but he has

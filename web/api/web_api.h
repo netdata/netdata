@@ -12,9 +12,10 @@
 #include "web/api/queries/weights.h"
 
 struct web_api_command {
-    const char *command;
+    const char *api;
     uint32_t hash;
     HTTP_ACL acl;
+    HTTP_ACCESS access;
     int (*callback)(RRDHOST *host, struct web_client *w, char *url);
     unsigned int allow_subpaths;
 };

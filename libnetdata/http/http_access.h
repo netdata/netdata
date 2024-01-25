@@ -51,12 +51,6 @@ typedef enum __attribute__((packed)) {
     | HTTP_ACCESS_EDIT_ALERTS_SILENCING \
 )
 
-#define HTTP_ACCESS_ACLK_DEFAULT (HTTP_ACCESS)( \
-      HTTP_ACCESS_SAME_SPACE \
-    | HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
-    | HTTP_ACCESS_VIEW_SENSITIVE_DATA \
-)
-
 #define HTTP_ACCESS_MAP_OLD_ANY (HTTP_ACCESS)( \
     HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
 )
@@ -87,25 +81,52 @@ bool log_cb_http_access_to_hex(struct web_buffer *wb, void *data);
 
 typedef enum __attribute__((packed)) {
     HTTP_ACL_NONE                   = (0),
-    HTTP_ACL_NOCHECK                = (1 << 0),          // Don't check anything - this should work on all channels
-    HTTP_ACL_DASHBOARD              = (1 << 1),
-    HTTP_ACL_REGISTRY               = (1 << 2),
-    HTTP_ACL_BADGE                  = (1 << 3),
-    HTTP_ACL_MGMT                   = (1 << 4),
-    HTTP_ACL_STREAMING              = (1 << 5),
-    HTTP_ACL_NETDATACONF            = (1 << 6),
-    HTTP_ACL_SSL_OPTIONAL           = (1 << 7),
-    HTTP_ACL_SSL_FORCE              = (1 << 8),
-    HTTP_ACL_SSL_DEFAULT            = (1 << 9),
-    HTTP_ACL_ACLK                   = (1 << 10),
-    HTTP_ACL_WEBRTC                 = (1 << 11),
-    HTTP_ACL_BEARER_IF_PROTECTED    = (1 << 12), // allow unprotected access if bearer is not enabled in netdata
-    HTTP_ACL_BEARER_REQUIRED        = (1 << 13), // allow access only if a valid bearer is used
-    HTTP_ACL_BEARER_OPTIONAL        = (1 << 14), // the call may or may not need a bearer - will be determined later
+
+    HTTP_ACL_NOCHECK                = (1 << 0), // Don't check anything - adding this to an endpoint, disables ACL checking
+
+    // transports
+    HTTP_ACL_API                    = (1 << 1), // from the internal web server (TCP port)
+    HTTP_ACL_API_UDP                = (1 << 2), // from the internal web server (UDP port)
+    HTTP_ACL_API_UNIX               = (1 << 3), // from the internal web server (UNIX socket)
+    HTTP_ACL_H2O                    = (1 << 4), // from the h2o web server
+    HTTP_ACL_ACLK                   = (1 << 5), // from ACLK
+    HTTP_ACL_WEBRTC                 = (1 << 6), // from WebRTC
+
+    // HTTP_ACL_API takes the following additional ACLs, based on pattern matching of the client IP
+    HTTP_ACL_DASHBOARD              = (1 << 10),
+    HTTP_ACL_REGISTRY               = (1 << 11),
+    HTTP_ACL_BADGES                 = (1 << 12),
+    HTTP_ACL_MANAGEMENT             = (1 << 13),
+    HTTP_ACL_STREAMING              = (1 << 14),
+    HTTP_ACL_NETDATACONF            = (1 << 15),
+
+    HTTP_ACL_SSL_OPTIONAL           = (1 << 10),
+    HTTP_ACL_SSL_FORCE              = (1 << 11),
+    HTTP_ACL_SSL_DEFAULT            = (1 << 12),
 } HTTP_ACL;
 
-#define HTTP_ACL_DASHBOARD_ACLK_WEBRTC (HTTP_ACL_DASHBOARD | HTTP_ACL_ACLK | HTTP_ACL_WEBRTC | HTTP_ACL_BEARER_IF_PROTECTED)
-#define HTTP_ACL_ACLK_WEBRTC_DASHBOARD_WITH_OPTIONAL_BEARER (HTTP_ACL_DASHBOARD | HTTP_ACL_ACLK | HTTP_ACL_WEBRTC | HTTP_ACL_BEARER_OPTIONAL)
+#define HTTP_ACL_TRANSPORTS (HTTP_ACL)(                                 \
+      HTTP_ACL_API                                                      \
+    | HTTP_ACL_API_UDP                                                  \
+    | HTTP_ACL_API_UNIX                                                 \
+    | HTTP_ACL_H2O                                                      \
+    | HTTP_ACL_ACLK                                                     \
+    | HTTP_ACL_WEBRTC                                                   \
+)
+
+#define HTTP_ACL_TRANSPORTS_WITHOUT_CLIENT_IP_VALIDATION (HTTP_ACL)(    \
+      HTTP_ACL_ACLK                                                     \
+    | HTTP_ACL_WEBRTC                                                   \
+)
+
+#define HTTP_ACL_ALL_FEATURES (HTTP_ACL)(                               \
+      HTTP_ACL_DASHBOARD                                                \
+    | HTTP_ACL_REGISTRY                                                 \
+    | HTTP_ACL_BADGES                                                   \
+    | HTTP_ACL_MANAGEMENT                                               \
+    | HTTP_ACL_STREAMING                                                \
+    | HTTP_ACL_NETDATACONF                                              \
+)
 
 #ifdef NETDATA_DEV_MODE
 #define ACL_DEV_OPEN_ACCESS HTTP_ACL_NOCHECK
@@ -115,8 +136,8 @@ typedef enum __attribute__((packed)) {
 
 #define http_can_access_dashboard(w) ((w)->acl & HTTP_ACL_DASHBOARD)
 #define http_can_access_registry(w) ((w)->acl & HTTP_ACL_REGISTRY)
-#define http_can_access_badges(w) ((w)->acl & HTTP_ACL_BADGE)
-#define http_can_access_mgmt(w) ((w)->acl & HTTP_ACL_MGMT)
+#define http_can_access_badges(w) ((w)->acl & HTTP_ACL_BADGES)
+#define http_can_access_mgmt(w) ((w)->acl & HTTP_ACL_MANAGEMENT)
 #define http_can_access_stream(w) ((w)->acl & HTTP_ACL_STREAMING)
 #define http_can_access_netdataconf(w) ((w)->acl & HTTP_ACL_NETDATACONF)
 #define http_is_using_ssl_optional(w) ((w)->port_acl & HTTP_ACL_SSL_OPTIONAL)

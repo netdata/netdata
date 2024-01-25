@@ -106,8 +106,9 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query) 
 
     struct web_client *w = web_client_get_from_cache();
     web_client_set_conn_cloud(w);
-    w->acl = HTTP_ACL_ACLK;
-    w->access = HTTP_ACCESS_ACLK_DEFAULT;
+    w->port_acl = HTTP_ACL_ACLK | HTTP_ACL_ALL_FEATURES;
+    w->acl = w->port_acl;
+    w->access = HTTP_ACCESS_MAP_OLD_MEMBER;
     w->user_role = HTTP_USER_ROLE_MEMBER;
     web_client_flags_clear_auth(w);
     web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_CLOUD);

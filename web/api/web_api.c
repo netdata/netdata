@@ -4,8 +4,8 @@
 
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
     if(!web_client_flags_check_auth(w)) {
-        w->user_role = HTTP_USER_ROLE_ANY;
-        w->access = HTTP_ACCESS_NONE;
+        w->user_role = (netdata_is_protected_by_bearer) ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY;
+        w->access = (netdata_is_protected_by_bearer) ? HTTP_ACCESS_NONE : HTTP_ACCESS_VIEW_ANONYMOUS_DATA;
     }
 
 #ifdef NETDATA_GOD_MODE
@@ -33,8 +33,8 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
 
     uint32_t hash = simple_hash(api_command);
 
-    for(int i = 0; api_commands[i].command ; i++) {
-        if(unlikely(hash == api_commands[i].hash && !strcmp(api_command, api_commands[i].command))) {
+    for(int i = 0; api_commands[i].api ; i++) {
+        if(unlikely(hash == api_commands[i].hash && !strcmp(api_command, api_commands[i].api))) {
             if(unlikely(!api_commands[i].allow_subpaths && api_command != url_path_endpoint)) {
                 buffer_flush(w->response.data);
                 buffer_sprintf(w->response.data, "API command '%s' does not support subpaths.", api_command);
@@ -45,8 +45,12 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
             if (api_command != url_path_endpoint)
                 freez(api_command);
 
-            bool acl_allows = (w->acl & api_commands[i].acl) || (api_commands[i].acl & HTTP_ACL_NOCHECK);
+            bool acl_allows = ((w->acl & api_commands[i].acl) == api_commands[i].acl) || (api_commands[i].acl & HTTP_ACL_NOCHECK);
             if(!acl_allows)
+                return web_client_permission_denied(w);
+
+            bool permissions_allows = web_client_has_enough_access_level(w->access, api_commands[i].access);
+            if(!permissions_allows)
                 return web_client_permission_denied(w);
 
             char *query_string = (char *)buffer_tostring(w->url_query_string_decoded);

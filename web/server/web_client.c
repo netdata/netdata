@@ -598,27 +598,7 @@ void buffer_data_options2string(BUFFER *wb, uint32_t options) {
 }
 
 static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    //if(unlikely(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
-    //    buffer_flush(w->response.data);
-    //    buffer_strcat(w->response.data, "This host does not maintain a database");
-    //    return HTTP_RESP_BAD_REQUEST;
-    //}
-
     return func(host, w, url);
-}
-
-static inline int UNUSED_FUNCTION(check_host_and_dashboard_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    if(!http_can_access_dashboard(w))
-        return web_client_permission_denied(w);
-
-    return check_host_and_call(host, w, url, func);
-}
-
-static inline int UNUSED_FUNCTION(check_host_and_mgmt_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    if(!http_can_access_mgmt(w))
-        return web_client_permission_denied(w);
-
-    return check_host_and_call(host, w, url, func);
 }
 
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment) {
