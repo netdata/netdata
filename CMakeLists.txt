@@ -126,7 +126,11 @@ if(ENABLE_SENTRY)
         set(SENTRY_BACKEND "breakpad")
         set(SENTRY_BUILD_SHARED_LIBS OFF)
 
-        FetchContent_Declare(sentry URL https://github.com/getsentry/sentry-native/releases/download/${SENTRY_VERSION}/sentry-native.zip)
+        FetchContent_Declare(
+                sentry
+                URL https://github.com/getsentry/sentry-native/releases/download/${SENTRY_VERSION}/sentry-native.zip
+                URL_HASH SHA256=7a98467c0b2571380a3afc5e681cb13aa406a709529be12d74610b0015ccde0c
+        )
         FetchContent_MakeAvailable(sentry)
 endif()
 
