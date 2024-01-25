@@ -48,7 +48,7 @@ int simple_pattern_is_potential_name(SIMPLE_PATTERN *p) ;
 char *simple_pattern_iterate(SIMPLE_PATTERN **p);
 
 // Auxiliary function to create a pattern
-char *simple_pattern_trim_around_equal(char *src);
+char *simple_pattern_trim_around_equal(const char *src);
 
 #define SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS ",|\t\r\n\f\v"
 

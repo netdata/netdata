@@ -47,7 +47,9 @@ typedef enum rrdr_time_grouping {
     RRDR_GROUPING_COUNTIF,
 } RRDR_TIME_GROUPING;
 
-const char *time_grouping_method2string(RRDR_TIME_GROUPING group);
+const char *time_grouping_id2txt(RRDR_TIME_GROUPING group);
+RRDR_TIME_GROUPING time_grouping_txt2id(const char *name);
+
 void time_grouping_init(void);
 RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def);
 const char *time_grouping_tostring(RRDR_TIME_GROUPING group);

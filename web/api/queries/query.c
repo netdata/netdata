@@ -632,7 +632,7 @@ void time_grouping_init(void) {
     }
 }
 
-const char *time_grouping_method2string(RRDR_TIME_GROUPING group) {
+const char *time_grouping_id2txt(RRDR_TIME_GROUPING group) {
     int i;
 
     for(i = 0; api_v1_data_groups[i].name ; i++) {
@@ -641,7 +641,18 @@ const char *time_grouping_method2string(RRDR_TIME_GROUPING group) {
         }
     }
 
-    return "unknown-group-method";
+    return "average";
+}
+
+RRDR_TIME_GROUPING time_grouping_txt2id(const char *name) {
+    int i;
+
+    uint32_t hash = simple_hash(name);
+    for(i = 0; api_v1_data_groups[i].name ; i++)
+        if(unlikely(hash == api_v1_data_groups[i].hash && !strcmp(name, api_v1_data_groups[i].name)))
+            return api_v1_data_groups[i].value;
+
+    return RRDR_GROUPING_AVERAGE;
 }
 
 RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def) {
@@ -2045,7 +2056,7 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 
          // grouping
          , (aligned) ? "aligned" : "unaligned"
-         , time_grouping_method2string(group_method)
+         , time_grouping_id2txt(group_method)
          , group
          , resampling_time
          , resampling_group

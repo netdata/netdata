@@ -2,6 +2,26 @@
 
 #include "../libnetdata.h"
 
+
+UUID UUID_generate_from_hash(const void *payload, size_t payload_len) {
+    assert(sizeof(XXH128_hash_t) == sizeof(UUID));
+
+    UUID uuid;
+    XXH128_hash_t *xxh3_128 = (XXH128_hash_t *)&uuid;
+
+    // Hash the payload using XXH128
+    // Assume xxh128_hash_function is your function to generate XXH128 hash
+    *xxh3_128 = XXH3_128bits(payload, payload_len);
+
+    // Set the UUID version (here, setting it to 4)
+    uuid.uuid[6] = (uuid.uuid[6] & 0x0F) | 0x40; // Version 4
+
+    // Set the UUID variant (standard variant for UUID)
+    uuid.uuid[8] = (uuid.uuid[8] & 0x3F) | 0x80; // Variant is 10xxxxxx
+
+    return uuid;
+}
+
 void uuid_unparse_lower_compact(const uuid_t uuid, char *out) {
     static const char *hex_chars = "0123456789abcdef";
     for (int i = 0; i < 16; i++) {

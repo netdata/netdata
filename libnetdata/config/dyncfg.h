@@ -8,6 +8,7 @@
 #define DYNCFG_RESP_SUCCESS(code) (code >= 200 && code <= 299)
 #define DYNCFG_RESP_RUNNING                   200 // accepted and running
 #define DYNCFG_RESP_ACCEPTED                  202 // accepted, but not running yet
+#define DYNCFG_RESP_ACCEPTED_DISABLED         298 // accepted, but is disabled
 #define DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED 299 // accepted, but restart is required to apply it
 
 typedef enum __attribute__((packed)) {
@@ -65,7 +66,7 @@ char *dyncfg_escape_id_for_filename(const char *id);
 #include "../buffer/buffer.h"
 #include "../dictionary/dictionary.h"
 
-typedef int (*dyncfg_cb_t)(const char *transaction, const char *id, DYNCFG_CMDS cmd, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *result, const char *source, void *data);
+typedef int (*dyncfg_cb_t)(const char *transaction, const char *id, DYNCFG_CMDS cmd, const char *add_name, BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *result, const char *source, void *data);
 
 struct dyncfg_node {
     DYNCFG_TYPE type;

@@ -22,10 +22,12 @@ static inline void line_splitter_reset(struct line_splitter *line) {
 int pluginsd_isspace(char c);
 int config_isspace(char c);
 int group_by_label_isspace(char c);
+int dyncfg_id_isspace(char c);
 
 extern bool isspace_map_pluginsd[256];
 extern bool isspace_map_config[256];
 extern bool isspace_map_group_by_label[256];
+extern bool isspace_dyncfg_id_map[256];
 
 static inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words, bool *isspace_map) {
     char *s = str, quote = 0;
@@ -109,6 +111,9 @@ static inline size_t quoted_strings_splitter(char *str, char **words, size_t max
 
 #define quoted_strings_splitter_pluginsd(str, words, max_words) \
         quoted_strings_splitter(str, words, max_words, isspace_map_pluginsd)
+
+#define quoted_strings_splitter_dyncfg_id(str, words, max_words) \
+        quoted_strings_splitter(str, words, max_words, isspace_dyncfg_id_map)
 
 static inline char *get_word(char **words, size_t num_words, size_t index) {
     if (unlikely(index >= num_words))

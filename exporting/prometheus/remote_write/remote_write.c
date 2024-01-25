@@ -330,24 +330,22 @@ static int format_variable_prometheus_remote_write_callback(const DICTIONARY_ITE
 
     struct prometheus_remote_write_variables_callback_options *opts = data;
 
-    if (rrdvar_flags(rv) & (RRDVAR_FLAG_CUSTOM_HOST_VAR | RRDVAR_FLAG_CUSTOM_CHART_VAR)) {
-        RRDHOST *host = opts->host;
-        struct instance *instance = opts->instance;
-        struct simple_connector_data *simple_connector_data =
-            (struct simple_connector_data *)instance->connector_specific_data;
-        struct prometheus_remote_write_specific_data *connector_specific_data =
-            (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
+    RRDHOST *host = opts->host;
+    struct instance *instance = opts->instance;
+    struct simple_connector_data *simple_connector_data =
+        (struct simple_connector_data *)instance->connector_specific_data;
+    struct prometheus_remote_write_specific_data *connector_specific_data =
+        (struct prometheus_remote_write_specific_data *)simple_connector_data->connector_specific_data;
 
-        char name[PROMETHEUS_LABELS_MAX + 1];
-        char *suffix = "";
+    char name[PROMETHEUS_LABELS_MAX + 1];
+    char *suffix = "";
 
-        prometheus_name_copy(context, rrdvar_name(rv), PROMETHEUS_ELEMENT_MAX);
-        snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
+    prometheus_name_copy(context, rrdvar_name(rv), PROMETHEUS_ELEMENT_MAX);
+    snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", instance->config.prefix, context, suffix);
 
-        NETDATA_DOUBLE value = rrdvar2number(rv);
-        add_variable(connector_specific_data->write_request, name,
-            (host == localhost) ? instance->config.hostname : rrdhost_hostname(host), value, opts->now / USEC_PER_MS);
-    }
+    NETDATA_DOUBLE value = rrdvar2number(rv);
+    add_variable(connector_specific_data->write_request, name,
+        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host), value, opts->now / USEC_PER_MS);
 
     return 0;
 }

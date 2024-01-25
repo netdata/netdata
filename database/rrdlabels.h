@@ -50,6 +50,7 @@ void rrdlabels_to_buffer_json_members(RRDLABELS *labels, BUFFER *wb);
 
 void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src);
 void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src);
+size_t rrdlabels_common_count(RRDLABELS *labels1, RRDLABELS *labels2);
 
 int rrdlabels_unittest(void);
 

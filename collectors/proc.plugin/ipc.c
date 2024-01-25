@@ -352,8 +352,8 @@ int do_ipc(int update_every, usec_t dt) {
             }
 
             // variables
-            semaphores_max = rrdvar_custom_host_variable_add_and_acquire(localhost, "ipc_semaphores_max");
-            arrays_max     = rrdvar_custom_host_variable_add_and_acquire(localhost, "ipc_semaphores_arrays_max");
+            semaphores_max = rrdvar_host_variable_add_and_acquire(localhost, "ipc_semaphores_max");
+            arrays_max     = rrdvar_host_variable_add_and_acquire(localhost, "ipc_semaphores_arrays_max");
         }
 
         struct stat stbuf;
@@ -373,8 +373,10 @@ int do_ipc(int update_every, usec_t dt) {
                 collector_error("Unable to fetch semaphore limits.");
             }
             else {
-                if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
-                if(arrays_max)     rrdvar_custom_host_variable_set(localhost, arrays_max,     limits.semmni);
+                if(semaphores_max)
+                    rrdvar_host_variable_set(localhost, semaphores_max, limits.semmns);
+                if(arrays_max)
+                    rrdvar_host_variable_set(localhost, arrays_max, limits.semmni);
 
                 st_arrays->red = limits.semmni;
                 st_semaphores->red = limits.semmns;

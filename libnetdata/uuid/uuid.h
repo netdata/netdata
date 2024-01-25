@@ -10,6 +10,24 @@ UUID_DEFINE(health_alert_transition_msgid, 0x9c, 0xe0, 0xcb, 0x58, 0xab, 0x8b, 0
 // this is also defined in alarm-notify.sh.in
 UUID_DEFINE(health_alert_notification_msgid, 0x6d, 0xb0, 0x01, 0x8e, 0x83, 0xe3, 0x43, 0x20, 0xae, 0x2a, 0x65, 0x9d, 0x78, 0x01, 0x9f, 0xb7);
 
+typedef struct {
+    union {
+        uuid_t uuid;
+        struct {
+            uint64_t hig64;
+            uint64_t low64;
+        } parts;
+    };
+} UUID;
+UUID UUID_generate_from_hash(const void *payload, size_t payload_len);
+
+#define UUIDeq(a, b) ((a).parts.hig64 == (b).parts.hig64 && (a).parts.low64 == (b).parts.low64)
+
+static inline UUID uuid2UUID(uuid_t uu1) {
+    UUID *ret = (UUID *)uu1;
+    return *ret;
+}
+
 #define UUID_COMPACT_STR_LEN 33
 void uuid_unparse_lower_compact(const uuid_t uuid, char *out);
 int uuid_parse_compact(const char *in, uuid_t uuid);

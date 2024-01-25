@@ -1,18 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_HEALTH_LIB
-# define NETDATA_HEALTH_LIB 1
+#ifndef NETDATA_HEALTH_SILENCERS_H
+#define NETDATA_HEALTH_SILENCERS_H
 
-# include "../libnetdata.h"
-
-#define HEALTH_ALARM_KEY "alarm"
-#define HEALTH_TEMPLATE_KEY "template"
-#define HEALTH_CONTEXT_KEY "context"
-#define HEALTH_CHART_KEY "chart"
-#define HEALTH_HOST_KEY "hosts"
-#define HEALTH_OS_KEY "os"
-#define HEALTH_LOOKUP_KEY "lookup"
-#define HEALTH_CALC_KEY "calc"
+#include "health.h"
 
 typedef struct silencer {
     char *alarms;
@@ -50,4 +41,15 @@ void health_silencers_add(SILENCER *silencer);
 SILENCER * health_silencers_addparam(SILENCER *silencer, char *key, char *value);
 int health_initialize_global_silencers();
 
-#endif
+void free_silencers(SILENCER *t);
+
+struct web_client;
+int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, char *url);
+
+const char *health_silencers_filename(void);
+void health_set_silencers_filename(void);
+void health_silencers_init(void);
+SILENCE_TYPE health_silencers_check_silenced(RRDCALC *rc, const char *host);
+int health_silencers_update_disabled_silenced(RRDHOST *host, RRDCALC *rc);
+
+#endif //NETDATA_HEALTH_SILENCERS_H

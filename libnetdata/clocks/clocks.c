@@ -60,7 +60,7 @@ static usec_t get_clock_resolution(clockid_t clock) {
 
     if(clock_getres(clock, &ts) == 0) {
         usec_t ret = (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)ts.tv_nsec / NSEC_PER_USEC;
-        if(!ret && ts.tv_nsec > 0 && ts.tv_nsec < NSEC_PER_USEC)
+        if(!ret && ts.tv_nsec > 0 && ts.tv_nsec < (long int)NSEC_PER_USEC)
             return (usec_t)1;
 
         else if(ret > MAX_CLOCK_RESOLUTION_UT) {

@@ -450,6 +450,11 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
     if(c == DYNCFG_CMD_UPDATE)
         memset(&t->current.value, 0, sizeof(t->current.value));
 
+    if(c & (DYNCFG_CMD_UPDATE) || (c & (DYNCFG_CMD_DISABLE|DYNCFG_CMD_ENABLE) && t->type != DYNCFG_TYPE_TEMPLATE)) {
+        freez((void *)t->source);
+        t->source = strdupz(source);
+    }
+
     buffer_flush(wb);
 
     CLEAN_BUFFER *pld = NULL;

@@ -521,7 +521,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20265,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
-        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION ratio '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
@@ -536,7 +536,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20266,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
-        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION files '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
@@ -551,7 +551,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20267,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
-        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION files '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
@@ -566,7 +566,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20268,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
-        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION files '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 

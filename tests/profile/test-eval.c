@@ -10,7 +10,7 @@
 #include "config.h"
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
-#include "database/rrdcalc.h"
+#include "health/rrdcalc.h"
 
 /*
 void indent(int level, int show) {

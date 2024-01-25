@@ -305,7 +305,7 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         rrd_chart_functions_expose_rrdpush(st, wb);
 
     // send the chart local custom variables
-    rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
+    rrdvar_print_to_streaming_custom_chart_variables(st, wb);
 
     if (stream_has_capability(host->sender, STREAM_CAP_REPLICATION)) {
         time_t db_first_time_t, db_last_time_t;
@@ -380,7 +380,7 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
     rrddim_foreach_done(rd);
 
     if(unlikely(flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
-        rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
+        rrdvar_print_to_streaming_custom_chart_variables(st, wb);
 
     buffer_fast_strcat(wb, "END\n", 4);
 }
@@ -475,7 +475,7 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
 
     if(rsb->v2 && rsb->begin_v2_added) {
         if(unlikely(rsb->rrdset_flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
-            rrdsetvar_print_to_streaming_custom_chart_variables(st, rsb->wb);
+            rrdvar_print_to_streaming_custom_chart_variables(st, rsb->wb);
 
         buffer_fast_strcat(rsb->wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
     }

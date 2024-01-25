@@ -1189,7 +1189,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20220,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_FD);
-        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1205,7 +1205,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  20221,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_FD);
-            ebpf_create_chart_labels("app_group", w->name, 0);
+            ebpf_create_chart_labels("app_group", w->name, 1);
             ebpf_commit_label();
             fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
         }
@@ -1221,7 +1221,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20222,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_FD);
-        ebpf_create_chart_labels("app_group", w->name, 0);
+        ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1237,7 +1237,7 @@ void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  20223,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_FD);
-            ebpf_create_chart_labels("app_group", w->name, 0);
+            ebpf_create_chart_labels("app_group", w->name, 1);
             ebpf_commit_label();
             fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
         }

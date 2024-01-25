@@ -1303,33 +1303,59 @@ int snprintfz(char *dst, size_t n, const char *fmt, ...) {
     return ret;
 }
 
-static int is_virtual_filesystem(const char *path, char **reason) {
-
+static int is_procfs(const char *path, char **reason) {
 #if defined(__APPLE__) || defined(__FreeBSD__)
     (void)path;
     (void)reason;
 #else
     struct statfs stat;
-    // stat.f_fsid.__val[0] is a file system id
-    // stat.f_fsid.__val[1] is the inode
-    // so their combination uniquely identifies the file/dir
 
     if (statfs(path, &stat) == -1) {
-        if(reason) *reason = "failed to statfs()";
+        if (reason)
+            *reason = "failed to statfs()";
         return -1;
     }
 
-    if(stat.f_fsid.__val[0] != 0 || stat.f_fsid.__val[1] != 0) {
-        errno = EINVAL;
-        if(reason) *reason = "is not a virtual file system";
+#if defined PROC_SUPER_MAGIC
+    if (stat.f_type != PROC_SUPER_MAGIC) {
+        if (reason)
+            *reason = "type is not procfs";
         return -1;
     }
+#endif
+
 #endif
 
     return 0;
 }
 
-int verify_netdata_host_prefix() {
+static int is_sysfs(const char *path, char **reason) {
+#if defined(__APPLE__) || defined(__FreeBSD__)
+    (void)path;
+    (void)reason;
+#else
+    struct statfs stat;
+
+    if (statfs(path, &stat) == -1) {
+        if (reason)
+            *reason = "failed to statfs()";
+        return -1;
+    }
+
+#if defined SYSFS_MAGIC
+    if (stat.f_type != SYSFS_MAGIC) {
+        if (reason)
+            *reason = "type is not sysfs";
+        return -1;
+    }
+#endif
+
+#endif
+
+    return 0;
+}
+
+int verify_netdata_host_prefix(bool log_msg) {
     if(!netdata_configured_host_prefix)
         netdata_configured_host_prefix = "";
 
@@ -1355,20 +1381,23 @@ int verify_netdata_host_prefix() {
 
     path = buffer;
     snprintfz(path, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
-    if(is_virtual_filesystem(path, &reason) == -1)
+    if(is_procfs(path, &reason) == -1)
         goto failed;
 
     snprintfz(path, FILENAME_MAX, "%s/sys", netdata_configured_host_prefix);
-    if(is_virtual_filesystem(path, &reason) == -1)
+    if(is_sysfs(path, &reason) == -1)
         goto failed;
 
-    if(netdata_configured_host_prefix && *netdata_configured_host_prefix)
-        netdata_log_info("Using host prefix directory '%s'", netdata_configured_host_prefix);
+    if (netdata_configured_host_prefix && *netdata_configured_host_prefix) {
+        if (log_msg)
+            netdata_log_info("Using host prefix directory '%s'", netdata_configured_host_prefix);
+    }
 
     return 0;
 
 failed:
-    netdata_log_error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
+    if (log_msg)
+        netdata_log_error("Ignoring host prefix '%s': path '%s' %s", netdata_configured_host_prefix, path, reason);
     netdata_configured_host_prefix = "";
     return -1;
 }
@@ -1474,11 +1503,14 @@ int path_is_file(const char *path, const char *subpath) {
     return is_file;
 }
 
-void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data), void *data, size_t depth) {
+void recursive_config_double_dir_load(const char *user_path, const char *stock_path, const char *subpath, int (*callback)(const char *filename, void *data, bool stock_config), void *data, size_t depth) {
     if(depth > 3) {
         netdata_log_error("CONFIG: Max directory depth reached while reading user path '%s', stock path '%s', subpath '%s'", user_path, stock_path, subpath);
         return;
     }
+
+    if(!stock_path)
+        stock_path = user_path;
 
     char *udir = strdupz_path_subpath(user_path, subpath);
     char *sdir = strdupz_path_subpath(stock_path, subpath);
@@ -1513,7 +1545,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                    len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                     char *filename = strdupz_path_subpath(udir, de->d_name);
                     netdata_log_debug(D_HEALTH, "CONFIG calling callback for user file '%s'", filename);
-                    callback(filename, data);
+                    callback(filename, data, false);
                     freez(filename);
                     continue;
                 }
@@ -1561,7 +1593,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
                         len > 5 && !strcmp(&de->d_name[len - 5], ".conf")) {
                         char *filename = strdupz_path_subpath(sdir, de->d_name);
                         netdata_log_debug(D_HEALTH, "CONFIG calling callback for stock file '%s'", filename);
-                        callback(filename, data);
+                        callback(filename, data, true);
                         freez(filename);
                         continue;
                     }
@@ -1968,7 +2000,7 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now)
 }
 
 // Returns 1 if an absolute period was requested or 0 if it was a relative period
-bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest_running) {
+bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest) {
     time_t now = now_realtime_sec() - 1;
 
     if(now_ptr)
@@ -1982,16 +2014,16 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
     time_t absolute_minimum_time = now - (10 * 365 * 86400);
     time_t absolute_maximum_time = now + (1 * 365 * 86400);
 
-    if (after_requested < absolute_minimum_time && !unittest_running)
+    if (after_requested < absolute_minimum_time && !unittest)
         after_requested = absolute_minimum_time;
 
-    if (after_requested > absolute_maximum_time && !unittest_running)
+    if (after_requested > absolute_maximum_time && !unittest)
         after_requested = absolute_maximum_time;
 
-    if (before_requested < absolute_minimum_time && !unittest_running)
+    if (before_requested < absolute_minimum_time && !unittest)
         before_requested = absolute_minimum_time;
 
-    if (before_requested > absolute_maximum_time && !unittest_running)
+    if (before_requested > absolute_maximum_time && !unittest)
         before_requested = absolute_maximum_time;
 
     *before = before_requested;

@@ -8,7 +8,7 @@ static struct {
     const char *name;
     uint32_t hash;
     RRDR_OPTIONS value;
-} api_v1_data_options[] = {
+} rrdr_options[] = {
         {  "nonzero"           , 0    , RRDR_OPTION_NONZERO}
         , {"flip"              , 0    , RRDR_OPTION_REVERSED}
         , {"reversed"          , 0    , RRDR_OPTION_REVERSED}
@@ -125,8 +125,8 @@ void web_client_api_v1_init(void) {
     for(i = 0; contexts_v2_alert_status[i].name ; i++)
         contexts_v2_alert_status[i].hash = simple_hash(contexts_v2_alert_status[i].name);
 
-    for(i = 0; api_v1_data_options[i].name ; i++)
-        api_v1_data_options[i].hash = simple_hash(api_v1_data_options[i].name);
+    for(i = 0; rrdr_options[i].name ; i++)
+        rrdr_options[i].hash = simple_hash(rrdr_options[i].name);
 
     for(i = 0; contexts_v2_options[i].name ; i++)
         contexts_v2_options[i].hash = simple_hash(contexts_v2_options[i].name);
@@ -211,21 +211,30 @@ void web_client_api_v1_management_init(void) {
 	api_secret = get_mgmt_api_key();
 }
 
-inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
+inline RRDR_OPTIONS rrdr_options_parse_one(const char *o) {
+    RRDR_OPTIONS ret = 0;
+
+    if(!o || !*o) return ret;
+
+    uint32_t hash = simple_hash(o);
+    int i;
+    for(i = 0; rrdr_options[i].name ; i++) {
+        if (unlikely(hash == rrdr_options[i].hash && !strcmp(o, rrdr_options[i].name))) {
+            ret |= rrdr_options[i].value;
+            break;
+        }
+    }
+
+    return ret;
+}
+
+inline RRDR_OPTIONS rrdr_options_parse(char *o) {
     RRDR_OPTIONS ret = 0;
     char *tok;
 
     while(o && *o && (tok = strsep_skip_consecutive_separators(&o, ", |"))) {
         if(!*tok) continue;
-
-        uint32_t hash = simple_hash(tok);
-        int i;
-        for(i = 0; api_v1_data_options[i].name ; i++) {
-            if (unlikely(hash == api_v1_data_options[i].hash && !strcmp(tok, api_v1_data_options[i].name))) {
-                ret |= api_v1_data_options[i].value;
-                break;
-            }
-        }
+        ret |= rrdr_options_parse_one(tok);
     }
 
     return ret;
@@ -303,14 +312,14 @@ void web_client_api_request_v2_contexts_options_to_buffer_json_array(BUFFER *wb,
     buffer_json_array_close(wb);
 }
 
-void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options) {
+void rrdr_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options) {
     buffer_json_member_add_array(wb, key);
 
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
-    for(int i = 0; api_v1_data_options[i].name ; i++) {
-        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
-            const char *name = api_v1_data_options[i].name;
-            used |= api_v1_data_options[i].value;
+    for(int i = 0; rrdr_options[i].name ; i++) {
+        if (unlikely((rrdr_options[i].value & options) && !(rrdr_options[i].value & used))) {
+            const char *name = rrdr_options[i].name;
+            used |= rrdr_options[i].value;
 
             buffer_json_add_array_item_string(wb, name);
         }
@@ -325,10 +334,10 @@ void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RR
 
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
     int added = 0;
-    for(int i = 0; api_v1_data_options[i].name ; i++) {
-        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
-            const char *name = api_v1_data_options[i].name;
-            used |= api_v1_data_options[i].value;
+    for(int i = 0; rrdr_options[i].name ; i++) {
+        if (unlikely((rrdr_options[i].value & options) && !(rrdr_options[i].value & used))) {
+            const char *name = rrdr_options[i].name;
+            used |= rrdr_options[i].value;
 
             if(added && write < end)
                 *write++ = ',';
@@ -511,6 +520,52 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     return HTTP_RESP_OK;
 
     cleanup:
+    return ret;
+}
+
+static inline int web_client_api_request_variable(RRDHOST *host, struct web_client *w, char *url) {
+    int ret = HTTP_RESP_BAD_REQUEST;
+    char *chart = NULL;
+    char *variable = NULL;
+
+    buffer_flush(w->response.data);
+
+    while(url) {
+        char *value = strsep_skip_consecutive_separators(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = strsep_skip_consecutive_separators(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "chart")) chart = value;
+        else if(!strcmp(name, "variable")) variable = value;
+    }
+
+    if(!chart || !*chart || !variable || !*variable) {
+        buffer_sprintf(w->response.data, "A chart= and a variable= are required.");
+        goto cleanup;
+    }
+
+    RRDSET *st = rrdset_find(host, chart);
+    if(!st) st = rrdset_find_byname(host, chart);
+    if(!st) {
+        buffer_strcat(w->response.data, "Chart is not found: ");
+        buffer_strcat_htmlescape(w->response.data, chart);
+        ret = HTTP_RESP_NOT_FOUND;
+        goto cleanup;
+    }
+
+    w->response.data->content_type = CT_APPLICATION_JSON;
+    st->last_accessed_time_s = now_realtime_sec();
+    alert_variable_lookup_trace(host, st, variable, w->response.data);
+
+    return HTTP_RESP_OK;
+
+cleanup:
     return ret;
 }
 
@@ -723,7 +778,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
             format = web_client_api_request_v1_data_format(value);
         }
         else if(!strcmp(name, "options")) {
-            options |= web_client_api_request_v1_data_options(value);
+            options |= rrdr_options_parse(value);
         }
         else if(!strcmp(name, "callback")) {
             responseHandler = value;
@@ -1655,7 +1710,7 @@ int web_client_api_request_v1_mgmt(RRDHOST *host, struct web_client *w, char *ur
     }
     needle += strlen(HLT_MGM);
     if (*needle != '\0') {
-        buffer_strcat(w->response.data, "Invalid management request. Curently only 'health' is supported.");
+        buffer_strcat(w->response.data, "Invalid management request. Currently only 'health' is supported.");
         return HTTP_RESP_NOT_FOUND;
     }
     return web_client_api_request_v1_mgmt_health(host, w, url);
@@ -1679,6 +1734,7 @@ static struct web_api_command api_commands_v1[] = {
         {"alarms_values", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarms_values, 0              },
         {"alarm_log", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_log, 0              },
         {"alarm_variables", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_variables, 0              },
+        {"variable", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_variable, 0              },
         {"alarm_count", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_alarm_count, 0              },
         {"allmetrics", 0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC, web_client_api_request_v1_allmetrics, 0              },
 

@@ -282,15 +282,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrddim_index_init(st);
 
-    // chart variables - we need this for data collection to work (collector given chart variables) - not only health
-    rrdsetvar_index_init(st);
-
-    if (host->health.health_enabled) {
-        st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
-        st->rrdvars = rrdvariables_create();
-        rrddimvar_index_init(st);
-    }
-
+    st->rrdvars = rrdvariables_create();
     st->rrdlabels = rrdlabels_create();
     rrdset_update_permanent_labels(st);
 
@@ -346,36 +338,24 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // release the collector info
     dictionary_destroy(st->functions_view);
 
-    rrdcalc_unlink_all_rrdset_alerts(st);
+    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
 
     // ------------------------------------------------------------------------
     // the order of destruction is important here
 
-    // 1. delete RRDDIMVAR index - this will speed up the destruction of RRDDIMs
-    //    because each dimension loops to find its own variables in this index.
-    //    There are no references to the items on this index from the dimensions.
-    //    To find their own, they have to walk-through the dictionary.
-    rrddimvar_index_destroy(st);                // destroy the rrddimvar index
-
-    // 2. delete RRDSETVAR index
-    rrdsetvar_index_destroy(st);                // destroy the rrdsetvar index
-
-    // 3. delete RRDVAR index after the above, to avoid triggering its garbage collector (they have references on this)
+    // 1. delete RRDVAR index after the above, to avoid triggering its garbage collector (they have references on this)
     rrdvariables_destroy(st->rrdvars);      // free all variables and destroy the rrdvar dictionary
 
-    // 4. delete RRDFAMILY - this has to be last, because RRDDIMVAR and RRDSETVAR need the reference counter
-    rrdfamily_release(host, st->rrdfamily); // release the acquired rrdfamily -- has to be after all variables
-
-    // 5. delete RRDDIMs, now their variables are not existing, so this is fast
+    // 2. delete RRDDIMs, now their variables are not existing, so this is fast
     rrddim_index_destroy(st);                   // free all the dimensions and destroy the dimensions index
 
-    // 6. this has to be after the dimensions are freed, but before labels are freed (contexts need the labels)
+    // 3. this has to be after the dimensions are freed, but before labels are freed (contexts need the labels)
     rrdcontext_removed_rrdset(st);              // let contexts know
 
-    // 7. destroy the chart labels
+    // 4. destroy the chart labels
     rrdlabels_destroy(st->rrdlabels);  // destroy the labels, after letting the contexts know
 
-    // 8. destroy the ml handle
+    // 5. destroy the ml handle
     ml_chart_delete(st);
 
     // ------------------------------------------------------------------------
@@ -461,8 +441,6 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         if(old_family != st->family)
             ctr->react_action |= RRDSET_REACT_UPDATED;
         string_freez(old_family);
-
-        // TODO - we should rename RRDFAMILY variables
     }
 
     if(ctr->context && *ctr->context) {
@@ -643,15 +621,9 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
         rrdset_index_del_name(host, st);
         string_freez(st->name);
         st->name = name_string;
-        rrdsetvar_rename_all(st);
     }
     else
         st->name = name_string;
-
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st)
-        rrddimvar_rename_all(rd);
-    rrddim_foreach_done(rd);
 
     rrdset_index_add_name(host, st);
 

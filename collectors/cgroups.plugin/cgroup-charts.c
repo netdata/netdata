@@ -96,7 +96,7 @@ void update_cpu_utilization_limit_chart(struct cgroup *cg, NETDATA_DOUBLE cpu_li
 
     cg->prev_cpu_usage = cpu_usage;
 
-    rrdsetvar_custom_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, cpu_limit);
+    rrdvar_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, cpu_limit);
     rrdset_done(chart);
 }
 

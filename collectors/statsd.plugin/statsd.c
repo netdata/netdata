@@ -1531,8 +1531,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
     return 0;
 }
 
-static int statsd_file_callback(const char *filename, void *data) {
-    (void)data;
+static int statsd_file_callback(const char *filename, void *data __maybe_unused, bool stock_config __maybe_unused) {
     return statsd_readfile(filename, NULL, NULL, NULL);
 }
 

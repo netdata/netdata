@@ -151,7 +151,7 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
             time_group_options = value;
 
         else if(!strcmp(name, "options"))
-            options |= web_client_api_request_v1_data_options(value);
+            options |= rrdr_options_parse(value);
 
         else if(!strcmp(name, "method"))
             method = weights_string_to_method(value);

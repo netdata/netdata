@@ -849,8 +849,6 @@ int do_sys_class_drm(int update_every, usec_t dt) {
                  (de->d_name[0] == '.' && de->d_name[1] == '.' && de->d_name[2] == '\0'))) continue;
             
             if(de->d_type == DT_LNK && !strncmp(de->d_name, "card", 4) && !strchr(de->d_name, '-')) {
-                char filename[FILENAME_MAX + 1];
-
                 snprintfz(filename, FILENAME_MAX, "%s/%s/%s", drm_dir_name, de->d_name, "device/uevent");
                 if(check_card_is_amdgpu(filename)) continue;
 

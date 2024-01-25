@@ -1282,12 +1282,12 @@ cpu_limits2_err:
 
 static inline int update_memory_limits(struct cgroup *cg) {
     char **filename = &cg->filename_memory_limit;
-    const RRDSETVAR_ACQUIRED **chart_var = &cg->chart_var_memory_limit;
+    const RRDVAR_ACQUIRED **chart_var = &cg->chart_var_memory_limit;
     unsigned long long *value = &cg->memory_limit;
 
     if(*filename) {
         if(unlikely(!*chart_var)) {
-            *chart_var = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_mem_usage, "memory_limit");
+            *chart_var = rrdvar_chart_variable_add_and_acquire(cg->st_mem_usage, "memory_limit");
             if(!*chart_var) {
                 collector_error("Cannot create cgroup %s chart variable '%s'. Will not update its limit anymore.", cg->id, "memory_limit");
                 freez(*filename);
@@ -1303,7 +1303,8 @@ static inline int update_memory_limits(struct cgroup *cg) {
                     *filename = NULL;
                 }
                 else {
-                    rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value) / (1024.0 * 1024.0));
+                    rrdvar_chart_variable_set(
+                        cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value) / (1024.0 * 1024.0));
                     return 1;
                 }
             } else {
@@ -1318,11 +1319,12 @@ static inline int update_memory_limits(struct cgroup *cg) {
                 char *s = "max\n\0";
                 if(strcmp(s, buffer) == 0){
                     *value = UINT64_MAX;
-                    rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value) / (1024.0 * 1024.0));
+                    rrdvar_chart_variable_set(
+                        cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value) / (1024.0 * 1024.0));
                     return 1;
                 }
                 *value = str2ull(buffer, NULL);
-                rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value) / (1024.0 * 1024.0));
+                rrdvar_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value) / (1024.0 * 1024.0));
                 return 1;
             }
         }
@@ -1400,7 +1402,7 @@ void update_cgroup_charts() {
                 }
 
                 if(unlikely(!cg->chart_var_cpu_limit)) {
-                    cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_cpu, "cpu_limit");
+                    cg->chart_var_cpu_limit = rrdvar_chart_variable_add_and_acquire(cg->st_cpu, "cpu_limit");
                     if(!cg->chart_var_cpu_limit) {
                         collector_error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
                         if(cg->filename_cpuset_cpus) freez(cg->filename_cpuset_cpus);
@@ -1430,7 +1432,7 @@ void update_cgroup_charts() {
                             rrdset_is_obsolete___safe_from_collector_thread(cg->st_cpu_limit);
                             cg->st_cpu_limit = NULL;
                         }
-                        rrdsetvar_custom_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, NAN);
+                        rrdvar_chart_variable_set(cg->st_cpu, cg->chart_var_cpu_limit, NAN);
                     }
                 }
             }

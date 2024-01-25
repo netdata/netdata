@@ -183,6 +183,13 @@ struct context_v2_entry {
     FTS_MATCH match;
 };
 
+struct alert_counts {
+    size_t critical;
+    size_t warning;
+    size_t clear;
+    size_t error;
+};
+
 struct alert_v2_entry {
     RRDCALC *tmp;
 
@@ -191,14 +198,23 @@ struct alert_v2_entry {
 
     size_t ati;
 
-    size_t critical;
-    size_t warning;
-    size_t clear;
-    size_t error;
+    struct alert_counts counts;
 
     size_t instances;
     DICTIONARY *nodes;
     DICTIONARY *configs;
+};
+
+struct alert_by_x_entry {
+    struct {
+        struct alert_counts counts;
+        size_t silent;
+        size_t total;
+    } running;
+
+    struct {
+        size_t available;
+    } prototypes;
 };
 
 typedef struct full_text_search_index {
@@ -254,8 +270,14 @@ struct rrdcontext_to_json_v2_data {
 
         size_t ati;
 
-        DICTIONARY *alerts;
+        DICTIONARY *summary;
         DICTIONARY *alert_instances;
+
+        DICTIONARY *by_type;
+        DICTIONARY *by_component;
+        DICTIONARY *by_classification;
+        DICTIONARY *by_recipient;
+        DICTIONARY *by_module;
     } alerts;
 
     struct {
@@ -279,9 +301,7 @@ struct rrdcontext_to_json_v2_data {
     struct query_timings timings;
 };
 
-static void alerts_v2_add(struct alert_v2_entry *t, RRDCALC *rc) {
-    t->instances++;
-
+static void alert_counts_add(struct alert_counts *t, RRDCALC *rc) {
     switch(rc->status) {
         case RRDCALC_STATUS_CRITICAL:
             t->critical++;
@@ -306,20 +326,51 @@ static void alerts_v2_add(struct alert_v2_entry *t, RRDCALC *rc) {
 
             break;
     }
+}
+
+static void alerts_v2_add(struct alert_v2_entry *t, RRDCALC *rc) {
+    t->instances++;
+
+    alert_counts_add(&t->counts, rc);
 
     dictionary_set(t->nodes, rc->rrdset->rrdhost->machine_guid, NULL, 0);
 
     char key[UUID_STR_LEN + 1];
-    uuid_unparse_lower(rc->config_hash_id, key);
+    uuid_unparse_lower(rc->config.hash_id, key);
     dictionary_set(t->configs, key, NULL, 0);
+}
+
+static void alerts_by_x_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
+    static STRING *silent = NULL;
+    if(unlikely(!silent)) silent = string_strdupz("silent");
+
+    struct alert_by_x_entry *b = value;
+    RRDCALC *rc = data;
+    if(!rc) {
+        // prototype
+        b->prototypes.available++;
+    }
+    else {
+        alert_counts_add(&b->running.counts, rc);
+
+        b->running.total++;
+
+        if (rc->config.recipient == silent)
+            b->running.silent++;
+    }
+}
+
+static bool alerts_by_x_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value __maybe_unused, void *data __maybe_unused) {
+    alerts_by_x_insert_callback(item, old_value, data);
+    return false;
 }
 
 static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     struct rrdcontext_to_json_v2_data *ctl = data;
     struct alert_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
-    t->name = rc->name;
-    t->summary = rc->original_summary;
+    t->name = rc->config.name;
+    t->summary = rc->config.summary; // the original summary
     t->ati = ctl->alerts.ati++;
 
     t->nodes = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_VALUE_LINK_DONT_CLONE|DICT_OPTION_NAME_LINK_DONT_CLONE);
@@ -350,16 +401,16 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->chart_id = rc->rrdset->id;
     t->chart_name = rc->rrdset->name;
     t->family = rc->rrdset->family;
-    t->units = rc->units;
-    t->classification = rc->classification;
-    t->type = rc->type;
-    t->recipient = rc->recipient;
-    t->component = rc->component;
-    t->name = rc->name;
-    t->source = rc->source;
+    t->units = rc->config.units;
+    t->classification = rc->config.classification;
+    t->type = rc->config.type;
+    t->recipient = rc->config.recipient;
+    t->component = rc->config.component;
+    t->name = rc->config.name;
+    t->source = rc->config.source;
     t->status = rc->status;
     t->flags = rc->run_flags;
-    t->info = rc->info;
+    t->info = rc->config.info;
     t->summary = rc->summary;
     t->value = rc->value;
     t->last_updated = rc->last_updated;
@@ -368,10 +419,8 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->host = rc->rrdset->rrdhost;
     t->alarm_id = rc->id;
     t->ni = ctl->nodes.ni;
-    t->name = rc->name;
 
-    uuid_copy(t->config_hash_id, rc->config_hash_id);
-
+    uuid_copy(t->config_hash_id, rc->config.hash_id);
     health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(rc, &t->global_id, &t->last_transition_id);
 }
 
@@ -437,12 +486,12 @@ static FTS_MATCH rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_jso
             RRDSET *st = ri->rrdset;
             rw_spinlock_read_lock(&st->alerts.spinlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->name))) {
+                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->config.name))) {
                     matched = FTS_MATCHED_ALERT;
                     break;
                 }
 
-                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->info))) {
+                if(unlikely(full_text_search_string(&ctl->q.fts, q, rcl->config.info))) {
                     matched = FTS_MATCHED_ALERT_INFO;
                     break;
                 }
@@ -462,7 +511,7 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
             RRDSET *st = ri->rrdset;
             rw_spinlock_read_lock(&st->alerts.spinlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
-                if(ctl->alerts.alert_name_pattern && !simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->name))
+                if(ctl->alerts.alert_name_pattern && !simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->config.name))
                     continue;
 
                 if(ctl->alerts.alarm_id_filter && ctl->alerts.alarm_id_filter != rcl->id)
@@ -502,10 +551,50 @@ static bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRD
                 struct alert_v2_entry t = {
                         .tmp = rcl,
                 };
-                struct alert_v2_entry *a2e = dictionary_set(ctl->alerts.alerts, string2str(rcl->name), &t,
-                                                            sizeof(struct alert_v2_entry));
+                struct alert_v2_entry *a2e =
+                    dictionary_set(ctl->alerts.summary, string2str(rcl->config.name),
+                                   &t, sizeof(struct alert_v2_entry));
                 size_t ati = a2e->ati;
                 matches++;
+
+                dictionary_set_advanced(ctl->alerts.by_type,
+                                        string2str(rcl->config.type),
+                                        (ssize_t)string_strlen(rcl->config.type),
+                                        NULL,
+                                        sizeof(struct alert_by_x_entry),
+                                        rcl);
+
+                dictionary_set_advanced(ctl->alerts.by_component,
+                                        string2str(rcl->config.component),
+                                        (ssize_t)string_strlen(rcl->config.component),
+                                        NULL,
+                                        sizeof(struct alert_by_x_entry),
+                                        rcl);
+
+                dictionary_set_advanced(ctl->alerts.by_classification,
+                                        string2str(rcl->config.classification),
+                                        (ssize_t)string_strlen(rcl->config.classification),
+                                        NULL,
+                                        sizeof(struct alert_by_x_entry),
+                                        rcl);
+
+                dictionary_set_advanced(ctl->alerts.by_recipient,
+                                        string2str(rcl->config.recipient),
+                                        (ssize_t)string_strlen(rcl->config.recipient),
+                                        NULL,
+                                        sizeof(struct alert_by_x_entry),
+                                        rcl);
+
+                char *module = NULL;
+                rrdlabels_get_value_strdup_or_null(st->rrdlabels, &module, "_collect_module");
+                if(!module || !*module) module = "[unset]";
+
+                dictionary_set_advanced(ctl->alerts.by_module,
+                                        module,
+                                        -1,
+                                        NULL,
+                                        sizeof(struct alert_by_x_entry),
+                                        rcl);
 
                 if (ctl->options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_VALUES)) {
                     char key[20 + 1];
@@ -1254,7 +1343,7 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
                     buffer_json_member_add_time_t(wb, "before", t->value.db.before);
                     buffer_json_member_add_string(wb, "method", t->value.db.method);
                     buffer_json_member_add_string(wb, "dimensions", t->value.db.dimensions);
-                    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options",(RRDR_OPTIONS) t->value.db.options);
+                    rrdr_options_to_buffer_json_array(wb, "options", (RRDR_OPTIONS)t->value.db.options);
                 }
                 buffer_json_object_close(wb); // db
             }
@@ -1394,6 +1483,41 @@ static int contexts_v2_alert_instance_to_json_callback(const DICTIONARY_ITEM *it
     return 1;
 }
 
+static void contexts_v2_alerts_by_x_update_prototypes(void *data, STRING *type, STRING *component, STRING *classification, STRING *recipient) {
+    struct rrdcontext_to_json_v2_data *ctl = data;
+
+    dictionary_set_advanced(ctl->alerts.by_type, string2str(type), (ssize_t)string_strlen(type), NULL, sizeof(struct alert_by_x_entry), NULL);
+    dictionary_set_advanced(ctl->alerts.by_component, string2str(component), (ssize_t)string_strlen(component), NULL, sizeof(struct alert_by_x_entry), NULL);
+    dictionary_set_advanced(ctl->alerts.by_classification, string2str(classification), (ssize_t)string_strlen(classification), NULL, sizeof(struct alert_by_x_entry), NULL);
+    dictionary_set_advanced(ctl->alerts.by_recipient, string2str(recipient), (ssize_t)string_strlen(recipient), NULL, sizeof(struct alert_by_x_entry), NULL);
+}
+
+static void contexts_v2_alerts_by_x_to_json(BUFFER *wb, DICTIONARY *dict, const char *key) {
+    buffer_json_member_add_array(wb, key);
+    {
+        struct alert_by_x_entry *b;
+        dfe_start_read(dict, b) {
+            buffer_json_add_array_item_object(wb);
+            {
+                buffer_json_member_add_string(wb, "name", b_dfe.name);
+                buffer_json_member_add_uint64(wb, "cr", b->running.counts.critical);
+                buffer_json_member_add_uint64(wb, "wr", b->running.counts.warning);
+                buffer_json_member_add_uint64(wb, "cl", b->running.counts.clear);
+                buffer_json_member_add_uint64(wb, "er", b->running.counts.error);
+                buffer_json_member_add_uint64(wb, "running", b->running.total);
+
+                buffer_json_member_add_uint64(wb, "running_silent", b->running.silent);
+
+                if(b->prototypes.available)
+                buffer_json_member_add_uint64(wb, "available", b->prototypes.available);
+            }
+            buffer_json_object_close(wb);
+        }
+        dfe_done(b);
+    }
+    buffer_json_array_close(wb);
+}
+
 static void contexts_v2_alert_instances_to_json(BUFFER *wb, const char *key, struct rrdcontext_to_json_v2_data *ctl, bool debug) {
     buffer_json_member_add_array(wb, key);
     {
@@ -1413,7 +1537,7 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
         buffer_json_member_add_array(wb, "alerts");
         {
             struct alert_v2_entry *t;
-            dfe_start_read(ctl->alerts.alerts, t)
+            dfe_start_read(ctl->alerts.summary, t)
                     {
                         buffer_json_add_array_item_object(wb);
                         {
@@ -1421,10 +1545,10 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
                             buffer_json_member_add_string(wb, "nm", string2str(t->name));
                             buffer_json_member_add_string(wb, "sum", string2str(t->summary));
 
-                            buffer_json_member_add_uint64(wb, "cr", t->critical);
-                            buffer_json_member_add_uint64(wb, "wr", t->warning);
-                            buffer_json_member_add_uint64(wb, "cl", t->clear);
-                            buffer_json_member_add_uint64(wb, "er", t->error);
+                            buffer_json_member_add_uint64(wb, "cr", t->counts.critical);
+                            buffer_json_member_add_uint64(wb, "wr", t->counts.warning);
+                            buffer_json_member_add_uint64(wb, "cl", t->counts.clear);
+                            buffer_json_member_add_uint64(wb, "er", t->counts.error);
 
                             buffer_json_member_add_uint64(wb, "in", t->instances);
                             buffer_json_member_add_uint64(wb, "nd", dictionary_entries(t->nodes));
@@ -1435,6 +1559,13 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
             dfe_done(t);
         }
         buffer_json_array_close(wb); // alerts
+
+        health_prototype_metadata_foreach(ctl, contexts_v2_alerts_by_x_update_prototypes);
+        contexts_v2_alerts_by_x_to_json(wb, ctl->alerts.by_type, "alerts_by_type");
+        contexts_v2_alerts_by_x_to_json(wb, ctl->alerts.by_component, "alerts_by_component");
+        contexts_v2_alerts_by_x_to_json(wb, ctl->alerts.by_classification, "alerts_by_classification");
+        contexts_v2_alerts_by_x_to_json(wb, ctl->alerts.by_recipient, "alerts_by_recipient");
+        contexts_v2_alerts_by_x_to_json(wb, ctl->alerts.by_module, "alerts_by_module");
     }
 
     if(ctl->request->options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES|CONTEXT_V2_OPTION_ALERTS_WITH_VALUES)) {
@@ -1942,12 +2073,42 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             }
         }
 
-        ctl.alerts.alerts = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        ctl.alerts.summary = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
                                                        NULL, sizeof(struct alert_v2_entry));
 
-        dictionary_register_insert_callback(ctl.alerts.alerts, alerts_v2_insert_callback, &ctl);
-        dictionary_register_conflict_callback(ctl.alerts.alerts, alerts_v2_conflict_callback, &ctl);
-        dictionary_register_delete_callback(ctl.alerts.alerts, alerts_v2_delete_callback, &ctl);
+        dictionary_register_insert_callback(ctl.alerts.summary, alerts_v2_insert_callback, &ctl);
+        dictionary_register_conflict_callback(ctl.alerts.summary, alerts_v2_conflict_callback, &ctl);
+        dictionary_register_delete_callback(ctl.alerts.summary, alerts_v2_delete_callback, &ctl);
+
+        ctl.alerts.by_type = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                        NULL, sizeof(struct alert_by_x_entry));
+
+        dictionary_register_insert_callback(ctl.alerts.by_type, alerts_by_x_insert_callback, NULL);
+        dictionary_register_conflict_callback(ctl.alerts.by_type, alerts_by_x_conflict_callback, NULL);
+
+        ctl.alerts.by_component = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                        NULL, sizeof(struct alert_by_x_entry));
+
+        dictionary_register_insert_callback(ctl.alerts.by_component, alerts_by_x_insert_callback, NULL);
+        dictionary_register_conflict_callback(ctl.alerts.by_component, alerts_by_x_conflict_callback, NULL);
+
+        ctl.alerts.by_classification = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                          NULL, sizeof(struct alert_by_x_entry));
+
+        dictionary_register_insert_callback(ctl.alerts.by_classification, alerts_by_x_insert_callback, NULL);
+        dictionary_register_conflict_callback(ctl.alerts.by_classification, alerts_by_x_conflict_callback, NULL);
+
+        ctl.alerts.by_recipient = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                          NULL, sizeof(struct alert_by_x_entry));
+
+        dictionary_register_insert_callback(ctl.alerts.by_recipient, alerts_by_x_insert_callback, NULL);
+        dictionary_register_conflict_callback(ctl.alerts.by_recipient, alerts_by_x_conflict_callback, NULL);
+
+        ctl.alerts.by_module = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                             NULL, sizeof(struct alert_by_x_entry));
+
+        dictionary_register_insert_callback(ctl.alerts.by_module, alerts_by_x_insert_callback, NULL);
+        dictionary_register_conflict_callback(ctl.alerts.by_module, alerts_by_x_conflict_callback, NULL);
 
         if(ctl.options & (CONTEXT_V2_OPTION_ALERTS_WITH_INSTANCES | CONTEXT_V2_OPTION_ALERTS_WITH_VALUES)) {
             ctl.alerts.alert_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
@@ -2150,8 +2311,13 @@ cleanup:
     dictionary_destroy(ctl.nodes.dict);
     dictionary_destroy(ctl.contexts.dict);
     dictionary_destroy(ctl.functions.dict);
-    dictionary_destroy(ctl.alerts.alerts);
+    dictionary_destroy(ctl.alerts.summary);
     dictionary_destroy(ctl.alerts.alert_instances);
+    dictionary_destroy(ctl.alerts.by_type);
+    dictionary_destroy(ctl.alerts.by_component);
+    dictionary_destroy(ctl.alerts.by_classification);
+    dictionary_destroy(ctl.alerts.by_recipient);
+    dictionary_destroy(ctl.alerts.by_module);
     simple_pattern_free(ctl.nodes.scope_pattern);
     simple_pattern_free(ctl.nodes.pattern);
     simple_pattern_free(ctl.contexts.pattern);

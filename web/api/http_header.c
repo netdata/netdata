@@ -135,10 +135,18 @@ static void http_header_x_netdata_role(struct web_client *w, const char *v, size
         strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
         if (strcasecmp(buffer, "admin") == 0)
             w->access = HTTP_ACCESS_ADMIN;
+        else if(strcasecmp(buffer, "manager") == 0)
+            w->access = HTTP_ACCESS_MEMBER;
+        else if(strcasecmp(buffer, "troubleshooter") == 0)
+            w->access = HTTP_ACCESS_MEMBER;
+        else if(strcasecmp(buffer, "observer") == 0)
+            w->access = HTTP_ACCESS_MEMBER;
         else if(strcasecmp(buffer, "member") == 0)
             w->access = HTTP_ACCESS_MEMBER;
+        else if(strcasecmp(buffer, "billing") == 0)
+            w->access = HTTP_ACCESS_MEMBER;
         else
-            w->access = HTTP_ACCESS_ANY;
+            w->access = HTTP_ACCESS_MEMBER;
 
         web_client_flags_clear_auth(w);
         web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_CLOUD);

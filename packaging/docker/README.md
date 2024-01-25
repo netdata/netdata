@@ -12,6 +12,16 @@ import TabItem from '@theme/TabItem';
 
 # Install Netdata with Docker
 
+## Limitations running the Agent in Docker
+
+We do not officially support running our Docker images with the Docker CLI `--user` option or the Docker Compose
+`user:` parameter. Such usage will usually still work, but some features will not be available when run this
+way. Note that the agent will drop privileges appropriately inside the container during startup, meaning that even
+when run without these options almost nothing in the container will actually run with an effective UID of 0.
+
+Our POWER8+ Docker images do not support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself,
+and unfortunately not something we can realistically work around.
+
 ## Create a new Netdata Agent container
 
 You can create a new Agent container using either `docker run` or `docker-compose`. After using any method, you can

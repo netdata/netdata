@@ -1207,19 +1207,19 @@ static void systemd_unit_priority(UnitInfo *u, size_t units) {
     u->prio = (prio * units) + u->prio;
 }
 
-#define if_less(current, max, target) ({                \
-    typeof(current) _wanted = (current);                \
-    if((current) < (target))                            \
-        _wanted = (target) > (max) ? (max) : (target);  \
-    _wanted;                                            \
-})
+static inline FACET_ROW_SEVERITY if_less(FACET_ROW_SEVERITY current, FACET_ROW_SEVERITY max, FACET_ROW_SEVERITY target) {
+    FACET_ROW_SEVERITY wanted = current;
+    if(current < target)
+        wanted = target > max ? max : target;
+    return wanted;
+}
 
-#define if_normal(current, max, target) ({              \
-    typeof(current) _wanted = (current);                \
-    if((current) == FACET_ROW_SEVERITY_NORMAL)          \
-        _wanted = (target) > (max) ? (max) : (target);  \
-    _wanted;                                            \
-})
+static inline FACET_ROW_SEVERITY if_normal(FACET_ROW_SEVERITY current, FACET_ROW_SEVERITY max, FACET_ROW_SEVERITY target) {
+    FACET_ROW_SEVERITY wanted = current;
+    if(current == FACET_ROW_SEVERITY_NORMAL)
+        wanted = target > max ? max : target;
+    return wanted;
+}
 
 FACET_ROW_SEVERITY system_unit_severity(UnitInfo *u) {
     FACET_ROW_SEVERITY severity, max_severity;

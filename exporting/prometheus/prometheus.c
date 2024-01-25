@@ -374,59 +374,55 @@ static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unu
 
     struct host_variables_callback_options *opts = data;
 
-    if (rrdvar_flags(rv) & (RRDVAR_FLAG_CUSTOM_HOST_VAR | RRDVAR_FLAG_CUSTOM_CHART_VAR)) {
-        if (!opts->host_header_printed) {
-            opts->host_header_printed = 1;
+    if (!opts->host_header_printed) {
+        opts->host_header_printed = 1;
 
-            if (opts->output_options & PROMETHEUS_OUTPUT_HELP) {
-                buffer_sprintf(opts->wb, "\n# COMMENT global host and chart variables\n");
-            }
+        if (opts->output_options & PROMETHEUS_OUTPUT_HELP) {
+            buffer_sprintf(opts->wb, "\n# COMMENT global host and chart variables\n");
         }
-
-        NETDATA_DOUBLE value = rrdvar2number(rv);
-        if (isnan(value) || isinf(value)) {
-            if (opts->output_options & PROMETHEUS_OUTPUT_HELP)
-                buffer_sprintf(
-                    opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rrdvar_name(rv), (isnan(value)) ? "NAN" : "INF");
-
-            return 0;
-        }
-
-        char *label_pre = "";
-        char *label_post = "";
-        if (opts->labels && *opts->labels) {
-            label_pre = "{";
-            label_post = "}";
-        }
-
-        prometheus_name_copy(opts->name, rrdvar_name(rv), sizeof(opts->name));
-
-        if (opts->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-            buffer_sprintf(
-                opts->wb,
-                "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
-                opts->prefix,
-                opts->name,
-                label_pre,
-                opts->labels,
-                label_post,
-                value,
-                opts->now * 1000ULL);
-        else
-            buffer_sprintf(
-                opts->wb,
-                "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT "\n",
-                opts->prefix,
-                opts->name,
-                label_pre,
-                opts->labels,
-                label_post,
-                value);
-
-        return 1;
     }
 
-    return 0;
+    NETDATA_DOUBLE value = rrdvar2number(rv);
+    if (isnan(value) || isinf(value)) {
+        if (opts->output_options & PROMETHEUS_OUTPUT_HELP)
+            buffer_sprintf(
+                opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rrdvar_name(rv), (isnan(value)) ? "NAN" : "INF");
+
+        return 0;
+    }
+
+    char *label_pre = "";
+    char *label_post = "";
+    if (opts->labels && *opts->labels) {
+        label_pre = "{";
+        label_post = "}";
+    }
+
+    prometheus_name_copy(opts->name, rrdvar_name(rv), sizeof(opts->name));
+
+    if (opts->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
+        buffer_sprintf(
+            opts->wb,
+            "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT " %llu\n",
+            opts->prefix,
+            opts->name,
+            label_pre,
+            opts->labels,
+            label_post,
+            value,
+            opts->now * 1000ULL);
+    else
+        buffer_sprintf(
+            opts->wb,
+            "%s_%s%s%s%s " NETDATA_DOUBLE_FORMAT "\n",
+            opts->prefix,
+            opts->name,
+            label_pre,
+            opts->labels,
+            label_post,
+            value);
+
+    return 1;
 }
 
 struct gen_parameters {
@@ -526,6 +522,86 @@ static void generate_as_collected_prom_metric(BUFFER *wb,
         buffer_sprintf(wb, "\n");
 }
 
+static void prometheus_print_os_info(
+    BUFFER *wb,
+    RRDHOST *host,
+    PROMETHEUS_OUTPUT_OPTIONS output_options)
+{
+    FILE *fp;
+    char filename[FILENAME_MAX + 1];
+    char buf[BUFSIZ + 1];
+
+    snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/etc/os-release");
+    fp = fopen(filename, "r");
+    if (!fp) {
+        /* Fallback to lsb-release */
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/etc/lsb-release");
+        fp = fopen(filename, "r");
+    }
+    if (!fp) {
+        return;
+    }
+
+    buffer_sprintf(wb, "netdata_os_info{instance=\"%s\"", rrdhost_hostname(host));
+
+    while (fgets(buf, BUFSIZ, fp)) {
+      char *in, *sanitized;
+      char *key, *val;
+      int in_val_part = 0;
+
+      /* sanitize the line */
+      sanitized = in = buf;
+      in_val_part = 0;
+      while (*in && *in != '\n') {
+          if (!in_val_part) {
+              /* Only accepts alphabetic characters and '_'
+               * in key part */
+              if (isalpha(*in) || *in == '_') {
+                  *(sanitized++) = tolower(*in);
+              } else if (*in == '=') {
+                  in_val_part = 1;
+                  *(sanitized++) = '=';
+              }
+          } else {
+              /* Don't accept special characters in
+               * value part */
+              switch (*in) {
+                  case '"':
+                  case '\'':
+                  case '\r':
+                  case '\t':
+                      break;
+                  default:
+                      if (isprint(*in)) {
+                          *(sanitized++) = *in;
+                      }
+              }
+          }
+          in++;
+      }
+      /* Terminate the string */
+      *(sanitized++) = '\0';
+
+      /* Split key/val */
+      key = buf;
+      val = strchr(buf, '=');
+
+      /* If we have a key/value pair, add it as a label */
+      if (val) {
+          *val = '\0';
+          val++;
+          buffer_sprintf(wb, ",%s=\"%s\"", key, val);
+      }
+    }
+
+    /* Finish the line */
+    if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
+        buffer_sprintf(wb, "} 1 %llu\n", now_realtime_usec() / USEC_PER_MS);
+    else
+        buffer_sprintf(wb, "} 1\n");
+
+    fclose(fp);
+}
 /**
  * Write metrics in Prometheus format to a buffer.
  *
@@ -578,6 +654,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     if (instance->labels_buffer)
         buffer_flush(instance->labels_buffer);
+
+    if (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS)
+        prometheus_print_os_info(wb, host, output_options);
 
     // send custom variables set for the host
     if (output_options & PROMETHEUS_OUTPUT_VARIABLES) {

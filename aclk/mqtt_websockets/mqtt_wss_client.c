@@ -145,16 +145,16 @@ static void mws_connack_callback_ng(void *user_ctx, int code)
 
 static ssize_t mqtt_send_cb(void *user_ctx, const void* buf, size_t len)
 {
-    mqtt_wss_client mqtt_wss_client = user_ctx;
+    mqtt_wss_client client = user_ctx;
 #ifdef DEBUG_ULTRA_VERBOSE
-    mws_debug(mqtt_wss_client->log, "mqtt_pal_sendall(len=%d)", len);
+    mws_debug(client->log, "mqtt_pal_sendall(len=%d)", len);
 #endif
-    int ret = ws_client_send(mqtt_wss_client->ws_client, WS_OP_BINARY_FRAME, buf, len);
+    int ret = ws_client_send(client->ws_client, WS_OP_BINARY_FRAME, buf, len);
     if (ret >= 0 && (size_t)ret != len) {
 #ifdef DEBUG_ULTRA_VERBOSE
-        mws_debug(mqtt_wss_client->log, "Not complete message sent (Msg=%d,Sent=%d). Need to arm POLLOUT!", len, ret);
+        mws_debug(client->log, "Not complete message sent (Msg=%d,Sent=%d). Need to arm POLLOUT!", len, ret);
 #endif
-        mqtt_wss_client->mqtt_didnt_finish_write = 1;
+        client->mqtt_didnt_finish_write = 1;
     }
     return ret;
 }

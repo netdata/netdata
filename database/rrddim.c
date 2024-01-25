@@ -203,8 +203,6 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         metaqueue_delete_dimension_uuid(&rd->metric_uuid);
     }
 
-    rrddimvar_delete_all(rd);
-
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(!rd->tiers[tier].smh) continue;
 
@@ -355,8 +353,6 @@ inline int rrddim_reset_name(RRDSET *st __maybe_unused, RRDDIM *rd, const char *
     STRING *old = rd->name;
     rd->name = rrd_string_strdupz(name);
     string_freez(old);
-
-    rrddimvar_rename_all(rd);
 
     rrddim_metadata_updated(rd);
 

@@ -633,4 +633,14 @@ static inline bool strendswith(const char *string, const char *suffix) {
     return strcmp(string + string_len - suffix_len, suffix) == 0;
 }
 
+static inline bool strendswith_lengths(const char *string, size_t string_len, const char *suffix, size_t suffix_len) {
+    if (string == NULL || suffix == NULL)
+        return false;
+
+    if (suffix_len > string_len)
+        return false;
+
+    return strcmp(string + string_len - suffix_len, suffix) == 0;
+}
+
 #endif //NETDATA_INLINED_H

@@ -1416,8 +1416,7 @@ void ml_host_get_info(RRDHOST *rh, BUFFER *wb)
 
     buffer_json_member_add_double(wb, "dimension-anomaly-score-threshold", Cfg.dimension_anomaly_score_threshold);
 
-    buffer_json_member_add_string(wb, "anomaly-detection-grouping-method",
-                                  time_grouping_method2string(Cfg.anomaly_detection_grouping_method));
+    buffer_json_member_add_string(wb, "anomaly-detection-grouping-method", time_grouping_id2txt(Cfg.anomaly_detection_grouping_method));
 
     buffer_json_member_add_int64(wb, "anomaly-detection-query-duration", Cfg.anomaly_detection_query_duration);
 

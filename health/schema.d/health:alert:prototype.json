@@ -1,0 +1,509 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {
+      "matchInstance": {
+        "type": "object",
+        "title": "Matching rule for a specific instance",
+        "description": "This rule will be applied to a specific instance on all nodes",
+        "properties": {
+          "on": {
+            "type": "string",
+            "default": "",
+            "title": "The instance this rule should be applied to",
+            "description": "You can find the instance names on all charts at the instances drop down menu. Do not include the host name in this field."
+          },
+          "plugin": {
+            "type": "string",
+            "default": "*",
+            "title": "Match data collection plugins",
+            "description": "A simple pattern to match the data collection plugins that are collecting the data this rule is to be applied to."
+          },
+          "module": {
+            "type": "string",
+            "default": "*",
+            "title": "Match data collection plugin modules",
+            "description": "A simple pattern to match the data collection plugin modules that are collecting the data this rule is to be applied to."
+          },
+          "instance_labels": {
+            "type": "string",
+            "default": "*",
+            "title": "Match instance labels",
+            "description": "A simple pattern to match the instance labels of the instances this rule is to be applied to."
+          },
+          "host_labels": {
+            "type": "string",
+            "default": "*",
+            "title": "Match node labels",
+            "description": "A simple pattern to match the node labels of the nodes this rule is to be applied to."
+          },
+          "os": {
+            "type": "string",
+            "default": "*",
+            "title": "Match operating system",
+            "description": "A simple pattern to match the operating system name of the nodes this rule is to be applied to."
+          },
+          "host": {
+            "type": "string",
+            "default": "*",
+            "title": "Match node hostnames",
+            "description": "A simple pattern to match the hostnames of the nodes this rule is to be applied to."
+          }
+        },
+        "required": [
+          "on",
+          "os",
+          "host",
+          "plugin",
+          "module",
+          "host_labels",
+          "instance_labels"
+        ]
+      },
+      "matchTemplate": {
+        "type": "object",
+        "title": "Matching rule for applying the alert to multiple instances",
+        "description": "This rule will applied to all instances on all nodes.",
+        "properties": {
+          "on": {
+            "type": "string",
+            "default": "",
+            "title": "The context of the instances this rule should be applied to",
+            "description": "You can find the context at the title bar of all charts in the Metrics dashboard, between the chart title and the units (like system.cpu, or disk.io, etc)."
+          },
+          "plugin": {
+            "type": "string",
+            "default": "*",
+            "title": "Match data collection plugins",
+            "description": "A simple pattern to match the data collection plugins that are collecting the data this rule is to be applied to."
+          },
+          "module": {
+            "type": "string",
+            "default": "*",
+            "title": "Match data collection plugin modules",
+            "description": "A simple pattern to match the data collection plugin modules that are collecting the data this rule is to be applied to."
+          },
+          "instance_labels": {
+            "type": "string",
+            "default": "*",
+            "title": "Match instance labels",
+            "description": "A simple pattern to match the instance labels of the instances this rule is to be applied to."
+          },
+          "instances": {
+            "type": "string",
+            "default": "*",
+            "title": "Match instance names",
+            "description": "A simple pattern to match the instance names of the instances this rule is to be applied to."
+          },
+          "host_labels": {
+            "type": "string",
+            "default": "*",
+            "title": "Match node labels",
+            "description": "A simple pattern to match the node labels of the nodes this rule is to be applied to."
+          },
+          "os": {
+            "type": "string",
+            "default": "*",
+            "title": "Match operating system",
+            "description": "A simple pattern to match the operating system name of the nodes this rule is to be applied to."
+          },
+          "host": {
+            "type": "string",
+            "default": "*",
+            "title": "Match node hostnames",
+            "description": "A simple pattern to match the hostnames of the nodes this rule is to be applied to."
+          }
+        },
+        "required": [
+          "on",
+          "os",
+          "host",
+          "plugin",
+          "module",
+          "host_labels",
+          "instances",
+          "instance_labels"
+        ]
+      },
+      "config": {
+        "type": "object",
+        "title": "Alert Configuration",
+        "description": "The properties that control the value the alert will get, the conditions it will trigger, the back-off for notifications, the auto-repeating of notifications, etc.",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Short description of the alert",
+            "description": "This field is used in notification as a short description of the alert. Variables, like ${label:key}, are replaced with the value of instance label called 'key'."
+          },
+          "info": {
+            "type": "string",
+            "title": "Long description of the alert",
+            "description": "This field is used to provide enough information about the type and nature of the alert. Variables, like ${label:key}, are replaced with the value of instance label called 'key'."
+          },
+          "type": {
+            "type": "string",
+            "title": "Alert Type",
+            "description": "Use categories like: 'System', 'Containers', 'Web Servers', 'Message Brokers', etc."
+          },
+          "component": {
+            "type": "string",
+            "title": "Alert Component (sub-type)",
+            "description": "Component is a sub-type of Alert Type. Examples: 'CPU', 'Memory', 'Network', 'Disk', 'Hardware', 'nginx', 'redis', 'postgresql', etc."
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification",
+            "description": "Use 'Workload', 'Utilization', 'Latency', 'Availability', 'Errors', etc."
+          },
+          "value": {
+            "type": "object",
+            "title": "Alert Value",
+            "description": "Each alert has a value. This section defines how this value is calculated.",
+            "properties": {
+              "database_lookup": {
+                "type": "object",
+                "properties": {
+                  "after": {
+                    "type": "integer",
+                    "default": 0,
+                    "title": "Time-Series Oldest Time",
+                    "description": "The oldest timestamp of the time-series data to be included in the query. Negative values define a duration in seconds in the past (so, -60 means a minute ago)."
+                  },
+                  "before": {
+                    "type": "integer",
+                    "default": 0,
+                    "title": "Time-Series Newest Time",
+                    "description": "The newest timestamp of the time-series data to be included in the query. Negative value define a duration in seconds in the past (so, -60 means a minute ago). Zero means now."
+                  },
+                  "grouping": {
+                    "type": "string",
+                    "enum": [
+                      "average",
+                      "median",
+                      "min",
+                      "max",
+                      "sum",
+                      "incremental_sum",
+                      "stddev",
+                      "cv",
+                      "trimmed-mean1",
+                      "trimmed-mean2",
+                      "trimmed-mean3",
+                      "trimmed-mean",
+                      "trimmed-mean10",
+                      "trimmed-mean15",
+                      "trimmed-mean20",
+                      "trimmed-mean25",
+                      "trimmed-median1",
+                      "trimmed-median2",
+                      "trimmed-median3",
+                      "trimmed-median",
+                      "trimmed-median10",
+                      "trimmed-median15",
+                      "trimmed-median20",
+                      "trimmed-median25",
+                      "percentile99",
+                      "percentile98",
+                      "percentile97",
+                      "percentile",
+                      "percentile90",
+                      "percentile80",
+                      "percentile75",
+                      "percentile50",
+                      "percentile25",
+                      "ses",
+                      "des",
+                      "countif"
+                    ],
+                    "enumNames": [
+                      "The mean (average) value",
+                      "The median value",
+                      "The minimum value",
+                      "The maximum value",
+                      "The sum of all the values",
+                      "The delta of the latest and oldest values",
+                      "The standard deviation of the values",
+                      "The standard deviation expresses as a % of the mean value",
+                      "The mean after trimming 1% of the extreme values",
+                      "The mean after trimming 2% of the extreme values",
+                      "The mean after trimming 3% of the extreme values",
+                      "The mean after trimming 5% of the extreme values",
+                      "The mean after trimming 10% of the extreme values",
+                      "The mean after trimming 15% of the extreme values",
+                      "The mean after trimming 20% of the extreme values",
+                      "The mean after trimming 25% of the extreme values",
+                      "The median after trimming 1% of the extreme values",
+                      "The median after trimming 2% of the extreme values",
+                      "The median after trimming 3% of the extreme values",
+                      "The median after trimming 5% of the extreme values",
+                      "The median after trimming 10% of the extreme values",
+                      "The median after trimming 15% of the extreme values",
+                      "The median after trimming 20% of the extreme values",
+                      "The median after trimming 25% of the extreme values",
+                      "The 99th percentile of the values",
+                      "The 98th percentile of the values",
+                      "The 97th percentile of the values",
+                      "The 95th percentile of the values",
+                      "The 90th percentile of the values",
+                      "The 80th percentile of the values",
+                      "The 75th percentile of the values",
+                      "The 50th percentile of the values",
+                      "The 25th percentile of the values",
+                      "Single Exponential Smoothing",
+                      "Double Exponential Smoothing",
+                      "Count If zero"
+                    ],
+                    "default": "average",
+                    "title": "Time Aggregation Function",
+                    "description": "When querying time-series data we need to come up with a single value. This function is used to aggregate all the values of the time-series data to a single value."
+                  },
+                  "options": {
+                    "type": "array",
+                    "title": "Time-Series Query options",
+                    "description": "Options affecting the way the value is calculated",
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "unaligned",
+                        "abs",
+                        "min2max",
+                        "null2zero",
+                        "percentage",
+                        "anomaly-bit",
+                        "match_ids",
+                        "match_names"
+                      ],
+                      "enumNames": [
+                        "Do not shift the time-frame for visual presentation",
+                        "Make all values positive before using them",
+                        "Use the delta of the minimum to the maximum value",
+                        "Treat gaps in the time-series as a zero value",
+                        "Calculate the percentage of the selected dimensions over the sum of all dimensions",
+                        "Query the anomaly rate of the samples collected",
+                        "Match only dimension IDs, not Names",
+                        "Match only dimension Names, not IDs"
+                      ]
+                    },
+                    "default": [ "unaligned" ]
+                  },
+                  "dimensions": {
+                    "type": "string",
+                    "title": "Dimensions Selection Pattern",
+                    "description": "A simple pattern to match the dimensions that should be included in the query",
+                    "default": "*"
+                  }
+                }
+              },
+              "calculation": {
+                "type": "string",
+                "title": "Calculation Expression",
+                "description": "The database value is available as '$this'. This expression can utilize variables to transform the value of the alert."
+              },
+              "units": {
+                "type": "string",
+                "title": "Alert Unit of Measurement",
+                "description": "The unit of measurement the alert value is expressed with. If unset, the units of the instance the alert is attached to will be used."
+              }
+            }
+          },
+          "conditions": {
+            "type": "object",
+            "properties": {
+              "green": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "title": "Healthy threshold ($green)",
+                "description": "A threshold that indicates a healthy status. This threshold can be used as '$green' in the alert conditions."
+              },
+              "red": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "title": "Critical threshold ($red)",
+                "description": "A threshold that indicates a critical status. This threshold can be used as '$red' in the alert conditions."
+              },
+              "warning_condition": {
+                "type": "string",
+                "title": "Warning Expression",
+                "description": "The alert value is available as '$this'. If this expression evaluates to a non-zero value, the alert is considered to be in warning level."
+              },
+              "critical_condition": {
+                "type": "string",
+                "title": "Critical Expression",
+                "description": "The alert value is available as '$this'. If this expression evaluates to a non-zero value, the alert is considered to be in critical level."
+              }
+            }
+          },
+          "action": {
+            "type": "object",
+            "title": "Alert Action",
+            "description": "The action the alert should take when it transitions states",
+            "properties": {
+              "execute": {
+                "type": "string",
+                "title": "Command to execute when the alert transitions states",
+                "description": "Leave this empty to get the default alert notification"
+              },
+              "recipient": {
+                "type": "string",
+                "title": "Notification Recipients",
+                "description": "A space separated list of the recipients of the alert notifications. The special recipient 'silent' prevents this alert from taking any action (i.e. sending notifications)."
+              },
+              "options": {
+                "type": "array",
+                "title": "Action Options",
+                "description": "Options related to the actions this alert will take.",
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "no-clear-notification"
+                  ],
+                  "enumNames": [
+                    "Do not perform any action when the alert is cleared"
+                  ]
+                },
+                "default": []
+              },
+              "delay": {
+                "type": "object",
+                "title": "Delay the action (notification)",
+                "description": "Rules to postpone the action, to avoid multiple notifications on flapping alerts.",
+                "properties": {
+                  "up": {
+                    "type": "integer",
+                    "title": "Delay when raising",
+                    "description": "Delay the action (notification) that many seconds, when the alert is rising."
+                  },
+                  "down": {
+                    "type": "integer",
+                    "title": "Delay when going Down",
+                    "description": "Delay the action (notification) that many seconds, when the alert is recovering."
+                  },
+                  "max": {
+                    "type": "integer",
+                    "title": "Max Acceptable Delay",
+                    "description": "The maximum acceptable delay in seconds, for taking the action (notification)."
+                  },
+                  "multiplier": {
+                    "type": "number",
+                    "title": "Back-Off on Transitions",
+                    "description": "Multiply the delay by this number, every time the alert transitions to a new state, while the action (notification) is being delayed."
+                  }
+                }
+              },
+              "repeat": {
+                "type": "object",
+                "title": "Action Auto-Repeat",
+                "description": "Repeat the action while the alert is raised.",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "warning": {
+                    "type": "integer",
+                    "title": "Repeat on Warning",
+                    "description": "The number of seconds to repeat the action while the alert is in warning state"
+                  },
+                  "critical": {
+                    "type": "integer",
+                    "title": "Repeat on Critical",
+                    "description": "The number of seconds to repeat the action while the alert is in critical state"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "required": [
+        ]
+      }
+    },
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "format_version": {
+        "type": "integer",
+        "default": 1
+      },
+      "rules": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "title": "Enabled"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "instance",
+                "template"
+              ],
+              "enumNames": [
+                "Apply this rule to a specific instance (deprecated)",
+                "Apply this rule to all instances matching the rules"
+              ],
+              "default": "template",
+              "title": "Type of rule",
+              "description": "Rules can be configured to match a specific instance (like a specific disk), or match all the instances (like all the disks). All rules are always checked against all nodes streamed to this Netdata, so the matching rules include patterns to match both instances and nodes."
+            }
+          },
+          "required": [ "type", "enabled" ],
+          "if": {
+            "properties": {
+              "type": { "const": "instance" }
+            }
+          },
+          "then": {
+            "properties": {
+              "match": { "$ref": "#/definitions/matchInstance" },
+              "config": { "$ref": "#/definitions/config" }
+            }
+          },
+          "else": {
+            "properties": {
+              "match": { "$ref": "#/definitions/matchTemplate" },
+              "config": { "$ref": "#/definitions/config" }
+            }
+          }
+        }
+      }
+    },
+    "required": [
+      "rules"
+    ]
+  },
+  "uiSchema": {
+    "format_version": {
+      "ui:widget": "hidden"
+    },
+    "name": {
+      "ui:widget": "hidden"
+    },
+    "rules": {
+      "items": {
+        "enabled": {
+          "ui:widget": "checkbox"
+        },
+        "config": {
+          "hash": {
+            "ui:widget": "hidden"
+          },
+          "source_type": {
+            "ui:widget": "hidden"
+          },
+          "source": {
+            "ui:widget": "hidden"
+          }
+        }
+      }
+    }
+  }
+}

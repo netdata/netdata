@@ -59,6 +59,7 @@ static int systemd_journal_directories_dyncfg_get(BUFFER *wb) {
 static int systemd_journal_directories_dyncfg_cb(const char *transaction,
                                                  const char *id,
                                                  DYNCFG_CMDS cmd,
+                                                 const char *add_name __maybe_unused,
                                                  BUFFER *payload,
                                                  usec_t *stop_monotonic_ut __maybe_unused,
                                                  bool *cancelled __maybe_unused,

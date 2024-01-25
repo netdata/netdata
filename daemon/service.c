@@ -35,8 +35,6 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
 
     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        rrddimvar_delete_all(rd);
-
         /* only a collector can mark a chart as obsolete, so we must remove the reference */
 
         size_t tiers_available = 0, tiers_said_no_retention = 0;
@@ -115,9 +113,7 @@ static void svc_rrdset_obsolete_to_free(RRDSET *st) {
 
     worker_is_busy(WORKER_JOB_FREE_CHART);
 
-    rrdcalc_unlink_all_rrdset_alerts(st);
-
-    rrdsetvar_release_and_delete_all(st);
+    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
 
     // has to be run after all dimensions are archived - or use-after-free will occur
     rrdvar_delete_all(st->rrdvars);

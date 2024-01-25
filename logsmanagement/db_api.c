@@ -754,9 +754,9 @@ int db_init() {
                                     -1, &stmt_init_BLOBS_table, NULL);
                     do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
 
-                    for(int i = 0; i < BLOB_MAX_FILES; i++){                  
+                    for(int t = 0; t < BLOB_MAX_FILES; t++){
                         char filename[FILENAME_MAX + 1];
-                        snprintfz(filename, FILENAME_MAX, BLOB_STORE_FILENAME "%d", i);
+                        snprintfz(filename, FILENAME_MAX, BLOB_STORE_FILENAME "%d", t);
                         if(unlikely( 
                                 SQLITE_OK != (rc = sqlite3_bind_text(stmt_init_BLOBS_table, 1, filename, -1, NULL)) ||
                                 SQLITE_OK != (rc = sqlite3_bind_int64(stmt_init_BLOBS_table, 2, (sqlite3_int64) 0)) ||
@@ -919,10 +919,10 @@ int db_init() {
                     -1, &stmt_update_id, NULL);
                 do_sqlite_error_check(p_file_info, rc, SQLITE_OK);
 
-                for (int i = 0; i < BLOB_MAX_FILES; i++){
+                for (int t = 0; t < BLOB_MAX_FILES; t++){
                     if(unlikely(
-                            SQLITE_OK != (rc = sqlite3_bind_int(stmt_update_id, 1, i + 1)) ||
-                            SQLITE_OK != (rc = sqlite3_bind_int(stmt_update_id, 2, old_blobs_table_ids[i])) ||
+                            SQLITE_OK != (rc = sqlite3_bind_int(stmt_update_id, 1, t + 1)) ||
+                            SQLITE_OK != (rc = sqlite3_bind_int(stmt_update_id, 2, old_blobs_table_ids[t])) ||
                             SQLITE_DONE != (rc = sqlite3_step(stmt_update_id)) ||
                             SQLITE_OK != (rc = sqlite3_reset(stmt_update_id)))) {
                         throw_error(p_file_info->chartname, ERR_TYPE_SQLITE, rc, __LINE__, __FILE__, __FUNCTION__);

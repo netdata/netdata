@@ -86,31 +86,32 @@ void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int 
 
 inline ALARM_ENTRY* health_create_alarm_entry(
     RRDHOST *host,
-    uint32_t alarm_id,
-    uint32_t alarm_event_id,
-    const uuid_t config_hash_id,
+    RRDCALC *rc,
     time_t when,
-    STRING *name,
-    STRING *chart,
-    STRING *chart_context,
-    STRING *chart_name,
-    STRING *class,
-    STRING *component,
-    STRING *type,
-    STRING *exec,
-    STRING *recipient,
     time_t duration,
     NETDATA_DOUBLE old_value,
     NETDATA_DOUBLE new_value,
     RRDCALC_STATUS old_status,
     RRDCALC_STATUS new_status,
-    STRING *source,
-    STRING *units,
-    STRING *summary,
-    STRING *info,
     int delay,
     HEALTH_ENTRY_FLAGS flags
 ) {
+    uint32_t alarm_id = rc->id;
+    uint32_t alarm_event_id = rc->next_event_id++;
+    STRING *name = rc->config.name;
+    STRING *chart = rc->rrdset->id;
+    STRING *chart_context = rc->rrdset->context;
+    STRING *chart_name = rc->rrdset->name;
+    STRING *class = rc->config.classification;
+    STRING *component = rc->config.component;
+    STRING *type = rc->config.type;
+    STRING *exec = rc->config.exec;
+    STRING *recipient = rc->config.recipient;
+    STRING *source = rc->config.source;
+    STRING *units = rc->config.units;
+    STRING *summary = rc->summary;
+    STRING *info = rc->info;
+
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
     ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
@@ -119,7 +120,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->chart_context = string_dup(chart_context);
     ae->chart_name = string_dup(chart_name);
 
-    uuid_copy(ae->config_hash_id, *((uuid_t *) config_hash_id));
+    uuid_copy(ae->config_hash_id, rc->config.hash_id);
 
     uuid_generate_random(ae->transition_id);
     ae->global_id = now_realtime_usec();
