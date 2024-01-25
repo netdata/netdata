@@ -444,7 +444,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                                     "This Netdata must be connected to Netdata Cloud to access this function.",
                                     HTTP_RESP_PRECOND_FAIL);
 
-        else if((rdcf->access & HTTP_ACCESS_SIGNED_IN) && !(user_access & HTTP_ACCESS_SIGNED_IN))
+        else if((rdcf->access & HTTP_ACCESS_SAME_SPACE) && !(user_access & HTTP_ACCESS_SAME_SPACE))
             rrd_call_function_error(result_wb,
                                     "You need to login to the Netdata Cloud space this agent is claimed to, "
                                     "to access this function.",

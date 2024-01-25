@@ -316,7 +316,7 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     }
 
     rrd_function_add(host, st, name, timeout_s, priority, help, tags,
-                     http_access_from_hex(access_str), false,
+                     http_access_from_hex_mapping_old_roles(access_str), false,
                      pluginsd_function_execute_cb, parser);
 
     parser->user.data_collections_count++;

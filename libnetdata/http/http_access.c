@@ -55,23 +55,15 @@ static struct {
 } http_accesses[] = {
       {"none"                       , 0    , HTTP_ACCESS_NONE}
     , {"claim"                      , 0    , HTTP_ACCESS_CLAIM_AGENT}
-    , {"signed-in"                  , 0    , HTTP_ACCESS_SIGNED_IN}
+    , {"signed-in"                  , 0    , HTTP_ACCESS_SAME_SPACE}
     , {"anonymous-data"             , 0    , HTTP_ACCESS_VIEW_ANONYMOUS_DATA}
     , {"sensitive-data"             , 0    , HTTP_ACCESS_VIEW_SENSITIVE_DATA}
     , {"view-config"                , 0    , HTTP_ACCESS_VIEW_AGENT_CONFIG}
     , {"edit-config"                , 0    , HTTP_ACCESS_EDIT_AGENT_CONFIG}
-    , {"view-collectors-config"     , 0    , HTTP_ACCESS_VIEW_COLLECTION_CONFIG}
-    , {"edit-collectors-config"     , 0    , HTTP_ACCESS_EDIT_COLLECTION_CONFIG}
-    , {"view-alerts-config"         , 0    , HTTP_ACCESS_VIEW_ALERTS_CONFIG}
-    , {"edit-alerts-config"         , 0    , HTTP_ACCESS_EDIT_ALERTS_CONFIG}
     , {"view-notifications-config"  , 0    , HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG}
     , {"edit-notifications-config"  , 0    , HTTP_ACCESS_EDIT_NOTIFICATIONS_CONFIG}
     , {"view-alerts-silencing"      , 0    , HTTP_ACCESS_VIEW_ALERTS_SILENCING}
-    , {"edit-alerts-silencing"      , 0    , HTTP_ACCESS_EDIT_ALERTS_SILENCING}
-    , {"view-streaming-config"      , 0    , HTTP_ACCESS_VIEW_STREAMING_CONFIG}
-    , {"edit-streaming-config"      , 0    , HTTP_ACCESS_EDIT_STREAMING_CONFIG}
-    , {"view-exporting-config"      , 0    , HTTP_ACCESS_VIEW_EXPORTING_CONFIG}
-    , {"edit-exporting-config"      , 0    , HTTP_ACCESS_EDIT_EXPORTING_CONFIG}
+    , {"edit-alerts-silencing"     , 0    , HTTP_ACCESS_EDIT_ALERTS_SILENCING}
 
     , {NULL                , 0    , 0}
 };
@@ -145,6 +137,22 @@ void http_access2txt(char *buf, size_t size, char separator, HTTP_ACCESS access)
         }
     }
     *write = *end = '\0';
+}
+
+HTTP_ACCESS http_access_from_hex_mapping_old_roles(const char *str) {
+    if(!str || !*str)
+        return HTTP_ACCESS_NONE;
+
+    if(strcmp(str, "any") == 0 || strcmp(str, "all") == 0)
+        return HTTP_ACCESS_NONE;
+
+    if(strcmp(str, "member") == 0 || strcmp(str, "members") == 0)
+        return HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_VIEW_SENSITIVE_DATA;
+
+    else if(strcmp(str, "admin") == 0 || strcmp(str, "admins") == 0)
+        return HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_VIEW_SENSITIVE_DATA|HTTP_ACCESS_VIEW_AGENT_CONFIG|HTTP_ACCESS_EDIT_AGENT_CONFIG;
+
+    return (HTTP_ACCESS)strtoull(str, NULL, 16);
 }
 
 HTTP_ACCESS http_access_from_hex(const char *str) {

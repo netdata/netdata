@@ -282,10 +282,10 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
                           rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
 
     if(view_access == HTTP_ACCESS_NONE)
-        view_access = HTTP_ACCESS_SIGNED_IN | HTTP_ACCESS_VIEW_AGENT_CONFIG;
+        view_access = HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG;
 
     if(edit_access == HTTP_ACCESS_NONE)
-        edit_access = HTTP_ACCESS_SIGNED_IN | HTTP_ACCESS_EDIT_AGENT_CONFIG;
+        edit_access = HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_EDIT_AGENT_CONFIG;
 
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
@@ -432,7 +432,7 @@ void dyncfg_add_streaming(BUFFER *wb) {
                    , 120
                    , "Dynamic configuration"
                    , "config"
-                   , (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_IN)
+                   , (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SAME_SPACE)
                    , 1000
     );
 }

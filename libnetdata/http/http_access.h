@@ -19,32 +19,27 @@ const char *http_id2user_role(HTTP_USER_ROLE role);
 HTTP_USER_ROLE http_user_role2id(const char *role);
 
 typedef enum __attribute__((packed)) {
-    HTTP_ACCESS_NONE                        = 0,
-    HTTP_ACCESS_SIGNED_IN                   = (1 << 0),
-    HTTP_ACCESS_CLAIM_AGENT                 = (1 << 1),
-    HTTP_ACCESS_VIEW_ANONYMOUS_DATA         = (1 << 2),
-    HTTP_ACCESS_VIEW_SENSITIVE_DATA         = (1 << 3),
-    HTTP_ACCESS_VIEW_AGENT_CONFIG           = (1 << 4),
-    HTTP_ACCESS_EDIT_AGENT_CONFIG           = (1 << 5),
-    HTTP_ACCESS_VIEW_COLLECTION_CONFIG      = (1 << 6),
-    HTTP_ACCESS_EDIT_COLLECTION_CONFIG      = (1 << 7),
-    HTTP_ACCESS_VIEW_ALERTS_CONFIG          = (1 << 8),
-    HTTP_ACCESS_EDIT_ALERTS_CONFIG          = (1 << 9),
-    HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG   = (1 << 10),
-    HTTP_ACCESS_EDIT_NOTIFICATIONS_CONFIG   = (1 << 11),
-    HTTP_ACCESS_VIEW_ALERTS_SILENCING       = (1 << 12),
-    HTTP_ACCESS_EDIT_ALERTS_SILENCING       = (1 << 13),
-    HTTP_ACCESS_VIEW_STREAMING_CONFIG       = (1 << 14),
-    HTTP_ACCESS_EDIT_STREAMING_CONFIG       = (1 << 15),
-    HTTP_ACCESS_VIEW_EXPORTING_CONFIG       = (1 << 16),
-    HTTP_ACCESS_EDIT_EXPORTING_CONFIG       = (1 << 17),
-} HTTP_ACCESS;
+    HTTP_ACCESS_NONE                        = 0,         //                                    adm man trb obs mem bil
+    HTTP_ACCESS_SAME_SPACE                  = (1 << 0),  // NC user+agent = same space          A   A   A   A   A   A
+    HTTP_ACCESS_CLAIM_AGENT                 = (1 << 1),  // NC node:Create                      A   -   -   -   -   -
+    HTTP_ACCESS_VIEW_ANONYMOUS_DATA         = (1 << 2),  // NC room:Read                        A   A   A   SR  SR  -
+    HTTP_ACCESS_VIEW_SENSITIVE_DATA         = (1 << 3),  // NC agent:ViewSensitiveData          A   A   A   -   -   -
+    HTTP_ACCESS_VIEW_AGENT_CONFIG           = (1 << 4),  // NC agent:ReadDynCfg                 P   P   -   -   -   -
+    HTTP_ACCESS_EDIT_AGENT_CONFIG           = (1 << 5),  // NC agent:EditDynCfg                 P   P   -   -   -   -
+    HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG   = (1 << 6),  // NC channel:Manage                   P   -   -   -   -   -
+    HTTP_ACCESS_EDIT_NOTIFICATIONS_CONFIG   = (1 << 7),  // NC channel:Manage                   P   -   -   -   -   -
+    HTTP_ACCESS_VIEW_ALERTS_SILENCING       = (1 << 8),  // NC space:GetSystemSilencingRules    P   P   P   -   P   -
+    HTTP_ACCESS_EDIT_ALERTS_SILENCING       = (1 << 9),  // NC space:CreateSystemSilencingRule  P   P   -   -   P   -
+} HTTP_ACCESS;                                           //                                     ---------------------
+                                                         //                                     A  = always
+                                                         //                                     P  = commercial plan
+                                                         //                                     SR = same room (Us+Ag)
 
 #define HTTP_ACCESS_FORMAT "0x%" PRIx32
 #define HTTP_ACCESS_FORMAT_CAST uint32_t
 
 #define HTTP_ACCESS_ACLK_DEFAULT                                                                                       \
-    (HTTP_ACCESS_SIGNED_IN|HTTP_ACCESS_VIEW_ANONYMOUS_DATA|HTTP_ACCESS_VIEW_SENSITIVE_DATA)
+    (HTTP_ACCESS_SAME_SPACE |HTTP_ACCESS_VIEW_ANONYMOUS_DATA|HTTP_ACCESS_VIEW_SENSITIVE_DATA)
 
 #define HTTP_ACCESS_ALL ((HTTP_ACCESS)(0xFFFFFFFF))
 
@@ -54,6 +49,7 @@ struct web_buffer;
 void http_access2buffer_json_array(struct web_buffer *wb, const char *key, HTTP_ACCESS access);
 void http_access2txt(char *buf, size_t size, char separator, HTTP_ACCESS access);
 HTTP_ACCESS http_access_from_hex(const char *str);
+HTTP_ACCESS http_access_from_hex_mapping_old_roles(const char *str);
 HTTP_ACCESS http_access_from_source(const char *str);
 bool log_cb_http_access_to_hex(struct web_buffer *wb, void *data);
 
