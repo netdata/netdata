@@ -147,28 +147,6 @@ void http_access2txt(char *buf, size_t size, char separator, HTTP_ACCESS access)
     *write = *end = '\0';
 }
 
-static inline uint64_t base64_char_value(char c) {
-    if (c >= 'A' && c <= 'Z') return c - 'A';
-    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
-    if (c >= '0' && c <= '9') return c - '0' + 52;
-    if (c == '+') return 62;
-    if (c == '/') return 63;
-    return 0; // Padding character '=' is treated as 0
-}
-
-HTTP_ACCESS https_access_from_base64_bitmap(const char *str) {
-    if(!str || !*str)
-        return HTTP_ACCESS_NONE;
-
-    uint64_t permissions = 0;
-
-    // decode each character and shift it into the number
-    for (size_t i = 0; str[i] ; i++)
-        permissions = (permissions << 6) | base64_char_value(str[i]);
-
-    return (HTTP_ACCESS)permissions;
-}
-
 HTTP_ACCESS http_access_from_hex(const char *str) {
     if(!str || !*str)
         return HTTP_ACCESS_NONE;

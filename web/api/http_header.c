@@ -152,7 +152,7 @@ static void http_header_x_netdata_role(struct web_client *w, const char *v, size
 
 static void http_header_x_netdata_permissions(struct web_client *w, const char *v, size_t len __maybe_unused) {
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl == HTTP_ACL_ACLK) {
-        w->access = https_access_from_base64_bitmap(v);
+        w->access = http_access_from_hex(v);
         web_client_flags_clear_auth(w);
         web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_CLOUD);
     }
