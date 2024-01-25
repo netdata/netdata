@@ -64,7 +64,7 @@ const char *database_config[] = {
 
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_5 ON health_log_detail (health_log_id, unique_id DESC)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_9 ON health_log_detail (unique_id DESC, health_log_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
@@ -84,6 +84,7 @@ const char *database_cleanup[] = {
     "DROP INDEX IF EXISTS alert_hash_index",
     "DROP INDEX IF EXISTS health_log_d_ind_4",
     "DROP INDEX IF EXISTS health_log_d_ind_1",
+    "DROP INDEX IF EXISTS health_log_d_ind_5",
     NULL
 };
 
