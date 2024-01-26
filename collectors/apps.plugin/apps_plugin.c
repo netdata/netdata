@@ -4406,7 +4406,8 @@ static void function_processes(const char *transaction, char *function __maybe_u
     struct pid_stat *p;
 
     bool show_cmdline = http_access_user_has_enough_access_level_for_endpoint(
-                            access, HTTP_ACCESS_SIGNED_ID |HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_SENSITIVE_DATA) ||
+                            access, HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE |
+                                        HTTP_ACCESS_VIEW_SENSITIVE_DATA | HTTP_ACCESS_VIEW_AGENT_CONFIG) ||
                         enable_function_cmdline;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
