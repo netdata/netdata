@@ -116,8 +116,8 @@ struct web_client *web_client_get_from_cache(void) {
     w->use_count++;
     w->port_acl = HTTP_ACL_NONE;
     w->acl = HTTP_ACL_NONE;
-    w->access = HTTP_ACCESS_NONE;
     w->mode = HTTP_REQUEST_MODE_GET;
+    web_client_reset_permissions(w);
     memset(w->transaction, 0, sizeof(w->transaction));
 
     return w;

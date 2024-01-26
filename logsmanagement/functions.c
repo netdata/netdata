@@ -705,7 +705,7 @@ struct functions_evloop_globals *logsmanagement_func_facets_init(bool *p_logsman
                     LOGS_MANAG_FUNC_NAME, 
                     LOGS_MANAG_QUERY_TIMEOUT_DEFAULT, 
                     FUNCTION_LOGSMANAGEMENT_HELP_SHORT,
-                    (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_SENSITIVE_DATA),
+                    (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
                     RRDFUNCTIONS_PRIORITY_DEFAULT + 1);
     netdata_mutex_unlock(&stdout_mut);
 

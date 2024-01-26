@@ -3,6 +3,8 @@
 #include "web_api.h"
 
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
+    buffer_no_cacheable(w->response.data);
+
     internal_fatal(web_client_flags_check_auth(w) && !(w->access & HTTP_ACCESS_SIGNED_ID),
                    "signed-in permission should be set, but is missing");
 
@@ -11,7 +13,7 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
 
     if(!web_client_flags_check_auth(w)) {
         w->user_role = (netdata_is_protected_by_bearer) ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY;
-        w->access = (netdata_is_protected_by_bearer) ? HTTP_ACCESS_NONE : HTTP_ACCESS_VIEW_ANONYMOUS_DATA;
+        w->access = (netdata_is_protected_by_bearer) ? HTTP_ACCESS_NONE : HTTP_ACCESS_ANONYMOUS_DATA;
     }
 
 #ifdef NETDATA_GOD_MODE
@@ -20,7 +22,10 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
     w->access = HTTP_ACCESS_ALL;
 #endif
 
-    buffer_no_cacheable(w->response.data);
+    if((w->access & HTTP_ACCESS_SIGNED_ID) && !(w->access & HTTP_ACCESS_SAME_SPACE)) {
+        // this should never happen: a signed-in user from a different space
+        return web_client_permission_denied(w);
+    }
 
     if(unlikely(!url_path_endpoint || !*url_path_endpoint)) {
         buffer_flush(w->response.data);

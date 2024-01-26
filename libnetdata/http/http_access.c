@@ -57,8 +57,8 @@ static struct {
     , {"signed-in"                  , 0    , HTTP_ACCESS_SIGNED_ID}
     , {"same-space"                 , 0    , HTTP_ACCESS_SAME_SPACE}
     , {"commercial"                 , 0    , HTTP_ACCESS_COMMERCIAL_SPACE}
-    , {"anonymous-data"             , 0    , HTTP_ACCESS_VIEW_ANONYMOUS_DATA}
-    , {"sensitive-data"             , 0    , HTTP_ACCESS_VIEW_SENSITIVE_DATA}
+    , {"anonymous-data"             , 0    , HTTP_ACCESS_ANONYMOUS_DATA}
+    , {"sensitive-data"             , 0    , HTTP_ACCESS_SENSITIVE_DATA}
     , {"view-config"                , 0    , HTTP_ACCESS_VIEW_AGENT_CONFIG}
     , {"edit-config"                , 0    , HTTP_ACCESS_EDIT_AGENT_CONFIG}
     , {"view-notifications-config"  , 0    , HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG}
@@ -156,14 +156,14 @@ HTTP_ACCESS http_access_from_hex_mapping_old_roles(const char *str) {
     else if(strcmp(str, "admin") == 0 || strcmp(str, "admins") == 0)
         return HTTP_ACCESS_MAP_OLD_ADMIN;
 
-    return (HTTP_ACCESS)strtoull(str, NULL, 16);
+    return (HTTP_ACCESS)strtoull(str, NULL, 16) & HTTP_ACCESS_ALL;
 }
 
 HTTP_ACCESS http_access_from_hex(const char *str) {
     if(!str || !*str)
         return HTTP_ACCESS_NONE;
 
-    return (HTTP_ACCESS)strtoull(str, NULL, 16);
+    return (HTTP_ACCESS)strtoull(str, NULL, 16) & HTTP_ACCESS_ALL;
 }
 
 HTTP_ACCESS http_access_from_source(const char *str) {
@@ -174,7 +174,7 @@ HTTP_ACCESS http_access_from_source(const char *str) {
 
     const char *permissions = strstr(str, "permissions=");
     if(permissions)
-        access = (HTTP_ACCESS)strtoull(permissions + 12, NULL, 16);
+        access = (HTTP_ACCESS)strtoull(permissions + 12, NULL, 16) & HTTP_ACCESS_ALL;
 
     return access;
 }
