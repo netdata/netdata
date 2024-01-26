@@ -96,11 +96,16 @@ static bool parse_config(json_object *jobj, const char *path, struct rrd_alert_c
     return true;
 }
 
-static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *base, BUFFER *error) {
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "name", base->config.name, error, false);
-
+static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *base, BUFFER *error, const char *name) {
     int64_t version;
     JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "format_version", version, error);
+
+    if(version != 1) {
+        buffer_sprintf(error, "unsupported document version");
+        return false;
+    }
+
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "name", base->config.name, error, !name && !*name);
 
     json_object *rules;
     if (json_object_object_get_ex(jobj, "rules", &rules)) {
@@ -162,7 +167,7 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
     }
     json_tokener_free(tokener);
 
-    if(!parse_prototype(jobj, "", base, error))
+    if(!parse_prototype(jobj, "", base, error, name))
         goto cleanup;
 
     if(!base->config.name && name)
