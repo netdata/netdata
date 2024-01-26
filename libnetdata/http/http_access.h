@@ -36,8 +36,8 @@ typedef enum __attribute__((packed)) {
                                                          //                                     P  = commercial plan
                                                          //                                     SR = same room (Us+Ag)
 
-#define HTTP_ACCESS_FORMAT "0x%" PRIx16
-#define HTTP_ACCESS_FORMAT_CAST uint16_t
+#define HTTP_ACCESS_FORMAT "0x%" PRIx32
+#define HTTP_ACCESS_FORMAT_CAST uint32_t
 
 #define HTTP_ACCESS_ALL (HTTP_ACCESS)( \
       HTTP_ACCESS_SIGNED_ID \
