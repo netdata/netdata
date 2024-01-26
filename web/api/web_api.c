@@ -3,6 +3,12 @@
 #include "web_api.h"
 
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
+    internal_fatal(web_client_flags_check_auth(w) && !(w->access & HTTP_ACCESS_SIGNED_ID),
+                   "signed-in permission should be set, but is missing");
+
+    internal_fatal(!web_client_flags_check_auth(w) && (w->access & HTTP_ACCESS_SIGNED_ID),
+                   "signed-in permission is set, but it shouldn't");
+
     if(!web_client_flags_check_auth(w)) {
         w->user_role = (netdata_is_protected_by_bearer) ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY;
         w->access = (netdata_is_protected_by_bearer) ? HTTP_ACCESS_NONE : HTTP_ACCESS_VIEW_ANONYMOUS_DATA;
@@ -47,7 +53,7 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
 
             bool acl_allows = ((w->acl & api_commands[i].acl) == api_commands[i].acl) || (api_commands[i].acl & HTTP_ACL_NOCHECK);
             if(!acl_allows)
-                return web_client_permission_denied(w);
+                return web_client_permission_denied_acl(w);
 
             bool permissions_allows =
                 http_access_user_has_enough_access_level_for_endpoint(w->access, api_commands[i].access);

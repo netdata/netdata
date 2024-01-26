@@ -54,8 +54,9 @@ static struct {
     HTTP_ACCESS value;
 } http_accesses[] = {
       {"none"                       , 0    , HTTP_ACCESS_NONE}
-    , {"claim"                      , 0    , HTTP_ACCESS_CLAIM_AGENT}
+    , {"signed-in"                  , 0    , HTTP_ACCESS_SIGNED_ID}
     , {"same-space"                 , 0    , HTTP_ACCESS_SAME_SPACE}
+    , {"commercial"                 , 0    , HTTP_ACCESS_COMMERCIAL_SPACE}
     , {"anonymous-data"             , 0    , HTTP_ACCESS_VIEW_ANONYMOUS_DATA}
     , {"sensitive-data"             , 0    , HTTP_ACCESS_VIEW_SENSITIVE_DATA}
     , {"view-config"                , 0    , HTTP_ACCESS_VIEW_AGENT_CONFIG}
@@ -116,7 +117,7 @@ void http_access2buffer_json_array(BUFFER *wb, const char *key, HTTP_ACCESS acce
     buffer_json_array_close(wb);
 }
 
-void http_access2txt(char *buf, size_t size, char separator, HTTP_ACCESS access) {
+void http_access2txt(char *buf, size_t size, const char *separator, HTTP_ACCESS access) {
     char *write = buf;
     char *end = &buf[size - 1];
 
@@ -127,8 +128,11 @@ void http_access2txt(char *buf, size_t size, char separator, HTTP_ACCESS access)
             const char *name = http_accesses[i].name;
             used |= http_accesses[i].value;
 
-            if(added && write < end)
-                *write++ = separator;
+            if(added && write < end) {
+                const char *s = separator;
+                while(*s && write < end)
+                    *write++ = *s++;
+            }
 
             while(*name && write < end)
                 *write++ = *name++;

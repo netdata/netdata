@@ -20,16 +20,17 @@ HTTP_USER_ROLE http_user_role2id(const char *role);
 
 typedef enum __attribute__((packed)) {
     HTTP_ACCESS_NONE                        = 0,         //                                    adm man trb obs mem bil
-    HTTP_ACCESS_SAME_SPACE                  = (1 << 0),  // NC user+agent = same space          A   A   A   A   A   A
-    HTTP_ACCESS_CLAIM_AGENT                 = (1 << 1),  // NC node:Create                      A   -   -   -   -   -
-    HTTP_ACCESS_VIEW_ANONYMOUS_DATA         = (1 << 2),  // NC room:Read                        A   A   A   SR  SR  -
-    HTTP_ACCESS_VIEW_SENSITIVE_DATA         = (1 << 3),  // NC agent:ViewSensitiveData          A   A   A   -   -   -
-    HTTP_ACCESS_VIEW_AGENT_CONFIG           = (1 << 4),  // NC agent:ReadDynCfg                 P   P   -   -   -   -
-    HTTP_ACCESS_EDIT_AGENT_CONFIG           = (1 << 5),  // NC agent:EditDynCfg                 P   P   -   -   -   -
-    HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG   = (1 << 6),  // NC channel:Manage                   P   -   -   -   -   -
-    HTTP_ACCESS_EDIT_NOTIFICATIONS_CONFIG   = (1 << 7),  // NC channel:Manage                   P   -   -   -   -   -
-    HTTP_ACCESS_VIEW_ALERTS_SILENCING       = (1 << 8),  // NC space:GetSystemSilencingRules    P   P   P   -   P   -
-    HTTP_ACCESS_EDIT_ALERTS_SILENCING       = (1 << 9),  // NC space:CreateSystemSilencingRule  P   P   -   -   P   -
+    HTTP_ACCESS_SIGNED_ID                   = (1 << 0),  // User is authenticated               A   A   A   A   A   A
+    HTTP_ACCESS_SAME_SPACE                  = (1 << 1),  // NC user+agent = same space          A   A   A   A   A   A
+    HTTP_ACCESS_COMMERCIAL_SPACE            = (1 << 2),  // NC node:Create                      A   -   -   -   -   -
+    HTTP_ACCESS_VIEW_ANONYMOUS_DATA         = (1 << 3),  // NC room:Read                        A   A   A   SR  SR  -
+    HTTP_ACCESS_VIEW_SENSITIVE_DATA         = (1 << 4),  // NC agent:ViewSensitiveData          A   A   A   -   -   -
+    HTTP_ACCESS_VIEW_AGENT_CONFIG           = (1 << 5),  // NC agent:ReadDynCfg                 P   P   -   -   -   -
+    HTTP_ACCESS_EDIT_AGENT_CONFIG           = (1 << 6),  // NC agent:EditDynCfg                 P   P   -   -   -   -
+    HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG   = (1 << 7),  // NC channel:Manage                   P   -   -   -   -   -
+    HTTP_ACCESS_EDIT_NOTIFICATIONS_CONFIG   = (1 << 8),  // NC channel:Manage                   P   -   -   -   -   -
+    HTTP_ACCESS_VIEW_ALERTS_SILENCING       = (1 << 9),  // NC space:GetSystemSilencingRules    P   P   P   -   P   -
+    HTTP_ACCESS_EDIT_ALERTS_SILENCING       = (1 << 10), // NC space:CreateSystemSilencingRule  P   P   -   -   P   -
 } HTTP_ACCESS;                                           //                                     ---------------------
                                                          //                                     A  = always
                                                          //                                     P  = commercial plan
@@ -39,8 +40,9 @@ typedef enum __attribute__((packed)) {
 #define HTTP_ACCESS_FORMAT_CAST uint16_t
 
 #define HTTP_ACCESS_ALL (HTTP_ACCESS)( \
-      HTTP_ACCESS_SAME_SPACE \
-    | HTTP_ACCESS_CLAIM_AGENT \
+      HTTP_ACCESS_SIGNED_ID \
+    | HTTP_ACCESS_SAME_SPACE \
+    | HTTP_ACCESS_COMMERCIAL_SPACE \
     | HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
     | HTTP_ACCESS_VIEW_SENSITIVE_DATA \
     | HTTP_ACCESS_VIEW_AGENT_CONFIG \
@@ -56,13 +58,15 @@ typedef enum __attribute__((packed)) {
 )
 
 #define HTTP_ACCESS_MAP_OLD_MEMBER (HTTP_ACCESS)( \
-      HTTP_ACCESS_SAME_SPACE \
+      HTTP_ACCESS_SIGNED_ID \
+    | HTTP_ACCESS_SAME_SPACE \
     | HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
     | HTTP_ACCESS_VIEW_SENSITIVE_DATA \
 )
 
 #define HTTP_ACCESS_MAP_OLD_ADMIN (HTTP_ACCESS)( \
-      HTTP_ACCESS_SAME_SPACE \
+      HTTP_ACCESS_SIGNED_ID \
+    | HTTP_ACCESS_SAME_SPACE \
     | HTTP_ACCESS_VIEW_ANONYMOUS_DATA \
     | HTTP_ACCESS_VIEW_SENSITIVE_DATA \
     | HTTP_ACCESS_VIEW_AGENT_CONFIG \
@@ -73,11 +77,13 @@ HTTP_ACCESS http_access2id_one(const char *str);
 HTTP_ACCESS http_access2id(char *str);
 struct web_buffer;
 void http_access2buffer_json_array(struct web_buffer *wb, const char *key, HTTP_ACCESS access);
-void http_access2txt(char *buf, size_t size, char separator, HTTP_ACCESS access);
+void http_access2txt(char *buf, size_t size, const char *separator, HTTP_ACCESS access);
 HTTP_ACCESS http_access_from_hex(const char *str);
 HTTP_ACCESS http_access_from_hex_mapping_old_roles(const char *str);
 HTTP_ACCESS http_access_from_source(const char *str);
 bool log_cb_http_access_to_hex(struct web_buffer *wb, void *data);
+
+#define HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(access) ((access & HTTP_ACCESS_SIGNED_ID) ? HTTP_RESP_FORBIDDEN : HTTP_RESP_PRECOND_FAIL)
 
 typedef enum __attribute__((packed)) {
     HTTP_ACL_NONE                   = (0),

@@ -23,13 +23,16 @@
 
 // HTTP_CODES 4XX Client Errors
 #define HTTP_RESP_BAD_REQUEST 400
-#define HTTP_RESP_UNAUTHORIZED 401
-#define HTTP_RESP_FORBIDDEN 403
 #define HTTP_RESP_NOT_FOUND 404
 #define HTTP_RESP_METHOD_NOT_ALLOWED 405
 #define HTTP_RESP_CONFLICT 409
-#define HTTP_RESP_PRECOND_FAIL 412
 #define HTTP_RESP_CONTENT_TOO_LONG 413
+
+#define HTTP_RESP_UNAUTHORIZED                  401 // do not use 401 when responding to users - it is used by authenticating proxies
+#define HTTP_RESP_FORBIDDEN                     403 // not enough permissions to access this resource
+#define HTTP_RESP_PRECOND_FAIL                  412 // An authorization bearer is required by it was not found in the request
+#define HTTP_RESP_UNAVAILABLE_FOR_LEGAL_REASONS 451 // Unavailable For Legal Reasons, we use it instead of 403 when access is forbidden due to an ACL.
+
 #define HTTP_RESP_CLIENT_CLOSED_REQUEST 499 // nginx's enxtension to the standard
 
 // HTTP_CODES 5XX Server Errors

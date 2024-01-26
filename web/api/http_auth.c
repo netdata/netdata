@@ -23,13 +23,9 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
 
         struct bearer_token *z = dictionary_get(netdata_authorized_bearers, uuid_str);
         if (z && z->expires_s > now_monotonic_sec()) {
-            w->user_role = z->user_role;
-            w->access = z->access;
             strncpyz(w->auth.client_name, z->cloud_user_name, sizeof(w->auth.client_name) - 1);
             uuid_copy(w->auth.cloud_account_id, z->cloud_account_id);
-
-            web_client_flags_clear_auth(w);
-            web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_BEARER);
+            web_client_set_permissions(w, z->access, z->user_role, WEB_CLIENT_FLAG_AUTH_BEARER);
             return true;
         }
     }

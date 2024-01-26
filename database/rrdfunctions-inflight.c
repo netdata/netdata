@@ -440,27 +440,49 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     if(!http_access_user_has_enough_access_level_for_endpoint(user_access, rdcf->access)) {
 
         if(!aclk_connected)
-            rrd_call_function_error(result_wb,
-                                    "This Netdata must be connected to Netdata Cloud to access this function.",
-                                    HTTP_RESP_PRECOND_FAIL);
+            code = rrd_call_function_error(result_wb,
+                                           "This Netdata must be connected to Netdata Cloud for Single-Sign-On (SSO) "
+                                           "access this feature. Claim this Netdata to Netdata Cloud to enable access.",
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+
+        else if((rdcf->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
+            code = rrd_call_function_error(result_wb,
+                                           "You need to be authenticated via Netdata Cloud Single-Sign-On (SSO) "
+                                           "to access this feature. Sign-in on this dashboard, "
+                                           "or access your Netdata via https://app.netdata.cloud.",
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
         else if((rdcf->access & HTTP_ACCESS_SAME_SPACE) && !(user_access & HTTP_ACCESS_SAME_SPACE))
-            rrd_call_function_error(result_wb,
-                                    "You need to login to the Netdata Cloud space this agent is claimed to, "
-                                    "to access this function.",
-                                    HTTP_RESP_PRECOND_FAIL);
+            code = rrd_call_function_error(result_wb,
+                                           "You need to login to the Netdata Cloud space this agent is claimed to, "
+                                           "to access this feature.",
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
-        else
-            rrd_call_function_error(result_wb,
-                                    "You don't have the permissions required to access this function.",
-                                    HTTP_RESP_PRECOND_FAIL);
+        else if((rdcf->access & HTTP_ACCESS_COMMERCIAL_SPACE) && !(user_access & HTTP_ACCESS_COMMERCIAL_SPACE))
+            code = rrd_call_function_error(result_wb,
+                                           "This feature is only available for commercial users and supporters "
+                                           "of Netdata. To use it, please upgrade your space. "
+                                           "Thank you for supporting Netdata.",
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+
+        else {
+            HTTP_ACCESS missing_access = (~user_access) & rdcf->access;
+            char perms_str[1024];
+            http_access2txt(perms_str, sizeof(perms_str), ", ", missing_access);
+
+            char msg[2048];
+            snprintfz(msg, sizeof(msg), "This feature requires additional permissions: %s.", perms_str);
+
+            code = rrd_call_function_error(result_wb, msg,
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+        }
 
         dictionary_acquired_item_release(host->functions, host_function_acquired);
 
         if(result_cb)
-            result_cb(result_wb, HTTP_RESP_PRECOND_FAIL, result_cb_data);
+            result_cb(result_wb, code, result_cb_data);
 
-        return HTTP_RESP_PRECOND_FAIL;
+        return code;
     }
 
     if(timeout_s <= 0)

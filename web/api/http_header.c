@@ -122,7 +122,7 @@ static void http_header_x_transaction_id(struct web_client *w, const char *v, si
 }
 
 static void http_header_x_netdata_account_id(struct web_client *w, const char *v, size_t len) {
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl == HTTP_ACL_ACLK) {
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
         char buffer[UUID_STR_LEN * 2];
         strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
         uuid_parse_flexi(buffer, w->auth.cloud_account_id); // will not alter w->cloud_account_id if it fails
@@ -130,7 +130,7 @@ static void http_header_x_netdata_account_id(struct web_client *w, const char *v
 }
 
 static void http_header_x_netdata_role(struct web_client *w, const char *v, size_t len) {
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl == HTTP_ACL_ACLK) {
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
         char buffer[100];
         strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
         if (strcasecmp(buffer, "admin") == 0)
@@ -151,21 +151,20 @@ static void http_header_x_netdata_role(struct web_client *w, const char *v, size
 }
 
 static void http_header_x_netdata_permissions(struct web_client *w, const char *v, size_t len __maybe_unused) {
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl == HTTP_ACL_ACLK) {
-        w->access = http_access_from_hex(v);
-        web_client_flags_clear_auth(w);
-        web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_CLOUD);
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
+        HTTP_ACCESS access = http_access_from_hex(v);
+        web_client_set_permissions(w, access, w->user_role, WEB_CLIENT_FLAG_AUTH_CLOUD);
     }
 }
 
 static void http_header_x_netdata_user_name(struct web_client *w, const char *v, size_t len) {
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl == HTTP_ACL_ACLK) {
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK) {
         strncpyz(w->auth.client_name, v, (len < sizeof(w->auth.client_name) - 1 ? len : sizeof(w->auth.client_name) - 1));
     }
 }
 
 static void http_header_x_netdata_auth(struct web_client *w, const char *v, size_t len __maybe_unused) {
-    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl == HTTP_ACL_ACLK)
+    if(web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD) && w->acl & HTTP_ACL_ACLK)
         // we don't need authorization bearer when the request comes from netdata cloud
         return;
 

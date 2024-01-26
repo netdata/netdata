@@ -1077,12 +1077,12 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
         // HELLO request, dashboard ACL
         analytics_log_dashboard();
         if(unlikely(!http_can_access_dashboard(w)))
-            return web_client_permission_denied(w);
+            return web_client_permission_denied_acl(w);
     }
     else {
         // everything else, registry ACL
         if(unlikely(!http_can_access_registry(w)))
-            return web_client_permission_denied(w);
+            return web_client_permission_denied_acl(w);
 
         if(unlikely(do_not_track)) {
             buffer_flush(w->response.data);
@@ -1858,7 +1858,7 @@ static struct web_api_command api_commands_v1[] = {
         // registry checks the ACL by itself, so we allow everything
         .api = "registry",
         .hash = 0,
-        .acl = HTTP_ACL_REGISTRY,
+        .acl = HTTP_ACL_NONE, // it manages acl by itself
         .access = HTTP_ACCESS_NONE, // it manages access by itself
         .callback = web_client_api_request_v1_registry,
         .allow_subpaths = 0

@@ -257,7 +257,7 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
         registry_json_header(host, w, "access", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
         registry_unlock();
-        return HTTP_RESP_PRECOND_FAIL;
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
     // set the cookie
@@ -299,7 +299,7 @@ int registry_request_delete_json(RRDHOST *host, struct web_client *w, char *pers
         registry_json_header(host, w, "delete", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
         registry_unlock();
-        return HTTP_RESP_PRECOND_FAIL;
+        return HTTP_RESP_BAD_REQUEST;
     }
 
     // generate the response
@@ -320,7 +320,7 @@ int registry_request_search_json(RRDHOST *host, struct web_client *w, char *pers
     if(!person_guid || !person_guid[0]) {
         registry_json_header(host, w, "search", REGISTRY_STATUS_FAILED);
         registry_json_footer(w);
-        return HTTP_RESP_PRECOND_FAIL;
+        return HTTP_RESP_BAD_REQUEST;
     }
 
     registry_lock();
@@ -362,7 +362,7 @@ int registry_request_switch_json(RRDHOST *host, struct web_client *w, char *pers
     if(!person_guid || !person_guid[0]) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Who are you? Person GUID is missing");
-        return HTTP_RESP_PRECOND_FAIL;
+        return HTTP_RESP_BAD_REQUEST;
     }
 
     if(!registry_is_valid_url(url)) {

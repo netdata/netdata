@@ -15,14 +15,14 @@
 #define APPS_PLUGIN_FUNCTIONS() do { \
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",         \
             PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,                          \
-            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_VIEW_SENSITIVE_DATA),                      \
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID|HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_VIEW_SENSITIVE_DATA),\
             RRDFUNCTIONS_PRIORITY_DEFAULT / 10);                                                                    \
 } while(0)
 
 #define APPS_PLUGIN_GLOBAL_FUNCTIONS() do { \
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"processes\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",  \
             PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,                          \
-            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_VIEW_SENSITIVE_DATA),                      \
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID|HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_VIEW_SENSITIVE_DATA),\
             RRDFUNCTIONS_PRIORITY_DEFAULT / 10);                                                                    \
 } while(0)
 
@@ -4406,7 +4406,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
     struct pid_stat *p;
 
     bool show_cmdline = http_access_user_has_enough_access_level_for_endpoint(
-                            access, HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_SENSITIVE_DATA) ||
+                            access, HTTP_ACCESS_SIGNED_ID |HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_SENSITIVE_DATA) ||
                         enable_function_cmdline;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };

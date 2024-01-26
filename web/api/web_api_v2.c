@@ -704,7 +704,7 @@ static struct web_api_command api_commands_v2[] = {
         .api = "rtc_offer",
         .hash = 0,
         .acl = HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS,
-        .access = HTTP_ACCESS_SAME_SPACE,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE,
         .callback = web_client_api_request_v2_webrtc,
         .allow_subpaths = 0
     },
@@ -722,7 +722,7 @@ static struct web_api_command api_commands_v2[] = {
         .api = "bearer_protection",
         .hash = 0,
         .acl = HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS,
-        .access = HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG | HTTP_ACCESS_EDIT_AGENT_CONFIG,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG | HTTP_ACCESS_EDIT_AGENT_CONFIG,
         .callback = api_v2_bearer_protection,
         .allow_subpaths = 0
     },
@@ -730,7 +730,7 @@ static struct web_api_command api_commands_v2[] = {
         .api = "bearer_get_token",
         .hash = 0,
         .acl = HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS,
-        .access = HTTP_ACCESS_SAME_SPACE,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE,
         .callback = api_v2_bearer_token,
         .allow_subpaths = 0
     },
