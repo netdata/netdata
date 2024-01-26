@@ -357,6 +357,12 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
             | SERVICE_ACLKSYNC
             );
 
+    delta_shutdown_time("stop maintenance thread");
+
+    timeout = !service_wait_exit(
+        SERVICE_MAINTENANCE
+        , 3 * USEC_PER_SEC);
+
     delta_shutdown_time("stop replication, exporters, health and web servers threads");
 
     timeout = !service_wait_exit(
@@ -392,12 +398,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
     timeout = !service_wait_exit(
             SERVICE_CONTEXT
-            , 3 * USEC_PER_SEC);
-
-    delta_shutdown_time("stop maintenance thread");
-
-    timeout = !service_wait_exit(
-            SERVICE_MAINTENANCE
             , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("clear web client cache");
