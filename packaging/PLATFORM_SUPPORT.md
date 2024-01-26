@@ -177,9 +177,9 @@ means that they generally do not support non-local username mappings or exotic n
 
 We currently provide static builds for the following CPU architectures:
 
-- 32-bit x86
 - 64-bit x86
 - ARMv7
+- ARMv6
 - AArch64
 - POWER8+
 
@@ -189,3 +189,8 @@ We currently provide static builds for the following CPU architectures:
 
 Our IPMI collector is based on FreeIPMI. Due to upstream limitations in FreeIPMI, we are unable to support our
 IPMI collector on POWER-based hardware.
+
+### Systemd
+
+Many of our systemd integrations are not supported in our static builds. This is due to a general refusal by the
+systemd developers to support static linking (or any C runtime other than glibc), and is not something we can resolve.
