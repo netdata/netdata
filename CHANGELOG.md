@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Disable local Go builds in our RPM packages. [\#16848](https://github.com/netdata/netdata/pull/16848) ([Ferroin](https://github.com/Ferroin))
+- Include timer units failed state alert as default [\#16845](https://github.com/netdata/netdata/pull/16845) ([tkatsoulas](https://github.com/tkatsoulas))
+- kickstart: use extended-regexp in `get_redirect()` [\#16844](https://github.com/netdata/netdata/pull/16844) ([ilyam8](https://github.com/ilyam8))
+- Make the kickstart checksum's placeholder value more concrete [\#16843](https://github.com/netdata/netdata/pull/16843) ([tkatsoulas](https://github.com/tkatsoulas))
+- Regenerate integrations.js [\#16835](https://github.com/netdata/netdata/pull/16835) ([netdatabot](https://github.com/netdatabot))
 - adds docs for cloud MS Teams integration [\#16834](https://github.com/netdata/netdata/pull/16834) ([papazach](https://github.com/papazach))
 - Fix coverity issue [\#16831](https://github.com/netdata/netdata/pull/16831) ([stelfrag](https://github.com/stelfrag))
 - add brotli and libyaml to buildinfo [\#16830](https://github.com/netdata/netdata/pull/16830) ([ktsaou](https://github.com/ktsaou))
@@ -397,12 +402,6 @@
 - Regenerate integrations.js [\#16266](https://github.com/netdata/netdata/pull/16266) ([netdatabot](https://github.com/netdatabot))
 - Fix coverity issue 403725 [\#16265](https://github.com/netdata/netdata/pull/16265) ([stelfrag](https://github.com/stelfrag))
 - SUBSTRING simple patterns fix [\#16264](https://github.com/netdata/netdata/pull/16264) ([ktsaou](https://github.com/ktsaou))
-- QUERIES: use tiers only when they have useful data [\#16263](https://github.com/netdata/netdata/pull/16263) ([ktsaou](https://github.com/ktsaou))
-- Improve dimension ML model load [\#16262](https://github.com/netdata/netdata/pull/16262) ([stelfrag](https://github.com/stelfrag))
-- cgroup: add net container\_device label [\#16261](https://github.com/netdata/netdata/pull/16261) ([ilyam8](https://github.com/ilyam8))
-- Replace distutils with packaging for version [\#16259](https://github.com/netdata/netdata/pull/16259) ([MrZammler](https://github.com/MrZammler))
-- Regenerate integrations.js [\#16258](https://github.com/netdata/netdata/pull/16258) ([netdatabot](https://github.com/netdatabot))
-- Fix Discord webhook payload [\#16257](https://github.com/netdata/netdata/pull/16257) ([luchaos](https://github.com/luchaos))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
