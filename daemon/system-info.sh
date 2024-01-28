@@ -57,7 +57,7 @@ if [ -z "${VIRTUALIZATION}" ]; then
     VIRTUALIZATION="unknown"
     VIRT_DETECTION="none"
   elif [ "$VIRTUALIZATION" != "none" ] && [ "$VIRTUALIZATION" != "unknown" ]; then
-    VIRTUALIZATION=$(virtualization_normalize_name $VIRTUALIZATION)
+    VIRTUALIZATION=$(virtualization_normalize_name "$VIRTUALIZATION")
   fi
 else
   # Passed from outside - probably in docker run
