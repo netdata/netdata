@@ -101,6 +101,10 @@ if [ "${CONTAINER}" = "unknown" ]; then
     CONT_DETECTION="kubernetes"
   fi
 
+  if [ "${KERNEL_NAME}" = FreeBSD ] && command -v sysctl && sysctl security.jail.jailed 2>/dev/null | grep -q "1$"; then
+    CONTAINER="jail"
+    CONT_DETECTION="sysctl"
+  fi
 fi
 
 # -------------------------------------------------------------------------------------------------
