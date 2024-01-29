@@ -53,7 +53,8 @@ typedef enum __attribute__((__packed__)) {
     HTTP_REQUEST_MODE_STREAM    = 7,
 } HTTP_REQUEST_MODE;
 
-const char *http_request_method2string(HTTP_REQUEST_MODE mode);
+ENUM_STR_DEFINE_FUNCTIONS_EXTERN(HTTP_REQUEST_MODE);
+
 const char *http_response_code2string(int code);
 HTTP_CONTENT_TYPE contenttype_for_filename(const char *filename);
 
