@@ -21,8 +21,9 @@ struct node_instance_list {
 typedef enum db_check_action_type {
     DB_CHECK_NONE          = (1 << 0),
     DB_CHECK_RECLAIM_SPACE = (1 << 1),
-    DB_CHECK_CONT          = (1 << 2),
-    DB_CHECK_RECOVER       = (1 << 3),
+    DB_CHECK_ANALYZE       = (1 << 2),
+    DB_CHECK_CONT          = (1 << 3),
+    DB_CHECK_RECOVER       = (1 << 4),
 } db_check_action_type_t;
 
 #define SQL_MAX_RETRY (100)
