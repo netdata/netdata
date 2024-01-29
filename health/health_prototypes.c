@@ -516,7 +516,7 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
         if(!prototype_matches_rrdset(st, t))
             continue;
 
-        if(rrdcalc_add_from_prototype(st->rrdhost, st, ap))
+        if(rrdcalc_add_from_prototype(st->rrdhost, st, t))
             ap->_internal.uses++;
     }
     spinlock_unlock(&ap->_internal.spinlock);

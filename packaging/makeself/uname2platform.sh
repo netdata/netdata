@@ -8,6 +8,7 @@ BUILDARCH="${1}"
 
 case "${BUILDARCH}" in
   x86_64) echo "linux/amd64" ;;
+  armv6l) echo "linux/arm/v6" ;;
   armv7l) echo "linux/arm/v7" ;;
   aarch64) echo "linux/arm64/v8" ;;
   ppc64le) echo "linux/ppc64le" ;;

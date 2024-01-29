@@ -4,7 +4,7 @@
 #include "sqlite3recover.h"
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 15
+#define DB_METADATA_VERSION 16
 
 const char *database_config[] = {
     "CREATE TABLE IF NOT EXISTS host(host_id BLOB PRIMARY KEY, hostname TEXT NOT NULL, "
@@ -64,7 +64,7 @@ const char *database_config[] = {
 
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)",
-    "CREATE INDEX IF NOT EXISTS health_log_d_ind_5 ON health_log_detail (health_log_id, unique_id DESC)",
+    "CREATE INDEX IF NOT EXISTS health_log_d_ind_9 ON health_log_detail (unique_id DESC, health_log_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_6 on health_log_detail (health_log_id, when_key)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
@@ -84,6 +84,7 @@ const char *database_cleanup[] = {
     "DROP INDEX IF EXISTS alert_hash_index",
     "DROP INDEX IF EXISTS health_log_d_ind_4",
     "DROP INDEX IF EXISTS health_log_d_ind_1",
+    "DROP INDEX IF EXISTS health_log_d_ind_5",
     NULL
 };
 
@@ -448,6 +449,20 @@ int sql_init_database(db_check_action_type_t rebuild, int memory)
         return 1;
     }
 
+    if (rebuild & DB_CHECK_ANALYZE) {
+        netdata_log_info("Running ANALYZE on %s", sqlite_database);
+        rc = sqlite3_exec_monitored(db_meta, "ANALYZE", 0, 0, &err_msg);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to execute ANALYZE rc = %d (%s)", rc, err_msg);
+            sqlite3_free(err_msg);
+        }
+        else {
+            (void) db_execute(db_meta, "select count(*) from sqlite_master limit 0");
+            (void) sqlite3_close(db_meta);
+        }
+        return 1;
+    }
+
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
     rc = sqlite3_create_function(db_meta, "u2h", 1, SQLITE_ANY | SQLITE_DETERMINISTIC, 0, sqlite_uuid_parse, 0, 0);
@@ -497,7 +512,7 @@ void sql_close_database(void)
 
     add_stmt_to_list(NULL);
 
-    (void) db_execute(db_meta, "PRAGMA analysis_limit=1000");
+    (void) db_execute(db_meta, "PRAGMA analysis_limit=10000");
     (void) db_execute(db_meta, "PRAGMA optimize");
 
     rc = sqlite3_close_v2(db_meta);

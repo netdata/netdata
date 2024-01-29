@@ -239,7 +239,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
-            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, http_request_method2string(w->mode)),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_RESPONSE_CODE, w->response.code),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_BYTES, sent),
@@ -635,7 +635,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_HOST, w->forwarded_host),
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
-            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, http_request_method2string(w->mode)),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
@@ -1170,7 +1170,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     // entry point for all API requests
 
     ND_LOG_STACK lgs[] = {
-            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, http_request_method2string(w->mode)),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
@@ -1397,7 +1397,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_HOST, w->forwarded_host),
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
-            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, http_request_method2string(w->mode)),
+            ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
             ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
