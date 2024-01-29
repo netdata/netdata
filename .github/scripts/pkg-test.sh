@@ -94,10 +94,10 @@ install_suse_like() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  zypper install -y --allow-downgrade --allow-unsigned-rpm /netdata/artifacts/netdata*.rpm || exit 1
+  zypper install -y --solver-focus Installed --allow-downgrade --allow-unsigned-rpm /netdata/artifacts/netdata*.rpm || exit 1
 
   # Install testing tools
-  zypper install -y --allow-downgrade --no-recommends curl netcat-openbsd jq || exit 1
+  zypper install -y --solver-focus Installed --allow-downgrade --no-recommends curl netcat-openbsd jq || exit 1
 
   [ "$(rpm --eval '%{_build_arch}')" = "x86_64" ] || NETDATA_SKIP_EBPF=1
 }

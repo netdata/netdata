@@ -224,6 +224,17 @@ include:
         - aarch64
     test:
       ebpf-core: true
+  - <<: *opensuse
+    version: tumbleweed
+    support_type: Intermediate
+    eol_check: false
+    base_image: opensuse/tumbleweed
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/tumbleweed
+    test:
+      ebpf-core: false
+      skip-local-builds: true
 
   - &oracle
     distro: oraclelinux
