@@ -34,12 +34,13 @@ along with their descriptions.
 <details open>
 <summary>Privileges</summary>
 
-|    Component    |          Privileges           | Description                                                                                                              | 
-|:---------------:|:-----------------------------:|--------------------------------------------------------------------------------------------------------------------------|
-| cgroups.plugin  |   host PID mode, SYS_ADMIN    | Container network interfaces monitoring. Map virtual interfaces in the system namespace to interfaces inside containers. |
-|   proc.plugin   |       host network mode       | Host system networking stack monitoring.                                                                                 |
-|   go.d.plugin   |       host network mode       | Monitoring applications running on the host and inside containers.                                                       |
-| local-listeners | host network mode, SYS_PTRACE | Discovering local services/applications. Map open (listening) ports to running services/applications.                    |
+|       Component       |          Privileges           | Description                                                                                                              | 
+|:---------------------:|:-----------------------------:|--------------------------------------------------------------------------------------------------------------------------|
+|    cgroups.plugin     |   host PID mode, SYS_ADMIN    | Container network interfaces monitoring. Map virtual interfaces in the system namespace to interfaces inside containers. |
+|      proc.plugin      |       host network mode       | Host system networking stack monitoring.                                                                                 |
+|      go.d.plugin      |       host network mode       | Monitoring applications running on the host and inside containers.                                                       |
+|    local-listeners    | host network mode, SYS_PTRACE | Discovering local services/applications. Map open (listening) ports to running services/applications.                    |
+| network-viewer.plugin | host network mode, SYS_ADMIN  | Discovering all current network sockets and building a network-map.                                                      |
 
 </details>
 

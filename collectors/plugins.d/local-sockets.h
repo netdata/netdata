@@ -96,6 +96,7 @@ typedef struct local_socket_state {
 // --------------------------------------------------------------------------------------------------------------------
 
 typedef enum __attribute__((packed)) {
+    SOCKET_DIRECTION_NONE = 0,
     SOCKET_DIRECTION_LISTEN = (1 << 0),     // a listening socket
     SOCKET_DIRECTION_INBOUND = (1 << 1),    // an inbound socket connecting a remote system to a local listening socket
     SOCKET_DIRECTION_OUTBOUND = (1 << 2),   // a socket initiated by this system, connecting to another system
