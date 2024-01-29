@@ -685,7 +685,7 @@ declare -A pkg_flex=(
 declare -A pkg_fts_dev=(
   ['default']="NOTREQUIRED"
   ['alpine']="musl-fts-dev" 
-  ['alpine-3.16.8']="fts-dev"
+  ['alpine-3.16.9']="fts-dev"
 )
 
 # cmake3 is required by Fluent-Bit on CentOS 7
