@@ -1946,7 +1946,8 @@ if(ENABLE_PLUGIN_EBPF)
 endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
-        set(LOCAL_LISTENERS_FILES collectors/plugins.d/local_listeners.c)
+        set(LOCAL_LISTENERS_FILES collectors/plugins.d/local_listeners.c
+                collectors/plugins.d/local-sockets.h)
 
         add_executable(local-listeners ${LOCAL_LISTENERS_FILES})
         target_link_libraries(local-listeners libnetdata)

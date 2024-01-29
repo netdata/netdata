@@ -44,7 +44,7 @@ static int read_tcp_mem(void) {
     }
 
     char buffer[200 + 1], *start, *end;
-    if(read_file(filename, buffer, 200) != 0) return 1;
+    if(read_txt_file(filename, buffer, sizeof(buffer)) != 0) return 1;
     buffer[200] = '\0';
 
     unsigned long long low = 0, pressure = 0, high = 0;

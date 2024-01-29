@@ -1140,7 +1140,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
              now_monotonic_sec() - d->duplex_file_lost_time > READ_RETRY_PERIOD)) {
             char buffer[STATE_LENGTH_MAX + 1];
 
-            if (read_file(d->filename_duplex, buffer, STATE_LENGTH_MAX)) {
+            if (read_txt_file(d->filename_duplex, buffer, sizeof(buffer))) {
                 if (d->duplex_file_exists)
                     collector_error("Cannot refresh interface %s duplex state by reading '%s'.", d->name, d->filename_duplex);
                 d->duplex_file_exists = 0;
@@ -1164,7 +1164,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         if(d->do_operstate != CONFIG_BOOLEAN_NO && d->filename_operstate) {
             char buffer[STATE_LENGTH_MAX + 1], *trimmed_buffer;
 
-            if (read_file(d->filename_operstate, buffer, STATE_LENGTH_MAX)) {
+            if (read_txt_file(d->filename_operstate, buffer, sizeof(buffer))) {
                 collector_error(
                     "Cannot refresh %s operstate by reading '%s'. Will not update its status anymore.",
                     d->name, d->filename_operstate);

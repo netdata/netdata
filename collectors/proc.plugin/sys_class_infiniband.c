@@ -470,7 +470,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 snprintfz(buffer, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "rate");
                 char buffer_rate[65];
                 p->width = 4;
-                if (read_file(buffer, buffer_rate, 64)) {
+                if (read_txt_file(buffer, buffer_rate, sizeof(buffer_rate))) {
                     collector_error("Unable to read '%s'", buffer);
                 } else {
                     char *buffer_width = strstr(buffer_rate, "(");

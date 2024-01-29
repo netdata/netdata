@@ -150,7 +150,7 @@ static kernel_uint_t read_edac_count(struct edac_count *t) {
 static bool read_edac_mc_file(const char *mc, const char *filename, char *out, size_t out_size) {
     char f[FILENAME_MAX + 1];
     snprintfz(f, FILENAME_MAX, "%s/%s/%s", mc_dirname, mc, filename);
-    if(read_file(f, out, out_size) != 0) {
+    if(read_txt_file(f, out, out_size) != 0) {
         collector_error("EDAC: cannot read file '%s'", f);
         return false;
     }
@@ -160,7 +160,7 @@ static bool read_edac_mc_file(const char *mc, const char *filename, char *out, s
 static bool read_edac_mc_rank_file(const char *mc, const char *rank, const char *filename, char *out, size_t out_size) {
     char f[FILENAME_MAX + 1];
     snprintfz(f, FILENAME_MAX, "%s/%s/%s/%s", mc_dirname, mc, rank, filename);
-    if(read_file(f, out, out_size) != 0) {
+    if(read_txt_file(f, out, out_size) != 0) {
         collector_error("EDAC: cannot read file '%s'", f);
         return false;
     }

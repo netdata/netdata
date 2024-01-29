@@ -122,7 +122,7 @@ static BTRFS_NODE *nodes = NULL;
 static inline int collect_btrfs_error_stats(BTRFS_DEVICE *device){
     char buffer[120 + 1];
     
-    int ret = read_file(device->error_stats_filename, buffer, 120);
+    int ret = read_txt_file(device->error_stats_filename, buffer, sizeof(buffer));
     if(unlikely(ret)) {
         collector_error("BTRFS: failed to read '%s'", device->error_stats_filename);
         device->write_errs = 0;
@@ -151,7 +151,7 @@ static inline int collect_btrfs_error_stats(BTRFS_DEVICE *device){
 static inline int collect_btrfs_commits_stats(BTRFS_NODE *node, int update_every){
     char buffer[120 + 1];
     
-    int ret = read_file(node->commit_stats_filename, buffer, 120);
+    int ret = read_txt_file(node->commit_stats_filename, buffer, sizeof(buffer));
     if(unlikely(ret)) {
         collector_error("BTRFS: failed to read '%s'", node->commit_stats_filename);
         node->commits_total = 0;
@@ -530,7 +530,7 @@ static inline int find_all_btrfs_pools(const char *path, int update_every) {
             char label[FILENAME_MAX + 1] = "";
 
             snprintfz(filename, FILENAME_MAX, "%s/%s/label", path, de->d_name);
-            if(read_file(filename, label, FILENAME_MAX) != 0) {
+            if(read_txt_file(filename, label, sizeof(label)) != 0) {
                 collector_error("BTRFS: failed to read '%s'", filename);
                 btrfs_free_node(node);
                 continue;

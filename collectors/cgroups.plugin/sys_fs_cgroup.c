@@ -1308,8 +1308,8 @@ static inline int update_memory_limits(struct cgroup *cg) {
                     return 1;
                 }
             } else {
-                char buffer[30 + 1];
-                int ret = read_file(*filename, buffer, 30);
+                char buffer[32];
+                int ret = read_txt_file(*filename, buffer, sizeof(buffer));
                 if(ret) {
                     collector_error("Cannot refresh cgroup %s memory limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
                     freez(*filename);

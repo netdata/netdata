@@ -469,7 +469,7 @@ static inline bool sanitize_command_argument_string(char *dst, const char *src, 
     return true;
 }
 
-static inline int read_file(const char *filename, char *buffer, size_t size) {
+static inline int read_txt_file(const char *filename, char *buffer, size_t size) {
     if(unlikely(!size)) return 3;
 
     int fd = open(filename, O_RDONLY, 0666);
@@ -478,7 +478,7 @@ static inline int read_file(const char *filename, char *buffer, size_t size) {
         return 1;
     }
 
-    ssize_t r = read(fd, buffer, size);
+    ssize_t r = read(fd, buffer, size - 1); // leave space of the final zero
     if(unlikely(r == -1)) {
         buffer[0] = '\0';
         close(fd);
@@ -490,10 +490,43 @@ static inline int read_file(const char *filename, char *buffer, size_t size) {
     return 0;
 }
 
+static inline int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
+    if (unlikely(!size)) return 3;
+
+    int fd = open(filename, O_RDONLY, 0666);
+    if (unlikely(fd == -1)) {
+        buffer[0] = '\0';
+        return 1;
+    }
+
+    ssize_t r = read(fd, buffer, size - 1); // Leave space for final null character
+    if (unlikely(r == -1)) {
+        buffer[0] = '\0';
+        close(fd);
+        return 2;
+    }
+
+    if (r > 0) {
+        // Replace null characters with spaces, except for the last one
+        for (ssize_t i = 0; i < r - 1; i++) {
+            if (buffer[i] == '\0') {
+                buffer[i] = ' ';
+            }
+        }
+        buffer[r] = '\0'; // Null-terminate the string
+    }
+    else {
+        buffer[0] = '\0'; // Empty cmdline
+    }
+
+    close(fd);
+    return 0;
+}
+
 static inline int read_single_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
 
-    int ret = read_file(filename, buffer, 30);
+    int ret = read_txt_file(filename, buffer, sizeof(buffer));
     if(unlikely(ret)) {
         *result = 0;
         return ret;
@@ -507,7 +540,7 @@ static inline int read_single_number_file(const char *filename, unsigned long lo
 static inline int read_single_signed_number_file(const char *filename, long long *result) {
     char buffer[30 + 1];
 
-    int ret = read_file(filename, buffer, 30);
+    int ret = read_txt_file(filename, buffer, sizeof(buffer));
     if(unlikely(ret)) {
         *result = 0;
         return ret;
@@ -521,7 +554,7 @@ static inline int read_single_signed_number_file(const char *filename, long long
 static inline int read_single_base64_or_hex_number_file(const char *filename, unsigned long long *result) {
     char buffer[30 + 1];
 
-    int ret = read_file(filename, buffer, 30);
+    int ret = read_txt_file(filename, buffer, sizeof(buffer));
     if(unlikely(ret)) {
         *result = 0;
         return ret;

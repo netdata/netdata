@@ -179,8 +179,8 @@ static int kernel_is_rejected()
     char version_string[VERSION_STRING_LEN + 1];
     int version_string_len = 0;
 
-    if (read_file("/proc/version_signature", version_string, VERSION_STRING_LEN)) {
-        if (read_file("/proc/version", version_string, VERSION_STRING_LEN)) {
+    if (read_txt_file("/proc/version_signature", version_string, sizeof(version_string))) {
+        if (read_txt_file("/proc/version", version_string, sizeof(version_string))) {
             struct utsname uname_buf;
             if (!uname(&uname_buf)) {
                 netdata_log_info("Cannot check kernel version");
