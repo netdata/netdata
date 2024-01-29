@@ -567,6 +567,8 @@ static size_t yaml_parse_rewrites(yaml_parser_t *parser, LOG_JOB *jb) {
                 replace_pattern = NULL;
                 freez(search_pattern);
                 search_pattern = NULL;
+                freez(key);
+                key = NULL;
             }
                 break;
 
