@@ -338,6 +338,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             .pid = true,
             .cmdline = false,
             .comm = true,
+            .namespaces = true,
 
             .max_errors = 10,
 
