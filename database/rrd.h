@@ -1093,7 +1093,6 @@ typedef struct health {
     time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
     STRING *health_default_exec;                   // the full path of the alarms notifications program
     STRING *health_default_recipient;              // the default recipient for all alarms
-    int health_log_entries_written;                // the number of alarm events written to the alarms event log
     uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
     uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
     unsigned int health_enabled;                   // 1 when this host has health enabled
