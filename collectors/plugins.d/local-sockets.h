@@ -42,7 +42,7 @@ union ipv46;
 
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for keeping all listening ports
-// key is XXH3_64bits hash of the family, protocol and port number
+// key is XXH3_64bits hash of the family, protocol, port number, namespace
 
 struct local_port;
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct local_port
@@ -67,10 +67,13 @@ typedef struct local_socket_state {
         bool pid;
         bool cmdline;
         bool comm;
+        bool namespaces;
         size_t max_errors;
 
         local_sockets_cb_t cb;
         void *data;
+
+        const char *host_prefix;
     } config;
 
     struct {
@@ -120,6 +123,7 @@ struct local_port {
     uint16_t protocol;
     uint16_t family;
     uint16_t port;
+    uint64_t net_ns_inode;
 };
 
 struct socket_endpoint {
@@ -332,7 +336,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                         cmdline_trimmed = trim(cmdline);
                     }
                 }
-                if(!net_ns_inode) {
+                if(!net_ns_inode && ls->config.namespaces) {
                     snprintfz(filename, sizeof(filename), "%s/%s/ns/net", proc_filename, proc_entry->d_name);
                     if(local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
                         SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode, (uint64_t *)net_ns_inode, true);
@@ -405,6 +409,20 @@ static bool local_sockets_is_zero_address(const void *ip, uint16_t family) {
     }
 
     return false;
+}
+
+static inline void local_sockets_index_listening_port(LS_STATE *ls, LOCAL_SOCKET *n) {
+    if(n->direction & SOCKET_DIRECTION_LISTEN) {
+        // for the listening sockets, keep a hashtable with all the local ports
+        // so that we will be able to detect INBOUND sockets
+
+        SIMPLE_HASHTABLE_SLOT_LISTENING_PORT *sl_port =
+            simple_hashtable_get_slot_LISTENING_PORT(&ls->listening_ports_hashtable, n->local_port_hash, &n->local_port_key, true);
+
+        struct local_port *port = SIMPLE_HASHTABLE_SLOT_DATA(sl_port);
+        if(!port)
+            simple_hashtable_set_slot_LISTENING_PORT(&ls->listening_ports_hashtable, sl_port, n->local_port_hash, &n->local_port_key);
+    }
 }
 
 static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
@@ -492,6 +510,7 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
         n->local_port_key.port = n->local.port;
         n->local_port_key.family = n->family;
         n->local_port_key.protocol = n->protocol;
+        n->local_port_key.net_ns_inode = ls->proc_self_net_ns_inode;
 
         n->local_ip_hash = XXH3_64bits(&n->local.ip, sizeof(n->local.ip));
         n->remote_ip_hash = XXH3_64bits(&n->remote.ip, sizeof(n->remote.ip));
@@ -548,17 +567,7 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
 
         // --- index it in LISTENING_PORT -----------------------------------------------------------------------------
 
-        if(n->direction & SOCKET_DIRECTION_LISTEN) {
-            // for the listening sockets, keep a hashtable with all the local ports
-            // so that we will be able to detect INBOUND sockets
-
-            SIMPLE_HASHTABLE_SLOT_LISTENING_PORT *sl_port =
-                simple_hashtable_get_slot_LISTENING_PORT(&ls->listening_ports_hashtable, n->local_port_hash, &n->local_port_key, true);
-
-            struct local_port *port = SIMPLE_HASHTABLE_SLOT_DATA(sl_port);
-            if(!port)
-                simple_hashtable_set_slot_LISTENING_PORT(&ls->listening_ports_hashtable, sl_port, n->local_port_hash, &n->local_port_key);
-        }
+        local_sockets_index_listening_port(ls, n);
     }
 
     fclose(fp);
@@ -658,43 +667,247 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
 static inline void local_sockets_read_sockets_from_proc(LS_STATE *ls) {
     char path[FILENAME_MAX + 1];
 
-    snprintfz(path, sizeof(path), "%s/proc/self/ns/net", netdata_configured_host_prefix);
-    local_sockets_read_proc_inode_link(ls, path, &ls->proc_self_net_ns_inode, "net");
+    if(ls->config.namespaces) {
+        snprintfz(path, sizeof(path), "%s/proc/self/ns/net", ls->config.host_prefix);
+        local_sockets_read_proc_inode_link(ls, path, &ls->proc_self_net_ns_inode, "net");
+    }
 
-    if(ls->config.cmdline || ls->config.comm || ls->config.pid) {
-        snprintfz(path, sizeof(path), "%s/proc", netdata_configured_host_prefix);
+    if(ls->config.cmdline || ls->config.comm || ls->config.pid || ls->config.namespaces) {
+        snprintfz(path, sizeof(path), "%s/proc", ls->config.host_prefix);
         local_sockets_find_all_sockets_in_proc(ls, path);
     }
 
     if(ls->config.tcp4) {
-        snprintfz(path, sizeof(path), "%s/proc/net/tcp", netdata_configured_host_prefix);
+        snprintfz(path, sizeof(path), "%s/proc/net/tcp", ls->config.host_prefix);
         local_sockets_read_proc_net_x(ls, path, AF_INET, IPPROTO_TCP);
     }
 
     if(ls->config.udp4) {
-        snprintfz(path, sizeof(path), "%s/proc/net/udp", netdata_configured_host_prefix);
+        snprintfz(path, sizeof(path), "%s/proc/net/udp", ls->config.host_prefix);
         local_sockets_read_proc_net_x(ls, path, AF_INET, IPPROTO_UDP);
     }
 
     if(ls->config.tcp6) {
-        snprintfz(path, sizeof(path), "%s/proc/net/tcp6", netdata_configured_host_prefix);
+        snprintfz(path, sizeof(path), "%s/proc/net/tcp6", ls->config.host_prefix);
         local_sockets_read_proc_net_x(ls, path, AF_INET6, IPPROTO_TCP);
     }
 
     if(ls->config.udp6) {
-        snprintfz(path, sizeof(path), "%s/proc/net/udp6", netdata_configured_host_prefix);
+        snprintfz(path, sizeof(path), "%s/proc/net/udp6", ls->config.host_prefix);
         local_sockets_read_proc_net_x(ls, path, AF_INET6, IPPROTO_UDP);
     }
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
+struct local_sockets_child_work {
+    int fd;
+    uint64_t net_ns_inode;
+};
+
+static inline void local_sockets_send_to_parent(struct local_socket_state *ls __maybe_unused, struct local_socket *n, void *data) {
+    struct local_sockets_child_work *cw = data;
+    int fd = cw->fd;
+
+    if(n->net_ns_inode != cw->net_ns_inode)
+        return;
+
+    // local_sockets_log(ls, "child is sending inode %"PRIu64" of namespace %"PRIu64, n->inode, n->net_ns_inode);
+
+    if(write(fd, n, sizeof(*n)) != sizeof(*n))
+        local_sockets_log(ls, "failed to write local socket to pipe");
+
+    size_t len = n->cmdline ? strlen(n->cmdline) + 1 : 0;
+    if(write(fd, &len, sizeof(len)) != sizeof(len))
+        local_sockets_log(ls, "failed to write cmdline length to pipe");
+
+    if(len)
+        if(write(fd, n->cmdline, len) != (ssize_t)len)
+            local_sockets_log(ls, "failed to write cmdline to pipe");
+}
+
+static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_socket *ps, pid_t *pid) {
+    char filename[1024];
+    snprintfz(filename, sizeof(filename), "%s/proc/%d/ns/net", ls->config.host_prefix, ps->pid);
+
+    // verify the pid is in the target namespace
+    struct stat statbuf;
+    if (stat(filename, &statbuf) == -1 || statbuf.st_ino != ps->net_ns_inode) {
+        local_sockets_log(ls, "pid %d is not in the wanted network namespace", ps->pid);
+        return false;
+    }
+
+    int fd = open(filename, O_RDONLY);
+    if(!fd) {
+        local_sockets_log(ls, "cannot open file '%s'", filename);
+        return false;
+    }
+
+    int pipefd[2];
+    if (pipe(pipefd) != 0) {
+        local_sockets_log(ls, "cannot create pipe");
+        return false;
+    }
+
+    *pid = fork();
+    if (*pid == 0) {
+        // Child process
+        close(pipefd[0]);
+
+        // local_sockets_log(ls, "child is here for inode %"PRIu64" and namespace %"PRIu64, ps->inode, ps->net_ns_inode);
+
+        struct local_sockets_child_work cw = {
+            .net_ns_inode = ps->net_ns_inode,
+            .fd = pipefd[1],
+        };
+
+        ls->config.host_prefix = ""; // we need the /proc of the container
+        ls->config.cb = local_sockets_send_to_parent;
+        ls->config.data = &cw;
+        ls->config.cmdline = false; // we have these already
+        ls->config.comm = false; // we have these already
+        ls->config.pid = false; // we have these already
+        ls->config.namespaces = false;
+        ls->proc_self_net_ns_inode = ps->net_ns_inode;
+
+
+        // switch namespace
+        if (setns(fd, CLONE_NEWNET) == -1) {
+            local_sockets_log(ls, "failed to switch network namespace at child process");
+            exit(EXIT_FAILURE);
+        }
+
+        // read all sockets from /proc
+        local_sockets_read_sockets_from_proc(ls);
+
+        // send all sockets to parent
+        local_sockets_foreach_local_socket_call_cb(ls);
+
+        // send the terminating socket
+        struct local_socket zero = {
+            .net_ns_inode = ps->net_ns_inode,
+        };
+        local_sockets_send_to_parent(ls, &zero, &cw);
+
+        close(pipefd[1]); // Close write end of pipe
+        exit(EXIT_SUCCESS);
+    }
+    // parent
+
+    close(fd);
+    close(pipefd[1]);
+
+    size_t received = 0;
+    struct local_socket buf;
+    while(read(pipefd[0], &buf, sizeof(buf)) == sizeof(buf)) {
+        size_t len = 0;
+        if(read(pipefd[0], &len, sizeof(len)) != sizeof(len))
+            local_sockets_log(ls, "failed to read cmdline length from pipe");
+
+        if(len) {
+            buf.cmdline = mallocz(len);
+            if(read(pipefd[0], buf.cmdline, len) != (ssize_t)len)
+                local_sockets_log(ls, "failed to read cmdline from pipe");
+        }
+        else
+            buf.cmdline = NULL;
+
+        received++;
+
+        struct local_socket zero = {
+            .net_ns_inode = ps->net_ns_inode,
+        };
+        if(memcmp(&buf, &zero, sizeof(buf)) == 0) {
+            // the terminator
+            break;
+        }
+
+        SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ls->sockets_hashtable, buf.inode, &buf, true);
+        LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
+        if(n) {
+            if(buf.cmdline)
+                freez(buf.cmdline);
+
+//            local_sockets_log(ls,
+//                              "ns inode %" PRIu64" (comm: '%s', pid: %u, ns: %"PRIu64") already exists in hashtable (comm: '%s', pid: %u, ns: %"PRIu64") - ignoring duplicate",
+//                              buf.inode, buf.comm, buf.pid, buf.net_ns_inode, n->comm, n->pid, n->net_ns_inode);
+            continue;
+        }
+        else {
+            n = mallocz(sizeof(*n));
+            memcpy(n, &buf, sizeof(*n));
+            simple_hashtable_set_slot_LOCAL_SOCKET(&ls->sockets_hashtable, sl, n->inode, n);
+
+            local_sockets_index_listening_port(ls, n);
+        }
+    }
+
+    close(pipefd[0]);
+
+    return received > 0;
+}
+
+static inline void local_socket_waitpid(LS_STATE *ls, pid_t pid) {
+    if(!pid) return;
+
+    int status;
+    waitpid(pid, &status, 0);
+
+    if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+        local_sockets_log(ls, "Child exited with status %d", WEXITSTATUS(status));
+    else if (WIFSIGNALED(status))
+        local_sockets_log(ls, "Child terminated by signal %d", WTERMSIG(status));
+}
+
+static inline void local_sockets_namespaces(LS_STATE *ls) {
+    pid_t children[5] = { 0 };
+    size_t last_child = 0;
+
+    for(SIMPLE_HASHTABLE_SLOT_NET_NS *sl = simple_hashtable_first_read_only_NET_NS(&ls->ns_hashtable);
+         sl;
+         sl = simple_hashtable_next_read_only_NET_NS(&ls->ns_hashtable, sl)) {
+        uint64_t inode = (uint64_t)SIMPLE_HASHTABLE_SLOT_DATA(sl);
+
+        if(inode == ls->proc_self_net_ns_inode)
+            continue;
+
+        // find a pid_socket that has this namespace
+        for(SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl_pid = simple_hashtable_first_read_only_PID_SOCKET(&ls->pid_sockets_hashtable) ;
+            sl_pid ;
+            sl_pid = simple_hashtable_next_read_only_PID_SOCKET(&ls->pid_sockets_hashtable, sl_pid)) {
+            struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl_pid);
+            if(!ps || ps->net_ns_inode != inode) continue;
+
+            if(++last_child >= 5)
+                last_child = 0;
+
+            local_socket_waitpid(ls, children[last_child]);
+            children[last_child] = 0;
+
+            // now we have a pid that has the same namespace inode
+            if(local_sockets_get_namespace_sockets(ls, ps, &children[last_child]))
+                break;
+        }
+    }
+
+    for(size_t i = 0; i < 5 ;i++)
+        local_socket_waitpid(ls, children[i]);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 static inline void local_sockets_process(LS_STATE *ls) {
+    ls->config.host_prefix = netdata_configured_host_prefix;
+
     // initialize our hashtables
     local_sockets_init(ls);
 
     // read all sockets from /proc
     local_sockets_read_sockets_from_proc(ls);
+
+    // check all socket namespaces
+    if(ls->config.namespaces)
+        local_sockets_namespaces(ls);
 
     // detect the directions of the sockets
     if(ls->config.inbound || ls->config.outbound || ls->config.local)

@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
             .pid = false,
             .cmdline = true,
             .comm = false,
+            .namespaces = true,
 
             .max_errors = 10,
 
@@ -124,7 +125,7 @@ int main(int argc, char **argv) {
                     "\n"
                     " while:\n"
                     "\n"
-                    "    listening, local, inbound, outbound\n"
+                    "    listening, local, inbound, outbound, namespaces\n"
                     "\n"
                     " filter the output based on the direction of the sockets.\n"
                     "\n"
@@ -132,7 +133,7 @@ int main(int argc, char **argv) {
                     "\n"
                     " Current options:\n"
                     "\n"
-                    "    %s %s %s %s %s %s %s %s\n"
+                    "    %s %s %s %s %s %s %s %s %s\n"
                     "\n"
                     " Option 'debug' enables all sources and all directions and provides\n"
                     " a full dump of current sockets.\n"
@@ -181,6 +182,7 @@ int main(int argc, char **argv) {
                     , ls.config.local ? "local" : "no-local"
                     , ls.config.inbound ? "inbound" : "no-inbound"
                     , ls.config.outbound ? "outbound" : "no-outbound"
+                    , ls.config.namespaces ? "namespaces" : "no-namespaces"
                     );
             exit(1);
         }
@@ -203,6 +205,7 @@ int main(int argc, char **argv) {
             ls.config.pid = true;
             ls.config.comm = true;
             ls.config.cmdline = true;
+            ls.config.namespaces = true;
             ls.config.max_errors = SIZE_MAX;
             ls.config.cb = print_local_listeners_debug;
         }
@@ -253,6 +256,10 @@ int main(int argc, char **argv) {
         else if (strcmp("outbound", s) == 0) {
             ls.config.outbound = positive;
             // fprintf(stderr, "%s outbound\n", positive ? "enabling" : "disabling");
+        }
+        else if (strcmp("namespaces", s) == 0 || strcmp("ns", s) == 0) {
+            ls.config.namespaces = positive;
+            // fprintf(stderr, "%s namespaces\n", positive ? "enabling" : "disabling");
         }
         else {
             fprintf(stderr, "Unknown parameter %s\n", s);
