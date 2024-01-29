@@ -57,7 +57,7 @@ if [ -z "${VIRTUALIZATION}" ]; then
     VIRTUALIZATION="unknown"
     VIRT_DETECTION="none"
   elif [ "$VIRTUALIZATION" != "none" ] && [ "$VIRTUALIZATION" != "unknown" ]; then
-    VIRTUALIZATION=$(virtualization_normalize_name $VIRTUALIZATION)
+    VIRTUALIZATION=$(virtualization_normalize_name "$VIRTUALIZATION")
   fi
 else
   # Passed from outside - probably in docker run
@@ -101,6 +101,10 @@ if [ "${CONTAINER}" = "unknown" ]; then
     CONT_DETECTION="kubernetes"
   fi
 
+  if [ "${KERNEL_NAME}" = FreeBSD ] && command -v sysctl && sysctl security.jail.jailed 2>/dev/null | grep -q "1$"; then
+    CONTAINER="jail"
+    CONT_DETECTION="sysctl"
+  fi
 fi
 
 # -------------------------------------------------------------------------------------------------
