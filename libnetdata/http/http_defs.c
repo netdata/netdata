@@ -2,33 +2,21 @@
 
 #include "../libnetdata.h"
 
-const char *http_request_method2string(HTTP_REQUEST_MODE mode) {
-    switch(mode) {
-        case HTTP_REQUEST_MODE_OPTIONS:
-            return "OPTIONS";
+ENUM_STR_MAP_DEFINE(HTTP_REQUEST_MODE) =
+{
+        { .name = "OPTIONS", .id = HTTP_REQUEST_MODE_OPTIONS },
+        { .name = "GET", .id = HTTP_REQUEST_MODE_GET },
+        { .name = "FILECOPY", .id = HTTP_REQUEST_MODE_FILECOPY },
+        { .name = "POST", .id = HTTP_REQUEST_MODE_POST },
+        { .name = "PUT", .id = HTTP_REQUEST_MODE_PUT },
+        { .name = "DELETE", .id = HTTP_REQUEST_MODE_DELETE },
+        { .name = "STREAM", .id = HTTP_REQUEST_MODE_STREAM },
 
-        case HTTP_REQUEST_MODE_GET:
-            return "GET";
+        // terminator
+        { .name = NULL, .id = 0 }
+};
 
-        case HTTP_REQUEST_MODE_FILECOPY:
-            return "FILECOPY";
-
-        case HTTP_REQUEST_MODE_POST:
-            return "POST";
-
-        case HTTP_REQUEST_MODE_PUT:
-            return "PUT";
-
-        case HTTP_REQUEST_MODE_DELETE:
-            return "DELETE";
-
-        case HTTP_REQUEST_MODE_STREAM:
-            return "STREAM";
-
-        default:
-            return "UNKNOWN";
-    }
-}
+ENUM_STR_DEFINE_FUNCTIONS(HTTP_REQUEST_MODE, 0, "UNKNOWN");
 
 const char *http_response_code2string(int code) {
     switch(code) {

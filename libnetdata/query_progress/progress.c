@@ -444,7 +444,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
         buffer_json_add_array_item_uuid_compact(wb, &qp->transaction);
         buffer_json_add_array_item_uint64(wb, qp->started_ut);
-        buffer_json_add_array_item_string(wb, http_request_method2string(qp->mode));
+        buffer_json_add_array_item_string(wb, HTTP_REQUEST_MODE_2str(qp->mode));
         buffer_json_add_array_item_string(wb, buffer_tostring(qp->query));
 
         if(!buffer_strlen(qp->client)) {

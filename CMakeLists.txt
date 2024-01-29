@@ -677,6 +677,7 @@ set(LIBNETDATA_FILES
         libnetdata/config/dyncfg.c
         libnetdata/config/dyncfg.h
         libnetdata/json/json-c-parser-inline.h
+        libnetdata/template-enum.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
