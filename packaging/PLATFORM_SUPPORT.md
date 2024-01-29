@@ -79,7 +79,6 @@ to work on these platforms with minimal user effort.
 | Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64                       |                                                                                                                                                    |
 | Red Hat Enterprise Linux | 7.x            | x86\_64                                |                                                                                                                                                    |
 | Ubuntu                   | 23.10          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
-| Ubuntu                   | 23.04          | x86\_64, AArch64, ARMv7                |                                                                                                                                                    |
 | Ubuntu                   | 22.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 
@@ -164,6 +163,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 | Fedora       | 35        | EOL as of 2022-12-13 |
 | openSUSE     | Leap 15.4 | EOL as of 2023-12-07 |
 | openSUSE     | Leap 15.3 | EOL as of 2022-12-01 |
+| Ubuntu       | 23.04     | EOL as of 2024-01-20 |
 | Ubuntu       | 22.10     | EOL as of 2023-07-20 |
 | Ubuntu       | 21.10     | EOL as of 2022-07-31 |
 | Ubuntu       | 18.04     | EOL as of 2023-04-02 |
