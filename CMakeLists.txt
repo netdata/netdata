@@ -1085,6 +1085,14 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
 )
 
+set(NETWORK_VIEWER_PLUGIN_FILES
+        collectors/network-viewer.plugin/network-viewer.c
+        collectors/network-viewer.plugin/network-viewer.bpf.h
+        collectors/plugins.d/local-sockets.h
+        collectors/network-viewer.plugin/network-viewer-userspace-bpf.c
+        collectors/network-viewer.plugin/network-viewer-userspace-bpf.h
+)
+
 set(STREAMING_PLUGIN_FILES
         streaming/rrdpush.c
         streaming/rrdpush.h
@@ -1890,6 +1898,72 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                 COMPONENT systemd_journal_plugin
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
+
+#if(ENABLE_PLUGIN_NETWORK_VIEWER)
+        # Set the path for the vmlinux.h header
+        set(VMLINUX_H_PATH "${CMAKE_BINARY_DIR}/vmlinux.h")
+
+        # Generate vmlinux.h
+        add_custom_command(
+                OUTPUT ${VMLINUX_H_PATH}
+                COMMAND bpftool btf dump file /sys/kernel/btf/vmlinux format c > ${VMLINUX_H_PATH}
+                DEPENDS ${KERNEL_HEADERS_DIR}
+        )
+
+        # Include directories for vmlinux.h
+        include_directories(${CMAKE_BINARY_DIR})
+
+        # Set the path for the eBPF source and the compiled output file
+        set(NETWORK_VIEWER_EBPF_SOURCE_FILE collectors/network-viewer.plugin/network-viewer.bpf.c)
+        set(NETWORK_VIEWER_EBPF_OUTPUT_FILE "${CMAKE_BINARY_DIR}/network-viewer.bpf.o")
+
+        # Compile the eBPF program
+        set(NETWORK_VIEWER_EBPF_OBJECT_FILE "${CMAKE_BINARY_DIR}/network-viewer.o")
+        add_custom_command(
+                OUTPUT ${NETWORK_VIEWER_EBPF_OBJECT_FILE}
+                COMMAND clang -O2 -Wall -Wextra -target bpf -D__TARGET_ARCH_x86
+                -I/usr/include/bpf -I${CMAKE_BINARY_DIR} -g -c ${CMAKE_SOURCE_DIR}/${NETWORK_VIEWER_EBPF_SOURCE_FILE}
+                -o ${NETWORK_VIEWER_EBPF_OBJECT_FILE}
+                DEPENDS ${NETWORK_VIEWER_EBPF_SOURCE_FILE} ${VMLINUX_H_PATH}
+                COMMENT "Compiling eBPF program"
+        )
+
+        # Generate BPF Object file (with a different name to avoid conflicts)
+        set(NETWORK_VIEWER_BPF_OBJECT_FILE "${CMAKE_BINARY_DIR}/network-viewer.bpf.o")
+        add_custom_command(
+                OUTPUT ${NETWORK_VIEWER_BPF_OBJECT_FILE}
+                COMMAND bpftool gen object ${NETWORK_VIEWER_BPF_OBJECT_FILE} ${NETWORK_VIEWER_EBPF_OBJECT_FILE}
+                DEPENDS ${NETWORK_VIEWER_EBPF_OBJECT_FILE}
+                COMMENT "Generating BPF Object file"
+        )
+
+        # Generate Skeleton Header
+        set(NETWORK_VIEWER_SKELETON_HEADER "${CMAKE_BINARY_DIR}/network-viewer.skel.h")
+        add_custom_command(
+                OUTPUT ${NETWORK_VIEWER_SKELETON_HEADER}
+                COMMAND bpftool gen skeleton ${NETWORK_VIEWER_BPF_OBJECT_FILE} > ${NETWORK_VIEWER_SKELETON_HEADER}
+                DEPENDS ${NETWORK_VIEWER_BPF_OBJECT_FILE}
+                COMMENT "Generating Skeleton Header"
+        )
+
+        # Custom target for eBPF program and skeleton
+        add_custom_target(
+                network_viewer_bpf ALL
+                DEPENDS ${NETWORK_VIEWER_EBPF_OUTPUT_FILE} ${NETWORK_VIEWER_SKELETON_HEADER}
+        )
+
+        # Existing executable target for user space loader
+        add_executable(network-viewer.plugin ${NETWORK_VIEWER_PLUGIN_FILES})
+        target_link_libraries(network-viewer.plugin libnetdata bpf elf)
+
+        # Include the directory for the skeleton header in the loader target
+        target_include_directories(network-viewer.plugin PRIVATE ${CMAKE_BINARY_DIR})
+
+        # Installation
+        install(TARGETS network-viewer.plugin
+                COMPONENT network_viewer_plugin
+                DESTINATION usr/libexec/netdata/plugins.d)
+#endif()
 
 if(ENABLE_PLUGIN_EBPF)
     set(EBPF_PLUGIN_FILES
