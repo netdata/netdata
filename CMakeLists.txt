@@ -922,6 +922,7 @@ set(HEALTH_PLUGIN_FILES
         health/health_silencers.h
         health/health_internals.h
         health/health_notifications.c
+        health/health_integrations.c
         health/health_event_loop.c
         health/health_dyncfg.c
         health/health_variable.c
@@ -2463,6 +2464,7 @@ install(FILES
 install(FILES
         collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
         health/schema.d/health:alert:prototype.json
+        health/schema.d/health:notification:integration.json
         DESTINATION usr/lib/netdata/conf.d/schema.d)
 
 #

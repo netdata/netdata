@@ -149,6 +149,7 @@ void health_plugin_init(void) {
 
     health_globals.initialization.done = true;
 
+    notif_curl_init();
     health_init_prototypes();
     health_load_config_defaults();
 

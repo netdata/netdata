@@ -1,0 +1,304 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Notification Integration Configuration",
+    "definitions": {
+      "variable": {
+        "type": "object",
+        "required": [
+          "name",
+          "help"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Variable Name",
+            "description": "The variable name as you want to use it later in variable substitution. Users do not see this. X in this field, will be available as ${X} in URL, form data, payload, headers, etc."
+          },
+          "help": {
+            "type": "string",
+            "title": "Variable Description (for end users)",
+            "description": "Provide a short description of the variable. This text will be shown to users. Make this a descriptive as possible for users to understand what they need to provide."
+          }
+        }
+      },
+      "nameValueHeaders": {
+        "type": "object",
+        "title": "HTTP Header to add to the request.",
+        "description": "This HTTP header will be added to the requests that will be send to the target endpoint.",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "HTTP Header Name",
+            "description": "Variable substitution is available in this field."
+          },
+          "value": {
+            "type": "string",
+            "title": "HTTP Header Value",
+            "description": "Variable substitution is available in this field."
+          }
+        }
+      },
+      "nameValueFormData": {
+        "type": "object",
+        "title": "Form field to send.",
+        "description": "This form field will be added to the request to the target endpoint",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Form Field Name",
+            "description": "Variable substitution is available in this field."
+          },
+          "value": {
+            "type": "string",
+            "title": "Form Field Value",
+            "description": "Variable substitution is available in this field."
+          }
+        }
+      },
+      "severityMap": {
+        "type": "object",
+        "title": "Define a variable that changes value depending on alert status.",
+        "description": "Usually we need the notification in include an icon, a color, an emoji or some text that depends on the severity of the alert.",
+        "required": [
+          "name",
+          "clear",
+          "warning",
+          "critical"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Variable Name",
+            "description": "X will be available as ${X} and will get one of the values depending on the severity of the alert."
+          },
+          "clear": {
+            "type": "string",
+            "title": "Value when CLEAR",
+            "description": "The value of the variable when the alert transitioned to CLEAR."
+          },
+          "warning": {
+            "type": "string",
+            "title": "Value when WARNING",
+            "description": "The value of the variable when the alert transitioned to WARNING."
+          },
+          "critical": {
+            "type": "string",
+            "title": "Value when CRITICAL",
+            "description": "The value of the variable when the alert transitioned to CRITICAL."
+          }
+        }
+      }
+    },
+    "type": "object",
+    "properties": {
+      "variables": {
+        "type": "array",
+        "title": "User Variables",
+        "description": "To enable this integration, users have to provide information about their account on the target system, like a username and a password, or an account token, a channel, a room, and generally anything that is required to personalize this integration for them.",
+        "items": {
+          "$ref": "#/definitions/variable"
+        }
+      },
+      "format_version": {
+        "type": "integer",
+        "description": "Version of the format; currently, only version 1 is supported."
+      },
+      "name": {
+        "type": "string",
+        "description": "Name of the notification configuration."
+      },
+      "method": {
+        "type": "string",
+        "title": "HTTP Method",
+        "description": "HTTP method for sending the notification.",
+        "enum": [
+          "GET",
+          "POST",
+          "PUT"
+        ],
+        "default": "POST"
+      },
+      "url": {
+        "type": "string",
+        "title": "URL of the target endpoint",
+        "description": "All variables are accessible in this field, so parts of the URL can be replaced with user-supplied variables, alert-specific variables, and severity mapping variables."
+      },
+      "content_type": {
+        "type": "string",
+        "title": "Content Type",
+        "description": "The content type of the payload to send to the target endpoint",
+        "enum": [
+          "Form Data",
+          "application/json"
+        ],
+        "default": "application/json"
+      },
+      "headers": {
+        "type": "array",
+        "title": "HTTP Headers",
+        "description": "HTTP headers to add to the request. Variable substitution is available for both the header name and the values.",
+        "items": {
+          "$ref": "#/definitions/nameValueHeaders"
+        }
+      },
+      "severity_map": {
+        "type": "array",
+        "title": "Severity Maps",
+        "description": "Define variables that take different values based on the severity of the alert.",
+        "items": {
+          "$ref": "#/definitions/severityMap"
+        }
+      },
+      "docs": {
+        "type": "string",
+        "title": "Documentation URL",
+        "description": "Documentation URL related to this integration, so that users can read more about this."
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "content_type": {
+              "const": "Form Data"
+            }
+          },
+          "required": [
+            "content_type"
+          ]
+        },
+        "then": {
+          "properties": {
+            "form_data": {
+              "title": "Form Field",
+              "description": "Form data are in the form of name-value pairs. This is the main body to be submitted. Variables substitution is available for both the field names and their values.",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/nameValueFormData"
+              },
+              "description": "List of form data for the cURL operation."
+            }
+          },
+          "required": [
+            "form_data"
+          ]
+        },
+        "else": {
+          "properties": {
+            "payload": {
+              "type": "string",
+              "title": "Payload to send to the target endpoint",
+              "description": "Variables substitution is available for both the field names and their values."
+            }
+          }
+        }
+      }
+    ]
+  },
+  "uiSchema": {
+    "ui:order": [
+      "format_version",
+      "name",
+      "variables",
+      "method",
+      "url",
+      "content_type",
+      "payload",
+      "form_data",
+      "headers",
+      "severity_map",
+      "docs",
+      "*"
+    ],
+    "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
+    "format_version": {
+      "ui:widget": "hidden"
+    },
+    "name": {
+      "ui:widget": "hidden"
+    },
+    "variables": {
+      "ui:classNames": "dyncfg-grid-col-span-1-6",
+      "items": {
+        "name": {
+          "ui:classNames": "dyncfg-grid-col-span-1-2"
+        },
+        "help": {
+          "ui:classNames": "dyncfg-grid-col-span-3-4"
+        }
+      }
+    },
+    "method": {
+      "ui:classNames": "dyncfg-grid-col-span-1-1"
+    },
+    "url": {
+      "ui:classNames": "dyncfg-grid-col-span-2-4"
+    },
+    "content_type": {
+      "ui:classNames": "dyncfg-grid-col-span-6-1"
+    },
+    "form_data": {
+      "ui:classNames": "dyncfg-grid-col-span-1-6",
+      "items": {
+        "name": {
+          "ui:classNames": "dyncfg-grid-col-span-1-2"
+        },
+        "value": {
+          "ui:classNames": "dyncfg-grid-col-span-3-4",
+          "ui:widget": "textarea"
+        }
+      }
+    },
+    "payload": {
+      "ui:classNames": "dyncfg-grid-col-span-1-6",
+      "ui:widget": "textarea"
+    },
+    "headers": {
+      "ui:classNames": "dyncfg-grid-col-span-1-6",
+      "items": {
+        "name": {
+          "ui:classNames": "dyncfg-grid-col-span-1-2"
+        },
+        "value": {
+          "ui:classNames": "dyncfg-grid-col-span-3-4",
+          "ui:widget": "textarea"
+        }
+      }
+    },
+    "severity_map": {
+      "ui:classNames": "dyncfg-grid-col-span-1-6",
+      "items": {
+        "name": {
+          "ui:classNames": "dyncfg-grid-col-span-1-6"
+        },
+        "clear": {
+          "ui:classNames": "dyncfg-grid-col-span-1-2",
+          "ui:widget": "textarea"
+        },
+        "warning": {
+          "ui:classNames": "dyncfg-grid-col-span-3-2",
+          "ui:widget": "textarea"
+        },
+        "critical": {
+          "ui:classNames": "dyncfg-grid-col-span-5-2",
+          "ui:widget": "textarea"
+        }
+      }
+    },
+    "docs": {
+      "ui:classNames": "dyncfg-grid-col-span-1-6"
+    }
+  },
+  "uiOptions": {
+    "fullPage": true
+  }
+}

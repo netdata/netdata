@@ -2,7 +2,6 @@
 
 #include "content_type.h"
 
-
 static struct {
     const char *format;
     HTTP_CONTENT_TYPE content_type;
