@@ -11,6 +11,7 @@ struct bearer_token {
     uuid_t cloud_account_id;
     char cloud_user_name[CLOUD_USER_NAME_LENGTH];
     HTTP_ACCESS access;
+    HTTP_USER_ROLE user_role;
     time_t created_s;
     time_t expires_s;
 };
@@ -22,12 +23,9 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
 
         struct bearer_token *z = dictionary_get(netdata_authorized_bearers, uuid_str);
         if (z && z->expires_s > now_monotonic_sec()) {
-            w->access = z->access;
             strncpyz(w->auth.client_name, z->cloud_user_name, sizeof(w->auth.client_name) - 1);
             uuid_copy(w->auth.cloud_account_id, z->cloud_account_id);
-
-            web_client_flags_clear_auth(w);
-            web_client_flag_set(w, WEB_CLIENT_FLAG_AUTH_BEARER);
+            web_client_set_permissions(w, z->access, z->user_role, WEB_CLIENT_FLAG_AUTH_BEARER);
             return true;
         }
     }
@@ -72,6 +70,7 @@ time_t bearer_create_token(uuid_t *uuid, struct web_client *w) {
     if(!z->created_s) {
         z->created_s = now_monotonic_sec();
         z->expires_s = z->created_s + BEARER_TOKEN_EXPIRATION;
+        z->user_role = w->user_role;
         z->access = w->access;
         uuid_copy(z->cloud_account_id, w->auth.cloud_account_id);
         strncpyz(z->cloud_user_name, w->auth.client_name, sizeof(z->cloud_account_id) - 1);

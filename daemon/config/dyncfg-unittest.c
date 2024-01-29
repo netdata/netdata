@@ -125,6 +125,7 @@ bool dyncfg_unittest_parse_payload(BUFFER *payload, TEST *t, DYNCFG_CMDS cmd, co
         dyncfg_add_low_level(localhost, t2->id, "/unittests",
                              DYNCFG_STATUS_RUNNING, t2->type, t2->source_type, t2->source,
                              t2->cmds, 0, 0, t2->sync,
+                             HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
                              dyncfg_unittest_execute_cb, t2);
     }
     else {
@@ -281,7 +282,7 @@ cleanup:
     return rc;
 }
 
-static bool dyncfg_unittest_check(TEST *t, const char *cmd, bool received) {
+static bool dyncfg_unittest_check(TEST *t, DYNCFG_CMDS c, const char *cmd, bool received) {
     size_t errors = 0;
 
     fprintf(stderr, "CHECK '%s' after cmd '%s'...", t->id, cmd);
@@ -346,31 +347,31 @@ static bool dyncfg_unittest_check(TEST *t, const char *cmd, bool received) {
         fprintf(stderr, "\n");
         errors++;
     }
-    else if(df->type == DYNCFG_TYPE_JOB && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves) {
+    else if(df->type == DYNCFG_TYPE_JOB && df->current.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->dyncfg.saves) {
         fprintf(stderr, "\n  - DYNCFG job has no saves!");
         errors++;
     }
-    else if(df->type == DYNCFG_TYPE_JOB && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && (!df->payload || !buffer_strlen(df->payload))) {
+    else if(df->type == DYNCFG_TYPE_JOB && df->current.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && (!df->dyncfg.payload || !buffer_strlen(df->dyncfg.payload))) {
         fprintf(stderr, "\n  - DYNCFG job has no payload!");
         errors++;
     }
-    else if(df->user_disabled && !df->saves) {
+    else if(df->dyncfg.user_disabled && !df->dyncfg.saves) {
         fprintf(stderr, "\n  - DYNCFG disabled config has no saves!");
         errors++;
     }
-    else if(t->source && string_strcmp(df->source, t->source) != 0) {
+    else if((c & (DYNCFG_CMD_ADD | DYNCFG_CMD_UPDATE)) && t->source && string_strcmp(df->current.source, t->source) != 0) {
         fprintf(stderr, "\n  - source does not match!");
         errors++;
     }
-    else if(df->source && !t->source) {
+    else if((c & (DYNCFG_CMD_ADD | DYNCFG_CMD_UPDATE)) && df->current.source && !t->source) {
         fprintf(stderr, "\n  - there is a source but it shouldn't be any!");
         errors++;
     }
-    else if(t->needs_save && df->saves <= t->last_saves) {
+    else if(t->needs_save && df->dyncfg.saves <= t->last_saves) {
         fprintf(stderr, "\n  - should be saved, but it is not saved!");
         errors++;
     }
-    else if(!t->needs_save && df->saves > t->last_saves) {
+    else if(!t->needs_save && df->dyncfg.saves > t->last_saves) {
         fprintf(stderr, "\n  - should be not be saved, but it saved!");
         errors++;
     }
@@ -398,7 +399,7 @@ static void dyncfg_unittest_reset(void) {
             dyncfg_unittest_register_error(NULL, NULL);
         }
         else
-            t->last_saves = df->saves;
+            t->last_saves = df->dyncfg.saves;
     }
     dfe_done(t);
 }
@@ -408,7 +409,7 @@ void should_be_saved(TEST *t, DYNCFG_CMDS c) {
 
     if(t->type == DYNCFG_TYPE_TEMPLATE) {
         df = dictionary_get(dyncfg_globals.nodes, t->id);
-        t->current.enabled = !df->user_disabled;
+        t->current.enabled = !df->dyncfg.user_disabled;
     }
 
     t->needs_save =
@@ -466,7 +467,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
 
     should_be_saved(t, c);
 
-    int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ADMIN, cmd,
+    int rc = rrd_function_run(localhost, wb, 10, HTTP_ACCESS_ALL, cmd,
                               true, NULL,
                               NULL, NULL,
                               NULL, NULL,
@@ -477,7 +478,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
         dyncfg_unittest_register_error(NULL, NULL);
     }
 
-    dyncfg_unittest_check(t, cmd, true);
+    dyncfg_unittest_check(t, c, cmd, true);
 
     if(rc == HTTP_RESP_OK && t->type == DYNCFG_TYPE_TEMPLATE) {
         if(c == DYNCFG_CMD_ADD) {
@@ -490,7 +491,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
                        id, cmd);
                 dyncfg_unittest_register_error(NULL, NULL);
             }
-            dyncfg_unittest_check(tt, cmd, true);
+            dyncfg_unittest_check(tt, c, cmd, true);
         }
         else {
             STRING *template = string_strdupz(t->id);
@@ -508,7 +509,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
                             tt->expected.enabled = false;
                         if(c == DYNCFG_CMD_ENABLE)
                             tt->expected.enabled = true;
-                        dyncfg_unittest_check(tt, cmd, true);
+                        dyncfg_unittest_check(tt, c, cmd, true);
                     }
                 }
             }
@@ -549,12 +550,14 @@ static TEST *dyncfg_unittest_add(TEST t) {
     TEST *ret = dictionary_set(dyncfg_unittest_data.nodes, t.id, &t, sizeof(t));
 
     if(!dyncfg_add_low_level(localhost, t.id, "/unittests", DYNCFG_STATUS_RUNNING, t.type,
-        t.source_type, t.source,
-        t.cmds, 0, 0, t.sync, dyncfg_unittest_execute_cb, ret)) {
+                              t.source_type, t.source,
+                              t.cmds, 0, 0, t.sync,
+                              HTTP_ACCESS_NONE, HTTP_ACCESS_NONE,
+                              dyncfg_unittest_execute_cb, ret)) {
         dyncfg_unittest_register_error(t.id, "addition of job failed");
     }
 
-    dyncfg_unittest_check(ret, "plugin create", t.type != DYNCFG_TYPE_TEMPLATE);
+    dyncfg_unittest_check(ret, DYNCFG_CMD_NONE, "plugin create", t.type != DYNCFG_TYPE_TEMPLATE);
 
     return ret;
 }

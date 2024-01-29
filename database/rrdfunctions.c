@@ -240,7 +240,8 @@ static inline bool is_function_dyncfg(const char *name) {
 }
 
 void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
-                      const char *help, const char *tags, HTTP_ACCESS access, bool sync,
+                      const char *help, const char *tags,
+                      HTTP_ACCESS access, bool sync,
                       rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
 
     // RRDSET *st may be NULL in this function

@@ -1756,7 +1756,8 @@ void *netdev_main(void *ptr)
 
     rrd_function_add_inline(localhost, NULL, "network-interfaces", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_NETDEV_HELP,
-                            "top", HTTP_ACCESS_ANY, netdev_function_net_interfaces);
+                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                            netdev_function_net_interfaces);
 
     netdata_thread_cleanup_push(netdev_main_cleanup, ptr) {
         usec_t step = localhost->rrd_update_every * USEC_PER_SEC;

@@ -1119,11 +1119,13 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
     // for the other nodes, the origin server should register it
     rrd_function_add_inline(localhost, NULL, "streaming", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT + 1, RRDFUNCTIONS_STREAMING_HELP, "top",
-        HTTP_ACCESS_MEMBER, rrdhost_function_streaming);
+                            HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+                            rrdhost_function_streaming);
 
     rrd_function_add_inline(localhost, NULL, "netdata-api-calls", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT + 2, RRDFUNCTIONS_PROGRESS_HELP, "top",
-        HTTP_ACCESS_MEMBER, rrdhost_function_progress);
+                            HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+                            rrdhost_function_progress);
 
     if (likely(system_info)) {
         migrate_localhost(&localhost->host_uuid);

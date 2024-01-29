@@ -113,9 +113,13 @@ typedef enum __attribute__((packed)) {
 #define web_client_check_conn_cloud(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD)
 #define web_client_check_conn_webrtc(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_WEBRTC)
 
+#define WEB_CLIENT_FLAG_ALL_AUTHS (WEB_CLIENT_FLAG_AUTH_CLOUD | WEB_CLIENT_FLAG_AUTH_BEARER)
 #define web_client_flags_clear_conn(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_CONN_TCP | WEB_CLIENT_FLAG_CONN_UNIX | WEB_CLIENT_FLAG_CONN_CLOUD | WEB_CLIENT_FLAG_CONN_WEBRTC)
-#define web_client_flags_check_auth(w) web_client_flag_check(w, WEB_CLIENT_FLAG_AUTH_CLOUD | WEB_CLIENT_FLAG_AUTH_BEARER)
-#define web_client_flags_clear_auth(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_AUTH_CLOUD | WEB_CLIENT_FLAG_AUTH_BEARER)
+#define web_client_flags_check_auth(w) web_client_flag_check(w, WEB_CLIENT_FLAG_ALL_AUTHS)
+#define web_client_flags_clear_auth(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_ALL_AUTHS)
+
+void web_client_reset_permissions(struct web_client *w);
+void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, WEB_CLIENT_FLAGS auth);
 
 void web_client_set_conn_tcp(struct web_client *w);
 void web_client_set_conn_unix(struct web_client *w);
@@ -166,8 +170,9 @@ struct web_client {
     WEB_CLIENT_FLAGS flags;             // status flags for the client
     HTTP_REQUEST_MODE mode;             // the operational mode of the client
     HTTP_ACL acl;                       // the access list of the client
-    HTTP_ACCESS access;                 // the access level of the client
-    int port_acl;                       // the operations permitted on the port the client connected to
+    HTTP_ACL port_acl;                  // the operations permitted on the port the client connected to
+    HTTP_ACCESS access;                 // the access permissions of the client
+    HTTP_USER_ROLE user_role;           // the user role of the client
     size_t header_parse_tries;
     size_t header_parse_last_size;
 
@@ -234,7 +239,9 @@ struct web_client {
 };
 
 int web_client_permission_denied(struct web_client *w);
-int web_client_bearer_required(struct web_client *w);
+int web_client_permission_denied_acl(struct web_client *w);
+
+int web_client_service_unavailable(struct web_client *w);
 
 ssize_t web_client_send(struct web_client *w);
 ssize_t web_client_receive(struct web_client *w);

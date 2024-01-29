@@ -20,6 +20,8 @@ struct rrd_function_inflight {
     bool cancelled;
     usec_t stop_monotonic_ut;
 
+    HTTP_ACCESS user_access;
+
     BUFFER *payload;
 
     const DICTIONARY_ITEM *host_function_acquired;
@@ -198,6 +200,7 @@ static inline int rrd_call_function_async_and_dont_wait(struct rrd_function_infl
         .transaction = &r->transaction_uuid,
         .function = r->sanitized_cmd,
         .payload = r->payload,
+        .user_access = r->user_access,
         .source = r->source,
         .stop_monotonic_ut = &r->stop_monotonic_ut,
         .result = {
@@ -248,6 +251,7 @@ static int rrd_call_function_async_and_wait(struct rrd_function_inflight *r) {
         .transaction = &r->transaction_uuid,
         .function = r->sanitized_cmd,
         .payload = r->payload,
+        .user_access = r->user_access,
         .source = r->source,
         .stop_monotonic_ut = &r->stop_monotonic_ut,
         .result = {
@@ -388,7 +392,8 @@ static inline int rrd_call_function_async(struct rrd_function_inflight *r, bool 
 
 // ----------------------------------------------------------------------------
 
-int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCESS access, const char *cmd,
+int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
+                     HTTP_ACCESS user_access, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,
@@ -432,21 +437,52 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
 
     struct rrd_host_function *rdcf = dictionary_acquired_item_value(host_function_acquired);
 
-    if(!web_client_has_enough_access_level(access, rdcf->access)) {
+    if(!http_access_user_has_enough_access_level_for_endpoint(user_access, rdcf->access)) {
 
         if(!aclk_connected)
-            rrd_call_function_error(result_wb, "This Netdata must be connected to Netdata Cloud to access this function.", HTTP_RESP_PRECOND_FAIL);
-        else if(access >= HTTP_ACCESS_ANY)
-            rrd_call_function_error(result_wb, "You need to login to the Netdata Cloud space this agent is claimed to, to access this function.", HTTP_RESP_PRECOND_FAIL);
-        else /* if(access < HTTP_ACCESS_ANY && rdcf->access < access) */
-            rrd_call_function_error(result_wb, "To access this function you need to be an admin in this Netdata Cloud space.", HTTP_RESP_PRECOND_FAIL);
+            code = rrd_call_function_error(result_wb,
+                                           "This Netdata must be connected to Netdata Cloud for Single-Sign-On (SSO) "
+                                           "access this feature. Claim this Netdata to Netdata Cloud to enable access.",
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+
+        else if((rdcf->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
+            code = rrd_call_function_error(result_wb,
+                                           "You need to be authenticated via Netdata Cloud Single-Sign-On (SSO) "
+                                           "to access this feature. Sign-in on this dashboard, "
+                                           "or access your Netdata via https://app.netdata.cloud.",
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+
+        else if((rdcf->access & HTTP_ACCESS_SAME_SPACE) && !(user_access & HTTP_ACCESS_SAME_SPACE))
+            code = rrd_call_function_error(result_wb,
+                                           "You need to login to the Netdata Cloud space this agent is claimed to, "
+                                           "to access this feature.",
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+
+        else if((rdcf->access & HTTP_ACCESS_COMMERCIAL_SPACE) && !(user_access & HTTP_ACCESS_COMMERCIAL_SPACE))
+            code = rrd_call_function_error(result_wb,
+                                           "This feature is only available for commercial users and supporters "
+                                           "of Netdata. To use it, please upgrade your space. "
+                                           "Thank you for supporting Netdata.",
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+
+        else {
+            HTTP_ACCESS missing_access = (~user_access) & rdcf->access;
+            char perms_str[1024];
+            http_access2txt(perms_str, sizeof(perms_str), ", ", missing_access);
+
+            char msg[2048];
+            snprintfz(msg, sizeof(msg), "This feature requires additional permissions: %s.", perms_str);
+
+            code = rrd_call_function_error(result_wb, msg,
+                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+        }
 
         dictionary_acquired_item_release(host->functions, host_function_acquired);
 
         if(result_cb)
-            result_cb(result_wb, HTTP_RESP_PRECOND_FAIL, result_cb_data);
+            result_cb(result_wb, code, result_cb_data);
 
-        return HTTP_RESP_PRECOND_FAIL;
+        return code;
     }
 
     if(timeout_s <= 0)
@@ -475,6 +511,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
         .sanitized_cmd = strdupz(sanitized_cmd),
         .sanitized_cmd_length = sanitized_cmd_length,
         .transaction = strdupz(transaction),
+        .user_access = user_access,
         .source = strdupz(sanitized_source),
         .payload = buffer_dup(payload),
         .timeout = timeout_s,
@@ -524,6 +561,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCES
             .transaction = &r->transaction_uuid,
             .function = r->sanitized_cmd,
             .payload = r->payload,
+            .user_access = r->user_access,
             .source = r->source,
             .stop_monotonic_ut = &r->stop_monotonic_ut,
             .result = {

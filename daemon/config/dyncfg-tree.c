@@ -25,27 +25,38 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
         if(df->type == DYNCFG_TYPE_JOB)
             buffer_json_member_add_string(wb, "template", string2str(df->template));
 
-        buffer_json_member_add_string(wb, "status", dyncfg_id2status(df->status));
+        buffer_json_member_add_string(wb, "status", dyncfg_id2status(df->current.status));
         dyncfg_cmds2json_array(df->cmds, "cmds", wb);
-        buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(df->source_type));
-        buffer_json_member_add_string(wb, "source", string2str(df->source));
+        buffer_json_member_add_object(wb, "access");
+        {
+            http_access2buffer_json_array(wb, "view", df->view_access);
+            http_access2buffer_json_array(wb, "edit", df->edit_access);
+        }
+        buffer_json_object_close(wb);
+        buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(df->current.source_type));
+        buffer_json_member_add_string(wb, "source", string2str(df->current.source));
         buffer_json_member_add_boolean(wb, "sync", df->sync);
-        buffer_json_member_add_boolean(wb, "user_disabled", df->user_disabled);
-        buffer_json_member_add_boolean(wb, "restart_required", df->restart_required);
-        buffer_json_member_add_boolean(wb, "plugin_rejected", df->restart_required);
+        buffer_json_member_add_boolean(wb, "user_disabled", df->dyncfg.user_disabled);
+        buffer_json_member_add_boolean(wb, "restart_required", df->dyncfg.restart_required);
+        buffer_json_member_add_boolean(wb, "plugin_rejected", df->dyncfg.plugin_rejected);
         buffer_json_member_add_object(wb, "payload");
         {
-            if (df->payload && buffer_strlen(df->payload)) {
+            if (df->dyncfg.payload && buffer_strlen(df->dyncfg.payload)) {
                 buffer_json_member_add_boolean(wb, "available", true);
-                buffer_json_member_add_string(wb, "content_type", content_type_id2string(df->payload->content_type));
-                buffer_json_member_add_uint64(wb, "content_length", df->payload->len);
+                buffer_json_member_add_string(wb, "status", dyncfg_id2status(df->dyncfg.status));
+                buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(df->dyncfg.source_type));
+                buffer_json_member_add_string(wb, "source", string2str(df->dyncfg.source));
+                buffer_json_member_add_uint64(wb, "created_ut", df->dyncfg.created_ut);
+                buffer_json_member_add_uint64(wb, "modified_ut", df->dyncfg.modified_ut);
+                buffer_json_member_add_string(wb, "content_type", content_type_id2string(df->dyncfg.payload->content_type));
+                buffer_json_member_add_uint64(wb, "content_length", df->dyncfg.payload->len);
             } else
                 buffer_json_member_add_boolean(wb, "available", false);
         }
         buffer_json_object_close(wb); // payload
-        buffer_json_member_add_uint64(wb, "saves", df->saves);
-        buffer_json_member_add_uint64(wb, "created_ut", df->created_ut);
-        buffer_json_member_add_uint64(wb, "modified_ut", df->modified_ut);
+        buffer_json_member_add_uint64(wb, "saves", df->dyncfg.saves);
+        buffer_json_member_add_uint64(wb, "created_ut", df->current.created_ut);
+        buffer_json_member_add_uint64(wb, "modified_ut", df->current.modified_ut);
     }
     buffer_json_object_close(wb);
 }
@@ -72,7 +83,7 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
             continue;
 
         if(!rrd_function_available(host, string2str(df->function)))
-            df->status = DYNCFG_STATUS_ORPHAN;
+            df->current.status = DYNCFG_STATUS_ORPHAN;
 
         if((id && strcmp(id, df_dfe.name) != 0) || (template && df->template != template))
             continue;
@@ -105,17 +116,17 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
 
             dyncfg_to_json(df, dictionary_acquired_item_name(items[i]), wb);
 
-            if(df->status != DYNCFG_STATUS_ORPHAN) {
-                if (df->restart_required)
+            if (df->dyncfg.plugin_rejected)
+                plugin_rejected++;
+
+            if(df->current.status != DYNCFG_STATUS_ORPHAN) {
+                if (df->dyncfg.restart_required)
                     restart_required++;
 
-                if (df->plugin_rejected)
-                    plugin_rejected++;
-
-                if (df->status == DYNCFG_STATUS_FAILED)
+                if (df->current.status == DYNCFG_STATUS_FAILED)
                     status_failed++;
 
-                if (df->status == DYNCFG_STATUS_INCOMPLETE)
+                if (df->current.status == DYNCFG_STATUS_INCOMPLETE)
                     status_incomplete++;
             }
         }
@@ -208,7 +219,6 @@ cleanup:
 
 void dyncfg_host_init(RRDHOST *host) {
     rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120,
-                     1000, "Dynamic configuration", "config",
-                     HTTP_ACCESS_ADMIN,
+                     1000, "Dynamic configuration", "config", HTTP_ACCESS_ANONYMOUS_DATA,
                      true, dyncfg_config_execute_cb, host);
 }

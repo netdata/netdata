@@ -478,7 +478,7 @@ The plugin can register functions to Netdata, like this:
   - `member` to offer the function to all authenticated members of Netdata.
   - `admin` to offer the function only to authenticated administrators. 
 
-A function can be used by users to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
+Users can use a function to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
 
 - per node
 - per chart
@@ -489,13 +489,17 @@ Users can get a list of all the registered functions using the `/api/v1/function
 
 Once a function is called, the plugin will receive at its standard input a command that looks like this:
 
-> FUNCTION transaction_id timeout "name and parameters of the function as one quoted parameter" "source of request"
+```
+FUNCTION transaction_id timeout "name and parameters of the function as one quoted parameter" "user permissions value" "source of request"
+```
 
 When the function to be called is to receive a payload of parameters, the call looks like this:
 
-> FUNCTION_PAYLOAD transaction_id timeout "name and parameters of the function as one quoted parameter" "source of request" "content/type"
-> body of the payload, formatted according to content/type
-> FUNCTION PAYLOAD END
+```
+FUNCTION_PAYLOAD transaction_id timeout "name and parameters of the function as one quoted parameter" "user permissions value" "source of request" "content/type"
+body of the payload, formatted according to content/type
+FUNCTION PAYLOAD END
+```
 
 In this case, Netdata will send:
 
@@ -522,7 +526,9 @@ FUNCTION_RESULT_END
 
 If the plugin prepares a response, it should send (via its standard output, together with the collected data, but not interleaved with them):
 
-> FUNCTION_RESULT_BEGIN transaction_id http_response_code content_type expiration
+```
+FUNCTION_RESULT_BEGIN transaction_id http_response_code content_type expiration
+```
 
 Where:
 
@@ -537,7 +543,9 @@ The type of the context itself depends on the plugin and the UI.
 
 To terminate the message, Netdata seeks a line with just this:
 
-> FUNCTION_RESULT_END
+```
+FUNCTION_RESULT_END
+```
 
 This defines the end of the message. `FUNCTION_RESULT_END` should appear in a line alone, without any other text, so it is wise to add `\n` before and after it.
 
@@ -557,7 +565,9 @@ When a request takes too long to be processed, Netdata allows the plugin to repo
 
 The plugin can send `FUNCTION_PROGRESS` like this:
 
-> FUNCTION_PROGRESS transaction_id done all
+```
+FUNCTION_PROGRESS transaction_id done all
+```
 
 Where:
 
@@ -583,7 +593,9 @@ To accomplish this, when Netdata receives a progress request by a user, it gener
 
 The plugin will receive progress requests like this:
 
-> FUNCTION_PROGRESS transaction_id
+```
+FUNCTION_PROGRESS transaction_id
+```
 
 There is no need to respond to this command. It is only there to let the plugin know that a user is still waiting for the query to finish. 
 
@@ -595,7 +607,9 @@ Dynamically configurations made this way are saved to disk by Netdata and are re
 
 `CONFIG` commands look like this:
 
-> CONFIG id action ...
+```
+CONFIG id action ...
+```
 
 Where:
 
@@ -606,12 +620,13 @@ Where:
   - `status`, to update the dynamic configuration entity status
 
 > IMPORTANT:<br/>
-> The plugin should blindly create, delete and update the status of its dynamic configuration entities, without any special logic applied to it. Netdata needs to be updated of what is actually happening at the plugin. Keep in mind that creating dynamic configuration entities triggers responses from Netdata, depending on its type and status. Re-creating a job, triggers the same responses every time. 
-
+> The plugin should blindly create, delete and update the status of its dynamic configuration entities, without any special logic applied to it. Netdata needs to be updated of what is actually happening at the plugin. Keep in mind that creating dynamic configuration entities triggers responses from Netdata, depending on its type and status. Re-creating a job, triggers the same responses every time, so make sure you create jobs only when you add jobs. 
 
 When the `action` is `create`, the following additional parameters are expected:
 
-> CONFIG id action status type "path" source_type "source" "supported commands"
+```
+CONFIG id action status type "path" source_type "source" "supported commands" "view permissions" "edit permissions"
+```
 
 Where:
 
@@ -644,23 +659,26 @@ Where:
   - `remove`, to remove a configuration. Only `jobs` should support this command.
   - `enable` and `disable`, to receive user requests to enable and disable this entity. Adding only one of `enable` or `disable` to the supported commands, Netdata will add both of them. The plugin should expose these commands on `templates` only when it wants to receive `enable` and `disable` commands for all the `jobs` of this `template`.
   - `restart`, to restart a job.
+- `view permissions` and `edit permissions` are bitmaps of the Netdata permission system to control access to the configuration. If set to zero, Netdata will require a signed in user with view and edit permissions to the Netdata's configuration system.
 
 The plugin receives commands as if it had exposed a `FUNCTION` named `config`. Netdata formats all these calls like this:
 
-> config id command
+```
+config id command
+```
 
 Where `id` is the unique id of the configurable entity and `command` is one of the supported commands the plugin sent to Netdata.
 
-The plugin will receive (for commands: `schema`, `get`, `remove`, `enable` and `disable`):
+The plugin will receive (for commands: `schema`, `get`, `remove`, `enable`, `disable` and `restart`):
 
 ```
-FUNCTION transaction_id timeout "config id command"
+FUNCTION transaction_id timeout "config id command" "user permissions value" "source string"
 ```
 
 or (for commands: `update`, `add` and `test`):
 
 ```
-FUNCTION_PAYLOAD transaction_id timeout "config id command" "content/type"
+FUNCTION_PAYLOAD transaction_id timeout "config id command" "user permissions value" "source string" "content/type"
 body of the payload formatted according to content/type
 FUNCTION_PAYLOAD_END
 ```

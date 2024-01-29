@@ -1677,11 +1677,13 @@ void *cgroups_main(void *ptr) {
 
     rrd_function_add_inline(localhost, NULL, "containers-vms", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT / 2, RRDFUNCTIONS_CGTOP_HELP,
-                            "top", HTTP_ACCESS_ANY, cgroup_function_cgroup_top);
+                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                            cgroup_function_cgroup_top);
 
     rrd_function_add_inline(localhost, NULL, "systemd-services", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT / 3, RRDFUNCTIONS_SYSTEMD_SERVICES_HELP,
-                            "top", HTTP_ACCESS_ANY, cgroup_function_systemd_top);
+                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                            cgroup_function_systemd_top);
 
     heartbeat_t hb;
     heartbeat_init(&hb);

@@ -12,6 +12,7 @@ struct inflight_function {
     int timeout_s;
     STRING *function;
     BUFFER *payload;
+    HTTP_ACCESS access;
     const char *source;
 
     BUFFER *result_body_wb;

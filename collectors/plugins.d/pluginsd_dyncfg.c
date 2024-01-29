@@ -14,17 +14,21 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
     char *action = get_word(words, num_words, i++);
 
     if(strcmp(action, PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE) == 0) {
-        char *status_str         = get_word(words, num_words, i++);
-        char *type_str           = get_word(words, num_words, i++);
-        char *path               = get_word(words, num_words, i++);
-        char *source_type_str    = get_word(words, num_words, i++);
-        char *source             = get_word(words, num_words, i++);
-        char *supported_cmds_str = get_word(words, num_words, i++);
+        char *status_str            = get_word(words, num_words, i++);
+        char *type_str              = get_word(words, num_words, i++);
+        char *path                  = get_word(words, num_words, i++);
+        char *source_type_str       = get_word(words, num_words, i++);
+        char *source                = get_word(words, num_words, i++);
+        char *supported_cmds_str    = get_word(words, num_words, i++);
+        char *view_permissions_str  = get_word(words, num_words, i++);
+        char *edit_permissions_str  = get_word(words, num_words, i++);
 
         DYNCFG_STATUS status = dyncfg_status2id(status_str);
         DYNCFG_TYPE type = dyncfg_type2id(type_str);
         DYNCFG_SOURCE_TYPE source_type = dyncfg_source_type2id(source_type_str);
         DYNCFG_CMDS cmds = dyncfg_cmds2id(supported_cmds_str);
+        HTTP_ACCESS view_access = http_access_from_hex(view_permissions_str);
+        HTTP_ACCESS edit_access = http_access_from_hex(edit_permissions_str);
 
         if(!dyncfg_add_low_level(
                 host,
@@ -38,6 +42,8 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
                 0,
                 0,
                 false,
+                view_access,
+                edit_access,
                 pluginsd_function_execute_cb,
                 parser))
             return PARSER_RC_ERROR;

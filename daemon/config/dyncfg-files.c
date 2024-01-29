@@ -21,7 +21,9 @@ void dyncfg_file_save(const char *id, DYNCFG *df) {
         return;
     }
 
-    df->modified_ut = now_realtime_usec();
+    df->dyncfg.modified_ut = now_realtime_usec();
+    if(!df->dyncfg.created_ut)
+        df->dyncfg.created_ut = df->dyncfg.modified_ut;
 
     fprintf(fp, "version=%zu\n", DYNCFG_VERSION);
     fprintf(fp, "id=%s\n", id);
@@ -36,24 +38,24 @@ void dyncfg_file_save(const char *id, DYNCFG *df) {
     fprintf(fp, "path=%s\n", string2str(df->path));
     fprintf(fp, "type=%s\n", dyncfg_id2type(df->type));
 
-    fprintf(fp, "source_type=%s\n", dyncfg_id2source_type(df->source_type));
-    fprintf(fp, "source=%s\n", string2str(df->source));
+    fprintf(fp, "source_type=%s\n", dyncfg_id2source_type(df->dyncfg.source_type));
+    fprintf(fp, "source=%s\n", string2str(df->dyncfg.source));
 
-    fprintf(fp, "created=%"PRIu64"\n", df->created_ut);
-    fprintf(fp, "modified=%"PRIu64"\n", df->modified_ut);
+    fprintf(fp, "created=%"PRIu64"\n", df->dyncfg.created_ut);
+    fprintf(fp, "modified=%"PRIu64"\n", df->dyncfg.modified_ut);
     fprintf(fp, "sync=%s\n", df->sync ? "true" : "false");
-    fprintf(fp, "user_disabled=%s\n", df->user_disabled ? "true" : "false");
-    fprintf(fp, "saves=%"PRIu32"\n", ++df->saves);
+    fprintf(fp, "user_disabled=%s\n", df->dyncfg.user_disabled ? "true" : "false");
+    fprintf(fp, "saves=%"PRIu32"\n", ++df->dyncfg.saves);
 
     fprintf(fp, "cmds=");
     dyncfg_cmds2fp(df->cmds, fp);
     fprintf(fp, "\n");
 
-    if(df->payload && buffer_strlen(df->payload) > 0) {
-        fprintf(fp, "content_type=%s\n", content_type_id2string(df->payload->content_type));
-        fprintf(fp, "content_length=%zu\n", buffer_strlen(df->payload));
+    if(df->dyncfg.payload && buffer_strlen(df->dyncfg.payload) > 0) {
+        fprintf(fp, "content_type=%s\n", content_type_id2string(df->dyncfg.payload->content_type));
+        fprintf(fp, "content_length=%zu\n", buffer_strlen(df->dyncfg.payload));
         fprintf(fp, "---\n");
-        fwrite(buffer_tostring(df->payload), 1, buffer_strlen(df->payload), fp);
+        fwrite(buffer_tostring(df->dyncfg.payload), 1, buffer_strlen(df->dyncfg.payload), fp);
     }
 
     fclose(fp);
@@ -66,9 +68,7 @@ void dyncfg_file_load(const char *filename) {
         return;
     }
 
-    DYNCFG tmp = {
-        .status = DYNCFG_STATUS_ORPHAN,
-    };
+    DYNCFG tmp = { 0 };
 
     char line[PLUGINSD_LINE_MAX];
     CLEAN_CHAR_P *id = NULL;
@@ -115,19 +115,19 @@ void dyncfg_file_load(const char *filename) {
         } else if (strcmp(key, "type") == 0) {
             tmp.type = dyncfg_type2id(value);
         } else if (strcmp(key, "source_type") == 0) {
-            tmp.source_type = dyncfg_source_type2id(value);
+            tmp.dyncfg.source_type = dyncfg_source_type2id(value);
         } else if (strcmp(key, "source") == 0) {
-            tmp.source = string_strdupz(value);
+            tmp.dyncfg.source = string_strdupz(value);
         } else if (strcmp(key, "created") == 0) {
-            tmp.created_ut = strtoull(value, NULL, 10);
+            tmp.dyncfg.created_ut = strtoull(value, NULL, 10);
         } else if (strcmp(key, "modified") == 0) {
-            tmp.modified_ut = strtoull(value, NULL, 10);
+            tmp.dyncfg.modified_ut = strtoull(value, NULL, 10);
         } else if (strcmp(key, "sync") == 0) {
             tmp.sync = (strcmp(value, "true") == 0);
         } else if (strcmp(key, "user_disabled") == 0) {
-            tmp.user_disabled = (strcmp(value, "true") == 0);
+            tmp.dyncfg.user_disabled = (strcmp(value, "true") == 0);
         } else if (strcmp(key, "saves") == 0) {
-            tmp.saves = strtoull(value, NULL, 10);
+            tmp.dyncfg.saves = strtoull(value, NULL, 10);
         } else if (strcmp(key, "content_type") == 0) {
             content_type = content_type_string2id(value);
         } else if (strcmp(key, "content_length") == 0) {
@@ -137,12 +137,26 @@ void dyncfg_file_load(const char *filename) {
         }
     }
 
-    if(read_payload && content_length) {
-        tmp.payload = buffer_create(content_length, NULL);
-        tmp.payload->content_type = content_type;
+    if (read_payload) {
+        // Determine the actual size of the remaining file content
+        long saved_position = ftell(fp); // Save current position
+        fseek(fp, 0, SEEK_END);
+        long total_size = ftell(fp); // Total size of the file
+        size_t actual_size = total_size - saved_position; // Calculate remaining content size
+        fseek(fp, saved_position, SEEK_SET); // Reset file pointer to the beginning of the payload
 
-        buffer_need_bytes(tmp.payload, content_length);
-        tmp.payload->len = fread(tmp.payload->buffer, 1, content_length, fp);
+        // Use actual_size instead of content_length to handle the whole remaining file
+        tmp.dyncfg.payload = buffer_create(actual_size, NULL);
+        tmp.dyncfg.payload->content_type = content_type;
+
+        buffer_need_bytes(tmp.dyncfg.payload, actual_size);
+        tmp.dyncfg.payload->len = fread(tmp.dyncfg.payload->buffer, 1, actual_size, fp);
+
+        if (content_length != tmp.dyncfg.payload->len) {
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "DYNCFG: content_length %zu does not match actual payload size %zu for file '%s'",
+                   content_length, actual_size, filename);
+        }
     }
 
     fclose(fp);
@@ -155,6 +169,11 @@ void dyncfg_file_load(const char *filename) {
         dyncfg_cleanup(&tmp);
         return;
     }
+
+    tmp.dyncfg.status = DYNCFG_STATUS_ORPHAN;
+    tmp.dyncfg.restart_required = false;
+
+    dyncfg_set_current_from_dyncfg(&tmp);
 
     dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp));
 }

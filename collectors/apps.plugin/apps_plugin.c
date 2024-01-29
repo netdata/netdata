@@ -13,16 +13,18 @@
 #define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
 
 #define APPS_PLUGIN_FUNCTIONS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" %d \"%s\" \"top\" \"members\" %d\n", \
-                PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,         \
-                RRDFUNCTIONS_PRIORITY_DEFAULT / 10); \
-    } while(0)
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",         \
+            PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,                          \
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID|HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_SENSITIVE_DATA),     \
+            RRDFUNCTIONS_PRIORITY_DEFAULT / 10);                                                                    \
+} while(0)
 
 #define APPS_PLUGIN_GLOBAL_FUNCTIONS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"processes\" %d \"%s\" \"top\" \"members\" %d\n", \
-                PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,                \
-                RRDFUNCTIONS_PRIORITY_DEFAULT / 10); \
-    } while(0)
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"processes\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",  \
+            PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,                          \
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID|HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_SENSITIVE_DATA),     \
+            RRDFUNCTIONS_PRIORITY_DEFAULT / 10);                                                                    \
+} while(0)
 
 // ----------------------------------------------------------------------------
 // debugging
@@ -4399,8 +4401,14 @@ static void apps_plugin_function_processes_help(const char *transaction) {
 
 static void function_processes(const char *transaction, char *function __maybe_unused,
                                usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-                               BUFFER *payload __maybe_unused, const char *source __maybe_unused, void *data __maybe_unused) {
+                               BUFFER *payload __maybe_unused, HTTP_ACCESS access,
+                               const char *source __maybe_unused, void *data __maybe_unused) {
     struct pid_stat *p;
+
+    bool show_cmdline = http_access_user_has_enough_access_level_for_endpoint(
+                            access, HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE |
+                                        HTTP_ACCESS_SENSITIVE_DATA | HTTP_ACCESS_VIEW_AGENT_CONFIG) ||
+                        enable_function_cmdline;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
     size_t num_words = quoted_strings_splitter_pluginsd(function, words, PLUGINSD_MAX_WORDS);
@@ -4573,7 +4581,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
         buffer_json_add_array_item_string(wb, p->comm);
 
         // cmdline
-        if (enable_function_cmdline) {
+        if (show_cmdline) {
             buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
         }
 
@@ -4684,7 +4692,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
                                     RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
 
-        if (enable_function_cmdline) {
+        if (show_cmdline) {
             buffer_rrdf_table_add_field(wb, field_id++, "CmdLine", "Command Line", RRDF_FIELD_TYPE_STRING,
                                         RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0,
                                         NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,

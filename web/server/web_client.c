@@ -30,20 +30,47 @@ void web_client_set_conn_webrtc(struct web_client *w) {
     web_client_flag_set(w, WEB_CLIENT_FLAG_CONN_WEBRTC);
 }
 
+void web_client_reset_permissions(struct web_client *w) {
+    web_client_flags_clear_auth(w);
+    w->access = HTTP_ACCESS_NONE;
+}
+
+void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, WEB_CLIENT_FLAGS auth) {
+    web_client_reset_permissions(w);
+    web_client_flag_set(w, auth & WEB_CLIENT_FLAG_ALL_AUTHS);
+    w->access = access;
+    w->user_role = role;
+}
+
+inline int web_client_permission_denied_acl(struct web_client *w) {
+    w->response.data->content_type = CT_TEXT_PLAIN;
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "You need to be authorized to access this resource");
+    w->response.code = HTTP_RESP_UNAVAILABLE_FOR_LEGAL_REASONS;
+    return HTTP_RESP_UNAVAILABLE_FOR_LEGAL_REASONS;
+}
+
 inline int web_client_permission_denied(struct web_client *w) {
     w->response.data->content_type = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, "You are not allowed to access this resource.");
-    w->response.code = HTTP_RESP_FORBIDDEN;
-    return HTTP_RESP_FORBIDDEN;
+
+    if(w->access & HTTP_ACCESS_SIGNED_ID)
+        buffer_strcat(w->response.data,
+                      "You don't have enough permissions to access this resource");
+    else
+        buffer_strcat(w->response.data,
+                      "You need to be authorized to access this resource");
+
+    w->response.code = HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(w->access);
+    return w->response.code;
 }
 
-inline int web_client_bearer_required(struct web_client *w) {
+inline int web_client_service_unavailable(struct web_client *w) {
     w->response.data->content_type = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, "An authorization bearer is required to access the resource.");
-    w->response.code = HTTP_RESP_PRECOND_FAIL;
-    return HTTP_RESP_PRECOND_FAIL;
+    buffer_strcat(w->response.data, "This service is currently unavailable.");
+    w->response.code = HTTP_RESP_SERVICE_UNAVAILABLE;
+    return HTTP_RESP_SERVICE_UNAVAILABLE;
 }
 
 static inline int bad_request_multiple_dashboard_versions(struct web_client *w) {
@@ -184,7 +211,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     }
 
     memset(w->transaction, 0, sizeof(w->transaction));
-    web_client_flags_clear_auth(w);
+    web_client_reset_permissions(w);
     web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
     web_client_reset_path_flags(w);
 }
@@ -225,7 +252,8 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->forwarded_for),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
             ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
-            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -443,7 +471,7 @@ static int mysendfile(struct web_client *w, char *filename) {
     netdata_log_debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
     if(!http_can_access_dashboard(w))
-        return web_client_permission_denied(w);
+        return web_client_permission_denied_acl(w);
 
     // skip leading slashes
     while (*filename == '/') filename++;
@@ -597,27 +625,7 @@ void buffer_data_options2string(BUFFER *wb, uint32_t options) {
 }
 
 static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    //if(unlikely(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
-    //    buffer_flush(w->response.data);
-    //    buffer_strcat(w->response.data, "This host does not maintain a database");
-    //    return HTTP_RESP_BAD_REQUEST;
-    //}
-
     return func(host, w, url);
-}
-
-static inline int UNUSED_FUNCTION(check_host_and_dashboard_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    if(!http_can_access_dashboard(w))
-        return web_client_permission_denied(w);
-
-    return check_host_and_call(host, w, url, func);
-}
-
-static inline int UNUSED_FUNCTION(check_host_and_mgmt_acl_and_call)(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    if(!http_can_access_mgmt(w))
-        return web_client_permission_denied(w);
-
-    return check_host_and_call(host, w, url, func);
 }
 
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment) {
@@ -633,7 +641,8 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
             ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
-            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -1167,7 +1176,8 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
             ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
-            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -1211,7 +1221,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
 
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *decoded_url_path) {
     if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
-        return web_client_permission_denied(w);
+        return web_client_service_unavailable(w);
 
     static uint32_t
             hash_api = 0,
@@ -1278,7 +1288,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
             if(unlikely(!http_can_access_netdataconf(w)))
-                return web_client_permission_denied(w);
+                return web_client_permission_denied_acl(w);
 
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: generating netdata.conf ...", w->id);
             w->response.data->content_type = CT_TEXT_PLAIN;
@@ -1289,7 +1299,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 #ifdef NETDATA_INTERNAL_CHECKS
         else if(unlikely(hash == hash_exit && strcmp(tok, "exit") == 0)) {
             if(unlikely(!http_can_access_netdataconf(w)))
-                return web_client_permission_denied(w);
+                return web_client_permission_denied_acl(w);
 
             w->response.data->content_type = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
@@ -1305,7 +1315,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
             if(unlikely(!http_can_access_netdataconf(w)))
-                return web_client_permission_denied(w);
+                return web_client_permission_denied_acl(w);
 
             buffer_flush(w->response.data);
 
@@ -1345,7 +1355,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
         else if(unlikely(hash == hash_mirror && strcmp(tok, "mirror") == 0)) {
             if(unlikely(!http_can_access_netdataconf(w)))
-                return web_client_permission_denied(w);
+                return web_client_permission_denied_acl(w);
 
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Mirroring...", w->id);
 
@@ -1393,7 +1403,8 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->auth.cloud_account_id),
             ND_LOG_FIELD_TXT(NDF_USER_NAME, w->auth.client_name),
-            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2access(w->access)),
+            ND_LOG_FIELD_TXT(NDF_USER_ROLE, http_id2user_role(w->user_role)),
+            ND_LOG_FIELD_CB(NDF_USER_ACCESS, log_cb_http_access_to_hex, &w->access),
             ND_LOG_FIELD_END(),
     };
     ND_LOG_STACK_PUSH(lgs);
@@ -1418,7 +1429,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             switch(w->mode) {
                 case HTTP_REQUEST_MODE_STREAM:
                     if(unlikely(!http_can_access_stream(w))) {
-                        web_client_permission_denied(w);
+                        web_client_permission_denied_acl(w);
                         return;
                     }
 
@@ -1433,7 +1444,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                             !http_can_access_mgmt(w) &&
                             !http_can_access_netdataconf(w)
                     )) {
-                        web_client_permission_denied(w);
+                        web_client_permission_denied_acl(w);
                         break;
                     }
 
@@ -1455,7 +1466,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                             !http_can_access_mgmt(w) &&
                             !http_can_access_netdataconf(w)
                     )) {
-                        web_client_permission_denied(w);
+                        web_client_permission_denied_acl(w);
                         break;
                     }
 
@@ -1489,7 +1500,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     break;
 
                 default:
-                    web_client_permission_denied(w);
+                    web_client_permission_denied_acl(w);
                     return;
             }
             break;

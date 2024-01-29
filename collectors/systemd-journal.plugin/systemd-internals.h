@@ -119,7 +119,7 @@ struct journal_directory {
 extern struct journal_directory journal_directories[MAX_JOURNAL_DIRECTORIES];
 
 void journal_init_files_and_directories(void);
-void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, const char *source, void *data);
+void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
 void journal_file_update_header(const char *filename, struct journal_file *jf);
 
 void netdata_systemd_journal_message_ids_init(void);
@@ -129,7 +129,7 @@ void *journal_watcher_main(void *arg);
 void journal_watcher_restart(void);
 
 #ifdef ENABLE_SYSTEMD_DBUS
-void function_systemd_units(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, const char *source, void *data);
+void function_systemd_units(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
 #endif
 
 static inline void send_newline_and_flush(void) {
