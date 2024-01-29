@@ -24,7 +24,7 @@ PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 REPOCONFIG_DEB_VERSION="2-2"
 REPOCONFIG_RPM_VERSION="2-2"
 START_TIME="$(date +%s)"
-STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
+STATIC_INSTALL_ARCHES="x86_64 armv7l armv6l aarch64 ppc64le"
 
 # ======================================================================
 # URLs used throughout the script
@@ -1902,9 +1902,13 @@ prepare_offline_install_source() {
         for arch in ${STATIC_INSTALL_ARCHES}; do
           set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
-          progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
-          if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
-            warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
+          if check_for_remote_file "${NETDATA_STATIC_ARCH_URL}"; then
+            progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
+            if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
+                warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
+            fi
+          else
+            progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
           fi
         done
         legacy=0

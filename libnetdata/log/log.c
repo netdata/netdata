@@ -1128,6 +1128,10 @@ static __thread struct log_field thread_log_fields[_NDF_MAX] = {
             .journal = "ND_USER_ROLE",
             .logfmt = "role",
         },
+        [NDF_USER_ACCESS] = {
+            .journal = "ND_USER_PERMISSIONS",
+            .logfmt = "permissions",
+        },
         [NDF_SRC_IP] = {
             .journal = "ND_SRC_IP",
             .logfmt = "src_ip",

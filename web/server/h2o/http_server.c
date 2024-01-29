@@ -204,6 +204,7 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     if (!api_command.len)
         return 1;
 
+    // TODO - get a web_client from the cache
     // this (emulating struct web_client) is a hack and will be removed
     // in future PRs but needs bigger changes in old http_api_v1
     // we need to make the web_client_api_request_v1 to be web server
@@ -216,7 +217,8 @@ static inline int _netdata_uberhandler(h2o_req_t *req, RRDHOST **host)
     w.response.header = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.url_query_string_decoded = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
     w.url_as_received = buffer_create(NBUF_INITIAL_SIZE_RESP, NULL);
-    w.acl = HTTP_ACL_DASHBOARD;
+    w.port_acl = HTTP_ACL_H2O | HTTP_ACL_ALL_FEATURES;
+    w.acl = w.port_acl; // TODO - web_client_update_acl_matches(w) to restrict this based on user configuration
 
     char *path_c_str = iovec_to_cstr(&api_command);
     char *path_unescaped = url_unescape(path_c_str);

@@ -1308,8 +1308,8 @@ static inline int update_memory_limits(struct cgroup *cg) {
                     return 1;
                 }
             } else {
-                char buffer[30 + 1];
-                int ret = read_file(*filename, buffer, 30);
+                char buffer[32];
+                int ret = read_txt_file(*filename, buffer, sizeof(buffer));
                 if(ret) {
                     collector_error("Cannot refresh cgroup %s memory limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
                     freez(*filename);
@@ -1677,11 +1677,13 @@ void *cgroups_main(void *ptr) {
 
     rrd_function_add_inline(localhost, NULL, "containers-vms", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT / 2, RRDFUNCTIONS_CGTOP_HELP,
-                            "top", HTTP_ACCESS_ANY, cgroup_function_cgroup_top);
+                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                            cgroup_function_cgroup_top);
 
     rrd_function_add_inline(localhost, NULL, "systemd-services", 10,
                             RRDFUNCTIONS_PRIORITY_DEFAULT / 3, RRDFUNCTIONS_SYSTEMD_SERVICES_HELP,
-                            "top", HTTP_ACCESS_ANY, cgroup_function_systemd_top);
+                            "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                            cgroup_function_systemd_top);
 
     heartbeat_t hb;
     heartbeat_init(&hb);

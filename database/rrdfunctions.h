@@ -24,6 +24,8 @@ struct rrd_function_execute {
     BUFFER *payload;
     const char *source;
 
+    HTTP_ACCESS user_access;
+
     usec_t *stop_monotonic_ut;
 
     struct {
@@ -71,7 +73,8 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
 void rrd_function_del(RRDHOST *host, RRDSET *st, const char *name);
 
 // call a function, to be run from anywhere
-int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s, HTTP_ACCESS access, const char *cmd,
+int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
+                     HTTP_ACCESS user_access, const char *cmd,
                      bool wait, const char *transaction,
                      rrd_function_result_callback_t result_cb, void *result_cb_data,
                      rrd_function_progress_cb_t progress_cb, void *progress_cb_data,

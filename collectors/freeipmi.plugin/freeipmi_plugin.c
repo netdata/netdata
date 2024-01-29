@@ -23,8 +23,9 @@
 #include "libnetdata/required_dummies.h"
 
 #define FREEIPMI_GLOBAL_FUNCTION_SENSORS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\" \"top\" \"any\" %d\n", \
-                5, "Displays current sensor state and readings", 100); \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"ipmi-sensors\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n", \
+                5, "Displays current sensor state and readings",                                                     \
+                (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_NONE), 100); \
     } while(0)
 
 // component names, based on our patterns
@@ -1472,7 +1473,8 @@ static const char *get_sensor_function_priority(struct sensor *sn) {
 
 static void freeimi_function_sensors(const char *transaction, char *function __maybe_unused,
                                      usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-                                     BUFFER *payload __maybe_unused, const char *source __maybe_unused, void *data __maybe_unused) {
+                                     BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+                                     const char *source __maybe_unused, void *data __maybe_unused) {
     time_t expires = now_realtime_sec() + update_every;
 
     BUFFER *wb = buffer_create(4096, NULL);

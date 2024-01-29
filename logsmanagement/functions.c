@@ -162,7 +162,7 @@ typedef struct function_query_status {
 
 static void logsmanagement_function_facets(const char *transaction, char *function,
                                            usec_t *stop_monotonic_ut, bool *cancelled,
-                                           BUFFER *payload __maybe_unused,
+                                           BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
                                            const char *src __maybe_unused, void *data __maybe_unused){
 
     struct rusage start, end;
@@ -701,10 +701,11 @@ struct functions_evloop_globals *logsmanagement_func_facets_init(bool *p_logsman
     used_hashes_registry = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     netdata_mutex_lock(&stdout_mut);
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" \"members\" %d\n",
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"logs\" "HTTP_ACCESS_FORMAT" %d\n",
                     LOGS_MANAG_FUNC_NAME, 
                     LOGS_MANAG_QUERY_TIMEOUT_DEFAULT, 
                     FUNCTION_LOGSMANAGEMENT_HELP_SHORT,
+                    (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
                     RRDFUNCTIONS_PRIORITY_DEFAULT + 1);
     netdata_mutex_unlock(&stdout_mut);
 

@@ -14,8 +14,8 @@ bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t d
 time_t bearer_create_token(uuid_t *uuid, struct web_client *w);
 bool web_client_bearer_token_auth(struct web_client *w, const char *v);
 
-static inline bool web_client_has_enough_access_level(HTTP_ACCESS user_level, HTTP_ACCESS endpoint_level) {
-    return user_level != HTTP_ACCESS_NONE && user_level <= endpoint_level;
+static inline bool http_access_user_has_enough_access_level_for_endpoint(HTTP_ACCESS user, HTTP_ACCESS endpoint) {
+    return ((user & endpoint) == endpoint);
 }
 
 #endif //NETDATA_HTTP_AUTH_H

@@ -2,9 +2,45 @@
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
+      "matchPlugin": {
+        "type": "string",
+        "default": "*",
+        "title": "Plugins",
+        "description": "A simple pattern to match the data collection plugins that are collecting the data this rule is to be applied to. The values it takes are shown as _collect_plugin at the labels filter of the charts on the dashboard."
+      },
+      "matchModule": {
+        "type": "string",
+        "default": "*",
+        "title": "Modules",
+        "description": "A simple pattern to match the data collection plugin modules that are collecting the data this rule is to be applied to. The values it takes are shown as _collect_module at the labels filter of the charts on the dashboard."
+      },
+      "matchInstanceLabels": {
+        "type": "string",
+        "default": "*",
+        "title": "Only for instances with these labels",
+        "description": "A simple pattern to match the instance labels of the instances this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard."
+      },
+      "matchHostLabels": {
+        "type": "string",
+        "default": "*",
+        "title": "Only for nodes with these host labels",
+        "description": "A simple pattern to match the node labels of the nodes this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard."
+      },
+      "matchHostnames": {
+        "type": "string",
+        "default": "*",
+        "title": "Only for these hostnames",
+        "description": "A simple pattern to match the hostnames of the nodes this rule is to be applied to."
+      },
+      "matchOs": {
+        "type": "string",
+        "default": "*",
+        "title": "Operating Systems",
+        "description": "A simple pattern to match the operating system name of the nodes this rule is to be applied to. The operating system names are available at the global nodes filter, with label key _os_name."
+      },
       "matchInstance": {
         "type": "object",
-        "title": "Matching rule for a specific instance",
+        "title": "Apply this rule to a single instance",
         "description": "This rule will be applied to a specific instance on all nodes",
         "properties": {
           "on": {
@@ -13,42 +49,12 @@
             "title": "The instance this rule should be applied to",
             "description": "You can find the instance names on all charts at the instances drop down menu. Do not include the host name in this field."
           },
-          "plugin": {
-            "type": "string",
-            "default": "*",
-            "title": "Match data collection plugins",
-            "description": "A simple pattern to match the data collection plugins that are collecting the data this rule is to be applied to."
-          },
-          "module": {
-            "type": "string",
-            "default": "*",
-            "title": "Match data collection plugin modules",
-            "description": "A simple pattern to match the data collection plugin modules that are collecting the data this rule is to be applied to."
-          },
-          "instance_labels": {
-            "type": "string",
-            "default": "*",
-            "title": "Match instance labels",
-            "description": "A simple pattern to match the instance labels of the instances this rule is to be applied to."
-          },
-          "host_labels": {
-            "type": "string",
-            "default": "*",
-            "title": "Match node labels",
-            "description": "A simple pattern to match the node labels of the nodes this rule is to be applied to."
-          },
-          "os": {
-            "type": "string",
-            "default": "*",
-            "title": "Match operating system",
-            "description": "A simple pattern to match the operating system name of the nodes this rule is to be applied to."
-          },
-          "host": {
-            "type": "string",
-            "default": "*",
-            "title": "Match node hostnames",
-            "description": "A simple pattern to match the hostnames of the nodes this rule is to be applied to."
-          }
+          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" },
+          "host_labels": { "$ref": "#/definitions/matchHostLabels" },
+          "host": { "$ref": "#/definitions/matchHostnames" },
+          "os": { "$ref": "#/definitions/matchOs" },
+          "plugin": { "$ref": "#/definitions/matchPlugin" },
+          "module": { "$ref": "#/definitions/matchModule" }
         },
         "required": [
           "on",
@@ -62,57 +68,27 @@
       },
       "matchTemplate": {
         "type": "object",
-        "title": "Matching rule for applying the alert to multiple instances",
+        "title": "Apply this rule to all instances of a context",
         "description": "This rule will applied to all instances on all nodes.",
         "properties": {
           "on": {
             "type": "string",
             "default": "",
             "title": "The context of the instances this rule should be applied to",
-            "description": "You can find the context at the title bar of all charts in the Metrics dashboard, between the chart title and the units (like system.cpu, or disk.io, etc)."
+            "description": "The context is the code-name of each chart on the dashboard, that appears at the chart title bar, between the chart title and its unit of measurement, like: system.cpu, disk.io, etc."
           },
-          "plugin": {
-            "type": "string",
-            "default": "*",
-            "title": "Match data collection plugins",
-            "description": "A simple pattern to match the data collection plugins that are collecting the data this rule is to be applied to."
-          },
-          "module": {
-            "type": "string",
-            "default": "*",
-            "title": "Match data collection plugin modules",
-            "description": "A simple pattern to match the data collection plugin modules that are collecting the data this rule is to be applied to."
-          },
-          "instance_labels": {
-            "type": "string",
-            "default": "*",
-            "title": "Match instance labels",
-            "description": "A simple pattern to match the instance labels of the instances this rule is to be applied to."
-          },
+          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" },
+          "host_labels": { "$ref": "#/definitions/matchHostLabels" },
+          "host": { "$ref": "#/definitions/matchHostnames" },
           "instances": {
             "type": "string",
             "default": "*",
-            "title": "Match instance names",
+            "title": "On on these instances",
             "description": "A simple pattern to match the instance names of the instances this rule is to be applied to."
           },
-          "host_labels": {
-            "type": "string",
-            "default": "*",
-            "title": "Match node labels",
-            "description": "A simple pattern to match the node labels of the nodes this rule is to be applied to."
-          },
-          "os": {
-            "type": "string",
-            "default": "*",
-            "title": "Match operating system",
-            "description": "A simple pattern to match the operating system name of the nodes this rule is to be applied to."
-          },
-          "host": {
-            "type": "string",
-            "default": "*",
-            "title": "Match node hostnames",
-            "description": "A simple pattern to match the hostnames of the nodes this rule is to be applied to."
-          }
+          "os": { "$ref": "#/definitions/matchOs" },
+          "plugin": { "$ref": "#/definitions/matchPlugin" },
+          "module": { "$ref": "#/definitions/matchModule" }
         },
         "required": [
           "on",
@@ -147,7 +123,7 @@
           },
           "component": {
             "type": "string",
-            "title": "Alert Component (sub-type)",
+            "title": "Alert Component",
             "description": "Component is a sub-type of Alert Type. Examples: 'CPU', 'Memory', 'Network', 'Disk', 'Hardware', 'nginx', 'redis', 'postgresql', etc."
           },
           "classification": {
@@ -157,101 +133,71 @@
           },
           "value": {
             "type": "object",
-            "title": "Alert Value",
+            "title": "Alert Value Calculation",
             "description": "Each alert has a value. This section defines how this value is calculated.",
             "properties": {
               "database_lookup": {
                 "type": "object",
+                "title": "Database Query to Get Value",
+                "description": "The database query to be executed to calculate the value of the alert. When set, the query is executed before any other calculations. The result of the query will be available as $this in further calculations.",
                 "properties": {
                   "after": {
                     "type": "integer",
                     "default": 0,
-                    "title": "Time-Series Oldest Time",
+                    "title": "From",
                     "description": "The oldest timestamp of the time-series data to be included in the query. Negative values define a duration in seconds in the past (so, -60 means a minute ago)."
                   },
                   "before": {
                     "type": "integer",
                     "default": 0,
-                    "title": "Time-Series Newest Time",
+                    "title": "To",
                     "description": "The newest timestamp of the time-series data to be included in the query. Negative value define a duration in seconds in the past (so, -60 means a minute ago). Zero means now."
+                  },
+                  "dimensions": {
+                    "type": "string",
+                    "title": "Dimensions",
+                    "description": "A simple pattern to match the dimensions that should be included in the query",
+                    "default": "*"
                   },
                   "grouping": {
                     "type": "string",
-                    "enum": [
-                      "average",
-                      "median",
-                      "min",
-                      "max",
-                      "sum",
-                      "incremental_sum",
-                      "stddev",
-                      "cv",
-                      "trimmed-mean1",
-                      "trimmed-mean2",
-                      "trimmed-mean3",
-                      "trimmed-mean",
-                      "trimmed-mean10",
-                      "trimmed-mean15",
-                      "trimmed-mean20",
-                      "trimmed-mean25",
-                      "trimmed-median1",
-                      "trimmed-median2",
-                      "trimmed-median3",
-                      "trimmed-median",
-                      "trimmed-median10",
-                      "trimmed-median15",
-                      "trimmed-median20",
-                      "trimmed-median25",
-                      "percentile99",
-                      "percentile98",
-                      "percentile97",
-                      "percentile",
-                      "percentile90",
-                      "percentile80",
-                      "percentile75",
-                      "percentile50",
-                      "percentile25",
-                      "ses",
-                      "des",
-                      "countif"
-                    ],
-                    "enumNames": [
-                      "The mean (average) value",
-                      "The median value",
-                      "The minimum value",
-                      "The maximum value",
-                      "The sum of all the values",
-                      "The delta of the latest and oldest values",
-                      "The standard deviation of the values",
-                      "The standard deviation expresses as a % of the mean value",
-                      "The mean after trimming 1% of the extreme values",
-                      "The mean after trimming 2% of the extreme values",
-                      "The mean after trimming 3% of the extreme values",
-                      "The mean after trimming 5% of the extreme values",
-                      "The mean after trimming 10% of the extreme values",
-                      "The mean after trimming 15% of the extreme values",
-                      "The mean after trimming 20% of the extreme values",
-                      "The mean after trimming 25% of the extreme values",
-                      "The median after trimming 1% of the extreme values",
-                      "The median after trimming 2% of the extreme values",
-                      "The median after trimming 3% of the extreme values",
-                      "The median after trimming 5% of the extreme values",
-                      "The median after trimming 10% of the extreme values",
-                      "The median after trimming 15% of the extreme values",
-                      "The median after trimming 20% of the extreme values",
-                      "The median after trimming 25% of the extreme values",
-                      "The 99th percentile of the values",
-                      "The 98th percentile of the values",
-                      "The 97th percentile of the values",
-                      "The 95th percentile of the values",
-                      "The 90th percentile of the values",
-                      "The 80th percentile of the values",
-                      "The 75th percentile of the values",
-                      "The 50th percentile of the values",
-                      "The 25th percentile of the values",
-                      "Single Exponential Smoothing",
-                      "Double Exponential Smoothing",
-                      "Count If zero"
+                    "oneOf": [
+                      { "const": "average", "title": "The mean (average) value" },
+                      { "const": "median", "title": "The median value" },
+                      { "const": "min", "title": "The minimum value" },
+                      { "const": "max", "title": "The maximum value" },
+                      { "const": "sum", "title": "The sum of all the values" },
+                      { "const": "incremental_sum", "title": "The delta of the latest and oldest values" },
+                      { "const": "stddev", "title": "The standard deviation of the values" },
+                      { "const": "cv", "title": "The standard deviation expresses as a % of the mean value" },
+                      { "const": "trimmed-mean1", "title": "The mean after trimming 1% of the extreme values" },
+                      { "const": "trimmed-mean2", "title": "The mean after trimming 2% of the extreme values" },
+                      { "const": "trimmed-mean3", "title": "The mean after trimming 3% of the extreme values" },
+                      { "const": "trimmed-mean", "title": "The mean after trimming 5% of the extreme values" },
+                      { "const": "trimmed-mean10", "title": "The mean after trimming 10% of the extreme values" },
+                      { "const": "trimmed-mean15", "title": "The mean after trimming 15% of the extreme values" },
+                      { "const": "trimmed-mean20", "title": "The mean after trimming 20% of the extreme values" },
+                      { "const": "trimmed-mean25", "title": "The mean after trimming 25% of the extreme values" },
+                      { "const": "trimmed-median1", "title": "The median after trimming 1% of the extreme values" },
+                      { "const": "trimmed-median2", "title": "The median after trimming 2% of the extreme values" },
+                      { "const": "trimmed-median3", "title": "The median after trimming 3% of the extreme values" },
+                      { "const": "trimmed-median", "title": "The median after trimming 5% of the extreme values" },
+                      { "const": "trimmed-median10", "title": "The median after trimming 10% of the extreme values" },
+                      { "const": "trimmed-median15", "title": "The median after trimming 15% of the extreme values" },
+                      { "const": "trimmed-median20", "title": "The median after trimming 20% of the extreme values" },
+                      { "const": "trimmed-median25", "title": "The median after trimming 25% of the extreme values" },
+                      { "const": "percentile99", "title": "The 99th percentile of the values" },
+                      { "const": "percentile98", "title": "The 98th percentile of the values" },
+                      { "const": "percentile97", "title": "The 97th percentile of the values" },
+                      { "const": "percentile", "title": "The 95th percentile of the values" },
+                      { "const": "percentile90", "title": "The 90th percentile of the values" },
+                      { "const": "percentile80", "title": "The 80th percentile of the values" },
+                      { "const": "percentile75", "title": "The 75th percentile of the values" },
+                      { "const": "percentile50", "title": "The 50th percentile of the values" },
+                      { "const": "percentile25", "title": "The 25th percentile of the values" },
+                      { "const": "ses", "title": "Single Exponential Smoothing" },
+                      { "const": "des", "title": "Double Exponential Smoothing" },
+                      { "const": "countif", "title": "Count If zero" }
                     ],
                     "default": "average",
                     "title": "Time Aggregation Function",
@@ -263,68 +209,37 @@
                     "description": "Options affecting the way the value is calculated",
                     "uniqueItems": true,
                     "items": {
-                      "enum": [
-                        "unaligned",
-                        "abs",
-                        "min2max",
-                        "null2zero",
-                        "percentage",
-                        "anomaly-bit",
-                        "match_ids",
-                        "match_names"
-                      ],
-                      "enumNames": [
-                        "Do not shift the time-frame for visual presentation",
-                        "Make all values positive before using them",
-                        "Use the delta of the minimum to the maximum value",
-                        "Treat gaps in the time-series as a zero value",
-                        "Calculate the percentage of the selected dimensions over the sum of all dimensions",
-                        "Query the anomaly rate of the samples collected",
-                        "Match only dimension IDs, not Names",
-                        "Match only dimension Names, not IDs"
+                      "oneOf": [
+                        { "const":  "unaligned", "title": "Do not shift the time-frame for visual presentation" },
+                        { "const":  "abs", "title": "Make all values positive before using them" },
+                        { "const":  "min2max", "title": "Use the delta of the minimum to the maximum value" },
+                        { "const":  "null2zero", "title": "Treat gaps in the time-series as a zero value" },
+                        { "const":  "percentage", "title": "Calculate the percentage of the selected dimensions over the sum of all dimensions" },
+                        { "const":  "anomaly-bit", "title": "Query the anomaly rate of the samples collected" },
+                        { "const":  "match_ids", "title": "Match only dimension IDs, not Names" },
+                        { "const":  "match_names", "title": "Match only dimension Names, not IDs" }
                       ]
                     },
                     "default": [ "unaligned" ]
-                  },
-                  "dimensions": {
-                    "type": "string",
-                    "title": "Dimensions Selection Pattern",
-                    "description": "A simple pattern to match the dimensions that should be included in the query",
-                    "default": "*"
                   }
                 }
               },
               "calculation": {
                 "type": "string",
-                "title": "Calculation Expression",
+                "title": "Calculation to Transform the Value",
                 "description": "The database value is available as '$this'. This expression can utilize variables to transform the value of the alert."
               },
               "units": {
                 "type": "string",
-                "title": "Alert Unit of Measurement",
+                "title": "Unit",
                 "description": "The unit of measurement the alert value is expressed with. If unset, the units of the instance the alert is attached to will be used."
               }
             }
           },
           "conditions": {
             "type": "object",
+            "title": "Warning and Critical Conditions",
             "properties": {
-              "green": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "title": "Healthy threshold ($green)",
-                "description": "A threshold that indicates a healthy status. This threshold can be used as '$green' in the alert conditions."
-              },
-              "red": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "title": "Critical threshold ($red)",
-                "description": "A threshold that indicates a critical status. This threshold can be used as '$red' in the alert conditions."
-              },
               "warning_condition": {
                 "type": "string",
                 "title": "Warning Expression",
@@ -334,12 +249,28 @@
                 "type": "string",
                 "title": "Critical Expression",
                 "description": "The alert value is available as '$this'. If this expression evaluates to a non-zero value, the alert is considered to be in critical level."
+              },
+              "green": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "title": "Healthy threshold",
+                "description": "A threshold that indicates a healthy status. This threshold can be used as '$green' in the alert conditions."
+              },
+              "red": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "title": "Critical threshold",
+                "description": "A threshold that indicates a critical status. This threshold can be used as '$red' in the alert conditions."
               }
             }
           },
           "action": {
             "type": "object",
-            "title": "Alert Action",
+            "title": "Alert Action (notification or automation)",
             "description": "The action the alert should take when it transitions states",
             "properties": {
               "execute": {
@@ -349,7 +280,7 @@
               },
               "recipient": {
                 "type": "string",
-                "title": "Notification Recipients",
+                "title": "Recipient(s)",
                 "description": "A space separated list of the recipients of the alert notifications. The special recipient 'silent' prevents this alert from taking any action (i.e. sending notifications)."
               },
               "options": {
@@ -358,11 +289,8 @@
                 "description": "Options related to the actions this alert will take.",
                 "uniqueItems": true,
                 "items": {
-                  "enum": [
-                    "no-clear-notification"
-                  ],
-                  "enumNames": [
-                    "Do not perform any action when the alert is cleared"
+                  "oneOf": [
+                    { "const":  "no-clear-notification", "title": "Do not perform any action when the alert is cleared"}
                   ]
                 },
                 "default": []
@@ -382,21 +310,21 @@
                     "title": "Delay when going Down",
                     "description": "Delay the action (notification) that many seconds, when the alert is recovering."
                   },
-                  "max": {
-                    "type": "integer",
-                    "title": "Max Acceptable Delay",
-                    "description": "The maximum acceptable delay in seconds, for taking the action (notification)."
-                  },
                   "multiplier": {
                     "type": "number",
-                    "title": "Back-Off on Transitions",
+                    "title": "Back-Off",
                     "description": "Multiply the delay by this number, every time the alert transitions to a new state, while the action (notification) is being delayed."
+                  },
+                  "max": {
+                    "type": "integer",
+                    "title": "Max",
+                    "description": "The maximum acceptable delay in seconds, for taking the action (notification)."
                   }
                 }
               },
               "repeat": {
                 "type": "object",
-                "title": "Action Auto-Repeat",
+                "title": "Auto-Repeat Action",
                 "description": "Repeat the action while the alert is raised.",
                 "properties": {
                   "enabled": {
@@ -442,13 +370,9 @@
             },
             "type": {
               "type": "string",
-              "enum": [
-                "instance",
-                "template"
-              ],
-              "enumNames": [
-                "Apply this rule to a specific instance (deprecated)",
-                "Apply this rule to all instances matching the rules"
+              "oneOf": [
+                { "const":  "instance" , "title": "Apply this rule to a specific instance (deprecated)" },
+                { "const":  "template" , "title": "Apply this rule to all instances" }
               ],
               "default": "template",
               "title": "Type of rule",
@@ -492,7 +416,126 @@
         "enabled": {
           "ui:widget": "checkbox"
         },
+        "match": {
+          "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
+          "on": {
+            "ui:classNames": "dyncfg-grid-col-span-1-6"
+          },
+          "instance_labels": {
+            "ui:classNames": "dyncfg-grid-col-span-1-2"
+          },
+          "host_labels": {
+            "ui:classNames": "dyncfg-grid-col-span-3-2"
+          },
+          "host": {
+            "ui:classNames": "dyncfg-grid-col-span-5-2"
+          },
+          "instances": {
+            "ui:classNames": "dyncfg-grid-col-span-1-2"
+          }
+        },
         "config": {
+          "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
+          "summary": {
+            "ui:classNames": "dyncfg-grid-col-span-1-3"
+          },
+          "info": {
+            "ui:classNames": "dyncfg-grid-col-span-4-3"
+          },
+          "type": {
+            "ui:classNames": "dyncfg-grid-col-span-1-2"
+          },
+          "component": {
+            "ui:classNames": "dyncfg-grid-col-span-3-2"
+          },
+          "classification": {
+            "ui:classNames": "dyncfg-grid-col-span-5-2"
+          },
+          "value": {
+            "ui:classNames": "dyncfg-grid-col-span-1-6",
+            "database_lookup": {
+              "ui:classNames": "dyncfg-grid-col-span-1-6",
+              "after": {
+                "ui:classNames": "dyncfg-grid-col-span-1-1"
+              },
+              "before": {
+                "ui:classNames": "dyncfg-grid-col-span-2-1"
+              },
+              "dimensions": {
+                "ui:classNames": "dyncfg-grid-col-span-3-4"
+              },
+              "grouping": {
+                "ui:classNames": "dyncfg-grid-col-span-1-3"
+              },
+              "options": {
+                "ui:classNames": "dyncfg-grid-col-span-4-3"
+              }
+            },
+            "calculation": {
+              "ui:classNames": "dyncfg-grid-col-span-1-5"
+            },
+            "units": {
+              "ui:classNames": "dyncfg-grid-col-span-6-1"
+            }
+          },
+          "conditions": {
+            "ui:classNames": "dyncfg-grid-col-span-1-6",
+            "warning_condition": {
+              "ui:classNames": "dyncfg-grid-col-span-1-2"
+            },
+            "critical_condition": {
+              "ui:classNames": "dyncfg-grid-col-span-3-2"
+            },
+            "green": {
+              "ui:classNames": "dyncfg-grid-col-span-5-1"
+            },
+            "red": {
+              "ui:classNames": "dyncfg-grid-col-span-6-1"
+            }
+          },
+          "action": {
+            "ui:classNames": "dyncfg-grid-col-span-1-6",
+            "execute": {
+              "ui:classNames": "dyncfg-grid-col-span-1-3"
+            },
+            "recipient": {
+              "ui:classNames": "dyncfg-grid-col-span-4-1"
+            },
+            "options": {
+              "ui:classNames": "dyncfg-grid-col-span-5-2"
+            },
+            "delay": {
+              "ui:Collapsible": true,
+              "ui:InitiallyExpanded": false,
+              "ui:classNames": "dyncfg-grid-col-span-1-6",
+              "up": {
+                "ui:classNames": "dyncfg-grid-col-span-1-2"
+              },
+              "down": {
+                "ui:classNames": "dyncfg-grid-col-span-3-2"
+              },
+              "multiplier": {
+                "ui:classNames": "dyncfg-grid-col-span-5-1"
+              },
+              "max": {
+                "ui:classNames": "dyncfg-grid-col-span-6-1"
+              }
+            },
+            "repeat": {
+              "ui:Collapsible": true,
+              "ui:InitiallyExpanded": false,
+              "ui:classNames": "dyncfg-grid-col-span-1-6",
+              "enabled": {
+                "ui:classNames": "dyncfg-grid-col-span-1-2"
+              },
+              "warning": {
+                "ui:classNames": "dyncfg-grid-col-span-3-2"
+              },
+              "critical": {
+                "ui:classNames": "dyncfg-grid-col-span-5-2"
+              }
+            }
+          },
           "hash": {
             "ui:widget": "hidden"
           },
@@ -505,5 +548,8 @@
         }
       }
     }
+  },
+  "uiOptions": {
+    "fullPage": true
   }
 }

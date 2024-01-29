@@ -115,6 +115,7 @@ option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
 option(ENABLE_SENTRY "enable sentry" False)
+option(ENABLE_WEBRTC "enable webrtc" False)
 
 if(ENABLE_SENTRY)
         include(FetchContent)
@@ -132,6 +133,25 @@ if(ENABLE_SENTRY)
                 URL_HASH SHA256=7a98467c0b2571380a3afc5e681cb13aa406a709529be12d74610b0015ccde0c
         )
         FetchContent_MakeAvailable(sentry)
+endif()
+
+if(ENABLE_WEBRTC)
+        include(FetchContent)
+
+        # ignore debhelper
+        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
+
+        set(PREFER_SYSTEM_LIB True)
+        set(NO_MEDIA True)
+        set(NO_WEBSOCKET True)
+
+        set(HAVE_LIBDATACHANNEL True)
+
+        FetchContent_Declare(libdatachannel
+            GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
+            GIT_TAG v0.20.1
+        )
+        FetchContent_MakeAvailable(libdatachannel)
 endif()
 
 #
@@ -676,6 +696,7 @@ set(LIBNETDATA_FILES
         libnetdata/config/dyncfg.c
         libnetdata/config/dyncfg.h
         libnetdata/json/json-c-parser-inline.h
+        libnetdata/template-enum.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1951,7 +1972,8 @@ if(ENABLE_PLUGIN_EBPF)
 endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
-        set(LOCAL_LISTENERS_FILES collectors/plugins.d/local_listeners.c)
+        set(LOCAL_LISTENERS_FILES collectors/plugins.d/local_listeners.c
+                collectors/plugins.d/local-sockets.h)
 
         add_executable(local-listeners ${LOCAL_LISTENERS_FILES})
         target_link_libraries(local-listeners libnetdata)
@@ -2037,6 +2059,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
+        "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
 )
 
 #

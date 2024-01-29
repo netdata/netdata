@@ -584,33 +584,176 @@ static int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, stru
 }
 
 static struct web_api_command api_commands_v2[] = {
-        {"info",                0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_info,              0},
+    // time-series multi-node multi-instance data APIs
+    {
+        .api = "data",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_data,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "weights",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_weights,
+        .allow_subpaths = 0
+    },
 
-        {"data",                0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_data,              0},
-        {"weights",             0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_weights,           0},
+    // time-series multi-node multi-instance metadata APIs
+    {
+        .api = "contexts",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_contexts,
+        .allow_subpaths = 0
+    },
+    {
+        // full text search
+        .api = "q",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_q,
+        .allow_subpaths = 0
+    },
 
-        {"contexts",            0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_contexts,          0},
-        {"nodes",               0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_nodes,             0},
-        {"node_instances",      0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_node_instances,    0},
-        {"versions",            0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_versions,          0},
-        {"functions",           0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC | ACL_DEV_OPEN_ACCESS, web_client_api_request_v2_functions, 0},
-        {"q",                   0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_q,                 0},
-        {"alerts",              0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_alerts,            0},
+    // multi-node multi-instance alerts APIs
+    {
+        .api = "alerts",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_alerts,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "alert_transitions",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_alert_transitions,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "alert_config",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_alert_config,
+        .allow_subpaths = 0
+    },
 
-        {"alert_transitions",   0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_alert_transitions, 0},
-        {"alert_config",        0, HTTP_ACL_DASHBOARD_ACLK_WEBRTC,      web_client_api_request_v2_alert_config,      0},
+    // agent information APIs
+    {
+        .api = "info",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_info,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "nodes",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_nodes,
+        .allow_subpaths = 0
+    },
+        {
+        .api = "node_instances",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_node_instances,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "versions",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_versions,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "progress",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_progress,
+        .allow_subpaths = 0
+    },
 
-        {"claim",               0, HTTP_ACL_NOCHECK,                    web_client_api_request_v2_claim,             0},
+    // functions APIs
+    {
+        .api = "functions",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_functions,
+        .allow_subpaths = 0
+    },
 
-        {"rtc_offer",           0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, web_client_api_request_v2_webrtc,            0},
-        {"bearer_protection",   0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_protection,                    0},
-        {"bearer_get_token",    0, HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS, api_v2_bearer_token,                         0},
+    // WebRTC APIs
+    {
+        .api = "rtc_offer",
+        .hash = 0,
+        .acl = HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE,
+        .callback = web_client_api_request_v2_webrtc,
+        .allow_subpaths = 0
+    },
 
-        { "ilove.svg",       0,    HTTP_ACL_NOCHECK,                    web_client_api_request_v2_ilove,             0 },
-        { "progress",        0,    HTTP_ACL_NOCHECK,                    web_client_api_request_v2_progress,          0 },
+    // management APIs
+    {
+        .api = "claim",
+        .hash = 0,
+        .acl = HTTP_ACL_NOCHECK,
+        .access = HTTP_ACCESS_NONE,
+        .callback = web_client_api_request_v2_claim,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "bearer_protection",
+        .hash = 0,
+        .acl = HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG | HTTP_ACCESS_EDIT_AGENT_CONFIG,
+        .callback = api_v2_bearer_protection,
+        .allow_subpaths = 0
+    },
+    {
+        .api = "bearer_get_token",
+        .hash = 0,
+        .acl = HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE,
+        .callback = api_v2_bearer_token,
+        .allow_subpaths = 0
+    },
 
+    // Netdata branding APIs
+    {
+        .api = "ilove.svg",
+        .hash = 0,
+        .acl = HTTP_ACL_DASHBOARD,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .callback = web_client_api_request_v2_ilove,
+        .allow_subpaths = 0
+    },
+
+    {
         // terminator
-        {NULL,                  0, HTTP_ACL_NONE,                                        NULL,                       0},
+        .api = NULL,
+        .hash = 0,
+        .acl = HTTP_ACL_NONE,
+        .access = HTTP_ACCESS_NONE,
+        .callback = NULL,
+        .allow_subpaths = 0
+    },
 };
 
 inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *url_path_endpoint) {
@@ -619,8 +762,8 @@ inline int web_client_api_request_v2(RRDHOST *host, struct web_client *w, char *
     if(unlikely(initialized == 0)) {
         initialized = 1;
 
-        for(int i = 0; api_commands_v2[i].command ; i++)
-            api_commands_v2[i].hash = simple_hash(api_commands_v2[i].command);
+        for(int i = 0; api_commands_v2[i].api ; i++)
+            api_commands_v2[i].hash = simple_hash(api_commands_v2[i].api);
     }
 
     return web_client_api_request_vX(host, w, url_path_endpoint, api_commands_v2);

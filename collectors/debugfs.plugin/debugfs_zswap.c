@@ -370,7 +370,7 @@ static int debugfs_is_zswap_enabled()
     snprintfz(filename, FILENAME_MAX, "/sys/module/zswap/parameters/enabled"); // host prefix is not needed here
     char state[ZSWAP_STATE_SIZE + 1];
 
-    int ret = read_file(filename, state, ZSWAP_STATE_SIZE);
+    int ret = read_txt_file(filename, state, sizeof(state));
 
     if (unlikely(!ret && !strcmp(state, "Y"))) {
         return 0;

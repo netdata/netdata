@@ -705,6 +705,7 @@ extern char *netdata_configured_host_prefix;
 #include "xxhash.h"
 
 #include "uuid/uuid.h"
+#include "template-enum.h"
 #include "http/http_access.h"
 #include "http/content_type.h"
 #include "config/dyncfg.h"

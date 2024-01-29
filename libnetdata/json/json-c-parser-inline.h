@@ -25,6 +25,29 @@
     }                                                                                                           \
 } while(0)
 
+#define JSONC_PARSE_TXT2BUFFER_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, required) do {               \
+    json_object *_j;                                                                                            \
+    if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \
+        const char *_s = json_object_get_string(_j);                                                            \
+        if(!_s || !*_s) {                                                                                       \
+            buffer_free(dst);                                                                                   \
+            dst = NULL;                                                                                         \
+        }                                                                                                       \
+        else {                                                                                                  \
+            if (dst)                                                                                            \
+                buffer_flush(dst);                                                                              \
+            else                                                                                                \
+                dst = buffer_create(0, NULL);                                                                   \
+            if (_s && *_s)                                                                                      \
+                buffer_strcat(dst, _s);                                                                         \
+        }                                                                                                       \
+    }                                                                                                           \
+    else if(required) {                                                                                         \
+        buffer_sprintf(error, "missing or invalid type for '%s.%s' string", path, member);                      \
+        return false;                                                                                           \
+    }                                                                                                           \
+} while(0)
+
 #define JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, member, dst, error) do {                        \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j) && json_object_is_type(_j, json_type_string)) {            \

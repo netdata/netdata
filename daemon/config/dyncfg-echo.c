@@ -12,18 +12,42 @@
 
 struct dyncfg_echo {
     const DICTIONARY_ITEM *item;
-    DYNCFG *df;
+    DYNCFG *df;                     // for additions this is the job, not the template
     BUFFER *wb;
-    const char *cmd;
+    DYNCFG_CMDS cmd;
+    const char *cmd_str;
 };
 
 void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code __maybe_unused, void *result_cb_data) {
     struct dyncfg_echo *e = result_cb_data;
+    DYNCFG *df = e->df;
 
-    if(!DYNCFG_RESP_SUCCESS(code))
+    if(DYNCFG_RESP_SUCCESS(code)) {
+        // successful response
+
+        if(e->cmd == DYNCFG_CMD_ADD) {
+            df->dyncfg.status = dyncfg_status_from_successful_response(code);
+            dyncfg_update_status_on_successful_add_or_update(df, code);
+        }
+        else if(e->cmd == DYNCFG_CMD_UPDATE) {
+            df->dyncfg.status = dyncfg_status_from_successful_response(code);
+            dyncfg_update_status_on_successful_add_or_update(df, code);
+        }
+        else if(e->cmd == DYNCFG_CMD_DISABLE)
+            df->dyncfg.status = df->current.status = DYNCFG_STATUS_DISABLED;
+        else if(e->cmd == DYNCFG_CMD_ENABLE)
+            df->dyncfg.status = df->current.status = dyncfg_status_from_successful_response(code);
+    }
+    else {
+        // failed response
+
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "DYNCFG: received response code %d on request to id '%s', cmd: %s",
-               code, dictionary_acquired_item_name(e->item), e->cmd);
+               code, dictionary_acquired_item_name(e->item), e->cmd_str);
+
+        if(e->cmd == DYNCFG_CMD_UPDATE || e->cmd == DYNCFG_CMD_ADD)
+            e->df->dyncfg.plugin_rejected = true;
+    }
 
     buffer_free(e->wb);
     dictionary_acquired_item_release(dyncfg_globals.nodes, e->item);
@@ -31,8 +55,8 @@ void dyncfg_echo_cb(BUFFER *wb __maybe_unused, int code __maybe_unused, void *re
     e->wb = NULL;
     e->df = NULL;
     e->item = NULL;
-    freez((void *)e->cmd);
-    e->cmd = NULL;
+    freez((void *)e->cmd_str);
+    e->cmd_str = NULL;
     freez(e);
 }
 
@@ -60,30 +84,32 @@ void dyncfg_echo(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id __maybe
     e->item = dictionary_acquired_item_dup(dyncfg_globals.nodes, item);
     e->wb = buffer_create(0, NULL);
     e->df = df;
-    e->cmd = strdupz(cmd_str);
+    e->cmd = cmd;
+    e->cmd_str = strdupz(cmd_str);
 
-    char buf[string_strlen(df->function) + strlen(cmd_str) + 20];
-    snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), cmd_str);
+    char buf[string_strlen(df->function) + strlen(e->cmd_str) + 20];
+    snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), e->cmd_str);
 
     rrd_function_run(
-        host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
+        host, e->wb, 10,
+        HTTP_ACCESS_ALL, buf, false, NULL,
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,
-        NULL, string2str(df->source));
+        NULL, string2str(df->dyncfg.source));
 }
 
 // ----------------------------------------------------------------------------
 
-static void dyncfg_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id, const char *cmd) {
+void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id) {
     RRDHOST *host = dyncfg_rrdhost(df);
     if(!host) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot find host of configuration id '%s'", id);
         return;
     }
 
-    if(!df->payload) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: requested to send a '%s' to '%s', but there is no payload", cmd, id);
+    if(!df->dyncfg.payload) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: requested to send an update to '%s', but there is no payload", id);
         return;
     }
 
@@ -91,21 +117,19 @@ static void dyncfg_echo_payload(const DICTIONARY_ITEM *item, DYNCFG *df, const c
     e->item = dictionary_acquired_item_dup(dyncfg_globals.nodes, item);
     e->wb = buffer_create(0, NULL);
     e->df = df;
-    e->cmd = strdupz(cmd);
+    e->cmd = DYNCFG_CMD_UPDATE;
+    e->cmd_str = strdupz("update");
 
-    char buf[string_strlen(df->function) + strlen(cmd) + 20];
-    snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), cmd);
+    char buf[string_strlen(df->function) + strlen(e->cmd_str) + 20];
+    snprintfz(buf, sizeof(buf), "%s %s", string2str(df->function), e->cmd_str);
 
     rrd_function_run(
-        host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
+        host, e->wb, 10,
+        HTTP_ACCESS_ALL, buf, false, NULL,
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,
-        df->payload, string2str(df->source));
-}
-
-void dyncfg_echo_update(const DICTIONARY_ITEM *item, DYNCFG *df, const char *id) {
-    dyncfg_echo_payload(item, df, id, "update");
+        df->dyncfg.payload, string2str(df->dyncfg.source));
 }
 
 // ----------------------------------------------------------------------------
@@ -117,7 +141,7 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
         return;
     }
 
-    if(!df_job->payload) {
+    if(!df_job->dyncfg.payload) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "DYNCFG: requested to send a '%s' to '%s', but there is no payload",
                cmd, id_template);
@@ -128,17 +152,19 @@ static void dyncfg_echo_payload_add(const DICTIONARY_ITEM *item_template __maybe
     e->item = dictionary_acquired_item_dup(dyncfg_globals.nodes, item_job);
     e->wb = buffer_create(0, NULL);
     e->df = df_job;
-    e->cmd = strdupz(cmd);
+    e->cmd = DYNCFG_CMD_ADD;
+    e->cmd_str = strdupz(cmd);
 
     char buf[string_strlen(df_template->function) + strlen(cmd) + 20];
     snprintfz(buf, sizeof(buf), "%s %s", string2str(df_template->function), cmd);
 
     rrd_function_run(
-        host, e->wb, 10, HTTP_ACCESS_ADMIN, buf, false, NULL,
+        host, e->wb, 10,
+        HTTP_ACCESS_ALL, buf, false, NULL,
         dyncfg_echo_cb, e,
         NULL, NULL,
         NULL, NULL,
-        df_job->payload, string2str(df_job->source));
+        df_job->dyncfg.payload, string2str(df_job->dyncfg.source));
 }
 
 void dyncfg_echo_add(const DICTIONARY_ITEM *item_template, const DICTIONARY_ITEM *item_job, DYNCFG *df_template, DYNCFG *df_job, const char *template_id, const char *job_name) {

@@ -248,7 +248,7 @@ static size_t webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t si
                             message_size,
                             chunk,
                             total_chunks,
-                            web_content_type_to_string(content_type)
+                            content_type_id2string(content_type)
         );
 
         internal_fatal((size_t)len != strlen(send_buffer), "WEBRTC compressed header line mismatch");
@@ -294,7 +294,8 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     w->interrupt.callback_data = chan;
     web_client_set_conn_webrtc(w);
 
-    w->acl = HTTP_ACL_WEBRTC;
+    w->port_acl = HTTP_ACL_WEBRTC | HTTP_ACL_ALL_FEATURES;
+    w->acl = w->port_acl;
 
     char *path = (char *)request;
     if(strncmp(request, "POST ", 5) == 0) {
@@ -504,7 +505,7 @@ static void cleanupConnections() {
     spinlock_unlock(&webrtc_base.unsafe.spinlock);
 }
 
-static WEBRTC_CONN *webrtc_create_connection(void) {
+static WEBRTC_CONN * webrtc_create_connection(void) {
     WEBRTC_CONN *conn = callocz(1, sizeof(WEBRTC_CONN));
 
     spinlock_init(&conn->response.spinlock);

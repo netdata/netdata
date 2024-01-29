@@ -44,8 +44,8 @@ void debug_sockets() {
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_NOCHECK) ? "NONE " : "");
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_DASHBOARD) ? "dashboard " : "");
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_REGISTRY) ? "registry " : "");
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_BADGE) ? "badges " : "");
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_MGMT) ? "management " : "");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_BADGES) ? "badges " : "");
+		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_MANAGEMENT) ? "management " : "");
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_STREAMING) ? "streaming " : "");
 		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_NETDATACONF) ? "netdata.conf " : "");
         netdata_log_debug(D_WEB_CLIENT, "Socket fd %d name '%s' acl_flags: %s",
@@ -91,37 +91,39 @@ SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
 int             web_allow_netdataconf_dns;
 
 void web_client_update_acl_matches(struct web_client *w) {
-    w->acl = HTTP_ACL_NONE;
+    w->acl = HTTP_ACL_TRANSPORTS;
 
-    if (!web_allow_dashboard_from ||
-        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_dashboard_from, "dashboard", web_allow_dashboard_dns))
-        w->acl |= HTTP_ACL_DASHBOARD;
+    if(!(w->port_acl & HTTP_ACL_TRANSPORTS_WITHOUT_CLIENT_IP_VALIDATION)) {
+        if (!web_allow_dashboard_from ||
+            connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                               web_allow_dashboard_from, "dashboard", web_allow_dashboard_dns))
+            w->acl |= HTTP_ACL_DASHBOARD;
 
-    if (!web_allow_registry_from ||
-        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_registry_from, "registry", web_allow_registry_dns))
-        w->acl |= HTTP_ACL_REGISTRY;
+        if (!web_allow_registry_from ||
+            connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                               web_allow_registry_from, "registry", web_allow_registry_dns))
+            w->acl |= HTTP_ACL_REGISTRY;
 
-    if (!web_allow_badges_from ||
-        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_badges_from, "badges", web_allow_badges_dns))
-        w->acl |= HTTP_ACL_BADGE;
+        if (!web_allow_badges_from ||
+            connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                               web_allow_badges_from, "badges", web_allow_badges_dns))
+            w->acl |= HTTP_ACL_BADGES;
 
-    if (!web_allow_mgmt_from ||
-        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_mgmt_from, "management", web_allow_mgmt_dns))
-        w->acl |= HTTP_ACL_MGMT;
+        if (!web_allow_mgmt_from ||
+            connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                               web_allow_mgmt_from, "management", web_allow_mgmt_dns))
+            w->acl |= HTTP_ACL_MANAGEMENT;
 
-    if (!web_allow_streaming_from ||
-        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_streaming_from, "streaming", web_allow_streaming_dns))
-        w->acl |= HTTP_ACL_STREAMING;
+        if (!web_allow_streaming_from ||
+            connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                               web_allow_streaming_from, "streaming", web_allow_streaming_dns))
+            w->acl |= HTTP_ACL_STREAMING;
 
-    if (!web_allow_netdataconf_from ||
-       connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                          web_allow_netdataconf_from, "netdata.conf", web_allow_netdataconf_dns))
-        w->acl |= HTTP_ACL_NETDATACONF;
+        if (!web_allow_netdataconf_from ||
+           connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                              web_allow_netdataconf_from, "netdata.conf", web_allow_netdataconf_dns))
+            w->acl |= HTTP_ACL_NETDATACONF;
+    }
 
     w->acl &= w->port_acl;
 }

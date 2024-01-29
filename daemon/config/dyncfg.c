@@ -21,14 +21,17 @@ RRDHOST *dyncfg_rrdhost(DYNCFG *df) {
 }
 
 void dyncfg_cleanup(DYNCFG *v) {
-    buffer_free(v->payload);
-    v->payload = NULL;
+    string_freez(v->dyncfg.source);
+    v->dyncfg.source = NULL;
+
+    buffer_free(v->dyncfg.payload);
+    v->dyncfg.payload = NULL;
 
     string_freez(v->path);
     v->path = NULL;
 
-    string_freez(v->source);
-    v->source = NULL;
+    string_freez(v->current.source);
+    v->current.source = NULL;
 
     string_freez(v->function);
     v->function = NULL;
@@ -40,11 +43,11 @@ void dyncfg_cleanup(DYNCFG *v) {
 static void dyncfg_normalize(DYNCFG *df) {
     usec_t now_ut = now_realtime_usec();
 
-    if(!df->created_ut)
-        df->created_ut = now_ut;
+    if(!df->current.created_ut)
+        df->current.created_ut = now_ut;
 
-    if(!df->modified_ut)
-        df->modified_ut = now_ut;
+    if(!df->current.modified_ut)
+        df->current.modified_ut = now_ut;
 }
 
 static void dyncfg_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -76,7 +79,10 @@ static void dyncfg_react_cb(const DICTIONARY_ITEM *item __maybe_unused, void *va
     ;
 }
 
-static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
+static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data) {
+    bool *overwrite_cb_ptr = data;
+    bool overwrite_cb = (overwrite_cb_ptr && *overwrite_cb_ptr);
+
     DYNCFG *v = old_value;
     DYNCFG *nv = new_value;
 
@@ -94,8 +100,8 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
         changes++;
     }
 
-    if(v->status != nv->status) {
-        SWAP(v->status, nv->status);
+    if(v->cmds != nv->cmds) {
+        SWAP(v->cmds, nv->cmds);
         changes++;
     }
 
@@ -104,42 +110,43 @@ static bool dyncfg_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
         changes++;
     }
 
-    if(v->source_type != nv->source_type) {
-        SWAP(v->source_type, nv->source_type);
+    if(v->view_access != nv->view_access) {
+        SWAP(v->view_access, nv->view_access);
         changes++;
     }
 
-    if(v->cmds != nv->cmds) {
-        SWAP(v->cmds, nv->cmds);
+    if(v->edit_access != nv->edit_access) {
+        SWAP(v->edit_access, nv->edit_access);
         changes++;
     }
 
-    if(v->source != nv->source) {
-        SWAP(v->source, nv->source);
+    if(v->current.status != nv->current.status) {
+        SWAP(v->current.status, nv->current.status);
         changes++;
     }
 
-    if(nv->created_ut < v->created_ut) {
-        SWAP(v->created_ut, nv->created_ut);
+    if (v->current.source_type != nv->current.source_type) {
+        SWAP(v->current.source_type, nv->current.source_type);
         changes++;
     }
 
-    if(nv->modified_ut > v->modified_ut) {
-        SWAP(v->modified_ut, nv->modified_ut);
+    if (v->current.source != nv->current.source) {
+        SWAP(v->current.source, nv->current.source);
         changes++;
     }
 
-    if(v->sync != nv->sync) {
-        SWAP(v->sync, nv->sync);
+    if(nv->current.created_ut < v->current.created_ut) {
+        SWAP(v->current.created_ut, nv->current.created_ut);
         changes++;
     }
 
-    if(nv->payload) {
-        SWAP(v->payload, nv->payload);
+    if(nv->current.modified_ut > v->current.modified_ut) {
+        SWAP(v->current.modified_ut, nv->current.modified_ut);
         changes++;
     }
 
-    if(!v->execute_cb || (nv->overwrite_cb && nv->execute_cb && (v->execute_cb != nv->execute_cb || v->execute_cb_data != nv->execute_cb_data))) {
+    if(!v->execute_cb || (overwrite_cb && nv->execute_cb && (v->execute_cb != nv->execute_cb || v->execute_cb_data != nv->execute_cb_data))) {
+        v->sync = nv->sync,
         v->execute_cb = nv->execute_cb;
         v->execute_cb_data = nv->execute_cb_data;
         changes++;
@@ -177,27 +184,34 @@ void dyncfg_init_low_level(bool load_saved) {
 
 // ----------------------------------------------------------------------------
 
-const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data, bool overwrite_cb) {
+const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const char *path,
+                                           DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type,
+                                           const char *source, DYNCFG_CMDS cmds,
+                                           usec_t created_ut, usec_t modified_ut,
+                                           bool sync, HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
+                                           rrd_function_execute_cb_t execute_cb, void *execute_cb_data,
+                                           bool overwrite_cb) {
     DYNCFG tmp = {
         .host_uuid = uuid2UUID(host->host_uuid),
         .path = string_strdupz(path),
-        .status = status,
-        .type = type,
         .cmds = cmds,
-        .source_type = source_type,
-        .source = string_strdupz(source),
-        .created_ut = created_ut,
-        .modified_ut = modified_ut,
+        .type = type,
+        .view_access = view_access,
+        .edit_access = edit_access,
+        .current = {
+            .status = status,
+            .source_type = source_type,
+            .source = string_strdupz(source),
+            .created_ut = created_ut,
+            .modified_ut = modified_ut,
+        },
         .sync = sync,
-        .user_disabled = false,
-        .restart_required = false,
-        .payload = NULL,
+        .dyncfg = { 0 },
         .execute_cb = execute_cb,
         .execute_cb_data = execute_cb_data,
-        .overwrite_cb = overwrite_cb,
     };
 
-    return dictionary_set_and_acquire_item_advanced(dyncfg_globals.nodes, id, -1, &tmp, sizeof(tmp), NULL);
+    return dictionary_set_and_acquire_item_advanced(dyncfg_globals.nodes, id, -1, &tmp, sizeof(tmp), &overwrite_cb);
 }
 
 static void dyncfg_send_updates(const char *id) {
@@ -210,7 +224,7 @@ static void dyncfg_send_updates(const char *id) {
     DYNCFG *df = dictionary_acquired_item_value(item);
 
     if(df->type == DYNCFG_TYPE_SINGLE || df->type == DYNCFG_TYPE_JOB) {
-        if (df->cmds & DYNCFG_CMD_UPDATE && df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && df->payload && buffer_strlen(df->payload))
+        if (df->cmds & DYNCFG_CMD_UPDATE && df->dyncfg.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && df->dyncfg.payload && buffer_strlen(df->dyncfg.payload))
             dyncfg_echo_update(item, df, id);
     }
     else if(df->type == DYNCFG_TYPE_TEMPLATE && (df->cmds & DYNCFG_CMD_ADD)) {
@@ -221,7 +235,7 @@ static void dyncfg_send_updates(const char *id) {
         dfe_start_reentrant(dyncfg_globals.nodes, df_job) {
             const char *id_template = df_job_dfe.name;
             if(df_job->type == DYNCFG_TYPE_JOB &&                   // it is a job
-                df_job->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && // it is dynamically configured
+                df_job->current.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && // it is dynamically configured
                 df_job->template == template &&                     // it has the same template name
                 strncmp(id_template, id, len) == 0 &&               // the template name matches (redundant)
                 id_template[len] == ':' &&                          // immediately after the template there is ':'
@@ -243,7 +257,7 @@ bool dyncfg_is_user_disabled(const char *id) {
         return false;
 
     DYNCFG *df = dictionary_acquired_item_value(item);
-    bool ret = df->user_disabled;
+    bool ret = df->dyncfg.user_disabled;
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     return ret;
 }
@@ -267,7 +281,18 @@ bool dyncfg_job_has_registered_template(const char *id) {
     return ret;
 }
 
-bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync, rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
+bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
+                          DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source,
+                          DYNCFG_CMDS cmds, usec_t created_ut, usec_t modified_ut, bool sync,
+                          HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
+                          rrd_function_execute_cb_t execute_cb, void *execute_cb_data) {
+
+    if(view_access == HTTP_ACCESS_NONE)
+        view_access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG;
+
+    if(edit_access == HTTP_ACCESS_NONE)
+        edit_access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_EDIT_AGENT_CONFIG;
+
     if(!dyncfg_is_valid_id(id)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: id '%s' is invalid. Ignoring dynamic configuration for it.", id);
         return false;
@@ -318,7 +343,9 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         nd_log(NDLS_DAEMON, NDLP_NOTICE, "%s", buffer_tostring(t));
     }
 
-    const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds, created_ut, modified_ut, sync, execute_cb, execute_cb_data, true);
+    const DICTIONARY_ITEM *item = dyncfg_add_internal(host, id, path, status, type, source_type, source, cmds,
+                                                      created_ut, modified_ut, sync, view_access, edit_access,
+                                                      execute_cb, execute_cb_data, true);
     DYNCFG *df = dictionary_acquired_item_value(item);
 
 //    if(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !df->saves)
@@ -333,14 +360,14 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         1000,
         "Dynamic configuration",
         "config",
-        HTTP_ACCESS_ADMIN,
+        (view_access & edit_access),
         sync,
         dyncfg_function_intercept_cb,
         NULL);
 
-    if(df->type != DYNCFG_TYPE_TEMPLATE) {
+    if(df->type != DYNCFG_TYPE_TEMPLATE && (df->cmds & (DYNCFG_CMD_ENABLE|DYNCFG_CMD_DISABLE))) {
         DYNCFG_CMDS status_to_send_to_plugin =
-            (df->user_disabled || df->status == DYNCFG_STATUS_DISABLED) ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
+            (df->dyncfg.user_disabled || df->current.status == DYNCFG_STATUS_DISABLED) ? DYNCFG_CMD_DISABLE : DYNCFG_CMD_ENABLE;
 
         if (status_to_send_to_plugin == DYNCFG_CMD_ENABLE && dyncfg_is_user_disabled(string2str(df->template)))
             status_to_send_to_plugin = DYNCFG_CMD_DISABLE;
@@ -348,7 +375,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path, DYNCF
         dyncfg_echo(item, df, id, status_to_send_to_plugin);
     }
 
-    if(!(df->source_type == DYNCFG_SOURCE_TYPE_DYNCFG && df->type == DYNCFG_TYPE_JOB))
+    if(!(df->current.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && df->type == DYNCFG_TYPE_JOB))
         dyncfg_send_updates(id);
 
     dictionary_acquired_item_release(dyncfg_globals.nodes, item);
@@ -368,7 +395,7 @@ void dyncfg_del_low_level(RRDHOST *host, const char *id) {
         rrd_function_del(host, NULL, string2str(df->function));
 
         bool garbage_collect = false;
-        if(df->saves == 0) {
+        if(df->dyncfg.saves == 0) {
             dictionary_del(dyncfg_globals.nodes, id);
             garbage_collect = true;
         }
@@ -394,7 +421,7 @@ void dyncfg_status_low_level(RRDHOST *host __maybe_unused, const char *id, DYNCF
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
     if(item) {
         DYNCFG *df = dictionary_acquired_item_value(item);
-        df->status = status;
+        df->current.status = status;
         dictionary_acquired_item_release(dyncfg_globals.nodes, item);
     }
 }
@@ -407,11 +434,11 @@ void dyncfg_add_streaming(BUFFER *wb) {
     // this way the parent does not need to receive removals of config functions;
 
     buffer_sprintf(wb
-                   , PLUGINSD_KEYWORD_FUNCTION " GLOBAL " PLUGINSD_FUNCTION_CONFIG " %d \"%s\" \"%s\" \"%s\" %d\n"
+                   , PLUGINSD_KEYWORD_FUNCTION " GLOBAL " PLUGINSD_FUNCTION_CONFIG " %d \"%s\" \"%s\" "HTTP_ACCESS_FORMAT" %d\n"
                    , 120
                    , "Dynamic configuration"
                    , "config"
-                   , http_id2access(HTTP_ACCESS_ADMIN)
+                   , (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA)
                    , 1000
     );
 }

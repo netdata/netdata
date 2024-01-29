@@ -25,10 +25,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     if(pf->payload && buffer_strlen(pf->payload)) {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION_PAYLOAD " %s %d \"%s\" \"%s\" \"%s\"\n",
+            PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN " %s %d \"%s\" \""HTTP_ACCESS_FORMAT"\" \"%s\" \"%s\"\n",
             transaction,
             pf->timeout_s,
             string2str(pf->function),
+            (HTTP_ACCESS_FORMAT_CAST)pf->access,
             pf->source ? pf->source : "",
             content_type_id2string(pf->payload->content_type)
             );
@@ -39,10 +40,11 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     else {
         buffer_sprintf(
             buffer,
-            PLUGINSD_KEYWORD_FUNCTION " %s %d \"%s\" \"%s\"\n",
+            PLUGINSD_CALL_FUNCTION " %s %d \"%s\" \""HTTP_ACCESS_FORMAT"\" \"%s\"\n",
             transaction,
             pf->timeout_s,
             string2str(pf->function),
+            (HTTP_ACCESS_FORMAT_CAST)pf->access,
             pf->source ? pf->source : ""
             );
     }
@@ -147,7 +149,7 @@ static void pluginsd_function_cancel(void *data) {
             internal_error(true, "PLUGINSD: sending function cancellation to plugin for transaction '%s'", transaction);
 
             char buffer[2048];
-            snprintfz(buffer, sizeof(buffer), PLUGINSD_KEYWORD_FUNCTION_CANCEL " %s\n", transaction);
+            snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_CANCEL " %s\n", transaction);
 
             // send the command to the plugin
             ssize_t ret = send_to_plugin(buffer, t->parser);
@@ -175,7 +177,7 @@ static void pluginsd_function_progress_to_plugin(void *data) {
             internal_error(true, "PLUGINSD: sending function progress to plugin for transaction '%s'", transaction);
 
             char buffer[2048];
-            snprintfz(buffer, sizeof(buffer), PLUGINSD_KEYWORD_FUNCTION_PROGRESS " %s\n", transaction);
+            snprintfz(buffer, sizeof(buffer), PLUGINSD_CALL_FUNCTION_PROGRESS " %s\n", transaction);
 
             // send the command to the plugin
             ssize_t ret = send_to_plugin(buffer, t->parser);
@@ -211,6 +213,7 @@ int pluginsd_function_execute_cb(struct rrd_function_execute *rfe, void *data) {
             .timeout_s = timeout_s,
             .function = string_strdupz(rfe->function),
             .payload = buffer_dup(rfe->payload),
+            .access = rfe->user_access,
             .source = rfe->source ? strdupz(rfe->source) : NULL,
             .parser = parser,
 
@@ -313,7 +316,7 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
     }
 
     rrd_function_add(host, st, name, timeout_s, priority, help, tags,
-                     http_access2id(access_str), false,
+                     http_access_from_hex_mapping_old_roles(access_str), false,
                      pluginsd_function_execute_cb, parser);
 
     parser->user.data_collections_count++;

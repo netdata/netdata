@@ -30,13 +30,15 @@ static int rrd_function_run_inline(struct rrd_function_execute *rfe, void *data)
     return code;
 }
 
-void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority, const char *help, const char *tags,
-                      HTTP_ACCESS access, rrd_function_execute_inline_cb_t execute_cb) {
+void rrd_function_add_inline(RRDHOST *host, RRDSET *st, const char *name, int timeout, int priority,
+                             const char *help, const char *tags,
+                             HTTP_ACCESS access, rrd_function_execute_inline_cb_t execute_cb) {
 
     rrd_collector_started(); // this creates a collector that runs for as long as netdata runs
 
     struct rrd_function_inline *fi = callocz(1, sizeof(struct rrd_function_inline));
     fi->cb = execute_cb;
 
-    rrd_function_add(host, st, name, timeout, priority, help, tags, access, true, rrd_function_run_inline, fi);
+    rrd_function_add(host, st, name, timeout, priority, help, tags, access, true,
+                     rrd_function_run_inline, fi);
 }

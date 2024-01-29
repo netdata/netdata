@@ -361,6 +361,12 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
             | SERVICE_ACLKSYNC
             );
 
+    delta_shutdown_time("stop maintenance thread");
+
+    timeout = !service_wait_exit(
+        SERVICE_MAINTENANCE
+        , 3 * USEC_PER_SEC);
+
     delta_shutdown_time("stop replication, exporters, health and web servers threads");
 
     timeout = !service_wait_exit(
@@ -396,12 +402,6 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
     timeout = !service_wait_exit(
             SERVICE_CONTEXT
-            , 3 * USEC_PER_SEC);
-
-    delta_shutdown_time("stop maintenance thread");
-
-    timeout = !service_wait_exit(
-            SERVICE_MAINTENANCE
             , 3 * USEC_PER_SEC);
 
     delta_shutdown_time("clear web client cache");
@@ -1108,7 +1108,7 @@ static int get_hostname(char *buf, size_t buf_size) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/etc/hostname", netdata_configured_host_prefix);
 
-        if (!read_file(filename, buf, buf_size)) {
+        if (!read_txt_file(filename, buf, buf_size)) {
             trim(buf);
             return 0;
         }

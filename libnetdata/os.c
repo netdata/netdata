@@ -151,11 +151,11 @@ unsigned long read_cpuset_cpus(const char *filename, long system_cpus) {
     static size_t buf_size = 0;
 
     if(!buf) {
-        buf_size = 100U + 6 * system_cpus; // taken from kernel/cgroup/cpuset.c
-        buf = mallocz(buf_size + 1);
+        buf_size = 100U + 6 * system_cpus + 1; // taken from kernel/cgroup/cpuset.c
+        buf = mallocz(buf_size);
     }
 
-    int ret = read_file(filename, buf, buf_size);
+    int ret = read_txt_file(filename, buf, buf_size);
 
     if(!ret) {
         char *s = buf;

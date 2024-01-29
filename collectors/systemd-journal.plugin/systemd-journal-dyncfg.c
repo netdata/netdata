@@ -64,6 +64,7 @@ static int systemd_journal_directories_dyncfg_cb(const char *transaction,
                                                  usec_t *stop_monotonic_ut __maybe_unused,
                                                  bool *cancelled __maybe_unused,
                                                  BUFFER *result,
+                                                 HTTP_ACCESS access __maybe_unused,
                                                  const char *source __maybe_unused,
                                                  void *data __maybe_unused) {
     CLEAN_BUFFER *action = buffer_create(100, NULL);
@@ -94,6 +95,8 @@ void systemd_journal_dyncfg_init(struct functions_evloop_globals *wg) {
         DYNCFG_SOURCE_TYPE_INTERNAL,
         "internal",
         DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE,
+        HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG,
+        HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_EDIT_AGENT_CONFIG,
         systemd_journal_directories_dyncfg_cb,
         NULL);
 }

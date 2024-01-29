@@ -279,6 +279,7 @@ static void ebpf_function_socket_manipulation(const char *transaction,
                                               usec_t *stop_monotonic_ut __maybe_unused,
                                               bool *cancelled __maybe_unused,
                                               BUFFER *payload __maybe_unused,
+                                              HTTP_ACCESS access __maybe_unused,
                                               const char *source __maybe_unused,
                                               void *data __maybe_unused)
 {

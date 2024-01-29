@@ -272,6 +272,7 @@ struct sender_state {
         const char *transaction;
         const char *timeout_s;
         const char *function;
+        const char *access;
         const char *source;
         BUFFER *payload;
     } functions;

@@ -14,7 +14,8 @@ static int dyncfg_inline_callback(struct rrd_function_execute *rfe, void *data _
     if(cancelled)
         code = HTTP_RESP_CLIENT_CLOSED_REQUEST;
     else
-        code = dyncfg_node_find_and_call(dyncfg_nodes, tr, rfe->function, rfe->stop_monotonic_ut, &cancelled, rfe->payload, rfe->source, rfe->result.wb);
+        code = dyncfg_node_find_and_call(dyncfg_nodes, tr, rfe->function, rfe->stop_monotonic_ut, &cancelled,
+                                         rfe->payload, rfe->user_access, rfe->source, rfe->result.wb);
 
     if(code == HTTP_RESP_CLIENT_CLOSED_REQUEST || (rfe->is_cancelled.cb && rfe->is_cancelled.cb(rfe->is_cancelled.data))) {
         buffer_flush(rfe->result.wb);
@@ -27,7 +28,10 @@ static int dyncfg_inline_callback(struct rrd_function_execute *rfe, void *data _
     return code;
 }
 
-bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds, dyncfg_cb_t cb, void *data) {
+bool dyncfg_add(RRDHOST *host, const char *id, const char *path,
+                DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source,
+                DYNCFG_CMDS cmds, HTTP_ACCESS view_access, HTTP_ACCESS edit_access,
+                dyncfg_cb_t cb, void *data) {
 
     struct dyncfg_node tmp = {
         .cmds = cmds,
@@ -38,7 +42,7 @@ bool dyncfg_add(RRDHOST *host, const char *id, const char *path, DYNCFG_STATUS s
     dictionary_set(dyncfg_nodes, id, &tmp, sizeof(tmp));
 
     if(!dyncfg_add_low_level(host, id, path, status, type, source_type, source, cmds,
-                             0, 0, true,
+                             0, 0, true, view_access, edit_access,
                              dyncfg_inline_callback, NULL)) {
         dictionary_del(dyncfg_nodes, id);
         return false;

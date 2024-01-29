@@ -718,7 +718,7 @@ void get_system_timezone(void)
     }
 
     // use the contents of /etc/timezone
-    if (!timezone && !read_file("/etc/timezone", buffer, FILENAME_MAX)) {
+    if (!timezone && !read_txt_file("/etc/timezone", buffer, sizeof(buffer))) {
         timezone = buffer;
         netdata_log_info("TIMEZONE: using the contents of /etc/timezone");
     }
