@@ -134,7 +134,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         send_newline_ut += dt_ut;
 
         if(!tty && send_newline_ut > USEC_PER_SEC) {
-            send_newline_and_flush();
+            send_newline_and_flush(&stdout_mutex);
             send_newline_ut = 0;
         }
     }

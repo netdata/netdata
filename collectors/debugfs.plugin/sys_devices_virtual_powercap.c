@@ -27,7 +27,7 @@ static struct zone_t *get_rapl_zone(const char *control_type __maybe_unused, str
     snprintfz(temp, FILENAME_MAX, "%s/%s", dirname, "name");
 
     char name[FILENAME_MAX + 1] = "";
-    if (read_file(temp, name, sizeof(name) - 1) != 0)
+    if (read_txt_file(temp, name, sizeof(name)) != 0)
         return NULL;
 
     char *trimmed = trim(name);

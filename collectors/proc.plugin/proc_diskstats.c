@@ -213,7 +213,7 @@ static SIMPLE_PATTERN *excluded_disks = NULL;
 
 static unsigned long long int bcache_read_number_with_units(const char *filename) {
     char buffer[50 + 1];
-    if(read_file(filename, buffer, 50) == 0) {
+    if(read_txt_file(filename, buffer, sizeof(buffer)) == 0) {
         static int unknown_units_error = 10;
 
         char *end = NULL;
@@ -547,9 +547,9 @@ static inline char *get_disk_model(char *device) {
     char buffer[256 + 1];
 
     snprintfz(path, sizeof(path) - 1, "%s/%s/device/model", path_to_sys_block, device);
-    if(read_file(path, buffer, 256) != 0) {
+    if(read_txt_file(path, buffer, sizeof(buffer)) != 0) {
         snprintfz(path, sizeof(path) - 1, "%s/%s/device/name", path_to_sys_block, device);
-        if(read_file(path, buffer, 256) != 0)
+        if(read_txt_file(path, buffer, sizeof(buffer)) != 0)
             return NULL;
     }
 
@@ -565,7 +565,7 @@ static inline char *get_disk_serial(char *device) {
     char buffer[256 + 1];
 
     snprintfz(path, sizeof(path) - 1, "%s/%s/device/serial", path_to_sys_block, device);
-    if(read_file(path, buffer, 256) != 0)
+    if(read_txt_file(path, buffer, sizeof(buffer)) != 0)
         return NULL;
 
     return strdupz(buffer);
@@ -778,7 +778,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         strncat(uuid_filename, "/dm/uuid", FILENAME_MAX - size);
 
         char device_uuid[RRD_ID_LENGTH_MAX + 1];
-        if (!read_file(uuid_filename, device_uuid, RRD_ID_LENGTH_MAX) && !strncmp(device_uuid, "LVM-", 4)) {
+        if (!read_txt_file(uuid_filename, device_uuid, sizeof(device_uuid)) && !strncmp(device_uuid, "LVM-", 4)) {
             trim(device_uuid);
 
             char chart_id[RRD_ID_LENGTH_MAX + 1];

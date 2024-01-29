@@ -639,7 +639,7 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
             if(files)
                 dictionary_set(files, full_path, NULL, 0);
 
-            send_newline_and_flush();
+            send_newline_and_flush(&stdout_mutex);
         }
         else if (entry->d_type == DT_LNK) {
             struct stat info;
@@ -657,7 +657,7 @@ void journal_directory_scan_recursively(DICTIONARY *files, DICTIONARY *dirs, con
                 if(files)
                     dictionary_set(files, full_path, NULL, 0);
 
-                send_newline_and_flush();
+                send_newline_and_flush(&stdout_mutex);
             }
         }
     }

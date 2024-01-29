@@ -378,7 +378,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                 snprintfz(filename, FILENAME_MAX, "%s/%s/state", dirname, de->d_name);
 
                 char state[STATE_SIZE + 1];
-                int ret = read_file(filename, state, STATE_SIZE);
+                int ret = read_txt_file(filename, state, sizeof(state));
 
                 if (!ret) {
                     state_file_found = 1;

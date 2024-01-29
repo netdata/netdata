@@ -138,6 +138,13 @@ static inline void pluginsd_function_progress_to_stdout(const char *transaction,
     fflush(stdout);
 }
 
+static inline void send_newline_and_flush(pthread_mutex_t *mutex) {
+    netdata_mutex_lock(mutex);
+    fprintf(stdout, "\n");
+    fflush(stdout);
+    netdata_mutex_unlock(mutex);
+}
+
 void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path,
                                  DYNCFG_STATUS status, DYNCFG_TYPE type, DYNCFG_SOURCE_TYPE source_type, const char *source, DYNCFG_CMDS cmds,
                                  HTTP_ACCESS view_access, HTTP_ACCESS edit_access,

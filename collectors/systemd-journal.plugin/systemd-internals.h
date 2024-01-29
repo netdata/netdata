@@ -132,13 +132,6 @@ void journal_watcher_restart(void);
 void function_systemd_units(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
 #endif
 
-static inline void send_newline_and_flush(void) {
-    netdata_mutex_lock(&stdout_mutex);
-    fprintf(stdout, "\n");
-    fflush(stdout);
-    netdata_mutex_unlock(&stdout_mutex);
-}
-
 static inline bool parse_journal_field(const char *data, size_t data_length, const char **key, size_t *key_length, const char **value, size_t *value_length) {
     const char *k = data;
     const char *equal = strchr(k, '=');
