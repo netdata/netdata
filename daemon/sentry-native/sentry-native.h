@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef SENTRY_NATIVE_H
 #define SENTRY_NATIVE_H
 

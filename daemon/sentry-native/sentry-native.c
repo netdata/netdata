@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "sentry-native.h"
 #include "daemon/common.h"
 
