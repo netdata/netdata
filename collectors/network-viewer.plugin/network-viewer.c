@@ -29,15 +29,15 @@ static void local_socket_to_array(struct local_socket_state *ls, struct local_so
     char remote_address[INET6_ADDRSTRLEN];
     char *protocol;
 
-    if(n->family == AF_INET) {
+    if(n->local.family == AF_INET) {
         ipv4_address_to_txt(n->local.ip.ipv4, local_address);
         ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
-        protocol = n->protocol == IPPROTO_TCP ? "tcp4" : "udp4";
+        protocol = n->local.protocol == IPPROTO_TCP ? "tcp4" : "udp4";
     }
-    else if(n->family == AF_INET6) {
+    else if(n->local.family == AF_INET6) {
         ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
-        protocol = n->protocol == IPPROTO_TCP ? "tcp6" : "udp6";
+        protocol = n->local.protocol == IPPROTO_TCP ? "tcp6" : "udp6";
     }
     else
         return;
@@ -59,8 +59,10 @@ static void local_socket_to_array(struct local_socket_state *ls, struct local_so
         buffer_json_add_array_item_string(wb, n->cmdline);
         buffer_json_add_array_item_string(wb, local_address);
         buffer_json_add_array_item_uint64(wb, n->local.port);
+        buffer_json_add_array_item_string(wb, local_sockets_address_space(&n->local));
         buffer_json_add_array_item_string(wb, remote_address);
         buffer_json_add_array_item_uint64(wb, n->remote.port);
+        buffer_json_add_array_item_string(wb, local_sockets_address_space(&n->remote));
         buffer_json_add_array_item_uint64(wb, 1); // count
     }
     buffer_json_array_close(wb);
@@ -163,7 +165,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                     NULL);
 
         // Cmdline
-        buffer_rrdf_table_add_field(wb, field_id++, "Command Line", "Command Line",
+        buffer_rrdf_table_add_field(wb, field_id++, "CommandLine", "Command Line",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -171,7 +173,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                     NULL);
 
         // Local Address
-        buffer_rrdf_table_add_field(wb, field_id++, "Local IP", "Local IP Address",
+        buffer_rrdf_table_add_field(wb, field_id++, "LocalIP", "Local IP Address",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -179,15 +181,23 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                     NULL);
 
         // Local Port
-        buffer_rrdf_table_add_field(wb, field_id++, "Local Port", "Local Port",
+        buffer_rrdf_table_add_field(wb, field_id++, "LocalPort", "Local Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE,
                                     NULL);
 
+        // Local Address Space
+        buffer_rrdf_table_add_field(wb, field_id++, "LocalAddressSpace", "Local IP Address Space",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
         // Remote Address
-        buffer_rrdf_table_add_field(wb, field_id++, "Remote IP", "Remote IP Address",
+        buffer_rrdf_table_add_field(wb, field_id++, "RemoteIP", "Remote IP Address",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
@@ -195,11 +205,19 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                     NULL);
 
         // Remote Port
-        buffer_rrdf_table_add_field(wb, field_id++, "Remote Port", "Remote Port",
+        buffer_rrdf_table_add_field(wb, field_id++, "RemotePort", "Remote Port",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_VISIBLE,
+                                    NULL);
+
+        // Remote Address Space
+        buffer_rrdf_table_add_field(wb, field_id++, "RemoteAddressSpace", "Remote IP Address Space",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
                                     NULL);
 
         // Count
@@ -321,7 +339,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             buffer_json_member_add_string(wb, "name", "Local IP");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Local IP");
+                buffer_json_add_array_item_string(wb, "LocalIP");
             }
             buffer_json_array_close(wb);
         }
@@ -332,7 +350,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             buffer_json_member_add_string(wb, "name", "Local Port");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Local Port");
+                buffer_json_add_array_item_string(wb, "LocalPort");
             }
             buffer_json_array_close(wb);
         }
@@ -343,7 +361,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             buffer_json_member_add_string(wb, "name", "Remote IP");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Remote IP");
+                buffer_json_add_array_item_string(wb, "RemoteIP");
             }
             buffer_json_array_close(wb);
         }
@@ -354,7 +372,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             buffer_json_member_add_string(wb, "name", "Remote Port");
             buffer_json_member_add_array(wb, "columns");
             {
-                buffer_json_add_array_item_string(wb, "Remote Port");
+                buffer_json_add_array_item_string(wb, "RemotePort");
             }
             buffer_json_array_close(wb);
         }
