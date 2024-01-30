@@ -22,6 +22,26 @@ ENUM_STR_MAP_DEFINE(SOCKET_DIRECTION) = {
 };
 ENUM_STR_DEFINE_FUNCTIONS(SOCKET_DIRECTION, SOCKET_DIRECTION_LISTEN, "unknown");
 
+typedef int TCP_STATE;
+ENUM_STR_MAP_DEFINE(TCP_STATE) = {
+    { .id = TCP_ESTABLISHED, .name = "established" },
+    { .id = TCP_SYN_SENT, .name = "syn-sent" },
+    { .id = TCP_SYN_RECV, .name = "syn-received" },
+    { .id = TCP_FIN_WAIT1, .name = "fin1-wait1" },
+    { .id = TCP_FIN_WAIT2, .name = "fin1-wait2" },
+    { .id = TCP_TIME_WAIT, .name = "time-wait" },
+    { .id = TCP_CLOSE, .name = "close" },
+    { .id = TCP_CLOSE_WAIT, .name = "close-wait" },
+    { .id = TCP_LAST_ACK, .name = "last-ack" },
+    { .id = TCP_LISTEN, .name = "listen" },
+    { .id = TCP_CLOSING, .name = "closing" },
+
+    // terminator
+    { . id = 0, .name = NULL }
+};
+ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
+
+
 static void local_socket_to_array(struct local_socket_state *ls, struct local_socket *n, void *data) {
     BUFFER *wb = data;
 
@@ -53,6 +73,10 @@ static void local_socket_to_array(struct local_socket_state *ls, struct local_so
         buffer_json_add_array_item_string(wb, SOCKET_DIRECTION_2str(n->direction));
         buffer_json_add_array_item_string(wb, protocol);
         buffer_json_add_array_item_string(wb, type);
+        if(n->local.protocol == IPPROTO_TCP)
+            buffer_json_add_array_item_string(wb, TCP_STATE_2str(n->state));
+        else
+            buffer_json_add_array_item_string(wb, "stateless");
         buffer_json_add_array_item_uint64(wb, n->net_ns_inode);
         buffer_json_add_array_item_uint64(wb, n->pid);
         buffer_json_add_array_item_string(wb, n->comm);
@@ -140,6 +164,14 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                     RRDF_FIELD_OPTS_VISIBLE,
                                     NULL);
 
+        // State
+        buffer_rrdf_table_add_field(wb, field_id++, "State", "Socket State",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE,
+                                    NULL);
+
         // Namespace ID
         buffer_rrdf_table_add_field(wb, field_id++, "Namespace ID", "Namespace ID",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
@@ -168,7 +200,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         buffer_rrdf_table_add_field(wb, field_id++, "CommandLine", "Command Line",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_NONE|RRDF_FIELD_OPTS_FULL_WIDTH,
                                     NULL);
 
@@ -403,7 +435,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ----------------------------------------------------------------------------------------------------------------
 
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
-            NETWORK_VIEWER_FUNCTION, 10, NETWORK_VIEWER_HELP,
+            NETWORK_VIEWER_FUNCTION, 60, NETWORK_VIEWER_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
             RRDFUNCTIONS_PRIORITY_DEFAULT);
 
