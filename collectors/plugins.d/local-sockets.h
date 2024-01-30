@@ -170,7 +170,7 @@ typedef struct local_socket {
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) __attribute__ ((format(__printf__, 2, 3)));
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
     if(++ls->stats.errors_encountered == ls->config.max_errors) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-LISTENERS: max number of logs reached. Not logging anymore");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: max number of logs reached. Not logging anymore");
         return;
     }
 
@@ -183,7 +183,7 @@ static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
     vsnprintf(buf, sizeof(buf), format, args);
     va_end(args);
 
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-LISTENERS: %s", buf);
+    nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: %s", buf);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
