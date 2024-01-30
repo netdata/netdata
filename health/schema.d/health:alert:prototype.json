@@ -452,9 +452,9 @@
             "ui:classNames": "dyncfg-grid-col-span-5-2"
           },
           "value": {
-            "ui:classNames": "dyncfg-grid-col-span-1-6",
+            "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "database_lookup": {
-              "ui:classNames": "dyncfg-grid-col-span-1-6",
+              "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "after": {
                 "ui:classNames": "dyncfg-grid-col-span-1-1"
               },
@@ -479,7 +479,7 @@
             }
           },
           "conditions": {
-            "ui:classNames": "dyncfg-grid-col-span-1-6",
+            "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "warning_condition": {
               "ui:classNames": "dyncfg-grid-col-span-1-2"
             },
@@ -494,7 +494,7 @@
             }
           },
           "action": {
-            "ui:classNames": "dyncfg-grid-col-span-1-6",
+            "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "execute": {
               "ui:classNames": "dyncfg-grid-col-span-1-3"
             },
@@ -507,7 +507,7 @@
             "delay": {
               "ui:Collapsible": true,
               "ui:InitiallyExpanded": false,
-              "ui:classNames": "dyncfg-grid-col-span-1-6",
+              "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "up": {
                 "ui:classNames": "dyncfg-grid-col-span-1-2"
               },
@@ -524,7 +524,7 @@
             "repeat": {
               "ui:Collapsible": true,
               "ui:InitiallyExpanded": false,
-              "ui:classNames": "dyncfg-grid-col-span-1-6",
+              "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "enabled": {
                 "ui:classNames": "dyncfg-grid-col-span-1-2"
               },
