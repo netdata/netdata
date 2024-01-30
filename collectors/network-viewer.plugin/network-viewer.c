@@ -72,12 +72,11 @@ static void local_socket_to_array(struct local_socket_state *ls, struct local_so
     {
         buffer_json_add_array_item_string(wb, SOCKET_DIRECTION_2str(n->direction));
         buffer_json_add_array_item_string(wb, protocol);
-        buffer_json_add_array_item_string(wb, type);
+        buffer_json_add_array_item_string(wb, type); // system or container
         if(n->local.protocol == IPPROTO_TCP)
             buffer_json_add_array_item_string(wb, TCP_STATE_2str(n->state));
         else
             buffer_json_add_array_item_string(wb, "stateless");
-        buffer_json_add_array_item_uint64(wb, n->net_ns_inode);
         buffer_json_add_array_item_uint64(wb, n->pid);
         buffer_json_add_array_item_string(wb, n->comm);
         buffer_json_add_array_item_string(wb, n->cmdline);
@@ -87,6 +86,8 @@ static void local_socket_to_array(struct local_socket_state *ls, struct local_so
         buffer_json_add_array_item_string(wb, remote_address);
         buffer_json_add_array_item_uint64(wb, n->remote.port);
         buffer_json_add_array_item_string(wb, local_sockets_address_space(&n->remote));
+        buffer_json_add_array_item_uint64(wb, n->inode);
+        buffer_json_add_array_item_uint64(wb, n->net_ns_inode);
         buffer_json_add_array_item_uint64(wb, 1); // count
     }
     buffer_json_array_close(wb);
@@ -172,14 +173,6 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                     RRDF_FIELD_OPTS_VISIBLE,
                                     NULL);
 
-        // Namespace ID
-        buffer_rrdf_table_add_field(wb, field_id++, "Namespace ID", "Namespace ID",
-                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                    RRDF_FIELD_OPTS_NONE,
-                                    NULL);
-
         // Pid
         buffer_rrdf_table_add_field(wb, field_id++, "PID", "Process ID",
                                     RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
@@ -247,6 +240,22 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         // Remote Address Space
         buffer_rrdf_table_add_field(wb, field_id++, "RemoteAddressSpace", "Remote IP Address Space",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        // inode
+        buffer_rrdf_table_add_field(wb, field_id++, "Inode", "Socket Inode",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        // Namespace inode
+        buffer_rrdf_table_add_field(wb, field_id++, "Namespace Inode", "Namespace Inode",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                     RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
                                     RRDF_FIELD_OPTS_NONE,
