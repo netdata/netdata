@@ -102,6 +102,7 @@ option(ENABLE_PLUGIN_CUPS "enable cups.plugin" True)
 option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network plugin" True)
 option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" True)
 option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" True)
+option(ENABLE_PLUGIN_NETWORK_VIEWER "enable network-viewer" True)
 option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "enable systemd-journal.plugin" True)
 option(ENABLE_PLUGIN_LOGS_MANAGEMENT "enable logs-management.plugin" True)
 
@@ -1947,14 +1948,30 @@ if(ENABLE_PLUGIN_EBPF)
 endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
-        set(LOCAL_LISTENERS_FILES collectors/plugins.d/local_listeners.c
-                collectors/plugins.d/local-sockets.h)
+        set(LOCAL_LISTENERS_FILES
+                collectors/plugins.d/local_listeners.c
+                collectors/plugins.d/local-sockets.h
+        )
 
         add_executable(local-listeners ${LOCAL_LISTENERS_FILES})
         target_link_libraries(local-listeners libnetdata)
 
         install(TARGETS local-listeners
                 COMPONENT local_listeners
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+if(ENABLE_PLUGIN_NETWORK_VIEWER)
+        set(NETWORK_VIEWER_FILES
+                collectors/plugins.d/local-sockets.h
+                collectors/network-viewer.plugin/network-viewer.c
+        )
+
+        add_executable(network-viewer.plugin ${NETWORK_VIEWER_FILES})
+        target_link_libraries(network-viewer.plugin libnetdata)
+
+        install(TARGETS network-viewer.plugin
+                COMPONENT network_viewer_plugin
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 

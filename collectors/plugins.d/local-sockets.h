@@ -96,6 +96,7 @@ typedef struct local_socket_state {
 // --------------------------------------------------------------------------------------------------------------------
 
 typedef enum __attribute__((packed)) {
+    SOCKET_DIRECTION_NONE = 0,
     SOCKET_DIRECTION_LISTEN = (1 << 0),     // a listening socket
     SOCKET_DIRECTION_INBOUND = (1 << 1),    // an inbound socket connecting a remote system to a local listening socket
     SOCKET_DIRECTION_OUTBOUND = (1 << 2),   // a socket initiated by this system, connecting to another system
@@ -114,11 +115,6 @@ struct pid_socket {
     char comm[TASK_COMM_LEN];
 };
 
-union ipv46 {
-    uint32_t ipv4;
-    struct in6_addr ipv6;
-};
-
 struct local_port {
     uint16_t protocol;
     uint16_t family;
@@ -126,7 +122,14 @@ struct local_port {
     uint64_t net_ns_inode;
 };
 
+union ipv46 {
+    uint32_t ipv4;
+    struct in6_addr ipv6;
+};
+
 struct socket_endpoint {
+    uint16_t protocol;
+    uint16_t family;
     uint16_t port;
     union ipv46 ip;
 };
@@ -145,8 +148,6 @@ typedef struct local_socket {
     uint64_t inode;
     uint64_t net_ns_inode;
 
-    uint16_t protocol;
-    uint16_t family;
     int state;
     struct socket_endpoint local;
     struct socket_endpoint remote;
@@ -218,7 +219,7 @@ static inline void local_sockets_fix_cmdline(char* str) {
     }
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 
 static inline bool
 local_sockets_read_proc_inode_link(LS_STATE *ls, const char *filename, uint64_t *inode, const char *type) {
@@ -368,7 +369,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
     return true;
 }
 
-// ----------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 
 static bool local_sockets_is_ipv4_mapped_ipv6_address(const struct in6_addr *addr) {
     // An IPv4-mapped IPv6 address starts with 80 bits of zeros followed by 16 bits of ones
@@ -376,41 +377,116 @@ static bool local_sockets_is_ipv4_mapped_ipv6_address(const struct in6_addr *add
     return memcmp(addr->s6_addr, ipv4_mapped_prefix, 12) == 0;
 }
 
-static bool local_sockets_is_loopback_address(const void *ip, uint16_t family) {
-    if (family == AF_INET) {
+static bool local_sockets_is_loopback_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
         // For IPv4, loopback addresses are in the 127.0.0.0/8 range
-        const uint32_t addr = ntohl(*((const uint32_t *)ip)); // Convert to host byte order for comparison
-        return (addr >> 24) == 127; // Check if the first byte is 127
-    } else if (family == AF_INET6) {
+        return (ntohl(se->ip.ipv4) >> 24) == 127; // Check if the first byte is 127
+    } else if (se->family == AF_INET6) {
         // Check if the address is an IPv4-mapped IPv6 address
-        const struct in6_addr *ipv6_addr = (const struct in6_addr *)ip;
-        if (local_sockets_is_ipv4_mapped_ipv6_address(ipv6_addr)) {
+        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
             // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
-            const uint32_t ipv4_addr = ntohl(*((const uint32_t *)(ipv6_addr->s6_addr + 12)));
-            return (ipv4_addr >> 24) == 127;
+            uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
+            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
+            return (ntohl(ipv4_addr) >> 24) == 127;
         }
 
         // For IPv6, loopback address is ::1
-        const struct in6_addr loopback_ipv6 = IN6ADDR_LOOPBACK_INIT;
-        return memcmp(ipv6_addr, &loopback_ipv6, sizeof(struct in6_addr)) == 0;
+        return memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
     }
 
     return false;
 }
 
-static bool local_sockets_is_zero_address(const void *ip, uint16_t family) {
-    if (family == AF_INET) {
-        // For IPv4, check if the address is not 0.0.0.0
-        const uint32_t zero_ipv4 = 0; // Zero address in network byte order
-        return memcmp(ip, &zero_ipv4, sizeof(uint32_t)) == 0;
-    } else if (family == AF_INET6) {
-        // For IPv6, check if the address is not ::
-        const struct in6_addr zero_ipv6 = IN6ADDR_ANY_INIT;
-        return memcmp(ip, &zero_ipv6, sizeof(struct in6_addr)) == 0;
+static inline bool local_sockets_is_ipv4_reserved_address(uint32_t ip) {
+    // Check for the reserved address ranges
+    ip = ntohl(ip);
+    return (
+            (ip >> 24 == 10) ||                         // Private IP range (A class)
+            (ip >> 20 == (172 << 4) + 1) ||             // Private IP range (B class)
+            (ip >> 16 == (192 << 8) + 168) ||           // Private IP range (C class)
+            (ip >> 24 == 127) ||                        // Loopback address (127.0.0.0)
+            (ip >> 24 == 0) ||                          // Reserved (0.0.0.0)
+            (ip >> 24 == 169 && (ip >> 16) == 254) ||   // Link-local address (169.254.0.0)
+            (ip >> 16 == (192 << 8) + 0)                // Test-Net (192.0.0.0)
+            );
+}
+
+static inline bool local_sockets_is_private_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        return local_sockets_is_ipv4_reserved_address(se->ip.ipv4);
+    }
+    else if (se->family == AF_INET6) {
+        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
+
+        // Check if the address is an IPv4-mapped IPv6 address
+        if (local_sockets_is_ipv4_mapped_ipv6_address(&se->ip.ipv6)) {
+            // Extract the last 32 bits (IPv4 address) and check if it's in the 127.0.0.0/8 range
+            const uint32_t ipv4_addr = *((const uint32_t *)(ip6 + 12));
+            return local_sockets_is_ipv4_reserved_address(ipv4_addr);
+        }
+
+        // Check for link-local addresses (fe80::/10)
+        if ((ip6[0] == 0xFE) && ((ip6[1] & 0xC0) == 0x80))
+            return true;
+
+        // Check for Unique Local Addresses (ULA) (fc00::/7)
+        if ((ip6[0] & 0xFE) == 0xFC)
+            return true;
+
+        // Check for multicast addresses (ff00::/8)
+        if (ip6[0] == 0xFF)
+            return true;
+
+        // For IPv6, loopback address is :: or ::1
+        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0 ||
+               memcmp(&se->ip.ipv6, &in6addr_loopback, sizeof(se->ip.ipv6)) == 0;
     }
 
     return false;
 }
+
+static bool local_sockets_is_multicast_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        // For IPv4, check if the address is 0.0.0.0
+        uint32_t ip = htonl(se->ip.ipv4);
+        return (ip >= 0xE0000000 && ip <= 0xEFFFFFFF);   // Multicast address range (224.0.0.0/4)
+    }
+    else if (se->family == AF_INET6) {
+        // For IPv6, check if the address is ff00::/8
+        uint8_t *ip6 = (uint8_t *)&se->ip.ipv6;
+        return ip6[0] == 0xff;
+    }
+
+    return false;
+}
+
+static bool local_sockets_is_zero_address(struct socket_endpoint *se) {
+    if (se->family == AF_INET) {
+        // For IPv4, check if the address is 0.0.0.0
+        return se->ip.ipv4 == 0;
+    }
+    else if (se->family == AF_INET6) {
+        // For IPv6, check if the address is ::
+        return memcmp(&se->ip.ipv6, &in6addr_any, sizeof(se->ip.ipv6)) == 0;
+    }
+
+    return false;
+}
+
+static inline const char *local_sockets_address_space(struct socket_endpoint *se) {
+    if(local_sockets_is_zero_address(se))
+        return "zero";
+    else if(local_sockets_is_loopback_address(se))
+        return "loopback";
+    else if(local_sockets_is_multicast_address(se))
+        return "multicast";
+    else if(local_sockets_is_private_address(se))
+        return "private";
+    else
+        return "public";
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 static inline void local_sockets_index_listening_port(LS_STATE *ls, LOCAL_SOCKET *n) {
     if(n->direction & SOCKET_DIRECTION_LISTEN) {
@@ -500,17 +576,20 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
         }
 
         n->direction = 0;
-        n->protocol = protocol;
-        n->family = family;
         n->state = (int)state;
         n->inode = inode;
+
+        n->local.family = family;
+        n->local.protocol = protocol;
         n->local.port = local_port;
+
+        n->remote.family = family;
+        n->remote.protocol = protocol;
         n->remote.port = remote_port;
-        n->protocol = protocol;
 
         n->local_port_key.port = n->local.port;
-        n->local_port_key.family = n->family;
-        n->local_port_key.protocol = n->protocol;
+        n->local_port_key.family = family;
+        n->local_port_key.protocol = protocol;
         n->local_port_key.net_ns_inode = ls->proc_self_net_ns_inode;
 
         n->local_ip_hash = XXH3_64bits(&n->local.ip, sizeof(n->local.ip));
@@ -533,7 +612,7 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
 
         simple_hashtable_set_slot_LOCAL_SOCKET(&ls->sockets_hashtable, sl, inode, n);
 
-        if(!local_sockets_is_zero_address(&n->local.ip, n->family)) {
+        if(!local_sockets_is_zero_address(&n->local)) {
             // put all the local IPs into the local_ips hashtable
             // so, we learn all local IPs the system has
 
@@ -547,16 +626,16 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
 
         // --- 1st phase for direction detection ----------------------------------------------------------------------
 
-        if((n->protocol == IPPROTO_TCP && n->state == TCP_LISTEN) ||
-            local_sockets_is_zero_address(&n->local.ip, n->family) ||
-            local_sockets_is_zero_address(&n->remote.ip, n->family)) {
+        if((n->local.protocol == IPPROTO_TCP && n->state == TCP_LISTEN) ||
+            local_sockets_is_zero_address(&n->local) ||
+            local_sockets_is_zero_address(&n->remote)) {
             // the socket is either in a TCP LISTEN, or
             // the remote address is zero
             n->direction |= SOCKET_DIRECTION_LISTEN;
         }
         else if(
-            local_sockets_is_loopback_address(&n->local.ip, n->family) ||
-            local_sockets_is_loopback_address(&n->remote.ip, n->family)) {
+            local_sockets_is_loopback_address(&n->local) ||
+            local_sockets_is_loopback_address(&n->remote)) {
             // the local IP address is loopback
             n->direction |= SOCKET_DIRECTION_LOCAL;
         }

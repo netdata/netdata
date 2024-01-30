@@ -6,18 +6,18 @@
 // --------------------------------------------------------------------------------------------------------------------
 
 static const char *protocol_name(LOCAL_SOCKET *n) {
-    if(n->family == AF_INET) {
-        if(n->protocol == IPPROTO_TCP)
+    if(n->local.family == AF_INET) {
+        if(n->local.protocol == IPPROTO_TCP)
             return "TCP";
-        else if(n->protocol == IPPROTO_UDP)
+        else if(n->local.protocol == IPPROTO_UDP)
             return "UDP";
         else
             return "UNKNOWN_IPV4";
     }
-    else if(n->family == AF_INET6) {
-        if (n->protocol == IPPROTO_TCP)
+    else if(n->local.family == AF_INET6) {
+        if (n->local.protocol == IPPROTO_TCP)
             return "TCP6";
-        else if(n->protocol == IPPROTO_UDP)
+        else if(n->local.protocol == IPPROTO_UDP)
             return "UDP6";
         else
             return "UNKNOWN_IPV6";
@@ -30,11 +30,11 @@ static void print_local_listeners(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, 
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
 
-    if(n->family == AF_INET) {
+    if(n->local.family == AF_INET) {
         ipv4_address_to_txt(n->local.ip.ipv4, local_address);
         ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
     }
-    else if(n->family == AF_INET6) {
+    else if(n->local.family == AF_INET6) {
         ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
     }
@@ -46,11 +46,11 @@ static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKE
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
 
-    if(n->family == AF_INET) {
+    if(n->local.family == AF_INET) {
         ipv4_address_to_txt(n->local.ip.ipv4, local_address);
         ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
     }
-    else if(n->family == AF_INET6) {
+    else if(n->local.family == AF_INET6) {
         ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
     }
