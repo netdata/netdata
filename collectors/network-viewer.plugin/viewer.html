@@ -351,7 +351,7 @@
 
     // Modify your fetchData function to call drawApplications after data transformation
     function fetchData() {
-        fetch('http://10.20.4.200:19999/api/v1/function?function=network-viewer')
+        fetch('http://localhost:19999/api/v1/function?function=network-viewer')
             .then(response => response.json())
             .then(data => {
                 // Your existing code
