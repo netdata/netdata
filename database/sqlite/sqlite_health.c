@@ -359,7 +359,6 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     }
 
     ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
-    host->health.health_log_entries_written++;
 
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
@@ -378,48 +377,6 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
         }
 #endif
     }
-}
-
-/* Health related SQL queries
-   Get a count of rows from health log table
-*/
-#define SQL_COUNT_HEALTH_LOG_DETAIL "SELECT count(1) FROM health_log_detail hld, health_log hl " \
-        "where hl.host_id = @host_id and hl.health_log_id = hld.health_log_id"
-
-static int sql_health_alarm_log_count(RRDHOST *host) {
-    sqlite3_stmt *res = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return -1;
-    }
-
-    int entries_in_db = -1;
-
-    rc = sqlite3_prepare_v2(db_meta, SQL_COUNT_HEALTH_LOG_DETAIL, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to count health log entries from db");
-        goto done;
-    }
-
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for SQL_COUNT_HEALTH_LOG.");
-        goto done;
-    }
-
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW))
-        entries_in_db = (int) sqlite3_column_int64(res, 0);
-
-done:
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement to count health log entries from db");
-
-    return entries_in_db;
 }
 
 /*
@@ -491,10 +448,6 @@ void sql_health_alarm_log_cleanup(RRDHOST *host, bool claimed) {
     rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to cleanup health log detail table, rc = %d", rc);
-
-    int rows = sql_health_alarm_log_count(host);
-    if (rows >= 0)
-        host->health.health_log_entries_written = rows;
 
     if (aclk_table_exists)
         sql_aclk_alert_clean_dead_entries(host);
@@ -769,8 +722,6 @@ void sql_health_alarm_log_load(RRDHOST *host)
     int ret;
     ssize_t errored = 0, loaded = 0;
 
-    host->health.health_log_entries_written = 0;
-
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
             error_report("HEALTH [%s]: Database has not been initialized", rrdhost_hostname(host));
@@ -939,11 +890,6 @@ void sql_health_alarm_log_load(RRDHOST *host)
     ret = sqlite3_finalize(res);
     if (unlikely(ret != SQLITE_OK))
         error_report("Failed to finalize the health log read statement");
-
-    int rows = sql_health_alarm_log_count(host);
-
-    if (rows >= 0)
-        host->health.health_log_entries_written = rows;
 }
 
 /*
