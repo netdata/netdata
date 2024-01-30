@@ -3,9 +3,9 @@
   cd /usr/local
   curl -L https://dl.dagger.io/dagger/install.sh | sudo sh
   ```
-- Install Python's Dagger SDK:
+- Install python requirements:
   ```
-  pip install dagger-io
+  pip install -r packaging/dag/requirements.txt
   ```
 
 Now you can run something like this:
