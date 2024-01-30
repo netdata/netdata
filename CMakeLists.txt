@@ -115,7 +115,26 @@ option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 
 option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
+option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
+
+if(ENABLE_SENTRY)
+        include(FetchContent)
+
+        # ignore debhelper
+        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
+
+        set(SENTRY_VERSION 0.6.6)
+        set(SENTRY_BACKEND "breakpad")
+        set(SENTRY_BUILD_SHARED_LIBS OFF)
+
+        FetchContent_Declare(
+                sentry
+                URL https://github.com/getsentry/sentry-native/releases/download/${SENTRY_VERSION}/sentry-native.zip
+                URL_HASH SHA256=7a98467c0b2571380a3afc5e681cb13aa406a709529be12d74610b0015ccde0c
+        )
+        FetchContent_MakeAvailable(sentry)
+endif()
 
 if(ENABLE_WEBRTC)
         include(FetchContent)
@@ -1305,6 +1324,12 @@ if(LINUX)
                 ${PROC_PLUGIN_FILES}
                 ${TC_PLUGIN_FILES}
         )
+
+        if(ENABLE_SENTRY)
+            list(APPEND NETDATA_FILES
+                    daemon/sentry-native/sentry-native.c
+                    daemon/sentry-native/sentry-native.h)
+        endif()
 elseif(MACOS)
         list(APPEND NETDATA_FILES
                 daemon/static_threads_macos.c
@@ -2050,6 +2075,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
+        "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
 )
 

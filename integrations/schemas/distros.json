@@ -77,6 +77,19 @@
             }
           ]
         },
+        "bundle_sentry": {
+          "description": "Set to true to build an Agent with Sentry telemetry from the CI.",
+          "oneOf": [
+            {
+              "type": "boolean",
+              "default": false
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]*$"
+            }
+          ]
+        },
         "base_image": {
           "type": "string",
           "description": "A string specifying the Docker image to be used for testing this platform.",
@@ -146,7 +159,8 @@
         "distro",
         "version",
         "support_type",
-        "notes"
+        "notes", 
+        "bundle_sentry"
       ]
     }
   }

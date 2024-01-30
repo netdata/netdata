@@ -6,6 +6,10 @@
 
 #include "database/engine/page_test.h"
 
+#ifdef ENABLE_SENTRY
+#include "sentry-native/sentry-native.h"
+#endif
+
 #if defined(ENV32BIT)
 #warning COMPILING 32BIT NETDATA
 #endif
@@ -509,6 +513,10 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     (void) unlink(agent_incomplete_shutdown_file);
 
     delta_shutdown_time("exit");
+
+#ifdef ENABLE_SENTRY
+    sentry_native_fini();
+#endif
 
     usec_t ended_ut = now_monotonic_usec();
     netdata_log_info("NETDATA SHUTDOWN: completed in %llu ms - netdata is now exiting - bye bye...", (ended_ut - started_ut) / USEC_PER_MS);
@@ -1890,7 +1898,6 @@ int main(int argc, char **argv) {
         for_each_open_fd(OPEN_FD_ACTION_CLOSE, OPEN_FD_EXCLUDE_STDIN | OPEN_FD_EXCLUDE_STDOUT | OPEN_FD_EXCLUDE_STDERR);
     }
 
-
     if(!config_loaded) {
         load_netdata_conf(NULL, 0, &user);
         load_cloud_conf(0);
@@ -2098,6 +2105,11 @@ int main(int argc, char **argv) {
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
+
+    // init sentry
+#ifdef ENABLE_SENTRY
+        sentry_native_init();
+#endif
 
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
     struct passwd *pw = getpwuid(getuid());

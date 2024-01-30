@@ -34,6 +34,7 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
+    bundle_sentry: false
   - <<: *alpine
     version: "3.18"
     support_type: Core
@@ -55,6 +56,7 @@ include:
     support_type: Intermediate
     notes: ''
     eol_check: false
+    bundle_sentry: false
     env_prep: |
       pacman --noconfirm -Syu && pacman --noconfirm -Sy grep libffi
     test:
@@ -66,6 +68,7 @@ include:
     support_type: Core
     notes: ''
     eol_check: 'amazon-linux'
+    bundle_sentry: false
     packages: &amzn_packages
       type: rpm
       repo_distro: amazonlinux/2
@@ -89,6 +92,7 @@ include:
     support_type: Core
     notes: ''
     eol_check: false
+    bundle_sentry: false
     packages:
       type: rpm
       repo_distro: el/7
@@ -110,6 +114,7 @@ include:
     jsonc_removal: |
       dnf remove -y json-c-devel
     eol_check: true
+    bundle_sentry: false
     packages: &cs_packages
       type: rpm
       repo_distro: el/c9s
@@ -132,6 +137,7 @@ include:
     notes: ''
     base_image: debian:bookworm
     eol_check: true
+    bundle_sentry: true
     env_prep: |
       apt-get update
     jsonc_removal: |
@@ -149,6 +155,7 @@ include:
   - <<: *debian
     version: "11"
     base_image: debian:bullseye
+    bundle_sentry: false
     packages:
       <<: *debian_packages
       repo_distro: debian/bullseye
@@ -157,6 +164,7 @@ include:
   - <<: *debian
     version: "10"
     base_image: debian:buster
+    bundle_sentry: false
     packages:
       <<: *debian_packages
       repo_distro: debian/buster
@@ -169,6 +177,7 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
+    bundle_sentry: false
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &fedora_packages
@@ -193,6 +202,7 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
+    bundle_sentry: false
     base_image: opensuse/leap:15.5
     jsonc_removal: |
       zypper rm -y libjson-c-devel
@@ -211,6 +221,7 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
+    bundle_sentry: false
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &oracle_packages
@@ -235,6 +246,7 @@ include:
     jsonc_removal: |
       dnf remove -y json-c-devel
     eol_check: true
+    bundle_sentry: false
     packages: &rocky_packages
       type: rpm
       repo_distro: el/9
@@ -263,6 +275,7 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
+    bundle_sentry: false
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
     jsonc_removal: |
@@ -289,11 +302,13 @@ include:
 legacy: # Info for platforms we used to support and still need to handle packages for
   - <<: *fedora
     version: "37"
+    bundle_sentry: false
     packages:
       <<: *fedora_packages
       repo_distro: fedora/37
   - <<: *opensuse
     version: "15.4"
+    bundle_sentry: false
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.4

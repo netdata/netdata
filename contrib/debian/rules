@@ -2,6 +2,7 @@
 
 # Find the arch we are building for, as this determines
 # the location of plugins in /usr/lib
+SRC_DIR = /usr/src/netdata
 TOP = $(CURDIR)/debian/netdata
 TEMPTOP = $(CURDIR)/debian/tmp
 BUILDDIR = $(CURDIR)/debian/build
@@ -37,6 +38,20 @@ HAVE_XENSTAT = 1
 XENSTAT_CONFIG = -DENABLE_PLUGIN_XENSTAT=On
 endif
 
+ifeq ($(ENABLE_SENTRY),true)
+    RELEASE_PIPELINE ?= Unknown
+    VERSION ?= Unknown
+    BUILD_DESTINATION ?= Unknown
+    SENTRY_CONFIG := -DENABLE_SENTRY=On \
+        -DNETDATA_SENTRY_ENVIRONMENT=$(RELEASE_PIPELINE) \
+        -DNETDATA_SENTRY_RELEASE=$(VERSION) \
+        -DNETDATA_SENTRY_DIST=$(BUILD_DESTINATION) \
+        -DNETDATA_SENTRY_DSN=$(SENTRY_DSN)
+else
+    SENTRY_CONFIG := -DENABLE_SENTRY=Off
+endif
+
+
 %:
 	dh $@ --builddirectory=$(BUILDDIR)
 
@@ -56,6 +71,7 @@ override_dh_auto_configure:
 	dh_auto_configure -- -G Ninja \
 		-DCMAKE_INSTALL_PREFIX=/ \
 		-DWEB_DIR=/var/lib/netdata/www \
+		-DCMAKE_C_FLAGS='-ffile-prefix-map=${SRC_DIR}=${SRC_DIR}' \
 		-DENABLE_ACLK=On \
 		-DENABLE_CLOUD=On \
 		-DENABLE_DBENGINE=On \
@@ -77,10 +93,17 @@ override_dh_auto_configure:
 		-DENABLE_EXPORTER_MONGODB=On \
 		-DENABLE_BUNDLED_PROTOBUF=Off \
 		-DENABLE_BUNDLED_JSONC=Off \
+		${SENTRY_CONFIG} \
 		-DENABLE_BUNDLED_YAML=Off
 
 override_dh_auto_test:
 	true
+
+override_dh_strip:
+	if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then \
+		sentry-cli debug-files upload -o netdata-inc -p netdata-agent --force-foreground --log-level=debug --wait --include-sources /usr/src/netdata/debian/netdata/usr/sbin/netdata; \
+	fi
+	dh_strip
 
 override_dh_install:
 	cp -v $(BASE_CONFIG) debian/netdata.conf
