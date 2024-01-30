@@ -227,7 +227,7 @@
       "ui:widget": "hidden"
     },
     "variables": {
-      "ui:classNames": "dyncfg-grid-col-span-1-6",
+      "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
       "items": {
         "name": {
           "ui:classNames": "dyncfg-grid-col-span-1-2"
@@ -247,7 +247,7 @@
       "ui:classNames": "dyncfg-grid-col-span-6-1"
     },
     "form_data": {
-      "ui:classNames": "dyncfg-grid-col-span-1-6",
+      "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
       "items": {
         "name": {
           "ui:classNames": "dyncfg-grid-col-span-1-2"
@@ -263,7 +263,7 @@
       "ui:widget": "textarea"
     },
     "headers": {
-      "ui:classNames": "dyncfg-grid-col-span-1-6",
+      "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
       "items": {
         "name": {
           "ui:classNames": "dyncfg-grid-col-span-1-2"
@@ -275,7 +275,7 @@
       }
     },
     "severity_map": {
-      "ui:classNames": "dyncfg-grid-col-span-1-6",
+      "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
       "items": {
         "name": {
           "ui:classNames": "dyncfg-grid-col-span-1-6"
