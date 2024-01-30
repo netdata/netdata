@@ -1347,6 +1347,114 @@ void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels) {
     rrdset_metadata_updated(st);
 }
 
+struct pattern_array *pattern_array_allocate()
+{
+    struct pattern_array *pa = callocz(1, sizeof(*pa));
+    return pa;
+}
+
+void pattern_array_add_label_key_with_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *sp)
+{
+    if (!pa || !key || !sp)
+        return;
+
+    STRING *string_key = string_strdupz(key);
+    Pvoid_t *Pvalue = JudyLIns(&pa->JudyL, (Word_t) string_key, PJE0);
+    if (!Pvalue) {
+        string_freez(string_key);
+        return;
+    }
+
+    struct pattern_array_item *pai;
+    if (*Pvalue) {
+        pai = *Pvalue;
+    } else {
+        *Pvalue = pai = callocz(1, sizeof(*pai));
+        pa->key_count++;
+    }
+
+    pai->size++;
+    Pvalue = JudyLIns(&pai->JudyL, (Word_t) pai->size, PJE0);
+    if (!Pvalue)
+        return;
+
+    *Pvalue = sp;
+}
+
+bool pattern_array_label_match(
+    struct pattern_array *pa,
+    RRDLABELS *labels,
+    char eq,
+    size_t *searches,
+    bool (*callback_function)(RRDLABELS *, void *, char, size_t *))
+{
+    if (!pa || !labels)
+        return true;
+
+    Pvoid_t *Pvalue;
+    Word_t Index = 0;
+    bool first_then_next = true;
+    while ((Pvalue = JudyLFirstThenNext(pa->JudyL, &Index, &first_then_next))) {
+        struct pattern_array_item *pai = *Pvalue;
+        bool match = false;
+        for (Word_t i = 1; !match && i <= pai->size; i++) {
+            if (!(Pvalue = JudyLGet(pai->JudyL, i, PJE0)) || !*Pvalue)
+                continue;
+            match = callback_function(labels, (SIMPLE_PATTERN *)(*Pvalue), eq, searches);
+        }
+        if (!match)
+            return false;
+    }
+    return true;
+}
+
+struct pattern_array *pattern_array_populate_from_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep)
+{
+    if (unlikely(!pattern))
+        return NULL;
+
+    if (!pa)
+        pa = pattern_array_allocate();
+
+    char *label_key;
+    while (pattern && (label_key = simple_pattern_iterate(&pattern))) {
+        char key [RRDLABELS_MAX_NAME_LENGTH+1], *key_sep;
+
+        if (unlikely(!label_key || !(key_sep = strchr(label_key, sep))))
+            return pa;
+
+        *key_sep = '\0';
+        strncpyz(key, label_key, RRDLABELS_MAX_NAME_LENGTH);
+        *key_sep = sep;
+
+        pattern_array_add_label_key_with_simple_pattern(pa, key, string_to_simple_pattern(label_key));
+    }
+    return pa;
+}
+
+
+void pattern_array_free(struct pattern_array *pa)
+{
+    if (!pa)
+        return;
+
+    Pvoid_t *Pvalue;
+    Word_t Index = 0;
+    while ((Pvalue = JudyLFirst(pa->JudyL, &Index, PJE0))) {
+        struct pattern_array_item *pai = *Pvalue;
+
+        for (Word_t i = 1; i <= pai->size; i++) {
+            if (!(Pvalue = JudyLGet(pai->JudyL, i, PJE0)))
+                continue;
+            //simple_pattern_free((SIMPLE_PATTERN *) (*Pvalue));
+        }
+        JudyLFreeArray(&(pai->JudyL), PJE0);
+
+        string_freez((STRING *)Index);
+        (void) JudyLDel(&(pa->JudyL), Index, PJE0);
+        Index = 0;
+    }
+}
 
 // ----------------------------------------------------------------------------
 // rrdlabels unit test
@@ -1728,3 +1836,4 @@ int rrdlabels_unittest(void) {
     fprintf(stderr, "%d errors found\n", errors);
     return errors;
 }
+
