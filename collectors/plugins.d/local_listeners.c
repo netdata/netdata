@@ -6,18 +6,18 @@
 // --------------------------------------------------------------------------------------------------------------------
 
 static const char *protocol_name(LOCAL_SOCKET *n) {
-    if(n->family == AF_INET) {
-        if(n->protocol == IPPROTO_TCP)
+    if(n->local.family == AF_INET) {
+        if(n->local.protocol == IPPROTO_TCP)
             return "TCP";
-        else if(n->protocol == IPPROTO_UDP)
+        else if(n->local.protocol == IPPROTO_UDP)
             return "UDP";
         else
             return "UNKNOWN_IPV4";
     }
-    else if(n->family == AF_INET6) {
-        if (n->protocol == IPPROTO_TCP)
+    else if(n->local.family == AF_INET6) {
+        if (n->local.protocol == IPPROTO_TCP)
             return "TCP6";
-        else if(n->protocol == IPPROTO_UDP)
+        else if(n->local.protocol == IPPROTO_UDP)
             return "UDP6";
         else
             return "UNKNOWN_IPV6";
@@ -30,11 +30,11 @@ static void print_local_listeners(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, 
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
 
-    if(n->family == AF_INET) {
+    if(n->local.family == AF_INET) {
         ipv4_address_to_txt(n->local.ip.ipv4, local_address);
         ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
     }
-    else if(n->family == AF_INET6) {
+    else if(n->local.family == AF_INET6) {
         ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
     }
@@ -46,16 +46,16 @@ static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKE
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
 
-    if(n->family == AF_INET) {
+    if(n->local.family == AF_INET) {
         ipv4_address_to_txt(n->local.ip.ipv4, local_address);
         ipv4_address_to_txt(n->remote.ip.ipv4, remote_address);
     }
-    else if(n->family == AF_INET6) {
+    else if(n->local.family == AF_INET6) {
         ipv6_address_to_txt(&n->local.ip.ipv6, local_address);
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
     }
 
-    printf("%s, direction=%s%s%s%s%s pid=%d, state=0x%0x, local=%s[:%u], remote=%s[:%u], comm=%s\n",
+    printf("%s, direction=%s%s%s%s%s pid=%d, state=0x%0x, ns=%"PRIu64", local=%s[:%u], remote=%s[:%u], comm=%s\n",
            protocol_name(n),
            (n->direction & SOCKET_DIRECTION_LISTEN) ? "LISTEN," : "",
            (n->direction & SOCKET_DIRECTION_INBOUND) ? "INBOUND," : "",
@@ -64,6 +64,7 @@ static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKE
            (n->direction == 0) ? "NONE," : "",
            n->pid,
            n->state,
+           n->net_ns_inode,
            local_address, n->local.port,
            remote_address, n->remote.port,
            n->comm);
@@ -85,6 +86,7 @@ int main(int argc, char **argv) {
             .pid = false,
             .cmdline = true,
             .comm = false,
+            .namespaces = true,
 
             .max_errors = 10,
 
@@ -123,7 +125,7 @@ int main(int argc, char **argv) {
                     "\n"
                     " while:\n"
                     "\n"
-                    "    listening, local, inbound, outbound\n"
+                    "    listening, local, inbound, outbound, namespaces\n"
                     "\n"
                     " filter the output based on the direction of the sockets.\n"
                     "\n"
@@ -131,7 +133,7 @@ int main(int argc, char **argv) {
                     "\n"
                     " Current options:\n"
                     "\n"
-                    "    %s %s %s %s %s %s %s %s\n"
+                    "    %s %s %s %s %s %s %s %s %s\n"
                     "\n"
                     " Option 'debug' enables all sources and all directions and provides\n"
                     " a full dump of current sockets.\n"
@@ -180,6 +182,7 @@ int main(int argc, char **argv) {
                     , ls.config.local ? "local" : "no-local"
                     , ls.config.inbound ? "inbound" : "no-inbound"
                     , ls.config.outbound ? "outbound" : "no-outbound"
+                    , ls.config.namespaces ? "namespaces" : "no-namespaces"
                     );
             exit(1);
         }
@@ -201,7 +204,9 @@ int main(int argc, char **argv) {
             ls.config.outbound = true;
             ls.config.pid = true;
             ls.config.comm = true;
-            ls.config.cmdline = false;
+            ls.config.cmdline = true;
+            ls.config.namespaces = true;
+            ls.config.max_errors = SIZE_MAX;
             ls.config.cb = print_local_listeners_debug;
         }
         else if (strcmp("tcp", s) == 0) {
@@ -251,6 +256,10 @@ int main(int argc, char **argv) {
         else if (strcmp("outbound", s) == 0) {
             ls.config.outbound = positive;
             // fprintf(stderr, "%s outbound\n", positive ? "enabling" : "disabling");
+        }
+        else if (strcmp("namespaces", s) == 0 || strcmp("ns", s) == 0) {
+            ls.config.namespaces = positive;
+            // fprintf(stderr, "%s namespaces\n", positive ? "enabling" : "disabling");
         }
         else {
             fprintf(stderr, "Unknown parameter %s\n", s);

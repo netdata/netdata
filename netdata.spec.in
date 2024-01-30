@@ -719,6 +719,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 # local-listeners detects the local processes that are listening for connections
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/local-listeners
 
+# network-viewer.plugin, detects all system sockets and classifies them
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
+
 # ndsudo a helper to run privileged commands
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/ndsudo
 
