@@ -300,6 +300,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
         pid_t pid = (pid_t)strtoul(proc_entry->d_name, NULL, 10);
         if(!pid) {
             local_sockets_log(ls, "cannot parse pid of '%s'", proc_entry->d_name);
+            closedir(fd_dir);
             continue;
         }
         net_ns_inode = 0;
@@ -746,6 +747,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
     int pipefd[2];
     if (pipe(pipefd) != 0) {
         local_sockets_log(ls, "cannot create pipe");
+        close(fd);
         return false;
     }
 
