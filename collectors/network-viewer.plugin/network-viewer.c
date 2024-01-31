@@ -43,7 +43,7 @@ ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
 
 
 static void local_socket_to_array(struct local_socket_state *ls, struct local_socket *n, void *data) {
-    if(!n->comm || n->uid == UID_UNSET) return;
+    if(!n->comm[0] || n->uid == UID_UNSET) return;
 
     BUFFER *wb = data;
 
