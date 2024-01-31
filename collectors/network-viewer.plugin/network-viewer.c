@@ -43,8 +43,6 @@ ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
 
 
 static void local_socket_to_array(struct local_socket_state *ls, struct local_socket *n, void *data) {
-    if(!n->comm[0] || n->uid == UID_UNSET) return;
-
     BUFFER *wb = data;
 
     char local_address[INET6_ADDRSTRLEN];
@@ -108,7 +106,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
