@@ -2266,7 +2266,7 @@ endif()
 
 configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/claim/netdata-claim.sh
+        ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
         DESTINATION usr/sbin)
 
 #
