@@ -136,7 +136,7 @@ Netdata v1.9+ support limiting access to the registry from given IPs, like this:
     allow from = *
 ```
 
-`allow from` settings are [Netdata simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md): string matches that use `*`
+`allow from` settings are [Netdata simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md): string matches that use `*`
 as wildcard (any number of times) and a `!` prefix for a negative match. So: `allow from = !10.1.2.3 10.*` will allow
 all IPs in `10.*` except `10.1.2.3`. The order is important: left to right, the first positive or negative match is
 used.

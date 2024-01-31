@@ -76,7 +76,7 @@ The following options can be defined for this exporter.
 | update every | Frequency of sending sending data to the external database, in seconds. | 10 | no |
 | buffer on failures | The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. | 10 | no |
 | timeout ms | The timeout in milliseconds to wait for the external database server to process the data. | 2 * update_every * 1000 | no |
-| send hosts matching | Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/libnetdata/simple_pattern#simple-patterns). | localhost * | no |
+| send hosts matching | Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#simple-patterns). | localhost * | no |
 | send charts matching | One or more space separated patterns (use * as wildcard) checked against both chart id and chart name. | * | no |
 | send names instead of ids | Controls the metric names Netdata should send to the external database (yes/no). |  | no |
 | send configured labels | Controls if host labels defined in the `[host labels]` section in `netdata.conf` should be sent to the external database (yes/no). |  | no |

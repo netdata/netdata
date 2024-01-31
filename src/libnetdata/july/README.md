@@ -1,5 +1,5 @@
 <!--
-custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/july/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/july/README.md
 sidebar_label: "July interface"
 learn_status: "Published"
 learn_topic_type: "Tasks"

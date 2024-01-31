@@ -373,7 +373,7 @@ When you compile Netdata with debugging:
 2.  a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is
     printed by default. Netdata allows you to select which sections of Netdata you want to trace. Tracing is activated
     via the config option `debug flags`. It accepts a hex number, to enable or disable specific sections. You can find
-    the options supported at [log.h](https://raw.githubusercontent.com/netdata/netdata/master/libnetdata/log/log.h).
+    the options supported at [log.h](https://raw.githubusercontent.com/netdata/netdata/master/src/libnetdata/log/log.h).
     They are the `D_*` defines. The value `0xffffffffffffffff` will enable all possible debug flags.
 
 Once Netdata is compiled with debugging and tracing is enabled for a few sections, the file `/var/log/netdata/debug.log`

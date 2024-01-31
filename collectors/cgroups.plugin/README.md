@@ -78,7 +78,7 @@ currently unsupported when using unified cgroups.
 ### Enabled cgroups
 
 To provide a sane default, Netdata uses the
-following [pattern list](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md):
+following [pattern list](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md):
 
 - Checks the pattern against the path of the cgroup
 

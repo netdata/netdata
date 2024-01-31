@@ -1,6 +1,6 @@
 <!--
 title: "PROCFILE"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/procfile/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/procfile/README.md
 sidebar_label: "Procfile"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -32,7 +32,7 @@ For each iteration, the caller:
 -   calls `procfile_readall()` to read updated contents.
      This call also rewinds (`lseek()` to 0) before reading it.
 
-     For every file, a [BUFFER](https://github.com/netdata/netdata/blob/master/libnetdata/buffer/README.md) is used that is automatically adjusted to fit the entire
+     For every file, a [BUFFER](https://github.com/netdata/netdata/blob/master/src/libnetdata/buffer/README.md) is used that is automatically adjusted to fit the entire
      file contents of the file. So the file is read with a single `read()` call (providing atomicity / consistency when
      the data are read from the kernel).
 

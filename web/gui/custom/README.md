@@ -356,7 +356,7 @@ select specific dimensions using this:
 ```
 
 Netdata supports coma (`,`) or pipe (`|`) separated [simple
-patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for dimensions. By default it
+patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) for dimensions. By default it
 searches for both dimension IDs and dimension NAMEs. You can control the target
 of the match with: `data-append-options="match-ids"` or
 `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched

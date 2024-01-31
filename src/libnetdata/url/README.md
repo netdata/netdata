@@ -1,6 +1,6 @@
 <!--
 title: "URL"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/url/README.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/url/README.md
 sidebar_label: "URL"
 learn_status: "Published"
 learn_topic_type: "Tasks"
