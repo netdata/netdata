@@ -875,9 +875,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
         else if(!strcmp(name, "mc_version"))
             rpt->system_info->mc_version = strtoul(value, NULL, 0);
 
-        else if(!strcmp(name, "tags") && !rpt->tags)
-            rpt->tags = strdupz(value);
-
         else if(!strcmp(name, "ver") && (rpt->capabilities & STREAM_CAP_INVALID))
             rpt->capabilities = convert_stream_version_to_capabilities(strtoul(value, NULL, 0), NULL, false);
 

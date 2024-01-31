@@ -786,7 +786,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                  "&ml_capable=%d"
                  "&ml_enabled=%d"
                  "&mc_version=%d"
-                 "&tags=%s"
                  "&ver=%u"
                  "&NETDATA_INSTANCE_CLOUD_TYPE=%s"
                  "&NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE=%s"
@@ -832,7 +831,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                  , host->system_info->ml_capable
                  , host->system_info->ml_enabled
                  , host->system_info->mc_version
-                 , rrdhost_tags(host)
                  , s->capabilities
                  , (host->system_info->cloud_provider_type) ? host->system_info->cloud_provider_type : ""
                  , (host->system_info->cloud_instance_type) ? host->system_info->cloud_instance_type : ""

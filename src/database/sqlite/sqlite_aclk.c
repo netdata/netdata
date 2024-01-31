@@ -61,7 +61,6 @@ enum {
     IDX_UPDATE_EVERY,
     IDX_OS,
     IDX_TIMEZONE,
-    IDX_TAGS,
     IDX_HOPS,
     IDX_MEMORY_MODE,
     IDX_ABBREV_TIMEZONE,
@@ -120,7 +119,6 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         (const char *)argv[IDX_TIMEZONE],
         (const char *)argv[IDX_ABBREV_TIMEZONE],
         (int32_t)(argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET], NULL) : 0),
-        (const char *)argv[IDX_TAGS],
         (const char *)(argv[IDX_PROGRAM_NAME] ? argv[IDX_PROGRAM_NAME] : "unknown"),
         (const char *)(argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown"),
         argv[IDX_UPDATE_EVERY] ? str2i(argv[IDX_UPDATE_EVERY]) : 1,
@@ -557,7 +555,7 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
 
 #define SQL_FETCH_ALL_HOSTS                                                                                            \
     "SELECT host_id, hostname, registry_hostname, update_every, os, "                                                  \
-    "timezone, tags, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "                                   \
+    "timezone, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "                                   \
     "program_version, entries, health_enabled, last_connected, "                                                       \
     "(SELECT CASE WHEN hl.label_value = 'true' THEN 1 ELSE 0 END FROM "                                                \
     "host_label hl WHERE hl.host_id = h.host_id AND hl.label_key = '_is_ephemeral')  "                                 \

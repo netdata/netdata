@@ -1151,7 +1151,6 @@ struct rrdhost {
     STRING *hostname;                               // the hostname of this host
     STRING *registry_hostname;                      // the registry hostname for this host
     STRING *os;                                     // the O/S type of the host
-    STRING *tags;                                   // tags for this host
     STRING *timezone;                               // the timezone of the host
     STRING *abbrev_timezone;                        // the abbriviated timezone of the host
     STRING *program_name;                           // the program name that collects metrics for this host
@@ -1388,7 +1387,6 @@ RRDHOST *rrdhost_find_or_create(
     const char *timezone,
     const char *abbrev_timezone,
     int32_t utc_offset,
-    const char *tags,
     const char *prog_name,
     const char *prog_version,
     int update_every,
@@ -1580,7 +1578,7 @@ void rrdset_reset(RRDSET *st);
 
 void set_host_properties(
     RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode, const char *registry_hostname,
-    const char *os, const char *tags, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
+    const char *os, const char *tzone, const char *abbrev_tzone, int32_t utc_offset,
     const char *prog_name, const char *prog_version);
 
 size_t get_tier_grouping(size_t tier);

@@ -354,7 +354,8 @@ static int store_host_metadata(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = bind_text_null(res, ++param, rrdhost_tags(host), 1);
+    // TODO: remove/migrate
+    rc = bind_text_null(res, ++param, "", 1);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
