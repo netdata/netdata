@@ -330,33 +330,32 @@
         // Initialize new elements
         appEnter.each(function (d) {
             const group = d3.select(this);
-            const oldPos = positionsMap.get(d.name) || { x: cw, y: ch };
-
-            d.x = oldPos.x;
-            d.y = oldPos.y;
-
             const pieData = pie(d.d3.pie);
-            const radius = d.d3.size;
 
             group.selectAll('path')
                 .data(pieData)
                 .enter().append('path')
                 .transition()
-                .attr('d', arc.innerRadius(0).outerRadius(radius))
                 .attr('fill', (d, i) => pieColors(i));
 
             group.append('text')
                 .text(d => d.name)
                 .attr('text-anchor', 'middle')
-                .attr('y', radius + 10)
                 .style('font-family', theme.appFontFamily)
                 .style('font-size', theme.appFontSize)
                 .style('font-weight', theme.appFontWeight)
                 .style('fill', theme.appFontColor);
         });
 
-        // Update selection
-        app.each(function (d) {
+        // Transition for new elements
+        appEnter.transition()
+            .attr('transform', d => `translate(${d.d3.x}, ${d.d3.y})`);
+
+        // Merge the enter and update selections
+        const mergedApp = appEnter.merge(app);
+
+        // Update saved positions
+        mergedApp.each(function (d) {
             const group = d3.select(this);
             const oldPos = positionsMap.get(d.name) || { x: cw, y: ch };
 
@@ -369,15 +368,9 @@
                 .attr('d', arc.innerRadius(0).outerRadius(d.d3.size));
 
             group.select('text')
+                .transition()
                 .attr('y', d.d3.size + 10);
         });
-
-        // Transition for new elements
-        appEnter.transition()
-            .attr('transform', d => `translate(${d.d3.x}, ${d.d3.y})`);
-
-        // Merge the enter and update selections
-        const mergedApp = appEnter.merge(app);
 
         // Apply the drag behavior to the merged selection
         mergedApp.call(d3.drag()
@@ -421,21 +414,13 @@
 
         const app = updateApps(svg, data, w, h, borderPadding, theme);
 
-        if(initial) {
-            simulation = d3.forceSimulation(data)
-                //.force('center', d3.forceCenter(cw, ch).strength(1))
-                .force("x", d3.forceX(d => d.d3.x).strength(0.05))
-                .force("y", d3.forceY(d => d.d3.y).strength(0.05))
-                //.force("charge", d3.forceManyBody().strength(-0.05))
-                .force("collide", d3.forceCollide(d => d.d3.size * 1.1 + 15).strength(1))
-                .on('tick', ticked);
-        }
-        else {
-            simulation.nodes(data)
-                .force("x", d3.forceX(d => d.d3.x).strength(0.02))
-                .force("y", d3.forceY(d => d.d3.y).strength(0.02))
-                .alpha(1).restart();
-        }
+        simulation = d3.forceSimulation(data)
+            //.force('center', d3.forceCenter(cw, ch).strength(1))
+            .force("x", d3.forceX(d => d.d3.x).strength(0.05))
+            .force("y", d3.forceY(d => d.d3.y).strength(0.05))
+            //.force("charge", d3.forceManyBody().strength(-0.05))
+            .force("collide", d3.forceCollide(d => d.d3.size * 1.1 + 15).strength(1))
+            .on('tick', ticked);
 
         function ticked() {
             app.attr('transform', d => `translate(${d.x}, ${d.y})`);
