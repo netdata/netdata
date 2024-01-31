@@ -2168,7 +2168,7 @@ set(NETDATACLI_FILES
         daemon/commands.h
         daemon/pipename.c
         daemon/pipename.h
-        cli/cli.c
+        src/cli/cli.c
 )
 
 add_executable(netdatacli ${NETDATACLI_FILES})
