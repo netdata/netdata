@@ -278,12 +278,21 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     buffer_json_object_close(wb); // columns
     buffer_json_member_add_string(wb, "default_sort_column", "Direction");
 
+    buffer_json_member_add_object(wb, "custom_charts");
+    {
+        buffer_json_member_add_object(wb, "Network Map");
+        {
+            buffer_json_member_add_string(wb, "type", "network-viewer");
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // custom_charts
+
     buffer_json_member_add_object(wb, "charts");
     {
         // Data Collection Age chart
         buffer_json_member_add_object(wb, "Count");
         {
-            buffer_json_member_add_string(wb, "name", "Connections");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
@@ -296,7 +305,6 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         // Streaming Age chart
         buffer_json_member_add_object(wb, "Count");
         {
-            buffer_json_member_add_string(wb, "name", "Connections");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
@@ -309,7 +317,6 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         // DB Duration
         buffer_json_member_add_object(wb, "Count");
         {
-            buffer_json_member_add_string(wb, "name", "Connections");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
