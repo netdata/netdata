@@ -71,7 +71,8 @@ static struct progress {
     SIMPLE_HASHTABLE_QUERY hashtable;
 
 } progress = {
-        .initialized = false,
+    .initialized = false,
+    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
 };
 
 SIMPLE_HASHTABLE_HASH query_hash(uuid_t *transaction) {
@@ -85,7 +86,6 @@ SIMPLE_HASHTABLE_HASH query_hash(uuid_t *transaction) {
 
 static void query_progress_init_unsafe(void) {
     if(!progress.initialized) {
-        memset(&progress, 0, sizeof(progress));
         simple_hashtable_init_QUERY(&progress.hashtable, PROGRESS_CACHE_SIZE * 4);
         progress.initialized = true;
     }
