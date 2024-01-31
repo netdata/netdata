@@ -678,7 +678,7 @@
 
         ##### Challenge secret
 
-        To validate that you has ownership of the web application that will receive the webhook events, we are using a challenge response check mechanism.
+        To validate that you have ownership of the web application that will receive the webhook events, we are using a challenge response check mechanism.
 
         This mechanism works as follows:
 
