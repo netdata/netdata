@@ -4,7 +4,7 @@
 
 // ----------------------------------------------------------------------------
 
-#include "../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 
 #define RRDFUNCTIONS_PRIORITY_DEFAULT 100
 

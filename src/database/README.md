@@ -3,12 +3,12 @@
 Netdata is fully capable of long-term metrics storage, at per-second granularity, via its default database engine
 (`dbengine`). But to remain as flexible as possible, Netdata supports several storage options:
 
-1. `dbengine`, (the default) data are in database files. The [Database Engine](https://github.com/netdata/netdata/blob/master/database/engine/README.md) works like a
+1. `dbengine`, (the default) data are in database files. The [Database Engine](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md) works like a
    traditional database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data
    reside compressed on disk. The number of history entries is not fixed in this case, but depends on the configured
    disk space and the effective compression ratio of the data stored. This is the **only mode** that supports changing
    the data collection update frequency (`update every`) **without losing** the previously stored metrics. For more
-   details see [here](https://github.com/netdata/netdata/blob/master/database/engine/README.md).
+   details see [here](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md).
 
 2. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
 

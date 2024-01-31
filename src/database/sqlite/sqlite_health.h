@@ -2,7 +2,8 @@
 
 #ifndef NETDATA_SQLITE_HEALTH_H
 #define NETDATA_SQLITE_HEALTH_H
-#include "../../daemon/common.h"
+
+#include "daemon/common.h"
 #include "sqlite3.h"
 
 struct sql_alert_transition_data;

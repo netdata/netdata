@@ -73,7 +73,7 @@
         <mxCell id="30" value="" style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
           <mxGeometry x="674" y="887" width="557" height="130" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;font style=&quot;font-size: 20px&quot;&gt;metrics database&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-weight: normal&quot;&gt;&lt;font style=&quot;font-size: 15px&quot;&gt;(organized in hosts, charts and dimensions)&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/database#netdata-database" id="31">
+        <UserObject label="&lt;font style=&quot;font-size: 20px&quot;&gt;metrics database&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-weight: normal&quot;&gt;&lt;font style=&quot;font-size: 15px&quot;&gt;(organized in hosts, charts and dimensions)&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/database#netdata-database" id="31">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="254" y="690" width="770" height="93" as="geometry" />
           </mxCell>

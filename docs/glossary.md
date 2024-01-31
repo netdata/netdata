@@ -160,7 +160,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Template Entity Type**](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#entity-types): Entity type that defines rules that apply to all charts of a specific context, and use the template label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
 
-- [**Tiers**](https://github.com/netdata/netdata/blob/master/database/engine/README.md#tiers): Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are collected and stored, i.e. their resolution).
+- [**Tiers**](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md#tiers): Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are collected and stored, i.e. their resolution).
 
 ## U
 
