@@ -808,7 +808,7 @@ jobs:
         with:
           destination: ${{ secrets.GCP_NIGHTLY_STORAGE_BUCKET }}
           gzip: false
-          path: ./final-artifacts
+          path: ./final-artifacts/latest-version.txt
           parent: false
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
