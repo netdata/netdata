@@ -77,8 +77,14 @@ static void local_socket_to_array(struct local_socket_state *ls, struct local_so
             buffer_json_add_array_item_string(wb, TCP_STATE_2str(n->state));
         else
             buffer_json_add_array_item_string(wb, "stateless");
+
         buffer_json_add_array_item_uint64(wb, n->pid);
-        buffer_json_add_array_item_string(wb, n->comm);
+
+        if(!n->comm[0])
+            buffer_json_add_array_item_string(wb, "[unknown]");
+        else
+            buffer_json_add_array_item_string(wb, n->comm);
+
         buffer_json_add_array_item_string(wb, n->cmdline);
         buffer_json_add_array_item_string(wb, local_address);
         buffer_json_add_array_item_uint64(wb, n->local.port);
@@ -272,12 +278,21 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     buffer_json_object_close(wb); // columns
     buffer_json_member_add_string(wb, "default_sort_column", "Direction");
 
+    buffer_json_member_add_object(wb, "custom_charts");
+    {
+        buffer_json_member_add_object(wb, "Network Map");
+        {
+            buffer_json_member_add_string(wb, "type", "network-viewer");
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // custom_charts
+
     buffer_json_member_add_object(wb, "charts");
     {
         // Data Collection Age chart
         buffer_json_member_add_object(wb, "Count");
         {
-            buffer_json_member_add_string(wb, "name", "Connections");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
@@ -290,7 +305,6 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         // Streaming Age chart
         buffer_json_member_add_object(wb, "Count");
         {
-            buffer_json_member_add_string(wb, "name", "Connections");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {
@@ -303,7 +317,6 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         // DB Duration
         buffer_json_member_add_object(wb, "Count");
         {
-            buffer_json_member_add_string(wb, "name", "Connections");
             buffer_json_member_add_string(wb, "type", "stacked-bar");
             buffer_json_member_add_array(wb, "columns");
             {

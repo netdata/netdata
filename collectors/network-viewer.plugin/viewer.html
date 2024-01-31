@@ -12,6 +12,7 @@
             height: 100%;
             width: 100%;
         }
+
         #d3-canvas {
             height: 100%;
             width: 100%;
@@ -20,352 +21,478 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400&display=swap" rel="stylesheet">
     <!-- Include D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script>
-
-        // The transformData function
-        function transformData(dataPayload, desiredColumnNames, columns) {
-            console.log(dataPayload);
-
-            const transformedData = [];
-
-            // Create a map to store data per application
-            const appMap = new Map();
-
-            dataPayload.data.forEach(row => {
-                const rowData = {};
-                desiredColumnNames.forEach(columnName => {
-                    const columnIndex = columns[columnName].index;
-                    rowData[columnName] = row[columnIndex];
-                });
-
-                const appName = rowData['Process'];
-                if (!appMap.has(appName)) {
-                    appMap.set(appName, {
-                        listenCount: 0,
-                        inboundCount: 0,
-                        outboundCount: 0,
-                        localCount: 0,
-                        privateCount: 0,
-                        publicCount: 0,
-                        totalCount: 0
-                    });
-                }
-
-                const appData = appMap.get(appName);
-                appData.totalCount++;
-
-                if (rowData['Direction'] === 'listen') {
-                    appData.listenCount++;
-                }
-                else if (rowData['Direction'] === 'local') {
-                    appData.localCount++;
-                }
-                else if (rowData['Direction'] === 'inbound') {
-                    appData.inboundCount++;
-                }
-                else if (rowData['Direction'] === 'outbound') {
-                    appData.outboundCount++;
-                }
-
-                if (rowData['RemoteAddressSpace'] === 'public') {
-                    appData.publicCount++;
-                }
-                else if (rowData['RemoteAddressSpace'] === 'private') {
-                    appData.privateCount++;
-                }
-            });
-
-            // Convert the map to an array format
-            for (let [appName, appData] of appMap) {
-                transformedData.push({
-                    name: appName,
-                    ...appData
-                });
-            }
-
-            console.log(transformedData);
-
-            return transformedData;
-        }
-    </script>
 </head>
 <body>
 <div id="d3-canvas"></div> <!-- Div for D3 rendering -->
 
 <script>
-    // Function to draw the circles and labels for each application with border forces
-    function drawApplications(data) {
-        console.log(data);
-        console.log(data.length)
-        const maxTotalCount = d3.max(data, d => d.totalCount);
-        const maxXCount = d3.max(data, d => Math.abs(Math.max(d.publicCount, d.privateCount)));
-        const maxStrength = 0.005;
-        const borderPadding = 40;
-        console.log("maxTotalCount", maxTotalCount);
-        console.log("maxXCount", maxXCount);
+    function transformData(dataPayload) {
+        // console.log("dataPayload", dataPayload);
+        const desiredColumns = ["Direction", "Protocol", "Namespace", "Process", "CommandLine", "LocalIP", "LocalPort", "RemoteIP", "RemotePort", "LocalAddressSpace", "RemoteAddressSpace"];
 
-        const max = {
-            totalCount: d3.max(data, d => d.totalCount),
-            localCount: d3.max(data, d => d.localCount),
-            listenCount: d3.max(data, d => d.listenCount),
-            privateCount: d3.max(data, d => d.privateCount),
-            publicCount: d3.max(data, d => d.publicCount),
-            inboundCount: d3.max(data, d => d.inboundCount),
-            outboundCount: d3.max(data, d => d.outboundCount),
-        }
+        const transformedData = [];
+        const appMap = new Map();
 
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        const cw = w / 2;
-        const ch = h / 2;
-        console.log(w, h, cw, ch);
-        console.log(w, h, cw, ch);
+        dataPayload.data.forEach(row => {
+            const rowData = {};
+            desiredColumns.forEach(columnName => {
+                const columnIndex = dataPayload.columns[columnName].index;
+                rowData[columnName] = row[columnIndex];
+            });
 
-        const minSize = 13;
-        const maxSize = Math.max(5, Math.min(w, h) / data.length) + minSize; // Avoid division by zero or too large sizes
-
-        const publicColor = "#bbaa00";
-        const privateColor = "#5555ff";
-        const serverColor = "#009900";
-        const clientColor = "#990000";
-
-        function hexToHalfOpacityRGBA(hex) {
-            // Ensure the hex color is valid
-            if (hex.length !== 7 || hex[0] !== '#') {
-                throw new Error('Invalid hex color format');
+            const appName = rowData['Process'];
+            if (!appMap.has(appName)) {
+                appMap.set(appName, {
+                    counts: {
+                        listen: 0,
+                        inbound: 0,
+                        outbound: 0,
+                        local: 0,
+                        private: 0,
+                        public: 0,
+                        total: 0
+                    }
+                });
             }
 
-            // Extract the red, green, and blue components
-            const r = parseInt(hex.slice(1, 3), 16);
-            const g = parseInt(hex.slice(3, 5), 16);
-            const b = parseInt(hex.slice(5, 7), 16);
+            const appData = appMap.get(appName);
+            appData.counts.total++;
 
-            // Return the color in RGBA format with half opacity
-            return `rgba(${r}, ${g}, ${b}, 0.5)`;
+            if (rowData['Direction'] === 'listen')
+                appData.counts.listen++;
+            else if (rowData['Direction'] === 'local')
+                appData.counts.local++;
+            else if (rowData['Direction'] === 'inbound')
+                appData.counts.inbound++;
+            else if (rowData['Direction'] === 'outbound')
+                appData.counts.outbound++;
+
+            if (rowData['RemoteAddressSpace'] === 'public')
+                appData.counts.public++;
+            else if (rowData['RemoteAddressSpace'] === 'private')
+                appData.counts.private++;
+        });
+
+        // Convert the map to an array format
+        for (let [appName, appData] of appMap) {
+            transformedData.push({
+                name: appName,
+                ...appData
+            });
         }
 
-        const pieColors = d3.scaleOrdinal()
-            .domain(["publicCount", "privateCount", "listenInboundCount", "outboundCount", "others"])
-            .range([publicColor, privateColor, serverColor, clientColor, "#666666"]); // Example colors
+        // console.log("transformedData", transformedData);
+        return transformedData;
+    }
 
-        const pie = d3.pie().value(d => d.value);
-        const arc = d3.arc();
+    function normalizeData(data, w, h, borderPadding) {
+        const cw = w / 2 - borderPadding;
+        const ch = h / 2 - borderPadding;
 
-        function getPieData(d) {
-            const others = d.totalCount - (d.publicCount + d.privateCount + d.listenCount + d.inboundCount + d.outboundCount);
-            return [
-                {value: d.publicCount},
-                {value: d.privateCount},
-                {value: d.listenCount + d.inboundCount},
-                {value: d.outboundCount},
-                {value: others > 0 ? others : 0}
-            ];
+        const minSize = 13;
+        const maxSize = Math.max(5, Math.min(w, h) / data.length) + minSize;
+
+        const max = {
+            total: d3.max(data, d => d.counts.total),
+            local: d3.max(data, d => d.counts.local),
+            listen: d3.max(data, d => d.counts.listen),
+            private: d3.max(data, d => d.counts.private),
+            public: d3.max(data, d => d.counts.public),
+            inbound: d3.max(data, d => d.counts.inbound),
+            outbound: d3.max(data, d => d.counts.outbound),
         }
-
-        const forceStrengthScale = d3.scaleLinear()
-            .domain([0, maxTotalCount])
-            .range([0, maxStrength]);
 
         const circleSize = d3.scaleLog()
-            .domain([1, maxTotalCount]) // Assuming maxTotalCount is the maximum value in your data
+            .domain([1, max.total])
             .range([minSize, maxSize])
             .clamp(true); // Clamps the output so that it stays within the range
 
-        const logScaleRight = d3.scaleLog().domain([1, max.publicCount + 1]).range([0, cw - borderPadding]);
-        const logScaleLeft = d3.scaleLog().domain([1, max.privateCount + 1]).range([0, cw - borderPadding]);
-        const logScaleTop = d3.scaleLog().domain([1, max.outboundCount + 1]).range([0, ch - borderPadding]);
-        const logScaleBottom = d3.scaleLog().domain([1, (max.listenCount + max.inboundCount) / 2 + 1]).range([0, ch - borderPadding]);
+        const logScaleRight = d3.scaleLog().domain([1, max.public + 1]).range([0, cw]);
+        const logScaleLeft = d3.scaleLog().domain([1, max.private + 1]).range([0, cw]);
+        const logScaleTop = d3.scaleLog().domain([1, max.outbound + 1]).range([0, ch]);
+        const logScaleBottom = d3.scaleLog().domain([1, (max.listen + max.inbound) / 2 + 1]).range([0, ch]);
 
         data.forEach((d, i) => {
-            const forces = {
-                total: d.totalCount / max.totalCount,
-                local: d.localCount / max.localCount,
-                listen: d.listenCount / max.listenCount,
-                private: d.privateCount / max.privateCount,
-                public: d.publicCount / max.publicCount,
-                inbound: d.inboundCount / max.inboundCount,
-                outbound: d.outboundCount / max.outboundCount,
+            d.forces = {
+                total: d.counts.total / max.total,
+                local: d.counts.local / max.local,
+                listen: d.counts.listen / max.listen,
+                private: d.counts.private / max.private,
+                public: d.counts.public / max.public,
+                inbound: d.counts.inbound / max.inbound,
+                outbound: d.counts.outbound / max.outbound,
             }
 
-            const pos = {
-                right: logScaleRight(d.publicCount + 1),
-                left: logScaleLeft(d.privateCount + 1),
-                top: logScaleTop(d.outboundCount + 1),
-                bottom: logScaleBottom((d.listenCount + d.inboundCount) / 2 + 1),
+            d.pos = {
+                // we add 1 to avoid log(0)
+                right: logScaleRight(d.counts.public + 1),
+                left: logScaleLeft(d.counts.private + 1),
+                top: logScaleTop(d.counts.outbound + 1),
+                bottom: logScaleBottom((d.counts.listen + d.counts.inbound) / 2 + 1),
             };
 
-            d.targetX = cw + pos.right - pos.left;
-            d.targetY = ch + pos.bottom - pos.top;
+            const others = d.counts.total - (d.counts.public + d.counts.private + d.counts.listen + d.counts.inbound + d.counts.outbound);
+            d.d3 = {
+                x: borderPadding + cw + d.pos.right - d.pos.left,
+                y: borderPadding + ch + d.pos.bottom - d.pos.top,
+                size: circleSize(d.counts.total),
+                pie: [
+                    { value: d.counts.public },
+                    { value: d.counts.private },
+                    { value: d.counts.listen + d.counts.inbound },
+                    { value: d.counts.outbound },
+                    { value: others > 0 ? others : 0 },
+                ]
+            }
 
-            if(d.name === 'deluged')
-                console.log("object", d, "forces", forces, "pos", pos);
+            if(d.d3.x - d.d3.size / 2 < borderPadding)
+                d.d3.x = borderPadding + d.d3.size * 2;
+
+            if(d.d3.x + d.d3.size / 2 > w)
+                d.d3.x = w - d.d3.size * 2;
+
+            if(d.d3.y - d.d3.size / 2 < borderPadding)
+                d.d3.y = borderPadding + d.d3.size * 2;
+
+            if(d.d3.y + d.d3.size / 2 > h)
+                d.d3.y = h - d.d3.size * 2;
+
+            // if (d.name === 'telnet')
+            //     console.log("object", d, "cw", cw, "ch", ch);
         });
 
+        return data;
+    }
 
-        console.log(data);
+    const themes = {
+        dark: {
+            publicColor: "#bb9900",
+            privateColor: "#323299",
+            serverColor: "#008800",
+            clientColor: "#994433",
+            otherColor: "#454545",
+            backgroundColor: "black",
+            appFontColor: "#bbbbbb",
+            appFontFamily: 'IBM Plex Sans',
+            appFontSize: "12px",
+            appFontWeight: "regular",
+            borderFontColor: "#aaaaaa",
+            borderFontFamily: 'IBM Plex Sans',
+            borderFontSize: "14px",
+            borderFontWeight: "bold",
+        },
+        light: {
+            publicColor: "#bbaa00",
+            privateColor: "#5555ff",
+            serverColor: "#009900",
+            clientColor: "#990000",
+            otherColor: "#666666",
+            backgroundColor: "white",
+            appFontColor: "black",
+            appFontFamily: 'IBM Plex Sans',
+            appFontSize: "12px",
+            appFontWeight: "bold",
+            borderFontColor: "white",
+            borderFontFamily: 'IBM Plex Sans',
+            borderFontSize: "14px",
+            borderFontWeight: "bold",
+        }
+    }
 
-        const svg = d3.select('#d3-canvas').append('svg')
-            .attr('width', '100%')
-            .attr('height', '100%');
+    function hexToHalfOpacityRGBA(hex) {
+        if (hex.length !== 7 || hex[0] !== '#')
+            throw new Error('Invalid hex color format');
 
-        // Top area - Clients
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, 0.5)`;
+    }
+
+    function drawInitialChart(svg, data, w, h, borderPadding, theme) {
+        const cw = w / 2;
+        const ch = h / 2;
+
+        document.body.style.backgroundColor = theme.backgroundColor;
+
         svg.append('rect')
             .attr('x', 0)
             .attr('y', 0)
             .attr('width', '100%')
-            .attr('height', borderPadding / 2) // Adjust height as needed
-            .style('fill', hexToHalfOpacityRGBA(clientColor));
+            .attr('height', borderPadding / 2)
+            .style('fill', hexToHalfOpacityRGBA(theme.clientColor));
 
         svg.append('text')
             .text('Clients')
             .attr('x', '50%')
-            .attr('y', borderPadding / 2 - 4) // Adjust y position based on the rectangle's height
+            .attr('y', borderPadding / 2 - 4)
             .attr('text-anchor', 'middle')
-            .style('font-family', 'IBM Plex Sans')
-            .style('font-size', '14px')
-            .style('font-weight', 'bold'); // Make the font bold
+            .style('font-family', theme.borderFontFamily)
+            .style('font-size', theme.borderFontSize)
+            .style('font-weight', theme.borderFontWeight)
+            .style('fill', theme.borderFontColor);
 
-        // Bottom area - Servers
         svg.append('rect')
             .attr('x', 0)
             .attr('y', h - borderPadding / 2)
             .attr('width', '100%')
-            .attr('height', borderPadding / 2) // Adjust height as needed
-            .style('fill', hexToHalfOpacityRGBA(serverColor));
+            .attr('height', borderPadding / 2)
+            .style('fill', hexToHalfOpacityRGBA(theme.serverColor));
 
         svg.append('text')
             .text('Servers')
             .attr('x', '50%')
-            .attr('y', h - borderPadding / 2 + 16) // Adjust y position based on the rectangle's height
+            .attr('y', h - borderPadding / 2 + 16)
             .attr('text-anchor', 'middle')
-            .style('font-family', 'IBM Plex Sans')
-            .style('font-size', '14px')
-            .style('font-weight', 'bold'); // Make the font bold
+            .style('font-family', theme.borderFontFamily)
+            .style('font-size', theme.borderFontSize)
+            .style('font-weight', theme.borderFontWeight)
+            .style('fill', theme.borderFontColor);
 
         svg.append('rect')
-            .attr('x', w - borderPadding / 2) // Position it close to the right edge
+            .attr('x', w - borderPadding / 2)
             .attr('y', 0)
-            .attr('width', borderPadding / 2) // Width of the border area
+            .attr('width', borderPadding / 2)
             .attr('height', '100%')
-            .style('fill', hexToHalfOpacityRGBA(publicColor));
+            .style('fill', hexToHalfOpacityRGBA(theme.publicColor));
 
         svg.append('text')
             .text('Public')
-            .attr('x', w - (borderPadding / 2)) // Position close to the right edge
-            .attr('y', ch - 10) // Vertically centered
+            .attr('x', w - (borderPadding / 2))
+            .attr('y', ch - 10)
             .attr('text-anchor', 'middle')
-            .attr('dominant-baseline', 'middle') // Center alignment of the text
-            .attr('transform', `rotate(90, ${w - (borderPadding / 2)}, ${ch})`) // Rotate around the text's center
-            .style('font-family', 'IBM Plex Sans')
-            .style('font-size', '14px')
-            .style('font-weight', 'bold'); // Make the font bold
+            .attr('dominant-baseline', 'middle')
+            .attr('transform', `rotate(90, ${w - (borderPadding / 2)}, ${ch})`)
+            .style('font-family', theme.borderFontFamily)
+            .style('font-size', theme.borderFontSize)
+            .style('font-weight', theme.borderFontWeight)
+            .style('fill', theme.borderFontColor);
 
         svg.append('rect')
-            .attr('x', 0) // Positioned at the left edge
+            .attr('x', 0)
             .attr('y', 0)
-            .attr('width', borderPadding / 2) // Width of the border area
+            .attr('width', borderPadding / 2)
             .attr('height', '100%')
-            .style('fill', hexToHalfOpacityRGBA(privateColor));
+            .style('fill', hexToHalfOpacityRGBA(theme.privateColor));
 
         svg.append('text')
             .text('Private')
-            .attr('x', borderPadding / 2) // Position close to the left edge
-            .attr('y', ch) // Vertically centered
+            .attr('x', borderPadding / 2)
+            .attr('y', ch)
             .attr('text-anchor', 'middle')
-            .attr('dominant-baseline', 'middle') // Center alignment of the text
-            .attr('transform', `rotate(-90, ${borderPadding / 2 - 10}, ${ch})`) // Rotate around the text's center
-            .style('font-family', 'IBM Plex Sans')
-            .style('font-size', '14px')
-            .style('font-weight', 'bold'); // Make the font bold
+            .attr('dominant-baseline', 'middle')
+            .attr('transform', `rotate(-90, ${borderPadding / 2 - 10}, ${ch})`)
+            .style('font-family', theme.borderFontFamily)
+            .style('font-size', theme.borderFontSize)
+            .style('font-weight', theme.borderFontWeight)
+            .style('fill', theme.borderFontColor);
+    }
 
-        function boundaryForce(alpha) {
-            return function(d) {
-                const nodeRadius = circleSize(d.totalCount) / 2;
-                d.x = Math.max(borderPadding + nodeRadius, Math.min(w - borderPadding - nodeRadius, d.x));
-                d.y = Math.max(borderPadding + nodeRadius, Math.min(h - borderPadding - nodeRadius, d.y));
-            };
-        }
+    let positionsMap = new Map();
+    function saveCurrentPositions(svg) {
+        svg.selectAll('.app').each(function(d) {
+            if (d) {
+                positionsMap.set(d.name, { x: d.x, y: d.y });
+            }
+        });
+    }
 
-        const simulation = d3.forceSimulation(data)
-            .force('center', d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2).strength(1)) // Scale center force strength
-            .force("x", d3.forceX(d => d.targetX).strength(0.3))
-            .force("y", d3.forceY(d => d.targetY).strength(0.3))
-            .force("charge", d3.forceManyBody().strength(-0.5))
-            .force("collide", d3.forceCollide(d => circleSize(d.totalCount) * 1.1 + 15).strength(1))
-            .force("boundary", boundaryForce(0.5))
-            .on('tick', ticked);
+    function updateApps(svg, data, w, h, borderPadding, theme) {
+        const cw = w / 2;
+        const ch = h / 2;
 
+        saveCurrentPositions(svg);
+        //svg.selectAll('.app').remove();
+
+        const pieColors = d3.scaleOrdinal()
+            .domain(["public", "private", "listenInbound", "outbound", "others"])
+            .range([theme.publicColor, theme.privateColor, theme.serverColor, theme.clientColor, theme.otherColor]);
+
+        const pie = d3.pie().value(d => d.value);
+        const arc = d3.arc();
+
+        // Binding data with key function
         const app = svg.selectAll('.app')
-            .data(data)
-            .enter().append('g')
-            .attr('class', 'app')
-            .call(d3.drag()
-                .on('start', dragstarted)
-                .on('drag', dragged)
-                .on('end', dragended));
+            .data(data, d => d.name);
 
-        app.each(function(d) {
+        // Remove any elements that no longer have data associated with them
+        app.exit()
+            .transition()
+            .style("opacity", 0)
+            .remove();
+
+        // Enter selection for new data points
+        const appEnter = app.enter()
+            .append('g')
+            .attr('class', 'app')
+            .attr('transform', `translate(${cw}, ${ch})`); // Start from center
+
+        // Initialize new elements
+        appEnter.each(function (d) {
             const group = d3.select(this);
-            const pieData = pie(getPieData(d));
-            const radius = circleSize(d.totalCount);
+            const oldPos = positionsMap.get(d.name) || { x: cw, y: ch };
+
+            d.x = oldPos.x;
+            d.y = oldPos.y;
+
+            const pieData = pie(d.d3.pie);
+            const radius = d.d3.size;
 
             group.selectAll('path')
                 .data(pieData)
                 .enter().append('path')
+                .transition()
                 .attr('d', arc.innerRadius(0).outerRadius(radius))
                 .attr('fill', (d, i) => pieColors(i));
+
+            group.append('text')
+                .text(d => d.name)
+                .attr('text-anchor', 'middle')
+                .attr('y', radius + 10)
+                .style('font-family', theme.appFontFamily)
+                .style('font-size', theme.appFontSize)
+                .style('font-weight', theme.appFontWeight)
+                .style('fill', theme.appFontColor);
         });
 
-        app.append('text')
-            .text(d => d.name)
-            .attr('text-anchor', 'middle')
-            .attr('y', d => circleSize(d.totalCount) + 10)
-            .style('font-family', 'IBM Plex Sans') // Set the font family
-            .style('font-size', '12px') // Set the font size
-            .style('font-weight', 'bold'); // Make the font bold
+        // Update selection
+        app.each(function (d) {
+            const group = d3.select(this);
+            const oldPos = positionsMap.get(d.name) || { x: cw, y: ch };
 
-        // Initialize app positions at the center
-        app.attr('transform', `translate(${window.innerWidth / 2}, ${window.innerHeight / 2})`);
+            d.x = oldPos.x;
+            d.y = oldPos.y;
+
+            group.selectAll('path')
+                .data(pie(d.d3.pie))
+                .transition()
+                .attr('d', arc.innerRadius(0).outerRadius(d.d3.size));
+
+            group.select('text')
+                .attr('y', d.d3.size + 10);
+        });
+
+        // Transition for new elements
+        appEnter.transition()
+            .attr('transform', d => `translate(${d.d3.x}, ${d.d3.y})`);
+
+        // Merge the enter and update selections
+        const mergedApp = appEnter.merge(app);
+
+        // Apply the drag behavior to the merged selection
+        mergedApp.call(d3.drag()
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended));
+
+        return mergedApp;
+    }
+
+    let initial = true;
+    let simulation;
+
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(1).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+
+    // Function to draw the circles and labels for each application with border forces
+    function drawApplications(data, w, h, borderPadding, theme) {
+        let svg = d3.select('#d3-canvas').select('svg');
+        if(svg.empty()) {
+            svg = d3.select('#d3-canvas').append('svg')
+                .attr('width', '100%')
+                .attr('height', '100%');
+
+            drawInitialChart(svg, data, w, h, borderPadding, theme);
+        }
+
+        const app = updateApps(svg, data, w, h, borderPadding, theme);
+
+        if(initial) {
+            simulation = d3.forceSimulation(data)
+                //.force('center', d3.forceCenter(cw, ch).strength(1))
+                .force("x", d3.forceX(d => d.d3.x).strength(0.05))
+                .force("y", d3.forceY(d => d.d3.y).strength(0.05))
+                //.force("charge", d3.forceManyBody().strength(-0.05))
+                .force("collide", d3.forceCollide(d => d.d3.size * 1.1 + 15).strength(1))
+                .on('tick', ticked);
+        }
+        else {
+            simulation.nodes(data)
+                .force("x", d3.forceX(d => d.d3.x).strength(0.02))
+                .force("y", d3.forceY(d => d.d3.y).strength(0.02))
+                .alpha(1).restart();
+        }
 
         function ticked() {
             app.attr('transform', d => `translate(${d.x}, ${d.y})`);
         }
 
-        function dragstarted(event, d) {
-            if (!event.active) simulation.alphaTarget(1).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-        }
-
-        function dragged(event, d) {
-            d.fx = event.x;
-            d.fy = event.y;
-        }
-
-        function dragended(event, d) {
-            if (!event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-        }
+        initial = false;
     }
 
+    function redrawChart() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        // Update SVG dimensions
+        const svg = d3.select('#d3-canvas').select('svg')
+            .attr('width', w)
+            .attr('height', h);
+
+        // Redraw the chart with the new dimensions
+        fetchDataAndUpdateChart(); // This function should use the new 'w' and 'h'
+    }
+
+    // Debounce function to optimize performance
+    function debounce(func, timeout = 300) {
+        let timer;
+        return (...args) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => { func.apply(this, args); }, timeout);
+        };
+    }
+
+    // Attach the event listener to the window resize event
+    window.addEventListener('resize', debounce(() => {
+        redrawChart();
+    }));
+
     // Modify your fetchData function to call drawApplications after data transformation
-    function fetchData() {
+    function fetchDataAndUpdateChart() {
         fetch('http://localhost:19999/api/v1/function?function=network-viewer')
             .then(response => response.json())
             .then(data => {
-                // Your existing code
-                const desiredColumns = ["Direction", "Protocol", "Namespace", "Process", "CommandLine", "LocalIP", "LocalPort", "RemoteIP", "RemotePort", "LocalAddressSpace", "RemoteAddressSpace"];
-                const transformed = transformData(data, desiredColumns, data.columns);
+                const transformed = transformData(data);
 
-                // Now draw the applications with border forces
-                drawApplications(transformed);
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                const borderPadding = 40;
+
+                const normalized = normalizeData(transformed, w, h, borderPadding);
+                drawApplications(normalized, w, h, borderPadding, themes.dark);
             })
             .catch(error => console.error('Error fetching data:', error));
     }
 
-    // Load data on start
-    window.onload = fetchData;
+    // Initial load
+    window.onload = () => {
+        redrawChart();
+        setInterval(fetchDataAndUpdateChart, 2000); // You may need to adjust this part
+    };
 </script>
 </body>
 </html>

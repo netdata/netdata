@@ -5264,6 +5264,7 @@ static bool apps_plugin_exit = false;
 int main(int argc, char **argv) {
     clocks_init();
     nd_log_initialize_for_external_plugins("apps.plugin");
+    for_each_open_fd(OPEN_FD_ACTION_CLOSE, OPEN_FD_EXCLUDE_STDIN|OPEN_FD_EXCLUDE_STDOUT|OPEN_FD_EXCLUDE_STDERR);
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
 
