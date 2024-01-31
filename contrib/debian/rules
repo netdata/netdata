@@ -69,6 +69,7 @@ override_dh_auto_configure:
 		packaging/bundle-ebpf-co-re.sh . ${TOP}/usr/libexec/netdata/plugins.d; \
 	fi
 	dh_auto_configure -- -G Ninja \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DCMAKE_INSTALL_PREFIX=/ \
 		-DWEB_DIR=/var/lib/netdata/www \
 		-DCMAKE_C_FLAGS='-ffile-prefix-map=${SRC_DIR}=${SRC_DIR}' \
