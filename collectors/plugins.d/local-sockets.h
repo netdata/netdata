@@ -811,15 +811,22 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
     snprintfz(filename, sizeof(filename), "%s/proc/%d/ns/net", ls->config.host_prefix, ps->pid);
 
     // verify the pid is in the target namespace
-    struct stat statbuf;
-    if (stat(filename, &statbuf) == -1 || statbuf.st_ino != ps->net_ns_inode) {
-        local_sockets_log(ls, "pid %d is not in the wanted network namespace", ps->pid);
+    int fd = open(filename, O_RDONLY);
+    if (fd == -1) {
+        local_sockets_log(ls, "cannot open file '%s'", filename);
         return false;
     }
 
-    int fd = open(filename, O_RDONLY);
-    if(!fd) {
-        local_sockets_log(ls, "cannot open file '%s'", filename);
+    struct stat statbuf;
+    if (fstat(fd, &statbuf) == -1) {
+        close(fd);
+        local_sockets_log(ls, "failed to get file statistics for '%s'", filename);
+        return false;
+    }
+
+    if (statbuf.st_ino != ps->net_ns_inode) {
+        close(fd);
+        local_sockets_log(ls, "pid %d is not in the wanted network namespace", ps->pid);
         return false;
     }
 
