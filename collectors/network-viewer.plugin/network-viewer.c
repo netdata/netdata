@@ -43,6 +43,8 @@ ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
 
 
 static void local_socket_to_array(struct local_socket_state *ls, struct local_socket *n, void *data) {
+    if(!n->comm || n->uid == UID_UNSET) return;
+
     BUFFER *wb = data;
 
     char local_address[INET6_ADDRSTRLEN];
