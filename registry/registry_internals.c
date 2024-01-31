@@ -277,7 +277,7 @@ char *registry_get_this_machine_guid(void) {
         return guid;
 
     // read it from disk
-    int fd = open(registry.machine_guid_filename, O_RDONLY);
+    int fd = open(registry.machine_guid_filename, O_RDONLY | O_CLOEXEC);
     if(fd != -1) {
         char buf[GUID_LEN + 1];
         if(read(fd, buf, GUID_LEN) != GUID_LEN)
@@ -305,7 +305,7 @@ char *registry_get_this_machine_guid(void) {
         guid[GUID_LEN] = '\0';
 
         // save it
-        fd = open(registry.machine_guid_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
+        fd = open(registry.machine_guid_filename, O_WRONLY|O_CREAT|O_TRUNC | O_CLOEXEC, 444);
         if(fd == -1)
             fatal("Cannot create unique machine id file '%s'. Please fix this.", registry.machine_guid_filename);
 

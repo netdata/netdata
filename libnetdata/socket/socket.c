@@ -262,7 +262,7 @@ char *strdup_client_description(int family, const char *protocol, const char *ip
 int create_listen_socket_unix(const char *path, int listen_backlog) {
     int sock;
 
-    sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    sock = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if(sock < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: UNIX socket() on path '%s' failed.",
@@ -316,7 +316,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
 int create_listen_socket4(int socktype, const char *ip, uint16_t port, int listen_backlog) {
     int sock;
 
-    sock = socket(AF_INET, socktype, 0);
+    sock = socket(AF_INET, socktype | SOCK_CLOEXEC, 0);
     if(sock < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: IPv4 socket() on ip '%s' port %d, socktype %d failed.",
@@ -374,7 +374,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     int sock;
     int ipv6only = 1;
 
-    sock = socket(AF_INET6, socktype, 0);
+    sock = socket(AF_INET6, socktype | SOCK_CLOEXEC, 0);
     if (sock < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: IPv6 socket() on ip '%s' port %d, socktype %d, failed.",
@@ -781,7 +781,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 // timeout     the timeout for establishing a connection
 
 static inline int connect_to_unix(const char *path, struct timeval *timeout) {
-    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if(fd == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "Failed to create UNIX socket() for '%s'",
@@ -894,7 +894,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             }
         }
 
-        fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        fd = socket(ai->ai_family, ai->ai_socktype | SOCK_CLOEXEC, ai->ai_protocol);
         if(fd != -1) {
             if(timeout) {
                 if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)

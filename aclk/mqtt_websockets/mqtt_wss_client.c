@@ -583,7 +583,7 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
 
     if (client->sockfd > 0)
         close(client->sockfd);
-    client->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    client->sockfd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (client->sockfd < 0) {
         mws_error(client->log, "Couldn't create socket()");
         return -1;

@@ -183,7 +183,7 @@ int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/%d/%s", prefix, (int)pid, ns);
-    int fd = open(filename, O_RDONLY);
+    int fd = open(filename, O_RDONLY | O_CLOEXEC);
 
     if(fd == -1)
         collector_error("Cannot open proc_pid_fd() file '%s'", filename);

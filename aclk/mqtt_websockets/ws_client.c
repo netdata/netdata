@@ -72,7 +72,7 @@ ws_client *ws_client_new(size_t buf_size, char **host, mqtt_wss_log_ctx_t log)
     if (!client->buf_to_mqtt)
         goto cleanup_2;
 
-    client->entropy_fd = open(ENTROPY_SOURCE, O_RDONLY);
+    client->entropy_fd = open(ENTROPY_SOURCE, O_RDONLY | O_CLOEXEC);
     if (client->entropy_fd < 1) {
         ERROR("Error opening entropy source \"" ENTROPY_SOURCE "\". Reason: \"%s\"", strerror(errno));
         goto cleanup_3;
@@ -164,7 +164,7 @@ static int ws_client_get_nonce(ws_client *client, char *dest, unsigned int size)
     // we do not need crypto secure random here
     // it's just used for protocol negotiation
     int rd;
-    int f = open(RAND_SRC, O_RDONLY);
+    int f = open(RAND_SRC, O_RDONLY | O_CLOEXEC);
     if (f < 0) {
         ERROR("Error opening \"%s\". Err: \"%s\"", RAND_SRC, strerror(errno));
         return -2;

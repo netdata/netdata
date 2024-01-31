@@ -811,7 +811,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
     snprintfz(filename, sizeof(filename), "%s/proc/%d/ns/net", ls->config.host_prefix, ps->pid);
 
     // verify the pid is in the target namespace
-    int fd = open(filename, O_RDONLY);
+    int fd = open(filename, O_RDONLY | O_CLOEXEC);
     if (fd == -1) {
         local_sockets_log(ls, "cannot open file '%s'", filename);
         return false;

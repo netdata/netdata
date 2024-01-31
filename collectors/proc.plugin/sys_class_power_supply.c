@@ -245,7 +245,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 char buffer[30 + 1];
 
                 if(unlikely(ps->capacity->fd == -1)) {
-                    ps->capacity->fd = open(ps->capacity->filename, O_RDONLY, 0666);
+                    ps->capacity->fd = open(ps->capacity->filename, O_RDONLY | O_CLOEXEC, 0666);
                     if(unlikely(ps->capacity->fd == -1)) {
                         collector_error("Cannot open file '%s'", ps->capacity->filename);
                         power_supply_free(ps);
@@ -290,7 +290,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                             char buffer[30 + 1];
 
                             if(unlikely(pd->fd == -1)) {
-                                pd->fd = open(pd->filename, O_RDONLY, 0666);
+                                pd->fd = open(pd->filename, O_RDONLY | O_CLOEXEC, 0666);
                                 if(unlikely(pd->fd == -1)) {
                                     collector_error("Cannot open file '%s'", pd->filename);
                                     read_error = 1;

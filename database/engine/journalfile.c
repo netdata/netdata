@@ -1045,7 +1045,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         journal_v1_file_size = (uint32_t)statbuf.st_size;
 
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path_v2));
-    fd = open(path_v2, O_RDONLY);
+    fd = open(path_v2, O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
         if (errno == ENOENT)
             return 1;
