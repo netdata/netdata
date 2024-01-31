@@ -55,7 +55,7 @@ static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKE
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
     }
 
-    printf("%s, direction=%s%s%s%s%s pid=%d, state=0x%0x, ns=%"PRIu64", local=%s[:%u], remote=%s[:%u], comm=%s\n",
+    printf("%s, direction=%s%s%s%s%s pid=%d, state=0x%0x, ns=%"PRIu64", local=%s[:%u], remote=%s[:%u], uid=%u, comm=%s\n",
            protocol_name(n),
            (n->direction & SOCKET_DIRECTION_LISTEN) ? "LISTEN," : "",
            (n->direction & SOCKET_DIRECTION_INBOUND) ? "INBOUND," : "",
@@ -67,12 +67,17 @@ static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKE
            n->net_ns_inode,
            local_address, n->local.port,
            remote_address, n->remote.port,
+           n->uid,
            n->comm);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
 int main(int argc, char **argv) {
+    static struct rusage started, ended;
+    getrusage(RUSAGE_SELF, &started);
+    bool debug = false;
+
     LS_STATE ls = {
         .config = {
             .listening = true,
@@ -206,8 +211,11 @@ int main(int argc, char **argv) {
             ls.config.comm = true;
             ls.config.cmdline = true;
             ls.config.namespaces = true;
+            ls.config.uid = true;
             ls.config.max_errors = SIZE_MAX;
             ls.config.cb = print_local_listeners_debug;
+
+            debug = true;
         }
         else if (strcmp("tcp", s) == 0) {
             ls.config.tcp4 = ls.config.tcp6 = positive;
@@ -268,6 +276,16 @@ int main(int argc, char **argv) {
     }
 
     local_sockets_process(&ls);
+
+    getrusage(RUSAGE_SELF, &ended);
+
+    if(debug) {
+        unsigned long long user   = ended.ru_utime.tv_sec * 1000000ULL + ended.ru_utime.tv_usec - started.ru_utime.tv_sec * 1000000ULL + started.ru_utime.tv_usec;
+        unsigned long long system = ended.ru_stime.tv_sec * 1000000ULL + ended.ru_stime.tv_usec - started.ru_stime.tv_sec * 1000000ULL + started.ru_stime.tv_usec;
+        unsigned long long total  = user + system;
+
+        fprintf(stderr, "CPU Usage %llu user, %llu system, %llu total\n", user, system, total);
+    }
 
     return 0;
 }

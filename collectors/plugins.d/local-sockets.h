@@ -5,6 +5,9 @@
 
 #include "libnetdata/libnetdata.h"
 
+// disable libmnl for the moment
+#undef HAVE_LIBMNL
+
 #ifdef HAVE_LIBMNL
 #include <linux/inet_diag.h>
 #include <linux/sock_diag.h>
@@ -12,6 +15,8 @@
 #include <linux/netlink.h>
 #include <libmnl/libmnl.h>
 #endif
+
+#define UID_UNSET (uid_t)(UINT32_MAX)
 
 // --------------------------------------------------------------------------------------------------------------------
 // hashtable for keeping the namespaces
@@ -75,6 +80,7 @@ typedef struct local_socket_state {
         bool pid;
         bool cmdline;
         bool comm;
+        bool uid;
         bool namespaces;
         size_t max_errors;
 
@@ -124,6 +130,7 @@ typedef enum __attribute__((packed)) {
 struct pid_socket {
     uint64_t inode;
     pid_t pid;
+    uid_t uid;
     uint64_t net_ns_inode;
     char *cmdline;
     char comm[TASK_COMM_LEN];
@@ -326,6 +333,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
             continue;
         }
         net_ns_inode = 0;
+        uid_t uid = UID_UNSET;
 
         struct dirent *fd_entry;
         while ((fd_entry = readdir(fd_dir)) != NULL) {
@@ -340,6 +348,22 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
             SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl = simple_hashtable_get_slot_PID_SOCKET(&ls->pid_sockets_hashtable, inode, &inode, true);
             struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl);
             if(!ps || (ps->pid == 1 && pid != 1)) {
+                if(uid == UID_UNSET && ls->config.uid) {
+                    char status_buf[512];
+                    snprintfz(filename, sizeof(filename), "%s/%s/status", proc_filename, proc_entry->d_name);
+                    if (read_txt_file(filename, status_buf, sizeof(status_buf)))
+                        local_sockets_log(ls, "cannot open file: %s\n", filename);
+                    else {
+                        char *u = strstr(status_buf, "Uid:");
+                        if(u) {
+                            u += 4;
+                            while(isspace(*u)) u++;                     // skip spaces
+                            while(*u >= '0' && *u <= '9') u++;          // skip the first number (real uid)
+                            while(isspace(*u)) u++;                     // skip spaces again
+                            uid = strtol(u, NULL, 10);   // parse the 2nd number (effective uid)
+                        }
+                    }
+                }
                 if(!comm[0] && ls->config.comm) {
                     snprintfz(filename, sizeof(filename), "%s/%s/comm", proc_filename, proc_entry->d_name);
                     if (read_txt_file(filename, comm, sizeof(comm)))
@@ -372,6 +396,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
 
                 ps->inode = inode;
                 ps->pid = pid;
+                ps->uid = uid;
                 ps->net_ns_inode = net_ns_inode;
                 strncpyz(ps->comm, comm, sizeof(ps->comm) - 1);
 
@@ -524,6 +549,8 @@ static inline void local_sockets_index_listening_port(LS_STATE *ls, LOCAL_SOCKET
 }
 
 static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
+    if(!tmp->inode) return false;
+
     SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ls->sockets_hashtable, tmp->inode, &tmp->inode, true);
     LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
     if(n) {
@@ -551,6 +578,10 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
     if(ps) {
         n->net_ns_inode = ps->net_ns_inode;
         n->pid = ps->pid;
+
+        if(ps->uid != UID_UNSET && n->uid == UID_UNSET)
+            n->uid = ps->uid;
+
         if(ps->cmdline)
             n->cmdline = strdupz(ps->cmdline);
         strncpyz(n->comm, ps->comm, sizeof(n->comm) - 1);
@@ -617,8 +648,10 @@ static inline void local_sockets_netlink_init(LS_STATE *ls) {
 }
 
 static inline void local_sockets_netlink_cleanup(LS_STATE *ls) {
-    if(ls->nl)
+    if(ls->nl) {
         mnl_socket_close(ls->nl);
+        ls->nl = NULL;
+    }
 }
 
 static inline int local_sockets_netlink_cb_data(const struct nlmsghdr *nlh, void *data) {
@@ -745,7 +778,6 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
                 continue;
             }
         }
-        if(!inode) continue;
 
         LOCAL_SOCKET n = {
             .inode = inode,
@@ -760,7 +792,8 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
                 .family = family,
                 .protocol = protocol,
                 .port = remote_port,
-            }
+            },
+            .uid = UID_UNSET,
         };
 
         if(family == AF_INET) {
@@ -879,7 +912,7 @@ static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *fi
     }
 #endif
 
-    local_sockets_find_all_sockets_in_proc(ls, filename);
+    local_sockets_read_proc_net_x(ls, filename, family, protocol);
 }
 
 static inline void local_sockets_read_sockets_from_proc(LS_STATE *ls) {
@@ -1004,7 +1037,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         }
 
 #ifdef HAVE_LIBMNL
-        ls->nl = NULL;
+        local_sockets_netlink_cleanup(ls);
         local_sockets_netlink_init(ls);
 #endif
 

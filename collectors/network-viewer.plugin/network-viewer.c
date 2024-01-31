@@ -125,6 +125,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             .udp4 = true,
             .udp6 = true,
             .pid = true,
+            .uid = true,
             .cmdline = true,
             .comm = true,
             .namespaces = true,
