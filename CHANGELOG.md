@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Network viewer fixes [\#16877](https://github.com/netdata/netdata/pull/16877) ([ktsaou](https://github.com/ktsaou))
+- Add requirements.txt for dag [\#16875](https://github.com/netdata/netdata/pull/16875) ([vkalintiris](https://github.com/vkalintiris))
+- Rm refs to map and save modes [\#16874](https://github.com/netdata/netdata/pull/16874) ([vkalintiris](https://github.com/vkalintiris))
+- Fix coverity issues [\#16873](https://github.com/netdata/netdata/pull/16873) ([stelfrag](https://github.com/stelfrag))
+- Network Viewer \(local-sockets version\) [\#16872](https://github.com/netdata/netdata/pull/16872) ([ktsaou](https://github.com/ktsaou))
 - Use dagger to build and test the agent. [\#16868](https://github.com/netdata/netdata/pull/16868) ([vkalintiris](https://github.com/vkalintiris))
 - Local sockets for network namespaces [\#16867](https://github.com/netdata/netdata/pull/16867) ([ktsaou](https://github.com/ktsaou))
 - Fix coverity issue [\#16866](https://github.com/netdata/netdata/pull/16866) ([stelfrag](https://github.com/stelfrag))
@@ -43,6 +48,7 @@
 - Move mqtt\_websockets under aclk/ [\#16804](https://github.com/netdata/netdata/pull/16804) ([vkalintiris](https://github.com/vkalintiris))
 - Fix incorrect major version check in updater. [\#16803](https://github.com/netdata/netdata/pull/16803) ([Ferroin](https://github.com/Ferroin))
 - cgroups: containers-vms add CPU throttling % [\#16800](https://github.com/netdata/netdata/pull/16800) ([ilyam8](https://github.com/ilyam8))
+- Setup sentry-native SDK. [\#16798](https://github.com/netdata/netdata/pull/16798) ([vkalintiris](https://github.com/vkalintiris))
 - Add additional fail reason and source during database initialization [\#16794](https://github.com/netdata/netdata/pull/16794) ([stelfrag](https://github.com/stelfrag))
 - Use original summary for alert transition [\#16793](https://github.com/netdata/netdata/pull/16793) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#16792](https://github.com/netdata/netdata/pull/16792) ([netdatabot](https://github.com/netdatabot))
@@ -395,12 +401,6 @@
 - fix various issues identified by coverity [\#16294](https://github.com/netdata/netdata/pull/16294) ([ktsaou](https://github.com/ktsaou))
 - fix missing labels from parents [\#16293](https://github.com/netdata/netdata/pull/16293) ([ktsaou](https://github.com/ktsaou))
 - fix renames in freebsd [\#16292](https://github.com/netdata/netdata/pull/16292) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#16291](https://github.com/netdata/netdata/pull/16291) ([netdatabot](https://github.com/netdatabot))
-- fix retention loading [\#16290](https://github.com/netdata/netdata/pull/16290) ([ktsaou](https://github.com/ktsaou))
-- integrations: yes/no instead of True/False in tables [\#16289](https://github.com/netdata/netdata/pull/16289) ([ilyam8](https://github.com/ilyam8))
-- typo fixed in gen\_docs\_integrations.py [\#16288](https://github.com/netdata/netdata/pull/16288) ([khalid586](https://github.com/khalid586))
-- Brotli streaming compression [\#16287](https://github.com/netdata/netdata/pull/16287) ([ktsaou](https://github.com/ktsaou))
-- Apcupsd selftest metric [\#16286](https://github.com/netdata/netdata/pull/16286) ([thomasbeaudry](https://github.com/thomasbeaudry))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
