@@ -444,6 +444,33 @@
         initial = false;
     }
 
+    function redrawChart() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        // Update SVG dimensions
+        const svg = d3.select('#d3-canvas').select('svg')
+            .attr('width', w)
+            .attr('height', h);
+
+        // Redraw the chart with the new dimensions
+        fetchDataAndUpdateChart(); // This function should use the new 'w' and 'h'
+    }
+
+    // Debounce function to optimize performance
+    function debounce(func, timeout = 300) {
+        let timer;
+        return (...args) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => { func.apply(this, args); }, timeout);
+        };
+    }
+
+    // Attach the event listener to the window resize event
+    window.addEventListener('resize', debounce(() => {
+        redrawChart();
+    }));
+
     // Modify your fetchData function to call drawApplications after data transformation
     function fetchDataAndUpdateChart() {
         fetch('http://localhost:19999/api/v1/function?function=network-viewer')
@@ -461,11 +488,11 @@
             .catch(error => console.error('Error fetching data:', error));
     }
 
-    // Load data on start
+    // Initial load
     window.onload = () => {
-        fetchDataAndUpdateChart();
-        setInterval(fetchDataAndUpdateChart, 2000);
-    }
+        redrawChart();
+        setInterval(fetchDataAndUpdateChart, 2000); // You may need to adjust this part
+    };
 </script>
 </body>
 </html>
