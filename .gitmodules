@@ -2,7 +2,7 @@
 	path = aclk/aclk-schemas
 	url = https://github.com/netdata/aclk-schemas.git
 [submodule "ml/kmeans/dlib"]
-	path = ml/dlib
+	path = src/ml/dlib
 	url = https://github.com/davisking/dlib.git
 	shallow = true
 	ignore = dirty

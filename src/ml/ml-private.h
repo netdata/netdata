@@ -3,7 +3,7 @@
 #ifndef NETDATA_ML_PRIVATE_H
 #define NETDATA_ML_PRIVATE_H
 
-#include "dlib/matrix.h"
+#include "dlib/dlib/matrix.h"
 #include "ml/ml.h"
 
 #include <vector>

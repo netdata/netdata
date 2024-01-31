@@ -955,18 +955,18 @@ set(IDLEJITTER_PLUGIN_FILES collectors/idlejitter.plugin/plugin_idlejitter.c)
 
 if(ENABLE_ML)
         set(ML_FILES
-                ml/ad_charts.h
-                ml/ad_charts.cc
-                ml/Config.cc
-                ml/dlib/dlib/all/source.cpp
-                ml/ml.h
-                ml/ml.cc
-                ml/ml-private.h
+                src/ml/ad_charts.h
+                src/ml/ad_charts.cc
+                src/ml/Config.cc
+                src/ml/dlib/dlib/all/source.cpp
+                src/ml/ml.h
+                src/ml/ml.cc
+                src/ml/ml-private.h
         )
 else()
         set(ML_FILES
-                ml/ml.h
-                ml/ml-dummy.c
+                src/ml/ml.h
+                src/ml/ml-dummy.c
         )
 endif()
 
@@ -1507,7 +1507,7 @@ include(systemd.cmake)
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
-target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR})
+target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
 
 # pthread (FIXME: use find_package for this)
 
@@ -2083,7 +2083,6 @@ target_compile_definitions(netdata PRIVATE
 target_include_directories(netdata PRIVATE
         "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/aclk/aclk-schemas>"
-        "$<$<BOOL:${ENABLE_ML}>:${CMAKE_SOURCE_DIR}/ml/dlib>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
 )

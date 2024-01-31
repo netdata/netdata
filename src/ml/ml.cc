@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <dlib/clustering.h>
+#include "dlib/dlib/clustering.h"
 
 #include "ml-private.h"
 
