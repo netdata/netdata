@@ -77,8 +77,14 @@ static void local_socket_to_array(struct local_socket_state *ls, struct local_so
             buffer_json_add_array_item_string(wb, TCP_STATE_2str(n->state));
         else
             buffer_json_add_array_item_string(wb, "stateless");
+
         buffer_json_add_array_item_uint64(wb, n->pid);
-        buffer_json_add_array_item_string(wb, n->comm);
+
+        if(!n->comm[0])
+            buffer_json_add_array_item_string(wb, "[unknown]");
+        else
+            buffer_json_add_array_item_string(wb, n->comm);
+
         buffer_json_add_array_item_string(wb, n->cmdline);
         buffer_json_add_array_item_string(wb, local_address);
         buffer_json_add_array_item_uint64(wb, n->local.port);

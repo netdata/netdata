@@ -166,7 +166,7 @@
 
     const themes = {
         dark: {
-            publicColor: "#aa8800",
+            publicColor: "#bb9900",
             privateColor: "#323299",
             serverColor: "#008800",
             clientColor: "#994433",
@@ -288,9 +288,21 @@
             .style('fill', theme.borderFontColor);
     }
 
+    let positionsMap = new Map();
+    function saveCurrentPositions(svg) {
+        svg.selectAll('.app').each(function(d) {
+            if (d) {
+                positionsMap.set(d.name, { x: d.x, y: d.y });
+            }
+        });
+    }
+
     function updateApps(svg, data, w, h, borderPadding, theme) {
         const cw = w / 2;
         const ch = h / 2;
+
+        saveCurrentPositions(svg);
+        //svg.selectAll('.app').remove();
 
         const pieColors = d3.scaleOrdinal()
             .domain(["public", "private", "listenInbound", "outbound", "others"])
@@ -298,13 +310,6 @@
 
         const pie = d3.pie().value(d => d.value);
         const arc = d3.arc();
-
-        let positionsMap = new Map();
-        svg.selectAll('.app').each(function(d) {
-            if (d && d.x !== undefined && d.y !== undefined) {
-                positionsMap.set(d.name, { x: d.x, y: d.y });
-            }
-        });
 
         // Binding data with key function
         const app = svg.selectAll('.app')
@@ -336,6 +341,7 @@
             group.selectAll('path')
                 .data(pieData)
                 .enter().append('path')
+                .transition()
                 .attr('d', arc.innerRadius(0).outerRadius(radius))
                 .attr('fill', (d, i) => pieColors(i));
 
@@ -359,6 +365,7 @@
 
             group.selectAll('path')
                 .data(pie(d.d3.pie))
+                .transition()
                 .attr('d', arc.innerRadius(0).outerRadius(d.d3.size));
 
             group.select('text')
