@@ -44,7 +44,7 @@ exist.
 - `health.d/` is a directory that contains [health configuration files](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
 - `health_alarm_notify.conf` enables and configures [alert notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
 - `statsd.d/` is a directory for configuring Netdata's [statsd collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
-- `stream.conf` configures [parent-child streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) between separate nodes running the Agent.
+- `stream.conf` configures [parent-child streaming](https://github.com/netdata/netdata/blob/master/src/streaming/README.md) between separate nodes running the Agent.
 - `.environment` is a hidden file that describes the environment in which the Netdata Agent is installed, including the
   `PATH` and any installation options. Useful for [reinstalling](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md) or
   [uninstalling](https://github.com/netdata/netdata/blob/master/packaging/installer/UNINSTALL.md) the Agent.

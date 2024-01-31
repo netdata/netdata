@@ -36,11 +36,11 @@ the [web server access lists](https://github.com/netdata/netdata/blob/master/web
 5. `[environment variables]` to [configure](#environment-variables-section-options) the environment variables used
    Netdata.
 6. `[sqlite]` to [configure](#sqlite-section-options) the [Netdata daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md) SQLite settings.
-7. `[ml]` to configure settings for [machine learning](https://github.com/netdata/netdata/blob/master/ml/README.md).
+7. `[ml]` to configure settings for [machine learning](https://github.com/netdata/netdata/blob/master/src/ml/README.md).
 8. `[health]` to [configure](#health-section-options) general settings for [health monitoring](https://github.com/netdata/netdata/blob/master/health/README.md).
 9. `[web]` to [configure the web server](https://github.com/netdata/netdata/blob/master/web/server/README.md).
-10. `[registry]` for the [Netdata registry](https://github.com/netdata/netdata/blob/master/registry/README.md).
-11. `[global statistics]` for the [Netdata registry](https://github.com/netdata/netdata/blob/master/registry/README.md).
+10. `[registry]` for the [Netdata registry](https://github.com/netdata/netdata/blob/master/src/registry/README.md).
+11. `[global statistics]` for the [Netdata registry](https://github.com/netdata/netdata/blob/master/src/registry/README.md).
 12. `[statsd]` for the general settings of the [stats.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
 13. `[plugins]` to [configure](#plugins-section-options) which [collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) to use and PATH
     settings.
@@ -126,7 +126,7 @@ Please note that your data history will be lost if you have modified `history` p
 |       plugins       | `"/usr/libexec/netdata/plugins.d" "/etc/netdata/custom-plugins.d"` | The directory plugin programs are kept. This setting supports multiple directories, space separated. If any directory path contains spaces, enclose it in single or double quotes. |
 |    health config    |                      `/etc/netdata/health.d`                       | The directory containing the user alert configuration files, to override the stock configurations                                                                                  |
 | stock health config |                 `/usr/lib/netdata/conf.d/health.d`                 | Contains the stock alert configuration files for each collector                                                                                                                    |
-|      registry       |              `/opt/netdata/var/lib/netdata/registry`               | Contains the [registry](https://github.com/netdata/netdata/blob/master/registry/README.md) database and GUID that uniquely identifies each Netdata Agent                           |
+|      registry       |              `/opt/netdata/var/lib/netdata/registry`               | Contains the [registry](https://github.com/netdata/netdata/blob/master/src/registry/README.md) database and GUID that uniquely identifies each Netdata Agent                           |
 
 ### [logs] section options
 
@@ -201,7 +201,7 @@ Additionally, there will be the following options:
 ### [registry] section options
 
 To understand what this section is and how it should be configured, please refer to
-the [registry documentation](https://github.com/netdata/netdata/blob/master/registry/README.md).
+the [registry documentation](https://github.com/netdata/netdata/blob/master/src/registry/README.md).
 
 ## Per-plugin configuration
 

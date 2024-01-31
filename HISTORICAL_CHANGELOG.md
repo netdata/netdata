@@ -125,7 +125,7 @@ netdata (1.6.0) - 2017-03-20
     menu on the dashboard.
 
     For more information check:
-    <https://github.com/netdata/netdata/tree/master/streaming#monitoring-ephemeral-nodes>
+    <https://github.com/netdata/netdata/tree/master/src/streaming#monitoring-ephemeral-nodes>
 
 -   monitoring ephemeral containers and VM guests
 

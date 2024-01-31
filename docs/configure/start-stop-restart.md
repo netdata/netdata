@@ -34,7 +34,7 @@ If you start the daemon this way, close it with `sudo killall netdata`.
 
 ## Using `netdatacli`
 
-The Netdata Agent also comes with a [CLI tool](https://github.com/netdata/netdata/blob/master/cli/README.md) capable of performing shutdowns. Start the Agent back up
+The Netdata Agent also comes with a [CLI tool](https://github.com/netdata/netdata/blob/master/src/cli/README.md) capable of performing shutdowns. Start the Agent back up
 using your preferred method listed above.
 
 ```bash

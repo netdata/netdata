@@ -668,13 +668,13 @@ function renderMachines(machinesArray) {
         if (machines) {
             html += (
                 `<div class="info-item">
-                    <a href="https://github.com/netdata/netdata/tree/master/registry#registry" target="_blank">Your nodes list is empty</a>
+                    <a href="https://github.com/netdata/netdata/tree/master/src/registry#registry" target="_blank">Your nodes list is empty</a>
                 </div>`
             )
         } else {
             html += (
                 `<div class="info-item">
-                    <a href="https://github.com/netdata/netdata/tree/master/registry#registry" target="_blank">Failed to contact the registry</a>
+                    <a href="https://github.com/netdata/netdata/tree/master/src/registry#registry" target="_blank">Failed to contact the registry</a>
                 </div>`
             )
         }
@@ -812,7 +812,7 @@ function renderMyNetdataMenu(machinesArray) {
             </div>
             <div class="agent-item">
                 <i class="fas fa-question-circle""></i>
-                <a href="https://github.com/netdata/netdata/tree/master/registry#registry" target="_blank">What is this?</a>
+                <a href="https://github.com/netdata/netdata/tree/master/src/registry#registry" target="_blank">What is this?</a>
                 <div></div>
             </div>`
         )

@@ -1,6 +1,6 @@
 <!--
 title: "Configure machine learning (ML) powered anomaly detection"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/ml/README.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/ml/README.md"
 description: "This is an in-depth look at how Netdata uses ML to detect anomalies."
 sidebar_label: "Configure machine learning (ML) powered anomaly detection"
 learn_status: "Published"
@@ -152,7 +152,7 @@ Below is a list of all the available configuration params and their default valu
 
 If you would like to run ML on a parent instead of at the edge, some configuration options are illustrated below.
 
-This example assumes 3 child nodes [streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) to 1 parent node and illustrates the main ways you might want to configure running ML for the children on the parent, running ML on the children themselves, or even a mix of approaches.
+This example assumes 3 child nodes [streaming](https://github.com/netdata/netdata/blob/master/src/streaming/README.md) to 1 parent node and illustrates the main ways you might want to configure running ML for the children on the parent, running ML on the children themselves, or even a mix of approaches.
 
 ![parent_child_options](https://user-images.githubusercontent.com/2178292/164439761-8fb7dddd-c4d8-4329-9f44-9a794937a086.png)
 

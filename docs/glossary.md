@@ -142,9 +142,9 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## R
 
-- [**Registry**](https://github.com/netdata/netdata/blob/master/registry/README.md): Registry that allows Netdata to provide unified cross-server dashboards.
+- [**Registry**](https://github.com/netdata/netdata/blob/master/src/registry/README.md): Registry that allows Netdata to provide unified cross-server dashboards.
 
-- [**Replication Streaming**](https://github.com/netdata/netdata/blob/master/streaming/README.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`.
+- [**Replication Streaming**](https://github.com/netdata/netdata/blob/master/src/streaming/README.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`.
 
 - [**Room** or **War Room**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 

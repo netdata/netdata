@@ -1138,8 +1138,8 @@ set(WEB_PLUGIN_FILES
 )
 
 set(CLAIM_PLUGIN_FILES
-        claim/claim.c
-        claim/claim.h
+        src/claim/claim.c
+        src/claim/claim.h
 )
 
 set(SPAWN_PLUGIN_FILES
@@ -2264,7 +2264,7 @@ else()
         set(enable_aclk_POST "no")
 endif()
 
-configure_file(claim/netdata-claim.sh.in claim/netdata-claim.sh @ONLY)
+configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/claim/netdata-claim.sh
         DESTINATION usr/sbin)
