@@ -564,146 +564,146 @@ endif()
 #
 
 set(LIBJUDY_PREV_FILES
-        libnetdata/libjudy/src/JudyL/JudyLPrev.c
-        libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
+        src/libnetdata/libjudy/src/JudyL/JudyLPrev.c
+        src/libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
 )
 
 set(LIBJUDY_NEXT_FILES
-        libnetdata/libjudy/src/JudyL/JudyLNext.c
-        libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
+        src/libnetdata/libjudy/src/JudyL/JudyLNext.c
+        src/libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
 )
 
 set(LIBJUDY_SOURCES
-        libnetdata/libjudy/src/Judy.h
-        libnetdata/libjudy/src/JudyCommon/JudyMalloc.c
-        libnetdata/libjudy/src/JudyCommon/JudyPrivate.h
-        libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h
-        libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h
-        libnetdata/libjudy/src/JudyL/JudyL.h
-        libnetdata/libjudy/src/JudyL/JudyLByCount.c
-        libnetdata/libjudy/src/JudyL/JudyLCascade.c
-        libnetdata/libjudy/src/JudyL/JudyLCount.c
-        libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c
-        libnetdata/libjudy/src/JudyL/JudyLDecascade.c
-        libnetdata/libjudy/src/JudyL/JudyLDel.c
-        libnetdata/libjudy/src/JudyL/JudyLFirst.c
-        libnetdata/libjudy/src/JudyL/JudyLFreeArray.c
-        libnetdata/libjudy/src/JudyL/j__udyLGet.c
-        libnetdata/libjudy/src/JudyL/JudyLGet.c
-        libnetdata/libjudy/src/JudyL/JudyLInsArray.c
-        libnetdata/libjudy/src/JudyL/JudyLIns.c
-        libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c
-        libnetdata/libjudy/src/JudyL/JudyLMallocIF.c
-        libnetdata/libjudy/src/JudyL/JudyLMemActive.c
-        libnetdata/libjudy/src/JudyL/JudyLMemUsed.c
-        libnetdata/libjudy/src/JudyL/JudyLTables.c
-        libnetdata/libjudy/src/JudyHS/JudyHS.c
+        src/libnetdata/libjudy/src/Judy.h
+        src/libnetdata/libjudy/src/JudyCommon/JudyMalloc.c
+        src/libnetdata/libjudy/src/JudyCommon/JudyPrivate.h
+        src/libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h
+        src/libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h
+        src/libnetdata/libjudy/src/JudyL/JudyL.h
+        src/libnetdata/libjudy/src/JudyL/JudyLByCount.c
+        src/libnetdata/libjudy/src/JudyL/JudyLCascade.c
+        src/libnetdata/libjudy/src/JudyL/JudyLCount.c
+        src/libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c
+        src/libnetdata/libjudy/src/JudyL/JudyLDecascade.c
+        src/libnetdata/libjudy/src/JudyL/JudyLDel.c
+        src/libnetdata/libjudy/src/JudyL/JudyLFirst.c
+        src/libnetdata/libjudy/src/JudyL/JudyLFreeArray.c
+        src/libnetdata/libjudy/src/JudyL/j__udyLGet.c
+        src/libnetdata/libjudy/src/JudyL/JudyLGet.c
+        src/libnetdata/libjudy/src/JudyL/JudyLInsArray.c
+        src/libnetdata/libjudy/src/JudyL/JudyLIns.c
+        src/libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c
+        src/libnetdata/libjudy/src/JudyL/JudyLMallocIF.c
+        src/libnetdata/libjudy/src/JudyL/JudyLMemActive.c
+        src/libnetdata/libjudy/src/JudyL/JudyLMemUsed.c
+        src/libnetdata/libjudy/src/JudyL/JudyLTables.c
+        src/libnetdata/libjudy/src/JudyHS/JudyHS.c
         ${LIBJUDY_PREV_FILES}
         ${LIBJUDY_NEXT_FILES}
 )
 
 set(LIBNETDATA_FILES
         ${CONFIG_H}
-        libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
-        libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
-        libnetdata/config/appconfig.c
-        libnetdata/config/appconfig.h
-        libnetdata/aral/aral.c
-        libnetdata/aral/aral.h
-        libnetdata/avl/avl.c
-        libnetdata/avl/avl.h
-        libnetdata/buffer/buffer.c
-        libnetdata/buffer/buffer.h
-        libnetdata/circular_buffer/circular_buffer.c
-        libnetdata/circular_buffer/circular_buffer.h
-        libnetdata/clocks/clocks.c
-        libnetdata/clocks/clocks.h
-        libnetdata/completion/completion.c
-        libnetdata/completion/completion.h
-        libnetdata/datetime/iso8601.c
-        libnetdata/datetime/iso8601.h
-        libnetdata/datetime/rfc7231.c
-        libnetdata/datetime/rfc7231.h
-        libnetdata/datetime/rfc3339.c
-        libnetdata/datetime/rfc3339.h
-        libnetdata/dictionary/dictionary.c
-        libnetdata/dictionary/dictionary.h
-        libnetdata/eval/eval.c
-        libnetdata/eval/eval.h
-        libnetdata/facets/facets.c
-        libnetdata/facets/facets.h
-        libnetdata/functions_evloop/functions_evloop.c
-        libnetdata/functions_evloop/functions_evloop.h
-        libnetdata/gorilla/gorilla.cc
-        libnetdata/gorilla/gorilla.h
-        libnetdata/july/july.c
-        libnetdata/july/july.h
-        libnetdata/inlined.h
-        libnetdata/json/json.c
-        libnetdata/json/json.h
-        libnetdata/json/jsmn.c
-        libnetdata/json/jsmn.h
-        libnetdata/libnetdata.c
-        libnetdata/libnetdata.h
-        libnetdata/line_splitter/line_splitter.c
-        libnetdata/line_splitter/line_splitter.h
-        libnetdata/libnetdata.h
-        libnetdata/locks/locks.c
-        libnetdata/locks/locks.h
-        libnetdata/log/journal.c
-        libnetdata/log/journal.h
-        libnetdata/log/log.c
-        libnetdata/log/log.h
-        libnetdata/os.c
-        libnetdata/os.h
-        libnetdata/simple_hashtable.h
-        libnetdata/endian.h
-        libnetdata/onewayalloc/onewayalloc.c
-        libnetdata/onewayalloc/onewayalloc.h
-        libnetdata/popen/popen.c
-        libnetdata/popen/popen.h
-        libnetdata/procfile/procfile.c
-        libnetdata/procfile/procfile.h
-        libnetdata/query_progress/progress.c
-        libnetdata/query_progress/progress.h
-        libnetdata/required_dummies.h
-        libnetdata/socket/security.c
-        libnetdata/socket/security.h
-        libnetdata/simple_pattern/simple_pattern.c
-        libnetdata/simple_pattern/simple_pattern.h
-        libnetdata/socket/socket.c
-        libnetdata/socket/socket.h
-        libnetdata/statistical/statistical.c
-        libnetdata/statistical/statistical.h
-        libnetdata/storage_number/storage_number.c
-        libnetdata/storage_number/storage_number.h
-        libnetdata/string/string.c
-        libnetdata/string/string.h
-        libnetdata/threads/threads.c
-        libnetdata/threads/threads.h
-        libnetdata/url/url.c
-        libnetdata/url/url.h
-        libnetdata/uuid/uuid.c
-        libnetdata/uuid/uuid.h
-        libnetdata/string/utf8.h
-        libnetdata/worker_utilization/worker_utilization.c
-        libnetdata/worker_utilization/worker_utilization.h
-        libnetdata/http/http_access.c
-        libnetdata/http/http_access.h
-        libnetdata/http/http_defs.c
-        libnetdata/http/http_defs.h
-        libnetdata/http/content_type.c
-        libnetdata/http/content_type.h
-        libnetdata/config/dyncfg.c
-        libnetdata/config/dyncfg.h
-        libnetdata/json/json-c-parser-inline.h
-        libnetdata/template-enum.h
+        src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
+        src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
+        src/libnetdata/config/appconfig.c
+        src/libnetdata/config/appconfig.h
+        src/libnetdata/aral/aral.c
+        src/libnetdata/aral/aral.h
+        src/libnetdata/avl/avl.c
+        src/libnetdata/avl/avl.h
+        src/libnetdata/buffer/buffer.c
+        src/libnetdata/buffer/buffer.h
+        src/libnetdata/circular_buffer/circular_buffer.c
+        src/libnetdata/circular_buffer/circular_buffer.h
+        src/libnetdata/clocks/clocks.c
+        src/libnetdata/clocks/clocks.h
+        src/libnetdata/completion/completion.c
+        src/libnetdata/completion/completion.h
+        src/libnetdata/datetime/iso8601.c
+        src/libnetdata/datetime/iso8601.h
+        src/libnetdata/datetime/rfc7231.c
+        src/libnetdata/datetime/rfc7231.h
+        src/libnetdata/datetime/rfc3339.c
+        src/libnetdata/datetime/rfc3339.h
+        src/libnetdata/dictionary/dictionary.c
+        src/libnetdata/dictionary/dictionary.h
+        src/libnetdata/eval/eval.c
+        src/libnetdata/eval/eval.h
+        src/libnetdata/facets/facets.c
+        src/libnetdata/facets/facets.h
+        src/libnetdata/functions_evloop/functions_evloop.c
+        src/libnetdata/functions_evloop/functions_evloop.h
+        src/libnetdata/gorilla/gorilla.cc
+        src/libnetdata/gorilla/gorilla.h
+        src/libnetdata/july/july.c
+        src/libnetdata/july/july.h
+        src/libnetdata/inlined.h
+        src/libnetdata/json/json.c
+        src/libnetdata/json/json.h
+        src/libnetdata/json/jsmn.c
+        src/libnetdata/json/jsmn.h
+        src/libnetdata/libnetdata.c
+        src/libnetdata/libnetdata.h
+        src/libnetdata/line_splitter/line_splitter.c
+        src/libnetdata/line_splitter/line_splitter.h
+        src/libnetdata/libnetdata.h
+        src/libnetdata/locks/locks.c
+        src/libnetdata/locks/locks.h
+        src/libnetdata/log/journal.c
+        src/libnetdata/log/journal.h
+        src/libnetdata/log/log.c
+        src/libnetdata/log/log.h
+        src/libnetdata/os.c
+        src/libnetdata/os.h
+        src/libnetdata/simple_hashtable.h
+        src/libnetdata/endian.h
+        src/libnetdata/onewayalloc/onewayalloc.c
+        src/libnetdata/onewayalloc/onewayalloc.h
+        src/libnetdata/popen/popen.c
+        src/libnetdata/popen/popen.h
+        src/libnetdata/procfile/procfile.c
+        src/libnetdata/procfile/procfile.h
+        src/libnetdata/query_progress/progress.c
+        src/libnetdata/query_progress/progress.h
+        src/libnetdata/required_dummies.h
+        src/libnetdata/socket/security.c
+        src/libnetdata/socket/security.h
+        src/libnetdata/simple_pattern/simple_pattern.c
+        src/libnetdata/simple_pattern/simple_pattern.h
+        src/libnetdata/socket/socket.c
+        src/libnetdata/socket/socket.h
+        src/libnetdata/statistical/statistical.c
+        src/libnetdata/statistical/statistical.h
+        src/libnetdata/storage_number/storage_number.c
+        src/libnetdata/storage_number/storage_number.h
+        src/libnetdata/string/string.c
+        src/libnetdata/string/string.h
+        src/libnetdata/threads/threads.c
+        src/libnetdata/threads/threads.h
+        src/libnetdata/url/url.c
+        src/libnetdata/url/url.h
+        src/libnetdata/uuid/uuid.c
+        src/libnetdata/uuid/uuid.h
+        src/libnetdata/string/utf8.h
+        src/libnetdata/worker_utilization/worker_utilization.c
+        src/libnetdata/worker_utilization/worker_utilization.h
+        src/libnetdata/http/http_access.c
+        src/libnetdata/http/http_access.h
+        src/libnetdata/http/http_defs.c
+        src/libnetdata/http/http_defs.h
+        src/libnetdata/http/content_type.c
+        src/libnetdata/http/content_type.h
+        src/libnetdata/config/dyncfg.c
+        src/libnetdata/config/dyncfg.h
+        src/libnetdata/json/json-c-parser-inline.h
+        src/libnetdata/template-enum.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
     list(APPEND LIBNETDATA_FILES
-            libnetdata/ebpf/ebpf.c
-            libnetdata/ebpf/ebpf.h
+            src/libnetdata/ebpf/ebpf.c
+            src/libnetdata/ebpf/ebpf.h
     )
 endif()
 
@@ -1489,15 +1489,15 @@ target_compile_definitions(judy PRIVATE
 )
 
 target_include_directories(judy PUBLIC
-        libnetdata/libjudy/src
-        libnetdata/libjudy/src/JudyCommon
+        src/libnetdata/libjudy/src
+        src/libnetdata/libjudy/src/JudyCommon
 )
 
 set_source_files_properties(${LIBJUDY_PREV_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYPREV")
 set_source_files_properties(${LIBJUDY_NEXT_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYNEXT")
-set_source_files_properties(libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
-set_source_files_properties(libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
-set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src/JudyL")
+set_source_files_properties(src/libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
+set_source_files_properties(src/libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
+set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/src/libnetdata/libjudy/src/JudyL")
 
 #
 # build libnetdata
@@ -2103,8 +2103,8 @@ target_link_libraries(netdata PRIVATE
 #
 # build systemd-cat-native
 #
-set(SYSTEMD_CAT_NATIVE_FILES libnetdata/log/systemd-cat-native.c
-                             libnetdata/log/systemd-cat-native.h)
+set(SYSTEMD_CAT_NATIVE_FILES src/libnetdata/log/systemd-cat-native.c
+                             src/libnetdata/log/systemd-cat-native.h)
 
 add_executable(systemd-cat-native ${SYSTEMD_CAT_NATIVE_FILES})
 target_link_libraries(systemd-cat-native libnetdata)
@@ -2138,7 +2138,7 @@ if(PCRE2_FOUND)
         )
 
         add_executable(log2journal ${LOG2JOURNAL_FILES})
-        target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${PCRE2_INCLUDE_DIRS})
+        target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src ${PCRE2_INCLUDE_DIRS})
         target_compile_definitions(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
         target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
 
