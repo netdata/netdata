@@ -1784,6 +1784,8 @@ if(ENABLE_PLUGIN_NFACCT)
     pkg_check_modules(NFACCT REQUIRED libnetfilter_acct)
     pkg_check_modules(MNL REQUIRED libmnl)
 
+    set(HAVE_LIBMNL True)
+
     set(NFACCT_PLUGIN_FILES collectors/nfacct.plugin/plugin_nfacct.c)
 
     add_executable(nfacct.plugin ${NFACCT_PLUGIN_FILES})
