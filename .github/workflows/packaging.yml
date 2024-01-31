@@ -216,6 +216,7 @@ jobs:
           else
               echo "RELEASE_PIPELINE=Unknown" >> "${GITHUB_ENV}"
               echo "UPLOAD_SENTRY=false" >> "${GITHUB_ENV}"
+              echo "SENTRY_DSN=https://1ea0662a@o01e.ingest.sentry.io/dummy"
           fi
       - name: Setup QEMU
         id: qemu
