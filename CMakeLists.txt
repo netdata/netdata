@@ -1107,23 +1107,23 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
 )
 
 set(STREAMING_PLUGIN_FILES
-        streaming/rrdpush.c
-        streaming/rrdpush.h
-        streaming/compression.c
-        streaming/compression.h
-        streaming/compression_brotli.c
-        streaming/compression_brotli.h
-        streaming/compression_gzip.c
-        streaming/compression_gzip.h
-        streaming/compression_lz4.c
-        streaming/compression_lz4.h
-        streaming/compression_zstd.c
-        streaming/compression_zstd.h
-        streaming/receiver.c
-        streaming/sender.c
-        streaming/replication.c
-        streaming/replication.h
-        streaming/common.h
+        src/streaming/rrdpush.c
+        src/streaming/rrdpush.h
+        src/streaming/compression.c
+        src/streaming/compression.h
+        src/streaming/compression_brotli.c
+        src/streaming/compression_brotli.h
+        src/streaming/compression_gzip.c
+        src/streaming/compression_gzip.h
+        src/streaming/compression_lz4.c
+        src/streaming/compression_lz4.h
+        src/streaming/compression_zstd.c
+        src/streaming/compression_zstd.h
+        src/streaming/receiver.c
+        src/streaming/sender.c
+        src/streaming/replication.c
+        src/streaming/replication.h
+        src/streaming/common.h
 )
 
 set(WEB_PLUGIN_FILES
@@ -2313,7 +2313,7 @@ install(FILES
 # streaming
 #
 install(FILES
-        streaming/stream.conf
+        src/streaming/stream.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 #
