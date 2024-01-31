@@ -159,7 +159,7 @@ char *get_mgmt_api_key(void) {
         return guid;
 
     // read it from disk
-    int fd = open(api_key_filename, O_RDONLY);
+    int fd = open(api_key_filename, O_RDONLY | O_CLOEXEC);
     if(fd != -1) {
         char buf[GUID_LEN + 1];
         if(read(fd, buf, GUID_LEN) != GUID_LEN)
@@ -185,7 +185,7 @@ char *get_mgmt_api_key(void) {
         guid[GUID_LEN] = '\0';
 
         // save it
-        fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC, 444);
+        fd = open(api_key_filename, O_WRONLY|O_CREAT|O_TRUNC | O_CLOEXEC, 444);
         if(fd == -1) {
             netdata_log_error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
             goto temp_key;

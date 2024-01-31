@@ -8,7 +8,7 @@
 #define PFLINES_INCREASE_STEP 200
 #define PROCFILE_INCREMENT_BUFFER 4096
 
-int procfile_open_flags = O_RDONLY;
+int procfile_open_flags = O_RDONLY | O_CLOEXEC;
 
 int procfile_adaptive_initial_allocation = 0;
 

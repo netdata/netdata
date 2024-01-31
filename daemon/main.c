@@ -2174,7 +2174,7 @@ int main(int argc, char **argv) {
     int incomplete_shutdown_detected = (unlink(agent_incomplete_shutdown_file) == 0);
     snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
     int crash_detected = (unlink(agent_crash_file) == 0);
-    int fd = open(agent_crash_file, O_WRONLY | O_CREAT | O_TRUNC, 444);
+    int fd = open(agent_crash_file, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 444);
     if (fd >= 0)
         close(fd);
 

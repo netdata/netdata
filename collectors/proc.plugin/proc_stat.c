@@ -68,7 +68,7 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
             continue;
 
         if(unlikely(f->fd == -1)) {
-            f->fd = open(f->filename, O_RDONLY);
+            f->fd = open(f->filename, O_RDONLY | O_CLOEXEC);
             if (unlikely(f->fd == -1)) {
                 collector_error("Cannot open file '%s'", f->filename);
                 continue;
@@ -412,7 +412,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
             char name_buf[50 + 1];
             snprintfz(filename, FILENAME_MAX, cpuidle_name_filename, core, state);
 
-            int fd = open(filename, O_RDONLY, 0666);
+            int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
             if(unlikely(fd == -1)) {
                 collector_error("Cannot open file '%s'", filename);
                 cc->rescan_cpu_states = 1;
@@ -444,7 +444,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         struct cpuidle_state *cs = &cc->cpuidle_state[state];
 
         if(unlikely(cs->time_fd == -1)) {
-            cs->time_fd = open(cs->time_filename, O_RDONLY);
+            cs->time_fd = open(cs->time_filename, O_RDONLY | O_CLOEXEC);
             if (unlikely(cs->time_fd == -1)) {
                 collector_error("Cannot open file '%s'", cs->time_filename);
                 cc->rescan_cpu_states = 1;

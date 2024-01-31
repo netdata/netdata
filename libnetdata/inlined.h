@@ -472,7 +472,7 @@ static inline bool sanitize_command_argument_string(char *dst, const char *src, 
 static inline int read_txt_file(const char *filename, char *buffer, size_t size) {
     if(unlikely(!size)) return 3;
 
-    int fd = open(filename, O_RDONLY, 0666);
+    int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
     if(unlikely(fd == -1)) {
         buffer[0] = '\0';
         return 1;
@@ -493,7 +493,7 @@ static inline int read_txt_file(const char *filename, char *buffer, size_t size)
 static inline int read_proc_cmdline(const char *filename, char *buffer, size_t size) {
     if (unlikely(!size)) return 3;
 
-    int fd = open(filename, O_RDONLY, 0666);
+    int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
     if (unlikely(fd == -1)) {
         buffer[0] = '\0';
         return 1;

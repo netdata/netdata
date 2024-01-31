@@ -201,7 +201,7 @@ void dyncfg_load_all(void) {
 // schemas loading
 
 static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
-    int fd = open(filename, O_RDONLY, 0666);
+    int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
     if(unlikely(fd == -1))
         return false;
 

@@ -48,7 +48,7 @@ int journal_direct_fd(const char *path) {
     if(!is_path_unix_socket(path))
         return -1;
 
-    int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    int fd = socket(AF_UNIX, SOCK_DGRAM| SOCK_CLOEXEC, 0);
     if (fd < 0) return -1;
 
     struct sockaddr_un addr;

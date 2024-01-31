@@ -817,7 +817,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         return false;
     }
 
-    int fd = open(filename, O_RDONLY);
+    int fd = open(filename, O_RDONLY | O_CLOEXEC);
     if(!fd) {
         local_sockets_log(ls, "cannot open file '%s'", filename);
         return false;

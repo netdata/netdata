@@ -512,7 +512,7 @@ static int mysendfile(struct web_client *w, char *filename) {
         return append_slash_to_url_and_redirect(w);
 
     // open the file
-    w->ifd = open(web_filename, O_NONBLOCK, O_RDONLY);
+    w->ifd = open(web_filename, O_NONBLOCK, O_RDONLY | O_CLOEXEC);
     if(w->ifd == -1) {
         w->ifd = w->ofd;
 

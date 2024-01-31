@@ -143,7 +143,7 @@ static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database)
     if (db_meta == database) {
         char recover_file[FILENAME_MAX + 1];
         snprintfz(recover_file, FILENAME_MAX, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
-        int fd = open(recover_file, O_WRONLY | O_CREAT | O_TRUNC, 444);
+        int fd = open(recover_file, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 444);
         if (fd >= 0) {
             close(fd);
             return true;

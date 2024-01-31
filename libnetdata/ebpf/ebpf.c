@@ -77,7 +77,7 @@ int ebpf_get_kernel_version()
     char ver[VERSION_STRING_LEN];
     char *version = ver;
 
-    int fd = open("/proc/sys/kernel/osrelease", O_RDONLY);
+    int fd = open("/proc/sys/kernel/osrelease", O_RDONLY | O_CLOEXEC);
     if (fd < 0)
         return -1;
 
@@ -1480,7 +1480,7 @@ void ebpf_histogram_dimension_cleanup(char **ptr, size_t length)
 static inline int ebpf_open_tracepoint_path(char *filename, size_t length, char *subsys, char *eventname, int flags)
 {
     snprintfz(filename, length, "%s/events/%s/%s/enable", NETDATA_DEBUGFS, subsys, eventname);
-    return open(filename, flags, 0);
+    return open(filename, flags | O_CLOEXEC, 0);
 }
 
 /**

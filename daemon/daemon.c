@@ -245,7 +245,7 @@ static void oom_score_adj(void) {
     }
 
     int written = 0;
-    int fd = open("/proc/self/oom_score_adj", O_WRONLY);
+    int fd = open("/proc/self/oom_score_adj", O_WRONLY | O_CLOEXEC);
     if(fd != -1) {
         snprintfz(buf, sizeof(buf) - 1, "%d", (int)wanted_score);
         ssize_t len = strlen(buf);
@@ -478,7 +478,7 @@ int become_daemon(int dont_fork, const char *user)
     // generate our pid file
     int pidfd = -1;
     if(pidfile[0]) {
-        pidfd = open(pidfile, O_WRONLY | O_CREAT, 0644);
+        pidfd = open(pidfile, O_WRONLY | O_CREAT | O_CLOEXEC, 0644);
         if(pidfd >= 0) {
             if(ftruncate(pidfd, 0) != 0)
                 netdata_log_error("Cannot truncate pidfile '%s'.", pidfile);

@@ -1087,7 +1087,7 @@ void netdata_fix_chart_id(char *s) {
 static int memory_file_open(const char *filename, size_t size) {
     // netdata_log_info("memory_file_open('%s', %zu", filename, size);
 
-    int fd = open(filename, O_RDWR | O_CREAT | O_NOATIME, 0664);
+    int fd = open(filename, O_RDWR | O_CREAT | O_NOATIME | O_CLOEXEC, 0664);
     if (fd != -1) {
         if (lseek(fd, size, SEEK_SET) == (off_t) size) {
             if (write(fd, "", 1) == 1) {
