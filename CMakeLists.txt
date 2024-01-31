@@ -1143,10 +1143,10 @@ set(CLAIM_PLUGIN_FILES
 )
 
 set(SPAWN_PLUGIN_FILES
-        spawn/spawn.c
-        spawn/spawn_server.c
-        spawn/spawn_client.c
-        spawn/spawn.h
+        src/spawn/spawn.c
+        src/spawn/spawn_server.c
+        src/spawn/spawn_client.c
+        src/spawn/spawn.h
 )
 
 set(ACLK_ALWAYS_BUILD
