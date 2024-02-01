@@ -270,6 +270,7 @@ prepare_cmake_options() {
   enable_feature PLUGIN_SLABINFO "${IS_LINUX}"
   enable_feature PLUGIN_CGROUP_NETWORK "${IS_LINUX}"
   enable_feature PLUGIN_LOCAL_LISTENERS "${IS_LINUX}"
+  enable_feature PLUGIN_NETWORK_VIEWER "${IS_LINUX}"
   enable_feature PLUGIN_EBPF "${ENABLE_EBPF:-0}"
   enable_feature PLUGIN_LOGS_MANAGEMENT "${ENABLE_LOGS_MANAGEMENT:-0}"
   enable_feature LOGS_MANAGEMENT_TESTS "${ENABLE_LOGS_MANAGEMENT_TESTS:-0}"
