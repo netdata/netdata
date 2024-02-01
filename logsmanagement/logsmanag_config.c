@@ -733,8 +733,32 @@ static void config_section_init(uv_loop_t *main_loop,
                     return p_file_info_destroy(p_file_info);
                 } else p_file_info->filename = strdupz(KMSG_DEFAULT_PATH);
                 break;
-            case FLB_SYSTEMD:
-                p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH);
+            case FLB_SYSTEMD:{
+                const char *const systemd_path_default[] = {
+                    "/run/log/journal",
+                    "/var/log/journal",
+                    NULL
+                };
+                for(int i = 0; systemd_path_default[i]; i++){
+
+                    DIR *dir = opendir(systemd_path_default[i]);
+                    if(!dir) continue;
+
+                    int de_num = 0;
+                    struct dirent *de = NULL;
+                    while ((de = readdir(dir))) {
+                        if(++de_num > 2) break; // journal files location found
+                    }
+                    closedir(dir);
+
+                    if(de_num > 2){
+                        p_file_info->filename = (char *) systemd_path_default[i];
+                        break;
+                    }
+                }
+                if(!p_file_info->filename)
+                    p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH); // last resort, try to open local only
+            }
                 break;
             case FLB_DOCKER_EV:
                 if(access(DOCKER_EV_DEFAULT_PATH, R_OK)){
@@ -1045,6 +1069,25 @@ static void config_section_init(uv_loop_t *main_loop,
             }
 
             p_file_info->parser_config->gen_config = syslog_config;
+        }
+        else {
+            Flb_systemd_config_t *systemd_config = callocz(1, sizeof(Flb_systemd_config_t));
+
+            systemd_config->read_from_tail = appconfig_get(&log_management_config, config_section->name, "read from tail", NULL);
+            
+            /* not possible to backfill correctly if _SOURCE_REALTIME_TIMESTAMP is not used */
+            if( p_file_info->use_log_timestamp && 
+                systemd_config->read_from_tail && (
+                !strcasecmp(systemd_config->read_from_tail, "off") ||
+                !strcasecmp(systemd_config->read_from_tail, "no"))
+                ){
+                systemd_config->read_from_tail = "Off";
+            }
+            else
+                systemd_config->read_from_tail = "On";
+
+            p_file_info->flb_config = systemd_config;
+
         }
         if(appconfig_get_boolean(&log_management_config, config_section->name, "priority value chart", CONFIG_BOOLEAN_NO)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_PRIOR;

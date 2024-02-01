@@ -49,6 +49,10 @@ typedef struct flb_kmsg_config {
     char *prio_level;
 } Flb_kmsg_config_t;
 
+typedef struct flb_systemd_config {
+    char *read_from_tail;
+} Flb_systemd_config_t;
+
 typedef struct flb_serial_config {
     char *bitrate;
     char *min_bytes;

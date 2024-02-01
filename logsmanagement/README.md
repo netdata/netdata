@@ -169,6 +169,7 @@ This collector will collect logs from the journald daemon. See also documentatio
 |  Configuration Option | Description  |
 |      :------------:  	| ------------ |
 | `log path` | Path to the systemd journal directory. If set to `auto`, the default path will be used to read local-only logs. |
+| `read from tail` | (**Experimental**) The first time this option is set to `no`, the collector will attempt to read all system journal logs from the beginning and maintain a cursor to the last collected log, so that it can continue from that point after an agent restart. This ensures no logs are missed when the agent is offline. This feature is disabled by default (defaults to `yes`), as it can cause high CPU usage. |
 | `priority value chart` | Enable chart showing Syslog Priority values (PRIVAL) of collected logs. The Priority value ranges from 0 to 191 and represents both the Facility and Severity. It is calculated by first multiplying the Facility number by 8 and then adding the numerical value of the Severity. Please see the [rfc5424: Syslog Protocol](https://www.rfc-editor.org/rfc/rfc5424#section-6.2.1) document for more information.|
 | `severity chart` | Enable chart showing Syslog Severity values of collected logs. Severity values are in the range of 0 to 7 inclusive.|
 | `facility chart` | Enable chart showing Syslog Facility values of collected logs. Facility values show which subsystem generated the log and are in the range of 0 to 23 inclusive.|
