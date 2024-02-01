@@ -68,7 +68,7 @@ Starting with v1.21, we additionally collect information about:
 
 -   Failures to build the dependencies required to use Cloud features.
 -   Unavailability of Cloud features in an agent.
--   Failures to connect to the Cloud in case the [connection process](https://github.com/netdata/netdata/blob/master/claim/README.md) has been completed. This includes error codes
+-   Failures to connect to the Cloud in case the [connection process](https://github.com/netdata/netdata/blob/master/src/claim/README.md) has been completed. This includes error codes
     to inform the Netdata team about the reason why the connection failed.
 
 To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The

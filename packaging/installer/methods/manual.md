@@ -218,9 +218,9 @@ cd netdata
 ### Connect node to Netdata Cloud during installation
 
 Unlike the [`kickstart.sh`](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
-not allow you to automatically [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your node to Netdata Cloud immediately after installation.
+not allow you to automatically [connect](https://github.com/netdata/netdata/blob/master/src/claim/README.md) your node to Netdata Cloud immediately after installation.
 
-See the [connect to cloud](https://github.com/netdata/netdata/blob/master/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
+See the [connect to cloud](https://github.com/netdata/netdata/blob/master/src/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
 
 ### 'nonrepresentable section on output' errors
 

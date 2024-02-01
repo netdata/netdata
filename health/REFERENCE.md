@@ -82,7 +82,7 @@ In the `netdata.conf` `[health]` section, set `enabled` to `no`, and restart the
 ### Disable some alerts
 
 In the `netdata.conf` `[health]` section, set `enabled alarms` to a
-[simple pattern](https://github.com/netdata/netdata/edit/master/libnetdata/simple_pattern/README.md) that
+[simple pattern](https://github.com/netdata/netdata/edit/master/src/libnetdata/simple_pattern/README.md) that
 excludes one or more alerts. e.g. `enabled alarms = !oom_kill *` will load all alerts except `oom_kill`.
 
 You can also [edit the file where the alert is defined](#edit-individual-alerts), comment out its definition,
@@ -216,7 +216,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 - The `every` line is **required** if not using `lookup`.
 - Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`.
 - A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
-    `!` for a negative match. Order is important, too! See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for
+    `!` for a negative match. Order is important, too! See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) for
     more examples.
 - Lines terminated by a `\` are spliced together with the next line. The backslash is removed and the following line is
     joined with the current one. No space is inserted, so you may split a line anywhere, even in the middle of a word.
@@ -402,7 +402,7 @@ hosts: server1 server2 database* !redis3 redis*
 #### Alert line `plugin`
 
 The `plugin` line filters which plugin within the context this alert should apply to. The value is a space-separated
-list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). For example,
+list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). For example,
 you can create a filter for an alert that applies specifically to `python.d.plugin`:
 
 ```yaml
@@ -416,7 +416,7 @@ comprehensive example using both.
 #### Alert line `module`
 
 The `module` line filters which module within the context this alert should apply to. The value is a space-separated
-list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). For
+list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). For
 example, you can create an alert that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
 
 ```yaml
@@ -428,7 +428,7 @@ module: isc_dhcpd
 
 The `charts` line filters which chart this alert should apply to. It is only available on entities using the
 [`template`](#alert-line-alarm-or-template) line.
-The value is a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). For
+The value is a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). For
 example, a template that applies to `disk.svctm` (Average Service Time) context, but excludes the disk `sdb` from alerts:
 
 ```yaml
@@ -685,7 +685,7 @@ that will be applied to all hosts installed in the last decade with the followin
 host labels: installed = 201*
 ```
 
-See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
+See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) for more examples.
 
 #### Alert line `chart labels`
 
@@ -714,7 +714,7 @@ chart labels: mount_point=/mnt/disk1 device=sda
 Will create the alert if the `mount_point` is `/mnt/disk1` or the `device` is `sda`. Furthermore, if a chart label name
 is specified that does not exist in the chart, the chart won't be matched.
 
-See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
+See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) for more examples.
 
 #### Alert line `summary`
 
@@ -1141,9 +1141,9 @@ lookup: mean -10s of user
 
 Since [`z = (x - mean) / stddev`](https://en.wikipedia.org/wiki/Standard_score) we create two input alerts, one for `mean` and one for `stddev` and then use them both as inputs in our final `cpu_user_zscore` alert.
 
-### Example 8 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) based CPU dimensions alert
+### Example 8 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/src/ml/README.md#anomaly-rate) based CPU dimensions alert
 
-Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) for any CPU dimension is above 5%, critical if it goes above 20%:
+Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/blob/master/src/ml/README.md#anomaly-rate) for any CPU dimension is above 5%, critical if it goes above 20%:
 
 ```yaml
 template: ml_5min_cpu_dims
@@ -1162,9 +1162,9 @@ template: ml_5min_cpu_dims
 The `lookup` line will calculate the average anomaly rate of each `system.cpu` dimension over the last 5 minues. In this case
 Netdata will create alerts for all dimensions of the chart.
 
-### Example 9 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) based CPU chart alert
+### Example 9 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/src/ml/README.md#anomaly-rate) based CPU chart alert
 
-Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) averaged across all CPU dimensions is above 5%, critical if it goes above 20%:
+Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/blob/master/src/ml/README.md#anomaly-rate) averaged across all CPU dimensions is above 5%, critical if it goes above 20%:
 
 ```yaml
 template: ml_5min_cpu_chart
@@ -1183,9 +1183,9 @@ template: ml_5min_cpu_chart
 The `lookup` line will calculate the average anomaly rate across all `system.cpu` dimensions over the last 5 minues. In this case
 Netdata will create one alert for the chart.
 
-### Example 10 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) based node level alert
+### Example 10 - [Anomaly rate](https://github.com/netdata/netdata/blob/master/src/ml/README.md#anomaly-rate) based node level alert
 
-Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#anomaly-rate) averaged across all ML enabled dimensions is above 5%, critical if it goes above 20%:
+Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/blob/master/src/ml/README.md#anomaly-rate) averaged across all ML enabled dimensions is above 5%, critical if it goes above 20%:
 
 ```yaml
 template: ml_5min_node
@@ -1201,7 +1201,7 @@ template: ml_5min_node
     info: rolling 5min anomaly rate for all ML enabled dims
 ```
 
-The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#node-anomaly-rate) over the last 5 minues.
+The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://github.com/netdata/netdata/blob/master/src/ml/README.md#node-anomaly-rate) over the last 5 minues.
 
 ## Use dimension templates to create dynamic alerts
 
@@ -1222,7 +1222,7 @@ is where the magic happens.
 
 You use the `foreach` parameter to specify which dimensions you want to monitor with this single alert. You can separate
 them with a comma (`,`) or a pipe (`|`). You can also use
-a [Netdata simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) to create
+a [Netdata simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) to create
 many alerts with a regex-like syntax.
 
 The `foreach` parameter _has_ to be the last parameter in your `lookup` line, and if you have both `of` and `foreach` in
@@ -1293,7 +1293,7 @@ Let's look at some other examples of how `foreach` works, so you can best apply 
 In the last example, we used `foreach system,user,nice` to create three distinct alerts using dimension templates. But
 what if you want to quickly create alerts for _all_ the dimensions of a given chart?
 
-Use a [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md)! One example of a simple pattern is a single wildcard
+Use a [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md)! One example of a simple pattern is a single wildcard
 (`*`).
 
 Instead of monitoring system CPU usage, let's monitor per-application CPU usage using the `apps.cpu` chart. Passing a
@@ -1312,7 +1312,7 @@ This entity will now create alerts for every dimension in the `apps.cpu` chart. 
 10 or more dimensions, using the wildcard ensures you catch every CPU-hogging process.
 
 To learn more about how to use simple patterns with dimension templates, see
-our [simple patterns documentation](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md).
+our [simple patterns documentation](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md).
 
 ### Using `foreach` with alert templates
 

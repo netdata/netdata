@@ -147,7 +147,7 @@ By default, the kickstart script will provide a Netdata agent installation that 
 - `--claim-rooms`
   Specify a comma-separated list of tokens for each War Room this node should appear in.
 - `--claim-proxy`
-  Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
+  Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy. See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/src/claim/README.md#connect-through-a-proxy) for details.
 - `--claim-only`
   If there is an existing install, only try to claim it without attempting to update it. If there is no existing install, install and claim Netdata normally.
 - `--require-cloud`

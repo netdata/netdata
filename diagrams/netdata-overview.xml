@@ -23,7 +23,7 @@
             <mxGeometry x="1022" y="1032" width="208" height="158" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;Streaming&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Database Replication&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/streaming" id="10">
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;Streaming&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Database Replication&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/streaming" id="10">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" parent="1" vertex="1">
             <mxGeometry x="1034" y="690" width="202" height="97" as="geometry" />
           </mxCell>
@@ -38,7 +38,7 @@
             <mxGeometry x="163" y="1034" width="110" height="60" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;span&gt;To another&lt;/span&gt;&lt;div&gt;netdata&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/streaming#options-for-the-sending-node" id="15">
+        <UserObject label="&lt;span&gt;To another&lt;/span&gt;&lt;div&gt;netdata&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/streaming#options-for-the-sending-node" id="15">
           <mxCell style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" parent="1" vertex="1">
             <mxGeometry x="1090" y="557" width="150" height="120" as="geometry" />
           </mxCell>
@@ -73,7 +73,7 @@
         <mxCell id="30" value="" style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
           <mxGeometry x="674" y="887" width="557" height="130" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;font style=&quot;font-size: 20px&quot;&gt;metrics database&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-weight: normal&quot;&gt;&lt;font style=&quot;font-size: 15px&quot;&gt;(organized in hosts, charts and dimensions)&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/database#netdata-database" id="31">
+        <UserObject label="&lt;font style=&quot;font-size: 20px&quot;&gt;metrics database&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-weight: normal&quot;&gt;&lt;font style=&quot;font-size: 15px&quot;&gt;(organized in hosts, charts and dimensions)&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/database#netdata-database" id="31">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="254" y="690" width="770" height="93" as="geometry" />
           </mxCell>
@@ -129,7 +129,7 @@
             <mxGeometry x="404" y="1119" width="110" height="60" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;remote netdata servers&lt;/b&gt;&lt;div&gt;database replication, streaming metrics in realtime&lt;br&gt;over TCP&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/streaming" id="43">
+        <UserObject label="&lt;b&gt;remote netdata servers&lt;/b&gt;&lt;div&gt;database replication, streaming metrics in realtime&lt;br&gt;over TCP&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/streaming" id="43">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=16;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="706" y="1200" width="420" height="90" as="geometry" />
           </mxCell>
@@ -219,7 +219,7 @@
             <mxGeometry x="1106" y="300" width="114" height="40" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="netdata&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;registry&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;my-netdata menu&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" id="89">
+        <UserObject label="netdata&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;registry&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;my-netdata menu&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/registry#netdata-registry" id="89">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" parent="1" vertex="1">
             <mxGeometry x="74" y="607" width="170" height="176" as="geometry" />
           </mxCell>
@@ -239,7 +239,7 @@
         <mxCell id="98" value="store &amp;amp;&lt;div&gt;forward&lt;/div&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=center;verticalAlign=top;spacingTop=-4;fontSize=14;" parent="1" vertex="1">
           <mxGeometry x="953" y="721" width="60" height="30" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;span&gt;from another&lt;/span&gt;&lt;div&gt;netdata&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/streaming#options-for-the-receiving-node" id="99">
+        <UserObject label="&lt;span&gt;from another&lt;/span&gt;&lt;div&gt;netdata&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/streaming#options-for-the-receiving-node" id="99">
           <mxCell style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" parent="1" vertex="1">
             <mxGeometry x="1083" y="1184" width="150" height="120" as="geometry" />
           </mxCell>

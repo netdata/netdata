@@ -220,7 +220,7 @@ Netdata can visualize StatsD collected metrics in 2 ways:
 
 ### Private metric charts
 
-Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). Netdata will create private charts for all metrics **by default**.
+Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). Netdata will create private charts for all metrics **by default**.
 
 For example, to render charts for all `myapp.*` metrics, except `myapp.*.badmetric`, use:
 
@@ -228,7 +228,7 @@ For example, to render charts for all `myapp.*` metrics, except `myapp.*.badmetr
 create private charts for metrics matching = !myapp.*.badmetric myapp.*
 ```
 
-You can specify Netdata StatsD to have a different `memory mode` than the rest of the Netdata Agent. You can read more about `memory mode` in the [documentation](https://github.com/netdata/netdata/blob/master/database/README.md).
+You can specify Netdata StatsD to have a different `memory mode` than the rest of the Netdata Agent. You can read more about `memory mode` in the [documentation](https://github.com/netdata/netdata/blob/master/src/database/README.md).
 
 The default behavior is to use the same settings as the rest of the Netdata Agent. If you wish to change them, edit the following settings:
 - `private charts memory mode`
@@ -341,7 +341,7 @@ Using the above configuration `myapp` should get its own section on the dashboar
 `[app]` starts a new application definition. The supported settings in this section are:
 
 -   `name` defines the name of the app.
--   `metrics` is a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). This pattern should match all the possible StatsD metrics that will be participating in the application `myapp`.
+-   `metrics` is a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). This pattern should match all the possible StatsD metrics that will be participating in the application `myapp`.
 -   `private charts = yes|no`, enables or disables private charts for the metrics matched.
 -   `gaps when not collected = yes|no`, enables or disables gaps on the charts of the application in case that no metrics are collected.
 -   `memory mode` sets the memory mode for all charts of the application. The default is the global default for Netdata (not the global default for StatsD private charts). We suggest not to use this (we have commented it out in the example) and let your app use the global default for Netdata, which is our dbengine.
@@ -367,7 +367,7 @@ So, the format is this:
 dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS
 ```
 
-`pattern` is a keyword. When set, `METRIC` is expected to be a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) that will be used to match all the StatsD metrics to be added to the chart. So, `pattern` automatically matches any number of StatsD metrics, all of which will be added as separate chart dimensions.
+`pattern` is a keyword. When set, `METRIC` is expected to be a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) that will be used to match all the StatsD metrics to be added to the chart. So, `pattern` automatically matches any number of StatsD metrics, all of which will be added as separate chart dimensions.
 
 `TYPE`, `MULTIPLIER`, `DIVIDER` and `OPTIONS` are optional.
 
@@ -845,7 +845,7 @@ metrics into different charts. This is particularly important, since we decide:
 The dimension option has this syntax: `dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS`
 
 - **pattern**: A keyword that tells the StatsD server the `METRIC` string is actually a 
-  [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). 
+  [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). 
   We don't use simple patterns in the example, but if we wanted to visualize all the `http_req` metrics, we 
   could have a single dimension: `dimension = pattern 'k6.http_req*' last 1 1`. Find detailed examples with 
   patterns in [dimension patterns](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md#dimension-patterns).

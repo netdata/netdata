@@ -107,7 +107,7 @@ static IP, only `localhost`, or connections from behind a management LAN.
 
 By default, this setting is `localhost *`. This setting allows connections from `localhost` in addition to _all_
 connections, using the `*` wildcard. You can change this setting using Netdata's [simple
-patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md).
+patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md).
 
 ```conf
 [web]

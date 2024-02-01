@@ -564,146 +564,146 @@ endif()
 #
 
 set(LIBJUDY_PREV_FILES
-        libnetdata/libjudy/src/JudyL/JudyLPrev.c
-        libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
+        src/libnetdata/libjudy/src/JudyL/JudyLPrev.c
+        src/libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c
 )
 
 set(LIBJUDY_NEXT_FILES
-        libnetdata/libjudy/src/JudyL/JudyLNext.c
-        libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
+        src/libnetdata/libjudy/src/JudyL/JudyLNext.c
+        src/libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c
 )
 
 set(LIBJUDY_SOURCES
-        libnetdata/libjudy/src/Judy.h
-        libnetdata/libjudy/src/JudyCommon/JudyMalloc.c
-        libnetdata/libjudy/src/JudyCommon/JudyPrivate.h
-        libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h
-        libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h
-        libnetdata/libjudy/src/JudyL/JudyL.h
-        libnetdata/libjudy/src/JudyL/JudyLByCount.c
-        libnetdata/libjudy/src/JudyL/JudyLCascade.c
-        libnetdata/libjudy/src/JudyL/JudyLCount.c
-        libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c
-        libnetdata/libjudy/src/JudyL/JudyLDecascade.c
-        libnetdata/libjudy/src/JudyL/JudyLDel.c
-        libnetdata/libjudy/src/JudyL/JudyLFirst.c
-        libnetdata/libjudy/src/JudyL/JudyLFreeArray.c
-        libnetdata/libjudy/src/JudyL/j__udyLGet.c
-        libnetdata/libjudy/src/JudyL/JudyLGet.c
-        libnetdata/libjudy/src/JudyL/JudyLInsArray.c
-        libnetdata/libjudy/src/JudyL/JudyLIns.c
-        libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c
-        libnetdata/libjudy/src/JudyL/JudyLMallocIF.c
-        libnetdata/libjudy/src/JudyL/JudyLMemActive.c
-        libnetdata/libjudy/src/JudyL/JudyLMemUsed.c
-        libnetdata/libjudy/src/JudyL/JudyLTables.c
-        libnetdata/libjudy/src/JudyHS/JudyHS.c
+        src/libnetdata/libjudy/src/Judy.h
+        src/libnetdata/libjudy/src/JudyCommon/JudyMalloc.c
+        src/libnetdata/libjudy/src/JudyCommon/JudyPrivate.h
+        src/libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h
+        src/libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h
+        src/libnetdata/libjudy/src/JudyL/JudyL.h
+        src/libnetdata/libjudy/src/JudyL/JudyLByCount.c
+        src/libnetdata/libjudy/src/JudyL/JudyLCascade.c
+        src/libnetdata/libjudy/src/JudyL/JudyLCount.c
+        src/libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c
+        src/libnetdata/libjudy/src/JudyL/JudyLDecascade.c
+        src/libnetdata/libjudy/src/JudyL/JudyLDel.c
+        src/libnetdata/libjudy/src/JudyL/JudyLFirst.c
+        src/libnetdata/libjudy/src/JudyL/JudyLFreeArray.c
+        src/libnetdata/libjudy/src/JudyL/j__udyLGet.c
+        src/libnetdata/libjudy/src/JudyL/JudyLGet.c
+        src/libnetdata/libjudy/src/JudyL/JudyLInsArray.c
+        src/libnetdata/libjudy/src/JudyL/JudyLIns.c
+        src/libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c
+        src/libnetdata/libjudy/src/JudyL/JudyLMallocIF.c
+        src/libnetdata/libjudy/src/JudyL/JudyLMemActive.c
+        src/libnetdata/libjudy/src/JudyL/JudyLMemUsed.c
+        src/libnetdata/libjudy/src/JudyL/JudyLTables.c
+        src/libnetdata/libjudy/src/JudyHS/JudyHS.c
         ${LIBJUDY_PREV_FILES}
         ${LIBJUDY_NEXT_FILES}
 )
 
 set(LIBNETDATA_FILES
         ${CONFIG_H}
-        libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
-        libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
-        libnetdata/config/appconfig.c
-        libnetdata/config/appconfig.h
-        libnetdata/aral/aral.c
-        libnetdata/aral/aral.h
-        libnetdata/avl/avl.c
-        libnetdata/avl/avl.h
-        libnetdata/buffer/buffer.c
-        libnetdata/buffer/buffer.h
-        libnetdata/circular_buffer/circular_buffer.c
-        libnetdata/circular_buffer/circular_buffer.h
-        libnetdata/clocks/clocks.c
-        libnetdata/clocks/clocks.h
-        libnetdata/completion/completion.c
-        libnetdata/completion/completion.h
-        libnetdata/datetime/iso8601.c
-        libnetdata/datetime/iso8601.h
-        libnetdata/datetime/rfc7231.c
-        libnetdata/datetime/rfc7231.h
-        libnetdata/datetime/rfc3339.c
-        libnetdata/datetime/rfc3339.h
-        libnetdata/dictionary/dictionary.c
-        libnetdata/dictionary/dictionary.h
-        libnetdata/eval/eval.c
-        libnetdata/eval/eval.h
-        libnetdata/facets/facets.c
-        libnetdata/facets/facets.h
-        libnetdata/functions_evloop/functions_evloop.c
-        libnetdata/functions_evloop/functions_evloop.h
-        libnetdata/gorilla/gorilla.cc
-        libnetdata/gorilla/gorilla.h
-        libnetdata/july/july.c
-        libnetdata/july/july.h
-        libnetdata/inlined.h
-        libnetdata/json/json.c
-        libnetdata/json/json.h
-        libnetdata/json/jsmn.c
-        libnetdata/json/jsmn.h
-        libnetdata/libnetdata.c
-        libnetdata/libnetdata.h
-        libnetdata/line_splitter/line_splitter.c
-        libnetdata/line_splitter/line_splitter.h
-        libnetdata/libnetdata.h
-        libnetdata/locks/locks.c
-        libnetdata/locks/locks.h
-        libnetdata/log/journal.c
-        libnetdata/log/journal.h
-        libnetdata/log/log.c
-        libnetdata/log/log.h
-        libnetdata/os.c
-        libnetdata/os.h
-        libnetdata/simple_hashtable.h
-        libnetdata/endian.h
-        libnetdata/onewayalloc/onewayalloc.c
-        libnetdata/onewayalloc/onewayalloc.h
-        libnetdata/popen/popen.c
-        libnetdata/popen/popen.h
-        libnetdata/procfile/procfile.c
-        libnetdata/procfile/procfile.h
-        libnetdata/query_progress/progress.c
-        libnetdata/query_progress/progress.h
-        libnetdata/required_dummies.h
-        libnetdata/socket/security.c
-        libnetdata/socket/security.h
-        libnetdata/simple_pattern/simple_pattern.c
-        libnetdata/simple_pattern/simple_pattern.h
-        libnetdata/socket/socket.c
-        libnetdata/socket/socket.h
-        libnetdata/statistical/statistical.c
-        libnetdata/statistical/statistical.h
-        libnetdata/storage_number/storage_number.c
-        libnetdata/storage_number/storage_number.h
-        libnetdata/string/string.c
-        libnetdata/string/string.h
-        libnetdata/threads/threads.c
-        libnetdata/threads/threads.h
-        libnetdata/url/url.c
-        libnetdata/url/url.h
-        libnetdata/uuid/uuid.c
-        libnetdata/uuid/uuid.h
-        libnetdata/string/utf8.h
-        libnetdata/worker_utilization/worker_utilization.c
-        libnetdata/worker_utilization/worker_utilization.h
-        libnetdata/http/http_access.c
-        libnetdata/http/http_access.h
-        libnetdata/http/http_defs.c
-        libnetdata/http/http_defs.h
-        libnetdata/http/content_type.c
-        libnetdata/http/content_type.h
-        libnetdata/config/dyncfg.c
-        libnetdata/config/dyncfg.h
-        libnetdata/json/json-c-parser-inline.h
-        libnetdata/template-enum.h
+        src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.c
+        src/libnetdata/adaptive_resortable_list/adaptive_resortable_list.h
+        src/libnetdata/config/appconfig.c
+        src/libnetdata/config/appconfig.h
+        src/libnetdata/aral/aral.c
+        src/libnetdata/aral/aral.h
+        src/libnetdata/avl/avl.c
+        src/libnetdata/avl/avl.h
+        src/libnetdata/buffer/buffer.c
+        src/libnetdata/buffer/buffer.h
+        src/libnetdata/circular_buffer/circular_buffer.c
+        src/libnetdata/circular_buffer/circular_buffer.h
+        src/libnetdata/clocks/clocks.c
+        src/libnetdata/clocks/clocks.h
+        src/libnetdata/completion/completion.c
+        src/libnetdata/completion/completion.h
+        src/libnetdata/datetime/iso8601.c
+        src/libnetdata/datetime/iso8601.h
+        src/libnetdata/datetime/rfc7231.c
+        src/libnetdata/datetime/rfc7231.h
+        src/libnetdata/datetime/rfc3339.c
+        src/libnetdata/datetime/rfc3339.h
+        src/libnetdata/dictionary/dictionary.c
+        src/libnetdata/dictionary/dictionary.h
+        src/libnetdata/eval/eval.c
+        src/libnetdata/eval/eval.h
+        src/libnetdata/facets/facets.c
+        src/libnetdata/facets/facets.h
+        src/libnetdata/functions_evloop/functions_evloop.c
+        src/libnetdata/functions_evloop/functions_evloop.h
+        src/libnetdata/gorilla/gorilla.cc
+        src/libnetdata/gorilla/gorilla.h
+        src/libnetdata/july/july.c
+        src/libnetdata/july/july.h
+        src/libnetdata/inlined.h
+        src/libnetdata/json/json.c
+        src/libnetdata/json/json.h
+        src/libnetdata/json/jsmn.c
+        src/libnetdata/json/jsmn.h
+        src/libnetdata/libnetdata.c
+        src/libnetdata/libnetdata.h
+        src/libnetdata/line_splitter/line_splitter.c
+        src/libnetdata/line_splitter/line_splitter.h
+        src/libnetdata/libnetdata.h
+        src/libnetdata/locks/locks.c
+        src/libnetdata/locks/locks.h
+        src/libnetdata/log/journal.c
+        src/libnetdata/log/journal.h
+        src/libnetdata/log/log.c
+        src/libnetdata/log/log.h
+        src/libnetdata/os.c
+        src/libnetdata/os.h
+        src/libnetdata/simple_hashtable.h
+        src/libnetdata/endian.h
+        src/libnetdata/onewayalloc/onewayalloc.c
+        src/libnetdata/onewayalloc/onewayalloc.h
+        src/libnetdata/popen/popen.c
+        src/libnetdata/popen/popen.h
+        src/libnetdata/procfile/procfile.c
+        src/libnetdata/procfile/procfile.h
+        src/libnetdata/query_progress/progress.c
+        src/libnetdata/query_progress/progress.h
+        src/libnetdata/required_dummies.h
+        src/libnetdata/socket/security.c
+        src/libnetdata/socket/security.h
+        src/libnetdata/simple_pattern/simple_pattern.c
+        src/libnetdata/simple_pattern/simple_pattern.h
+        src/libnetdata/socket/socket.c
+        src/libnetdata/socket/socket.h
+        src/libnetdata/statistical/statistical.c
+        src/libnetdata/statistical/statistical.h
+        src/libnetdata/storage_number/storage_number.c
+        src/libnetdata/storage_number/storage_number.h
+        src/libnetdata/string/string.c
+        src/libnetdata/string/string.h
+        src/libnetdata/threads/threads.c
+        src/libnetdata/threads/threads.h
+        src/libnetdata/url/url.c
+        src/libnetdata/url/url.h
+        src/libnetdata/uuid/uuid.c
+        src/libnetdata/uuid/uuid.h
+        src/libnetdata/string/utf8.h
+        src/libnetdata/worker_utilization/worker_utilization.c
+        src/libnetdata/worker_utilization/worker_utilization.h
+        src/libnetdata/http/http_access.c
+        src/libnetdata/http/http_access.h
+        src/libnetdata/http/http_defs.c
+        src/libnetdata/http/http_defs.h
+        src/libnetdata/http/content_type.c
+        src/libnetdata/http/content_type.h
+        src/libnetdata/config/dyncfg.c
+        src/libnetdata/config/dyncfg.h
+        src/libnetdata/json/json-c-parser-inline.h
+        src/libnetdata/template-enum.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
     list(APPEND LIBNETDATA_FILES
-            libnetdata/ebpf/ebpf.c
-            libnetdata/ebpf/ebpf.h
+            src/libnetdata/ebpf/ebpf.c
+            src/libnetdata/ebpf/ebpf.h
     )
 endif()
 
@@ -955,18 +955,18 @@ set(IDLEJITTER_PLUGIN_FILES collectors/idlejitter.plugin/plugin_idlejitter.c)
 
 if(ENABLE_ML)
         set(ML_FILES
-                ml/ad_charts.h
-                ml/ad_charts.cc
-                ml/Config.cc
-                ml/dlib/dlib/all/source.cpp
-                ml/ml.h
-                ml/ml.cc
-                ml/ml-private.h
+                src/ml/ad_charts.h
+                src/ml/ad_charts.cc
+                src/ml/Config.cc
+                src/ml/dlib/dlib/all/source.cpp
+                src/ml/ml.h
+                src/ml/ml.cc
+                src/ml/ml-private.h
         )
 else()
         set(ML_FILES
-                ml/ml.h
-                ml/ml-dummy.c
+                src/ml/ml.h
+                src/ml/ml-dummy.c
         )
 endif()
 
@@ -986,107 +986,107 @@ set(PLUGINSD_PLUGIN_FILES
 )
 
 set(RRD_PLUGIN_FILES
-        database/contexts/api_v1.c
-        database/contexts/api_v2.c
-        database/contexts/context.c
-        database/contexts/instance.c
-        database/contexts/internal.h
-        database/contexts/metric.c
-        database/contexts/query_scope.c
-        database/contexts/query_target.c
-        database/contexts/rrdcontext.c
-        database/contexts/rrdcontext.h
-        database/contexts/worker.c
-        database/rrdcollector.c
-        database/rrdcollector.h
-        database/rrddim.c
-        database/rrdfunctions.c
-        database/rrdfunctions.h
-        database/rrdfunctions-inline.c
-        database/rrdfunctions-inline.h
-        database/rrdfunctions-progress.c
-        database/rrdfunctions-progress.h
-        database/rrdfunctions-streaming.c
-        database/rrdfunctions-streaming.h
-        database/rrdhost.c
-        database/rrdlabels.c
-        database/rrd.c
-        database/rrd.h
-        database/rrdset.c
-        database/storage_engine.c
-        database/storage_engine.h
-        database/ram/rrddim_mem.c
-        database/ram/rrddim_mem.h
-        database/sqlite/sqlite_metadata.c
-        database/sqlite/sqlite_metadata.h
-        database/sqlite/sqlite_functions.c
-        database/sqlite/sqlite_functions.h
-        database/sqlite/sqlite_context.c
-        database/sqlite/sqlite_context.h
-        database/sqlite/sqlite_db_migration.c
-        database/sqlite/sqlite_db_migration.h
-        database/sqlite/sqlite_aclk.c
-        database/sqlite/sqlite_aclk.h
-        database/sqlite/sqlite_health.c
-        database/sqlite/sqlite_health.h
-        database/sqlite/sqlite_aclk_node.c
-        database/sqlite/sqlite_aclk_node.h
-        database/sqlite/sqlite_aclk_alert.c
-        database/sqlite/sqlite_aclk_alert.h
-        database/sqlite/sqlite3.c
-        database/sqlite/sqlite3.h
-        database/sqlite/sqlite3recover.c
-        database/sqlite/sqlite3recover.h
-        database/sqlite/dbdata.c
-        database/KolmogorovSmirnovDist.c
-        database/KolmogorovSmirnovDist.h
-        database/rrdfunctions-inflight.c
-        database/rrdfunctions-inflight.h
-        database/rrdfunctions-exporters.c
-        database/rrdfunctions-exporters.h
-        database/rrdfunctions-internals.h
-        database/rrdcollector-internals.h
+        src/database/contexts/api_v1.c
+        src/database/contexts/api_v2.c
+        src/database/contexts/context.c
+        src/database/contexts/instance.c
+        src/database/contexts/internal.h
+        src/database/contexts/metric.c
+        src/database/contexts/query_scope.c
+        src/database/contexts/query_target.c
+        src/database/contexts/rrdcontext.c
+        src/database/contexts/rrdcontext.h
+        src/database/contexts/worker.c
+        src/database/rrdcollector.c
+        src/database/rrdcollector.h
+        src/database/rrddim.c
+        src/database/rrdfunctions.c
+        src/database/rrdfunctions.h
+        src/database/rrdfunctions-inline.c
+        src/database/rrdfunctions-inline.h
+        src/database/rrdfunctions-progress.c
+        src/database/rrdfunctions-progress.h
+        src/database/rrdfunctions-streaming.c
+        src/database/rrdfunctions-streaming.h
+        src/database/rrdhost.c
+        src/database/rrdlabels.c
+        src/database/rrd.c
+        src/database/rrd.h
+        src/database/rrdset.c
+        src/database/storage_engine.c
+        src/database/storage_engine.h
+        src/database/ram/rrddim_mem.c
+        src/database/ram/rrddim_mem.h
+        src/database/sqlite/sqlite_metadata.c
+        src/database/sqlite/sqlite_metadata.h
+        src/database/sqlite/sqlite_functions.c
+        src/database/sqlite/sqlite_functions.h
+        src/database/sqlite/sqlite_context.c
+        src/database/sqlite/sqlite_context.h
+        src/database/sqlite/sqlite_db_migration.c
+        src/database/sqlite/sqlite_db_migration.h
+        src/database/sqlite/sqlite_aclk.c
+        src/database/sqlite/sqlite_aclk.h
+        src/database/sqlite/sqlite_health.c
+        src/database/sqlite/sqlite_health.h
+        src/database/sqlite/sqlite_aclk_node.c
+        src/database/sqlite/sqlite_aclk_node.h
+        src/database/sqlite/sqlite_aclk_alert.c
+        src/database/sqlite/sqlite_aclk_alert.h
+        src/database/sqlite/sqlite3.c
+        src/database/sqlite/sqlite3.h
+        src/database/sqlite/sqlite3recover.c
+        src/database/sqlite/sqlite3recover.h
+        src/database/sqlite/dbdata.c
+        src/database/KolmogorovSmirnovDist.c
+        src/database/KolmogorovSmirnovDist.h
+        src/database/rrdfunctions-inflight.c
+        src/database/rrdfunctions-inflight.h
+        src/database/rrdfunctions-exporters.c
+        src/database/rrdfunctions-exporters.h
+        src/database/rrdfunctions-internals.h
+        src/database/rrdcollector-internals.h
 )
 
 if(ENABLE_DBENGINE)
     list(APPEND RRD_PLUGIN_FILES
-            database/engine/rrdengine.c
-            database/engine/rrdengine.h
-            database/engine/rrddiskprotocol.h
-            database/engine/datafile.c
-            database/engine/datafile.h
-            database/engine/journalfile.c
-            database/engine/journalfile.h
-            database/engine/rrdenginelib.c
-            database/engine/rrdenginelib.h
-            database/engine/rrdengineapi.c
-            database/engine/rrdengineapi.h
-            database/engine/pagecache.c
-            database/engine/pagecache.h
-            database/engine/page_test.cc
-            database/engine/page.c
-            database/engine/page.h
-            database/engine/cache.c
-            database/engine/cache.h
-            database/engine/metric.c
-            database/engine/metric.h
-            database/engine/pdc.c
-            database/engine/pdc.h
+            src/database/engine/rrdengine.c
+            src/database/engine/rrdengine.h
+            src/database/engine/rrddiskprotocol.h
+            src/database/engine/datafile.c
+            src/database/engine/datafile.h
+            src/database/engine/journalfile.c
+            src/database/engine/journalfile.h
+            src/database/engine/rrdenginelib.c
+            src/database/engine/rrdenginelib.h
+            src/database/engine/rrdengineapi.c
+            src/database/engine/rrdengineapi.h
+            src/database/engine/pagecache.c
+            src/database/engine/pagecache.h
+            src/database/engine/page_test.cc
+            src/database/engine/page.c
+            src/database/engine/page.h
+            src/database/engine/cache.c
+            src/database/engine/cache.h
+            src/database/engine/metric.c
+            src/database/engine/metric.h
+            src/database/engine/pdc.c
+            src/database/engine/pdc.h
     )
 endif()
 
 set(REGISTRY_PLUGIN_FILES
-        registry/registry.c
-        registry/registry.h
-        registry/registry_db.c
-        registry/registry_init.c
-        registry/registry_internals.c
-        registry/registry_internals.h
-        registry/registry_log.c
-        registry/registry_machine.c
-        registry/registry_machine.h
-        registry/registry_person.c
-        registry/registry_person.h
+        src/registry/registry.c
+        src/registry/registry.h
+        src/registry/registry_db.c
+        src/registry/registry_init.c
+        src/registry/registry_internals.c
+        src/registry/registry_internals.h
+        src/registry/registry_log.c
+        src/registry/registry_machine.c
+        src/registry/registry_machine.h
+        src/registry/registry_person.c
+        src/registry/registry_person.h
 )
 
 set(STATSD_PLUGIN_FILES
@@ -1107,23 +1107,23 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
 )
 
 set(STREAMING_PLUGIN_FILES
-        streaming/rrdpush.c
-        streaming/rrdpush.h
-        streaming/compression.c
-        streaming/compression.h
-        streaming/compression_brotli.c
-        streaming/compression_brotli.h
-        streaming/compression_gzip.c
-        streaming/compression_gzip.h
-        streaming/compression_lz4.c
-        streaming/compression_lz4.h
-        streaming/compression_zstd.c
-        streaming/compression_zstd.h
-        streaming/receiver.c
-        streaming/sender.c
-        streaming/replication.c
-        streaming/replication.h
-        streaming/common.h
+        src/streaming/rrdpush.c
+        src/streaming/rrdpush.h
+        src/streaming/compression.c
+        src/streaming/compression.h
+        src/streaming/compression_brotli.c
+        src/streaming/compression_brotli.h
+        src/streaming/compression_gzip.c
+        src/streaming/compression_gzip.h
+        src/streaming/compression_lz4.c
+        src/streaming/compression_lz4.h
+        src/streaming/compression_zstd.c
+        src/streaming/compression_zstd.h
+        src/streaming/receiver.c
+        src/streaming/sender.c
+        src/streaming/replication.c
+        src/streaming/replication.h
+        src/streaming/common.h
 )
 
 set(WEB_PLUGIN_FILES
@@ -1138,15 +1138,15 @@ set(WEB_PLUGIN_FILES
 )
 
 set(CLAIM_PLUGIN_FILES
-        claim/claim.c
-        claim/claim.h
+        src/claim/claim.c
+        src/claim/claim.h
 )
 
 set(SPAWN_PLUGIN_FILES
-        spawn/spawn.c
-        spawn/spawn_server.c
-        spawn/spawn_client.c
-        spawn/spawn.h
+        src/spawn/spawn.c
+        src/spawn/spawn_server.c
+        src/spawn/spawn_client.c
+        src/spawn/spawn.h
 )
 
 set(ACLK_ALWAYS_BUILD
@@ -1291,8 +1291,8 @@ set(LOGS_MANAGEMENT_PLUGIN_FILES
         logsmanagement/rrd_api/rrd_api_web_log.c
         logsmanagement/rrd_api/rrd_api_web_log.h
         logsmanagement/rrd_api/rrd_api.h
-        database/sqlite/sqlite3.c
-        database/sqlite/sqlite3.h
+        src/database/sqlite/sqlite3.c
+        src/database/sqlite/sqlite3.h
 )
 
 set(NETDATA_FILES
@@ -1489,15 +1489,15 @@ target_compile_definitions(judy PRIVATE
 )
 
 target_include_directories(judy PUBLIC
-        libnetdata/libjudy/src
-        libnetdata/libjudy/src/JudyCommon
+        src/libnetdata/libjudy/src
+        src/libnetdata/libjudy/src/JudyCommon
 )
 
 set_source_files_properties(${LIBJUDY_PREV_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYPREV")
 set_source_files_properties(${LIBJUDY_NEXT_FILES} PROPERTIES COMPILE_OPTIONS "-DJUDYNEXT")
-set_source_files_properties(libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
-set_source_files_properties(libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
-set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/libnetdata/libjudy/src/JudyL")
+set_source_files_properties(src/libnetdata/libjudy/src/JudyL/j__udyLGet.c PROPERTIES COMPILE_OPTIONS "-DJUDYGETINLINE")
+set_source_files_properties(src/libnetdata/libjudy/src/JudyL/JudyLByCount.c PROPERTIES COMPILE_OPTIONS "-DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB")
+set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_SOURCE_DIR}/src/libnetdata/libjudy/src/JudyL")
 
 #
 # build libnetdata
@@ -1507,7 +1507,7 @@ include(systemd.cmake)
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
-target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR})
+target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
 
 # pthread (FIXME: use find_package for this)
 
@@ -2083,7 +2083,6 @@ target_compile_definitions(netdata PRIVATE
 target_include_directories(netdata PRIVATE
         "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/aclk/aclk-schemas>"
-        "$<$<BOOL:${ENABLE_ML}>:${CMAKE_SOURCE_DIR}/ml/dlib>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
 )
@@ -2104,8 +2103,8 @@ target_link_libraries(netdata PRIVATE
 #
 # build systemd-cat-native
 #
-set(SYSTEMD_CAT_NATIVE_FILES libnetdata/log/systemd-cat-native.c
-                             libnetdata/log/systemd-cat-native.h)
+set(SYSTEMD_CAT_NATIVE_FILES src/libnetdata/log/systemd-cat-native.c
+                             src/libnetdata/log/systemd-cat-native.h)
 
 add_executable(systemd-cat-native ${SYSTEMD_CAT_NATIVE_FILES})
 target_link_libraries(systemd-cat-native libnetdata)
@@ -2139,7 +2138,7 @@ if(PCRE2_FOUND)
         )
 
         add_executable(log2journal ${LOG2JOURNAL_FILES})
-        target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${PCRE2_INCLUDE_DIRS})
+        target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src ${PCRE2_INCLUDE_DIRS})
         target_compile_definitions(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
         target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
 
@@ -2169,7 +2168,7 @@ set(NETDATACLI_FILES
         daemon/commands.h
         daemon/pipename.c
         daemon/pipename.h
-        cli/cli.c
+        src/cli/cli.c
 )
 
 add_executable(netdatacli ${NETDATACLI_FILES})
@@ -2265,9 +2264,9 @@ else()
         set(enable_aclk_POST "no")
 endif()
 
-configure_file(claim/netdata-claim.sh.in claim/netdata-claim.sh @ONLY)
+configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/claim/netdata-claim.sh
+        ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
         DESTINATION usr/sbin)
 
 #
@@ -2314,7 +2313,7 @@ install(FILES
 # streaming
 #
 install(FILES
-        streaming/stream.conf
+        src/streaming/stream.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 #

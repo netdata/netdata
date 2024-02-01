@@ -3,7 +3,7 @@
 #ifndef NETDATA_WEBRTC_H
 #define NETDATA_WEBRTC_H
 
-#include "../../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 
 int webrtc_new_connection(const char *sdp, BUFFER *wb);
 void webrtc_close_all_connections();

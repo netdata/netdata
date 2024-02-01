@@ -4,10 +4,10 @@
 #define NETDATA_DYNCFG_INTERNALS_H
 
 #include "../common.h"
-#include "../../database/rrd.h"
-#include "../../database/rrdfunctions.h"
-#include "../../database/rrdfunctions-internals.h"
-#include "../../database/rrdcollector-internals.h"
+#include "database/rrd.h"
+#include "database/rrdfunctions.h"
+#include "database/rrdfunctions-internals.h"
+#include "database/rrdcollector-internals.h"
 
 typedef struct dyncfg {
     UUID host_uuid;

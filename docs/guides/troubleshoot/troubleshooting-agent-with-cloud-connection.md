@@ -31,7 +31,7 @@ and firewall settings for outbound connections.
 
 If your firewall is configured to completely prevent outbound connections, you need to whitelist `app.netdata.cloud` and `mqtt.netdata.cloud`.  If you can't whitelist domains in your firewall, you can whitelist the IPs that the hostnames resolve to, but keep in mind that they can change without any notice.
 
-If you use an outbound proxy, you need to [take some extra steps]( https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy).
+If you use an outbound proxy, you need to [take some extra steps]( https://github.com/netdata/netdata/blob/master/src/claim/README.md#connect-through-a-proxy).
 
 ### Troubleshoot claiming with kickstart.sh
 
@@ -48,7 +48,7 @@ and can be executed.
 First verify that the NETDATA_CLAIM_TOKEN parameter is correctly configured and then check for any errors during
 initialization of the container. 
 
-The most common issue we have seen claiming nodes in Docker is [running on older hosts with seccomp enabled](https://github.com/netdata/netdata/blob/master/claim/README.md#known-issues-on-older-hosts-with-seccomp-enabled).
+The most common issue we have seen claiming nodes in Docker is [running on older hosts with seccomp enabled](https://github.com/netdata/netdata/blob/master/src/claim/README.md#known-issues-on-older-hosts-with-seccomp-enabled).
 
 ## The Agent was claimed but can not connect
 

@@ -125,7 +125,7 @@ Raspberry Pi temperature sensor monitoring.
 ### Storing historical metrics on your Raspberry Pi
 
 By default, Netdata allocates 256 MiB in disk space to store historical metrics inside the [database
-engine](https://github.com/netdata/netdata/blob/master/database/engine/README.md). On the Raspberry Pi used for this guide, Netdata collects 1,500 metrics every
+engine](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md). On the Raspberry Pi used for this guide, Netdata collects 1,500 metrics every
 second, which equates to storing 3.5 days worth of historical metrics.
 
 You can increase this allocation by editing `netdata.conf` and increasing the `dbengine multihost disk space` setting to
@@ -138,5 +138,5 @@ more than 256.
 
 Use our [database sizing
 calculator](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-and the [Database configuration documentation](https://github.com/netdata/netdata/blob/master/database/README.md) to help you determine the right
+and the [Database configuration documentation](https://github.com/netdata/netdata/blob/master/src/database/README.md) to help you determine the right
 setting for your Raspberry Pi.

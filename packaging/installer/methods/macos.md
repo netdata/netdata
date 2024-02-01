@@ -10,7 +10,7 @@ learn_rel_path: "Installation/Install on specific environments"
 
 Netdata works on macOS, albeit with some limitations. 
 The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md) to monitor any services you might have installed on your macOS system. 
-You could also use a macOS system as the parent node in a [streaming configuration](https://github.com/netdata/netdata/blob/master/streaming/README.md).
+You could also use a macOS system as the parent node in a [streaming configuration](https://github.com/netdata/netdata/blob/master/src/streaming/README.md).
 
 You can install Netdata in one of the three following ways: 
 
@@ -35,7 +35,7 @@ The Netdata Agent is installed under `/usr/local/netdata`. Dependencies are hand
 
 **Automatically connect to Netdata Cloud during installation**
 
-The `kickstart.sh` script accepts additional parameters to automatically [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your node to Netdata
+The `kickstart.sh` script accepts additional parameters to automatically [connect](https://github.com/netdata/netdata/blob/master/src/claim/README.md) your node to Netdata
 Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
 Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Connect Nodes** in the [Spaces management
 area](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces).
@@ -44,7 +44,7 @@ area](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-
   after the install.
 - `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
 - `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
-  See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
+  See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/src/claim/README.md#connect-through-a-proxy) for details.
 - `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://app.netdata.cloud`.
 
 For example: 
@@ -53,7 +53,7 @@ curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /t
 ```
 The Netdata Agent is installed under `/usr/local/netdata` on your machine. Your machine will also show up as a node in your Netdata Cloud.
 
-If you experience issues while claiming your node, follow the steps in our [Troubleshooting](https://github.com/netdata/netdata/blob/master/claim/README.md#troubleshooting) documentation.
+If you experience issues while claiming your node, follow the steps in our [Troubleshooting](https://github.com/netdata/netdata/blob/master/src/claim/README.md#troubleshooting) documentation.
 ## Install Netdata via Homebrew
 
 ### For macOS Intel

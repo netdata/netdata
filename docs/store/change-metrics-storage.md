@@ -1,7 +1,7 @@
 # Change how long Netdata stores metrics
 
 The Netdata Agent uses a custom made time-series database (TSDB), named the 
-[`dbengine`](https://github.com/netdata/netdata/blob/master/database/engine/README.md), to store metrics.
+[`dbengine`](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md), to store metrics.
 
 To see the number of metrics stored and the retention in days per tier, use the `/api/v1/dbengine_stats` endpoint. 
 
@@ -84,7 +84,7 @@ The DBENGINE memory is related to the number of metrics concurrently being colle
 on disk in relation with the queries running, and the number of metrics for which retention is maintained.
 
 The precise analysis of how much memory will be used by the DBENGINE itself is described in 
-[DBENGINE memory requirements](https://github.com/netdata/netdata/blob/master/database/engine/README.md#memory-requirements).
+[DBENGINE memory requirements](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md#memory-requirements).
 
 In addition to the DBENGINE, Netdata uses memory for contexts, metric labels (e.g. in a Kubernetes setup), 
 other Netdata structures/processes (e.g. Health) and system overhead.

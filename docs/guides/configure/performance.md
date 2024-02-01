@@ -20,7 +20,7 @@ Optimization | CPU | RAM | Disk IO
 [Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:
 [Reduce data collection frequency](#reduce-collection-frequency) | :heavy_check_mark: | | :heavy_check_mark:
 [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) | | :heavy_check_mark: | :heavy_check_mark:
-[Use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md) | | :heavy_check_mark: | :heavy_check_mark:
+[Use a different metric storage database](https://github.com/netdata/netdata/blob/master/src/database/README.md) | | :heavy_check_mark: | :heavy_check_mark:
 [Disable machine learning](#disable-machine-learning) | :heavy_check_mark: | | 
 [Use a reverse proxy](#run-netdata-behind-a-proxy) | :heavy_check_mark: | | 
 [Disable/lower gzip compression for the agent dashboard](#disablelower-gzip-compression-for-the-dashboard) | :heavy_check_mark: | | 
@@ -57,7 +57,7 @@ To reduce CPU usage you can [disable machine learning](#disable-machine-learning
 
 The memory footprint of Netdata is mainly influenced by the number of metrics concurrently being collected. Expect about 150MB of RAM for a typical 64-bit server collecting about 2000 to 3000 metrics.
 
-To estimate and control memory consumption, you can [disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors), [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md), or [use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md).
+To estimate and control memory consumption, you can [disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors), [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md), or [use a different metric storage database](https://github.com/netdata/netdata/blob/master/src/database/README.md).
 
 
 ### Disk footprint and I/O
@@ -67,7 +67,7 @@ By default, Netdata should not use more than 1GB of disk space, most of which is
 Netdata spreads I/O operations across time. For typical standalone installations there should be a few write operations every 5-10 seconds of a few kilobytes each, occasionally up to 1MB. In addition, under heavy load, collectors that require disk I/O may stop and show gaps in charts.
 
 To configure retention, you can [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
-To control disk I/O [use a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md), avoid querying the 
+To control disk I/O [use a different metric storage database](https://github.com/netdata/netdata/blob/master/src/database/README.md), avoid querying the 
 production system [using streaming and replication](#use-streaming-and-replication), [reduce the data collection frequency](#reduce-collection-frequency), and [disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors).
 
 ## Use streaming and replication
@@ -90,7 +90,7 @@ On the child nodes you should add to `netdata.conf` the following:
 
 ### Use memory mode ram or save for the child nodes
 
-See [using a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md).
+See [using a different metric storage database](https://github.com/netdata/netdata/blob/master/src/database/README.md).
 
 ## Disable unneeded plugins or collectors
 
@@ -180,7 +180,7 @@ See how to [change how long Netdata stores metrics](https://github.com/netdata/n
 
 ## Use a different metric storage database
 
-Consider [using a different metric storage database](https://github.com/netdata/netdata/blob/master/database/README.md) when running Netdata on IoT devices,
+Consider [using a different metric storage database](https://github.com/netdata/netdata/blob/master/src/database/README.md) when running Netdata on IoT devices,
 and for children in a parent-child set up based on [streaming and replication](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md).
 
 ## Disable machine learning

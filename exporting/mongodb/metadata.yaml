@@ -97,7 +97,7 @@ setup:
         - name: 'send hosts matching'
           default_value: 'localhost *'
           description: |
-            Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/libnetdata/simple_pattern#simple-patterns).
+            Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#simple-patterns).
           required: false
           detailed_description: |
             Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern).

@@ -11,7 +11,7 @@ learn_rel_path: "Installation/Install on specific environments"
 
 Netdata is fully compatible with Azure. 
 You can install Netdata on cloud instances to monitor the apps/services running there, or use
-multiple instances in a [parent-child streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) configuration.
+multiple instances in a [parent-child streaming](https://github.com/netdata/netdata/blob/master/src/streaming/README.md) configuration.
 
 ## Recommended installation method
 

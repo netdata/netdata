@@ -215,7 +215,7 @@ extern netdata_fd_stat_t **fd_pid;
 extern netdata_publish_shm_t **shm_pid;
 
 // The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
-// this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/libnetdata/aral).
+// this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/src/libnetdata/aral).
 #ifndef NETDATA_EBPF_ALLOC_MAX_PID
 # define NETDATA_EBPF_ALLOC_MAX_PID 1024
 #endif

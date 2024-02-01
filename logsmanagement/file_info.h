@@ -9,7 +9,7 @@
 #define FILE_INFO_H_
 
 #include <uv.h>
-#include "../database/sqlite/sqlite3.h"
+#include "database/sqlite/sqlite3.h"
 #include "defaults.h"
 #include "parser.h"
 

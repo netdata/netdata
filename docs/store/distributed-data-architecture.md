@@ -52,7 +52,7 @@ appropriate amount of RAM and disk space.
 Read our document on changing [how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) on your nodes for
 details.
 
-You can also stream between nodes using [streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md), allowing to replicate databases and create
+You can also stream between nodes using [streaming](https://github.com/netdata/netdata/blob/master/src/streaming/README.md), allowing to replicate databases and create
 your own centralized data lake of metrics, if you choose to do so.
 
 While a distributed data architecture is the default when monitoring infrastructure with Netdata, you can also configure

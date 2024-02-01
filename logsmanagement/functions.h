@@ -7,7 +7,7 @@
 #ifndef FUNCTIONS_H_
 #define FUNCTIONS_H_
 
-#include "../database/rrdfunctions.h"
+#include "database/rrdfunctions.h"
 
 #define LOGS_MANAG_FUNC_NAME "logs-management"
 #define FUNCTION_LOGSMANAGEMENT_HELP_SHORT "View, search and analyze logs monitored through the logs management engine."

@@ -15,7 +15,7 @@ Streaming lets you decide exactly how you want to store and maintain metrics dat
 ideal for speed and scale, streaming provides centralization options and high data availability.
 
 This document will get you started quickly with streaming. More advanced concepts and suggested production deployments
-can be found in the [streaming and replication reference](https://github.com/netdata/netdata/blob/master/streaming/README.md).
+can be found in the [streaming and replication reference](https://github.com/netdata/netdata/blob/master/src/streaming/README.md).
 
 ## Streaming basics
 

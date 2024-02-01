@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../database/rrd.h"
-#include "../web/api/queries/rrdr.h"
+#include "database/rrd.h"
+#include "web/api/queries/rrdr.h"
 #include "health_prototypes.h"
 
 #ifndef NETDATA_RRDCALC_H

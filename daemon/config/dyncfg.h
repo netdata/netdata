@@ -4,8 +4,8 @@
 #define NETDATA_DYNCFG_H
 
 #include "../common.h"
-#include "../../database/rrd.h"
-#include "../../database/rrdfunctions.h"
+#include "database/rrd.h"
+#include "database/rrdfunctions.h"
 
 void dyncfg_add_streaming(BUFFER *wb);
 bool dyncfg_available_for_rrdhost(RRDHOST *host);

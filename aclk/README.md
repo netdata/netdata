@@ -15,7 +15,7 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
 >This list of IPs can change without notice, we strongly advise you to whitelist following domains `app.netdata.cloud`, `mqtt.netdata.cloud`, if this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
 
 For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [connect to Cloud
-documentation](https://github.com/netdata/netdata/blob/master/claim/README.md).
+documentation](https://github.com/netdata/netdata/blob/master/src/claim/README.md).
 
 ## Data privacy
 
@@ -39,7 +39,7 @@ configuration uses two settings:
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
-connecting to cloud](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy).
+connecting to cloud](https://github.com/netdata/netdata/blob/master/src/claim/README.md#connect-through-a-proxy).
 
 You can configure following keys in the `netdata.conf` section `[cloud]`:
 ```
@@ -118,7 +118,7 @@ If you first disable the ACLK and any Cloud functionality and then decide you wo
 
 If you passed `--disable-cloud` to `netdata-installer.sh` during installation, you must
 [reinstall](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md) your Agent. Use the same method as before, but pass `--require-cloud` to
-the installer. When installation finishes you can [connect your node](https://github.com/netdata/netdata/blob/master/claim/README.md#how-to-connect-a-node).
+the installer. When installation finishes you can [connect your node](https://github.com/netdata/netdata/blob/master/src/claim/README.md#how-to-connect-a-node).
 
 If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` file, edit the file again and change
 `enabled` to `yes`:
@@ -128,6 +128,6 @@ If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` 
     enabled = yes
 ```
 
-Restart your Agent and [connect your node](https://github.com/netdata/netdata/blob/master/claim/README.md#how-to-connect-a-node).
+Restart your Agent and [connect your node](https://github.com/netdata/netdata/blob/master/src/claim/README.md#how-to-connect-a-node).
 
 

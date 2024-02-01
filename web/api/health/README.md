@@ -130,7 +130,7 @@ curl "http://NODE:19999/api/v1/manage/health?cmd=SILENCE&context=load" -H "X-Aut
 
 #### Selection criteria
 
-The `selection criteria` are key/value pairs, in the format `key : value`, where value is a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). This means that you can create very powerful selectors (you will rarely need more than one or two).
+The `selection criteria` are key/value pairs, in the format `key : value`, where value is a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). This means that you can create very powerful selectors (you will rarely need more than one or two).
 
 The accepted keys for the `selection criteria` are the following:
 

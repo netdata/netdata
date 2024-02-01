@@ -56,7 +56,7 @@ will open a side tab in which you can:
 2. _Edit the War Rooms*_, click on the **War rooms** tab to add or remove War Rooms.
 
 3. _Connect nodes*_, click on **Nodes** tab. Copy the claiming script to your node and run it. See the
-   [connect to Cloud doc](https://github.com/netdata/netdata/blob/master/claim/README.md) for details.
+   [connect to Cloud doc](https://github.com/netdata/netdata/blob/master/src/claim/README.md) for details.
 
 4. _Manage the users*_, click on **Users**.
    The [invitation doc](#invite-your-team)
