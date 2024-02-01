@@ -1150,17 +1150,17 @@ set(SPAWN_PLUGIN_FILES
 )
 
 set(ACLK_ALWAYS_BUILD
-        aclk/aclk_rrdhost_state.h
-        aclk/aclk_proxy.c
-        aclk/aclk_proxy.h
-        aclk/aclk.c
-        aclk/aclk.h
-        aclk/aclk_capas.c
-        aclk/aclk_capas.h
-        aclk/aclk_util.c
-        aclk/aclk_util.h
-        aclk/https_client.c
-        aclk/https_client.h
+        src/aclk/aclk_rrdhost_state.h
+        src/aclk/aclk_proxy.c
+        src/aclk/aclk_proxy.h
+        src/aclk/aclk.c
+        src/aclk/aclk.h
+        src/aclk/aclk_capas.c
+        src/aclk/aclk_capas.h
+        src/aclk/aclk_util.c
+        src/aclk/aclk_util.h
+        src/aclk/https_client.c
+        src/aclk/https_client.h
 )
 
 set(TIMEX_PLUGIN_FILES
@@ -1343,83 +1343,83 @@ elseif(FREEBSD)
 endif()
 
 set(MQTT_WEBSOCKETS_FILES
-        aclk/mqtt_websockets/mqtt_wss_client.c
-        aclk/mqtt_websockets/mqtt_wss_client.h
-        aclk/mqtt_websockets/mqtt_wss_log.c
-        aclk/mqtt_websockets/mqtt_wss_log.h
-        aclk/mqtt_websockets/ws_client.c
-        aclk/mqtt_websockets/ws_client.h
-        aclk/mqtt_websockets/mqtt_ng.c
-        aclk/mqtt_websockets/mqtt_ng.h
-        aclk/mqtt_websockets/common_public.c
-        aclk/mqtt_websockets/common_public.h
-        aclk/mqtt_websockets/common_internal.h
-        aclk/mqtt_websockets/c-rbuf/cringbuffer.c
-        aclk/mqtt_websockets/c-rbuf/cringbuffer.h
-        aclk/mqtt_websockets/c-rbuf/cringbuffer_internal.h
-        aclk/mqtt_websockets/c_rhash/c_rhash.c
-        aclk/mqtt_websockets/c_rhash/c_rhash.h
-        aclk/mqtt_websockets/c_rhash/c_rhash_internal.h
+        src/aclk/mqtt_websockets/mqtt_wss_client.c
+        src/aclk/mqtt_websockets/mqtt_wss_client.h
+        src/aclk/mqtt_websockets/mqtt_wss_log.c
+        src/aclk/mqtt_websockets/mqtt_wss_log.h
+        src/aclk/mqtt_websockets/ws_client.c
+        src/aclk/mqtt_websockets/ws_client.h
+        src/aclk/mqtt_websockets/mqtt_ng.c
+        src/aclk/mqtt_websockets/mqtt_ng.h
+        src/aclk/mqtt_websockets/common_public.c
+        src/aclk/mqtt_websockets/common_public.h
+        src/aclk/mqtt_websockets/common_internal.h
+        src/aclk/mqtt_websockets/c-rbuf/cringbuffer.c
+        src/aclk/mqtt_websockets/c-rbuf/cringbuffer.h
+        src/aclk/mqtt_websockets/c-rbuf/cringbuffer_internal.h
+        src/aclk/mqtt_websockets/c_rhash/c_rhash.c
+        src/aclk/mqtt_websockets/c_rhash/c_rhash.h
+        src/aclk/mqtt_websockets/c_rhash/c_rhash_internal.h
 )
 
 set(ACLK_PROTO_DEFS
-        aclk/aclk-schemas/proto/aclk/v1/lib.proto
-        aclk/aclk-schemas/proto/agent/v1/disconnect.proto
-        aclk/aclk-schemas/proto/agent/v1/connection.proto
-        aclk/aclk-schemas/proto/alarm/v1/config.proto
-        aclk/aclk-schemas/proto/alarm/v1/stream.proto
-        aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
-        aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
-        aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
-        aclk/aclk-schemas/proto/context/v1/context.proto
-        aclk/aclk-schemas/proto/context/v1/stream.proto
-        aclk/aclk-schemas/proto/agent/v1/cmds.proto
+        src/aclk/aclk-schemas/proto/aclk/v1/lib.proto
+        src/aclk/aclk-schemas/proto/agent/v1/disconnect.proto
+        src/aclk/aclk-schemas/proto/agent/v1/connection.proto
+        src/aclk/aclk-schemas/proto/alarm/v1/config.proto
+        src/aclk/aclk-schemas/proto/alarm/v1/stream.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
+        src/aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto
+        src/aclk/aclk-schemas/proto/context/v1/context.proto
+        src/aclk/aclk-schemas/proto/context/v1/stream.proto
+        src/aclk/aclk-schemas/proto/agent/v1/cmds.proto
 )
 
 set(ACLK_FILES
-        aclk/aclk_stats.c
-        aclk/aclk_stats.h
-        aclk/aclk_query.c
-        aclk/aclk_query.h
-        aclk/aclk_query_queue.c
-        aclk/aclk_query_queue.h
-        aclk/aclk_otp.c
-        aclk/aclk_otp.h
-        aclk/aclk_tx_msgs.c
-        aclk/aclk_tx_msgs.h
-        aclk/aclk_rx_msgs.c
-        aclk/aclk_rx_msgs.h
-        aclk/aclk_alarm_api.c
-        aclk/aclk_alarm_api.h
-        aclk/aclk_contexts_api.c
-        aclk/aclk_contexts_api.h
-        aclk/schema-wrappers/connection.cc
-        aclk/schema-wrappers/connection.h
-        aclk/schema-wrappers/node_connection.cc
-        aclk/schema-wrappers/node_connection.h
-        aclk/schema-wrappers/node_creation.cc
-        aclk/schema-wrappers/node_creation.h
-        aclk/schema-wrappers/alarm_stream.cc
-        aclk/schema-wrappers/alarm_stream.h
-        aclk/schema-wrappers/alarm_config.cc
-        aclk/schema-wrappers/alarm_config.h
-        aclk/schema-wrappers/node_info.cc
-        aclk/schema-wrappers/node_info.h
-        aclk/schema-wrappers/capability.cc
-        aclk/schema-wrappers/capability.h
-        aclk/schema-wrappers/proto_2_json.cc
-        aclk/schema-wrappers/proto_2_json.h
-        aclk/schema-wrappers/context_stream.cc
-        aclk/schema-wrappers/context_stream.h
-        aclk/schema-wrappers/context.cc
-        aclk/schema-wrappers/context.h
-        aclk/schema-wrappers/schema_wrappers.h
-        aclk/schema-wrappers/schema_wrapper_utils.cc
-        aclk/schema-wrappers/schema_wrapper_utils.h
-        aclk/schema-wrappers/agent_cmds.cc
-        aclk/schema-wrappers/agent_cmds.h
-        aclk/helpers/mqtt_wss_pal.h
-        aclk/helpers/ringbuffer_pal.h
+        src/aclk/aclk_stats.c
+        src/aclk/aclk_stats.h
+        src/aclk/aclk_query.c
+        src/aclk/aclk_query.h
+        src/aclk/aclk_query_queue.c
+        src/aclk/aclk_query_queue.h
+        src/aclk/aclk_otp.c
+        src/aclk/aclk_otp.h
+        src/aclk/aclk_tx_msgs.c
+        src/aclk/aclk_tx_msgs.h
+        src/aclk/aclk_rx_msgs.c
+        src/aclk/aclk_rx_msgs.h
+        src/aclk/aclk_alarm_api.c
+        src/aclk/aclk_alarm_api.h
+        src/aclk/aclk_contexts_api.c
+        src/aclk/aclk_contexts_api.h
+        src/aclk/schema-wrappers/connection.cc
+        src/aclk/schema-wrappers/connection.h
+        src/aclk/schema-wrappers/node_connection.cc
+        src/aclk/schema-wrappers/node_connection.h
+        src/aclk/schema-wrappers/node_creation.cc
+        src/aclk/schema-wrappers/node_creation.h
+        src/aclk/schema-wrappers/alarm_stream.cc
+        src/aclk/schema-wrappers/alarm_stream.h
+        src/aclk/schema-wrappers/alarm_config.cc
+        src/aclk/schema-wrappers/alarm_config.h
+        src/aclk/schema-wrappers/node_info.cc
+        src/aclk/schema-wrappers/node_info.h
+        src/aclk/schema-wrappers/capability.cc
+        src/aclk/schema-wrappers/capability.h
+        src/aclk/schema-wrappers/proto_2_json.cc
+        src/aclk/schema-wrappers/proto_2_json.h
+        src/aclk/schema-wrappers/context_stream.cc
+        src/aclk/schema-wrappers/context_stream.h
+        src/aclk/schema-wrappers/context.cc
+        src/aclk/schema-wrappers/context.h
+        src/aclk/schema-wrappers/schema_wrappers.h
+        src/aclk/schema-wrappers/schema_wrapper_utils.cc
+        src/aclk/schema-wrappers/schema_wrapper_utils.h
+        src/aclk/schema-wrappers/agent_cmds.cc
+        src/aclk/schema-wrappers/agent_cmds.h
+        src/aclk/helpers/mqtt_wss_pal.h
+        src/aclk/helpers/ringbuffer_pal.h
 )
 
 
@@ -1715,8 +1715,8 @@ if(ENABLE_ACLK)
         #
         # proto definitions
         #
-        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/aclk/aclk-schemas"
-                            "${CMAKE_SOURCE_DIR}/aclk/aclk-schemas"
+        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                            "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
                             ACLK_PROTO_BUILT_SRCS
                             ACLK_PROTO_BUILT_HDRS
                             ${ACLK_PROTO_DEFS})
@@ -2082,7 +2082,7 @@ target_compile_definitions(netdata PRIVATE
 
 target_include_directories(netdata PRIVATE
         "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_INCLUDE_DIRS}>"
-        "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/aclk/aclk-schemas>"
+        "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
 )

@@ -15,7 +15,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Agent** or **Netdata Agent**](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
 
-- [**Agent-cloud link** or **ACLK**](https://github.com/netdata/netdata/blob/master/aclk/README.md): The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser through Netdata Cloud.
+- [**Agent-cloud link** or **ACLK**](https://github.com/netdata/netdata/blob/master/src/aclk/README.md): The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser through Netdata Cloud.
 
 - [**Aggregate Function**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#aggregate-functions-over-time): A function applied When the granularity of the data collected is higher than the plotted points on the chart.
 

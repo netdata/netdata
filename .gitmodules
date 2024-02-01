@@ -1,5 +1,5 @@
 [submodule "aclk/aclk-schemas"]
-	path = aclk/aclk-schemas
+	path = src/aclk/aclk-schemas
 	url = https://github.com/netdata/aclk-schemas.git
 [submodule "ml/kmeans/dlib"]
 	path = src/ml/dlib

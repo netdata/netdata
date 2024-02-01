@@ -77,7 +77,7 @@ An API key is a key created with `uuidgen` and is used for authentication and/or
 
 #### Child config
 
-As mentioned above, the recommendation is to not claim the Child to Cloud directly during your setup, avoiding establishing an [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md) connection.
+As mentioned above, the recommendation is to not claim the Child to Cloud directly during your setup, avoiding establishing an [ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md) connection.
 
 To reduce the footprint of the Netdata Agent on your production system, some capabilities can be switched OFF on the Child and kept ON on the Parent. In this example, Machine Learning and Alerting are disabled in the Child, so that the Parent can take the load. We also use RAM instead of disk to store metrics with limited retention, covering temporary network issues.
 

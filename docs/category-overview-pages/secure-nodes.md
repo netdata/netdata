@@ -47,7 +47,7 @@ This is the _recommended method for those who have connected their nodes to Netd
 metrics using the War Room Overview, Nodes tab, and Cloud dashboards.
 
 You can disable the local dashboard (and API) but retain the encrypted Agent-Cloud link 
-([ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md)) that
+([ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md)) that
 allows you to stream metrics on demand from your nodes via the Netdata Cloud interface. This change mitigates all
 concerns about revealing metrics and system design to the internet at large, while keeping all the functionality you
 need to view metrics and troubleshoot issues with Netdata Cloud.
