@@ -4,7 +4,7 @@ This page will guide you through connecting a Netdata Agent to Netdata Cloud sec
 
 You can securely connect a Netdata Agent, running on a distributed node, to Netdata Cloud. A Space's
 administrator creates a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link
-(ACLK)](https://github.com/netdata/netdata/blob/master/aclk/README.md).
+(ACLK)](https://github.com/netdata/netdata/blob/master/src/aclk/README.md).
 
 Are you just getting started with Netdata Cloud? You can find simplified instructions in the [Install Netdata documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#get-started)
 
@@ -16,7 +16,7 @@ Netdata Cloud.
 > The connection process ensures no third party can add your node, and then view your node's metrics, in a Cloud account,
 > Space, or War Room that you did not authorize.
 
-By connecting a node, you opt-in to sending data from your Agent to Netdata Cloud via the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md). This
+By connecting a node, you opt-in to sending data from your Agent to Netdata Cloud via the [ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md). This
 data is encrypted by TLS while it is in transit. We use the RSA keypair created during the connection process to authenticate the
 identity of the Netdata Agent when it connects to the Cloud. While the data does flow through Netdata Cloud servers on its way
 from Agents to the browser, we do not store or log it.
@@ -337,7 +337,7 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 
 ### Troubleshooting
 
-If you're having trouble connecting a node, this may be because the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md) cannot connect to Cloud.
+If you're having trouble connecting a node, this may be because the [ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md) cannot connect to Cloud.
 
 With the Netdata Agent running, visit `http://NODE:19999/api/v1/info` in your browser, replacing `NODE` with the IP
 address or hostname of your Agent. The returned JSON contains four keys that will be helpful to diagnose any issues you
@@ -562,12 +562,12 @@ tool, and details about the files found in `cloud.d`.
 ### The `cloud.conf` file
 
 This section defines how and whether your Agent connects to Netdata Cloud
-using the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md).
+using the [ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md).
 
 | setting        | default                   | info                                                                                                                                   |
 |:-------------- |:------------------------- |:-------------------------------------------------------------------------------------------------------------------------------------- |
 | cloud base url | <https://app.netdata.cloud> | The URL for the Netdata Cloud web application. You should not change this. If you want to disable Cloud, change the `enabled` setting. |
-| enabled        | yes                       | The runtime option to disable the [Agent-Cloud link](https://github.com/netdata/netdata/blob/master/aclk/README.md) and prevent your Agent from connecting to Netdata Cloud.         |
+| enabled        | yes                       | The runtime option to disable the [Agent-Cloud link](https://github.com/netdata/netdata/blob/master/src/aclk/README.md) and prevent your Agent from connecting to Netdata Cloud.         |
 
 ### Claiming script
 

@@ -63,14 +63,14 @@ Since these functions are able to execute routines on the node and due to the po
 concern is to ensure no sensitive information or disruptive actions are exposed through the Agent's API.
 
 With the communication between the Netdata Agent and Netdata Cloud being
-through [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md) this
+through [ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md) this
 concern is addressed.
 
 ## Related Topics
 
 ### **Related Concepts**
 
-- [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md)
+- [ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md)
 - [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md)
 
 ### Related Tasks

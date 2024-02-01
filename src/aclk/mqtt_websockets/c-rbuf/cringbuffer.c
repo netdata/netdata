@@ -13,7 +13,7 @@
 // this allows user to use their own
 // custom memory allocation functions
 #ifdef RBUF_CUSTOM_MALLOC
-#include "ringbuffer_pal.h"
+#include "../../helpers/ringbuffer_pal.h"
 #else
 #define crbuf_malloc(...) malloc(__VA_ARGS__)
 #define crbuf_free(...) free(__VA_ARGS__)

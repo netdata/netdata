@@ -6,7 +6,7 @@
 #include "endian_compat.h"
 
 #ifdef MQTT_WSS_CUSTOM_ALLOC
-#include "mqtt_wss_pal.h"
+#include "../helpers/mqtt_wss_pal.h"
 #else
 #define mw_malloc(...) malloc(__VA_ARGS__)
 #define mw_calloc(...) calloc(__VA_ARGS__)
