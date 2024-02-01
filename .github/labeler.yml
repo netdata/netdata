@@ -278,4 +278,4 @@ area/logs-management:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - logsmanagement/**
+              - src/logsmanagement/**

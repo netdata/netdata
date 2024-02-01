@@ -1258,39 +1258,39 @@ set(TC_PLUGIN_FILES
 )
 
 set(LOGS_MANAGEMENT_PLUGIN_FILES
-        logsmanagement/circular_buffer.c
-        logsmanagement/circular_buffer.h
-        logsmanagement/db_api.c
-        logsmanagement/db_api.h
-        logsmanagement/defaults.h
-        logsmanagement/file_info.h
-        logsmanagement/flb_plugin.c
-        logsmanagement/flb_plugin.h
-        logsmanagement/functions.c
-        logsmanagement/functions.h
-        logsmanagement/helper.h
-        logsmanagement/logsmanag_config.c
-        logsmanagement/logsmanag_config.h
-        logsmanagement/logsmanagement.c
-        logsmanagement/parser.c
-        logsmanagement/parser.h
-        logsmanagement/query.c
-        logsmanagement/query.h
-        logsmanagement/rrd_api/rrd_api_docker_ev.c
-        logsmanagement/rrd_api/rrd_api_docker_ev.h
-        logsmanagement/rrd_api/rrd_api_generic.c
-        logsmanagement/rrd_api/rrd_api_generic.h
-        logsmanagement/rrd_api/rrd_api_kernel.c
-        logsmanagement/rrd_api/rrd_api_kernel.h
-        logsmanagement/rrd_api/rrd_api_mqtt.c
-        logsmanagement/rrd_api/rrd_api_mqtt.h
-        logsmanagement/rrd_api/rrd_api_stats.c
-        logsmanagement/rrd_api/rrd_api_stats.h
-        logsmanagement/rrd_api/rrd_api_systemd.c
-        logsmanagement/rrd_api/rrd_api_systemd.h
-        logsmanagement/rrd_api/rrd_api_web_log.c
-        logsmanagement/rrd_api/rrd_api_web_log.h
-        logsmanagement/rrd_api/rrd_api.h
+        src/logsmanagement/circular_buffer.c
+        src/logsmanagement/circular_buffer.h
+        src/logsmanagement/db_api.c
+        src/logsmanagement/db_api.h
+        src/logsmanagement/defaults.h
+        src/logsmanagement/file_info.h
+        src/logsmanagement/flb_plugin.c
+        src/logsmanagement/flb_plugin.h
+        src/logsmanagement/functions.c
+        src/logsmanagement/functions.h
+        src/logsmanagement/helper.h
+        src/logsmanagement/logsmanag_config.c
+        src/logsmanagement/logsmanag_config.h
+        src/logsmanagement/logsmanagement.c
+        src/logsmanagement/parser.c
+        src/logsmanagement/parser.h
+        src/logsmanagement/query.c
+        src/logsmanagement/query.h
+        src/logsmanagement/rrd_api/rrd_api_docker_ev.c
+        src/logsmanagement/rrd_api/rrd_api_docker_ev.h
+        src/logsmanagement/rrd_api/rrd_api_generic.c
+        src/logsmanagement/rrd_api/rrd_api_generic.h
+        src/logsmanagement/rrd_api/rrd_api_kernel.c
+        src/logsmanagement/rrd_api/rrd_api_kernel.h
+        src/logsmanagement/rrd_api/rrd_api_mqtt.c
+        src/logsmanagement/rrd_api/rrd_api_mqtt.h
+        src/logsmanagement/rrd_api/rrd_api_stats.c
+        src/logsmanagement/rrd_api/rrd_api_stats.h
+        src/logsmanagement/rrd_api/rrd_api_systemd.c
+        src/logsmanagement/rrd_api/rrd_api_systemd.h
+        src/logsmanagement/rrd_api/rrd_api_web_log.c
+        src/logsmanagement/rrd_api/rrd_api_web_log.h
+        src/logsmanagement/rrd_api/rrd_api.h
         src/database/sqlite/sqlite3.c
         src/database/sqlite/sqlite3.h
 )
@@ -1847,8 +1847,8 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
     set(ENABLE_LOGSMANAGEMENT True)
 
     if(ENABLE_LOGS_MANAGEMENT_TESTS)
-        list(APPEND LOGS_MANAGEMENT_PLUGIN_FILES logsmanagement/unit_test/unit_test.c
-                                                 logsmanagement/unit_test/unit_test.h)
+        list(APPEND LOGS_MANAGEMENT_PLUGIN_FILES src/logsmanagement/unit_test/unit_test.c
+                                                 src/logsmanagement/unit_test/unit_test.h)
         set(ENABLE_LOGSMANAGEMENT_TESTS True)
     endif()
 
@@ -1859,7 +1859,7 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
             COMPONENT logs_management_plugin
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    install(DIRECTORY logsmanagement/stock_conf/logsmanagement.d
+    install(DIRECTORY src/logsmanagement/stock_conf/logsmanagement.d
             COMPONENT logs_management_plugin
             DESTINATION usr/lib/netdata/conf.d)
 
@@ -2683,8 +2683,8 @@ install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/ioping.plugin/ioping.plugin DEST
 # logs management
 #
 if (ENABLE_PLUGIN_LOGS_MANAGEMENT)
-        configure_file(logsmanagement/stock_conf/logsmanagement.d.conf.in logsmanagement/stock_conf/logsmanagement.d.conf @ONLY)
-        install(FILES ${CMAKE_BINARY_DIR}/logsmanagement/stock_conf/logsmanagement.d.conf
+        configure_file(src/logsmanagement/stock_conf/logsmanagement.d.conf.in src/logsmanagement/stock_conf/logsmanagement.d.conf @ONLY)
+        install(FILES ${CMAKE_BINARY_DIR}/src/logsmanagement/stock_conf/logsmanagement.d.conf
                 COMPONENT logs_management_plugin
                 DESTINATION usr/lib/netdata/conf.d)
 endif()
