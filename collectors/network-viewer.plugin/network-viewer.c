@@ -5,8 +5,8 @@
 #include "libnetdata/required_dummies.h"
 #include "collectors/plugins.d/local-sockets.h"
 
-#define NETWORK_VIEWER_FUNCTION "network-viewer"
-#define NETWORK_VIEWER_HELP "Network dependencies (outbound connections)"
+#define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
+#define NETWORK_CONNECTIONS_VIEWER_HELP "Network connections explorer"
 
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
@@ -113,7 +113,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 5);
-    buffer_json_member_add_string(wb, "help", NETWORK_VIEWER_HELP);
+    buffer_json_member_add_string(wb, "help", NETWORK_CONNECTIONS_VIEWER_HELP);
     buffer_json_member_add_array(wb, "data");
 
     LS_STATE ls = {
@@ -460,7 +460,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ----------------------------------------------------------------------------------------------------------------
 
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
-            NETWORK_VIEWER_FUNCTION, 60, NETWORK_VIEWER_HELP,
+        NETWORK_CONNECTIONS_VIEWER_FUNCTION, 60,
+        NETWORK_CONNECTIONS_VIEWER_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
             RRDFUNCTIONS_PRIORITY_DEFAULT);
 
@@ -469,8 +470,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     struct functions_evloop_globals *wg =
         functions_evloop_init(5, "Network-Viewer", &stdout_mutex, &plugin_should_exit);
 
-    functions_evloop_add_function(wg,
-                                  NETWORK_VIEWER_FUNCTION,
+    functions_evloop_add_function(wg, NETWORK_CONNECTIONS_VIEWER_FUNCTION,
                                   network_viewer_function,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
                                   NULL);
