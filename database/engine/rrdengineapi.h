@@ -3,6 +3,7 @@
 #ifndef NETDATA_RRDENGINEAPI_H
 #define NETDATA_RRDENGINEAPI_H
 
+#include "database/rrd.h"
 #include "rrdengine.h"
 
 #define RRDENG_MIN_PAGE_CACHE_SIZE_MB (8)
@@ -26,24 +27,38 @@ extern uint8_t tier_page_type[];
 
 void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si);
+STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(STORAGE_INSTANCE *si, RRDDIM *rd);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, uuid_t *uuid);
-void rrdeng_metric_release(STORAGE_METRIC_HANDLE *smh);
-STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *smh);
+void rrdeng_metric_release(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh);
+STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_INSTANCE *si, STORAGE_METRIC_HANDLE *smh);
 
-STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
-void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch);
-void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch, int update_every);
-void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *sch, usec_t point_in_time_ut, NETDATA_DOUBLE n,
-                                     NETDATA_DOUBLE min_value,
-                                     NETDATA_DOUBLE max_value,
-                                     uint16_t count,
-                                     uint16_t anomaly_count,
-                                     SN_FLAGS flags);
-int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch);
+STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, uint32_t update_every);
+void rrdeng_store_metric_flush_current_page(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch);
+void rrdeng_store_metric_change_collection_frequency(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch, int update_every);
 
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_handle *seqh,
-                                    time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
+void rrdeng_store_metric_next(STORAGE_INSTANCE *si,
+                              STORAGE_METRICS_GROUP *smg,
+                              STORAGE_METRIC_HANDLE *smh,
+                              STORAGE_COLLECT_HANDLE *sch,
+                              usec_t point_in_time_ut,
+                              NETDATA_DOUBLE n,
+                              NETDATA_DOUBLE min_value,
+                              NETDATA_DOUBLE max_value,
+                              uint16_t count,
+                              uint16_t anomaly_count,
+                              SN_FLAGS flags);
+
+int rrdeng_store_metric_finalize(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg, STORAGE_METRIC_HANDLE *smh, STORAGE_COLLECT_HANDLE *sch);
+
+void rrdeng_load_metric_init(STORAGE_INSTANCE *si,
+                             STORAGE_METRICS_GROUP *smg,
+                             STORAGE_METRIC_HANDLE *smh,
+                             STORAGE_COLLECT_HANDLE *sch,
+                             struct storage_engine_query_handle *seqh,
+                             time_t start_time_s,
+                             time_t end_time_s,
+                             STORAGE_PRIORITY priority);
+
 STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *seqh);
 
 

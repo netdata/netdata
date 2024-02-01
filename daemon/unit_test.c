@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "database/rrd.h"
 
 static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
     bool ok = sanitize_command_argument_string(dst, src, dst_size);
@@ -1907,7 +1908,11 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
     // Flush pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].sch);
+            rrdeng_store_metric_flush_current_page(
+                host->db[0].si,
+                st[i]->smg[0],
+                rd[i][j]->tiers[0].smh,
+                rd[i][j]->tiers[0].sch);
         }
     }
 }
@@ -1923,10 +1928,16 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
 
     update_every = REGION_UPDATE_EVERY[current_region];
     time_now = time_start;
+
     // feed it with the test data
     for (i = 0 ; i < CHARTS ; ++i) {
+        STORAGE_INSTANCE *si = st[i]->rrdhost->db[0].si;
+        STORAGE_METRICS_GROUP *smg = st[i]->smg[0];
+
         for (j = 0 ; j < DIMS ; ++j) {
-            storage_engine_store_change_collection_frequency(rd[i][j]->tiers[0].sch, update_every);
+            STORAGE_METRIC_HANDLE *smh = rd[i][j]->tiers[0].smh;
+            STORAGE_COLLECT_HANDLE *sch = rd[i][j]->tiers[0].sch;
+            storage_engine_store_change_collection_frequency(si, smg, smh, sch, update_every);
 
             rd[i][j]->collector.last_collected_time.tv_sec =
             st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
@@ -1977,7 +1988,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                storage_engine_query_init(rd[i][j]->tiers[0].seb, rd[i][j]->tiers[0].smh, &seqh, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
+                storage_engine_query_init(rd[i][j]->tiers[0].seb, st[i]->rrdhost->db[0].si, st[i]->smg[0], rd[i][j]->tiers[0].smh, rd[i][j]->tiers[0].sch, &seqh, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
@@ -2143,7 +2154,11 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].sch);
+            rrdeng_store_metric_flush_current_page(
+                host->db[0].si,
+                st[i]->smg[0],
+                rd[i][j]->tiers[0].smh,
+                rd[i][j]->tiers[0].sch);
         }
     }
 
@@ -2161,7 +2176,11 @@ int test_dbengine(void)
     for (i = 0 ; i < CHARTS ; ++i) {
         st[i]->update_every = update_every;
         for (j = 0; j < DIMS; ++j) {
-            rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].sch);
+            rrdeng_store_metric_flush_current_page(
+                host->db[0].si,
+                st[i]->smg[0],
+                rd[i][j]->tiers[0].smh,
+                rd[i][j]->tiers[0].sch);
         }
     }
 
@@ -2323,8 +2342,12 @@ static void generate_dbengine_chart(void *arg)
         rrdset_done(st);
         thread_info->time_max = time_current;
     }
+
+    STORAGE_INSTANCE *si = st->rrdhost->db[0].si;
+    STORAGE_METRICS_GROUP *smg = st->smg[0];
     for (j = 0; j < DSET_DIMS; ++j) {
-        rrdeng_store_metric_finalize((rd[j])->tiers[0].sch);
+
+        rrdeng_store_metric_finalize(si, smg, rd[j]->tiers[0].smh, rd[j]->tiers[0].sch);
     }
 }
 
@@ -2444,7 +2467,7 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        storage_engine_query_init(rd->tiers[0].seb, rd->tiers[0].smh, &seqh, time_after, time_before, STORAGE_PRIORITY_NORMAL);
+        storage_engine_query_init(rd->tiers[0].seb, st->rrdhost->db[0].si, st->smg[0], rd->tiers[0].smh, rd->tiers[0].sch, &seqh, time_after, time_before, STORAGE_PRIORITY_NORMAL);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);

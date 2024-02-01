@@ -126,7 +126,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     size_t counter = 0;
     NETDATA_DOUBLE sum = 0;
 
-    for (storage_engine_query_init(rd->tiers[0].seb, rd->tiers[0].smh, &handle, after, before, STORAGE_PRIORITY_SYNCHRONOUS); !storage_engine_query_is_finished(&handle);) {
+    for (storage_engine_query_init(rd->tiers[0].seb, host->db[0].si, st->smg[0], rd->tiers[0].smh, rd->tiers[0].sch, &handle, after, before, STORAGE_PRIORITY_SYNCHRONOUS); !storage_engine_query_is_finished(&handle);) {
         STORAGE_POINT sp = storage_engine_query_next_metric(&handle);
         points_read++;
 
