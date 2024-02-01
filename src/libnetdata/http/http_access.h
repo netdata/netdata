@@ -22,9 +22,9 @@ typedef enum __attribute__((packed)) {
     HTTP_ACCESS_NONE                        = 0,         //                                    adm man trb obs mem bil
     HTTP_ACCESS_SIGNED_ID                   = (1 << 0),  // User is authenticated               A   A   A   A   A   A
     HTTP_ACCESS_SAME_SPACE                  = (1 << 1),  // NC user+agent = same space          A   A   A   A   A   A
-    HTTP_ACCESS_COMMERCIAL_SPACE            = (1 << 2),  // NC                                  A   -   -   -   -   -
+    HTTP_ACCESS_COMMERCIAL_SPACE            = (1 << 2),  // NC                                  P   P   P   P   P   P
     HTTP_ACCESS_ANONYMOUS_DATA              = (1 << 3),  // NC room:Read                        A   A   A   SR  SR  -
-    HTTP_ACCESS_SENSITIVE_DATA              = (1 << 4),  // NC agent:ViewSensitiveData          A   A   A   -   -   -
+    HTTP_ACCESS_SENSITIVE_DATA              = (1 << 4),  // NC agent:ViewSensitiveData          A   A   A   -   SR  -
     HTTP_ACCESS_VIEW_AGENT_CONFIG           = (1 << 5),  // NC agent:ReadDynCfg                 P   P   -   -   -   -
     HTTP_ACCESS_EDIT_AGENT_CONFIG           = (1 << 6),  // NC agent:EditDynCfg                 P   P   -   -   -   -
     HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG   = (1 << 7),  // NC agent:ViewNotificationsConfig    P   -   -   -   -   -
