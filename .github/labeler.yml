@@ -14,15 +14,15 @@ area/ACLK:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - aclk/**
-              - database/sqlite/sqlite_aclk*
-              - mqtt_websockets
+              - src/aclk/**
+              - src/database/sqlite/sqlite_aclk*
+              - src/aclk/mqtt_websockets
 
 area/claim:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - claim/*
+              - src/claim/*
 
 area/exporting:
   - any:
@@ -57,7 +57,7 @@ area/database:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - database/**
+              - src/database/**
 
 area/docs:
   - any:
@@ -233,7 +233,7 @@ area/ml:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - ml/**
+              - src/ml/**
 
 area/packaging:
   - any:
@@ -250,13 +250,13 @@ area/registry:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - registry/**
+              - src/registry/**
 
 area/streaming:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - streaming/**
+              - src/streaming/**
 
 area/tests:
   - any:
