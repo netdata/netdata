@@ -16,7 +16,7 @@ static inline void EBPF_PLUGIN_FUNCTIONS(const char *NAME, const char *DESC, int
 #define NETDATA_EBPF_FUNCTIONS_MODULE_DESC "Show information about current function status."
 
 // function list
-#define EBPF_FUNCTION_SOCKET "network-connections"
+#define EBPF_FUNCTION_SOCKET "network-sockets-tracing"
 
 // socket constants
 #define EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION "Detailed information about open sockets."

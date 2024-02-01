@@ -101,7 +101,11 @@
         const ch = h / 2 - borderPadding;
 
         const minSize = 13;
-        const maxSize = Math.max(5, Math.min(w, h) / data.length) + minSize;
+        const maxSize = Math.min(
+            (cw * 2) / 3 - borderPadding,
+            (ch * 2) / 3 - borderPadding,
+            Math.max(5, Math.min(w, h) / data.length) + minSize
+        )
 
         const max = {
             total: d3.max(data, d => d.counts.total),
@@ -118,12 +122,18 @@
             .range([minSize, maxSize])
             .clamp(true); // Clamps the output so that it stays within the range
 
-        const logScaleRight = d3.scaleLog().domain([1, max.public + 1]).range([0, cw]);
-        const logScaleLeft = d3.scaleLog().domain([1, max.private + 1]).range([0, cw]);
-        const logScaleTop = d3.scaleLog().domain([1, max.outbound + 1]).range([0, ch]);
-        const logScaleBottom = d3.scaleLog().domain([1, (max.listen + max.inbound) / 2 + 1]).range([0, ch]);
+        let listenerDelta = 50;
+        let listenersAdded = 0;
+        let listenersAddedRight = 0;
+        let listenersAddedLeft = 0;
+        let listenersH = h - borderPadding;
 
         data.forEach((d, i) => {
+            const logScaleRight = d3.scaleLog().domain([1, d.counts.public + 1]).range([0, cw]);
+            const logScaleLeft = d3.scaleLog().domain([1, d.counts.private + 1]).range([0, cw]);
+            const logScaleTop = d3.scaleLog().domain([1, d.counts.outbound + 1]).range([0, ch]);
+            const logScaleBottom = d3.scaleLog().domain([1, (d.counts.listen + d.counts.inbound) / 2 + 1]).range([0, ch]);
+
             d.forces = {
                 total: d.counts.total / max.total,
                 local: d.counts.local / max.local,
@@ -142,11 +152,48 @@
                 bottom: logScaleBottom(((config.listen ? d.counts.listen : 0) + d.counts.inbound) / (config.listen ? 2 : 1) + 1),
             };
 
+            let x = borderPadding + cw + d.pos.right - d.pos.left;
+            let y = borderPadding + ch + d.pos.bottom - d.pos.top;
+            let size = circleSize(d.counts.total);
+
+            if(d.counts.listen === d.counts.total) {
+                // a listener
+                size = circleSize(1);
+
+                if(listenersAdded * listenerDelta > cw * 2 / 3) {
+                    // too many listeners on this row
+                    // let's start adding on another row above
+                    listenersAdded = 0;
+                    listenersAddedLeft = 0;
+                    listenersAddedRight = 0;
+                    listenersH -= 30;
+                }
+
+                if(!listenersAdded) {
+                    x = cw;
+                    y = listenersH - size;
+                }
+                else {
+                    if(listenersAddedLeft >= listenersAddedRight) {
+                        listenersAddedRight++;
+                        x = cw + listenersAddedRight * listenerDelta;
+                        y = listenersH - size - (listenersAddedRight % 2 === 0 ? 0 : 30);
+                    }
+                    else {
+                        listenersAddedLeft++;
+                        x = cw - listenersAddedLeft * listenerDelta;
+                        y = listenersH - size - (listenersAddedLeft % 2 === 0 ? 0 : 30);
+                    }
+                }
+
+                listenersAdded++;
+            }
+
             const others = d.counts.total - (d.counts.public + d.counts.private + (config.listen ? d.counts.listen : 0) + d.counts.inbound + d.counts.outbound);
             d.d3 = {
-                x: borderPadding + cw + d.pos.right - d.pos.left,
-                y: borderPadding + ch + d.pos.bottom - d.pos.top,
-                size: circleSize(d.counts.total),
+                x: x,
+                y: y,
+                size: size,
                 pie: [
                     { value: d.counts.public },
                     { value: d.counts.private },
