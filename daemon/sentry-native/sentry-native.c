@@ -31,7 +31,6 @@ void sentry_native_init(void)
     sentry_options_t *options = sentry_options_new();
     sentry_options_set_dsn(options, NETDATA_SENTRY_DSN);
     sentry_options_set_database_path(options, path);
-    sentry_options_set_auto_session_tracking(options, false);
     sentry_options_set_environment(options, NETDATA_SENTRY_ENVIRONMENT);
     sentry_options_set_release(options, NETDATA_SENTRY_RELEASE);
     sentry_options_set_dist(options, NETDATA_SENTRY_DIST);
