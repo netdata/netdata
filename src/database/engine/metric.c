@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "metric.h"
 #include "cache.h"
+#include "libnetdata/locks/locks.h"
 #include "rrddiskprotocol.h"
 
 typedef int32_t REFCOUNT;
@@ -16,6 +17,8 @@ struct metric {
     uint32_t latest_update_every_s; // the latest data collection frequency
     pid_t writer;
     uint8_t partition;
+
+    SPINLOCK refcount_spinlock;
     REFCOUNT refcount;
 
     // THIS IS allocated with malloc()
@@ -131,17 +134,17 @@ static inline time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, 
 }
 
 static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric) {
+    spinlock_lock(&metric->refcount_spinlock);
+
+    if (metric->refcount >= 0)
+        metric->refcount += 1;
+    else
+        fatal("METRIC: refcount is %d (negative) during acquire", metric->refcount);
+
+    REFCOUNT refcount = metric->refcount;
+    spinlock_unlock(&metric->refcount_spinlock);
+
     size_t partition = metric->partition;
-    REFCOUNT expected = __atomic_load_n(&metric->refcount, __ATOMIC_RELAXED);
-    REFCOUNT refcount;
-
-    do {
-        if(expected < 0)
-            fatal("METRIC: refcount is %d (negative) during acquire", metric->refcount);
-
-        refcount = expected + 1;
-    } while(!__atomic_compare_exchange_n(&metric->refcount, &expected, refcount, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-
     if(refcount == 1)
         __atomic_add_fetch(&mrg->index[partition].stats.entries_referenced, 1, __ATOMIC_RELAXED);
 
@@ -151,17 +154,17 @@ static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, METRIC *metric) {
+    spinlock_lock(&metric->refcount_spinlock);
+
+    if (metric->refcount <= 0)
+        fatal("METRIC: refcount is %d (zero or negative) during release", metric->refcount);
+
+    metric->refcount -= 1;
+    REFCOUNT refcount = metric->refcount;
+
+    spinlock_unlock(&metric->refcount_spinlock);
+
     size_t partition = metric->partition;
-    REFCOUNT expected = __atomic_load_n(&metric->refcount, __ATOMIC_RELAXED);
-    REFCOUNT refcount;
-
-    do {
-        if(expected <= 0)
-            fatal("METRIC: refcount is %d (zero or negative) during release", metric->refcount);
-
-        refcount = expected - 1;
-    } while(!__atomic_compare_exchange_n(&metric->refcount, &expected, refcount, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-
     if(unlikely(!refcount))
         __atomic_sub_fetch(&mrg->index[partition].stats.entries_referenced, 1, __ATOMIC_RELAXED);
 
@@ -223,6 +226,7 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     metric->writer = 0;
     metric->refcount = 0;
     metric->partition = partition;
+    spinlock_init(&metric->refcount_spinlock);
     metric_acquire(mrg, metric);
     *PValue = metric;
 
