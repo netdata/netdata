@@ -65,6 +65,8 @@ static void local_socket_to_array(struct local_socket_state *ls, struct local_so
     const char *type;
     if(n->net_ns_inode == ls->proc_self_net_ns_inode)
         type = "system";
+    else if(n->net_ns_inode == 0)
+        type = "[unknown]";
     else
         type = "container";
 

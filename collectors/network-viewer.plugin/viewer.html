@@ -26,6 +26,11 @@
 <div id="d3-canvas"></div> <!-- Div for D3 rendering -->
 
 <script>
+
+    let config = {
+        listen: true,
+    }
+
     function transformData(dataPayload) {
         // console.log("dataPayload", dataPayload);
         const desiredColumns = ["Direction", "Protocol", "Namespace", "Process", "CommandLine", "LocalIP", "LocalPort", "RemoteIP", "RemotePort", "LocalAddressSpace", "RemoteAddressSpace"];
@@ -56,7 +61,9 @@
             }
 
             const appData = appMap.get(appName);
-            appData.counts.total++;
+
+            if(config.listen || rowData['Direction'] !== 'listen')
+                appData.counts.total++;
 
             if (rowData['Direction'] === 'listen')
                 appData.counts.listen++;
@@ -81,8 +88,12 @@
             });
         }
 
-        // console.log("transformedData", transformedData);
-        return transformedData;
+        if(!config.listen)
+            return transformedData.filter(function(d) {
+                return d.counts.total > 0;
+            });
+        else
+            return transformedData;
     }
 
     function normalizeData(data, w, h, borderPadding) {
@@ -128,10 +139,10 @@
                 right: logScaleRight(d.counts.public + 1),
                 left: logScaleLeft(d.counts.private + 1),
                 top: logScaleTop(d.counts.outbound + 1),
-                bottom: logScaleBottom((d.counts.listen + d.counts.inbound) / 2 + 1),
+                bottom: logScaleBottom(((config.listen ? d.counts.listen : 0) + d.counts.inbound) / (config.listen ? 2 : 1) + 1),
             };
 
-            const others = d.counts.total - (d.counts.public + d.counts.private + d.counts.listen + d.counts.inbound + d.counts.outbound);
+            const others = d.counts.total - (d.counts.public + d.counts.private + (config.listen ? d.counts.listen : 0) + d.counts.inbound + d.counts.outbound);
             d.d3 = {
                 x: borderPadding + cw + d.pos.right - d.pos.left,
                 y: borderPadding + ch + d.pos.bottom - d.pos.top,
@@ -139,7 +150,7 @@
                 pie: [
                     { value: d.counts.public },
                     { value: d.counts.private },
-                    { value: d.counts.listen + d.counts.inbound },
+                    { value: (config.listen ? d.counts.listen : 0) + d.counts.inbound },
                     { value: d.counts.outbound },
                     { value: others > 0 ? others : 0 },
                 ]
@@ -157,8 +168,8 @@
             if(d.d3.y + d.d3.size / 2 > h)
                 d.d3.y = h - d.d3.size * 2;
 
-            // if (d.name === 'telnet')
-            //     console.log("object", d, "cw", cw, "ch", ch);
+            if (d.name === 'upsd')
+                console.log("object", d, "cw", cw, "ch", ch);
         });
 
         return data;
@@ -225,6 +236,9 @@
     }
 
     function drawInitialChart(svg, data, w, h, borderPadding, theme) {
+        console.log("drawInitialChart");
+        d3.select("#d3-canvas").selectAll("svg > *").remove()
+
         const cw = w / 2;
         const ch = h / 2;
 
@@ -460,6 +474,7 @@
         return mergedApp;
     }
 
+    let forceInit = true;
     let initial = true;
     let simulation;
 
@@ -483,12 +498,14 @@
     // Function to draw the circles and labels for each application with border forces
     function drawApplications(data, w, h, borderPadding, theme) {
         let svg = d3.select('#d3-canvas').select('svg');
-        if(svg.empty()) {
+
+        if(svg.empty() || forceInit) {
             svg = d3.select('#d3-canvas').append('svg')
                 .attr('width', '100%')
                 .attr('height', '100%');
 
             drawInitialChart(svg, data, w, h, borderPadding, theme);
+            forceInit = false;
         }
 
         const app = updateApps(svg, data, w, h, borderPadding, theme);
@@ -508,17 +525,22 @@
         initial = false;
     }
 
+    let lastPayload = {};
     function redrawChart() {
+        const transformed = transformData(lastPayload);
+        console.log(transformed);
+
         const w = window.innerWidth;
         const h = window.innerHeight;
+        const borderPadding = 40;
+
+        const normalized = normalizeData(transformed, w, h, borderPadding);
+        drawApplications(normalized, w, h, borderPadding, themes.dark);
 
         // Update SVG dimensions
         const svg = d3.select('#d3-canvas').select('svg')
             .attr('width', w)
             .attr('height', h);
-
-        // Redraw the chart with the new dimensions
-        fetchDataAndUpdateChart(); // This function should use the new 'w' and 'h'
     }
 
     // Debounce function to optimize performance
@@ -532,6 +554,7 @@
 
     // Attach the event listener to the window resize event
     window.addEventListener('resize', debounce(() => {
+        forceInit = true;
         redrawChart();
     }));
 
@@ -540,21 +563,15 @@
         fetch('http://localhost:19999/api/v1/function?function=network-viewer')
             .then(response => response.json())
             .then(data => {
-                const transformed = transformData(data);
-
-                const w = window.innerWidth;
-                const h = window.innerHeight;
-                const borderPadding = 40;
-
-                const normalized = normalizeData(transformed, w, h, borderPadding);
-                drawApplications(normalized, w, h, borderPadding, themes.dark);
+                lastPayload = data;
+                redrawChart();
             })
             .catch(error => console.error('Error fetching data:', error));
     }
 
     // Initial load
     window.onload = () => {
-        redrawChart();
+        fetchDataAndUpdateChart();
         setInterval(fetchDataAndUpdateChart, 2000); // You may need to adjust this part
     };
 </script>
