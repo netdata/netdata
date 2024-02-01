@@ -11,22 +11,6 @@
 #include <machine/endian.h>
 #endif
 
-static inline void log_message_to_stderr(BUFFER *msg) {
-    CLEAN_BUFFER *tmp = buffer_create(0, NULL);
-
-    for(size_t i = 0; i < msg->len ;i++) {
-        if(isprint(msg->buffer[i]))
-            buffer_putc(tmp, msg->buffer[i]);
-        else {
-            buffer_putc(tmp, '[');
-            buffer_print_uint64_hex(tmp, msg->buffer[i]);
-            buffer_putc(tmp, ']');
-        }
-    }
-
-    fprintf(stderr, "SENDING: %s\n", buffer_tostring(tmp));
-}
-
 static inline buffered_reader_ret_t get_next_line(struct buffered_reader *reader, BUFFER *line, int timeout_ms) {
     while(true) {
         if(unlikely(!buffered_reader_next_line(reader, line))) {
@@ -225,9 +209,6 @@ static void journal_remote_complete_event(BUFFER *msg, usec_t *monotonic_ut) {
 }
 
 static CURLcode journal_remote_send_buffer(CURL* curl, BUFFER *msg) {
-
-    // log_message_to_stderr(msg);
-
     struct upload_data upload = {0};
 
     if (!curl || !buffer_strlen(msg))
@@ -659,8 +640,6 @@ static int log_input_as_netdata(const char *newline, int timeout_ms) {
 // log to a local systemd-journald
 
 static bool journal_local_send_buffer(int fd, BUFFER *msg) {
-    // log_message_to_stderr(msg);
-
     bool ret = journal_direct_send(fd, msg->buffer, msg->len);
     if (!ret)
         fprintf(stderr, "Cannot send message to systemd journal.\n");

@@ -239,11 +239,25 @@ static inline SIMPLE_HASHTABLE_VALUE_TYPE **simple_hashtable_sorted_array_next_r
 
 #define SIMPLE_HASHTABLE_SORTED_FOREACH_READ_ONLY_VALUE(var) (*(var))
 
-#else
-static inline void simple_hashtable_add_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *value __maybe_unused) { ; }
-static inline void simple_hashtable_del_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *value __maybe_unused) { ; }
-static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *old_value __maybe_unused, SIMPLE_HASHTABLE_VALUE_TYPE *new_value __maybe_unused) { ; }
-#endif
+#else /* SIMPLE_HASHTABLE_SORT_FUNCTION */
+
+static inline void simple_hashtable_add_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE *value) {
+    (void) ht;
+    (void) value;
+}
+
+static inline void simple_hashtable_del_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE *value) {
+    (void) ht;
+    (void) value;
+}
+
+static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_NAMED *ht, SIMPLE_HASHTABLE_VALUE_TYPE *old_value, SIMPLE_HASHTABLE_VALUE_TYPE *new_value) {
+    (void) ht;
+    (void) old_value;
+    (void) new_value;
+}
+
+#endif /* SIMPLE_HASHTABLE_SORT_FUNCTION */
 
 static inline void simple_hashtable_init_named(SIMPLE_HASHTABLE_NAMED *ht, size_t size) {
     memset(ht, 0, sizeof(*ht));
@@ -272,7 +286,7 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht);
 
 static inline bool simple_hashtable_can_use_slot_named(
         SIMPLE_HASHTABLE_SLOT_NAMED *sl, SIMPLE_HASHTABLE_HASH hash,
-        SIMPLE_HASHTABLE_KEY_TYPE *key __maybe_unused) {
+        SIMPLE_HASHTABLE_KEY_TYPE *key) {
 
     if(simple_hashtable_is_slot_unset(sl))
         return true;
@@ -284,6 +298,7 @@ static inline bool simple_hashtable_can_use_slot_named(
 #if defined(SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION) && defined(SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION)
         return SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION(SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION(SIMPLE_HASHTABLE_SLOT_DATA(sl)), key);
 #else
+        (void) key;
         return true;
 #endif
     }

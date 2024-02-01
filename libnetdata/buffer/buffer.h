@@ -72,7 +72,10 @@ typedef struct web_buffer {
 #define buffer_overflow_check(b)
 #endif
 
-static inline void _buffer_overflow_check(BUFFER *b __maybe_unused) {
+static inline void _buffer_overflow_check(BUFFER *b)
+{
+    UNUSED(b);
+
     assert(b->len <= b->size &&
                    "BUFFER: length is above buffer size.");
 

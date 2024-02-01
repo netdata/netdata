@@ -570,8 +570,10 @@ void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em)
  * @param em        the structure with information about how the module/thread is working.
  * @param map_name  the name of the file used to log.
  */
-void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_module_t *em, const char *map_name __maybe_unused)
+void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_module_t *em, const char *map_name)
 {
+    UNUSED(map_name);
+
     uint32_t define_size = 0;
     uint32_t apps_type = NETDATA_EBPF_MAP_PID | NETDATA_EBPF_MAP_RESIZABLE;
     if (lmap->user_input && lmap->user_input != lmap->internal_input) {
