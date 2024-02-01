@@ -1638,6 +1638,12 @@ target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
 # h2o
 target_link_libraries(libnetdata PUBLIC "$<$<BOOL:${ENABLE_H2O}>:h2o>")
 
+# mnl
+pkg_check_modules(MNL libmnl)
+if(MNL_FOUND)
+    set(HAVE_LIBMNL True)
+endif()
+
 #
 # helper function to build protos
 #
@@ -1781,8 +1787,11 @@ if(ENABLE_PLUGIN_FREEIPMI)
 endif()
 
 if(ENABLE_PLUGIN_NFACCT)
+    if (NOT MNL_FOUND)
+        message(FATAL_ERROR "Can not build nfacct.plugin because MNL library could not be found.")
+    endif()
+
     pkg_check_modules(NFACCT REQUIRED libnetfilter_acct)
-    pkg_check_modules(MNL REQUIRED libmnl)
 
     set(NFACCT_PLUGIN_FILES collectors/nfacct.plugin/plugin_nfacct.c)
 
@@ -1979,7 +1988,13 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         )
 
         add_executable(local-listeners ${LOCAL_LISTENERS_FILES})
-        target_link_libraries(local-listeners libnetdata)
+
+        target_compile_options(local-listeners PRIVATE
+                               "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
+        target_include_directories(local-listeners PRIVATE
+                                   "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
+        target_link_libraries(local-listeners libnetdata
+                              "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
 
         install(TARGETS local-listeners
                 COMPONENT local_listeners
@@ -1993,7 +2008,14 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         )
 
         add_executable(network-viewer.plugin ${NETWORK_VIEWER_FILES})
-        target_link_libraries(network-viewer.plugin libnetdata)
+
+        target_compile_options(network-viewer.plugin PRIVATE
+                               "$<$<BOOL:${MNL_FOUND}>:${MNL_CFLAGS_OTHER}>")
+        target_include_directories(network-viewer.plugin PRIVATE
+                                   "$<$<BOOL:${MNL_FOUND}>:${MNL_INCLUDE_DIRS}>")
+        target_link_libraries(network-viewer.plugin libnetdata
+                              "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
+
 
         install(TARGETS network-viewer.plugin
                 COMPONENT network_viewer_plugin

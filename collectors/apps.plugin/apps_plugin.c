@@ -4483,7 +4483,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 
     BUFFER *wb = buffer_create(4096, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", update_every);
@@ -5264,7 +5264,6 @@ static bool apps_plugin_exit = false;
 int main(int argc, char **argv) {
     clocks_init();
     nd_log_initialize_for_external_plugins("apps.plugin");
-    for_each_open_fd(OPEN_FD_ACTION_CLOSE, OPEN_FD_EXCLUDE_STDIN|OPEN_FD_EXCLUDE_STDOUT|OPEN_FD_EXCLUDE_STDERR);
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
 

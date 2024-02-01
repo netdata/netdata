@@ -143,6 +143,7 @@
 #define ENABLE_JSONC 1
 
 #cmakedefine HAVE_LIBYAML
+#cmakedefine HAVE_LIBMNL
 
 // /* Enable GNU extensions on systems that have them.  */
 // #ifndef _GNU_SOURCE
