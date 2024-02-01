@@ -94,10 +94,10 @@ The study did not normalize the results based on the number of metrics collected
 
 <p align="center">
 <a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis#gh-light-mode-only">
-  <img src="https://www.netdata.cloud/img/readme-images/netdata%20vs%20prometheus.png" alt="Netdata" width="500"/>
+  <img src="https://github.com/netdata/netdata/assets/139226121/6c21ae39-8656-45c3-bc85-4b012679d2bb" alt="Netdata" width="1000"/>
 </a>
 <a href="https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis#gh-dark-mode-only">
-  <img src="https://www.netdata.cloud/img/readme-images/netdata%20vs%20prometheus%20dark.png" alt="Netdata" width="500"/>
+  <img src="https://github.com/netdata/netdata/assets/139226121/f2dbde46-d3dd-4807-bd34-966da4d0ec22" alt="Netdata" width="1000"/>
 </a>
 </p>
 
