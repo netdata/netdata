@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "local-sockets.h"
+#include "libnetdata/libnetdata.h"
+#include "libnetdata/maps/local-sockets.h"
 #include "libnetdata/required_dummies.h"
 
 // --------------------------------------------------------------------------------------------------------------------

@@ -1104,6 +1104,8 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         collectors/systemd-journal.plugin/systemd-journal-fstat.c
         collectors/systemd-journal.plugin/systemd-journal-watcher.c
         collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
+        src/libnetdata/maps/system-users.h
+        src/libnetdata/maps/system-groups.h
 )
 
 set(STREAMING_PLUGIN_FILES
@@ -1984,7 +1986,7 @@ endif()
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         set(LOCAL_LISTENERS_FILES
                 collectors/plugins.d/local_listeners.c
-                collectors/plugins.d/local-sockets.h
+                src/libnetdata/maps/local-sockets.h
         )
 
         add_executable(local-listeners ${LOCAL_LISTENERS_FILES})
@@ -2003,7 +2005,8 @@ endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         set(NETWORK_VIEWER_FILES
-                collectors/plugins.d/local-sockets.h
+                src/libnetdata/maps/local-sockets.h
+                src/libnetdata/maps/system-users.h
                 collectors/network-viewer.plugin/network-viewer.c
         )
 

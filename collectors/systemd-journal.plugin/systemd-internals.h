@@ -122,7 +122,7 @@ void journal_init_files_and_directories(void);
 void function_systemd_journal(const char *transaction, char *function, usec_t *stop_monotonic_ut, bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused, const char *source, void *data);
 void journal_file_update_header(const char *filename, struct journal_file *jf);
 
-void netdata_systemd_journal_message_ids_init(void);
+void netdata_systemd_journal_annotations_init(void);
 void netdata_systemd_journal_transform_message_id(FACETS *facets, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope, void *data);
 
 void *journal_watcher_main(void *arg);

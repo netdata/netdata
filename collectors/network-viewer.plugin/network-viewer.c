@@ -3,13 +3,15 @@
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
-#include "collectors/plugins.d/local-sockets.h"
+#include "libnetdata/maps/local-sockets.h"
+#include "libnetdata/maps/system-users.h"
 
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Network connections explorer"
 
 netdata_mutex_t stdout_mutex = NETDATA_MUTEX_INITIALIZER;
 static bool plugin_should_exit = false;
+static USERNAMES_CACHE *uc;
 
 ENUM_STR_MAP_DEFINE(SOCKET_DIRECTION) = {
     { .id = SOCKET_DIRECTION_LISTEN, .name = "listen" },
@@ -88,6 +90,18 @@ static void local_socket_to_array(struct local_socket_state *ls, struct local_so
             buffer_json_add_array_item_string(wb, n->comm);
 
         buffer_json_add_array_item_string(wb, n->cmdline);
+
+        if(n->uid == UID_UNSET) {
+            buffer_json_add_array_item_uint64(wb, n->uid);
+            buffer_json_add_array_item_string(wb, "[unknown]");
+        }
+        else {
+            buffer_json_add_array_item_uint64(wb, n->uid);
+            STRING *u = system_usernames_cache_lookup_uid(uc, n->uid);
+            buffer_json_add_array_item_string(wb, string2str(u));
+            string_freez(u);
+        }
+
         buffer_json_add_array_item_string(wb, local_address);
         buffer_json_add_array_item_uint64(wb, n->local.port);
         buffer_json_add_array_item_string(wb, local_sockets_address_space(&n->local));
@@ -206,11 +220,27 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                     RRDF_FIELD_OPTS_NONE|RRDF_FIELD_OPTS_FULL_WIDTH,
                                     NULL);
 
+        // Uid
+        buffer_rrdf_table_add_field(wb, field_id++, "UID", "User ID",
+                                    RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+        // Username
+        buffer_rrdf_table_add_field(wb, field_id++, "User", "Username",
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE,
+                                    NULL);
+
         // Local Address
         buffer_rrdf_table_add_field(wb, field_id++, "LocalIP", "Local IP Address",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_VISIBLE|RRDF_FIELD_OPTS_FULL_WIDTH,
                                     NULL);
 
@@ -234,7 +264,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         buffer_rrdf_table_add_field(wb, field_id++, "RemoteIP", "Remote IP Address",
                                     RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                     0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_VISIBLE|RRDF_FIELD_OPTS_FULL_WIDTH,
                                     NULL);
 
@@ -456,6 +486,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
     if(verify_netdata_host_prefix(true) == -1) exit(1);
+
+    uc = system_usernames_cache_init();
 
     // ----------------------------------------------------------------------------------------------------------------
 

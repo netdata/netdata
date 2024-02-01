@@ -2,6 +2,20 @@
 
 #include "systemd-internals.h"
 
+// ----------------------------------------------------------------------------
+#include "libnetdata/maps/system-users.h"
+#include "libnetdata/maps/system-groups.h"
+
+static struct {
+    USERNAMES_CACHE *uc;
+    GROUPNAMES_CACHE *gc;
+} systemd_annotations_globals = {
+    .uc = NULL,
+    .gc = NULL,
+};
+
+// ----------------------------------------------------------------------------
+
 const char *errno_map[] = {
         [1] = "1 (EPERM)",          // "Operation not permitted",
         [2] = "2 (ENOENT)",         // "No such file or directory",
@@ -246,30 +260,6 @@ FACET_ROW_SEVERITY syslog_priority_to_facet_severity(FACETS *facets __maybe_unus
     return FACET_ROW_SEVERITY_NORMAL;
 }
 
-static char *uid_to_username(uid_t uid, char *buffer, size_t buffer_size) {
-    static __thread char tmp[1024 + 1];
-    struct passwd pw, *result = NULL;
-
-    if (getpwuid_r(uid, &pw, tmp, sizeof(tmp), &result) != 0 || !result || !pw.pw_name || !(*pw.pw_name))
-        snprintfz(buffer, buffer_size - 1, "%u", uid);
-    else
-        snprintfz(buffer, buffer_size - 1, "%u (%s)", uid, pw.pw_name);
-
-    return buffer;
-}
-
-static char *gid_to_groupname(gid_t gid, char* buffer, size_t buffer_size) {
-    static __thread char tmp[1024];
-    struct group grp, *result = NULL;
-
-    if (getgrgid_r(gid, &grp, tmp, sizeof(tmp), &result) != 0 || !result || !grp.gr_name || !(*grp.gr_name))
-        snprintfz(buffer, buffer_size - 1, "%u", gid);
-    else
-        snprintfz(buffer, buffer_size - 1, "%u (%s)", gid, grp.gr_name);
-
-    return buffer;
-}
-
 void netdata_systemd_journal_transform_syslog_facility(FACETS *facets __maybe_unused, BUFFER *wb, FACETS_TRANSFORMATION_SCOPE scope __maybe_unused, void *data __maybe_unused) {
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
@@ -315,82 +305,6 @@ void netdata_systemd_journal_transform_errno(FACETS *facets __maybe_unused, BUFF
 }
 
 // ----------------------------------------------------------------------------
-// UID and GID transformation
-
-#define UID_GID_HASHTABLE_SIZE 10000
-
-struct word_t2str_hashtable_entry {
-    struct word_t2str_hashtable_entry *next;
-    Word_t hash;
-    size_t len;
-    char str[];
-};
-
-struct word_t2str_hashtable {
-    SPINLOCK spinlock;
-    size_t size;
-    struct word_t2str_hashtable_entry *hashtable[UID_GID_HASHTABLE_SIZE];
-};
-
-struct word_t2str_hashtable uid_hashtable = {
-        .size = UID_GID_HASHTABLE_SIZE,
-};
-
-struct word_t2str_hashtable gid_hashtable = {
-        .size = UID_GID_HASHTABLE_SIZE,
-};
-
-struct word_t2str_hashtable_entry **word_t2str_hashtable_slot(struct word_t2str_hashtable *ht, Word_t hash) {
-    size_t slot = hash % ht->size;
-    struct word_t2str_hashtable_entry **e = &ht->hashtable[slot];
-
-    while(*e && (*e)->hash != hash)
-        e = &((*e)->next);
-
-    return e;
-}
-
-const char *uid_to_username_cached(uid_t uid, size_t *length) {
-    spinlock_lock(&uid_hashtable.spinlock);
-
-    struct word_t2str_hashtable_entry **e = word_t2str_hashtable_slot(&uid_hashtable, uid);
-    if(!(*e)) {
-        static __thread char buf[1024];
-        const char *name = uid_to_username(uid, buf, sizeof(buf));
-        size_t size = strlen(name) + 1;
-
-        *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
-        (*e)->len = size - 1;
-        (*e)->hash = uid;
-        memcpy((*e)->str, name, size);
-    }
-
-    spinlock_unlock(&uid_hashtable.spinlock);
-
-    *length = (*e)->len;
-    return (*e)->str;
-}
-
-const char *gid_to_groupname_cached(gid_t gid, size_t *length) {
-    spinlock_lock(&gid_hashtable.spinlock);
-
-    struct word_t2str_hashtable_entry **e = word_t2str_hashtable_slot(&gid_hashtable, gid);
-    if(!(*e)) {
-        static __thread char buf[1024];
-        const char *name = gid_to_groupname(gid, buf, sizeof(buf));
-        size_t size = strlen(name) + 1;
-
-        *e = callocz(1, sizeof(struct word_t2str_hashtable_entry) + size);
-        (*e)->len = size - 1;
-        (*e)->hash = gid;
-        memcpy((*e)->str, name, size);
-    }
-
-    spinlock_unlock(&gid_hashtable.spinlock);
-
-    *length = (*e)->len;
-    return (*e)->str;
-}
 
 DICTIONARY *boot_ids_to_first_ut = NULL;
 
@@ -455,9 +369,9 @@ void netdata_systemd_journal_transform_uid(FACETS *facets __maybe_unused, BUFFER
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         uid_t uid = str2i(buffer_tostring(wb));
-        size_t len;
-        const char *name = uid_to_username_cached(uid, &len);
-        buffer_contents_replace(wb, name, len);
+        STRING *u = system_usernames_cache_lookup_uid(systemd_annotations_globals.uc, uid);
+        buffer_contents_replace(wb, string2str(u), string_strlen(u));
+        string_freez(u);
     }
 }
 
@@ -468,9 +382,9 @@ void netdata_systemd_journal_transform_gid(FACETS *facets __maybe_unused, BUFFER
     const char *v = buffer_tostring(wb);
     if(*v && isdigit(*v)) {
         gid_t gid = str2i(buffer_tostring(wb));
-        size_t len;
-        const char *name = gid_to_groupname_cached(gid, &len);
-        buffer_contents_replace(wb, name, len);
+        STRING *g = system_groupnames_cache_lookup_gid(systemd_annotations_globals.gc, gid);
+        buffer_contents_replace(wb, string2str(g), string_strlen(g));
+        string_freez(g);
     }
 }
 
@@ -557,7 +471,7 @@ struct message_id_info {
 
 static DICTIONARY *known_journal_messages_ids = NULL;
 
-void netdata_systemd_journal_message_ids_init(void) {
+static void netdata_systemd_journal_message_ids_init(void) {
     known_journal_messages_ids = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
     struct message_id_info i = { 0 };
@@ -708,6 +622,14 @@ void netdata_systemd_journal_transform_message_id(FACETS *facets __maybe_unused,
             buffer_strcat(wb, i->msg);
             break;
     }
+}
+
+// ----------------------------------------------------------------------------
+
+void netdata_systemd_journal_annotations_init(void) {
+    systemd_annotations_globals.uc = system_usernames_cache_init();
+    systemd_annotations_globals.gc = system_groupnames_cache_init();
+    netdata_systemd_journal_message_ids_init();
 }
 
 // ----------------------------------------------------------------------------
