@@ -972,20 +972,20 @@ build_fluentbit() {
     env_cmd="env CFLAGS='-fPIC -pipe -w' CXXFLAGS='-fPIC -pipe -w' LDFLAGS="
   fi
 
-  mkdir -p fluent-bit/build || return 1
-  cd fluent-bit/build > /dev/null || return 1
+  mkdir -p src/fluent-bit/build || return 1
+  cd src/fluent-bit/build > /dev/null || return 1
 
   rm CMakeCache.txt > /dev/null 2>&1
 
   if ! run eval "${env_cmd} $1 -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../"; then
     cd - > /dev/null || return 1
-    rm -rf fluent-bit/build > /dev/null 2>&1
+    rm -rf src/fluent-bit/build > /dev/null 2>&1
     return 1
   fi
 
   if ! run eval "${env_cmd} ${make} ${MAKEOPTS}"; then
     cd - > /dev/null || return 1
-    rm -rf fluent-bit/build > /dev/null 2>&1
+    rm -rf src/fluent-bit/build > /dev/null 2>&1
     return 1
   fi
 
@@ -1000,28 +1000,28 @@ bundle_fluentbit() {
     return 0
   fi
 
-  if [ ! -d "fluent-bit" ]; then
+  if [ ! -d "src/fluent-bit" ]; then
     warning "Missing submodule Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
     ENABLE_LOGS_MANAGEMENT=0
     return 0
   fi
 
-  patch -N -p1 fluent-bit/CMakeLists.txt -i logsmanagement/fluent_bit_build/CMakeLists.patch
-  patch -N -p1 fluent-bit/src/flb_log.c -i logsmanagement/fluent_bit_build/flb-log-fmt.patch
+  patch -N -p1 src/fluent-bit/CMakeLists.txt -i src/logsmanagement/fluent_bit_build/CMakeLists.patch
+  patch -N -p1 src/fluent-bit/src/flb_log.c -i src/logsmanagement/fluent_bit_build/flb-log-fmt.patch
 
   # If musl is used, we need to patch chunkio, providing fts has been previously installed.
   libc="$(detect_libc)"
   if [ "${libc}" = "musl" ]; then
-    patch -N -p1 fluent-bit/lib/chunkio/src/CMakeLists.txt -i logsmanagement/fluent_bit_build/chunkio-static-lib-fts.patch
-    patch -N -p1 fluent-bit/cmake/luajit.cmake -i logsmanagement/fluent_bit_build/exclude-luajit.patch
-    patch -N -p1 fluent-bit/src/flb_network.c -i logsmanagement/fluent_bit_build/xsi-strerror.patch
+    patch -N -p1 src/fluent-bit/lib/chunkio/src/CMakeLists.txt -i src/logsmanagement/fluent_bit_build/chunkio-static-lib-fts.patch
+    patch -N -p1 src/fluent-bit/cmake/luajit.cmake -i src/logsmanagement/fluent_bit_build/exclude-luajit.patch
+    patch -N -p1 src/fluent-bit/src/flb_network.c -i src/logsmanagement/fluent_bit_build/xsi-strerror.patch
   fi
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling Fluent-Bit."
 
   if build_fluentbit "$cmake"; then
     # If Fluent-Bit built with inotify support, use it.
-    if [ "$(grep -o '^FLB_HAVE_INOTIFY:INTERNAL=.*' fluent-bit/build/CMakeCache.txt | cut -d '=' -f 2)" ]; then
+    if [ "$(grep -o '^FLB_HAVE_INOTIFY:INTERNAL=.*' src/fluent-bit/build/CMakeCache.txt | cut -d '=' -f 2)" ]; then
       CFLAGS="${CFLAGS} -DFLB_HAVE_INOTIFY"
     fi
     FLUENT_BIT_BUILD_SUCCESS=1

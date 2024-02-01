@@ -158,7 +158,7 @@ collectors/ioping.plugin/ioping.plugin
 collectors/go.d.plugin
 web/netdata-switch-dashboard.sh
 
-logsmanagement/stress_test/stress_test
+src/logsmanagement/stress_test/stress_test
 
 # installer generated files
 /netdata-uninstaller.sh
