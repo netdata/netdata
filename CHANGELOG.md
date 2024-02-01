@@ -6,11 +6,20 @@
 
 **Merged pull requests:**
 
+- Add a constant env var for Sentry's  DSN when someone wants to build Agent and doesn't have access to GH secrets.  [\#16892](https://github.com/netdata/netdata/pull/16892) ([tkatsoulas](https://github.com/tkatsoulas))
+- fixed missing collisions and drag on newly added apps [\#16891](https://github.com/netdata/netdata/pull/16891) ([ktsaou](https://github.com/ktsaou))
+- Set build type to release with debug info. [\#16889](https://github.com/netdata/netdata/pull/16889) ([vkalintiris](https://github.com/vkalintiris))
+- fix order of openning a file and checking its inode [\#16887](https://github.com/netdata/netdata/pull/16887) ([ktsaou](https://github.com/ktsaou))
+- fix crash on query\_progress initializer [\#16885](https://github.com/netdata/netdata/pull/16885) ([ktsaou](https://github.com/ktsaou))
+- highlight Challenge Secret title to be more visible [\#16882](https://github.com/netdata/netdata/pull/16882) ([juacker](https://github.com/juacker))
+- add the CLOEXEC flag to all sockets and files [\#16881](https://github.com/netdata/netdata/pull/16881) ([ktsaou](https://github.com/ktsaou))
+- Network viewer UI minor fixes [\#16880](https://github.com/netdata/netdata/pull/16880) ([ktsaou](https://github.com/ktsaou))
 - Network viewer fixes [\#16877](https://github.com/netdata/netdata/pull/16877) ([ktsaou](https://github.com/ktsaou))
 - Add requirements.txt for dag [\#16875](https://github.com/netdata/netdata/pull/16875) ([vkalintiris](https://github.com/vkalintiris))
 - Rm refs to map and save modes [\#16874](https://github.com/netdata/netdata/pull/16874) ([vkalintiris](https://github.com/vkalintiris))
 - Fix coverity issues [\#16873](https://github.com/netdata/netdata/pull/16873) ([stelfrag](https://github.com/stelfrag))
 - Network Viewer \(local-sockets version\) [\#16872](https://github.com/netdata/netdata/pull/16872) ([ktsaou](https://github.com/ktsaou))
+- Limit what we upload to GCS for nightlies. [\#16870](https://github.com/netdata/netdata/pull/16870) ([Ferroin](https://github.com/Ferroin))
 - Use dagger to build and test the agent. [\#16868](https://github.com/netdata/netdata/pull/16868) ([vkalintiris](https://github.com/vkalintiris))
 - Local sockets for network namespaces [\#16867](https://github.com/netdata/netdata/pull/16867) ([ktsaou](https://github.com/ktsaou))
 - Fix coverity issue [\#16866](https://github.com/netdata/netdata/pull/16866) ([stelfrag](https://github.com/stelfrag))
@@ -392,15 +401,6 @@
 - update docker swarm deploy info [\#16308](https://github.com/netdata/netdata/pull/16308) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16306](https://github.com/netdata/netdata/pull/16306) ([netdatabot](https://github.com/netdatabot))
 - Use proper icons for deploy integrations [\#16305](https://github.com/netdata/netdata/pull/16305) ([Ancairon](https://github.com/Ancairon))
-- bump openssl for static in 3.1.4 [\#16303](https://github.com/netdata/netdata/pull/16303) ([tkatsoulas](https://github.com/tkatsoulas))
-- claim.sh: use echo instead of /bin/echo [\#16300](https://github.com/netdata/netdata/pull/16300) ([ilyam8](https://github.com/ilyam8))
-- update journal sources once per minute [\#16298](https://github.com/netdata/netdata/pull/16298) ([ktsaou](https://github.com/ktsaou))
-- Fix label copy [\#16297](https://github.com/netdata/netdata/pull/16297) ([stelfrag](https://github.com/stelfrag))
-- fix missing labels from parents [\#16296](https://github.com/netdata/netdata/pull/16296) ([ktsaou](https://github.com/ktsaou))
-- do not propagate upstream internal label sources [\#16295](https://github.com/netdata/netdata/pull/16295) ([ktsaou](https://github.com/ktsaou))
-- fix various issues identified by coverity [\#16294](https://github.com/netdata/netdata/pull/16294) ([ktsaou](https://github.com/ktsaou))
-- fix missing labels from parents [\#16293](https://github.com/netdata/netdata/pull/16293) ([ktsaou](https://github.com/ktsaou))
-- fix renames in freebsd [\#16292](https://github.com/netdata/netdata/pull/16292) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
