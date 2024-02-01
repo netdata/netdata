@@ -27,7 +27,8 @@ typedef enum exporting_options {
     EXPORTING_OPTION_USE_TLS                = (1 << 5),
 
     EXPORTING_OPTION_SEND_NAMES             = (1 << 16),
-    EXPORTING_OPTION_SEND_VARIABLES         = (1 << 17)
+    EXPORTING_OPTION_SEND_VARIABLES         = (1 << 17),
+    EXPORTING_OPTION_SEND_INTERNAL_LABELS   = (1 << 18)
 } EXPORTING_OPTIONS;
 
 #define EXPORTING_OPTIONS_SOURCE_BITS                                                                                  \
@@ -39,6 +40,8 @@ extern const char *global_exporting_prefix;
 
 #define sending_labels_configured(instance)                                                                            \
     ((instance)->config.options & (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))
+
+#define sending_labels_internal(instance) (instance->config.options & EXPORTING_OPTION_SEND_INTERNAL_LABELS)
 
 #define should_send_label(instance, label_source)                                                                      \
     (((instance)->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS && (label_source)&RRDLABEL_SRC_CONFIG) ||   \

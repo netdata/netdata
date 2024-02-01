@@ -354,7 +354,7 @@ struct rrddim {
 size_t rrddim_size(void);
 
 #define rrddim_id(rd) string2str((rd)->id)
-#define rrddim_name(rd) string2str((rd) ->name)
+#define rrddim_name(rd) string2str((rd)->name)
 
 #define rrddim_check_updated(rd) ((rd)->collector.options & RRDDIM_OPTION_UPDATED)
 #define rrddim_set_updated(rd) (rd)->collector.options |= RRDDIM_OPTION_UPDATED

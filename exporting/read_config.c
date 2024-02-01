@@ -263,6 +263,11 @@ struct engine *read_exporting_config()
         else
             prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
+        if (prometheus_config_get_boolean("send internal labels", CONFIG_BOOLEAN_YES))
+            prometheus_exporter_instance->config.options |= EXPORTING_OPTION_SEND_INTERNAL_LABELS;
+        else
+            prometheus_exporter_instance->config.options &= ~EXPORTING_OPTION_SEND_INTERNAL_LABELS;
+
         prometheus_exporter_instance->config.charts_pattern = simple_pattern_create(
                 prometheus_config_get("send charts matching", "*"),
                 NULL,
@@ -407,6 +412,11 @@ struct engine *read_exporting_config()
             tmp_instance->config.options |= EXPORTING_OPTION_SEND_VARIABLES;
         else 
             tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_VARIABLES;
+
+        if (exporter_get_boolean(instance_name, "send internal labels", CONFIG_BOOLEAN_YES))
+            tmp_instance->config.options |= EXPORTING_OPTION_SEND_INTERNAL_LABELS;
+        else
+            tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_INTERNAL_LABELS;
 
         if (tmp_instance->config.type == EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE) {
             struct prometheus_remote_write_specific_config *connector_specific_config =
