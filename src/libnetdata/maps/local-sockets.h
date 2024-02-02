@@ -104,6 +104,9 @@ typedef struct local_socket_state {
     uint16_t tmp_protocol;
 #endif
 
+    ARAL *local_socket_aral;
+    ARAL *pid_socket_aral;
+
     uint64_t proc_self_net_ns_inode;
 
     SIMPLE_HASHTABLE_NET_NS ns_hashtable;
@@ -397,7 +400,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                 }
 
                 if(!ps)
-                    ps = callocz(1, sizeof(*ps));
+                    ps = aral_callocz(ls->pid_socket_aral);
 
                 ps->inode = inode;
                 ps->pid = pid;
@@ -563,7 +566,7 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
         return false;
     }
 
-    n = (LOCAL_SOCKET *)callocz(1, sizeof(LOCAL_SOCKET));
+    n = aral_mallocz(ls->local_socket_aral);
     *n = *tmp; // copy all contents
 
     // fix the key
@@ -906,11 +909,20 @@ static inline void local_sockets_init(LS_STATE *ls) {
     simple_hashtable_init_LOCAL_SOCKET(&ls->sockets_hashtable, 65535);
     simple_hashtable_init_LOCAL_IP(&ls->local_ips_hashtable, 4096);
     simple_hashtable_init_LISTENING_PORT(&ls->listening_ports_hashtable, 4096);
-}
 
-static inline void local_sockets_free_one(LOCAL_SOCKET *n) {
-    string_freez(n->cmdline);
-    freez(n);
+    ls->local_socket_aral = aral_create(
+        "local-sockets",
+        sizeof(LOCAL_SOCKET),
+        65536,
+        65536,
+        NULL, NULL, NULL, false, true);
+
+    ls->pid_socket_aral = aral_create(
+        "pid-sockets",
+        sizeof(struct pid_socket),
+        65536,
+        65536,
+        NULL, NULL, NULL, false, true);
 }
 
 static inline void local_sockets_cleanup(LS_STATE *ls) {
@@ -920,7 +932,9 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
          sl = simple_hashtable_next_read_only_LOCAL_SOCKET(&ls->sockets_hashtable, sl)) {
         LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
         if(!n) continue;
-        local_sockets_free_one(n);
+
+        string_freez(n->cmdline);
+        aral_freez(ls->local_socket_aral, n);
     }
 
     // free the pid_socket hashtable data
@@ -931,7 +945,7 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
         if(!ps) continue;
 
         freez(ps->cmdline);
-        freez(ps);
+        aral_freez(ls->pid_socket_aral, ps);
     }
 
     // free the hashtable
@@ -940,6 +954,9 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
     simple_hashtable_destroy_LISTENING_PORT(&ls->listening_ports_hashtable);
     simple_hashtable_destroy_LOCAL_IP(&ls->local_ips_hashtable);
     simple_hashtable_destroy_LOCAL_SOCKET(&ls->sockets_hashtable);
+
+    aral_destroy(ls->local_socket_aral);
+    aral_destroy(ls->pid_socket_aral);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1147,7 +1164,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
             continue;
         }
         else {
-            n = mallocz(sizeof(*n));
+            n = aral_mallocz(ls->local_socket_aral);
             memcpy(n, &buf, sizeof(*n));
             simple_hashtable_set_slot_LOCAL_SOCKET(&ls->sockets_hashtable, sl, n->inode, n);
 
