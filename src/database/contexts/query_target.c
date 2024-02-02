@@ -1072,8 +1072,10 @@ static void add_label_pattern(struct label_pattern_list *lpl, char *label_key_va
 
         lpl->buffer_list[index] = buffer_create(128, NULL);
         lpl->key[index] = key_match;
-    } else
+    } else {
+        string_freez(key_match);
         buffer_strncat(lpl->buffer_list[index], ",", 1);
+    }
 
     buffer_strcat(lpl->buffer_list[index], label_key_value);
 }
