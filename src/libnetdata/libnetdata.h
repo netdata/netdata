@@ -737,6 +737,7 @@ extern char *netdata_configured_host_prefix;
 #include "procfile/procfile.h"
 #include "string/string.h"
 #include "dictionary/dictionary.h"
+#include "dictionary/thread-cache.h"
 #if defined(HAVE_LIBBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"
 #endif
