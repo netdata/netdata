@@ -408,6 +408,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_PROGRESS_HELP);
     buffer_json_member_add_array(wb, "data");
 

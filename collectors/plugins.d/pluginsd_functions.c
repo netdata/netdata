@@ -13,7 +13,7 @@ static void inflight_functions_insert_callback(const DICTIONARY_ITEM *item, void
     PARSER  *parser = parser_ptr;
 
     // leave this code as default, so that when the dictionary is destroyed this will be sent back to the caller
-    pf->code = HTTP_RESP_GATEWAY_TIMEOUT;
+    pf->code = HTTP_RESP_SERVICE_UNAVAILABLE;
 
     const char *transaction = dictionary_acquired_item_name(item);
 
@@ -92,6 +92,9 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
                    string2str(pf->function), dictionary_acquired_item_name(item),
                    buffer_strlen(pf->result_body_wb),
                    pf->sent_monotonic_ut - pf->started_monotonic_ut, now_realtime_usec() - pf->sent_monotonic_ut);
+
+    if(pf->code == HTTP_RESP_SERVICE_UNAVAILABLE && !buffer_strlen(pf->result_body_wb))
+        rrd_call_function_error(pf->result_body_wb, "The plugin exited while servicing this call.", pf->code);
 
     pf->result.cb(pf->result_body_wb, pf->code, pf->result.data);
 

@@ -292,6 +292,9 @@ static void ebpf_function_socket_manipulation(const char *transaction,
     rw_spinlock_write_lock(&ebpf_judy_pid.index.rw_spinlock);
     network_viewer_opt.enabled = CONFIG_BOOLEAN_YES;
     uint32_t previous;
+    bool info = false;
+    time_t now_s = now_realtime_sec();
+
     static const char *socket_help = {
         "ebpf.plugin / socket\n"
         "\n"
@@ -413,7 +416,8 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
             ebpf_function_help(transaction, socket_help);
             rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
             return;
-        }
+        } else if (strncmp(keyword, "info", 4) == 0)
+            info = true;
     }
     rw_spinlock_write_unlock(&ebpf_judy_pid.index.rw_spinlock);
 
@@ -443,7 +447,11 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", em->update_every);
+    buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION);
+
+    if(info)
+        goto close_and_send;
 
     // Collect data
     buffer_json_member_add_array(wb, "data");
@@ -652,12 +660,12 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
     }
     buffer_json_object_close(wb); // group_by
 
-    time_t expires = now_realtime_sec() + em->update_every;
-    buffer_json_member_add_time_t(wb, "expires", expires);
+close_and_send:
+    buffer_json_member_add_time_t(wb, "expires", now_s + em->update_every);
     buffer_json_finalize(wb);
 
     // Lock necessary to avoid race condition
-    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires);
+    pluginsd_function_result_begin_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_s + em->update_every);
 
     fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
 

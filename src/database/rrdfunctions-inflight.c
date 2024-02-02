@@ -427,7 +427,6 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
 
     code = rrd_functions_find_by_name(host, result_wb, sanitized_cmd, sanitized_cmd_length, &host_function_acquired);
     if(code != HTTP_RESP_OK) {
-        rrd_call_function_error(result_wb, "not found", code);
 
         if(result_cb)
             result_cb(result_wb, code, result_cb_data);
