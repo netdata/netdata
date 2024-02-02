@@ -2059,6 +2059,8 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
 
                     NETDATA_DOUBLE *cn = &r->v[ c * r->d ];
                     value = cn[j];
+
+                    assert(false && "Welp...");
                     assert(rd[i][j] == d);
 
                     last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c;
