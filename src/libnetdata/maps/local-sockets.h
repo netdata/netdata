@@ -117,10 +117,11 @@ typedef struct local_socket_state {
 
 typedef enum __attribute__((packed)) {
     SOCKET_DIRECTION_NONE = 0,
-    SOCKET_DIRECTION_LISTEN = (1 << 0),     // a listening socket
-    SOCKET_DIRECTION_INBOUND = (1 << 1),    // an inbound socket connecting a remote system to a local listening socket
-    SOCKET_DIRECTION_OUTBOUND = (1 << 2),   // a socket initiated by this system, connecting to another system
-    SOCKET_DIRECTION_LOCAL = (1 << 3),      // the socket connecting 2 localhost applications
+    SOCKET_DIRECTION_LISTEN = (1 << 0),         // a listening socket
+    SOCKET_DIRECTION_INBOUND = (1 << 1),        // an inbound socket connecting a remote system to a local listening socket
+    SOCKET_DIRECTION_OUTBOUND = (1 << 2),       // a socket initiated by this system, connecting to another system
+    SOCKET_DIRECTION_LOCAL_INBOUND = (1 << 3),  // the socket connecting 2 localhost applications
+    SOCKET_DIRECTION_LOCAL_OUTBOUND = (1 << 4), // the socket connecting 2 localhost applications
 } SOCKET_DIRECTION;
 
 #ifndef TASK_COMM_LEN
@@ -224,7 +225,7 @@ static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
         if(!n) continue;
 
         if((ls->config.listening && n->direction & SOCKET_DIRECTION_LISTEN) ||
-            (ls->config.local && n->direction & SOCKET_DIRECTION_LOCAL) ||
+            (ls->config.local && n->direction & (SOCKET_DIRECTION_LOCAL_INBOUND|SOCKET_DIRECTION_LOCAL_OUTBOUND)) ||
             (ls->config.inbound && n->direction & SOCKET_DIRECTION_INBOUND) ||
             (ls->config.outbound && n->direction & SOCKET_DIRECTION_OUTBOUND)
         ) {
@@ -612,12 +613,6 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
         // the remote address is zero
         n->direction |= SOCKET_DIRECTION_LISTEN;
     }
-    else if(
-        local_sockets_is_loopback_address(&n->local) ||
-        local_sockets_is_loopback_address(&n->remote)) {
-        // the local IP address is loopback
-        n->direction |= SOCKET_DIRECTION_LOCAL;
-    }
     else {
         // we can't say yet if it is inbound or outboud
         // so, mark it as both inbound and outbound
@@ -826,22 +821,8 @@ static inline void local_sockets_detect_directions(LS_STATE *ls) {
         if (!n) continue;
 
         if ((n->direction & (SOCKET_DIRECTION_INBOUND|SOCKET_DIRECTION_OUTBOUND)) !=
-            (SOCKET_DIRECTION_INBOUND|SOCKET_DIRECTION_OUTBOUND))
+                            (SOCKET_DIRECTION_INBOUND|SOCKET_DIRECTION_OUTBOUND))
             continue;
-
-        // check if the remote IP is one of our local IPs
-        {
-            SIMPLE_HASHTABLE_SLOT_LOCAL_IP *sl_ip =
-                simple_hashtable_get_slot_LOCAL_IP(&ls->local_ips_hashtable, n->remote_ip_hash, &n->remote.ip, false);
-
-            union ipv46 *d = SIMPLE_HASHTABLE_SLOT_DATA(sl_ip);
-            if (d) {
-                // the remote IP of this socket is one of our local IPs
-                n->direction &= ~(SOCKET_DIRECTION_INBOUND|SOCKET_DIRECTION_OUTBOUND);
-                n->direction |= SOCKET_DIRECTION_LOCAL;
-                continue;
-            }
-        }
 
         // check if the local port is one of our listening ports
         {
@@ -855,6 +836,39 @@ static inline void local_sockets_detect_directions(LS_STATE *ls) {
             }
             else
                 n->direction &= ~SOCKET_DIRECTION_INBOUND;
+        }
+
+        // check if the remote IP is one of our local IPs
+        {
+            SIMPLE_HASHTABLE_SLOT_LOCAL_IP *sl_ip =
+                simple_hashtable_get_slot_LOCAL_IP(&ls->local_ips_hashtable, n->remote_ip_hash, &n->remote.ip, false);
+
+            union ipv46 *d = SIMPLE_HASHTABLE_SLOT_DATA(sl_ip);
+            if (d) {
+                // the remote IP of this socket is one of our local IPs
+                if(n->direction & SOCKET_DIRECTION_INBOUND) {
+                    n->direction &= ~SOCKET_DIRECTION_INBOUND;
+                    n->direction |= SOCKET_DIRECTION_LOCAL_INBOUND;
+                }
+                else if(n->direction & SOCKET_DIRECTION_OUTBOUND) {
+                    n->direction &= ~SOCKET_DIRECTION_OUTBOUND;
+                    n->direction |= SOCKET_DIRECTION_LOCAL_OUTBOUND;
+                }
+                continue;
+            }
+        }
+
+        if (local_sockets_is_loopback_address(&n->local) ||
+            local_sockets_is_loopback_address(&n->remote)) {
+            // both IP addresses are loopback
+            if(n->direction & SOCKET_DIRECTION_INBOUND) {
+                n->direction &= ~SOCKET_DIRECTION_INBOUND;
+                n->direction |= SOCKET_DIRECTION_LOCAL_INBOUND;
+            }
+            else if(n->direction & SOCKET_DIRECTION_OUTBOUND) {
+                n->direction &= ~SOCKET_DIRECTION_OUTBOUND;
+                n->direction |= SOCKET_DIRECTION_LOCAL_OUTBOUND;
+            }
         }
     }
 }

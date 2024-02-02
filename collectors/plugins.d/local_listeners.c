@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "local-sockets.h"
+#include "libnetdata/libnetdata.h"
+#include "libnetdata/maps/local-sockets.h"
 #include "libnetdata/required_dummies.h"
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -60,7 +61,7 @@ static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKE
            (n->direction & SOCKET_DIRECTION_LISTEN) ? "LISTEN," : "",
            (n->direction & SOCKET_DIRECTION_INBOUND) ? "INBOUND," : "",
            (n->direction & SOCKET_DIRECTION_OUTBOUND) ? "OUTBOUND," : "",
-           (n->direction & SOCKET_DIRECTION_LOCAL) ? "LOCAL," : "",
+           (n->direction & (SOCKET_DIRECTION_LOCAL_INBOUND|SOCKET_DIRECTION_LOCAL_OUTBOUND)) ? "LOCAL," : "",
            (n->direction == 0) ? "NONE," : "",
            n->pid,
            n->state,
