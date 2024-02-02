@@ -50,21 +50,22 @@ jobs:
             **.h
             **.hh
             **.in
+            **.patch
+            **.cmake
             netdata.spec.in
+            contrib/debian/**
             CMakeLists.txt
             .github/data/distros.yml
             .github/workflows/packaging.yml
             .github/scripts/gen-matrix-packaging.py
             .github/scripts/pkg-test.sh
-            build/**
             packaging/*.sh
-            packaging/*.checksums
             packaging/*.version
-            contrib/debian/**
-            aclk/aclk-schemas/
-            ml/dlib/
-            mqtt_websockets
-            web/server/h2o/libh2o
+            packaging/*.checksums
+            src/aclk/aclk-schemas/
+            src/ml/dlib/
+            src/fluent-bit/
+            web/server/h2o/libh2o/
           files_ignore: |
             **.md
       - name: Check Run

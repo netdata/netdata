@@ -43,6 +43,8 @@ jobs:
             **.h
             **.hh
             **.in
+            **.patch
+            **.cmake
             CMakeLists.txt
             netdata-installer.sh
             .github/data/distros.yml
@@ -51,13 +53,15 @@ jobs:
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-build.py
             .github/scripts/run-updater-check.sh
-            build/**
             packaging/makeself/**
             packaging/installer/**
-            aclk/aclk-schemas/
-            ml/dlib/
-            mqtt_websockets
-            web/server/h2o/libh2o
+            packaging/*.sh
+            packaging/*.version
+            packaging/*.checksums
+            src/aclk/aclk-schemas/
+            src/ml/dlib/
+            src/fluent-bit/
+            web/server/h2o/libh2o/
           files_ignore: |
             netdata.spec.in
             **.md

@@ -40,18 +40,22 @@ jobs:
             **.h
             **.hh
             **.in
+            **.patch
+            **.cmake
             .dockerignore
-            netdata-installer.sh
             CMakeLists.txt
+            netdata-installer.sh
             .github/workflows/docker.yml
             .github/scripts/docker-test.sh
-            build/**
             packaging/docker/**
             packaging/installer/**
-            aclk/aclk-schemas/
-            ml/dlib/
-            mqtt_websockets
-            web/server/h2o/libh2o
+            packaging/runtime-check.sh
+            packaging/*.version
+            packaging/*.checksums
+            src/aclk/aclk-schemas/
+            src/ml/dlib/
+            src/fluent-bit/
+            web/server/h2o/libh2o/
           files_ignore: |
             netdata.spec.in
             **.md
