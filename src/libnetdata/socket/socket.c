@@ -1387,7 +1387,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     struct sockaddr_storage sadr;
     socklen_t addrlen = sizeof(sadr);
 
-    int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags);
+    int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags | SOCK_CLOEXEC);
     if (likely(nfd >= 0)) {
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {

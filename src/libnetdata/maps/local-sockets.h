@@ -104,6 +104,9 @@ typedef struct local_socket_state {
     uint16_t tmp_protocol;
 #endif
 
+    ARAL *local_socket_aral;
+    ARAL *pid_socket_aral;
+
     uint64_t proc_self_net_ns_inode;
 
     SIMPLE_HASHTABLE_NET_NS ns_hashtable;
@@ -162,7 +165,7 @@ static inline void ipv6_to_in6_addr(const char *ipv6_str, struct in6_addr *d) {
     for (size_t k = 0; k < 4; ++k) {
         memcpy(buf, ipv6_str + (k * 8), 8);
         buf[sizeof(buf) - 1] = '\0';
-        d->s6_addr32[k] = strtoul(buf, NULL, 16);
+        d->s6_addr32[k] = str2uint32_hex(buf, NULL);
     }
 }
 
@@ -185,13 +188,17 @@ typedef struct local_socket {
     uid_t uid;
 
     char comm[TASK_COMM_LEN];
-    char *cmdline;
+    STRING *cmdline;
 
     struct local_port local_port_key;
 
     XXH64_hash_t local_ip_hash;
     XXH64_hash_t remote_ip_hash;
     XXH64_hash_t local_port_hash;
+
+#ifdef LOCAL_SOCKETS_EXTENDED_MEMBERS
+    LOCAL_SOCKETS_EXTENDED_MEMBERS
+#endif
 } LOCAL_SOCKET;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -393,7 +400,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                 }
 
                 if(!ps)
-                    ps = callocz(1, sizeof(*ps));
+                    ps = aral_callocz(ls->pid_socket_aral);
 
                 ps->inode = inode;
                 ps->pid = pid;
@@ -559,7 +566,7 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
         return false;
     }
 
-    n = (LOCAL_SOCKET *)callocz(1, sizeof(LOCAL_SOCKET));
+    n = aral_mallocz(ls->local_socket_aral);
     *n = *tmp; // copy all contents
 
     // fix the key
@@ -584,7 +591,8 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
             n->uid = ps->uid;
 
         if(ps->cmdline)
-            n->cmdline = strdupz(ps->cmdline);
+            n->cmdline = string_strdupz(ps->cmdline);
+
         strncpyz(n->comm, ps->comm, sizeof(n->comm) - 1);
     }
 
@@ -731,17 +739,26 @@ static inline bool local_sockets_netlink_get_sockets(LS_STATE *ls, uint16_t fami
 #endif // HAVE_LIBMNL
 
 static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
+    static bool is_space[256] = {
+        [':'] = true,
+        [' '] = true,
+    };
+
     if(family != AF_INET && family != AF_INET6)
         return false;
 
-    FILE *fp;
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-
-    fp = fopen(filename, "r");
+    FILE *fp = fopen(filename, "r");
     if (fp == NULL)
         return false;
+
+    char *line = malloc(1024);  // no mallocz() here because getline() may resize
+    if(!line) {
+        fclose(fp);
+        return false;
+    }
+
+    size_t len = 1024;
+    ssize_t read;
 
     ssize_t min_line_length = (family == AF_INET) ? 105 : 155;
     size_t counter = 0;
@@ -755,49 +772,60 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
             continue;
         }
 
-        unsigned int local_address, local_port, state, remote_address, remote_port;
-        uint64_t  inode = 0;
-        char local_address6[33], remote_address6[33];
-
-        if(family == AF_INET) {
-            if (sscanf(line, "%*d: %X:%X %X:%X %X %*X:%*X %*X:%*X %*X %*d %*d %"PRIu64,
-                       &local_address, &local_port, &remote_address, &remote_port, &state, &inode) != 6) {
-                local_sockets_log(ls, "cannot parse ipv4 line No %zu of filename '%s': %s", counter, filename, line);
-                continue;
-            }
-        }
-        else if(family == AF_INET6) {
-            if(sscanf(line, "%*d: %32[0-9A-Fa-f]:%X %32[0-9A-Fa-f]:%X %X %*X:%*X %*X:%*X %*X %*d %*d %"PRIu64,
-                       local_address6, &local_port, remote_address6, &remote_port, &state, &inode) != 6) {
-                local_sockets_log(ls, "cannot parse ipv6 line No %zu of filename '%s': %s", counter, filename, line);
-                continue;
-            }
-        }
-
         LOCAL_SOCKET n = {
-            .inode = inode,
             .direction = SOCKET_DIRECTION_NONE,
-            .state = (int)state,
             .local = {
                 .family = family,
                 .protocol = protocol,
-                .port = local_port,
             },
             .remote = {
                 .family = family,
                 .protocol = protocol,
-                .port = remote_port,
             },
             .uid = UID_UNSET,
         };
 
+        char *words[32];
+        size_t num_words = quoted_strings_splitter(line, words, 32, is_space);
+        // char *sl_txt = get_word(words, num_words, 0);
+        char *local_ip_txt = get_word(words, num_words, 1);
+        char *local_port_txt = get_word(words, num_words, 2);
+        char *remote_ip_txt = get_word(words, num_words, 3);
+        char *remote_port_txt = get_word(words, num_words, 4);
+        char *state_txt = get_word(words, num_words, 5);
+        char *tx_queue_txt = get_word(words, num_words, 6);
+        char *rx_queue_txt = get_word(words, num_words, 7);
+        char *tr_txt = get_word(words, num_words, 8);
+        char *tm_when_txt = get_word(words, num_words, 9);
+        char *retrans_txt = get_word(words, num_words, 10);
+        char *uid_txt = get_word(words, num_words, 11);
+        // char *timeout_txt = get_word(words, num_words, 12);
+        char *inode_txt = get_word(words, num_words, 13);
+
+        if(!local_ip_txt || !local_port_txt || !remote_ip_txt || !remote_port_txt || !state_txt ||
+            !tx_queue_txt || !rx_queue_txt || !tr_txt || !tm_when_txt || !retrans_txt || !uid_txt || !inode_txt) {
+            local_sockets_log(ls, "cannot parse ipv4 line No %zu of filename '%s'", counter, filename);
+            continue;
+        }
+
+        n.local.port = str2uint32_hex(local_port_txt, NULL);
+        n.remote.port = str2uint32_hex(remote_port_txt, NULL);
+        n.state = str2uint32_hex(state_txt, NULL);
+        n.wqueue = str2uint32_hex(tx_queue_txt, NULL);
+        n.rqueue = str2uint32_hex(rx_queue_txt, NULL);
+        n.timer = str2uint32_hex(tr_txt, NULL);
+        n.expires = str2uint32_hex(tm_when_txt, NULL);
+        n.retransmits = str2uint32_hex(retrans_txt, NULL);
+        n.uid = str2uint32_t(uid_txt, NULL);
+        n.inode = str2uint64_t(inode_txt, NULL);
+
         if(family == AF_INET) {
-            n.local.ip.ipv4 = local_address;
-            n.remote.ip.ipv4 = remote_address;
+            n.local.ip.ipv4 = str2uint32_hex(local_ip_txt, NULL);
+            n.remote.ip.ipv4 = str2uint32_hex(remote_ip_txt, NULL);
         }
         else if(family == AF_INET6) {
-            ipv6_to_in6_addr(local_address6, &n.local.ip.ipv6);
-            ipv6_to_in6_addr(remote_address6, &n.remote.ip.ipv6);
+            ipv6_to_in6_addr(local_ip_txt, &n.local.ip.ipv6);
+            ipv6_to_in6_addr(remote_ip_txt, &n.remote.ip.ipv6);
         }
 
         local_sockets_add_socket(ls, &n);
@@ -806,7 +834,7 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
     fclose(fp);
 
     if (line)
-        freez(line);
+        free(line); // no freez() here because getline() may resize
 
     return true;
 }
@@ -881,6 +909,20 @@ static inline void local_sockets_init(LS_STATE *ls) {
     simple_hashtable_init_LOCAL_SOCKET(&ls->sockets_hashtable, 65535);
     simple_hashtable_init_LOCAL_IP(&ls->local_ips_hashtable, 4096);
     simple_hashtable_init_LISTENING_PORT(&ls->listening_ports_hashtable, 4096);
+
+    ls->local_socket_aral = aral_create(
+        "local-sockets",
+        sizeof(LOCAL_SOCKET),
+        65536,
+        65536,
+        NULL, NULL, NULL, false, true);
+
+    ls->pid_socket_aral = aral_create(
+        "pid-sockets",
+        sizeof(struct pid_socket),
+        65536,
+        65536,
+        NULL, NULL, NULL, false, true);
 }
 
 static inline void local_sockets_cleanup(LS_STATE *ls) {
@@ -891,8 +933,8 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
         LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
         if(!n) continue;
 
-        freez(n->cmdline);
-        freez(n);
+        string_freez(n->cmdline);
+        aral_freez(ls->local_socket_aral, n);
     }
 
     // free the pid_socket hashtable data
@@ -903,7 +945,7 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
         if(!ps) continue;
 
         freez(ps->cmdline);
-        freez(ps);
+        aral_freez(ls->pid_socket_aral, ps);
     }
 
     // free the hashtable
@@ -912,6 +954,9 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
     simple_hashtable_destroy_LISTENING_PORT(&ls->listening_ports_hashtable);
     simple_hashtable_destroy_LOCAL_IP(&ls->local_ips_hashtable);
     simple_hashtable_destroy_LOCAL_SOCKET(&ls->sockets_hashtable);
+
+    aral_destroy(ls->local_socket_aral);
+    aral_destroy(ls->pid_socket_aral);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -982,12 +1027,12 @@ static inline void local_sockets_send_to_parent(struct local_socket_state *ls __
     if(write(fd, n, sizeof(*n)) != sizeof(*n))
         local_sockets_log(ls, "failed to write local socket to pipe");
 
-    size_t len = n->cmdline ? strlen(n->cmdline) + 1 : 0;
+    size_t len = n->cmdline ? string_strlen(n->cmdline) + 1 : 0;
     if(write(fd, &len, sizeof(len)) != sizeof(len))
         local_sockets_log(ls, "failed to write cmdline length to pipe");
 
     if(len)
-        if(write(fd, n->cmdline, len) != (ssize_t)len)
+        if(write(fd, string2str(n->cmdline), len) != (ssize_t)len)
             local_sockets_log(ls, "failed to write cmdline to pipe");
 }
 
@@ -1087,9 +1132,13 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
         if(len) {
-            buf.cmdline = mallocz(len);
-            if(read(pipefd[0], buf.cmdline, len) != (ssize_t)len)
+            char cmdline[len + 1];
+            if(read(pipefd[0], cmdline, len) != (ssize_t)len)
                 local_sockets_log(ls, "failed to read cmdline from pipe");
+            else {
+                cmdline[len] = '\0';
+                buf.cmdline = string_strdupz(cmdline);
+            }
         }
         else
             buf.cmdline = NULL;
@@ -1107,8 +1156,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ls->sockets_hashtable, buf.inode, &buf, true);
         LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
         if(n) {
-            if(buf.cmdline)
-                freez(buf.cmdline);
+            string_freez(buf.cmdline);
 
 //            local_sockets_log(ls,
 //                              "ns inode %" PRIu64" (comm: '%s', pid: %u, ns: %"PRIu64") already exists in hashtable (comm: '%s', pid: %u, ns: %"PRIu64") - ignoring duplicate",
@@ -1116,7 +1164,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
             continue;
         }
         else {
-            n = mallocz(sizeof(*n));
+            n = aral_mallocz(ls->local_socket_aral);
             memcpy(n, &buf, sizeof(*n));
             simple_hashtable_set_slot_LOCAL_SOCKET(&ls->sockets_hashtable, sl, n->inode, n);
 

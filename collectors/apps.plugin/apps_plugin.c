@@ -4399,10 +4399,11 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     buffer_json_add_array_item_double(wb, _tmp);                                                                \
 } while(0)
 
-static void function_processes(const char *transaction, char *function __maybe_unused,
+static void function_processes(const char *transaction, char *function,
                                usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                                BUFFER *payload __maybe_unused, HTTP_ACCESS access,
                                const char *source __maybe_unused, void *data __maybe_unused) {
+    time_t now_s = now_realtime_sec();
     struct pid_stat *p;
 
     bool show_cmdline = http_access_user_has_enough_access_level_for_endpoint(
@@ -4418,6 +4419,7 @@ static void function_processes(const char *transaction, char *function __maybe_u
     pid_t pid = 0;
     uid_t uid = 0;
     gid_t gid = 0;
+    bool info = false;
 
     bool filter_pid = false, filter_uid = false, filter_gid = false;
 
@@ -4468,15 +4470,10 @@ static void function_processes(const char *transaction, char *function __maybe_u
             apps_plugin_function_processes_help(transaction);
             return;
         }
-        else {
-            char msg[1024];
-            snprintfz(msg, sizeof(msg), "Invalid parameter '%s'", keyword);
-            pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_BAD_REQUEST, msg);
-            return;
+        else if(strcmp(keyword, "info") == 0) {
+            info = true;
         }
     }
-
-    time_t expires = now_realtime_sec() + update_every;
 
     unsigned int cpu_divisor = time_factor * RATES_DETAIL / 100;
     unsigned int memory_divisor = 1024;
@@ -4487,8 +4484,12 @@ static void function_processes(const char *transaction, char *function __maybe_u
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", update_every);
+    buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION);
     buffer_json_member_add_array(wb, "data");
+
+    if(info)
+        goto close_and_send;
 
     NETDATA_DOUBLE
               UserCPU_max = 0.0
@@ -5251,10 +5252,11 @@ static void function_processes(const char *transaction, char *function __maybe_u
     }
     buffer_json_object_close(wb); // group_by
 
-    buffer_json_member_add_time_t(wb, "expires", expires);
+close_and_send:
+    buffer_json_member_add_time_t(wb, "expires", now_s + update_every);
     buffer_json_finalize(wb);
 
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires, wb);
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_s + update_every, wb);
 
     buffer_free(wb);
 }

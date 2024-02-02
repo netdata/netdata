@@ -464,6 +464,12 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
     return page;
 }
 
+void *aral_callocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+    void *r = aral_mallocz_internal(ar TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+    memset(r, 0, ar->config.requested_element_size);
+    return r;
+}
+
 void *aral_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
 #ifdef FSANITIZE_ADDRESS
     return mallocz(ar->config.requested_element_size);

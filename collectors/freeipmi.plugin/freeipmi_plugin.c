@@ -1475,14 +1475,31 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
                                      usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                                      BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
                                      const char *source __maybe_unused, void *data __maybe_unused) {
-    time_t expires = now_realtime_sec() + update_every;
+    time_t now_s = now_realtime_sec();
 
     BUFFER *wb = buffer_create(4096, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_NEWLINE_ON_ARRAY_ITEMS);
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", update_every);
+    buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", "View IPMI sensor readings and its state");
+
+    char function_copy[strlen(function) + 1];
+    memcpy(function_copy, function, sizeof(function_copy));
+    char *words[1024];
+    size_t num_words = quoted_strings_splitter_pluginsd(function_copy, words, 1024);
+    for(size_t i = 1; i < num_words ;i++) {
+        char *param = get_word(words, num_words, i);
+        if(strcmp(param, "info") == 0) {
+            buffer_json_member_add_array(wb, "accepted_params");
+            buffer_json_array_close(wb); // accepted_params
+            buffer_json_member_add_array(wb, "required_params");
+            buffer_json_array_close(wb); // required_params
+            goto close_and_send;
+        }
+    }
+
     buffer_json_member_add_array(wb, "data");
 
     struct sensor *sn;
@@ -1608,10 +1625,11 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
     }
     buffer_json_array_close(wb);
 
-    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+close_and_send:
+    buffer_json_member_add_time_t(wb, "expires", now_s + update_every);
     buffer_json_finalize(wb);
 
-    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", expires, wb);
+    pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_s + update_every, wb);
 
     buffer_free(wb);
 }

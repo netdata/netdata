@@ -557,15 +557,39 @@
 
         const app = updateApps(svg, data, w, h, borderPadding, theme);
 
+        app.transition().duration(5000)
+
         simulation = d3.forceSimulation(data)
             //.force('center', d3.forceCenter(cw, ch).strength(1))
-            .force("x", d3.forceX(d => d.d3.x).strength(0.05))
-            .force("y", d3.forceY(d => d.d3.y).strength(0.05))
+            .force("x", d3.forceX(d => d.d3.x).strength(d => {
+                if(d.counts.listen === d.counts.total)
+                    return 0.5
+                else
+                    return 0.05
+            }))
+            .force("y", d3.forceY(d => d.d3.y).strength(d => {
+                if(d.counts.listen === d.counts.total)
+                    return 0.5
+                else
+                    return 0.05
+            }))
             //.force("charge", d3.forceManyBody().strength(-0.05))
             .force("collide", d3.forceCollide(d => d.d3.size * 1.1 + 15).strength(1))
             .on('tick', ticked);
 
         function ticked() {
+            data.forEach(d => {
+                if(d.x > w - d.d3.size)
+                    d.x = w - d.d3.size;
+                else if(d.x < 0)
+                    d.x = 0;
+
+                if(d.y > h - d.d3.size)
+                    d.y = h - d.d3.size;
+                else if(d.y < 0)
+                    d.y = 0;
+            });
+
             app.attr('transform', d => `translate(${d.x}, ${d.y})`);
         }
 
