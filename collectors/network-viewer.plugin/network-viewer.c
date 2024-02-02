@@ -58,7 +58,6 @@ ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
 static void local_socket_to_json_array(BUFFER *wb, LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
-    char server_address[INET6_ADDRSTRLEN];
     char *protocol;
 
     if(n->local.family == AF_INET) {
@@ -99,14 +98,14 @@ static void local_socket_to_json_array(BUFFER *wb, LOCAL_SOCKET *n, uint64_t pro
         else
             buffer_json_add_array_item_string(wb, n->comm);
 
-        buffer_json_add_array_item_string(wb, string2str(n->cmdline));
+        // buffer_json_add_array_item_string(wb, string2str(n->cmdline));
 
         if(n->uid == UID_UNSET) {
-            buffer_json_add_array_item_uint64(wb, n->uid);
+            // buffer_json_add_array_item_uint64(wb, n->uid);
             buffer_json_add_array_item_string(wb, "[unknown]");
         }
         else {
-            buffer_json_add_array_item_uint64(wb, n->uid);
+            // buffer_json_add_array_item_uint64(wb, n->uid);
             STRING *u = system_usernames_cache_lookup_uid(uc, n->uid);
             buffer_json_add_array_item_string(wb, string2str(u));
             string_freez(u);
@@ -124,32 +123,43 @@ static void local_socket_to_json_array(BUFFER *wb, LOCAL_SOCKET *n, uint64_t pro
         }
         buffer_json_add_array_item_string(wb, n->network_viewer.remote_address_space);
 
-        struct socket_endpoint *se;
-        switch(n->direction) {
+        uint16_t server_port;
+        const char *server_address;
+        const char *client_address_space;
+        const char *server_address_space;
+        switch (n->direction) {
             case SOCKET_DIRECTION_LISTEN:
             case SOCKET_DIRECTION_INBOUND:
             case SOCKET_DIRECTION_LOCAL_INBOUND:
-                se = &n->local;
+                server_port = n->local.port;
+                server_address = local_address;
+                server_address_space = n->network_viewer.local_address_space;
+                client_address_space = n->network_viewer.remote_address_space;
                 break;
 
             case SOCKET_DIRECTION_OUTBOUND:
             case SOCKET_DIRECTION_LOCAL_OUTBOUND:
-                se = &n->remote;
+                server_port = n->remote.port;
+                server_address = remote_address;
+                server_address_space = n->network_viewer.remote_address_space;
+                client_address_space = n->network_viewer.local_address_space;
                 break;
 
             case SOCKET_DIRECTION_NONE:
                 break;
         }
-        if(se->family == AF_INET)
-            ipv4_address_to_txt(se->ip.ipv4, server_address);
-        else if(se->family == AF_INET6)
-            ipv6_address_to_txt(&se->ip.ipv6, server_address);
+        if(aggregated)
+            buffer_json_add_array_item_string(wb, server_address);
 
-        buffer_json_add_array_item_string(wb, server_address);
-        buffer_json_add_array_item_uint64(wb, se->port);
+        buffer_json_add_array_item_uint64(wb, server_port);
 
-        buffer_json_add_array_item_uint64(wb, n->inode);
-        buffer_json_add_array_item_uint64(wb, n->net_ns_inode);
+        if(aggregated) {
+            buffer_json_add_array_item_string(wb, client_address_space);
+            buffer_json_add_array_item_string(wb, server_address_space);
+        }
+
+        // buffer_json_add_array_item_uint64(wb, n->inode);
+        // buffer_json_add_array_item_uint64(wb, n->net_ns_inode);
         buffer_json_add_array_item_uint64(wb, n->network_viewer.count);
     }
     buffer_json_array_close(wb);
@@ -221,7 +231,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                              const char *source __maybe_unused, void *data __maybe_unused) {
 
     time_t now_s = now_realtime_sec();
-    bool aggregated = true;
+    bool aggregated = false;
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_flush(wb);
@@ -234,6 +244,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
     buffer_json_member_add_boolean(wb, "has_history", false);
     buffer_json_member_add_string(wb, "help", NETWORK_CONNECTIONS_VIEWER_HELP);
 
+#ifdef ENABLE_DETAILED_VIEW
     buffer_json_member_add_array(wb, "accepted_params");
     {
         buffer_json_add_array_item_string(wb, "sockets");
@@ -267,6 +278,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         buffer_json_object_close(wb);
     }
     buffer_json_array_close(wb); // required_params
+#endif
 
     char function_copy[strlen(function) + 1];
     memcpy(function_copy, function, sizeof(function_copy));
@@ -402,21 +414,21 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                         RRDF_FIELD_OPTS_VISIBLE|RRDF_FIELD_OPTS_FULL_WIDTH,
                                         NULL);
 
-            // Cmdline
-            buffer_rrdf_table_add_field(wb, field_id++, "CommandLine", "Command Line",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                                        RRDF_FIELD_OPTS_NONE|RRDF_FIELD_OPTS_FULL_WIDTH,
-                                        NULL);
+//            // Cmdline
+//            buffer_rrdf_table_add_field(wb, field_id++, "CommandLine", "Command Line",
+//                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+//                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+//                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+//                                        RRDF_FIELD_OPTS_NONE|RRDF_FIELD_OPTS_FULL_WIDTH,
+//                                        NULL);
 
-            // Uid
-            buffer_rrdf_table_add_field(wb, field_id++, "UID", "User ID",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
+//            // Uid
+//            buffer_rrdf_table_add_field(wb, field_id++, "UID", "User ID",
+//                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+//                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+//                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+//                                        RRDF_FIELD_OPTS_NONE,
+//                                        NULL);
 
             // Username
             buffer_rrdf_table_add_field(wb, field_id++, "User", "Username",
@@ -478,13 +490,15 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                         RRDF_FIELD_OPTS_NONE,
                                         NULL);
 
-            // Server IP
-            buffer_rrdf_table_add_field(wb, field_id++, "ServerIP", "Server IP Address",
-                                        RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                                        RRDF_FIELD_OPTS_FULL_WIDTH | (aggregated ? RRDF_FIELD_OPTS_VISIBLE : RRDF_FIELD_OPTS_NONE),
-                                        NULL);
+            if(aggregated) {
+                // Server IP
+                buffer_rrdf_table_add_field(wb, field_id++, "ServerIP", "Server IP Address",
+                                            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+                                            RRDF_FIELD_OPTS_FULL_WIDTH | (aggregated ? RRDF_FIELD_OPTS_VISIBLE : RRDF_FIELD_OPTS_NONE),
+                                            NULL);
+            }
 
             // Server Port
             buffer_rrdf_table_add_field(wb, field_id++, "ServerPort", "Server Port",
@@ -494,24 +508,42 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                         aggregated ? RRDF_FIELD_OPTS_VISIBLE : RRDF_FIELD_OPTS_NONE,
                                         NULL);
 
-            // inode
-            buffer_rrdf_table_add_field(wb, field_id++, "Inode", "Socket Inode",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
+            if(aggregated) {
+                // Client Address Space
+                buffer_rrdf_table_add_field(wb, field_id++, "ClientAddressSpace", "Client IP Address Space",
+                                            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                            RRDF_FIELD_OPTS_VISIBLE,
+                                            NULL);
 
-            // Namespace inode
-            buffer_rrdf_table_add_field(wb, field_id++, "Namespace Inode", "Namespace Inode",
-                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                                        RRDF_FIELD_OPTS_NONE,
-                                        NULL);
+                // Server Address Space
+                buffer_rrdf_table_add_field(wb, field_id++, "ServerAddressSpace", "Server IP Address Space",
+                                            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                            RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                                            RRDF_FIELD_OPTS_VISIBLE,
+                                            NULL);
+            }
+
+//            // inode
+//            buffer_rrdf_table_add_field(wb, field_id++, "Inode", "Socket Inode",
+//                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+//                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+//                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+//                                        RRDF_FIELD_OPTS_NONE,
+//                                        NULL);
+
+//            // Namespace inode
+//            buffer_rrdf_table_add_field(wb, field_id++, "Namespace Inode", "Namespace Inode",
+//                                        RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+//                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+//                                        RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
+//                                        RRDF_FIELD_OPTS_NONE,
+//                                        NULL);
 
             // Count
-            buffer_rrdf_table_add_field(wb, field_id++, "Count", "Count",
+            buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets like this",
                                         RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                         0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
