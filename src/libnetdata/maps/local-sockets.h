@@ -185,13 +185,17 @@ typedef struct local_socket {
     uid_t uid;
 
     char comm[TASK_COMM_LEN];
-    char *cmdline;
+    STRING *cmdline;
 
     struct local_port local_port_key;
 
     XXH64_hash_t local_ip_hash;
     XXH64_hash_t remote_ip_hash;
     XXH64_hash_t local_port_hash;
+
+#ifdef LOCAL_SOCKETS_EXTENDED_MEMBERS
+    LOCAL_SOCKETS_EXTENDED_MEMBERS
+#endif
 } LOCAL_SOCKET;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -584,7 +588,8 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
             n->uid = ps->uid;
 
         if(ps->cmdline)
-            n->cmdline = strdupz(ps->cmdline);
+            n->cmdline = string_strdupz(ps->cmdline);
+
         strncpyz(n->comm, ps->comm, sizeof(n->comm) - 1);
     }
 
@@ -883,6 +888,11 @@ static inline void local_sockets_init(LS_STATE *ls) {
     simple_hashtable_init_LISTENING_PORT(&ls->listening_ports_hashtable, 4096);
 }
 
+static inline void local_sockets_free_one(LOCAL_SOCKET *n) {
+    string_freez(n->cmdline);
+    freez(n);
+}
+
 static inline void local_sockets_cleanup(LS_STATE *ls) {
     // free the sockets hashtable data
     for(SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_first_read_only_LOCAL_SOCKET(&ls->sockets_hashtable);
@@ -890,9 +900,7 @@ static inline void local_sockets_cleanup(LS_STATE *ls) {
          sl = simple_hashtable_next_read_only_LOCAL_SOCKET(&ls->sockets_hashtable, sl)) {
         LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
         if(!n) continue;
-
-        freez(n->cmdline);
-        freez(n);
+        local_sockets_free_one(n);
     }
 
     // free the pid_socket hashtable data
@@ -982,12 +990,12 @@ static inline void local_sockets_send_to_parent(struct local_socket_state *ls __
     if(write(fd, n, sizeof(*n)) != sizeof(*n))
         local_sockets_log(ls, "failed to write local socket to pipe");
 
-    size_t len = n->cmdline ? strlen(n->cmdline) + 1 : 0;
+    size_t len = n->cmdline ? string_strlen(n->cmdline) + 1 : 0;
     if(write(fd, &len, sizeof(len)) != sizeof(len))
         local_sockets_log(ls, "failed to write cmdline length to pipe");
 
     if(len)
-        if(write(fd, n->cmdline, len) != (ssize_t)len)
+        if(write(fd, string2str(n->cmdline), len) != (ssize_t)len)
             local_sockets_log(ls, "failed to write cmdline to pipe");
 }
 
@@ -1087,9 +1095,13 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
             local_sockets_log(ls, "failed to read cmdline length from pipe");
 
         if(len) {
-            buf.cmdline = mallocz(len);
-            if(read(pipefd[0], buf.cmdline, len) != (ssize_t)len)
+            char cmdline[len + 1];
+            if(read(pipefd[0], cmdline, len) != (ssize_t)len)
                 local_sockets_log(ls, "failed to read cmdline from pipe");
+            else {
+                cmdline[len] = '\0';
+                buf.cmdline = string_strdupz(cmdline);
+            }
         }
         else
             buf.cmdline = NULL;
@@ -1107,8 +1119,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ls->sockets_hashtable, buf.inode, &buf, true);
         LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
         if(n) {
-            if(buf.cmdline)
-                freez(buf.cmdline);
+            string_freez(buf.cmdline);
 
 //            local_sockets_log(ls,
 //                              "ns inode %" PRIu64" (comm: '%s', pid: %u, ns: %"PRIu64") already exists in hashtable (comm: '%s', pid: %u, ns: %"PRIu64") - ignoring duplicate",

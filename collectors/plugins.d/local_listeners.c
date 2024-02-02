@@ -40,7 +40,7 @@ static void print_local_listeners(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, 
         ipv6_address_to_txt(&n->remote.ip.ipv6, remote_address);
     }
 
-    printf("%s|%s|%u|%s\n", protocol_name(n), local_address, n->local.port, n->cmdline ? n->cmdline : "");
+    printf("%s|%s|%u|%s\n", protocol_name(n), local_address, n->local.port, string2str(n->cmdline));
 }
 
 static void print_local_listeners_debug(LS_STATE *ls __maybe_unused, LOCAL_SOCKET *n, void *data __maybe_unused) {
