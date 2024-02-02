@@ -196,7 +196,7 @@ documentation](https://github.com/netdata/netdata/blob/master/health/REFERENCE.m
 
 ### Host labels in metrics exporting
 
-If you have enabled any metrics exporting via our experimental [exporters](https://github.com/netdata/netdata/blob/master/exporting/README.md), any new host
+If you have enabled any metrics exporting via our experimental [exporters](https://github.com/netdata/netdata/blob/master/src/exporting/README.md), any new host
 labels you created manually are sent to the destination database alongside metrics. You can change this behavior by
 editing `exporting.conf`, and you can even send automatically-generated labels on with exported metrics.
 
@@ -221,7 +221,7 @@ send automatic labels = yes
 ```
 
 By applying labels to exported metrics, you can more easily parse historical metrics with the labels applied. To learn
-more about exporting, read the [documentation](https://github.com/netdata/netdata/blob/master/exporting/README.md).
+more about exporting, read the [documentation](https://github.com/netdata/netdata/blob/master/src/exporting/README.md).
 
 ## Metric labels
 

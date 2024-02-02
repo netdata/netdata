@@ -1,1 +1,0 @@
-../integrations/prometheus_remote_write.md

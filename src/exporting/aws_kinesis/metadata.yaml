@@ -1,0 +1,173 @@
+# yamllint disable rule:line-length
+---
+id: 'export-aws-kinesis'
+meta:
+  name: 'AWS Kinesis'
+  link: 'https://aws.amazon.com/kinesis/'
+  categories:
+    - export
+  icon_filename: 'aws-kinesis.svg'
+keywords:
+  - exporter
+  - AWS
+  - Kinesis
+overview:
+  exporter_description: |
+    Export metrics to AWS Kinesis Data Streams
+  exporter_limitations: ''
+setup:
+  prerequisites:
+    list:
+      - title: ''
+        description: |
+          - First [install](https://docs.aws.amazon.com/en_us/sdk-for-cpp/v1/developer-guide/setup.html) AWS SDK for C++
+          - Here are the instructions when building from source, to ensure 3rd party dependencies are installed:
+            ```bash
+            git clone --recursive https://github.com/aws/aws-sdk-cpp.git
+            cd aws-sdk-cpp/
+            git submodule update --init --recursive
+            mkdir BUILT
+            cd BUILT
+            cmake -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_ONLY=kinesis ..
+            make
+            make install
+            ```
+          - `libcrypto`, `libssl`, and `libcurl` are also required to compile Netdata with Kinesis support enabled.
+          - Next, Netdata should be re-installed from the source. The installer will detect that the required libraries are now available.
+  configuration:
+    file:
+      name: 'exporting.conf'
+    options:
+      description: |
+        Netdata automatically computes a partition key for every record with the purpose to distribute records across available shards evenly.
+        The following options can be defined for this exporter.
+      folding:
+        title: 'Config options'
+        enabled: true
+      list:
+        - name: 'enabled'
+          default_value: 'no'
+          description: 'Enables or disables an exporting connector instance (yes|no).'
+          required: true
+        - name: 'destination'
+          default_value: 'no'
+          description: 'Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics.'
+          required: true
+          detailed_description: |
+            The format of each item in this list, is: [PROTOCOL:]IP[:PORT].
+            - PROTOCOL can be udp or tcp. tcp is the default and only supported by the current exporting engine.
+            - IP can be XX.XX.XX.XX (IPv4), or [XX:XX...XX:XX] (IPv6). For IPv6 you can to enclose the IP in [] to separate it from the port.
+            - PORT can be a number of a service name. If omitted, the default port for the exporting connector will be used.
+
+            Example IPv4:
+              ```yaml
+              destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
+              ```
+            Example IPv6 and IPv4 together:
+            ```yaml
+            destination = [ffff:...:0001]:2003 10.11.12.1:2003
+            ```
+            When multiple servers are defined, Netdata will try the next one when the previous one fails.
+        - name: 'username'
+          default_value: 'my_username'
+          description: 'Username for HTTP authentication'
+          required: false
+        - name: 'password'
+          default_value: 'my_password'
+          description: 'Password for HTTP authentication'
+          required: false
+        - name: 'data source'
+          default_value: ''
+          description: 'Selects the kind of data that will be sent to the external database. (as collected|average|sum)'
+          required: false
+        - name: 'hostname'
+          default_value: '[global].hostname'
+          description: 'The hostname to be used for sending data to the external database server.'
+          required: false
+        - name: 'prefix'
+          default_value: 'Netdata'
+          description: 'The prefix to add to all metrics.'
+          required: false
+        - name: 'update every'
+          default_value: '10'
+          description: |
+            Frequency of sending sending data to the external database, in seconds.
+          required: false
+          detailed_description: |
+            Netdata will add some randomness to this number, to prevent stressing the external server when many Netdata servers
+            send data to the same database. This randomness does not affect the quality of the data, only the time they are sent.
+        - name: 'buffer on failures'
+          default_value: '10'
+          description: |
+            The number of iterations (`update every` seconds) to buffer data, when the external database server is not available.
+          required: false
+          detailed_description: |
+            If the server fails to receive the data after that many failures, data loss on the connector instance is expected (Netdata will also log it).
+        - name: 'timeout ms'
+          default_value: '2 * update_every * 1000'
+          description: 'The timeout in milliseconds to wait for the external database server to process the data.'
+          required: false
+        - name: 'send hosts matching'
+          default_value: 'localhost *'
+          description: |
+            Hosts filter. Determines which hosts will be sent to the external database. The syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#simple-patterns).
+          required: false
+          detailed_description: |
+            Includes one or more space separated patterns, using * as wildcard (any number of times within each pattern).
+            The patterns are checked against the hostname (the localhost is always checked as localhost), allowing us to
+            filter which hosts will be sent to the external database when this Netdata is a central Netdata aggregating multiple hosts.
+
+            A pattern starting with `!` gives a negative match. So to match all hosts named `*db*` except hosts containing `*child*`,
+            use `!*child* *db*` (so, the order is important: the first pattern matching the hostname will be used - positive or negative).
+        - name: 'send charts matching'
+          default_value: '*'
+          description: |
+            One or more space separated patterns (use * as wildcard) checked against both chart id and chart name.
+          required: false
+          detailed_description: |
+            A pattern starting with ! gives a negative match. So to match all charts named apps.* except charts ending in *reads,
+            use !*reads apps.* (so, the order is important: the first pattern matching the chart id or the chart name will be used,
+            positive or negative). There is also a URL parameter filter that can be used while querying allmetrics. The URL parameter
+            has a higher priority than the configuration option.
+        - name: 'send names instead of ids'
+          default_value: ''
+          description: 'Controls the metric names Netdata should send to the external database (yes|no).'
+          required: false
+          detailed_description: |
+            Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names
+            are human friendly labels (also unique). Most charts and metrics have the same ID and name, but in several cases they are
+            different : disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
+        - name: 'send configured labels'
+          default_value: ''
+          description: 'Controls if host labels defined in the `[host labels]` section in `netdata.conf` should be sent to the external database (yes|no).'
+          required: false
+        - name: 'send automatic labels'
+          default_value: ''
+          description: 'Controls if automatically created labels, like `_os_name` or `_architecture` should be sent to the external database (yes|no).'
+          required: false
+    examples:
+      folding:
+        enabled: true
+        title: ''
+      list:
+        - name: 'Example configuration'
+          folding:
+            enabled: false
+          description: 'Basic configuration'
+          config: |
+            [kinesis:my_instance]
+                enabled = yes
+                destination = us-east-1
+        - name: 'Configuration with AWS credentials'
+          folding:
+            enabled: false
+          description: 'Add `:https` modifier to the connector type if you need to use the TLS/SSL protocol. For example: `remote_write:https:my_instance`.'
+          config: |
+            [kinesis:my_instance]
+                enabled = yes
+                destination = us-east-1
+                # AWS credentials
+                aws_access_key_id = your_access_key_id
+                aws_secret_access_key = your_secret_access_key
+                # destination stream
+                stream name = your_stream_name

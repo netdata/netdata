@@ -28,7 +28,7 @@ area/exporting:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - exporting/**
+              - src/exporting/**
 
 area/build:
   - any:
