@@ -34,14 +34,22 @@ jobs:
             **.h
             **.hh
             **.in
+            **.patch
+            **.cmake
             CMakeLists.txt
             .gitignore
-            .github/workflows/checks.yml
-            build/**
-            aclk/aclk-schemas/
-            ml/dlib/
-            mqtt_websockets
-            web/server/h2o/libh2o
+            .github/data/distros.yml
+            .github/workflows/build.yml
+            .github/scripts/build-static.sh
+            .github/scripts/get-static-cache-key.sh
+            .github/scripts/gen-matrix-build.py
+            .github/scripts/run-updater-check.sh
+            packaging/*.version
+            packaging/*.checksums
+            src/aclk/aclk-schemas/
+            src/ml/dlib/
+            src/fluent-bit/
+            web/server/h2o/libh2o/
           files_ignore: |
             netdata.spec.in
             **.md
