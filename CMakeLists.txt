@@ -706,7 +706,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-statistics.h
         src/libnetdata/dictionary/dictionary-locks.h
         src/libnetdata/dictionary/dictionary-refcount.h
-        src/libnetdata/dictionary/dictionary-index-judy.h
+        src/libnetdata/dictionary/dictionary-hashtable.h
         src/libnetdata/dictionary/dictionary-item.h
         src/libnetdata/dictionary/dictionary-callbacks.h
 )

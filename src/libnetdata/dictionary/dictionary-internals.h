@@ -252,7 +252,7 @@ extern ARAL *dict_shared_items_aral;
 #include "dictionary-statistics.h"
 #include "dictionary-locks.h"
 #include "dictionary-refcount.h"
-#include "dictionary-index-judy.h"
+#include "dictionary-hashtable.h"
 #include "dictionary-callbacks.h"
 #include "dictionary-item.h"
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_DICTIONARY_INDEX_JUDY_H
-#define NETDATA_DICTIONARY_INDEX_JUDY_H
+#ifndef NETDATA_DICTIONARY_HASHTABLE_H
+#define NETDATA_DICTIONARY_HASHTABLE_H
 
 #include "dictionary-internals.h"
 
@@ -104,4 +104,4 @@ static inline void hashtable_inserted_item_unsafe(DICTIONARY *dict, void *item) 
 }
 
 
-#endif //NETDATA_DICTIONARY_INDEX_JUDY_H
+#endif //NETDATA_DICTIONARY_HASHTABLE_H
