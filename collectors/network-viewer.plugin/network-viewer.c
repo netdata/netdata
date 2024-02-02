@@ -211,6 +211,11 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_S
     }
 }
 
+static int local_sockets_compar(const void *a, const void *b) {
+    LOCAL_SOCKET *n1 = *(LOCAL_SOCKET **)a, *n2 = *(LOCAL_SOCKET **)b;
+    return strcmp(n1->comm, n2->comm);
+}
+
 void network_viewer_function(const char *transaction, char *function __maybe_unused, usec_t *stop_monotonic_ut __maybe_unused,
                              bool *cancelled __maybe_unused, BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
                              const char *source __maybe_unused, void *data __maybe_unused) {
@@ -321,17 +326,26 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         local_sockets_process(&ls);
 
         if(aggregated) {
+            LOCAL_SOCKET *array[ht.used];
+            size_t added = 0;
             uint64_t proc_self_net_ns_inode = ls.proc_self_net_ns_inode;
             for(SIMPLE_HASHTABLE_SLOT_AGGREGATED_SOCKETS *sl = simple_hashtable_first_read_only_AGGREGATED_SOCKETS(&ht);
                  sl;
                  sl = simple_hashtable_next_read_only_AGGREGATED_SOCKETS(&ht, sl)) {
                 LOCAL_SOCKET *n = SIMPLE_HASHTABLE_SLOT_DATA(sl);
-                if(!n) continue;
+                if(!n || added >= ht.used) continue;
 
-                local_socket_to_json_array(wb, n, proc_self_net_ns_inode, true);
-                string_freez(n->cmdline);
-                freez(n);
+                array[added++] = n;
             }
+
+            qsort(array, added, sizeof(LOCAL_SOCKET *), local_sockets_compar);
+
+            for(size_t i = 0; i < added ;i++) {
+                local_socket_to_json_array(wb, array[i], proc_self_net_ns_inode, true);
+                string_freez(array[i]->cmdline);
+                freez(array[i]);
+            }
+
             simple_hashtable_destroy_AGGREGATED_SOCKETS(&ht);
         }
 
@@ -687,6 +701,21 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     if(verify_netdata_host_prefix(true) == -1) exit(1);
 
     uc = system_usernames_cache_init();
+
+    // ----------------------------------------------------------------------------------------------------------------
+
+    if(argc == 2 && strcmp(argv[1], "debug") == 0) {
+        bool cancelled = false;
+        usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
+        char buf[] = "network-connections sockets:aggregated";
+        network_viewer_function("123", buf, &stop_monotonic_ut, &cancelled,
+                                 NULL, HTTP_ACCESS_ALL, NULL, NULL);
+
+        char buf2[] = "network-connections sockets:detailed";
+        network_viewer_function("123", buf2, &stop_monotonic_ut, &cancelled,
+                                NULL, HTTP_ACCESS_ALL, NULL, NULL);
+        exit(1);
+    }
 
     // ----------------------------------------------------------------------------------------------------------------
 

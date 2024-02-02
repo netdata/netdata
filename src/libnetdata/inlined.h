@@ -204,12 +204,28 @@ static inline long long str2ll(const char *s, char **endptr) {
     }
 }
 
+static inline uint32_t str2uint32_hex(const char *src, char **endptr) {
+    uint32_t num = 0;
+    const unsigned char *s = (const unsigned char *)src;
+    unsigned char c;
+
+    while ((c = hex_value_from_ascii[(uint8_t)*s]) != 255) {
+        num = (num << 4) | c;
+        s++;
+    }
+
+    if(endptr)
+        *endptr = (char *)s;
+
+    return num;
+}
+
 static inline uint64_t str2uint64_hex(const char *src, char **endptr) {
     uint64_t num = 0;
     const unsigned char *s = (const unsigned char *)src;
     unsigned char c;
 
-    while ((c = hex_value_from_ascii[toupper(*s)]) != 255) {
+    while ((c = hex_value_from_ascii[(uint8_t)*s]) != 255) {
         num = (num << 4) | c;
         s++;
     }

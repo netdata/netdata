@@ -341,8 +341,10 @@ __attribute__((constructor)) void initialize_ascii_maps(void) {
         base64_value_from_ascii[i] = 255;
     }
 
-    for(size_t i = 0; i < 16 ; i++)
-        hex_value_from_ascii[(int)hex_digits[i]] = i;
+    for(size_t i = 0; i < 16 ; i++) {
+        hex_value_from_ascii[(int)toupper(hex_digits[i])] = i;
+        hex_value_from_ascii[(int)tolower(hex_digits[i])] = i;
+    }
 
     for(size_t i = 0; i < 64 ; i++)
         base64_value_from_ascii[(int)base64_digits[i]] = i;

@@ -162,7 +162,7 @@ static inline void ipv6_to_in6_addr(const char *ipv6_str, struct in6_addr *d) {
     for (size_t k = 0; k < 4; ++k) {
         memcpy(buf, ipv6_str + (k * 8), 8);
         buf[sizeof(buf) - 1] = '\0';
-        d->s6_addr32[k] = strtoul(buf, NULL, 16);
+        d->s6_addr32[k] = str2uint32_hex(buf, NULL);
     }
 }
 
@@ -736,17 +736,26 @@ static inline bool local_sockets_netlink_get_sockets(LS_STATE *ls, uint16_t fami
 #endif // HAVE_LIBMNL
 
 static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
+    static bool is_space[256] = {
+        [':'] = true,
+        [' '] = true,
+    };
+
     if(family != AF_INET && family != AF_INET6)
         return false;
 
-    FILE *fp;
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-
-    fp = fopen(filename, "r");
+    FILE *fp = fopen(filename, "r");
     if (fp == NULL)
         return false;
+
+    char *line = malloc(1024);  // no mallocz() here because getline() may resize
+    if(!line) {
+        fclose(fp);
+        return false;
+    }
+
+    size_t len = 1024;
+    ssize_t read;
 
     ssize_t min_line_length = (family == AF_INET) ? 105 : 155;
     size_t counter = 0;
@@ -760,49 +769,60 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
             continue;
         }
 
-        unsigned int local_address, local_port, state, remote_address, remote_port;
-        uint64_t  inode = 0;
-        char local_address6[33], remote_address6[33];
-
-        if(family == AF_INET) {
-            if (sscanf(line, "%*d: %X:%X %X:%X %X %*X:%*X %*X:%*X %*X %*d %*d %"PRIu64,
-                       &local_address, &local_port, &remote_address, &remote_port, &state, &inode) != 6) {
-                local_sockets_log(ls, "cannot parse ipv4 line No %zu of filename '%s': %s", counter, filename, line);
-                continue;
-            }
-        }
-        else if(family == AF_INET6) {
-            if(sscanf(line, "%*d: %32[0-9A-Fa-f]:%X %32[0-9A-Fa-f]:%X %X %*X:%*X %*X:%*X %*X %*d %*d %"PRIu64,
-                       local_address6, &local_port, remote_address6, &remote_port, &state, &inode) != 6) {
-                local_sockets_log(ls, "cannot parse ipv6 line No %zu of filename '%s': %s", counter, filename, line);
-                continue;
-            }
-        }
-
         LOCAL_SOCKET n = {
-            .inode = inode,
             .direction = SOCKET_DIRECTION_NONE,
-            .state = (int)state,
             .local = {
                 .family = family,
                 .protocol = protocol,
-                .port = local_port,
             },
             .remote = {
                 .family = family,
                 .protocol = protocol,
-                .port = remote_port,
             },
             .uid = UID_UNSET,
         };
 
+        char *words[32];
+        size_t num_words = quoted_strings_splitter(line, words, 32, is_space);
+        // char *sl_txt = get_word(words, num_words, 0);
+        char *local_ip_txt = get_word(words, num_words, 1);
+        char *local_port_txt = get_word(words, num_words, 2);
+        char *remote_ip_txt = get_word(words, num_words, 3);
+        char *remote_port_txt = get_word(words, num_words, 4);
+        char *state_txt = get_word(words, num_words, 5);
+        char *tx_queue_txt = get_word(words, num_words, 6);
+        char *rx_queue_txt = get_word(words, num_words, 7);
+        char *tr_txt = get_word(words, num_words, 8);
+        char *tm_when_txt = get_word(words, num_words, 9);
+        char *retrans_txt = get_word(words, num_words, 10);
+        char *uid_txt = get_word(words, num_words, 11);
+        // char *timeout_txt = get_word(words, num_words, 12);
+        char *inode_txt = get_word(words, num_words, 13);
+
+        if(!local_ip_txt || !local_port_txt || !remote_ip_txt || !remote_port_txt || !state_txt ||
+            !tx_queue_txt || !rx_queue_txt || !tr_txt || !tm_when_txt || !retrans_txt || !uid_txt || !inode_txt) {
+            local_sockets_log(ls, "cannot parse ipv4 line No %zu of filename '%s'", counter, filename);
+            continue;
+        }
+
+        n.local.port = str2uint32_hex(local_port_txt, NULL);
+        n.remote.port = str2uint32_hex(remote_port_txt, NULL);
+        n.state = str2uint32_hex(state_txt, NULL);
+        n.wqueue = str2uint32_hex(tx_queue_txt, NULL);
+        n.rqueue = str2uint32_hex(rx_queue_txt, NULL);
+        n.timer = str2uint32_hex(tr_txt, NULL);
+        n.expires = str2uint32_hex(tm_when_txt, NULL);
+        n.retransmits = str2uint32_hex(retrans_txt, NULL);
+        n.uid = str2uint32_t(uid_txt, NULL);
+        n.inode = str2uint64_t(inode_txt, NULL);
+
         if(family == AF_INET) {
-            n.local.ip.ipv4 = local_address;
-            n.remote.ip.ipv4 = remote_address;
+            n.local.ip.ipv4 = str2uint32_hex(local_ip_txt, NULL);
+            n.remote.ip.ipv4 = str2uint32_hex(remote_ip_txt, NULL);
         }
         else if(family == AF_INET6) {
-            ipv6_to_in6_addr(local_address6, &n.local.ip.ipv6);
-            ipv6_to_in6_addr(remote_address6, &n.remote.ip.ipv6);
+            ipv6_to_in6_addr(local_ip_txt, &n.local.ip.ipv6);
+            ipv6_to_in6_addr(remote_ip_txt, &n.remote.ip.ipv6);
         }
 
         local_sockets_add_socket(ls, &n);
@@ -811,7 +831,7 @@ static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filen
     fclose(fp);
 
     if (line)
-        freez(line);
+        free(line); // no freez() here because getline() may resize
 
     return true;
 }
