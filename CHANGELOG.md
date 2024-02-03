@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Update file match patterns in CI jobs. [\#16917](https://github.com/netdata/netdata/pull/16917) ([Ferroin](https://github.com/Ferroin))
+- add support for the info parameter to all external plugin functions [\#16915](https://github.com/netdata/netdata/pull/16915) ([ktsaou](https://github.com/ktsaou))
+- Network viewer: filter by username [\#16911](https://github.com/netdata/netdata/pull/16911) ([ktsaou](https://github.com/ktsaou))
 - Build network-viewer only on linux [\#16910](https://github.com/netdata/netdata/pull/16910) ([vkalintiris](https://github.com/vkalintiris))
 - rename network functions [\#16908](https://github.com/netdata/netdata/pull/16908) ([ktsaou](https://github.com/ktsaou))
 - Remove markdown linter [\#16905](https://github.com/netdata/netdata/pull/16905) ([vkalintiris](https://github.com/vkalintiris))
@@ -399,10 +402,6 @@
 - Regenerate integrations.js [\#16330](https://github.com/netdata/netdata/pull/16330) ([netdatabot](https://github.com/netdatabot))
 - Improve unittests [\#16329](https://github.com/netdata/netdata/pull/16329) ([stelfrag](https://github.com/stelfrag))
 - fix coverity warnings in cgroups [\#16328](https://github.com/netdata/netdata/pull/16328) ([ilyam8](https://github.com/ilyam8))
-- Fix readme images [\#16327](https://github.com/netdata/netdata/pull/16327) ([Ancairon](https://github.com/Ancairon))
-- integrations: fix nightly tag in helm deploy [\#16326](https://github.com/netdata/netdata/pull/16326) ([ilyam8](https://github.com/ilyam8))
-- rename newly added functions [\#16325](https://github.com/netdata/netdata/pull/16325) ([ktsaou](https://github.com/ktsaou))
-- Added section Blog posts README.md [\#16323](https://github.com/netdata/netdata/pull/16323) ([Aliki92](https://github.com/Aliki92))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
