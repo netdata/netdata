@@ -698,6 +698,17 @@ set(LIBNETDATA_FILES
         src/libnetdata/config/dyncfg.h
         src/libnetdata/json/json-c-parser-inline.h
         src/libnetdata/template-enum.h
+        src/libnetdata/dictionary/dictionary-internals.h
+        src/libnetdata/dictionary/dictionary-unittest.c
+        src/libnetdata/dictionary/thread-cache.c
+        src/libnetdata/dictionary/thread-cache.h
+        src/libnetdata/dictionary/dictionary-traversal.c
+        src/libnetdata/dictionary/dictionary-statistics.h
+        src/libnetdata/dictionary/dictionary-locks.h
+        src/libnetdata/dictionary/dictionary-refcount.h
+        src/libnetdata/dictionary/dictionary-hashtable.h
+        src/libnetdata/dictionary/dictionary-item.h
+        src/libnetdata/dictionary/dictionary-callbacks.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

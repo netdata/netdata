@@ -58,6 +58,8 @@ typedef enum __attribute__((packed)) dictionary_options {
     DICT_OPTION_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
     DICT_OPTION_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
     DICT_OPTION_FIXED_SIZE              = (1 << 5), // the items of the dictionary have a fixed size
+    DICT_OPTION_INDEX_JUDY              = (1 << 6), // the default, if no other indexing is set
+    DICT_OPTION_INDEX_HASHTABLE         = (1 << 7), // use SIMPLE_HASHTABLE for indexing
 } DICT_OPTIONS;
 
 struct dictionary_stats {
@@ -327,15 +329,5 @@ size_t dictionary_referenced_items(DICTIONARY *dict);
 extern struct dictionary_stats dictionary_stats_category_other;
 
 int dictionary_unittest(size_t entries);
-
-// ----------------------------------------------------------------------------
-// THREAD CACHE
-
-void *thread_cache_entry_get_or_set(void *key,
-                                    ssize_t key_length,
-                                    void *value,
-                                    void *(*transform_the_value_before_insert)(void *key, size_t key_length, void *value));
-
-void thread_cache_destroy(void);
 
 #endif /* NETDATA_DICTIONARY_H */
