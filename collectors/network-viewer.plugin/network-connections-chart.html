@@ -315,6 +315,7 @@
             .style("fill", "url(#clientsGradient)");
 
         svg.append("text")
+            .attr("id", "clientsText")
             .text("Clients")
             .attr("x", "50%")
             .attr("y", borderPadding / 2 - 4)
@@ -349,6 +350,7 @@
             .style("fill", "url(#serversGradient)"); // Use the reversed gradient fill
 
         svg.append("text")
+            .attr("id", "serversText")
             .text("Servers")
             .attr("x", "50%")
             .attr("y", h - borderPadding / 2 + 16)
@@ -383,6 +385,7 @@
             .style("fill", "url(#publicGradient)");
 
         svg.append("text")
+            .attr("id", "publicText")
             .text("Public")
             .attr("x", w - (borderPadding / 2))
             .attr("y", ch - 10)
@@ -419,6 +422,7 @@
             .style("fill", "url(#privateGradient)");
 
         svg.append("text")
+            .attr("id", "privateText")
             .text("Private")
             .attr("x", borderPadding / 2)
             .attr("y", ch)
@@ -432,7 +436,8 @@
     }
 
     function updateGradientBoxes(svg, w, h, borderPadding, theme) {
-        // Assuming the IDs for gradients are set during their creation, update here accordingly
+        const cw = w / 2;
+        const ch = h / 2;
 
         // Update clientsGradient (top gradient) - mainly adjusting width
         svg.select("rect#clientsGradientRect")
@@ -460,7 +465,9 @@
 
         // Update text position if necessary, adjusting for rotation
         svg.select("text#publicText")
-            .attr("transform", `rotate(90, ${w - (borderPadding / 2)}, ${h / 2})`);
+            .attr("x", w - (borderPadding / 2))
+            .attr("y", ch - 10)
+            .attr("transform", `rotate(90, ${w - (borderPadding / 2)}, ${ch})`);
 
         // Update privateGradient (left gradient) - height adjustment only as it's already at x = 0
         svg.select("rect#privateGradientRect")
@@ -468,7 +475,10 @@
 
         // Update text position if necessary, adjusting for rotation
         svg.select("text#privateText")
-            .attr("transform", `rotate(-90, ${borderPadding / 2 - 10}, ${h / 2})`);
+            .attr("x", borderPadding / 2)
+            .attr("y", ch)
+            .attr("transform", `rotate(-90, ${borderPadding / 2 - 10}, ${ch})`);
+
     }
 
     let positionsMap = new Map();
