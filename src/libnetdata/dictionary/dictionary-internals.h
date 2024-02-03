@@ -145,7 +145,7 @@ struct dictionary {
     ARAL *value_aral;
 
     struct {                            // support for multiple indexing engines
-        Pvoid_t JudyHSArray;            // the hash table
+        Pvoid_t JudyHSArray;        // the hash table
         RW_SPINLOCK rw_spinlock;        // protect the index
     } index;
 
@@ -187,7 +187,7 @@ void garbage_collect_pending_deletes(DICTIONARY *dict);
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static inline const char *item_get_name(const DICTIONARY_ITEM *item);
-static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *item);
+static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, DICTIONARY_ITEM *item);
 static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item);
 

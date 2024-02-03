@@ -31,7 +31,7 @@ static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_si
         __atomic_fetch_sub(&dict->stats->memory.values, (long)value_size, __ATOMIC_RELAXED);
 }
 #else
-#define DICTIONARY_STATS_PLUS_MEMORY(dict, key_size, item_size, value_size) do {;} while(0)
+#define DICTIONARY_STATS_PLUS_MEMORY(dict, key_size, item_size, value_size) do {(void)item_size;} while(0)
 #define DICTIONARY_STATS_MINUS_MEMORY(dict, key_size, item_size, value_size) do {;} while(0)
 #endif
 

@@ -439,18 +439,17 @@ static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONA
     size_t spins = 0;
     DICTIONARY_ITEM *item = NULL;
     do {
-        DICTIONARY_ITEM **item_pptr = (DICTIONARY_ITEM **)hashtable_insert_unsafe(dict, name, name_len);
-        if (likely(*item_pptr == NULL)) {
+        void *handle = hashtable_insert_unsafe(dict, name, name_len);
+        item = hashtable_insert_handle_to_item_unsafe(dict, handle);
+        if (likely(item == NULL)) {
             // a new item added to the index
 
             // create the dictionary item
-            item = *item_pptr =
-                dict_item_create_with_hooks(dict, name, name_len, value, value_len, constructor_data, master_item);
+            item = dict_item_create_with_hooks(dict, name, name_len, value, value_len, constructor_data, master_item);
 
             pointer_add(dict, item);
 
-            // call the hashtable react
-            hashtable_inserted_item_unsafe(dict, item);
+            hashtable_set_item_unsafe(dict, handle, item);
 
             // unlock the index lock, before we add it to the linked list
             // DON'T DO IT THE OTHER WAY AROUND - DO NOT CROSS THE LOCKS!
@@ -461,9 +460,9 @@ static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONA
             added_or_updated = true;
         }
         else {
-            pointer_check(dict, *item_pptr);
+            pointer_check(dict, item);
 
-            if(item_check_and_acquire_advanced(dict, *item_pptr, true) != RC_ITEM_OK) {
+            if(item_check_and_acquire_advanced(dict, item, true) != RC_ITEM_OK) {
                 spins++;
                 continue;
             }
@@ -475,8 +474,6 @@ static inline DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONA
             // We should not compare the values here!
             // even if they are the same, we have to do the whole job
             // so that the callbacks will be called.
-
-            item = *item_pptr;
 
             if(is_view_dictionary(dict)) {
                 // view dictionary

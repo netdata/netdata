@@ -265,8 +265,8 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
         item_size += dict_item_free_with_hooks(dict, item);
         item = item_next;
 
-        // to speed up destruction, we don't
-        // unlink item from the linked-list here
+        // to speed up destruction, we don't unlink the item
+        // from the linked-list here
 
         counted_items++;
     }
@@ -496,6 +496,9 @@ static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dicti
         dict->value_aral = aral_by_size_acquire(fixed_size);
     else
         dict->value_aral = NULL;
+
+    if(!(dict->options & (DICT_OPTION_INDEX_JUDY|DICT_OPTION_INDEX_HASHTABLE)))
+        dict->options |= DICT_OPTION_INDEX_JUDY;
 
     size_t dict_size = 0;
     dict_size += sizeof(DICTIONARY);
