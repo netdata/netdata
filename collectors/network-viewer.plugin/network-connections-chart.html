@@ -33,11 +33,12 @@
 
     function transformData(dataPayload) {
         // console.log("dataPayload", dataPayload);
-        const desiredColumns = ["Direction", "Protocol", "Namespace", "Process", "CommandLine", "LocalIP", "LocalPort", "RemoteIP", "RemotePort", "LocalAddressSpace", "RemoteAddressSpace"];
+        const desiredColumns = ["Direction", "Protocol", "Namespace", "Process", "LocalIP", "LocalPort", "RemoteIP", "RemotePort", "LocalAddressSpace", "RemoteAddressSpace"];
 
         const transformedData = [];
         const appMap = new Map();
 
+        console.log(dataPayload);
         dataPayload.data.forEach(row => {
             const rowData = {};
             desiredColumns.forEach(columnName => {
@@ -631,7 +632,7 @@
 
     // Modify your fetchData function to call drawApplications after data transformation
     function fetchDataAndUpdateChart() {
-        fetch('http://localhost:19999/api/v1/function?function=network-viewer')
+        fetch('http://localhost:19999/api/v1/function?function=network-connections')
             .then(response => response.json())
             .then(data => {
                 lastPayload = data;
