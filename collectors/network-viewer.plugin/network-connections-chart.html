@@ -11,6 +11,7 @@
             padding: 0;
             height: 100%;
             width: 100%;
+            overflow: hidden;
         }
 
         #d3-canvas {
@@ -284,9 +285,6 @@
     }
 
     function drawInitialChart(svg, data, w, h, borderPadding, theme) {
-        console.log("drawInitialChart");
-        d3.select("#d3-canvas").selectAll("svg > *").remove()
-
         const cw = w / 2;
         const ch = h / 2;
 
@@ -309,6 +307,7 @@
             .style("stop-color", getRgbColor(theme.clientColor, 0));
 
         svg.append("rect")
+            .attr("id", "clientsGradientRect")
             .attr("x", 0)
             .attr("y", 0)
             .attr("width", "100%")
@@ -342,6 +341,7 @@
             .style("stop-color", getRgbColor(theme.serverColor, 0));
 
         svg.append("rect")
+            .attr("id", "serversGradientRect")
             .attr("x", 0)
             .attr("y", h - borderPadding / 2)
             .attr("width", "100%")
@@ -375,6 +375,7 @@
             .style("stop-color", getRgbColor(theme.publicColor, 0));
 
         svg.append("rect")
+            .attr("id", "publicGradientRect")
             .attr("x", w - borderPadding / 2)
             .attr("y", 0)
             .attr("width", borderPadding / 2)
@@ -410,6 +411,7 @@
             .style("stop-color", getRgbColor(theme.privateColor, 0));
 
         svg.append("rect")
+            .attr("id", "privateGradientRect")
             .attr("x", 0)
             .attr("y", 0)
             .attr("width", borderPadding / 2)
@@ -427,6 +429,46 @@
             .style("font-size", theme.borderFontSize)
             .style("font-weight", theme.borderFontWeight)
             .style("fill", theme.borderFontColor);
+    }
+
+    function updateGradientBoxes(svg, w, h, borderPadding, theme) {
+        // Assuming the IDs for gradients are set during their creation, update here accordingly
+
+        // Update clientsGradient (top gradient) - mainly adjusting width
+        svg.select("rect#clientsGradientRect")
+            .attr("width", w); // Stretch across the new width
+
+        // Update text position if necessary
+        svg.select("text#clientsText")
+            .attr("x", w / 2); // Center text
+
+        // Update serversGradient (bottom gradient) - adjust Y position and width
+        svg.select("rect#serversGradientRect")
+            .attr("y", h - borderPadding / 2) // Move to the new bottom position
+            .attr("width", w) // Stretch across the new width
+            .attr("fill", "red");
+
+        // Update text position if necessary
+        svg.select("text#serversText")
+            .attr("x", w / 2) // Center text
+            .attr("y", h - borderPadding / 2 + 16); // Adjust based on your specific offset
+
+        // Update publicGradient (right gradient) - adjust X position and height
+        svg.select("rect#publicGradientRect")
+            .attr("x", w - borderPadding / 2) // Move to the new right side position
+            .attr("height", h); // Stretch across the new height
+
+        // Update text position if necessary, adjusting for rotation
+        svg.select("text#publicText")
+            .attr("transform", `rotate(90, ${w - (borderPadding / 2)}, ${h / 2})`);
+
+        // Update privateGradient (left gradient) - height adjustment only as it's already at x = 0
+        svg.select("rect#privateGradientRect")
+            .attr("height", h); // Stretch across the new height
+
+        // Update text position if necessary, adjusting for rotation
+        svg.select("text#privateText")
+            .attr("transform", `rotate(-90, ${borderPadding / 2 - 10}, ${h / 2})`);
     }
 
     let positionsMap = new Map();
@@ -547,7 +589,8 @@
     function drawApplications(data, w, h, borderPadding, theme) {
         let svg = d3.select('#d3-canvas').select('svg');
 
-        if(svg.empty() || forceInit) {
+        if(svg.empty()) {
+            svg = d3.select('#d3-canvas').select('svg');
             svg = d3.select('#d3-canvas').append('svg')
                 .attr('width', '100%')
                 .attr('height', '100%');
@@ -555,6 +598,8 @@
             drawInitialChart(svg, data, w, h, borderPadding, theme);
             forceInit = false;
         }
+
+        updateGradientBoxes(svg, w, h, borderPadding, theme);
 
         const app = updateApps(svg, data, w, h, borderPadding, theme);
 
@@ -616,7 +661,7 @@
     }
 
     // Debounce function to optimize performance
-    function debounce(func, timeout = 300) {
+    function debounce(func, timeout = 50) {
         let timer;
         return (...args) => {
             clearTimeout(timer);
