@@ -1736,7 +1736,7 @@ should_install_fluentbit() {
   elif [ "${FLUENT_BIT_BUILD_SUCCESS:=0}" -eq 0 ]; then
     run_failed "Fluent-Bit was not built successfully, Netdata Logs Management support will be disabled in this build."
     return 1
-  elif [ ! -f fluent-bit/build/lib/libfluent-bit.so ]; then
+  elif [ ! -f src/fluent-bit/build/lib/libfluent-bit.so ]; then
     run_failed "libfluent-bit.so is missing, Netdata Logs Management support will be disabled in this build."
     return 1
   fi
@@ -1752,10 +1752,10 @@ install_fluentbit() {
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing Fluent-Bit."
 
-  run chown "root:${NETDATA_GROUP}" fluent-bit/build/lib
-  run chmod 0644 fluent-bit/build/lib/libfluent-bit.so
+  run chown "root:${NETDATA_GROUP}" src/fluent-bit/build/lib
+  run chmod 0644 src/fluent-bit/build/lib/libfluent-bit.so
 
-  run cp -a -v fluent-bit/build/lib/libfluent-bit.so "${NETDATA_PREFIX}"/usr/lib/netdata
+  run cp -a -v src/fluent-bit/build/lib/libfluent-bit.so "${NETDATA_PREFIX}"/usr/lib/netdata
 
   [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
 }
