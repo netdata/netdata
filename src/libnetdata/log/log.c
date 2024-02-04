@@ -661,8 +661,10 @@ void nd_log_set_priority_level(const char *setting) {
     priority = NDLP_DEBUG;
 #endif
 
-    nd_log.sources[NDLS_DAEMON].min_priority = priority;
-    nd_log.sources[NDLS_COLLECTORS].min_priority = priority;
+    for (size_t i = 0; i < _NDLS_MAX; i++) {
+        if (i != NDLS_DEBUG)
+            nd_log.sources[i].min_priority = priority;
+    }
 
     // the right one
     setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
