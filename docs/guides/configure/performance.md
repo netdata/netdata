@@ -93,12 +93,12 @@ To configure retention, you can:
 
 1. [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
 
-To control disk I/O 
+To control disk I/O:
 
 1. [Use a different metric storage database](https://github.com/netdata/netdata/blob/master/src/database/README.md),
 
 
-Minimize deployment impact on the production system by optimizing disk footprint
+Minimize deployment impact on the production system by optimizing disk footprint:
 
 1. [Using streaming and replication](#use-streaming-and-replication)
 2. [Reduce the data collection frequency](#reduce-collection-frequency)
