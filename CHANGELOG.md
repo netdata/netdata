@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- split dictionary into multiple files [\#16920](https://github.com/netdata/netdata/pull/16920) ([ktsaou](https://github.com/ktsaou))
 - Update file match patterns in CI jobs. [\#16917](https://github.com/netdata/netdata/pull/16917) ([Ferroin](https://github.com/Ferroin))
 - add support for the info parameter to all external plugin functions [\#16915](https://github.com/netdata/netdata/pull/16915) ([ktsaou](https://github.com/ktsaou))
 - Network viewer: filter by username [\#16911](https://github.com/netdata/netdata/pull/16911) ([ktsaou](https://github.com/ktsaou))
