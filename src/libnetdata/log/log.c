@@ -2254,7 +2254,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     int saved_errno = errno;
     source = nd_log_validate_source(source);
 
-    if((source == NDLS_DAEMON || source == NDLS_COLLECTORS) && priority > nd_log.sources[source].min_priority)
+    if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
         return;
 
     va_list args;
@@ -2268,6 +2268,9 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     int saved_errno = errno;
     source = nd_log_validate_source(source);
+
+    if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
+        return;
 
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
