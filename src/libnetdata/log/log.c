@@ -661,8 +661,10 @@ void nd_log_set_priority_level(const char *setting) {
     priority = NDLP_DEBUG;
 #endif
 
-    nd_log.sources[NDLS_DAEMON].min_priority = priority;
-    nd_log.sources[NDLS_COLLECTORS].min_priority = priority;
+    for (size_t i = 0; i < _NDLS_MAX; i++) {
+        if (i != NDLS_DEBUG)
+            nd_log.sources[i].min_priority = priority;
+    }
 
     // the right one
     setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
@@ -2252,7 +2254,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     int saved_errno = errno;
     source = nd_log_validate_source(source);
 
-    if((source == NDLS_DAEMON || source == NDLS_COLLECTORS) && priority > nd_log.sources[source].min_priority)
+    if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
         return;
 
     va_list args;
@@ -2266,6 +2268,9 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     int saved_errno = errno;
     source = nd_log_validate_source(source);
+
+    if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
+        return;
 
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
