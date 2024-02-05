@@ -490,9 +490,15 @@ You can monitor the replication process in two ways:
 
 ### Replication and storage
 
-When netdata replicates data from child to parent, the agent will replicate data stored in [tier 0](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics#effect-of-storage-tiers-and-disk-space-on-retention),
-because other tiers are calculated from its data. The default storage values allow `tier 0` to have `12 days` of retention.
-To have more data replicated, it is necessary to change both parent and child [configuration](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics). 
+When netdata is configured with [dbengine](https://github.com/netdata/netdata/blob/master/src/database/README.md),
+it will replicate data stored in [tier 0](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics#effect-of-storage-tiers-and-disk-space-on-retention),
+and other levels will be calculated again on parent side.
+
+You can check the status, and days replicated accessing the URL `https://localhost:19999/api/v2/node_instances`.
+
+To have more data replicated, it is necessary to change both parent and child
+[configuration](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics).
+
 
 ## Troubleshooting
 
