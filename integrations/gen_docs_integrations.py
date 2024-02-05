@@ -21,7 +21,7 @@ def cleanup():
             if "integrations" in str(element):
                 shutil.rmtree(element)
 
-        for element in Path("exporting").glob('**/*/'):
+        for element in Path("src/exporting").glob('**/*/'):
             if "integrations" in str(element):
                 shutil.rmtree(element)
         for element in Path("integrations/cloud-notifications").glob('**/*/'):
