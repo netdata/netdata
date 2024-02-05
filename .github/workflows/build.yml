@@ -199,7 +199,7 @@ jobs:
       - name: Build
         if: github.event_name == 'workflow_dispatch' && needs.file-check.outputs.run == 'true'
         id: build
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 180
           max_attempts: 3
