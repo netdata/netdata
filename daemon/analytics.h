@@ -71,6 +71,7 @@ struct analytics_data {
 
     size_t charts_count;
     size_t metrics_count;
+    SPINLOCK spinlock;
 
     bool exporting_enabled;
 };
