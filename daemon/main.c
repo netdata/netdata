@@ -2016,11 +2016,11 @@ int main(int argc, char **argv) {
         health_set_silencers_filename();
         health_initialize_global_silencers();
 
-        // --------------------------------------------------------------------
-        // Initialize ML configuration
-
-        delta_startup_time("initialize ML");
-        ml_init();
+//        // --------------------------------------------------------------------
+//        // Initialize ML configuration
+//
+//        delta_startup_time("initialize ML");
+//        ml_init();
 
         // --------------------------------------------------------------------
         // setup process signals
@@ -2073,8 +2073,18 @@ int main(int argc, char **argv) {
         web_client_api_v1_init();
         web_server_threading_selection();
 
-        if(web_server_mode != WEB_SERVER_MODE_NONE)
-            api_listen_sockets_setup();
+        if(web_server_mode != WEB_SERVER_MODE_NONE) {
+            if (!api_listen_sockets_setup()) {
+                netdata_log_error("Cannot setup listen port(s). Is Netdata already running?");
+                exit(1);
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Initialize ML configuration
+
+        delta_startup_time("initialize ML");
+        ml_init();
 
 #ifdef ENABLE_H2O
         delta_startup_time("initialize h2o server");
