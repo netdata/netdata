@@ -39,7 +39,7 @@ DEPLOY_SOURCES = [
 ]
 
 EXPORTER_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'exporting', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'exporting', True),
 ]
 
 NOTIFICATION_SOURCES = [
