@@ -57,16 +57,16 @@ void debug_sockets() {
 	buffer_free(wb);
 }
 
-void api_listen_sockets_setup(void) {
+bool api_listen_sockets_setup(void) {
 	int socks = listen_sockets_setup(&api_sockets);
 
 	if(!socks)
-		fatal("LISTENER: Cannot listen on any API socket. Exiting...");
+        return false;
 
 	if(unlikely(debug_flags & D_WEB_CLIENT))
 		debug_sockets();
 
-	return;
+	return true;
 }
 
 
