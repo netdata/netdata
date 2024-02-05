@@ -2162,13 +2162,11 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
     if(likely(!thread_log_fields[NDF_THREAD_TAG].entry.set)) {
         const char *thread_tag = netdata_thread_tag();
-        if(!netdata_thread_tag_exists()) {
-            if (!netdata_thread_tag_exists()) {
-                os_thread_get_current_name_np(os_threadname);
-                if ('\0' != os_threadname[0])
-                    /* If it is not an empty string replace "MAIN" thread_tag */
-                    thread_tag = os_threadname;
-            }
+        if (!netdata_thread_tag_exists()) {
+            os_thread_get_current_name_np(os_threadname);
+            if ('\0' != os_threadname[0])
+                /* If it is not an empty string replace "MAIN" thread_tag */
+                thread_tag = os_threadname;
         }
         thread_log_fields[NDF_THREAD_TAG].entry = ND_LOG_FIELD_TXT(NDF_THREAD_TAG, thread_tag);
 
@@ -2311,13 +2309,11 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
 
     char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
     const char *thread_tag = netdata_thread_tag();
-    if(!netdata_thread_tag_exists()) {
-        if (!netdata_thread_tag_exists()) {
-            os_thread_get_current_name_np(os_threadname);
-            if ('\0' != os_threadname[0])
-                /* If it is not an empty string replace "MAIN" thread_tag */
-                thread_tag = os_threadname;
-        }
+    if (!netdata_thread_tag_exists()) {
+        os_thread_get_current_name_np(os_threadname);
+        if ('\0' != os_threadname[0])
+            /* If it is not an empty string replace "MAIN" thread_tag */
+            thread_tag = os_threadname;
     }
     if(!thread_tag)
         thread_tag = "UNKNOWN";
