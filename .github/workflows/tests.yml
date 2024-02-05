@@ -20,8 +20,8 @@ concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  unit-tests-legacy:
-    name: Unit Tests (legacy)
+  unit-tests-asan:
+    name: Unit Tests (Address Sanitizer)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,5 +37,7 @@ jobs:
       - name: Run ./tests/run-unit-tests.sh
         env:
           CFLAGS: "-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1"
+          NETDATA_CMAKE_OPTIONS: "-DCMAKE_BUILD_TYPE=Debug -DENABLE_ADDRESS_SANITIZER=On"
+          ASAN_OPTIONS: "detect_leaks=1"
         run: |
           ./tests/run-unit-tests.sh

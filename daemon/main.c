@@ -2304,3 +2304,4 @@ int main(int argc, char **argv) {
     // but we need it for rpmlint #2752
     return 1;
 }
+
