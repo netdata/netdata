@@ -1,6 +1,6 @@
 # Start, stop, or restart the Netdata Agent
 
-When you install the Netdata Agent, the [daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md) is 
+When you install the Netdata Agent, the [daemon](https://github.com/netdata/netdata/blob/master/src/daemon/README.md) is 
 configured to start at boot and stop and restart/shutdown.
 
 You will most often need to _restart_ the Agent to load new or editing configuration files. 

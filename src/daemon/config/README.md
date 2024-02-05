@@ -1,7 +1,7 @@
 <!--
 title: "Daemon configuration"
 description: "The Netdata Agent's daemon is installed preconfigured to collect thousands of metrics every second, but is highly configurable for real-world workloads."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/daemon/config/README.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/daemon/config/README.md"
 sidebar_label: "Daemon"
 learn_status: "Published"
 learn_rel_path: "Configuration"
@@ -29,13 +29,13 @@ the [web server access lists](https://github.com/netdata/netdata/blob/master/web
 
 `netdata.conf` has sections stated with `[section]`. You will see the following sections:
 
-1. `[global]` to [configure](#global-section-options) the [Netdata daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md).
+1. `[global]` to [configure](#global-section-options) the [Netdata daemon](https://github.com/netdata/netdata/blob/master/src/daemon/README.md).
 2. `[db]` to [configure](#db-section-options) the database of Netdata.
 3. `[directories]` to [configure](#directories-section-options) the directories used by Netdata.
 4. `[logs]` to [configure](#logs-section-options) the Netdata logging.
 5. `[environment variables]` to [configure](#environment-variables-section-options) the environment variables used
    Netdata.
-6. `[sqlite]` to [configure](#sqlite-section-options) the [Netdata daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md) SQLite settings.
+6. `[sqlite]` to [configure](#sqlite-section-options) the [Netdata daemon](https://github.com/netdata/netdata/blob/master/src/daemon/README.md) SQLite settings.
 7. `[ml]` to configure settings for [machine learning](https://github.com/netdata/netdata/blob/master/src/ml/README.md).
 8. `[health]` to [configure](#health-section-options) general settings for [health monitoring](https://github.com/netdata/netdata/blob/master/health/README.md).
 9. `[web]` to [configure the web server](https://github.com/netdata/netdata/blob/master/web/server/README.md).
@@ -74,10 +74,10 @@ Please note that your data history will be lost if you have modified `history` p
 
 |              setting               |    default    | info                                                                                                                                                                                                                                         |
 |:----------------------------------:|:-------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|     process scheduling policy      |    `keep`     | See [Netdata process scheduling policy](https://github.com/netdata/netdata/blob/master/daemon/README.md#netdata-process-scheduling-policy)                                                                                                   |
+|     process scheduling policy      |    `keep`     | See [Netdata process scheduling policy](https://github.com/netdata/netdata/blob/master/src/daemon/README.md#netdata-process-scheduling-policy)                                                                                                   |
 |             OOM score              |      `0`      |                                                                                                                                                                                                                                              |
-| glibc malloc arena max for plugins |      `1`      | See [Virtual memory](https://github.com/netdata/netdata/blob/master/daemon/README.md#virtual-memory).                                                                                                                                        |
-| glibc malloc arena max for Netdata |      `1`      | See [Virtual memory](https://github.com/netdata/netdata/blob/master/daemon/README.md#virtual-memory).                                                                                                                                        |
+| glibc malloc arena max for plugins |      `1`      | See [Virtual memory](https://github.com/netdata/netdata/blob/master/src/daemon/README.md#virtual-memory).                                                                                                                                        |
+| glibc malloc arena max for Netdata |      `1`      | See [Virtual memory](https://github.com/netdata/netdata/blob/master/src/daemon/README.md#virtual-memory).                                                                                                                                        |
 |              hostname              | auto-detected | The hostname of the computer running Netdata.                                                                                                                                                                                                |
 |         host access prefix         |     empty     | This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43). |
 |              timezone              | auto-detected | The timezone retrieved from the environment variable                                                                                                                                                                                         |
@@ -117,7 +117,7 @@ Please note that your data history will be lost if you have modified `history` p
 |:-------------------:|:------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |       config        |                           `/etc/netdata`                           | The directory configuration files are kept.                                                                                                                                        |
 |    stock config     |                     `/usr/lib/netdata/conf.d`                      |                                                                                                                                                                                    |
-|         log         |                         `/var/log/netdata`                         | The directory in which the [log files](https://github.com/netdata/netdata/blob/master/daemon/README.md#log-files) are kept.                                                        |
+|         log         |                         `/var/log/netdata`                         | The directory in which the [log files](https://github.com/netdata/netdata/blob/master/src/daemon/README.md#log-files) are kept.                                                        |
 |         web         |                      `/usr/share/netdata/web`                      | The directory the web static files are kept.                                                                                                                                       |
 |        cache        |                        `/var/cache/netdata`                        | The directory the memory database will be stored if and when Netdata exits. Netdata will re-read the database when it will start again, to continue from the same point.           |
 |         lib         |                         `/var/lib/netdata`                         | Contains the alert log and the Netdata instance GUID.                                                                                                                              |
@@ -132,8 +132,8 @@ Please note that your data history will be lost if you have modified `history` p
 
 |              setting               |            default            | info                                                                                                                                                                                                                                                                                                                             |
 |:----------------------------------:|:-----------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|            debug flags             |     `0x0000000000000000`      | Bitmap of debug options to enable. For more information check [Tracing Options](https://github.com/netdata/netdata/blob/master/daemon/README.md#debugging).                                                                                                                                                                      |
-|               debug                | `/var/log/netdata/debug.log`  | The filename to save debug information. This file will not be created if debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](https://github.com/netdata/netdata/blob/master/daemon/README.md#debugging). |
+|            debug flags             |     `0x0000000000000000`      | Bitmap of debug options to enable. For more information check [Tracing Options](https://github.com/netdata/netdata/blob/master/src/daemon/README.md#debugging).                                                                                                                                                                      |
+|               debug                | `/var/log/netdata/debug.log`  | The filename to save debug information. This file will not be created if debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](https://github.com/netdata/netdata/blob/master/src/daemon/README.md#debugging). |
 |               error                | `/var/log/netdata/error.log`  | The filename to save error messages for Netdata daemon and all plugins (`stderr` is sent here for all Netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.                                                                                     |
 |               access               | `/var/log/netdata/access.log` | The filename to save the log of web clients accessing Netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.                                                                                                                                                           |
 |              facility              |           `daemon`            | A facility keyword is used to specify the type of system that is logging the message.                                                                                                                                                                                                                                            |

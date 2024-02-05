@@ -2840,13 +2840,13 @@ netdataDashboard.context = {
 
     'apps.vmem': {
         info: 'Virtual memory allocated by applications. '+
-        'Check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+        'Check <a href="https://github.com/netdata/netdata/tree/master/src/daemon#virtual-memory" target="_blank">this article</a> for more information.'
     },
     'groups.vmem': {
-        info: 'Virtual memory allocated per user group since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated per user group since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/src/daemon#virtual-memory" target="_blank">this article</a> for more information.'
     },
     'users.vmem': {
-        info: 'Virtual memory allocated per user since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated per user since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/src/daemon#virtual-memory" target="_blank">this article</a> for more information.'
     },
 
     'apps.minor_faults': {
