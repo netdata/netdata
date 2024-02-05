@@ -1,1 +1,0 @@
-integrations/aws_kinesis.md

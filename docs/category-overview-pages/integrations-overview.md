@@ -26,6 +26,6 @@ We designed Netdata with interoperability in mind. The Agent collects thousands 
 you do with them is up to you. You can 
 [store metrics in the database engine](https://github.com/netdata/netdata/blob/master/src/database/README.md),
 or send them to another time series database for long-term storage or further analysis using
-Netdata's [exporting engine](https://github.com/netdata/netdata/edit/master/exporting/README.md).
+Netdata's [exporting engine](https://github.com/netdata/netdata/edit/master/src/exporting/README.md).
 
 

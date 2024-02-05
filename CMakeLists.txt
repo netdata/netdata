@@ -922,23 +922,23 @@ set(API_PLUGIN_FILES
 )
 
 set(EXPORTING_ENGINE_FILES
-        exporting/exporting_engine.c
-        exporting/exporting_engine.h
-        exporting/graphite/graphite.c
-        exporting/graphite/graphite.h
-        exporting/json/json.c
-        exporting/json/json.h
-        exporting/opentsdb/opentsdb.c
-        exporting/opentsdb/opentsdb.h
-        exporting/prometheus/prometheus.c
-        exporting/prometheus/prometheus.h
-        exporting/read_config.c
-        exporting/clean_connectors.c
-        exporting/init_connectors.c
-        exporting/process_data.c
-        exporting/check_filters.c
-        exporting/send_data.c
-        exporting/send_internal_metrics.c
+        src/exporting/exporting_engine.c
+        src/exporting/exporting_engine.h
+        src/exporting/graphite/graphite.c
+        src/exporting/graphite/graphite.h
+        src/exporting/json/json.c
+        src/exporting/json/json.h
+        src/exporting/opentsdb/opentsdb.c
+        src/exporting/opentsdb/opentsdb.h
+        src/exporting/prometheus/prometheus.c
+        src/exporting/prometheus/prometheus.h
+        src/exporting/read_config.c
+        src/exporting/clean_connectors.c
+        src/exporting/init_connectors.c
+        src/exporting/process_data.c
+        src/exporting/check_filters.c
+        src/exporting/send_data.c
+        src/exporting/send_internal_metrics.c
 )
 
 set(HEALTH_PLUGIN_FILES
@@ -1437,15 +1437,15 @@ set(ACLK_FILES
 
 
 set(MONGODB_EXPORTING_FILES
-        exporting/mongodb/mongodb.c
-        exporting/mongodb/mongodb.h
+        src/exporting/mongodb/mongodb.c
+        src/exporting/mongodb/mongodb.h
 )
 
 set(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
-        exporting/prometheus/remote_write/remote_write.c
-        exporting/prometheus/remote_write/remote_write.h
-        exporting/prometheus/remote_write/remote_write_request.cc
-        exporting/prometheus/remote_write/remote_write_request.h
+        src/exporting/prometheus/remote_write/remote_write.c
+        src/exporting/prometheus/remote_write/remote_write.h
+        src/exporting/prometheus/remote_write/remote_write_request.cc
+        src/exporting/prometheus/remote_write/remote_write_request.h
 )
 
 #
@@ -2062,11 +2062,11 @@ if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                 endif()
         endif()
 
-        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write"
-                            "${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write"
+        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
+                            "${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
                             PROMETHEUS_REMOTE_WRITE_BUILT_SRCS
                             PROMETHEUS_REMOTE_WRITE_BUILT_HDRS
-                            "exporting/prometheus/remote_write/remote_write.proto")
+                            "src/exporting/prometheus/remote_write/remote_write.proto")
 
         list(APPEND PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
                     ${PROMETHEUS_REMOTE_WRITE_BUILT_SRCS}
@@ -2313,7 +2313,7 @@ install(FILES
 # exporting
 #
 install(FILES
-        exporting/exporting.conf
+        src/exporting/exporting.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 #

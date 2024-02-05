@@ -60,8 +60,8 @@ Netdata Agent exports metrics _beginning from the time the process starts_, and 
 collected, you should start seeing data in your external database after only a few seconds.
 
 Any further configuration is optional, based on your needs and the configuration of your OpenTSDB database. See the
-[OpenTSDB connector doc](https://github.com/netdata/netdata/blob/master/exporting/opentsdb/README.md)
-and [exporting engine reference](https://github.com/netdata/netdata/blob/master/exporting/README.md#configuration) for
+[OpenTSDB connector doc](https://github.com/netdata/netdata/blob/master/src/exporting/opentsdb/README.md)
+and [exporting engine reference](https://github.com/netdata/netdata/blob/master/src/exporting/README.md#configuration) for
 details.
 
 ## Example: Enable the Graphite connector
@@ -84,22 +84,22 @@ Because the Agent exports metrics as they're collected, you should start seeing 
 only a few seconds.
 
 Any further configuration is optional, based on your needs and the configuration of your Graphite-supported database.
-See [exporting engine reference](https://github.com/netdata/netdata/blob/master/exporting/README.md#configuration) for
+See [exporting engine reference](https://github.com/netdata/netdata/blob/master/src/exporting/README.md#configuration) for
 details.
 
 ## What's next?
 
 If you want to further configure your exporting connectors, see
-the [exporting engine reference](https://github.com/netdata/netdata/blob/master/exporting/README.md#configuration).
+the [exporting engine reference](https://github.com/netdata/netdata/blob/master/src/exporting/README.md#configuration).
 
 For a comprehensive example of using the Graphite connector, read our documentation on 
-[exporting metrics to Graphite providers](https://github.com/netdata/netdata/blob/master/exporting/graphite/README.md). Or, start
+[exporting metrics to Graphite providers](https://github.com/netdata/netdata/blob/master/src/exporting/graphite/README.md). Or, start
 [using host labels](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md) on exported metrics.
 
 ### Related reference documentation
 
-- [Exporting engine reference](https://github.com/netdata/netdata/blob/master/exporting/README.md)
-- [OpenTSDB connector](https://github.com/netdata/netdata/blob/master/exporting/opentsdb/README.md)
-- [Graphite connector](https://github.com/netdata/netdata/blob/master/exporting/graphite/README.md)
+- [Exporting engine reference](https://github.com/netdata/netdata/blob/master/src/exporting/README.md)
+- [OpenTSDB connector](https://github.com/netdata/netdata/blob/master/src/exporting/opentsdb/README.md)
+- [Graphite connector](https://github.com/netdata/netdata/blob/master/src/exporting/graphite/README.md)
 
 
