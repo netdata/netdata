@@ -2075,7 +2075,7 @@ int main(int argc, char **argv) {
 
         if(web_server_mode != WEB_SERVER_MODE_NONE) {
             if (!api_listen_sockets_setup()) {
-                netdata_log_info("Cannot setup listen port(s). Is Netdata already running?");
+                netdata_log_error("Cannot setup listen port(s). Is Netdata already running?");
                 exit(1);
             }
         }
