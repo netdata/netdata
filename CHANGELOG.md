@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Minor rework on document optimize performance guide [\#16925](https://github.com/netdata/netdata/pull/16925) ([tkatsoulas](https://github.com/tkatsoulas))
 - split dictionary into multiple files [\#16920](https://github.com/netdata/netdata/pull/16920) ([ktsaou](https://github.com/ktsaou))
 - Update file match patterns in CI jobs. [\#16917](https://github.com/netdata/netdata/pull/16917) ([Ferroin](https://github.com/Ferroin))
 - add support for the info parameter to all external plugin functions [\#16915](https://github.com/netdata/netdata/pull/16915) ([ktsaou](https://github.com/ktsaou))
@@ -402,7 +403,6 @@
 - fix: check for null rrdim in cgroup functions [\#16331](https://github.com/netdata/netdata/pull/16331) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16330](https://github.com/netdata/netdata/pull/16330) ([netdatabot](https://github.com/netdatabot))
 - Improve unittests [\#16329](https://github.com/netdata/netdata/pull/16329) ([stelfrag](https://github.com/stelfrag))
-- fix coverity warnings in cgroups [\#16328](https://github.com/netdata/netdata/pull/16328) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
