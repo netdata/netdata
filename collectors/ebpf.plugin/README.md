@@ -644,6 +644,8 @@ To collect data related to Linux multi-device (MD) flushing, the following kprob
 
 The eBPF plugin also shows a chart in the Disk section when the `disk` thread is enabled.
 
+Before enabling this option see how [Latency Monitoring](#latency-monitoring) impacts your host performance.
+
 #### Disk Latency
 
 This will create the chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
@@ -662,6 +664,8 @@ The dimensions refer to time intervals.
 
 This group has charts demonstrating how applications interact with the Linux kernel to open and close file descriptors.
 It also brings latency charts for several different filesystems.
+
+Before enabling this option see how [Latency Monitoring](#latency-monitoring) impacts your host performance.
 
 #### Latency Algorithm
 
@@ -885,7 +889,7 @@ These are tracepoints related to [OOM](https://en.wikipedia.org/wiki/Out_of_memo
 
 ## Known issues
 
-### Performance opimization
+### Performance optimization
 
 eBPF monitoring is complex and produces a large volume of metrics. We've discovered scenarios where the eBPF plugin
 significantly increases kernel memory usage by several hundred MB.
@@ -907,6 +911,13 @@ in `ebpf.conf`.
 
 The total memory usage is a well known [issue](https://lore.kernel.org/all/167821082315.1693.6957546778534183486.git-patchwork-notify@kernel.org/) 
 for eBPF, this is not a bug present in plugin.
+
+### Latency monitoring
+
+To effectively measure latency, it's crucial to attach two tracers to the same function: one when the function is called and another when it returns.
+Additionally, the plugin must manage data within a temporary hash table, performing necessary calculations and storing the final result.
+It's important to note that this process will impact your system's performance. Therefore, we highly recommend enabling [Filesystem](#filesystem) and
+[Disk](#disk) only when debugging events related to your filesystem or storage device is necessary.
 
 ### SELinux
 
