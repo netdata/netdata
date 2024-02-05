@@ -112,6 +112,9 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     STRING *summary = rc->summary;
     STRING *info = rc->info;
 
+    if (duration < 0)
+        duration = 0;
+
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
     ALARM_ENTRY *ae = callocz(1, sizeof(ALARM_ENTRY));
