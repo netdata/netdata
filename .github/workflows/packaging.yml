@@ -232,7 +232,7 @@ jobs:
       - name: Fetch images
         id: fetch-images
         if: needs.file-check.outputs.run == 'true'
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         with:
           max_attempts: 3
           retry_wait_seconds: 30

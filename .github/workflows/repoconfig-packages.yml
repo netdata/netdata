@@ -81,7 +81,7 @@ jobs:
         # Unlike normally, we do not need a deep clone or submodules for this.
       - name: Fetch base image
         id: fetch-images
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         with:
           max_attempts: 3
           retry_wait_seconds: 30
