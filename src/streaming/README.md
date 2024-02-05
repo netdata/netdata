@@ -488,17 +488,34 @@ You can monitor the replication process in two ways:
 1. **Netdata Monitoring**: access the Netdata Monitoring section and look for the Replication charts. 
 2. **Streaming Function**: use the Streaming function (Top) to see the replication status of children nodes. This function provides real-time insights into the replication status of each child node.
 
-### Replication and storage
+### Replication history
 
-When netdata is configured with [dbengine](https://github.com/netdata/netdata/blob/master/src/database/README.md),
-it will replicate data stored in [tier 0](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics#effect-of-storage-tiers-and-disk-space-on-retention),
-and other levels will be calculated again on parent side.
+Replication history in [dbengine](https://github.com/netdata/netdata/blob/master/src/database/README.md) mode is limited
+by [Tier 0 retention](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics#effect-of-storage-tiers-and-disk-space-on-retention):
 
-You can check the status, and days replicated accessing the URL `https://localhost:19999/api/v2/node_instances`.
+- Child instances replicate only Tier 0 data.
+- Parent instance calculates higher-level tiers using Tier 0 as the basis.
 
-To have more data replicated, it is necessary to change both parent and child
-[configuration](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics).
+Extend replication history by increasing Tier 0 retention.
 
+Checking Tier 0 retention:
+
+- Using a web browser:
+    - Navigate to `http://{CHILD_IP}:19999/api/v2/node_instances`.
+    - Locate the `expected_retention` value for Tier 0 of your Agent.
+    - Convert the value from seconds to days for a more meaningful representation.
+- Using `curl` and `jq`:
+    - Execute the following command:
+      ```bash
+      $ curl -s "http://{CHILD_IP}:19999/api/v2/node_instances" | jq '.agents[] | {nm, retention: (.db_size[0].retention / 86400 | .*100 | round/100) }'
+      ```
+    - Example output:
+      ```json
+       {
+         "nm": "myhost",
+         "retention": 12.73
+       }
+      ```
 
 ## Troubleshooting
 
