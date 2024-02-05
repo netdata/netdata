@@ -627,8 +627,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
         rrdpush_parse_compression_order(rpt, order);
     }
 
-    (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
-
     // find the host for this receiver
     {
         // this will also update the host with our system_info
