@@ -192,8 +192,8 @@ info "started from '$PROGRAM_FILE' with options: $*"
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
 pluginsd="${NETDATA_PLUGINS_DIR}"
-stockconfd="${NETDATA_STOCK_CONFIG_DIR}/${PROGRAM_NAME}"
-userconfd="${NETDATA_USER_CONFIG_DIR}/${PROGRAM_NAME}"
+stockconfd="${NETDATA_STOCK_CONFIG_DIR}/${SHORT_PROGRAM_NAME}"
+userconfd="${NETDATA_USER_CONFIG_DIR}/${SHORT_PROGRAM_NAME}"
 olduserconfd="${NETDATA_USER_CONFIG_DIR}"
 chartsd="$pluginsd/../charts.d"
 
