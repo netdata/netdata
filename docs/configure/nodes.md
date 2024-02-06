@@ -31,7 +31,7 @@ these files in your own Netdata config directory, as the next section describes 
 exist.
 
 - `netdata.conf` is the main configuration file. This is where you'll find most configuration options. Read descriptions
-  for each in the [daemon config](https://github.com/netdata/netdata/blob/master/daemon/config/README.md) doc.
+  for each in the [daemon config](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md) doc.
 - `edit-config` is a shell script used for [editing configuration files](#use-edit-config-to-edit-configuration-files).
 - Various configuration files ending in `.conf` for [configuring plugins or
   collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) behave. Examples: `go.d.conf`,

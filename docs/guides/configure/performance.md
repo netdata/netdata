@@ -50,7 +50,7 @@ including all its components, should be below 5 - 15% of a single core. For exam
 0.6% - 1.8% of a total CPU capacity, depending on the CPU characteristics.
 
 The Netdata Agent runs with the lowest
-possible [process scheduling policy](https://github.com/netdata/netdata/blob/master/daemon/README.md#netdata-process-scheduling-policy),
+possible [process scheduling policy](https://github.com/netdata/netdata/blob/master/src/daemon/README.md#netdata-process-scheduling-policy),
 which is `nice 19`, and uses the `idle` process scheduler. Together, these settings ensure that the Agent only gets CPU
 resources when the node has CPU resources to space. If the node reaches 100% CPU utilization, the Agent is stopped first
 to ensure your applications get any available resources.

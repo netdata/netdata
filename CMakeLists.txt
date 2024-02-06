@@ -801,40 +801,40 @@ set(LIBH2O_FILES
 )
 
 set(DAEMON_FILES
-        daemon/buildinfo.c
-        daemon/buildinfo.h
-        daemon/common.c
-        daemon/common.h
-        daemon/daemon.c
-        daemon/daemon.h
-        daemon/event_loop.c
-        daemon/event_loop.h
-        daemon/global_statistics.c
-        daemon/global_statistics.h
-        daemon/analytics.c
-        daemon/analytics.h
-        daemon/main.c
-        daemon/main.h
-        daemon/signals.c
-        daemon/signals.h
-        daemon/service.c
-        daemon/static_threads.c
-        daemon/static_threads.h
-        daemon/commands.c
-        daemon/commands.h
-        daemon/pipename.c
-        daemon/pipename.h
-        daemon/unit_test.c
-        daemon/unit_test.h
-        daemon/config/dyncfg.c
-        daemon/config/dyncfg.h
-        daemon/config/dyncfg-files.c
-        daemon/config/dyncfg-unittest.c
-        daemon/config/dyncfg-inline.c
-        daemon/config/dyncfg-echo.c
-        daemon/config/dyncfg-internals.h
-        daemon/config/dyncfg-intercept.c
-        daemon/config/dyncfg-tree.c
+        src/daemon/buildinfo.c
+        src/daemon/buildinfo.h
+        src/daemon/common.c
+        src/daemon/common.h
+        src/daemon/daemon.c
+        src/daemon/daemon.h
+        src/daemon/event_loop.c
+        src/daemon/event_loop.h
+        src/daemon/global_statistics.c
+        src/daemon/global_statistics.h
+        src/daemon/analytics.c
+        src/daemon/analytics.h
+        src/daemon/main.c
+        src/daemon/main.h
+        src/daemon/signals.c
+        src/daemon/signals.h
+        src/daemon/service.c
+        src/daemon/static_threads.c
+        src/daemon/static_threads.h
+        src/daemon/commands.c
+        src/daemon/commands.h
+        src/daemon/pipename.c
+        src/daemon/pipename.h
+        src/daemon/unit_test.c
+        src/daemon/unit_test.h
+        src/daemon/config/dyncfg.c
+        src/daemon/config/dyncfg.h
+        src/daemon/config/dyncfg-files.c
+        src/daemon/config/dyncfg-unittest.c
+        src/daemon/config/dyncfg-inline.c
+        src/daemon/config/dyncfg-echo.c
+        src/daemon/config/dyncfg-internals.h
+        src/daemon/config/dyncfg-intercept.c
+        src/daemon/config/dyncfg-tree.c
 )
 
 set(H2O_FILES
@@ -1331,7 +1331,7 @@ set(NETDATA_FILES
 
 if(LINUX)
         list(APPEND NETDATA_FILES
-                daemon/static_threads_linux.c
+                src/daemon/static_threads_linux.c
                 ${CGROUPS_PLUGIN_FILES}
                 ${DISKSPACE_PLUGIN_FILES}
                 ${PROC_PLUGIN_FILES}
@@ -1340,17 +1340,17 @@ if(LINUX)
 
         if(ENABLE_SENTRY)
             list(APPEND NETDATA_FILES
-                    daemon/sentry-native/sentry-native.c
-                    daemon/sentry-native/sentry-native.h)
+                    src/daemon/sentry-native/sentry-native.c
+                    src/daemon/sentry-native/sentry-native.h)
         endif()
 elseif(MACOS)
         list(APPEND NETDATA_FILES
-                daemon/static_threads_macos.c
+                src/daemon/static_threads_macos.c
                 ${MACOS_PLUGIN_FILES}
         )
 elseif(FREEBSD)
         list(APPEND NETDATA_FILES
-                daemon/static_threads_freebsd.c
+                src/daemon/static_threads_freebsd.c
                 ${FREEBSD_PLUGIN_FILES}
         )
 endif()
@@ -2179,9 +2179,9 @@ endif()
 #
 
 set(NETDATACLI_FILES
-        daemon/commands.h
-        daemon/pipename.c
-        daemon/pipename.h
+        src/daemon/commands.h
+        src/daemon/pipename.c
+        src/daemon/pipename.h
         src/cli/cli.c
 )
 
@@ -2432,18 +2432,18 @@ install(PROGRAMS
 #
 # TODO: check the following files for correct substitutions
 #
-configure_file(daemon/anonymous-statistics.sh.in daemon/anonymous-statistics.sh @ONLY)
+configure_file(src/daemon/anonymous-statistics.sh.in src/daemon/anonymous-statistics.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/daemon/anonymous-statistics.sh
+        ${CMAKE_BINARY_DIR}/src/daemon/anonymous-statistics.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
-configure_file(daemon/get-kubernetes-labels.sh.in daemon/get-kubernetes-labels.sh @ONLY)
+configure_file(src/daemon/get-kubernetes-labels.sh.in src/daemon/get-kubernetes-labels.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/daemon/get-kubernetes-labels.sh
+        ${CMAKE_BINARY_DIR}/src/daemon/get-kubernetes-labels.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(PROGRAMS
-        daemon/system-info.sh
+        src/daemon/system-info.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
