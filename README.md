@@ -84,7 +84,7 @@ The size of each application in the chart is determined by the number of sockets
 
 ---
 
-### :star: **Netdata is the most energy-efficient monitoring tool for Docker-based systems** :star:
+### :star: Netdata is the most energy-efficient monitoring tool :star:
 
 <p align="center">
 <a href="https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf#gh-dark-mode-only">
