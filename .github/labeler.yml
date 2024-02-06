@@ -220,7 +220,7 @@ area/health:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - health/**
+              - src/health/**
 
 area/metadata:
   - any:

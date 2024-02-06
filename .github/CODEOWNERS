@@ -19,9 +19,9 @@ src/exporting/ @thiagoftsm
 src/daemon/ @thiagoftsm @vkalintiris
 src/database/ @thiagoftsm @vkalintiris
 docs/ @tkatsoulas @Ancairon
-health/ @thiagoftsm @vkalintiris
-health/health.d/ @thiagoftsm
-health/notifications/ @Ferroin @thiagoftsm
+src/health/ @thiagoftsm @vkalintiris
+src/health/health.d/ @thiagoftsm
+src/health/notifications/ @Ferroin @thiagoftsm
 src/ml/ @vkalintiris
 src/libnetdata/ @thiagoftsm @vkalintiris
 packaging/ @Ferroin @tkatsoulas
