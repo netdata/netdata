@@ -461,12 +461,9 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
                 for (size_t tier = 0; tier < storage_tiers; tier++)
                     running += rrdeng_collectors_running(multidb_ctx[tier]);
 
-                if(running) {
+                if (running) {
                     nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
-                                 "waiting for %zu collectors to finish", running);
-                    // sleep_usec(100 * USEC_PER_MS);
-                    cleanup_destroyed_dictionaries();
+                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE, "waiting for %zu collectors to finish", running);
                 }
                 count--;
             }
