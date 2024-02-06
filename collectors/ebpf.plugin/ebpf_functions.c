@@ -107,6 +107,26 @@ static NETDATA_DOUBLE bytes_to_mb(uint64_t bytes) {
  */
 static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values, char *name)
 {
+    // https://elixir.bootlin.com/linux/latest/source/include/net/tcp_states.h#L13
+    // List made to map exactly the TCP states available in kernel source
+    static char *local_tcp_states[NETDATA_EBPF_TCP_STATES] = {
+        "Not defined",
+        "Established",
+        "SYN Sent",
+        "SYN Recv",
+        "FIN Wait 1",
+        "FIN Wait 2",
+        "Time Wait",
+        "Close",
+        "Close Wait",
+        "Last ACK",
+        "Listen",
+        "Closing",
+        "New Sync Recv",
+
+        "Max States",
+    };
+
     buffer_json_add_array_item_array(wb);
 
     // IMPORTANT!
@@ -163,6 +183,11 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
         connections++;
     }
     buffer_json_add_array_item_uint64(wb, connections);
+
+    buffer_json_add_array_item_string(wb,
+                                      (values->data.tcp.state < NETDATA_EBPF_TCP_STATES) ?
+                                       local_tcp_states[values->data.tcp.state]:
+                                       local_tcp_states[0]);
 
     buffer_json_array_close(wb);
 }
@@ -539,12 +564,20 @@ for (int i = 1; i < PLUGINSD_MAX_WORDS; i++) {
                                     RRDF_FIELD_OPTS_VISIBLE,
                                     NULL);
 
-        buffer_rrdf_table_add_field(wb, fields_id, "Conns", "Connections", RRDF_FIELD_TYPE_INTEGER,
+        buffer_rrdf_table_add_field(wb, fields_id++, "Conns", "Connections", RRDF_FIELD_TYPE_INTEGER,
                                     RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER, 0, "connections", NAN,
                                     RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_NONE,
                                     RRDF_FIELD_OPTS_VISIBLE,
                                     NULL);
+
+        buffer_rrdf_table_add_field(wb, fields_id, "TCPState", "TCP STATE", RRDF_FIELD_TYPE_STRING,
+                                    RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE, 0, NULL, NAN,
+                                    RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+                                    RRDF_FIELD_FILTER_MULTISELECT,
+                                    RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY | RRDF_FIELD_OPTS_FULL_WIDTH,
+                                    NULL);
+
     }
     buffer_json_object_close(wb); // columns
 
