@@ -16,7 +16,7 @@ collectors/macos.plugin/ @thiagoftsm
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @thiagoftsm
 src/exporting/ @thiagoftsm
-daemon/ @thiagoftsm @vkalintiris
+src/daemon/ @thiagoftsm @vkalintiris
 src/database/ @thiagoftsm @vkalintiris
 docs/ @tkatsoulas @Ancairon
 health/ @thiagoftsm @vkalintiris

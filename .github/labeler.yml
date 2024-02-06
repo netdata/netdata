@@ -51,7 +51,7 @@ area/daemon:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - daemon/**
+              - src/daemon/**
 
 area/database:
   - any:
@@ -263,7 +263,7 @@ area/tests:
       - changed-files:
           - any-glob-to-any-file:
               - tests/**
-              - daemon/unit_test*
+              - src/daemon/unit_test*
               - coverity-scan.sh
               - cppcheck.sh
               - netdata.cppcheck
