@@ -16,7 +16,7 @@ collectors/freebsd.plugin/ @thiagoftsm
 collectors/macos.plugin/ @thiagoftsm
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @thiagoftsm
-exporting/ @thiagoftsm
+src/exporting/ @thiagoftsm
 daemon/ @thiagoftsm @vkalintiris
 database/ @thiagoftsm @vkalintiris
 docs/ @tkatsoulas @Ancairon

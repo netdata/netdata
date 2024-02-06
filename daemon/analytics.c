@@ -116,12 +116,14 @@ void analytics_free_data(void)
  */
 void analytics_set_data(char **name, char *value)
 {
+    spinlock_lock(&analytics_data.spinlock);
     if (*name) {
         analytics_data.data_length -= strlen(*name);
         freez(*name);
     }
     *name = strdupz(value);
     analytics_data.data_length += strlen(*name);
+    spinlock_unlock(&analytics_data.spinlock);
 }
 
 /*
@@ -130,6 +132,7 @@ void analytics_set_data(char **name, char *value)
 void analytics_set_data_str(char **name, const char *value)
 {
     size_t value_string_len;
+    spinlock_lock(&analytics_data.spinlock);
     if (*name) {
         analytics_data.data_length -= strlen(*name);
         freez(*name);
@@ -138,6 +141,7 @@ void analytics_set_data_str(char **name, const char *value)
     *name = mallocz(sizeof(char) * value_string_len);
     snprintfz(*name, value_string_len - 1, "\"%s\"", value);
     analytics_data.data_length += strlen(*name);
+    spinlock_unlock(&analytics_data.spinlock);
 }
 
 /*
@@ -466,6 +470,8 @@ void analytics_alarms(void)
  */
 void analytics_misc(void)
 {
+    analytics_data.spinlock.locked = false;
+
 #ifdef ENABLE_ACLK
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
     analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");

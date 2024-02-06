@@ -7,7 +7,7 @@ on:
       - master
     paths: # If any of these files change, we need to regenerate integrations.js.
       - 'collectors/**/metadata.yaml'
-      - 'exporting/**/metadata.yaml'
+      - 'src/exporting/**/metadata.yaml'
       - 'health/notifications/**/metadata.yaml'
       - 'integrations/templates/**'
       - 'integrations/categories.yaml'
@@ -67,7 +67,7 @@ jobs:
         run: rm -rf go.d.plugin virtualenv
       - name: Create PR
         id: create-pr
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           commit-message: Regenerate integrations.js
