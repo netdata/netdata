@@ -69,7 +69,18 @@ Network Connections viewer is currently in the nightly builds of Netdata!
 
 ![network-connections](https://github.com/netdata/netdata/assets/2662304/5f71c102-9146-463e-acba-329094b136a5)
 
-This tool visualizes all the sockets each server has (IPv4 and IPv6, TCP and UDP). It can classify them as `inbound`, `outbound`, `listen` and `local` and allow filtering on them. The visualization has 4 sides: `public` (meaning public IPs), `private` (meaning private and reserved IPs), `servers` (meaning listening and inbound sockets), `clients` (meaning sockets towards other servers). The position of each application on the chart is determined by the classification of the sockets it uses (so to the top as clients, to the bottom are servers, to the right are internet facing, to the left is private facing). The size of each app in the chart is determined by the number of sockets it has. Each chart is a pie chart showing the percentage of each kind of sockets each app has.
+This tool visualizes all the sockets each server has (IPv4 and IPv6, TCP and UDP). It can classify them as `inbound`, `outbound`, `listen` and `local` and allow filtering on them.
+
+The visualization has 4 sides:
+
+- `public` (ie. public IPs),
+- `private` (ie. private and reserved IPs),
+- `servers` (ie. listening and inbound sockets),
+- `clients` (ie. sockets towards other servers).
+
+The position of each application on the chart is determined by the classification of the sockets it has. To the top are clients, to the bottom are servers, to the right are internet facing applications, to the left is internal network applications.
+
+The size of each application in the chart is determined by the number of sockets it has, and each application is a pie chart representing the percentage of each kind of sockets it has.
 
 ---
 
