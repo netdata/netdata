@@ -1831,7 +1831,6 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
         netdata_configured_timezone,
         netdata_configured_abbrev_timezone,
         netdata_configured_utc_offset,
-        "",
         program_name,
         program_version,
         default_rrd_update_every,

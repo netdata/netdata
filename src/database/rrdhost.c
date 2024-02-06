@@ -178,15 +178,6 @@ static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 // RRDHOST - internal helpers
 
-static inline void rrdhost_init_tags(RRDHOST *host, const char *tags) {
-    if(host->tags && tags && !strcmp(rrdhost_tags(host), tags))
-        return;
-
-    STRING *old = host->tags;
-    host->tags = string_strdupz((tags && *tags)?tags:NULL);
-    string_freez(old);
-}
-
 static inline void rrdhost_init_hostname(RRDHOST *host, const char *hostname, bool add_to_index) {
     if(unlikely(hostname && !*hostname)) hostname = NULL;
 
@@ -229,8 +220,8 @@ static inline void rrdhost_init_timezone(RRDHOST *host, const char *timezone, co
 }
 
 void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory_mode,
-                         const char *registry_hostname, const char *os, const char *tags,
-                         const char *tzone, const char *abbrev_tzone, int32_t utc_offset, const char *prog_name,
+                         const char *registry_hostname, const char *os, const char *tzone,
+                         const char *abbrev_tzone, int32_t utc_offset, const char *prog_name,
                          const char *prog_version)
 {
 
@@ -239,7 +230,6 @@ void set_host_properties(RRDHOST *host, int update_every, RRD_MEMORY_MODE memory
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, tzone, abbrev_tzone, utc_offset);
-    rrdhost_init_tags(host, tags);
 
     host->program_name = string_strdupz((prog_name && *prog_name) ? prog_name : "unknown");
     host->program_version = string_strdupz((prog_version && *prog_version) ? prog_version : "unknown");
@@ -287,7 +277,6 @@ static RRDHOST *rrdhost_create(
         const char *timezone,
         const char *abbrev_timezone,
         int32_t utc_offset,
-        const char *tags,
         const char *prog_name,
         const char *prog_version,
         int update_every,
@@ -326,7 +315,7 @@ int is_legacy = 1;
     strncpyz(host->machine_guid, guid, GUID_LEN + 1);
 
     set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, registry_hostname, os,
-                        tags, timezone, abbrev_timezone, utc_offset,
+                        timezone, abbrev_timezone, utc_offset,
         prog_name,
         prog_version);
 
@@ -539,7 +528,6 @@ int is_legacy = 1;
            "Host '%s' (at registry as '%s') with guid '%s' initialized"
            ", os '%s'"
            ", timezone '%s'"
-           ", tags '%s'"
            ", program_name '%s'"
            ", program_version '%s'"
            ", update every %d"
@@ -556,7 +544,6 @@ int is_legacy = 1;
          , host->machine_guid
          , rrdhost_os(host)
          , rrdhost_timezone(host)
-         , rrdhost_tags(host)
          , rrdhost_program_name(host)
          , rrdhost_program_version(host)
          , host->rrd_update_every
@@ -590,7 +577,6 @@ static void rrdhost_update(RRDHOST *host
                            , const char *timezone
                            , const char *abbrev_timezone
                            , int32_t utc_offset
-                           , const char *tags
                            , const char *prog_name
                            , const char *prog_version
                            , int update_every
@@ -680,9 +666,6 @@ static void rrdhost_update(RRDHOST *host
                host->rrd_history_entries,
                history);
 
-    // update host tags
-    rrdhost_init_tags(host, tags);
-
     if(!host->rrdvars)
         host->rrdvars = rrdvariables_create();
 
@@ -734,7 +717,6 @@ RRDHOST *rrdhost_find_or_create(
     , const char *timezone
     , const char *abbrev_timezone
     , int32_t utc_offset
-    , const char *tags
     , const char *prog_name
     , const char *prog_version
     , int update_every
@@ -779,10 +761,9 @@ RRDHOST *rrdhost_find_or_create(
                 , timezone
                 , abbrev_timezone
                 , utc_offset
-                , tags
-                ,
-            prog_name,
-            prog_version, update_every
+                , prog_name
+                , prog_version
+                , update_every
                 , history
                 , mode
                 , health_enabled
@@ -808,10 +789,9 @@ RRDHOST *rrdhost_find_or_create(
                , timezone
                , abbrev_timezone
                , utc_offset
-               , tags
-               ,
-                prog_name,
-                prog_version, update_every
+               , prog_name
+               , prog_version
+               , update_every
                , history
                , mode
                , health_enabled
@@ -1087,7 +1067,6 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
             , netdata_configured_timezone
             , netdata_configured_abbrev_timezone
             , netdata_configured_utc_offset
-            , ""
             , program_name
             , program_version
             , default_rrd_update_every
@@ -1307,7 +1286,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     pthread_mutex_destroy(&host->aclk_state_lock);
     freez(host->aclk_state.claimed_id);
     freez(host->aclk_state.prev_claimed_id);
-    string_freez(host->tags);
     rrdlabels_destroy(host->rrdlabels);
     string_freez(host->os);
     string_freez(host->timezone);

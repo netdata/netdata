@@ -347,7 +347,6 @@ struct receiver_state {
     char *timezone;         // Unused?
     char *abbrev_timezone;
     int32_t utc_offset;
-    char *tags;
     char *client_ip;        // Duplicated in pluginsd
     char *client_port;        // Duplicated in pluginsd
     char *program_name;        // Duplicated in pluginsd

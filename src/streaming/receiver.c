@@ -14,7 +14,6 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt->os);
     freez(rpt->timezone);
     freez(rpt->abbrev_timezone);
-    freez(rpt->tags);
     freez(rpt->client_ip);
     freez(rpt->client_port);
     freez(rpt->program_name);
@@ -628,8 +627,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
         rrdpush_parse_compression_order(rpt, order);
     }
 
-    (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
-
     // find the host for this receiver
     {
         // this will also update the host with our system_info
@@ -641,7 +638,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
             rpt->timezone,
             rpt->abbrev_timezone,
             rpt->utc_offset,
-            rpt->tags,
             rpt->program_name,
             rpt->program_version,
             rpt->config.update_every,
@@ -694,7 +690,7 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
          "client willing to stream metrics for host '%s' with machine_guid '%s': "
-         "update every = %d, history = %d, memory mode = %s, health %s,%s tags '%s'"
+         "update every = %d, history = %d, memory mode = %s, health %s,%s"
          , rpt->hostname
          , rpt->client_ip
          , rpt->client_port
@@ -709,7 +705,6 @@ static void rrdpush_receive(struct receiver_state *rpt)
 #else
          , ""
 #endif
-         , rrdhost_tags(rpt->host)
     );
 #endif // NETDATA_INTERNAL_CHECKS
 

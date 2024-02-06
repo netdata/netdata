@@ -144,20 +144,6 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
     RRDSET *st = rd->rrdset;
     RRDHOST *host = st->rrdhost;
 
-    const char *tags_pre = "", *tags_post = "", *tags = rrdhost_tags(host);
-    if (!tags)
-        tags = "";
-
-    if (*tags) {
-        if (*tags == '{' || *tags == '[' || *tags == '"') {
-            tags_pre = "\"host_tags\":";
-            tags_post = ",";
-        } else {
-            tags_pre = "\"host_tags\":\"";
-            tags_post = "\",";
-        }
-    }
-
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
         if (buffer_strlen((BUFFER *)instance->buffer) > 2)
         buffer_strcat(instance->buffer, ",\n");
@@ -169,7 +155,6 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         "{"
         "\"prefix\":\"%s\","
         "\"hostname\":\"%s\","
-        "%s%s%s"
         "%s"
 
         "\"chart_id\":\"%s\","
@@ -187,9 +172,6 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
 
         instance->config.prefix,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-        tags_pre,
-        tags,
-        tags_post,
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
 
         rrdset_id(st),
@@ -229,20 +211,6 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
     if(isnan(value))
         return 0;
 
-    const char *tags_pre = "", *tags_post = "", *tags = rrdhost_tags(host);
-    if (!tags)
-        tags = "";
-
-    if (*tags) {
-        if (*tags == '{' || *tags == '[' || *tags == '"') {
-            tags_pre = "\"host_tags\":";
-            tags_post = ",";
-        } else {
-            tags_pre = "\"host_tags\":\"";
-            tags_post = "\",";
-        }
-    }
-
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
         if (buffer_strlen((BUFFER *)instance->buffer) > 2)
             buffer_strcat(instance->buffer, ",\n");
@@ -253,7 +221,6 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         "{"
         "\"prefix\":\"%s\","
         "\"hostname\":\"%s\","
-        "%s%s%s"
         "%s"
 
         "\"chart_id\":\"%s\","
@@ -271,9 +238,6 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
 
         instance->config.prefix,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-        tags_pre,
-        tags,
-        tags_post,
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
 
         rrdset_id(st),

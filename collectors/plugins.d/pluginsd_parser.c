@@ -184,7 +184,6 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         netdata_configured_timezone,
         netdata_configured_abbrev_timezone,
         netdata_configured_utc_offset,
-        NULL,
         program_name,
         program_version,
         default_rrd_update_every,
