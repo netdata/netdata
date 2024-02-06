@@ -10,7 +10,7 @@
             <mxGeometry x="1154" y="2050" width="82" height="86" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/messagebird" id="6">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/messagebird" id="6">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528607/80773520-43b8-11e7-8010-5219c75fbe9b.png;" parent="1" vertex="1">
             <mxGeometry x="576" y="410" width="195" height="38" as="geometry" />
           </mxCell>
@@ -194,7 +194,7 @@
             <mxGeometry x="74" y="557" width="800" height="40" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; Notifications&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/health/notifications" id="77">
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; Notifications&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/src/health/notifications" id="77">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" parent="1" vertex="1">
             <mxGeometry x="675" y="470" width="163" height="77" as="geometry" />
           </mxCell>
@@ -255,32 +255,32 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/slack" id="101">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/slack" id="101">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26529341/ebcbc5d0-43c6-11e7-9056-df89e0c10e6a.png;" parent="1" vertex="1">
             <mxGeometry x="530" y="302" width="162" height="48" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/pushbullet" id="102">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/pushbullet" id="102">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528627/81813ef2-43b8-11e7-9371-9dfcfb1f27f8.png;" parent="1" vertex="1">
             <mxGeometry x="553" y="363" width="188" height="32" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/discord" id="103">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/discord" id="103">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528628/8195a284-43b8-11e7-8582-e94e53feb1c7.png;" parent="1" vertex="1">
             <mxGeometry x="440" y="227" width="146" height="40" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/pagerduty" id="104">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/pagerduty" id="104">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528630/81a3e33a-43b8-11e7-89a0-53c9d89ef2d6.png;" parent="1" vertex="1">
             <mxGeometry x="500" y="188" width="140" height="26" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/telegram" id="105">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/telegram" id="105">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26529349/256417f2-43c7-11e7-8036-9aa59efe0605.png;" parent="1" vertex="1">
             <mxGeometry x="452" y="363" width="77" height="83" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/twilio" id="106">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/twilio" id="106">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528631/81c0f9b6-43b8-11e7-9088-77d895f50346.png;" parent="1" vertex="1">
             <mxGeometry x="600" y="250" width="134" height="40" as="geometry" />
           </mxCell>
@@ -505,12 +505,12 @@
         <mxCell id="188" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528673/84d4fc60-43b8-11e7-9512-5db073e72e9f.png;" parent="1" vertex="1">
           <mxGeometry x="283" y="1956" width="58" height="77" as="geometry" />
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/email" id="189">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/email" id="189">
           <mxCell style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cloud.githubusercontent.com/assets/2662304/26528675/84f226d2-43b8-11e7-9de6-6d7c391aaa8d.png;rounded=0;shadow=0;glass=0;dashed=1;dashPattern=1 1;comic=0;strokeColor=#C7D1E0;strokeWidth=3;fillColor=none;gradientColor=#CCFFFF;fontSize=14;fontColor=#E6E6E6;align=center;" parent="1" vertex="1">
             <mxGeometry x="766" y="250" width="56" height="56" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/pushover" id="191">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/pushover" id="191">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528605/80703edc-43b8-11e7-839d-267f613e15b0.png;" parent="1" vertex="1">
             <mxGeometry x="654" y="205" width="134" height="28" as="geometry" />
           </mxCell>
@@ -518,12 +518,12 @@
         <mxCell id="192" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cloud.githubusercontent.com/assets/2662304/26528645/8275abfe-43b8-11e7-9d21-306ab844f7bb.png;strokeColor=#6A9153;fillColor=#CCFFFF;gradientColor=#CCFFFF;fontSize=20;align=center;" parent="1" vertex="1">
           <mxGeometry x="127" y="815" width="61" height="39" as="geometry" />
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/flock" id="198">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/flock" id="198">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/32355748-512dda64-c039-11e7-8117-bc31a0cf50eb.png;" parent="1" vertex="1">
             <mxGeometry x="370" y="311" width="142" height="50" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/alerta" id="200">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/alerta" id="200">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/34533144-9ecf2918-f0c1-11e7-928e-c2654b092303.png;" parent="1" vertex="1">
             <mxGeometry x="420" y="275" width="106" height="27" as="geometry" />
           </mxCell>
@@ -540,7 +540,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/irc" id="204">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/irc" id="204">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://user-images.githubusercontent.com/31221999/36795772-8b096efe-1cac-11e8-8d6d-791ee5c88179.png;" parent="1" vertex="1">
             <mxGeometry x="680" y="153" width="69" height="35" as="geometry" />
           </mxCell>
@@ -582,12 +582,12 @@
             <mxGeometry x="959" y="476" width="274" height="52" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/awssns" id="232">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/awssns" id="232">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609620-26040480-da4b-11e8-8ac3-c1b6a209619f.png;" parent="1" vertex="1">
             <mxGeometry x="510" y="120" width="140" height="56" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/rocketchat" id="233">
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/src/health/notifications/rocketchat" id="233">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609674-ec7fc900-da4b-11e8-84cd-ff47fe586f84.png;" parent="1" vertex="1">
             <mxGeometry x="422" y="143" width="77" height="77" as="geometry" />
           </mxCell>

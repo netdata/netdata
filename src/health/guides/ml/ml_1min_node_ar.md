@@ -1,6 +1,6 @@
 ### Understand the alert
 
-This alert is triggered when the [node anomaly rate](https://learn.netdata.cloud/docs/ml-and-troubleshooting/machine-learning-ml-powered-anomaly-detection#node-anomaly-rate) exceeds the threshold defined in the [alert configuration](https://github.com/netdata/netdata/blob/master/health/health.d/ml.conf) over the most recent 1 minute window evaluated. 
+This alert is triggered when the [node anomaly rate](https://learn.netdata.cloud/docs/ml-and-troubleshooting/machine-learning-ml-powered-anomaly-detection#node-anomaly-rate) exceeds the threshold defined in the [alert configuration](https://github.com/netdata/netdata/blob/master/src/health/health.d/ml.conf) over the most recent 1 minute window evaluated. 
 
 For example, with the default of `warn: $this > 1`, this means that 1% or more of the metrics collected on the node have across the most recent 1 minute window been flagged as [anomalous](https://learn.netdata.cloud/docs/ml-and-troubleshooting/machine-learning-ml-powered-anomaly-detection) by Netdata.
 

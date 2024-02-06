@@ -123,11 +123,11 @@ modules:
         list: []
     alerts:
       - name: adaptec_raid_ld_status
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/adaptec_raid.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf
         metric: adaptec_raid.ld_status
         info: logical device status is failed or degraded
       - name: adaptec_raid_pd_state
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/adaptec_raid.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf
         metric: adaptec_raid.pd_state
         info: physical device state is not online
     metrics:

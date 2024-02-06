@@ -113,7 +113,7 @@ modules:
         list: []
     alerts:
       - name: ceph_cluster_space_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ceph.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf
         metric: ceph.general_usage
         info: cluster disk space utilization
     metrics:

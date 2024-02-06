@@ -23,6 +23,6 @@ The Value formatter respects the following API `&options=`:
 
 The Value formatter is not exposed by the API by itself.
 Instead it is used by the [`ssv`](https://github.com/netdata/netdata/blob/master/web/api/formatters/ssv/README.md) formatter
-and [health monitoring queries](https://github.com/netdata/netdata/blob/master/health/README.md).
+and [health monitoring queries](https://github.com/netdata/netdata/blob/master/src/health/README.md).
 
 

@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/email/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/health/notifications/email/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/health/notifications/email/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/health/notifications/email/metadata.yaml"
 sidebar_label: "Email"
 learn_status: "Published"
 learn_rel_path: "Alerting/Notifications/Agent Dispatched Notifications"

@@ -27,7 +27,7 @@ Centralized alert notifications from Netdata Cloud is a independent process from
 Netdata](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md). You can enable one or the other, or both, based on your needs. However,
 the alerts you see in Netdata Cloud are based on those streamed from your Netdata-monitoring nodes. If you want to tweak
 or add new alert that you see in Netdata Cloud, and receive via centralized alert notifications, you must
-[configure](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) each node's alert watchdog.
+[configure](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) each node's alert watchdog.
 
 </Callout>
 
@@ -104,8 +104,8 @@ if the node should be silenced for the entire space or just for specific rooms (
 
 ### Scope definition for Alerts
 * **Alert name:** silencing a specific alert name silences all alert state transitions for that specific alert. 
-* **Alert context:** silencing a specific alert context will silence all alert state transitions for alerts targeting that chart context, for more details check [alert configuration docs](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alert-line-on).
-* **Alert role:** silencing a specific alert role will silence all the alert state transitions for alerts that are configured to be specific role recipients, for more details check [alert configuration docs](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alert-line-to).
+* **Alert context:** silencing a specific alert context will silence all alert state transitions for alerts targeting that chart context, for more details check [alert configuration docs](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-on).
+* **Alert role:** silencing a specific alert role will silence all the alert state transitions for alerts that are configured to be specific role recipients, for more details check [alert configuration docs](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-to).
 
 Beside the above two main entities there are another two important settings that you can define on a silencing rule:
 * Who does the rule affect? **All user** in the space or **Myself**

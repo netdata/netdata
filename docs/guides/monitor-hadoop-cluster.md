@@ -178,7 +178,7 @@ showing real-time metrics for both in your Netdata dashboard. 🎉
 The Netdata community helped us create sane defaults for alerts related to both HDFS and Zookeeper. You may want to
 investigate these to ensure they work well with your Hadoop implementation.
 
--   [HDFS alerts](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/hdfs.conf)
+-   [HDFS alerts](https://raw.githubusercontent.com/netdata/netdata/master/src/health/health.d/hdfs.conf)
 
 You can also access/edit these files directly with `edit-config`:
 
@@ -188,4 +188,4 @@ sudo /etc/netdata/edit-config health.d/zookeeper.conf
 ```
 
 For more information about editing the defaults or writing new alert entities, see our 
-[health monitoring documentation](https://github.com/netdata/netdata/blob/master/health/README.md).
+[health monitoring documentation](https://github.com/netdata/netdata/blob/master/src/health/README.md).

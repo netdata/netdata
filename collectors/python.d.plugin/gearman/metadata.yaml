@@ -133,7 +133,7 @@ modules:
         list: []
     alerts:
       - name: gearman_workers_queued
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/gearman.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/gearman.conf
         metric: gearman.single_job
         info: average number of queued jobs over the last 10 minutes
     metrics:

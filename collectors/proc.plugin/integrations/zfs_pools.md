@@ -78,8 +78,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ zfs_pool_state_warn ](https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf) | zfspool.state | ZFS pool ${label:pool} state is degraded |
-| [ zfs_pool_state_crit ](https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf) | zfspool.state | ZFS pool ${label:pool} state is faulted or unavail |
+| [ zfs_pool_state_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.state | ZFS pool ${label:pool} state is degraded |
+| [ zfs_pool_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.state | ZFS pool ${label:pool} state is faulted or unavail |
 
 
 ## Setup

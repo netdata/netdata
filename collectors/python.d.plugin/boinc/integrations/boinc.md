@@ -77,10 +77,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ boinc_total_tasks ](https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf) | boinc.tasks | average number of total tasks over the last 10 minutes |
-| [ boinc_active_tasks ](https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf) | boinc.tasks | average number of active tasks over the last 10 minutes |
-| [ boinc_compute_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf) | boinc.states | average number of compute errors over the last 10 minutes |
-| [ boinc_upload_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/boinc.conf) | boinc.states | average number of failed uploads over the last 10 minutes |
+| [ boinc_total_tasks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf) | boinc.tasks | average number of total tasks over the last 10 minutes |
+| [ boinc_active_tasks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf) | boinc.tasks | average number of active tasks over the last 10 minutes |
+| [ boinc_compute_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf) | boinc.states | average number of compute errors over the last 10 minutes |
+| [ boinc_upload_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf) | boinc.states | average number of failed uploads over the last 10 minutes |
 
 
 ## Setup

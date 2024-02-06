@@ -128,7 +128,7 @@ modules:
         list: []
     alerts:
       - name: ipfs_datastore_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipfs.conf
         metric: ipfs.repo_size
         info: IPFS datastore utilization
     metrics:

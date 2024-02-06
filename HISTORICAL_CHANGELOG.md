@@ -456,7 +456,7 @@ netdata (1.3.0) - 2016-08-28
     netdata now has a powerful health monitoring system embedded.
     Please check the wiki page:
 
-    <https://github.com/netdata/netdata/tree/master/health>
+    <https://github.com/netdata/netdata/tree/master/src/health>
 
 -   netdata has badges!
 

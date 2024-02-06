@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/messagebird/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/health/notifications/messagebird/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/health/notifications/messagebird/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/health/notifications/messagebird/metadata.yaml"
 sidebar_label: "MessageBird"
 learn_status: "Published"
 learn_rel_path: "Alerting/Notifications/Agent Dispatched Notifications"

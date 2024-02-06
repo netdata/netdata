@@ -21,7 +21,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Alerts** (formerly **Alarms**)](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
 
-- [**Alarm Entity Type**](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#health-entity-reference): Entity types that are attached to specific charts and use the `alarm` label.
+- [**Alarm Entity Type**](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#health-entity-reference): Entity types that are attached to specific charts and use the `alarm` label.
 
 - [**Anomaly Advisor**](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md): A Netdata feature that lets you quickly surface potentially anomalous metrics and charts related to a particular highlight window of interest.
 
@@ -77,9 +77,9 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Headless Collector Streaming**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md#supported-streaming-configurations): Streaming configuration where child `A`, _without_ a database or web dashboard, streams metrics to parent `B`.
 
-- [**Health Configuration Files**](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#edit-health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
+- [**Health Configuration Files**](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#edit-health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
 
-- [**Health Entity Reference**](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#health-entity-reference):
+- [**Health Entity Reference**](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#health-entity-reference):
 
 - [**Home** tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#home): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the War Room.
 
@@ -158,7 +158,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## T
 
-- [**Template Entity Type**](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#entity-types): Entity type that defines rules that apply to all charts of a specific context, and use the template label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
+- [**Template Entity Type**](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#entity-types): Entity type that defines rules that apply to all charts of a specific context, and use the template label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
 
 - [**Tiers**](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md#tiers): Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are collected and stored, i.e. their resolution).
 

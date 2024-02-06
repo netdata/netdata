@@ -76,7 +76,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ retroshare_dht_working ](https://github.com/netdata/netdata/blob/master/health/health.d/retroshare.conf) | retroshare.dht | number of DHT peers |
+| [ retroshare_dht_working ](https://github.com/netdata/netdata/blob/master/src/health/health.d/retroshare.conf) | retroshare.dht | number of DHT peers |
 
 
 ## Setup

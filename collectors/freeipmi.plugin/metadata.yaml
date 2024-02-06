@@ -263,7 +263,7 @@ modules:
               You can also use a higher number (this is the number of microseconds to poll IPMI for a response, before waiting for a tick).
     alerts:
       - name: ipmi_sensor_state
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf
         metric: ipmi.sensor_state
         info: IPMI sensor ${label:sensor} (${label:component}) state
     metrics:

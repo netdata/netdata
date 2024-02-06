@@ -163,7 +163,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ interface_speed ](https://github.com/netdata/netdata/blob/master/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
+| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
 
 
 ## Setup

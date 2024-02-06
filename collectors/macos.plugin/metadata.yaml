@@ -279,7 +279,7 @@ modules:
         list: []
     alerts:
       - name: interface_speed
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.net
         info: network interface ${label:device} current speed
         os: "*"

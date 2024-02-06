@@ -95,12 +95,12 @@ modules:
         list: []
     alerts:
       - name: disk_space_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf
         metric: disk.space
         info: disk ${label:mount_point} space utilization
         os: "linux freebsd"
       - name: disk_inode_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf
         metric: disk.inodes
         info: disk ${label:mount_point} inode utilization
         os: "linux freebsd"

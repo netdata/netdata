@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/twilio/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/health/notifications/twilio/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/health/notifications/twilio/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/health/notifications/twilio/metadata.yaml"
 sidebar_label: "Twilio"
 learn_status: "Published"
 learn_rel_path: "Alerting/Notifications/Agent Dispatched Notifications"

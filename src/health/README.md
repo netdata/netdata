@@ -10,5 +10,5 @@ silence anything you're not interested in. You can even power complex lookups by
 your metrics.
 
 You can [use various alert notification methods](https://github.com/netdata/netdata/edit/master/docs/monitor/enable-notifications.md), 
-[customize alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md), and 
-[disable/silence](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#disable-or-silence-alerts) alerts.
+[customize alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md), and 
+[disable/silence](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#disable-or-silence-alerts) alerts.

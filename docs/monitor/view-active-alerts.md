@@ -66,5 +66,5 @@ With the three icons beneath that and the **role** designation, you can:
 3.  Copy the code to embed the badge onto another web page using an `<embed>` element.
 
 The table on the right-hand side displays information about the health entity that triggered the alert, which you can
-use as a reference to [configure alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
+use as a reference to [configure alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md).
  -->

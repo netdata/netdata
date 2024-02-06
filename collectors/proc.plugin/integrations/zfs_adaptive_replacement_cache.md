@@ -99,7 +99,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ zfs_memory_throttle ](https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf) | zfs.memory_ops | number of times ZFS had to limit the ARC growth in the last 10 minutes |
+| [ zfs_memory_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfs.memory_ops | number of times ZFS had to limit the ARC growth in the last 10 minutes |
 
 
 ## Setup

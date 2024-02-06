@@ -154,10 +154,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ k8s_cgroup_10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf) | k8s.cgroup.cpu_limit | average cgroup CPU utilization over the last 10 minutes |
-| [ k8s_cgroup_ram_in_use ](https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf) | k8s.cgroup.mem_usage | cgroup memory utilization |
-| [ k8s_cgroup_1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf) | k8s.cgroup.net_packets | average number of packets received by the network interface ${label:device} over the last minute |
-| [ k8s_cgroup_10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/health/health.d/cgroups.conf) | k8s.cgroup.net_packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
+| [ k8s_cgroup_10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | k8s.cgroup.cpu_limit | average cgroup CPU utilization over the last 10 minutes |
+| [ k8s_cgroup_ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | k8s.cgroup.mem_usage | cgroup memory utilization |
+| [ k8s_cgroup_1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | k8s.cgroup.net_packets | average number of packets received by the network interface ${label:device} over the last minute |
+| [ k8s_cgroup_10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | k8s.cgroup.net_packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
 
 
 ## Setup

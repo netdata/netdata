@@ -122,9 +122,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf) | system.cpu | average CPU utilization over the last 10 minutes (excluding iowait, nice and steal) |
-| [ 10min_cpu_iowait ](https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf) | system.cpu | average CPU iowait time over the last 10 minutes |
-| [ 20min_steal_cpu ](https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf) | system.cpu | average CPU steal time over the last 20 minutes |
+| [ 10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU utilization over the last 10 minutes (excluding iowait, nice and steal) |
+| [ 10min_cpu_iowait ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU iowait time over the last 10 minutes |
+| [ 20min_steal_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU steal time over the last 20 minutes |
 
 
 ## Setup

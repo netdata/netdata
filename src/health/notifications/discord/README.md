@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/discord/README.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/health/notifications/discord/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/health/notifications/discord/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/health/notifications/discord/metadata.yaml"
 sidebar_label: "Discord"
 learn_status: "Published"
 learn_rel_path: "Alerting/Notifications/Agent Dispatched Notifications"

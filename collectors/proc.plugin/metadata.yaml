@@ -81,17 +81,17 @@ modules:
         list: []
     alerts:
       - name: 10min_cpu_usage
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
         metric: system.cpu
         info: average CPU utilization over the last 10 minutes (excluding iowait, nice and steal)
         os: "linux"
       - name: 10min_cpu_iowait
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
         metric: system.cpu
         info: average CPU iowait time over the last 10 minutes
         os: "linux"
       - name: 20min_steal_cpu
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/cpu.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
         metric: system.cpu
         info: average CPU steal time over the last 20 minutes
         os: "linux"
@@ -279,7 +279,7 @@ modules:
         list: []
     alerts:
       - name: lowest_entropy
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/entropy.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/entropy.conf
         metric: system.entropy
         info: minimum number of bits of entropy available for the kernel’s random number generator
     metrics:
@@ -464,12 +464,12 @@ modules:
         list: []
     alerts:
       - name: 30min_ram_swapped_out
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf
         metric: mem.swapio
         info: percentage of the system RAM swapped in the last 30 minutes
         os: "linux freebsd"
       - name: oom_kill
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf
         metric: mem.oom_kill
         info: number of out of memory kills in the last 30 minutes
         os: "linux"
@@ -798,27 +798,27 @@ modules:
         list: []
     alerts:
       - name: load_cpu_number
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf
         metric: system.load
         info: number of active CPU cores in the system
         os: "linux"
       - name: load_average_15
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf
         metric: system.load
         info: system fifteen-minute load average
         os: "linux"
       - name: load_average_5
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf
         metric: system.load
         info: system five-minute load average
         os: "linux"
       - name: load_average_1
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/load.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf
         metric: system.load
         info: system one-minute load average
         os: "linux"
       - name: active_processes
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/processes.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf
         metric: system.active_processes
         info: system process IDs (PID) space utilization
     metrics:
@@ -1207,12 +1207,12 @@ modules:
         list: []
     alerts:
       - name: 1min_netdev_backlog_exceeded
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf
         metric: system.softnet_stat
         info: average number of dropped packets in the last minute due to exceeded net.core.netdev_max_backlog
         os: "linux"
       - name: 1min_netdev_budget_ran_outs
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/softnet.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf
         metric: system.softnet_stat
         info:
           average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last
@@ -1329,22 +1329,22 @@ modules:
         list: []
     alerts:
       - name: ram_in_use
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf
         metric: system.ram
         info: system memory utilization
         os: "linux"
       - name: ram_available
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf
         metric: mem.available
         info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
         os: "linux"
       - name: used_swap
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/swap.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf
         metric: mem.swap
         info: swap memory utilization
         os: "linux freebsd"
       - name: 1hour_memory_hw_corrupted
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
         metric: mem.hwcorrupt
         info: amount of memory corrupted due to a hardware failure
         os: "linux"
@@ -1660,19 +1660,19 @@ modules:
       - name: ecc_memory_mc_noinfo_correctable
         metric: mem.edac_mc
         info: memory controller ${label:controller} ECC correctable errors (unknown DIMM slot) in the last 10 minutes
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_mc_noinfo_uncorrectable
         metric: mem.edac_mc
         info: memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot) in the last 10 minutes
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_dimm_correctable
         metric: mem.edac_mc_dimm
         info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors in the last 10 minutes
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_dimm_uncorrectable
         metric: mem.edac_mc_dimm
         info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors in the last 10 minutes
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/memory.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
     metrics:
       folding:
         title: Metrics
@@ -2089,12 +2089,12 @@ modules:
         list: []
     alerts:
       - name: semaphores_used
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf
         metric: system.ipc_semaphores
         info: IPC semaphore utilization
         os: "linux"
       - name: semaphore_arrays_used
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf
         metric: system.ipc_semaphore_arrays
         info: IPC semaphore arrays utilization
         os: "linux"
@@ -2210,21 +2210,21 @@ modules:
         list: []
     alerts:
       - name: 10min_disk_backlog
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf
         metric: disk.backlog
         info: average backlog size of the ${label:device} disk over the last 10 minutes
         os: "linux"
       - name: 10min_disk_utilization
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf
         metric: disk.util
         info: average percentage of time ${label:device} disk was busy over the last 10 minutes
         os: "linux freebsd"
       - name: bcache_cache_dirty
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/bcache.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf
         metric: disk.bcache_cache_alloc
         info: percentage of cache space used for dirty data and metadata (this usually means your SSD cache is too small)
       - name: bcache_cache_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/bcache.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf
         metric: disk.bcache_cache_read_races
         info:
           number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is
@@ -2489,20 +2489,20 @@ modules:
         list: []
     alerts:
       - name: mdstat_last_collected
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf
         metric: md.disks
         info: number of seconds since the last successful data collection
       - name: mdstat_disks
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf
         metric: md.disks
         info:
           number of devices in the down state for the ${label:device} ${label:raid_level} array. Any number > 0 indicates that the array is degraded.
       - name: mdstat_mismatch_cnt
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf
         metric: md.mismatch_cnt
         info: number of unsynchronized blocks for the ${label:device} ${label:raid_level} array
       - name: mdstat_nonredundant_last_collected
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf
         metric: md.nonredundant
         info: number of seconds since the last successful data collection
     metrics:
@@ -2627,52 +2627,52 @@ modules:
         list: []
     alerts:
       - name: interface_speed
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.net
         info: network interface ${label:device} current speed
         os: "*"
       - name: 1m_received_traffic_overflow
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.net
         info: average inbound utilization for the network interface ${label:device} over the last minute
         os: "linux"
       - name: 1m_sent_traffic_overflow
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.net
         info: average outbound utilization for the network interface ${label:device} over the last minute
         os: "linux"
       - name: inbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.drops
         info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
         os: "linux"
       - name: outbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.drops
         info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
         os: "linux"
       - name: wifi_inbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.drops
         info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
         os: "linux"
       - name: wifi_outbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.drops
         info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
         os: "linux"
       - name: 1m_received_packets_rate
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.packets
         info: average number of packets received by the network interface ${label:device} over the last minute
         os: "linux freebsd"
       - name: 10s_received_packets_storm
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.packets
         info: ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute
         os: "linux freebsd"
       - name: 10min_fifo_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/net.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
         metric: net.fifo
         info: number of FIFO errors for the network interface ${label:device} in the last 10 minutes
         os: "linux"
@@ -3107,61 +3107,61 @@ modules:
         list: []
     alerts:
       - name: 1m_tcp_syn_queue_drops
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf
         metric: ip.tcp_syn_queue
         info: average number of SYN requests was dropped due to the full TCP SYN queue over the last minute (SYN cookies were not enabled)
         os: "linux"
       - name: 1m_tcp_syn_queue_cookies
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf
         metric: ip.tcp_syn_queue
         info: average number of sent SYN cookies due to the full TCP SYN queue over the last minute
         os: "linux"
       - name: 1m_tcp_accept_queue_overflows
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf
         metric: ip.tcp_accept_queue
         info: average number of overflows in the TCP accept queue over the last minute
         os: "linux"
       - name: 1m_tcp_accept_queue_drops
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_listen.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_listen.conf
         metric: ip.tcp_accept_queue
         info: average number of dropped packets in the TCP accept queue over the last minute
         os: "linux"
       - name: tcp_connections
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_conn.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_conn.conf
         metric: ip.tcpsock
         info: TCP connections utilization
         os: "linux"
       - name: 1m_ip_tcp_resets_sent
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf
         metric: ip.tcphandshake
         info: average number of sent TCP RESETS over the last minute
         os: "linux"
       - name: 10s_ip_tcp_resets_sent
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf
         metric: ip.tcphandshake
         info:
           average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has
           crashed. Netdata will not send a clear notification for this alarm.
         os: "linux"
       - name: 1m_ip_tcp_resets_received
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf
         metric: ip.tcphandshake
         info: average number of received TCP RESETS over the last minute
         os: "linux freebsd"
       - name: 10s_ip_tcp_resets_received
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_resets.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf
         metric: ip.tcphandshake
         info:
           average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed.
           Netdata will not send a clear notification for this alarm.
         os: "linux freebsd"
       - name: 1m_ipv4_udp_receive_buffer_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf
         metric: ipv4.udperrors
         info: average number of UDP receive buffer errors over the last minute
         os: "linux freebsd"
       - name: 1m_ipv4_udp_send_buffer_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf
         metric: ipv4.udperrors
         info: average number of UDP send buffer errors over the last minute
         os: "linux"
@@ -3696,12 +3696,12 @@ modules:
         list: []
     alerts:
       - name: tcp_orphans
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_orphans.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_orphans.conf
         metric: ipv4.sockstat_tcp_sockets
         info: orphan IPv4 TCP sockets utilization
         os: "linux"
       - name: tcp_memory
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/tcp_mem.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_mem.conf
         metric: ipv4.sockstat_tcp_mem
         info: TCP memory utilization
         os: "linux"
@@ -4355,7 +4355,7 @@ modules:
         list: []
     alerts:
       - name: netfilter_conntrack_full
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/netfilter.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/netfilter.conf
         metric: netfilter.conntrack_sockets
         info: netfilter connection tracker table size utilization
         os: "linux"
@@ -4564,11 +4564,11 @@ modules:
         list: []
     alerts:
       - name: zfs_pool_state_warn
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
         metric: zfspool.state
         info: ZFS pool ${label:pool} state is degraded
       - name: zfs_pool_state_crit
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
         metric: zfspool.state
         info: ZFS pool ${label:pool} state is faulted or unavail
     metrics:
@@ -4656,7 +4656,7 @@ modules:
         list: []
     alerts:
       - name: zfs_memory_throttle
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/zfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
         metric: zfs.memory_ops
         info: number of times ZFS had to limit the ARC growth in the last 10 minutes
     metrics:
@@ -4920,47 +4920,47 @@ modules:
         list: []
     alerts:
       - name: btrfs_allocated
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf
         metric: btrfs.disk
         info: percentage of allocated BTRFS physical disk space
         os: "*"
       - name: btrfs_data
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf
         metric: btrfs.data
         info: utilization of BTRFS data space
         os: "*"
       - name: btrfs_metadata
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf
         metric: btrfs.metadata
         info: utilization of BTRFS metadata space
         os: "*"
       - name: btrfs_system
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf
         metric: btrfs.system
         info: utilization of BTRFS system space
         os: "*"
       - name: btrfs_device_read_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf
         metric: btrfs.device_errors
         info: number of encountered BTRFS read errors
         os: "*"
       - name: btrfs_device_write_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf
         metric: btrfs.device_errors
         info: number of encountered BTRFS write errors
         os: "*"
       - name: btrfs_device_flush_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf
         metric: btrfs.device_errors
         info: number of encountered BTRFS flush errors
         os: "*"
       - name: btrfs_device_corruption_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf
         metric: btrfs.device_errors
         info: number of encountered BTRFS corruption errors
         os: "*"
       - name: btrfs_device_generation_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf
         metric: btrfs.device_errors
         info: number of encountered BTRFS generation errors
         os: "*"
@@ -5110,7 +5110,7 @@ modules:
         list: []
     alerts:
       - name: linux_power_supply_capacity
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/linux_power_supply.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/linux_power_supply.conf
         metric: powersupply.capacity
         info: percentage of remaining power supply capacity
     metrics:

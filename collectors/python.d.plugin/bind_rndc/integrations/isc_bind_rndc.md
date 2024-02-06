@@ -77,7 +77,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ bind_rndc_stats_file_size ](https://github.com/netdata/netdata/blob/master/health/health.d/bind_rndc.conf) | bind_rndc.stats_size | BIND statistics-file size |
+| [ bind_rndc_stats_file_size ](https://github.com/netdata/netdata/blob/master/src/health/health.d/bind_rndc.conf) | bind_rndc.stats_size | BIND statistics-file size |
 
 
 ## Setup

@@ -83,9 +83,9 @@ sudo ./edit-config health.d/example-alert.conf
 
 Or, append your new alert to an existing file by editing a relevant existing file in the `health.d/` directory.
 
-Read more about [configuring alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) to
+Read more about [configuring alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) to
 get started, and see
-the [health monitoring reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) for a full listing
+the [health monitoring reference](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) for a full listing
 of options available in health entities.
 
 ### Configure a specific alert
