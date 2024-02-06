@@ -1592,6 +1592,9 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
 
         if (w->external_origin)
             external_origin = NETDATA_EBPF_SRC_IP_ORIGIN_EXTERNAL;
+
+        if (!values[0].name[0] && w->name[0])
+            strncpyz(values[0].name, w->name, sizeof(w->name));
     }
 
     values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
@@ -1787,9 +1790,10 @@ static void ebpf_update_array_vectors(ebpf_module_t *em)
         }
         uint64_t prev_period = socket_ptr->data.current_timestamp;
         memcpy(&socket_ptr->data, &values[0], sizeof(netdata_socket_t));
-        if (translate)
+        if (translate) {
             ebpf_socket_translate(socket_ptr, &key);
-        else { // Check socket was updated
+            strncpyz(socket_ptr->data.name, values[0].name, sizeof(values[0].name));
+        } else { // Check socket was updated
             if (prev_period) {
                 if (values[0].current_timestamp > prev_period) // Socket updated
                     socket_ptr->last_update = update_time;
