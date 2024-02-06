@@ -127,4 +127,6 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
 void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap);
 
+void notif_curl_init(void);
+
 #endif //NETDATA_HEALTH_INTERNALS_H
