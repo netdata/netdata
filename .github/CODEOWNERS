@@ -6,8 +6,7 @@
 
 # Ownership by directory structure
 .github/ @Ferroin @tkatsoulas
-aclk/ @stelfrag
-build/ @Ferroin @tkatsoulas
+src/aclk/ @stelfrag
 contrib/debian @Ferroin @tkatsoulas
 collectors/ @thiagoftsm
 collectors/ebpf.plugin/ @thiagoftsm
@@ -18,34 +17,29 @@ collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @thiagoftsm
 src/exporting/ @thiagoftsm
 daemon/ @thiagoftsm @vkalintiris
-database/ @thiagoftsm @vkalintiris
+src/database/ @thiagoftsm @vkalintiris
 docs/ @tkatsoulas @Ancairon
 health/ @thiagoftsm @vkalintiris
 health/health.d/ @thiagoftsm
 health/notifications/ @Ferroin @thiagoftsm
-ml/ @vkalintiris
-libnetdata/ @thiagoftsm @vkalintiris
+src/ml/ @vkalintiris
+src/libnetdata/ @thiagoftsm @vkalintiris
 packaging/ @Ferroin @tkatsoulas
-registry/ @novykh
-streaming/ @thiagoftsm
+src/registry/ @novykh
+src/streaming/ @thiagoftsm
 system/ @Ferroin @tkatsoulas
 tests/ @Ferroin @vkalintiris @tkatsoulas
 web/ @thiagoftsm @vkalintiris
 web/gui/ @novykh
-logsmanagement/ @thiagoftsm
+src/logsmanagement/ @thiagoftsm
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin @tkatsoulas
 *.md @tkatsoulas @Ancairon
 *.mdx @tkatsoulas @Ancairon
 Dockerfile* @Ferroin @tkatsoulas
 
 # Ownership of specific files
 .gitignore @Ferroin @tkatsoulas @vkalintiris
-.eslintrc @Ferroin @tkatsoulas
-.eslintignore @Ferroin @tkatsoulas
-.csslintrc @Ferroin @tkatsoulas
-.codeclimate.yml @Ferroin @tkatsoulas
 .codacy.yml @Ferroin @tkatsoulas
 .yamllint.yml @Ferroin @tkatsoulas
 netdata.spec.in @Ferroin @tkatsoulas
