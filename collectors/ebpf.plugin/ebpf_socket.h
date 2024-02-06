@@ -170,6 +170,7 @@ typedef struct ebpf_socket_publish_apps {
     uint64_t call_close;            // Number of times tcp_close was called
     uint64_t call_tcp_v4_connection;// Number of times tcp_v4_connect was called
     uint64_t call_tcp_v6_connection;// Number of times tcp_v6_connect was called
+    uint32_t tcp_state;             // The current TCP state
 } ebpf_socket_publish_apps_t;
 
 typedef struct ebpf_network_viewer_dimension_names {

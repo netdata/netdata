@@ -1595,6 +1595,9 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
 
         if (!values[0].name[0] && w->name[0])
             strncpyz(values[0].name, w->name, sizeof(w->name));
+
+        if (w->tcp.state)
+            values[0].tcp.state = w->tcp.state;
     }
 
     values[0].protocol          = (!protocol)?IPPROTO_TCP:protocol;
@@ -2015,6 +2018,8 @@ void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
 
     curr->call_udp_sent += ns->udp.call_udp_sent;
     curr->call_udp_received += ns->udp.call_udp_received;
+
+    curr->tcp_state += ns->tcp.state;
 }
 
 /**
