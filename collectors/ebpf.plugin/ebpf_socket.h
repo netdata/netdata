@@ -15,6 +15,7 @@
 
 // Vector indexes
 #define NETDATA_UDP_START 3
+#define NETDATA_EBPF_TCP_STATES 14
 
 // config file
 #define NETDATA_NETWORK_CONFIG_FILE "network.conf"
@@ -287,6 +288,7 @@ typedef struct netdata_socket {
         uint32_t retransmit;   //It is never used with UDP
         uint32_t ipv4_connect;
         uint32_t ipv6_connect;
+        uint32_t state;
     } tcp;
 
     struct {

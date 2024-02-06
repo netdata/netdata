@@ -1575,6 +1575,8 @@ static void ebpf_hash_socket_accumulator(netdata_socket_t *values, int end)
         values[0].tcp.retransmit            += w->tcp.retransmit;
         values[0].tcp.ipv4_connect          += w->tcp.ipv4_connect;
         values[0].tcp.ipv6_connect          += w->tcp.ipv6_connect;
+        if (w->tcp.state)
+            values[0].tcp.state                 = w->tcp.state;
 
         if (!protocol)
             protocol = w->protocol;
