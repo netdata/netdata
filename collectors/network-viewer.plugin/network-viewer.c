@@ -190,7 +190,7 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_S
 
         case SOCKET_DIRECTION_OUTBOUND:
         case SOCKET_DIRECTION_LOCAL_OUTBOUND:
-            memset(&n->local.ip, 0, sizeof(n->remote.ip));
+            memset(&n->local.ip, 0, sizeof(n->local.ip));
             n->local.port = 0;
             break;
 
