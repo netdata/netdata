@@ -661,8 +661,10 @@ void nd_log_set_priority_level(const char *setting) {
     priority = NDLP_DEBUG;
 #endif
 
-    nd_log.sources[NDLS_DAEMON].min_priority = priority;
-    nd_log.sources[NDLS_COLLECTORS].min_priority = priority;
+    for (size_t i = 0; i < _NDLS_MAX; i++) {
+        if (i != NDLS_DEBUG)
+            nd_log.sources[i].min_priority = priority;
+    }
 
     // the right one
     setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
@@ -2162,13 +2164,11 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
     if(likely(!thread_log_fields[NDF_THREAD_TAG].entry.set)) {
         const char *thread_tag = netdata_thread_tag();
-        if(!netdata_thread_tag_exists()) {
-            if (!netdata_thread_tag_exists()) {
-                os_thread_get_current_name_np(os_threadname);
-                if ('\0' != os_threadname[0])
-                    /* If it is not an empty string replace "MAIN" thread_tag */
-                    thread_tag = os_threadname;
-            }
+        if (!netdata_thread_tag_exists()) {
+            os_thread_get_current_name_np(os_threadname);
+            if ('\0' != os_threadname[0])
+                /* If it is not an empty string replace "MAIN" thread_tag */
+                thread_tag = os_threadname;
         }
         thread_log_fields[NDF_THREAD_TAG].entry = ND_LOG_FIELD_TXT(NDF_THREAD_TAG, thread_tag);
 
@@ -2254,7 +2254,7 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
     int saved_errno = errno;
     source = nd_log_validate_source(source);
 
-    if((source == NDLS_DAEMON || source == NDLS_COLLECTORS) && priority > nd_log.sources[source].min_priority)
+    if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
         return;
 
     va_list args;
@@ -2268,6 +2268,9 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     int saved_errno = errno;
     source = nd_log_validate_source(source);
+
+    if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
+        return;
 
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
@@ -2311,13 +2314,11 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
 
     char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
     const char *thread_tag = netdata_thread_tag();
-    if(!netdata_thread_tag_exists()) {
-        if (!netdata_thread_tag_exists()) {
-            os_thread_get_current_name_np(os_threadname);
-            if ('\0' != os_threadname[0])
-                /* If it is not an empty string replace "MAIN" thread_tag */
-                thread_tag = os_threadname;
-        }
+    if (!netdata_thread_tag_exists()) {
+        os_thread_get_current_name_np(os_threadname);
+        if ('\0' != os_threadname[0])
+            /* If it is not an empty string replace "MAIN" thread_tag */
+            thread_tag = os_threadname;
     }
     if(!thread_tag)
         thread_tag = "UNKNOWN";
