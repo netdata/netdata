@@ -942,24 +942,24 @@ set(EXPORTING_ENGINE_FILES
 )
 
 set(HEALTH_PLUGIN_FILES
-        health/health.c
-        health/health.h
-        health/health_config.c
-        health/health_json.c
-        health/health_log.c
-        health/health_prototypes.c
-        health/health_prototypes.h
-        health/health_silencers.c
-        health/health_silencers.h
-        health/health_internals.h
-        health/health_notifications.c
-        health/health_event_loop.c
-        health/health_dyncfg.c
-        health/health_variable.c
-        health/rrdcalc.c
-        health/rrdcalc.h
-        health/rrdvar.c
-        health/rrdvar.h
+        src/health/health.c
+        src/health/health.h
+        src/health/health_config.c
+        src/health/health_json.c
+        src/health/health_log.c
+        src/health/health_prototypes.c
+        src/health/health_prototypes.h
+        src/health/health_silencers.c
+        src/health/health_silencers.h
+        src/health/health_internals.h
+        src/health/health_notifications.c
+        src/health/health_event_loop.c
+        src/health/health_dyncfg.c
+        src/health/health_variable.c
+        src/health/rrdcalc.c
+        src/health/rrdcalc.h
+        src/health/rrdvar.c
+        src/health/rrdvar.h
 )
 
 set(IDLEJITTER_PLUGIN_FILES collectors/idlejitter.plugin/plugin_idlejitter.c)
@@ -2450,24 +2450,24 @@ install(PROGRAMS
 # health files
 #
 
-file(GLOB_RECURSE HEALTH_CONF_FILES "health/health.d/*.conf")
+file(GLOB_RECURSE HEALTH_CONF_FILES "src/health/health.d/*.conf")
 install(FILES
         ${HEALTH_CONF_FILES}
         DESTINATION usr/lib/netdata/conf.d/health.d)
 
-configure_file(health/notifications/alarm-notify.sh.in health/notifications/alarm-notify.sh @ONLY)
+configure_file(src/health/notifications/alarm-notify.sh.in src/health/notifications/alarm-notify.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/health/notifications/alarm-notify.sh
+        ${CMAKE_BINARY_DIR}/src/health/notifications/alarm-notify.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(PROGRAMS
-        health/notifications/alarm-email.sh
-        health/notifications/alarm-test.sh
+        src/health/notifications/alarm-email.sh
+        src/health/notifications/alarm-test.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES
-        health/notifications/health_alarm_notify.conf
-        health/notifications/health_email_recipients.conf
+        src/health/notifications/health_alarm_notify.conf
+        src/health/notifications/health_email_recipients.conf
         DESTINATION usr/lib/netdata/conf.d)
 #
 # test/ files
@@ -2540,7 +2540,7 @@ install(FILES
 
 install(FILES
         collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
-        health/schema.d/health:alert:prototype.json
+        src/health/schema.d/health:alert:prototype.json
         DESTINATION usr/lib/netdata/conf.d/schema.d)
 
 #
