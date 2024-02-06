@@ -880,7 +880,10 @@ static void log_init(void) {
     logs = (unsigned long)config_get_number(CONFIG_SECTION_LOGS, "logs to trigger flood protection", (long long int)logs);
     nd_log_set_flood_protection(logs, period);
 
-    nd_log_set_priority_level(config_get(CONFIG_SECTION_LOGS, "level", NDLP_INFO_STR));
+    const char *netdata_log_level = getenv("NETDATA_LOG_LEVEL");
+    netdata_log_level = netdata_log_level ? nd_log_id2priority(nd_log_priority2id(netdata_log_level)) : NDLP_INFO_STR;
+
+    nd_log_set_priority_level(config_get(CONFIG_SECTION_LOGS, "level", netdata_log_level));
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
