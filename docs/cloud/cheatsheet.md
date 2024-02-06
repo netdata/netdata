@@ -39,7 +39,7 @@ You are expected to use this method in all following configuration changes.
 ## Metrics collection & retention
 
 You can tweak your settings in the netdata.conf file.
-📄 [Find your netdata.conf file](https://github.com/netdata/netdata/blob/master/daemon/config/README.md)
+📄 [Find your netdata.conf file](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md)
 
 Open a new terminal and navigate to the netdata.conf file. Use the edit-config script to make changes: `sudo ./edit-config netdata.conf`
 

@@ -38,7 +38,7 @@ to help you determine the exact settings for your desired retention period.
 ### Reduce the data collection frequency
 
 Change `update every` in
-the [`[global]` section](https://github.com/netdata/netdata/blob/master/daemon/config/README.md#global-section-options)
+the [`[global]` section](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md#global-section-options)
 of `netdata.conf` so
 that it is greater than `1`. An `update every` of `5` means the Netdata Agent enforces a _minimum_ collection frequency
 of 5 seconds.
@@ -57,7 +57,7 @@ doc for details.
 ### Disable a collector or plugin
 
 Turn off entire plugins in
-the [`[plugins]` section](https://github.com/netdata/netdata/blob/master/daemon/config/README.md#plugins-section-options)
+the [`[plugins]` section](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md#plugins-section-options)
 of
 `netdata.conf`.
 
@@ -116,7 +116,7 @@ template: disk_fill_rate
 ### Turn of all alerts and notifications
 
 Set `enabled` to `no` in
-the [`[health]`](https://github.com/netdata/netdata/blob/master/daemon/config/README.md#health-section-options)
+the [`[health]`](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md#health-section-options)
 section of `netdata.conf`.
 
 ### Enable alert notifications

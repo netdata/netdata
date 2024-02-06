@@ -19,7 +19,7 @@ You can configure the Agent's health watchdog service by editing files in two lo
 
 - The `[health]` section in `netdata.conf`. By editing the daemon's behavior, you can disable health monitoring
     altogether, run health checks more or less often, and more. See
-    [daemon configuration](https://github.com/netdata/netdata/blob/master/daemon/config/README.md#health-section-options) for a table of
+    [daemon configuration](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md#health-section-options) for a table of
     all the available settings, their default values, and what they control.
 
 - The individual `.conf` files in `health.d/`. These health entity files are organized by the type of metric they are
@@ -1368,7 +1368,7 @@ health configuration files!
 
 ## Troubleshooting
 
-You can compile Netdata with [debugging](https://github.com/netdata/netdata/blob/master/daemon/README.md#debugging) and then set in `netdata.conf`:
+You can compile Netdata with [debugging](https://github.com/netdata/netdata/blob/master/src/daemon/README.md#debugging) and then set in `netdata.conf`:
 
 ```yaml
 [global]

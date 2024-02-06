@@ -21,74 +21,16 @@ Makefile.in
 !collectors/log2journal/tests.d/*.log
 *.pyc
 
-Makefile
-aclocal.m4
-autom4te.cache
-compile
-config.guess
-config.h
-config.status
-config.sub
-configure
-depcomp
-install-sh
-libtool
-ltmain.sh
-missing
-stamp-h1
 netdata.spec
 sha256sums.txt
 
-# netdata binaries
-netdata
-netdatacli
-systemd-cat-native
-log2journal
-!log2journal/
-!netdata/
 upload/
 artifacts/
-
-apps.plugin
-!apps.plugin/
-
-freeipmi.plugin
-!freeipmi.plugin/
-
-cups.plugin
-!cups.plugin/
-
-nfacct.plugin
-!nfacct.plugin/
-
-xenstat.plugin
-!xenstat.plugin/
-
-perf.plugin
-!perf.plugin/
-
-slabinfo.plugin
-!slabinfo.plugin/
-
-cgroup-network
-!cgroup-network/
-
-local-listeners
-!local-listeners/
 
 ebpf.plugin
 collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
 collectors/ebpf.plugin/includes/
-
-debugfs.plugin
-!debugfs.plugin/
-
-systemd-journal.plugin
-!systemd-journal.plugin/
-
-logs-management.plugin
-!logs-management.plugin/
 
 # protoc generated files
 *.pb.cc
@@ -143,9 +85,6 @@ system/systemd/netdata.service.*
 system/systemd/netdata-updater.service
 !system/systemd/netdata.service.in
 !system/systemd/netdata.service.*.in
-
-daemon/anonymous-statistics.sh
-daemon/get-kubernetes-labels.sh
 
 health/notifications/alarm-notify.sh
 claim/netdata-claim.sh
@@ -248,14 +187,10 @@ Session.*.vim
 # Jupyter notebook checkpoints
 .ipynb_checkpoints
 
-# m4 generated ksys
-database/engine/journalfile_v2.ksy
-database/engine/journalfile_v2_virtmemb.ksy
-
 # gorilla benchmark & fuzz binaries
-libnetdata/gorilla/gorilla_benchmark
-libnetdata/gorilla/gorilla_fuzzer
-libnetdata/gorilla/fuzz-*.log
+src/libnetdata/gorilla/gorilla_benchmark
+src/libnetdata/gorilla/gorilla_fuzzer
+src/libnetdata/gorilla/fuzz-*.log
 
 # ignore build/ directory (default dir for many IDEs/LSPs)
 build/

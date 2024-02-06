@@ -4,6 +4,8 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+#define ENABLE_DETAILED_VIEW
+
 #define LOCAL_SOCKETS_EXTENDED_MEMBERS struct { \
         size_t count;                           \
         const char *local_address_space;        \
@@ -188,7 +190,7 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, LOCAL_S
 
         case SOCKET_DIRECTION_OUTBOUND:
         case SOCKET_DIRECTION_LOCAL_OUTBOUND:
-            memset(&n->local.ip, 0, sizeof(n->remote.ip));
+            memset(&n->local.ip, 0, sizeof(n->local.ip));
             n->local.port = 0;
             break;
 
@@ -257,6 +259,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             buffer_json_member_add_string(wb, "id", "sockets");
             buffer_json_member_add_string(wb, "name", "Sockets");
             buffer_json_member_add_string(wb, "help", "Select the source type to query");
+            buffer_json_member_add_boolean(wb, "unique_view", true);
             buffer_json_member_add_string(wb, "type", "select");
             buffer_json_member_add_array(wb, "options");
             {
@@ -371,7 +374,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                                         RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
                                         0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                                        RRDF_FIELD_OPTS_VISIBLE,
+                                        RRDF_FIELD_OPTS_VISIBLE|RRDF_FIELD_OPTS_STICKY,
                                         NULL);
 
             // Protocol

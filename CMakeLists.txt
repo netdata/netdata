@@ -801,40 +801,40 @@ set(LIBH2O_FILES
 )
 
 set(DAEMON_FILES
-        daemon/buildinfo.c
-        daemon/buildinfo.h
-        daemon/common.c
-        daemon/common.h
-        daemon/daemon.c
-        daemon/daemon.h
-        daemon/event_loop.c
-        daemon/event_loop.h
-        daemon/global_statistics.c
-        daemon/global_statistics.h
-        daemon/analytics.c
-        daemon/analytics.h
-        daemon/main.c
-        daemon/main.h
-        daemon/signals.c
-        daemon/signals.h
-        daemon/service.c
-        daemon/static_threads.c
-        daemon/static_threads.h
-        daemon/commands.c
-        daemon/commands.h
-        daemon/pipename.c
-        daemon/pipename.h
-        daemon/unit_test.c
-        daemon/unit_test.h
-        daemon/config/dyncfg.c
-        daemon/config/dyncfg.h
-        daemon/config/dyncfg-files.c
-        daemon/config/dyncfg-unittest.c
-        daemon/config/dyncfg-inline.c
-        daemon/config/dyncfg-echo.c
-        daemon/config/dyncfg-internals.h
-        daemon/config/dyncfg-intercept.c
-        daemon/config/dyncfg-tree.c
+        src/daemon/buildinfo.c
+        src/daemon/buildinfo.h
+        src/daemon/common.c
+        src/daemon/common.h
+        src/daemon/daemon.c
+        src/daemon/daemon.h
+        src/daemon/event_loop.c
+        src/daemon/event_loop.h
+        src/daemon/global_statistics.c
+        src/daemon/global_statistics.h
+        src/daemon/analytics.c
+        src/daemon/analytics.h
+        src/daemon/main.c
+        src/daemon/main.h
+        src/daemon/signals.c
+        src/daemon/signals.h
+        src/daemon/service.c
+        src/daemon/static_threads.c
+        src/daemon/static_threads.h
+        src/daemon/commands.c
+        src/daemon/commands.h
+        src/daemon/pipename.c
+        src/daemon/pipename.h
+        src/daemon/unit_test.c
+        src/daemon/unit_test.h
+        src/daemon/config/dyncfg.c
+        src/daemon/config/dyncfg.h
+        src/daemon/config/dyncfg-files.c
+        src/daemon/config/dyncfg-unittest.c
+        src/daemon/config/dyncfg-inline.c
+        src/daemon/config/dyncfg-echo.c
+        src/daemon/config/dyncfg-internals.h
+        src/daemon/config/dyncfg-intercept.c
+        src/daemon/config/dyncfg-tree.c
 )
 
 set(H2O_FILES
@@ -922,23 +922,23 @@ set(API_PLUGIN_FILES
 )
 
 set(EXPORTING_ENGINE_FILES
-        exporting/exporting_engine.c
-        exporting/exporting_engine.h
-        exporting/graphite/graphite.c
-        exporting/graphite/graphite.h
-        exporting/json/json.c
-        exporting/json/json.h
-        exporting/opentsdb/opentsdb.c
-        exporting/opentsdb/opentsdb.h
-        exporting/prometheus/prometheus.c
-        exporting/prometheus/prometheus.h
-        exporting/read_config.c
-        exporting/clean_connectors.c
-        exporting/init_connectors.c
-        exporting/process_data.c
-        exporting/check_filters.c
-        exporting/send_data.c
-        exporting/send_internal_metrics.c
+        src/exporting/exporting_engine.c
+        src/exporting/exporting_engine.h
+        src/exporting/graphite/graphite.c
+        src/exporting/graphite/graphite.h
+        src/exporting/json/json.c
+        src/exporting/json/json.h
+        src/exporting/opentsdb/opentsdb.c
+        src/exporting/opentsdb/opentsdb.h
+        src/exporting/prometheus/prometheus.c
+        src/exporting/prometheus/prometheus.h
+        src/exporting/read_config.c
+        src/exporting/clean_connectors.c
+        src/exporting/init_connectors.c
+        src/exporting/process_data.c
+        src/exporting/check_filters.c
+        src/exporting/send_data.c
+        src/exporting/send_internal_metrics.c
 )
 
 set(HEALTH_PLUGIN_FILES
@@ -1331,7 +1331,7 @@ set(NETDATA_FILES
 
 if(LINUX)
         list(APPEND NETDATA_FILES
-                daemon/static_threads_linux.c
+                src/daemon/static_threads_linux.c
                 ${CGROUPS_PLUGIN_FILES}
                 ${DISKSPACE_PLUGIN_FILES}
                 ${PROC_PLUGIN_FILES}
@@ -1340,17 +1340,17 @@ if(LINUX)
 
         if(ENABLE_SENTRY)
             list(APPEND NETDATA_FILES
-                    daemon/sentry-native/sentry-native.c
-                    daemon/sentry-native/sentry-native.h)
+                    src/daemon/sentry-native/sentry-native.c
+                    src/daemon/sentry-native/sentry-native.h)
         endif()
 elseif(MACOS)
         list(APPEND NETDATA_FILES
-                daemon/static_threads_macos.c
+                src/daemon/static_threads_macos.c
                 ${MACOS_PLUGIN_FILES}
         )
 elseif(FREEBSD)
         list(APPEND NETDATA_FILES
-                daemon/static_threads_freebsd.c
+                src/daemon/static_threads_freebsd.c
                 ${FREEBSD_PLUGIN_FILES}
         )
 endif()
@@ -1437,15 +1437,15 @@ set(ACLK_FILES
 
 
 set(MONGODB_EXPORTING_FILES
-        exporting/mongodb/mongodb.c
-        exporting/mongodb/mongodb.h
+        src/exporting/mongodb/mongodb.c
+        src/exporting/mongodb/mongodb.h
 )
 
 set(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
-        exporting/prometheus/remote_write/remote_write.c
-        exporting/prometheus/remote_write/remote_write.h
-        exporting/prometheus/remote_write/remote_write_request.cc
-        exporting/prometheus/remote_write/remote_write_request.h
+        src/exporting/prometheus/remote_write/remote_write.c
+        src/exporting/prometheus/remote_write/remote_write.h
+        src/exporting/prometheus/remote_write/remote_write_request.cc
+        src/exporting/prometheus/remote_write/remote_write_request.h
 )
 
 #
@@ -2062,11 +2062,11 @@ if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                 endif()
         endif()
 
-        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write"
-                            "${CMAKE_SOURCE_DIR}/exporting/prometheus/remote_write"
+        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
+                            "${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
                             PROMETHEUS_REMOTE_WRITE_BUILT_SRCS
                             PROMETHEUS_REMOTE_WRITE_BUILT_HDRS
-                            "exporting/prometheus/remote_write/remote_write.proto")
+                            "src/exporting/prometheus/remote_write/remote_write.proto")
 
         list(APPEND PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
                     ${PROMETHEUS_REMOTE_WRITE_BUILT_SRCS}
@@ -2179,9 +2179,9 @@ endif()
 #
 
 set(NETDATACLI_FILES
-        daemon/commands.h
-        daemon/pipename.c
-        daemon/pipename.h
+        src/daemon/commands.h
+        src/daemon/pipename.c
+        src/daemon/pipename.h
         src/cli/cli.c
 )
 
@@ -2313,7 +2313,7 @@ install(FILES
 # exporting
 #
 install(FILES
-        exporting/exporting.conf
+        src/exporting/exporting.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 #
@@ -2432,18 +2432,18 @@ install(PROGRAMS
 #
 # TODO: check the following files for correct substitutions
 #
-configure_file(daemon/anonymous-statistics.sh.in daemon/anonymous-statistics.sh @ONLY)
+configure_file(src/daemon/anonymous-statistics.sh.in src/daemon/anonymous-statistics.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/daemon/anonymous-statistics.sh
+        ${CMAKE_BINARY_DIR}/src/daemon/anonymous-statistics.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
-configure_file(daemon/get-kubernetes-labels.sh.in daemon/get-kubernetes-labels.sh @ONLY)
+configure_file(src/daemon/get-kubernetes-labels.sh.in src/daemon/get-kubernetes-labels.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/daemon/get-kubernetes-labels.sh
+        ${CMAKE_BINARY_DIR}/src/daemon/get-kubernetes-labels.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(PROGRAMS
-        daemon/system-info.sh
+        src/daemon/system-info.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
