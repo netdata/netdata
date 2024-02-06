@@ -4,6 +4,8 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+#define ENABLE_DETAILED_VIEW
+
 #define LOCAL_SOCKETS_EXTENDED_MEMBERS struct { \
         size_t count;                           \
         const char *local_address_space;        \
@@ -257,6 +259,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             buffer_json_member_add_string(wb, "id", "sockets");
             buffer_json_member_add_string(wb, "name", "Sockets");
             buffer_json_member_add_string(wb, "help", "Select the source type to query");
+            buffer_json_member_add_boolean(wb, "unique_view", true);
             buffer_json_member_add_string(wb, "type", "select");
             buffer_json_member_add_array(wb, "options");
             {
