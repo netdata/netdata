@@ -2,27 +2,10 @@
 
 set -e
 
-dpkg-maintscript-helper dir_to_symlink \
-  /var/lib/netdata/www/.well-known /usr/share/netdata/www/.well-known 1.18.1~ netdata -- "$@"
-dpkg-maintscript-helper dir_to_symlink \
-  /var/lib/netdata/www/css /usr/share/netdata/www/css 1.18.1~ netdata -- "$@"
-dpkg-maintscript-helper dir_to_symlink \
-  /var/lib/netdata/www/fonts /usr/share/netdata/www/fonts 1.18.1~ netdata -- "$@"
-dpkg-maintscript-helper dir_to_symlink \
-  /var/lib/netdata/www/images /usr/share/netdata/www/images 1.18.1~ netdata -- "$@"
-dpkg-maintscript-helper dir_to_symlink \
-  /var/lib/netdata/www/lib /usr/share/netdata/www/lib 1.18.1~ netdata -- "$@"
-dpkg-maintscript-helper dir_to_symlink \
-  /var/lib/netdata/www/static /usr/share/netdata/www/static 1.18.1~ netdata -- "$@"
-
 case "$1" in
   configure|reconfigure)
     if ! dpkg-statoverride --list /var/lib/netdata > /dev/null 2>&1; then
       dpkg-statoverride --update --add netdata netdata 0755 /var/lib/netdata
-    fi
-
-    if ! dpkg-statoverride --list /var/lib/netdata/www > /dev/null 2>&1; then
-      dpkg-statoverride --update --add root netdata 0755 /var/lib/netdata/www
     fi
 
     if ! dpkg-statoverride --list /var/cache/netdata > /dev/null 2>&1; then
@@ -37,17 +20,17 @@ case "$1" in
       dpkg-statoverride --update --add netdata adm 02750 /var/log/netdata
     fi
 
+    if ! dpkg-statoverride --list /usr/share/netdata/www > /dev/null 2>&1; then
+      dpkg-statoverride --update --add root netdata 0755 /usr/share/netdata/www
+    fi
+
     dpkg-statoverride --force --update --add root netdata 0775 /var/lib/netdata/registry > /dev/null 2>&1
 
     grep /usr/libexec/netdata /var/lib/dpkg/info/netdata.list | xargs -n 30 chown root:netdata
 
-    chmod 4750 /usr/libexec/netdata/plugins.d/ndsudo
-    chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network
-    chmod 4750 /usr/libexec/netdata/plugins.d/local-listeners
-    chmod 4750 /usr/libexec/netdata/plugins.d/network-viewer.plugin
-
-    # Workaround for other plugins not installed directly by this package
-    chmod -f 4750 /usr/libexec/netdata/plugins.d/ioping || true
+    for f in ndsudo cgroup-network local-listeners ioping network-viewer.plugin; do
+        chmod 4750 "/usr/libexec/netdata/plugins.d/${f}" || true
+    done
 
     ;;
 esac
