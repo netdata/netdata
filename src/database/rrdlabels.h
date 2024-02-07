@@ -71,7 +71,8 @@ bool pattern_array_label_match(
     char eq,
     size_t *searches,
     bool (*callback_function)(RRDLABELS *, void *, char, size_t *));
-struct pattern_array *pattern_array_populate_from_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep);
+struct pattern_array *
+pattern_array_populate_with_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep);
 void pattern_array_free(struct pattern_array *pa);
 
 int rrdlabels_unittest(void);
