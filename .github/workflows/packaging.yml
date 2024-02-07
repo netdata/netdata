@@ -53,7 +53,7 @@ jobs:
             **.patch
             **.cmake
             netdata.spec.in
-            contrib/debian/**
+            contrib/debian/
             CMakeLists.txt
             .github/data/distros.yml
             .github/workflows/packaging.yml
