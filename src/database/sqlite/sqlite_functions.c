@@ -518,6 +518,7 @@ void sql_close_database(void)
     rc = sqlite3_close_v2(db_meta);
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
+    db_meta = NULL;
 }
 
 int exec_statement_with_uuid(const char *sql, uuid_t *uuid)

@@ -1826,8 +1826,11 @@ void metadata_sync_shutdown(void)
 
 void metadata_sync_shutdown_prepare(void)
 {
-    if (unlikely(!metasync_worker.loop))
+    static bool running = false;
+    if (unlikely(!metasync_worker.loop || running))
         return;
+
+    running = true;
 
     struct metadata_cmd cmd;
     memset(&cmd, 0, sizeof(cmd));
