@@ -1675,6 +1675,53 @@ static int unittest_dump_labels(const char *name, const char *value, RRDLABEL_SR
     return 1;
 }
 
+static int rrdlabels_unittest_pattern_check()
+{
+    fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
+    int rc = 0;
+
+    RRDLABELS *labels = NULL;
+
+    labels = rrdlabels_create();
+
+    rrdlabels_add(labels, "_module", "disk_detection", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "_plugin", "super_plugin", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "key1", "value1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "key2", "value2", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "key3", "value3", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "key4", "value4", RRDLABEL_SRC_CONFIG);
+
+    bool match;
+    struct pattern_array *pa = pattern_array_populate_with_key_value(NULL, "_module", "wrong_module", '=');
+    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    // This should not match:  _module in ("wrong_module")
+    if (match)
+        rc++;
+
+    pattern_array_populate_with_key_value(pa, "_module", "disk_detection", '=');
+    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    // This should match: _module in ("wrong_module","disk_detection")
+    if (!match)
+        rc++;
+
+    pattern_array_populate_with_key_value(pa, "key1", "wrong_key1_value", '=');
+    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    // This should not match: _module in ("wrong_module","disk_detection") AND key1 in ("wrong_key1_value")
+    if (match)
+        rc++;
+
+    pattern_array_populate_with_key_value(pa, "key1", "value1", '=');
+    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    // This should match: _module in ("wrong_module","disk_detection") AND key1 in ("wrong_key1_value", "value1")
+    if (!match)
+        rc++;
+
+    pattern_array_free(pa);
+    rrdlabels_destroy(labels);
+
+    return rc;
+}
+
 static int rrdlabels_unittest_migrate_check()
 {
     fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
@@ -1850,6 +1897,7 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_simple_pattern();
     errors += rrdlabels_unittest_double_check();
     errors += rrdlabels_unittest_migrate_check();
+    errors += rrdlabels_unittest_pattern_check();
 
     fprintf(stderr, "%d errors found\n", errors);
     return errors;
