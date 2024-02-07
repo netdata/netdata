@@ -106,7 +106,7 @@ Netdata to see your new charts.
 
 This release also includes eight pre-configured alerts for live nodes, such as whether the node is live, storage
 capacity, issues with replication, and the number of SQL connections/statements. See [health.d/cockroachdb.conf on
-GitHub](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/cockroachdb.conf) for details.
+GitHub](https://raw.githubusercontent.com/netdata/netdata/master/src/health/health.d/cockroachdb.conf) for details.
 
 You can also edit these files directly with `edit-config`:
 
@@ -115,4 +115,4 @@ cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /et
 ./edit-config health.d/cockroachdb.conf # You may need to use `sudo` for write privileges
 ```
 
-For more information about editing the defaults or writing new alert entities, see our documentation on [configuring health alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md).
+For more information about editing the defaults or writing new alert entities, see our documentation on [configuring health alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md).

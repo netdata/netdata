@@ -75,8 +75,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ semaphores_used ](https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf) | system.ipc_semaphores | IPC semaphore utilization |
-| [ semaphore_arrays_used ](https://github.com/netdata/netdata/blob/master/health/health.d/ipc.conf) | system.ipc_semaphore_arrays | IPC semaphore arrays utilization |
+| [ semaphores_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphores | IPC semaphore utilization |
+| [ semaphore_arrays_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphore_arrays | IPC semaphore arrays utilization |
 
 
 ## Setup

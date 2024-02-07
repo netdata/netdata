@@ -20,7 +20,7 @@ Use them to trigger [alert notifications](https://github.com/netdata/netdata/blo
 either centrally, via the 
 [Cloud alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 , or by configuring individual 
-[agent notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md).
+[agent notifications](https://github.com/netdata/netdata/blob/master/src/health/notifications/README.md).
 
 We designed Netdata with interoperability in mind. The Agent collects thousands of metrics every second, and then what
 you do with them is up to you. You can 

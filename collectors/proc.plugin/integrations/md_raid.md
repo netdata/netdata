@@ -96,10 +96,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ mdstat_last_collected ](https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf) | md.disks | number of seconds since the last successful data collection |
-| [ mdstat_disks ](https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf) | md.disks | number of devices in the down state for the ${label:device} ${label:raid_level} array. Any number > 0 indicates that the array is degraded. |
-| [ mdstat_mismatch_cnt ](https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf) | md.mismatch_cnt | number of unsynchronized blocks for the ${label:device} ${label:raid_level} array |
-| [ mdstat_nonredundant_last_collected ](https://github.com/netdata/netdata/blob/master/health/health.d/mdstat.conf) | md.nonredundant | number of seconds since the last successful data collection |
+| [ mdstat_last_collected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.disks | number of seconds since the last successful data collection |
+| [ mdstat_disks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.disks | number of devices in the down state for the ${label:device} ${label:raid_level} array. Any number > 0 indicates that the array is degraded. |
+| [ mdstat_mismatch_cnt ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.mismatch_cnt | number of unsynchronized blocks for the ${label:device} ${label:raid_level} array |
+| [ mdstat_nonredundant_last_collected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf) | md.nonredundant | number of seconds since the last successful data collection |
 
 
 ## Setup

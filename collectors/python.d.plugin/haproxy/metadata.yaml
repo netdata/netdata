@@ -122,11 +122,11 @@
 #     list: []
 # alerts:
 # - name: haproxy_backend_server_status
-#   link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
+#   link: https://github.com/netdata/netdata/blob/master/src/health/health.d/haproxy.conf
 #   metric: haproxy_hs.down
 #   info: average number of failed haproxy backend servers over the last 10 seconds
 # - name: haproxy_backend_status
-#   link: https://github.com/netdata/netdata/blob/master/health/health.d/haproxy.conf
+#   link: https://github.com/netdata/netdata/blob/master/src/health/health.d/haproxy.conf
 #   metric: haproxy_hb.down
 #   info: average number of failed haproxy backends over the last 10 seconds
 # metrics:

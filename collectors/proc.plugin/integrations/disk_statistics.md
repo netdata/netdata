@@ -120,10 +120,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 10min_disk_backlog ](https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf) | disk.backlog | average backlog size of the ${label:device} disk over the last 10 minutes |
-| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
-| [ bcache_cache_dirty ](https://github.com/netdata/netdata/blob/master/health/health.d/bcache.conf) | disk.bcache_cache_alloc | percentage of cache space used for dirty data and metadata (this usually means your SSD cache is too small) |
-| [ bcache_cache_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/bcache.conf) | disk.bcache_cache_read_races | number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is reread from the backing device) |
+| [ 10min_disk_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.backlog | average backlog size of the ${label:device} disk over the last 10 minutes |
+| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
+| [ bcache_cache_dirty ](https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf) | disk.bcache_cache_alloc | percentage of cache space used for dirty data and metadata (this usually means your SSD cache is too small) |
+| [ bcache_cache_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf) | disk.bcache_cache_read_races | number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is reread from the backing device) |
 
 
 ## Setup

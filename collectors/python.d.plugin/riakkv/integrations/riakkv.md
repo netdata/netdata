@@ -99,12 +99,12 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ riakkv_1h_kv_get_mean_latency ](https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf) | riak.kv.latency.get | average time between reception of client GET request and subsequent response to client over the last hour |
-| [ riakkv_kv_get_slow ](https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf) | riak.kv.latency.get | average time between reception of client GET request and subsequent response to the client over the last 3 minutes, compared to the average over the last hour |
-| [ riakkv_1h_kv_put_mean_latency ](https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf) | riak.kv.latency.put | average time between reception of client PUT request and subsequent response to the client over the last hour |
-| [ riakkv_kv_put_slow ](https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf) | riak.kv.latency.put | average time between reception of client PUT request and subsequent response to the client over the last 3 minutes, compared to the average over the last hour |
-| [ riakkv_vm_high_process_count ](https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf) | riak.vm | number of processes running in the Erlang VM |
-| [ riakkv_list_keys_active ](https://github.com/netdata/netdata/blob/master/health/health.d/riakkv.conf) | riak.core.fsm_active | number of currently running list keys finite state machines |
+| [ riakkv_1h_kv_get_mean_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.kv.latency.get | average time between reception of client GET request and subsequent response to client over the last hour |
+| [ riakkv_kv_get_slow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.kv.latency.get | average time between reception of client GET request and subsequent response to the client over the last 3 minutes, compared to the average over the last hour |
+| [ riakkv_1h_kv_put_mean_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.kv.latency.put | average time between reception of client PUT request and subsequent response to the client over the last hour |
+| [ riakkv_kv_put_slow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.kv.latency.put | average time between reception of client PUT request and subsequent response to the client over the last 3 minutes, compared to the average over the last hour |
+| [ riakkv_vm_high_process_count ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.vm | number of processes running in the Erlang VM |
+| [ riakkv_list_keys_active ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.core.fsm_active | number of currently running list keys finite state machines |
 
 
 ## Setup

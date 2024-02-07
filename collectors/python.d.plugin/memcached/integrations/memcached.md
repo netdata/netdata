@@ -88,9 +88,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ memcached_cache_memory_usage ](https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf) | memcached.cache | cache memory utilization |
-| [ memcached_cache_fill_rate ](https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf) | memcached.cache | average rate the cache fills up (positive), or frees up (negative) space over the last hour |
-| [ memcached_out_of_cache_space_time ](https://github.com/netdata/netdata/blob/master/health/health.d/memcached.conf) | memcached.cache | estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour |
+| [ memcached_cache_memory_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | cache memory utilization |
+| [ memcached_cache_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | average rate the cache fills up (positive), or frees up (negative) space over the last hour |
+| [ memcached_out_of_cache_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memcached.conf) | memcached.cache | estimated time the cache will run out of space if the system continues to add data at the same rate as the past hour |
 
 
 ## Setup

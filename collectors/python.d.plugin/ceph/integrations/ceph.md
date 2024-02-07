@@ -88,7 +88,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ceph_cluster_space_usage ](https://github.com/netdata/netdata/blob/master/health/health.d/ceph.conf) | ceph.general_usage | cluster disk space utilization |
+| [ ceph_cluster_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.general_usage | cluster disk space utilization |
 
 
 ## Setup

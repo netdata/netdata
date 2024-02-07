@@ -86,7 +86,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ gearman_workers_queued ](https://github.com/netdata/netdata/blob/master/health/health.d/gearman.conf) | gearman.single_job | average number of queued jobs over the last 10 minutes |
+| [ gearman_workers_queued ](https://github.com/netdata/netdata/blob/master/src/health/health.d/gearman.conf) | gearman.single_job | average number of queued jobs over the last 10 minutes |
 
 
 ## Setup

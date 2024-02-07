@@ -79,7 +79,7 @@ modules:
         list: []
     alerts:
       - name: ioping_disk_latency
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/ioping.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ioping.conf
         metric: ioping.latency
         info: average I/O latency over the last 10 seconds
     metrics:

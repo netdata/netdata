@@ -103,7 +103,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ipmi_sensor_state ](https://github.com/netdata/netdata/blob/master/health/health.d/ipmi.conf) | ipmi.sensor_state | IPMI sensor ${label:sensor} (${label:component}) state |
+| [ ipmi_sensor_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.sensor_state | IPMI sensor ${label:sensor} (${label:component}) state |
 
 
 ## Setup

@@ -75,8 +75,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf) | disk.space | disk ${label:mount_point} space utilization |
-| [ disk_inode_usage ](https://github.com/netdata/netdata/blob/master/health/health.d/disks.conf) | disk.inodes | disk ${label:mount_point} inode utilization |
+| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | disk ${label:mount_point} space utilization |
+| [ disk_inode_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | disk ${label:mount_point} inode utilization |
 
 
 ## Setup

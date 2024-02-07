@@ -127,23 +127,23 @@ modules:
         list: []
     alerts:
       - name: megacli_adapter_state
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
         metric: megacli.adapter_degraded
         info: "adapter is in the degraded state (0: false, 1: true)"
       - name: megacli_pd_media_errors
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
         metric: megacli.pd_media_error
         info: number of physical drive media errors
       - name: megacli_pd_predictive_failures
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
         metric: megacli.pd_predictive_failure
         info: number of physical drive predictive failures
       - name: megacli_bbu_relative_charge
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
         metric: megacli.bbu_relative_charge
         info: average battery backup unit (BBU) relative state of charge over the last 10 seconds
       - name: megacli_bbu_cycle_count
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf
         metric: megacli.bbu_cycle_count
         info: average battery backup unit (BBU) charge cycles count over the last 10 seconds
     metrics:

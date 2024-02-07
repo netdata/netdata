@@ -74,10 +74,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ load_cpu_number ](https://github.com/netdata/netdata/blob/master/health/health.d/load.conf) | system.load | number of active CPU cores in the system |
-| [ load_average_15 ](https://github.com/netdata/netdata/blob/master/health/health.d/load.conf) | system.load | system fifteen-minute load average |
-| [ load_average_5 ](https://github.com/netdata/netdata/blob/master/health/health.d/load.conf) | system.load | system five-minute load average |
-| [ load_average_1 ](https://github.com/netdata/netdata/blob/master/health/health.d/load.conf) | system.load | system one-minute load average |
+| [ load_cpu_number ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | number of active CPU cores in the system |
+| [ load_average_15 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system fifteen-minute load average |
+| [ load_average_5 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system five-minute load average |
+| [ load_average_1 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system one-minute load average |
 
 
 ## Setup

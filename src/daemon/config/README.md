@@ -37,7 +37,7 @@ the [web server access lists](https://github.com/netdata/netdata/blob/master/web
    Netdata.
 6. `[sqlite]` to [configure](#sqlite-section-options) the [Netdata daemon](https://github.com/netdata/netdata/blob/master/src/daemon/README.md) SQLite settings.
 7. `[ml]` to configure settings for [machine learning](https://github.com/netdata/netdata/blob/master/src/ml/README.md).
-8. `[health]` to [configure](#health-section-options) general settings for [health monitoring](https://github.com/netdata/netdata/blob/master/health/README.md).
+8. `[health]` to [configure](#health-section-options) general settings for [health monitoring](https://github.com/netdata/netdata/blob/master/src/health/README.md).
 9. `[web]` to [configure the web server](https://github.com/netdata/netdata/blob/master/web/server/README.md).
 10. `[registry]` for the [Netdata registry](https://github.com/netdata/netdata/blob/master/src/registry/README.md).
 11. `[global statistics]` for the [Netdata registry](https://github.com/netdata/netdata/blob/master/src/registry/README.md).
@@ -165,9 +165,9 @@ Please note that your data history will be lost if you have modified `history` p
 This section controls the general behavior of the health monitoring capabilities of Netdata.
 
 Specific alerts are configured in per-collector config files under the `health.d` directory. For more info, see [health
-monitoring](https://github.com/netdata/netdata/blob/master/health/README.md).
+monitoring](https://github.com/netdata/netdata/blob/master/src/health/README.md).
 
-[Alert notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md) are configured in `health_alarm_notify.conf`.
+[Alert notifications](https://github.com/netdata/netdata/blob/master/src/health/notifications/README.md) are configured in `health_alarm_notify.conf`.
 
 |                    setting                     |                     default                      | info                                                                                                                                                                                                                                                                                                                                            |
 |:----------------------------------------------:|:------------------------------------------------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

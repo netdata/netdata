@@ -76,7 +76,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ active_processes ](https://github.com/netdata/netdata/blob/master/health/health.d/processes.conf) | system.active_processes | system process IDs (PID) space utilization |
+| [ active_processes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf) | system.active_processes | system process IDs (PID) space utilization |
 
 
 ## Setup

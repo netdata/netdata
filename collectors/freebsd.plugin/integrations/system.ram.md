@@ -75,10 +75,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf) | system.ram | system memory utilization |
-| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf) | system.ram | system memory utilization |
-| [ ram_available ](https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
-| [ ram_available ](https://github.com/netdata/netdata/blob/master/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
+| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
+| [ ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | system.ram | system memory utilization |
+| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
+| [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
 
 
 ## Setup

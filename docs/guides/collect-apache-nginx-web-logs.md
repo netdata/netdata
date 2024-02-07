@@ -100,7 +100,7 @@ Over time, we've created some default alerts for web log monitoring. These alert
 web server is receiving more than 120 requests per minute. Otherwise, there's simply not enough data to make conclusions
 about what is "too few" or "too many."
 
--   [web log alerts](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/web_log.conf).
+-   [web log alerts](https://raw.githubusercontent.com/netdata/netdata/master/src/health/health.d/web_log.conf).
 
 You can also edit this file directly with `edit-config`:
 
@@ -109,4 +109,4 @@ You can also edit this file directly with `edit-config`:
 ```
 
 For more information about editing the defaults or writing new alert entities, see our 
-[health monitoring documentation](https://github.com/netdata/netdata/blob/master/health/README.md).
+[health monitoring documentation](https://github.com/netdata/netdata/blob/master/src/health/README.md).

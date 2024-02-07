@@ -98,7 +98,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ beanstalk_server_buried_jobs ](https://github.com/netdata/netdata/blob/master/health/health.d/beanstalkd.conf) | beanstalk.current_jobs | number of buried jobs across all tubes. You need to manually kick them so they can be processed. Presence of buried jobs in a tube does not affect new jobs. |
+| [ beanstalk_server_buried_jobs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/beanstalkd.conf) | beanstalk.current_jobs | number of buried jobs across all tubes. You need to manually kick them so they can be processed. Presence of buried jobs in a tube does not affect new jobs. |
 
 
 ## Setup

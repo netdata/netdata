@@ -96,11 +96,11 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ megacli_adapter_state ](https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf) | megacli.adapter_degraded | adapter is in the degraded state (0: false, 1: true) |
-| [ megacli_pd_media_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf) | megacli.pd_media_error | number of physical drive media errors |
-| [ megacli_pd_predictive_failures ](https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf) | megacli.pd_predictive_failure | number of physical drive predictive failures |
-| [ megacli_bbu_relative_charge ](https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf) | megacli.bbu_relative_charge | average battery backup unit (BBU) relative state of charge over the last 10 seconds |
-| [ megacli_bbu_cycle_count ](https://github.com/netdata/netdata/blob/master/health/health.d/megacli.conf) | megacli.bbu_cycle_count | average battery backup unit (BBU) charge cycles count over the last 10 seconds |
+| [ megacli_adapter_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.adapter_degraded | adapter is in the degraded state (0: false, 1: true) |
+| [ megacli_pd_media_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.pd_media_error | number of physical drive media errors |
+| [ megacli_pd_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.pd_predictive_failure | number of physical drive predictive failures |
+| [ megacli_bbu_relative_charge ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_relative_charge | average battery backup unit (BBU) relative state of charge over the last 10 seconds |
+| [ megacli_bbu_cycle_count ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_cycle_count | average battery backup unit (BBU) charge cycles count over the last 10 seconds |
 
 
 ## Setup

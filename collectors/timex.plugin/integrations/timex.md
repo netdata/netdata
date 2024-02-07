@@ -76,7 +76,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ system_clock_sync_state ](https://github.com/netdata/netdata/blob/master/health/health.d/timex.conf) | system.clock_sync_state | when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server |
+| [ system_clock_sync_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/timex.conf) | system.clock_sync_state | when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server |
 
 
 ## Setup

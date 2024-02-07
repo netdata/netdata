@@ -57,10 +57,10 @@ It is possible to use the `anomaly-bit` when defining traditional Alerts within 
 
 You can see some example ML based alert configurations below:
 
-- [Anomaly rate based CPU dimensions alert](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#example-8---anomaly-rate-based-cpu-dimensions-alert)
-- [Anomaly rate based CPU chart alert](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#example-9---anomaly-rate-based-cpu-chart-alert)
-- [Anomaly rate based node level alert](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#example-10---anomaly-rate-based-node-level-alert)
-- More examples in the [`/health/health.d/ml.conf`](https://github.com/netdata/netdata/blob/master/health/health.d/ml.conf) file that ships with the agent.
+- [Anomaly rate based CPU dimensions alert](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#example-8---anomaly-rate-based-cpu-dimensions-alert)
+- [Anomaly rate based CPU chart alert](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#example-9---anomaly-rate-based-cpu-chart-alert)
+- [Anomaly rate based node level alert](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#example-10---anomaly-rate-based-node-level-alert)
+- More examples in the [`/health/health.d/ml.conf`](https://github.com/netdata/netdata/blob/master/src/health/health.d/ml.conf) file that ships with the agent.
 
 ## Learn More
 

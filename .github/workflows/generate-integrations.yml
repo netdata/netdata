@@ -8,7 +8,7 @@ on:
     paths: # If any of these files change, we need to regenerate integrations.js.
       - 'collectors/**/metadata.yaml'
       - 'src/exporting/**/metadata.yaml'
-      - 'health/notifications/**/metadata.yaml'
+      - 'src/health/notifications/**/metadata.yaml'
       - 'integrations/templates/**'
       - 'integrations/categories.yaml'
       - 'integrations/deploy.yaml'

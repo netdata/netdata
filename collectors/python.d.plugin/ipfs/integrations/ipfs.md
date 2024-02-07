@@ -81,7 +81,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ipfs_datastore_usage ](https://github.com/netdata/netdata/blob/master/health/health.d/ipfs.conf) | ipfs.repo_size | IPFS datastore utilization |
+| [ ipfs_datastore_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipfs.conf) | ipfs.repo_size | IPFS datastore utilization |
 
 
 ## Setup

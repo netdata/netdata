@@ -107,7 +107,7 @@ modules:
         list: []
     alerts:
       - name: retroshare_dht_working
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/retroshare.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/retroshare.conf
         metric: retroshare.dht
         info: number of DHT peers
     metrics:

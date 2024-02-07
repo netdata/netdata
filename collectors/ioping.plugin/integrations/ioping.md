@@ -74,7 +74,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ioping_disk_latency ](https://github.com/netdata/netdata/blob/master/health/health.d/ioping.conf) | ioping.latency | average I/O latency over the last 10 seconds |
+| [ ioping_disk_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ioping.conf) | ioping.latency | average I/O latency over the last 10 seconds |
 
 
 ## Setup

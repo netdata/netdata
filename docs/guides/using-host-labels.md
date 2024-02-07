@@ -192,7 +192,7 @@ Or when ephemeral Docker nodes are involved:
 ```
 
 Of course, there are many more possibilities for intuitively organizing your systems with host labels. See the [health
-documentation](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alert-line-host-labels) for more details, and then get creative!
+documentation](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-host-labels) for more details, and then get creative!
 
 ### Host labels in metrics exporting
 

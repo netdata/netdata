@@ -75,8 +75,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 1m_ipv4_udp_receive_buffer_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP receive buffer errors over the last minute |
-| [ 1m_ipv4_udp_send_buffer_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP send buffer errors over the last minute |
+| [ 1m_ipv4_udp_receive_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP receive buffer errors over the last minute |
+| [ 1m_ipv4_udp_send_buffer_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf) | ipv4.udperrors | average number of UDP send buffer errors over the last minute |
 
 
 ## Setup

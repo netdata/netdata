@@ -84,8 +84,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ adaptec_raid_ld_status ](https://github.com/netdata/netdata/blob/master/health/health.d/adaptec_raid.conf) | adaptec_raid.ld_status | logical device status is failed or degraded |
-| [ adaptec_raid_pd_state ](https://github.com/netdata/netdata/blob/master/health/health.d/adaptec_raid.conf) | adaptec_raid.pd_state | physical device state is not online |
+| [ adaptec_raid_ld_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf) | adaptec_raid.ld_status | logical device status is failed or degraded |
+| [ adaptec_raid_pd_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf) | adaptec_raid.pd_state | physical device state is not online |
 
 
 ## Setup

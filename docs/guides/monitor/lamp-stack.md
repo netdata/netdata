@@ -203,7 +203,7 @@ shows any alerts currently triggered, while the **All** tab displays a list of _
 ![An example of LAMP stack
 alerts](https://user-images.githubusercontent.com/1153921/109524120-5883f900-7a6d-11eb-830e-0e7baaa28163.png)
 
-[Tweak alerts](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) based on your infrastructure monitoring needs, and to see these alerts
+[Tweak alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) based on your infrastructure monitoring needs, and to see these alerts
 in other places, like your inbox or a Slack channel, [enable a notification
 method](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
 

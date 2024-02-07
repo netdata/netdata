@@ -76,7 +76,7 @@ modules:
         list: []
     alerts:
       - name: system_clock_sync_state
-        link: https://github.com/netdata/netdata/blob/master/health/health.d/timex.conf
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/timex.conf
         metric: system.clock_sync_state
         info: when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server
         os: "linux"

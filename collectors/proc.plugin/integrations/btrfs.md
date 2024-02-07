@@ -103,15 +103,15 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ btrfs_allocated ](https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf) | btrfs.disk | percentage of allocated BTRFS physical disk space |
-| [ btrfs_data ](https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf) | btrfs.data | utilization of BTRFS data space |
-| [ btrfs_metadata ](https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf) | btrfs.metadata | utilization of BTRFS metadata space |
-| [ btrfs_system ](https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf) | btrfs.system | utilization of BTRFS system space |
-| [ btrfs_device_read_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS read errors |
-| [ btrfs_device_write_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS write errors |
-| [ btrfs_device_flush_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS flush errors |
-| [ btrfs_device_corruption_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS corruption errors |
-| [ btrfs_device_generation_errors ](https://github.com/netdata/netdata/blob/master/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS generation errors |
+| [ btrfs_allocated ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.disk | percentage of allocated BTRFS physical disk space |
+| [ btrfs_data ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.data | utilization of BTRFS data space |
+| [ btrfs_metadata ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.metadata | utilization of BTRFS metadata space |
+| [ btrfs_system ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.system | utilization of BTRFS system space |
+| [ btrfs_device_read_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS read errors |
+| [ btrfs_device_write_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS write errors |
+| [ btrfs_device_flush_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS flush errors |
+| [ btrfs_device_corruption_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS corruption errors |
+| [ btrfs_device_generation_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/btrfs.conf) | btrfs.device_errors | number of encountered BTRFS generation errors |
 
 
 ## Setup
