@@ -1362,6 +1362,7 @@ void pattern_array_add_label_key_with_simple_pattern(struct pattern_array *pa, c
     Pvoid_t *Pvalue = JudyLIns(&pa->JudyL, (Word_t) string_key, PJE0);
     if (!Pvalue) {
         string_freez(string_key);
+        simple_pattern_free(sp);
         return;
     }
 
@@ -1375,8 +1376,10 @@ void pattern_array_add_label_key_with_simple_pattern(struct pattern_array *pa, c
 
     pai->size++;
     Pvalue = JudyLIns(&pai->JudyL, (Word_t) pai->size, PJE0);
-    if (!Pvalue)
+    if (!Pvalue) {
+        simple_pattern_free(sp);
         return;
+    }
 
     *Pvalue = sp;
 }
@@ -1446,7 +1449,7 @@ void pattern_array_free(struct pattern_array *pa)
         for (Word_t i = 1; i <= pai->size; i++) {
             if (!(Pvalue = JudyLGet(pai->JudyL, i, PJE0)))
                 continue;
-            //simple_pattern_free((SIMPLE_PATTERN *) (*Pvalue));
+            simple_pattern_free((SIMPLE_PATTERN *) (*Pvalue));
         }
         JudyLFreeArray(&(pai->JudyL), PJE0);
 
