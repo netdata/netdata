@@ -36,8 +36,8 @@ static void dyncfg_function_intercept_job_successfully_added(DYNCFG *df_template
             DYNCFG_TYPE_JOB,
             DYNCFG_SOURCE_TYPE_DYNCFG,
             dc->source,
-            (df_template->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST | DYNCFG_CMD_ENABLE |
-                DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
+            (df_template->cmds & ~DYNCFG_CMD_ADD) | DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
+                DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_REMOVE,
             0,
             0,
             df_template->sync,
@@ -180,6 +180,23 @@ static int dyncfg_intercept_early_error(struct rrd_function_execute *rfe, int rc
     return rc;
 }
 
+static const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id) {
+    const char *colon = strrchr(job_id, ':');
+    if(!colon) return NULL;
+
+    colon++;
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, colon);
+    if(!item) return NULL;
+
+    DYNCFG *df = dictionary_acquired_item_value(item);
+    if(df->type != DYNCFG_TYPE_TEMPLATE) {
+        dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+        return NULL;
+    }
+
+    return item;
+}
+
 int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __maybe_unused) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
@@ -239,9 +256,15 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
                                             "dyncfg functions intercept: this action does not require a payload");
 
     item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
-    if(!item)
-        return dyncfg_intercept_early_error(rfe, HTTP_RESP_NOT_FOUND,
-                                            "dyncfg functions intercept: id is not found");
+    if(!item) {
+        if(cmd == DYNCFG_CMD_TEST) {
+            // this may be a test on a new job
+            item = dyncfg_get_template_of_new_job(id);
+        }
+
+        if(!item)
+            return dyncfg_intercept_early_error(rfe, HTTP_RESP_NOT_FOUND, "dyncfg functions intercept: id is not found");
+    }
 
     DYNCFG *df = dictionary_acquired_item_value(item);
 

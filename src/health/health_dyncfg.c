@@ -382,12 +382,15 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
             code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "schema not implemented yet for prototype templates");
             break;
 
+        case DYNCFG_CMD_TEST:
+            code = dyncfg_default_response(result, HTTP_RESP_NOT_IMPLEMENTED, "test not implemented yet for prototype templates");
+            break;
+
         case DYNCFG_CMD_REMOVE:
         case DYNCFG_CMD_RESTART:
         case DYNCFG_CMD_DISABLE:
         case DYNCFG_CMD_ENABLE:
         case DYNCFG_CMD_UPDATE:
-        case DYNCFG_CMD_TEST:
         case DYNCFG_CMD_GET:
             code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "action given is not supported for prototype templates");
             break;
@@ -599,7 +602,7 @@ void health_dyncfg_register_all_prototypes(void) {
                DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX, "/health/alerts/prototypes",
                DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE_TEMPLATE,
                DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
-               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_TEST,
                HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG,
                HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_EDIT_AGENT_CONFIG,
                dyncfg_health_cb, NULL);
