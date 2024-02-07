@@ -43,7 +43,7 @@ EXPORTER_SOURCES = [
 ]
 
 NOTIFICATION_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'health' / 'notifications', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'health' / 'notifications', True),
     (AGENT_REPO, INTEGRATIONS_PATH / 'cloud-notifications' / 'metadata.yaml', False),
 ]
 
