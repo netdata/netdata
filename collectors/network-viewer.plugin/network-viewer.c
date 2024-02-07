@@ -300,6 +300,16 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         }
     }
 
+    if(aggregated) {
+        buffer_json_member_add_object(wb, "aggregated_view");
+        {
+            buffer_json_member_add_string(wb, "column", "Count");
+            buffer_json_member_add_string(wb, "results_label", "unique combinations");
+            buffer_json_member_add_string(wb, "aggregated_label", "sockets");
+        }
+        buffer_json_object_close(wb);
+    }
+
     {
         buffer_json_member_add_array(wb, "data");
 
@@ -548,13 +558,13 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             // Count
             buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets like this",
                                         RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                                        0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                        0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
                                         RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE,
-                                        aggregated ? RRDF_FIELD_OPTS_VISIBLE : RRDF_FIELD_OPTS_NONE,
+                                        aggregated ? (RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY) : RRDF_FIELD_OPTS_NONE,
                                         NULL);
         }
         buffer_json_object_close(wb); // columns
-        buffer_json_member_add_string(wb, "default_sort_column", "Direction");
+        buffer_json_member_add_string(wb, "default_sort_column", aggregated ? "Count" : "Direction");
 
         buffer_json_member_add_object(wb, "custom_charts");
         {
