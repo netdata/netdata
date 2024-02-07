@@ -2,15 +2,24 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.44.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.44.2...HEAD)
 
 **Merged pull requests:**
 
+- fix linking of a markdown file [\#16952](https://github.com/netdata/netdata/pull/16952) ([tkatsoulas](https://github.com/tkatsoulas))
+- Do not declare struct meant for internal usage [\#16951](https://github.com/netdata/netdata/pull/16951) ([vkalintiris](https://github.com/vkalintiris))
+- fix wrong sizeof [\#16950](https://github.com/netdata/netdata/pull/16950) ([ktsaou](https://github.com/ktsaou))
+- update bundled UI to v6.85.0 [\#16948](https://github.com/netdata/netdata/pull/16948) ([ilyam8](https://github.com/ilyam8))
+- Update codeowners and cleanup .gitignore [\#16946](https://github.com/netdata/netdata/pull/16946) ([vkalintiris](https://github.com/vkalintiris))
+- Remove cleanup\_destroyed\_dictionaries call during shutdown [\#16944](https://github.com/netdata/netdata/pull/16944) ([stelfrag](https://github.com/stelfrag))
+- respect NETDATA\_LOG\_LEVEL if set [\#16943](https://github.com/netdata/netdata/pull/16943) ([ilyam8](https://github.com/ilyam8))
+- enable network-viewer aggregated views [\#16940](https://github.com/netdata/netdata/pull/16940) ([ktsaou](https://github.com/ktsaou))
 - fix charts.d.plugin configuration directory names [\#16939](https://github.com/netdata/netdata/pull/16939) ([ilyam8](https://github.com/ilyam8))
 - Check for agent already running [\#16937](https://github.com/netdata/netdata/pull/16937) ([stelfrag](https://github.com/stelfrag))
 - Remove duplicate check [\#16936](https://github.com/netdata/netdata/pull/16936) ([stelfrag](https://github.com/stelfrag))
 - Drop ESLint CI jobs and config. [\#16935](https://github.com/netdata/netdata/pull/16935) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#16934](https://github.com/netdata/netdata/pull/16934) ([netdatabot](https://github.com/netdatabot))
+- Move daemon/ under src/ [\#16933](https://github.com/netdata/netdata/pull/16933) ([vkalintiris](https://github.com/vkalintiris))
 - Exporting moved, so changes needed for integrations, + CODEOWNERS change [\#16932](https://github.com/netdata/netdata/pull/16932) ([Ancairon](https://github.com/Ancairon))
 - Make sure the duration is not negative [\#16931](https://github.com/netdata/netdata/pull/16931) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#16930](https://github.com/netdata/netdata/pull/16930) ([netdatabot](https://github.com/netdatabot))
@@ -26,6 +35,7 @@
 - Network viewer: filter by username [\#16911](https://github.com/netdata/netdata/pull/16911) ([ktsaou](https://github.com/ktsaou))
 - Build network-viewer only on linux [\#16910](https://github.com/netdata/netdata/pull/16910) ([vkalintiris](https://github.com/vkalintiris))
 - rename network functions [\#16908](https://github.com/netdata/netdata/pull/16908) ([ktsaou](https://github.com/ktsaou))
+- Update CODEOWNERS [\#16907](https://github.com/netdata/netdata/pull/16907) ([tkatsoulas](https://github.com/tkatsoulas))
 - Remove markdown linter [\#16905](https://github.com/netdata/netdata/pull/16905) ([vkalintiris](https://github.com/vkalintiris))
 - Update README.md [\#16904](https://github.com/netdata/netdata/pull/16904) ([Aliki92](https://github.com/Aliki92))
 - fluent-bit & logsmanagement under src/ [\#16903](https://github.com/netdata/netdata/pull/16903) ([vkalintiris](https://github.com/vkalintiris))
@@ -37,6 +47,7 @@
 - Do not cancel detection thread. [\#16897](https://github.com/netdata/netdata/pull/16897) ([vkalintiris](https://github.com/vkalintiris))
 - Create a top-level directory to contain source code. [\#16896](https://github.com/netdata/netdata/pull/16896) ([vkalintiris](https://github.com/vkalintiris))
 - updating What's new based on Office Hours shared plans [\#16895](https://github.com/netdata/netdata/pull/16895) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Remove tags field from RRD hosts. [\#16894](https://github.com/netdata/netdata/pull/16894) ([vkalintiris](https://github.com/vkalintiris))
 - local-sockets: use netlink when libmnl is available [\#16893](https://github.com/netdata/netdata/pull/16893) ([ktsaou](https://github.com/ktsaou))
 - Add a constant env var for Sentry's  DSN when someone wants to build Agent and doesn't have access to GH secrets.  [\#16892](https://github.com/netdata/netdata/pull/16892) ([tkatsoulas](https://github.com/tkatsoulas))
 - fixed missing collisions and drag on newly added apps [\#16891](https://github.com/netdata/netdata/pull/16891) ([ktsaou](https://github.com/ktsaou))
@@ -80,6 +91,7 @@
 - Improve container detection logic for edit-config. [\#16825](https://github.com/netdata/netdata/pull/16825) ([Ferroin](https://github.com/Ferroin))
 - Preserve label source during migration [\#16821](https://github.com/netdata/netdata/pull/16821) ([stelfrag](https://github.com/stelfrag))
 - Add explicit callback types for readability. [\#16820](https://github.com/netdata/netdata/pull/16820) ([vkalintiris](https://github.com/vkalintiris))
+- Update documentation \(Replication DB\) [\#16816](https://github.com/netdata/netdata/pull/16816) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add script to ensure a usable Go toolchain is installed. [\#16815](https://github.com/netdata/netdata/pull/16815) ([Ferroin](https://github.com/Ferroin))
 - fix verify\_netdata\_host\_prefix log spam [\#16814](https://github.com/netdata/netdata/pull/16814) ([ilyam8](https://github.com/ilyam8))
 - use fs type to veryfiy procfs/sysfs [\#16813](https://github.com/netdata/netdata/pull/16813) ([ilyam8](https://github.com/ilyam8))
@@ -191,6 +203,7 @@
 - Fix compilation error when using --disable-dbengine [\#16645](https://github.com/netdata/netdata/pull/16645) ([stelfrag](https://github.com/stelfrag))
 - Create alerts-configuration-manager.md [\#16642](https://github.com/netdata/netdata/pull/16642) ([sashwathn](https://github.com/sashwathn))
 - Add extra build flags to CMakeLists.txt. [\#16641](https://github.com/netdata/netdata/pull/16641) ([Ferroin](https://github.com/Ferroin))
+- Assorted cleanup of native packaging code. [\#16640](https://github.com/netdata/netdata/pull/16640) ([Ferroin](https://github.com/Ferroin))
 - Update artifact-handling actions to latest version. [\#16639](https://github.com/netdata/netdata/pull/16639) ([Ferroin](https://github.com/Ferroin))
 - cmake: make WEB\_DIR configurable [\#16638](https://github.com/netdata/netdata/pull/16638) ([ilyam8](https://github.com/ilyam8))
 - Remove code relying on autotools. [\#16634](https://github.com/netdata/netdata/pull/16634) ([vkalintiris](https://github.com/vkalintiris))
@@ -246,6 +259,10 @@
 - wip documentation about functions table [\#16535](https://github.com/netdata/netdata/pull/16535) ([ktsaou](https://github.com/ktsaou))
 - Remove openSUSE 15.4 from CI [\#16449](https://github.com/netdata/netdata/pull/16449) ([tkatsoulas](https://github.com/tkatsoulas))
 - Remove fedora 37 from CI [\#16422](https://github.com/netdata/netdata/pull/16422) ([tkatsoulas](https://github.com/tkatsoulas))
+
+## [v1.44.2](https://github.com/netdata/netdata/tree/v1.44.2) (2024-02-06)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.44.1...v1.44.2)
 
 ## [v1.44.1](https://github.com/netdata/netdata/tree/v1.44.1) (2023-12-12)
 
@@ -386,21 +403,6 @@
 - cgroups: fix throttle\_duration chart context [\#16367](https://github.com/netdata/netdata/pull/16367) ([ilyam8](https://github.com/ilyam8))
 - Introduce agent release metadata pipelines [\#16366](https://github.com/netdata/netdata/pull/16366) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix system.net when inside lxc  [\#16364](https://github.com/netdata/netdata/pull/16364) ([ilyam8](https://github.com/ilyam8))
-- collectors/freeipmi: add ipmi-sensors function [\#16363](https://github.com/netdata/netdata/pull/16363) ([ilyam8](https://github.com/ilyam8))
-- Add assorted improvements to the version policy draft. [\#16362](https://github.com/netdata/netdata/pull/16362) ([Ferroin](https://github.com/Ferroin))
-- Add a apcupsd status code metric [\#16361](https://github.com/netdata/netdata/pull/16361) ([thomasbeaudry](https://github.com/thomasbeaudry))
-- Switch alarm\_log to use the buffer json functions [\#16360](https://github.com/netdata/netdata/pull/16360) ([stelfrag](https://github.com/stelfrag))
-- Switch charts / chart to use buffer json functions [\#16359](https://github.com/netdata/netdata/pull/16359) ([stelfrag](https://github.com/stelfrag))
-- health: put guides into subdirs [\#16358](https://github.com/netdata/netdata/pull/16358) ([ilyam8](https://github.com/ilyam8))
-- New logging layer [\#16357](https://github.com/netdata/netdata/pull/16357) ([ktsaou](https://github.com/ktsaou))
-- Import alert guides from Netdata Assistant [\#16355](https://github.com/netdata/netdata/pull/16355) ([ralphm](https://github.com/ralphm))
-- update bundle UI to v6.58.5 [\#16354](https://github.com/netdata/netdata/pull/16354) ([ilyam8](https://github.com/ilyam8))
-- Update CODEOWNERS [\#16353](https://github.com/netdata/netdata/pull/16353) ([Ancairon](https://github.com/Ancairon))
-- Copy outdated alert guides to health/guides [\#16352](https://github.com/netdata/netdata/pull/16352) ([Ancairon](https://github.com/Ancairon))
-- Replace rrdset\_is\_obsolete & rrdset\_isnot\_obsolete [\#16351](https://github.com/netdata/netdata/pull/16351) ([MrZammler](https://github.com/MrZammler))
-- fix zstd in static build [\#16349](https://github.com/netdata/netdata/pull/16349) ([ilyam8](https://github.com/ilyam8))
-- add rrddim\_get\_last\_stored\_value to simplify function code in internal collectors [\#16348](https://github.com/netdata/netdata/pull/16348) ([ilyam8](https://github.com/ilyam8))
-- change defaults for functions [\#16347](https://github.com/netdata/netdata/pull/16347) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
