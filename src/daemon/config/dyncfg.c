@@ -331,7 +331,7 @@ bool dyncfg_add_low_level(RRDHOST *host, const char *id, const char *path,
     // data
     if(type == DYNCFG_TYPE_TEMPLATE) {
         // templates do not have data
-        cmds &= ~(DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST);
+        cmds &= ~(DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE);
     }
 
     if(cmds != old_cmds) {
