@@ -1421,7 +1421,7 @@ struct pattern_array *pattern_array_populate_from_simple_pattern(struct pattern_
 
     char *label_key;
     while (pattern && (label_key = simple_pattern_iterate(&pattern))) {
-        char key [RRDLABELS_MAX_NAME_LENGTH+1], *key_sep;
+        char key[RRDLABELS_MAX_NAME_LENGTH + 1], *key_sep;
 
         if (unlikely(!label_key || !(key_sep = strchr(label_key, sep))))
             return pa;
@@ -1432,6 +1432,21 @@ struct pattern_array *pattern_array_populate_from_simple_pattern(struct pattern_
 
         pattern_array_add_label_key_with_simple_pattern(pa, key, string_to_simple_pattern(label_key));
     }
+    return pa;
+}
+
+struct pattern_array *pattern_array_populate_with_key_value(struct pattern_array *pa, const char *key, const char *value, char sep)
+{
+    if (unlikely(!key || !value))
+        return NULL;
+
+    if (!pa)
+        pa = pattern_array_allocate();
+
+    char label_key[RRDLABELS_MAX_NAME_LENGTH + RRDLABELS_MAX_VALUE_LENGTH + 2];
+    snprintfz(label_key, sizeof(label_key) - 1, "%s%c%s", key, sep, value);
+    pattern_array_add_label_key_with_simple_pattern(pa, key, string_to_simple_pattern(label_key));
+
     return pa;
 }
 
