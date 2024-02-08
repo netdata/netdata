@@ -1658,20 +1658,20 @@ modules:
         list: []
     alerts:
       - name: ecc_memory_mc_noinfo_correctable
-        metric: mem.edac_mc
-        info: memory controller ${label:controller} ECC correctable errors (unknown DIMM slot) in the last 10 minutes
+        metric: mem.edac_mc_errors
+        info: memory controller ${label:controller} ECC correctable errors (unknown DIMM slot)
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_mc_noinfo_uncorrectable
-        metric: mem.edac_mc
-        info: memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot) in the last 10 minutes
+        metric: mem.edac_mc_errors
+        info: memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot)
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_dimm_correctable
-        metric: mem.edac_mc_dimm
-        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors in the last 10 minutes
+        metric: mem.edac_mc_dimm_errors
+        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_dimm_uncorrectable
-        metric: mem.edac_mc_dimm
-        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors in the last 10 minutes
+        metric: mem.edac_mc_dimm_errors
+        info: DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
     metrics:
       folding:
@@ -1692,9 +1692,9 @@ modules:
             - name: max_location
               description: Last available memory slot in this memory controller.
           metrics:
-            - name: mem.edac_mc
+            - name: mem.edac_mc_errors
               description: Memory Controller (MC) Error Detection And Correction (EDAC) Errors
-              unit: errors/s
+              unit: errors
               chart_type: line
               dimensions:
                 - name: correctable
@@ -1721,9 +1721,9 @@ modules:
             - name: size
               description: The amount of memory in megabytes that this memory module manages.
           metrics:
-            - name: mem.edac_mc
+            - name: mem.edac_mc_errors
               description: DIMM Error Detection And Correction (EDAC) Errors
-              unit: errors/s
+              unit: errors
               chart_type: line
               dimensions:
                 - name: correctable
