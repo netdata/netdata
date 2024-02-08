@@ -202,9 +202,9 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
                     , id
                     , NULL
                     , "edac"
-                    , "mem.edac_mc"
+                    , "mem.edac_mc_errors"
                     , "Memory Controller (MC) Error Detection And Correction (EDAC) Errors"
-                    , "errors/s"
+                    , "errors"
                     , PLUGIN_PROC_NAME
                     , "/sys/devices/system/edac/mc"
                     , NETDATA_CHART_PRIO_MEM_HW_ECC_CE
@@ -225,10 +225,10 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
             if(read_edac_mc_file(m->name, "max_location", buffer, 1024))
                 rrdlabels_add(m->st->rrdlabels, "max_location", buffer, RRDLABEL_SRC_AUTO);
 
-            m->ce.rd = rrddim_add(m->st, "correctable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            m->ue.rd = rrddim_add(m->st, "uncorrectable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            m->ce_noinfo.rd = rrddim_add(m->st, "correctable_noinfo", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            m->ue_noinfo.rd = rrddim_add(m->st, "uncorrectable_noinfo", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            m->ce.rd = rrddim_add(m->st, "correctable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            m->ue.rd = rrddim_add(m->st, "uncorrectable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            m->ce_noinfo.rd = rrddim_add(m->st, "correctable_noinfo", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            m->ue_noinfo.rd = rrddim_add(m->st, "uncorrectable_noinfo", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         rrddim_set_by_pointer(m->st, m->ce.rd, (collected_number)m->ce.count);
@@ -250,9 +250,9 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
                 		, id
                 		, NULL
                 		, "edac"
-                        , "mem.edac_mc_dimm"
+                        , "mem.edac_mc_dimm_errors"
                 		, "DIMM Error Detection And Correction (EDAC) Errors"
-                        , "errors/s"
+                        , "errors"
                         , PLUGIN_PROC_NAME
                         , "/sys/devices/system/edac/mc"
                         , NETDATA_CHART_PRIO_MEM_HW_ECC_CE + 1
@@ -283,8 +283,8 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt __maybe_unuse
                 if (read_edac_mc_rank_file(m->name, d->name, "size", buffer, 1024))
                     rrdlabels_add(d->st->rrdlabels, "size", buffer, RRDLABEL_SRC_AUTO);
 
-                d->ce.rd = rrddim_add(d->st, "correctable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                d->ue.rd = rrddim_add(d->st, "uncorrectable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                d->ce.rd = rrddim_add(d->st, "correctable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                d->ue.rd = rrddim_add(d->st, "uncorrectable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
 
             rrddim_set_by_pointer(d->st, d->ce.rd, (collected_number)d->ce.count);
