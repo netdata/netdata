@@ -1,6 +1,7 @@
 plugin_name: tc.plugin
 modules:
   - meta:
+      id: collector-tc.plugin
       plugin_name: tc.plugin
       module_name: tc.plugin
       monitored_instance:

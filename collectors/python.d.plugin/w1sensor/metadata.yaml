@@ -1,6 +1,7 @@
 plugin_name: python.d.plugin
 modules:
   - meta:
+      id: collector-python.d.plugin-w1sensor
       plugin_name: python.d.plugin
       module_name: w1sensor
       monitored_instance:

@@ -1,6 +1,7 @@
 plugin_name: nfacct.plugin
 modules:
   - meta:
+      id: collector-nfacct.plugin
       plugin_name: nfacct.plugin
       module_name: nfacct.plugin
       monitored_instance:

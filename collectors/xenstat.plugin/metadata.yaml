@@ -1,6 +1,7 @@
 plugin_name: xenstat.plugin
 modules:
   - meta:
+      id: collector-xenstat.plugin
       plugin_name: xenstat.plugin
       module_name: xenstat.plugin
       monitored_instance:

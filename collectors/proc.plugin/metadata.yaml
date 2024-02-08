@@ -1,6 +1,7 @@
 plugin_name: proc.plugin
 modules:
   - meta:
+      id: collector-proc.plugin-proc_stat
       plugin_name: proc.plugin
       module_name: /proc/stat
       monitored_instance:
@@ -192,6 +193,7 @@ modules:
               dimensions:
                 - name: a dimension per c-state
   - meta:
+      id: collector-proc.plugin-proc_sys_kernel_random_entropy_avail
       plugin_name: proc.plugin
       module_name: /proc/sys/kernel/random/entropy_avail
       monitored_instance:
@@ -300,6 +302,7 @@ modules:
               dimensions:
                 - name: entropy
   - meta:
+      id: collector-proc.plugin-proc_uptime
       plugin_name: proc.plugin
       module_name: /proc/uptime
       monitored_instance:
@@ -384,6 +387,7 @@ modules:
               dimensions:
                 - name: uptime
   - meta:
+      id: collector-proc.plugin-proc_vmstat
       plugin_name: proc.plugin
       module_name: /proc/vmstat
       monitored_instance:
@@ -603,6 +607,7 @@ modules:
                 - name: hint_faults_local
                 - name: pages_migrated
   - meta:
+      id: collector-proc.plugin-proc_interrupts
       plugin_name: proc.plugin
       module_name: /proc/interrupts
       monitored_instance:
@@ -718,6 +723,7 @@ modules:
               dimensions:
                 - name: a dimension per device
   - meta:
+      id: collector-proc.plugin-proc_loadavg
       plugin_name: proc.plugin
       module_name: /proc/loadavg
       monitored_instance:
@@ -847,6 +853,7 @@ modules:
               dimensions:
                 - name: active
   - meta:
+      id: collector-proc.plugin-proc_pressure
       plugin_name: proc.plugin
       module_name: /proc/pressure
       monitored_instance:
@@ -1021,6 +1028,7 @@ modules:
               dimensions:
                 - name: time
   - meta:
+      id: collector-proc.plugin-proc_softirqs
       plugin_name: proc.plugin
       module_name: /proc/softirqs
       monitored_instance:
@@ -1129,6 +1137,7 @@ modules:
               dimensions:
                 - name: a dimension per softirq
   - meta:
+      id: collector-proc.plugin-proc_softnet_stat
       plugin_name: proc.plugin
       module_name: /proc/net/softnet_stat
       monitored_instance:
@@ -1254,6 +1263,7 @@ modules:
                 - name: received_rps
                 - name: flow_limit_count
   - meta:
+      id: collector-proc.plugin-proc_meminfo
       plugin_name: proc.plugin
       module_name: /proc/meminfo
       monitored_instance:
@@ -1496,6 +1506,7 @@ modules:
                 - name: 4m
                 - name: 1g
   - meta:
+      id: collector-proc.plugin-proc_pagetypeinfo
       plugin_name: proc.plugin
       module_name: /proc/pagetypeinfo
       monitored_instance:
@@ -1585,6 +1596,7 @@ modules:
               dimensions:
                 - name: a dimension per pagesize
   - meta:
+      id: collector-proc.plugin-sys_devices_system_edac_mc
       plugin_name: proc.plugin
       module_name: /sys/devices/system/edac/mc
       monitored_instance:
@@ -1729,6 +1741,7 @@ modules:
                 - name: correctable
                 - name: uncorrectable
   - meta:
+      id: collector-proc.plugin-sys_devices_system_node
       plugin_name: proc.plugin
       module_name: /sys/devices/system/node
       monitored_instance:
@@ -1821,6 +1834,7 @@ modules:
                 - name: interleave
                 - name: other
   - meta:
+      id: collector-proc.plugin-sys_kernel_mm_ksm
       plugin_name: proc.plugin
       module_name: /sys/kernel/mm/ksm
       monitored_instance:
@@ -1918,6 +1932,7 @@ modules:
               dimensions:
                 - name: savings
   - meta:
+      id: collector-proc.plugin-sys_block_zram
       plugin_name: proc.plugin
       module_name: /sys/block/zram
       monitored_instance:
@@ -2017,6 +2032,7 @@ modules:
               dimensions:
                 - name: percent
   - meta:
+      id: collector-proc.plugin-ipc
       plugin_name: proc.plugin
       module_name: ipc
       monitored_instance:
@@ -2146,6 +2162,7 @@ modules:
               dimensions:
                 - name: bytes
   - meta:
+      id: collector-proc.plugin-proc_diskstats
       plugin_name: proc.plugin
       module_name: /proc/diskstats
       monitored_instance:
@@ -2430,6 +2447,7 @@ modules:
                 - name: hits
                 - name: misses
   - meta:
+      id: collector-proc.plugin-proc_mdstat
       plugin_name: proc.plugin
       module_name: /proc/mdstat
       monitored_instance:
@@ -2571,6 +2589,7 @@ modules:
               dimensions:
                 - name: available
   - meta:
+      id: collector-proc.plugin-proc_net_dev
       plugin_name: proc.plugin
       module_name: /proc/net/dev
       monitored_instance:
@@ -2793,6 +2812,7 @@ modules:
                 - name: collisions
                 - name: carrier
   - meta:
+      id: collector-proc.plugin-proc_net_wireless
       plugin_name: proc.plugin
       module_name: /proc/net/wireless
       monitored_instance:
@@ -2903,6 +2923,7 @@ modules:
               dimensions:
                 - name: missed_beacons
   - meta:
+      id: collector-proc.plugin-sys_class_infiniband
       plugin_name: proc.plugin
       module_name: /sys/class/infiniband
       monitored_instance:
@@ -3046,6 +3067,7 @@ modules:
                 - name: RoCE_slow_restart_congestion
                 - name: RoCE_slow_restart_count
   - meta:
+      id: collector-proc.plugin-proc_net_netstat
       plugin_name: proc.plugin
       module_name: /proc/net/netstat
       monitored_instance:
@@ -3640,6 +3662,7 @@ modules:
                 - name: failed
                 - name: all
   - meta:
+      id: collector-proc.plugin-proc_net_sockstat
       plugin_name: proc.plugin
       module_name: /proc/net/sockstat
       monitored_instance:
@@ -3774,6 +3797,7 @@ modules:
               dimensions:
                 - name: mem
   - meta:
+      id: collector-proc.plugin-proc_net_sockstat6
       plugin_name: proc.plugin
       module_name: /proc/net/sockstat6
       monitored_instance:
@@ -3871,6 +3895,7 @@ modules:
               dimensions:
                 - name: inuse
   - meta:
+      id: collector-proc.plugin-proc_net_ip_vs_stats
       plugin_name: proc.plugin
       module_name: /proc/net/ip_vs_stats
       monitored_instance:
@@ -3958,6 +3983,7 @@ modules:
                 - name: received
                 - name: sent
   - meta:
+      id: collector-proc.plugin-proc_net_rpc_nfs
       plugin_name: proc.plugin
       module_name: /proc/net/rpc/nfs
       monitored_instance:
@@ -4059,6 +4085,7 @@ modules:
               dimensions:
                 - name: a dimension per proc4 call
   - meta:
+      id: collector-proc.plugin-proc_net_rpc_nfsd
       plugin_name: proc.plugin
       module_name: /proc/net/rpc/nfsd
       monitored_instance:
@@ -4193,6 +4220,7 @@ modules:
               dimensions:
                 - name: a dimension per proc4 operation
   - meta:
+      id: collector-proc.plugin-proc_net_sctp_snmp
       plugin_name: proc.plugin
       module_name: /proc/net/sctp/snmp
       monitored_instance:
@@ -4297,6 +4325,7 @@ modules:
                 - name: reassembled
                 - name: fragmented
   - meta:
+      id: collector-proc.plugin-proc_net_stat_nf_conntrack
       plugin_name: proc.plugin
       module_name: /proc/net/stat/nf_conntrack
       monitored_instance:
@@ -4418,6 +4447,7 @@ modules:
                 - name: drop
                 - name: early_drop
   - meta:
+      id: collector-proc.plugin-proc_net_stat_synproxy
       plugin_name: proc.plugin
       module_name: /proc/net/stat/synproxy
       monitored_instance:
@@ -4505,6 +4535,7 @@ modules:
                 - name: invalid
                 - name: retransmits
   - meta:
+      id: collector-proc.plugin-proc_spl_kstat_zfs
       plugin_name: proc.plugin
       module_name: /proc/spl/kstat/zfs
       monitored_instance:
@@ -4597,6 +4628,7 @@ modules:
                 - name: unavail
                 - name: suspended
   - meta:
+      id: collector-proc.plugin-proc_spl_kstat_zfs_arcstats
       plugin_name: proc.plugin
       module_name: /proc/spl/kstat/zfs/arcstats
       monitored_instance:
@@ -4863,6 +4895,7 @@ modules:
                 - name: current
                 - name: max
   - meta:
+      id: collector-proc.plugin-sys_fs_btrfs
       plugin_name: proc.plugin
       module_name: /sys/fs/btrfs
       monitored_instance:
@@ -5053,6 +5086,7 @@ modules:
                 - name: corruption_errs
                 - name: generation_errs
   - meta:
+      id: collector-proc.plugin-sys_class_power_supply
       plugin_name: proc.plugin
       module_name: /sys/class/power_supply
       monitored_instance:
@@ -5163,6 +5197,7 @@ modules:
                 - name: max
                 - name: max_design
   - meta:
+      id: collector-proc.plugin-sys_class_drm
       plugin_name: proc.plugin
       module_name: /sys/class/drm
       monitored_instance:

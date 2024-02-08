@@ -1,6 +1,7 @@
 plugin_name: cups.plugin
 modules:
   - meta:
+      id: collector-cups.plugin
       plugin_name: cups.plugin
       module_name: cups.plugin
       monitored_instance:

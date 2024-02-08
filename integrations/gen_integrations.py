@@ -253,6 +253,13 @@ def load_collectors():
             item['_src_path'] = path
             item['_repo'] = repo
             item['_index'] = idx
+
+            if 'id' not in item['meta'].keys():
+                item['id'] = make_id(item['meta'])
+                warn(f'Needed to generate id for item found at { item["_src_path"] } index { item["_index"] }.', item['_src_path'])
+            else:
+                item['id'] = item['meta']['id']
+
             ret.append(item)
 
     return ret
@@ -427,15 +434,35 @@ def dedupe_integrations(integrations, ids):
     return tmp_integrations, ids
 
 
+def get_related_items(item, idmap):
+    related = []
+
+    for idx, res in enumerate(item['meta']['related_resources']['integrations']['list']):
+        res_id = res.get('id', False)
+
+        if not res_id:
+            warn(f'Missing ID for related resource { idx } in { item["id" ] }, ignoring it.', item['_src_path'])
+            continue
+
+        if res_id not in idmap.keys():
+            warn(f'Could not find related integration { res_id }, ignoring it.', item['_src_path'])
+            continue
+
+        related.append({
+            'plugin_name': idmap[res_id]['meta']['plugin_name'],
+            'module_name': idmap[res_id]['meta']['module_name'],
+            'id': res_id,
+            'name': idmap[res_id]['meta']['monitored_instance']['name'],
+            'info': idmap[res_id]['meta']['info_provided_to_referring_integrations'],
+        })
+
+    return related
+
+
 def render_collectors(categories, collectors, ids):
     debug('Computing default categories.')
 
     default_cats, valid_cats = get_category_sets(categories)
-
-    debug('Generating collector IDs.')
-
-    for item in collectors:
-        item['id'] = make_id(item['meta'])
 
     debug('Sorting collectors.')
 
@@ -455,22 +482,7 @@ def render_collectors(categories, collectors, ids):
 
         clean_item = deepcopy(item)
 
-        related = []
-
-        for res in item['meta']['related_resources']['integrations']['list']:
-            res_id = make_id(res)
-
-            if res_id not in idmap.keys():
-                warn(f'Could not find related integration { res_id }, ignoring it.', item['_src_path'])
-                continue
-
-            related.append({
-                'plugin_name': res['plugin_name'],
-                'module_name': res['module_name'],
-                'id': res_id,
-                'name': idmap[res_id]['meta']['monitored_instance']['name'],
-                'info': idmap[res_id]['meta']['info_provided_to_referring_integrations'],
-            })
+        related = get_related_items(item, idmap)
 
         item_cats = set(item['meta']['monitored_instance']['categories'])
         bogus_cats = item_cats - valid_cats
@@ -483,7 +495,7 @@ def render_collectors(categories, collectors, ids):
             item['meta']['monitored_instance']['categories'] = list(default_cats)
             warn(f'{ item["id"] } does not list any caregories, adding it to: { default_cats }', item["_src_path"])
         else:
-            item['meta']['monitored_instance']['categories'] =  [x for x in item['meta']['monitored_instance']['categories'] if x in list(actual_cats)]
+            item['meta']['monitored_instance']['categories'] = [x for x in item['meta']['monitored_instance']['categories'] if x in list(actual_cats)]
 
         for scope in item['metrics']['scopes']:
             if scope['name'] == 'global':

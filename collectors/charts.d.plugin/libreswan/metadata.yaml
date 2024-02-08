@@ -1,6 +1,7 @@
 plugin_name: charts.d.plugin
 modules:
   - meta:
+      id: collector-charts.d.plugin-libreswan
       plugin_name: charts.d.plugin
       module_name: libreswan
       monitored_instance:

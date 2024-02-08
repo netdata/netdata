@@ -1,6 +1,7 @@
 plugin_name: python.d.plugin
 modules:
   - meta:
+      id: collector-python.d.plugin-samba
       plugin_name: python.d.plugin
       module_name: samba
       monitored_instance:

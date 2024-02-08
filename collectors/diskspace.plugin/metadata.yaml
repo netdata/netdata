@@ -1,6 +1,7 @@
 plugin_name: diskspace.plugin
 modules:
   - meta:
+      id: collector-diskspace.plugin
       plugin_name: diskspace.plugin
       module_name: diskspace.plugin
       monitored_instance:
@@ -12,8 +13,7 @@ modules:
       related_resources:
         integrations:
           list:
-            - plugin_name: ebpf.plugin
-              module_name: disk
+            - id: collector-ebpf.plugin-disk
       info_provided_to_referring_integrations:
         description: ""
       keywords:
