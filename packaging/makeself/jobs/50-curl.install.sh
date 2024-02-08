@@ -25,6 +25,7 @@ else
   CACHE_HIT=0
 fi
 
+
 cd "${NETDATA_MAKESELF_PATH}/tmp/curl" || exit 1
 
 export CFLAGS="-I/openssl-static/include -pipe"
