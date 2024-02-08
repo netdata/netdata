@@ -69,7 +69,9 @@ ebpf_module_t ebpf_modules[] = {
               .thread_description = NETDATA_EBPF_SOCKET_MODULE_DESC},
       .functions = {.start_routine = ebpf_socket_thread,
                    .apps_routine = ebpf_socket_create_apps_charts,
-                   .fnct_routine = ebpf_socket_read_open_connections,
+// FIXME: Disabled because it has problems and in its current state is generally inferior to "network connections".
+                //    .fnct_routine = ebpf_socket_read_open_connections,
+                   .fnct_routine = NULL,
                    .fcnt_name = EBPF_FUNCTION_SOCKET,
                    .fcnt_desc = EBPF_PLUGIN_SOCKET_FUNCTION_DESCRIPTION,
                    .fcnt_thread_chart_name = NULL,
