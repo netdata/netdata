@@ -3,8 +3,8 @@ yaml-files:
   - '*.yaml'
   - '*.yml'
   - '.yamllint'
-  - 'collectors/python.d.plugin/*.conf'
-  - 'collectors/python.d.plugin/*/*.conf'
+  - 'src/collectors/python.d.plugin/*.conf'
+  - 'src/collectors/python.d.plugin/*/*.conf'
 
 ignore: |
   mqtt_websockets/
