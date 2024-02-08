@@ -18,7 +18,7 @@ Makefile.in
 .*.swp
 *.old
 *.log
-!collectors/log2journal/tests.d/*.log
+!src/collectors/log2journal/tests.d/*.log
 *.pyc
 
 netdata.spec
@@ -28,9 +28,9 @@ upload/
 artifacts/
 
 ebpf.plugin
-collectors/ebpf.plugin/reset_netdata_trace.sh
+src/collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
-collectors/ebpf.plugin/includes/
+src/collectors/ebpf.plugin/includes/
 
 # protoc generated files
 *.pb.cc
@@ -88,13 +88,13 @@ system/systemd/netdata-updater.service
 
 src/health/notifications/alarm-notify.sh
 claim/netdata-claim.sh
-collectors/cgroups.plugin/cgroup-name.sh
-collectors/cgroups.plugin/cgroup-network-helper.sh
-collectors/tc.plugin/tc-qos-helper.sh
-collectors/charts.d.plugin/charts.d.plugin
-collectors/python.d.plugin/python.d.plugin
-collectors/ioping.plugin/ioping.plugin
-collectors/go.d.plugin
+src/collectors/cgroups.plugin/cgroup-name.sh
+src/collectors/cgroups.plugin/cgroup-network-helper.sh
+src/collectors/tc.plugin/tc-qos-helper.sh
+src/collectors/charts.d.plugin/charts.d.plugin
+src/collectors/python.d.plugin/python.d.plugin
+src/collectors/ioping.plugin/ioping.plugin
+src/collectors/go.d.plugin
 web/netdata-switch-dashboard.sh
 
 src/logsmanagement/stress_test/stress_test
