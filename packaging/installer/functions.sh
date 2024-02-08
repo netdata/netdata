@@ -235,6 +235,28 @@ check_for_feature() {
 prepare_cmake_options() {
   NETDATA_CMAKE_OPTIONS="-S ./ -B ${NETDATA_BUILD_DIR} ${CMAKE_OPTS} ${NETDATA_PREFIX+-DCMAKE_INSTALL_PREFIX="${NETDATA_PREFIX}"} ${NETDATA_USER:+-DNETDATA_USER=${NETDATA_USER}} ${NETDATA_CMAKE_OPTIONS} "
 
+  NEED_OLD_CXX=0
+
+  if [ "${FORCE_LEGACY_CXX:-0}" -eq 1 ]; then
+    NEED_OLD_CXX=1
+  else
+    if command -v gcc >/dev/null 2>&1; then
+      if [ "$(gcc --version | head -n 1 | sed 's/(.*) //' | cut -f 2 -d ' ' | cut -f 1 -d '.')" -lt 5 ]; then
+        NEED_OLD_CXX=1
+      fi
+    fi
+
+    if command -v clang >/dev/null 2>&1; then
+      if [ "$(clang --version | head -n 1 | cut -f 3 -d ' ' | cut -f 1 -d '.')" -lt 4 ]; then
+        NEED_OLD_CXX=1
+      fi
+    fi
+  fi
+
+  if [ "${NEED_OLD_CXX}" -eq 1 ]; then
+    NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DUSE_CXX_11=On"
+  fi
+
   if [ "${USE_SYSTEM_PROTOBUF:-1}" -eq 1 ]; then
     enable_feature BUNDLED_PROTOBUF 0
   else
