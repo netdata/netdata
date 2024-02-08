@@ -691,6 +691,9 @@ static void set_nofile_limit(struct rlimit *rl) {
 void cancel_main_threads() {
     nd_log_limits_unlimited();
 
+    if (!static_threads)
+        return;
+
     int i, found = 0;
     usec_t max = 5 * USEC_PER_SEC, step = 100000;
     for (i = 0; static_threads[i].name != NULL ; i++) {
@@ -732,6 +735,7 @@ void cancel_main_threads() {
         freez(static_threads[i].thread);
 
     freez(static_threads);
+    static_threads = NULL;
 }
 
 static const struct option_def {

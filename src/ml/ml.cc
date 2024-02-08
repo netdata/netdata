@@ -1805,12 +1805,13 @@ void ml_init()
 }
 
 void ml_fini() {
-    if (!Cfg.enable_anomaly_detection)
+    if (!Cfg.enable_anomaly_detection || !db)
         return;
 
     int rc = sqlite3_close_v2(db);
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
+    db = NULL;
 }
 
 void ml_start_threads() {
@@ -1845,6 +1846,7 @@ void ml_stop_threads()
         return;
 
     netdata_thread_join(Cfg.detection_thread, NULL);
+    Cfg.detection_thread = 0;
 
     // signal the training queue of each thread
     for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {

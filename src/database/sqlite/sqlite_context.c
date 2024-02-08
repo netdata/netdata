@@ -86,6 +86,7 @@ void sql_close_context_database(void)
     rc = sqlite3_close_v2(db_context_meta);
     if (unlikely(rc != SQLITE_OK))
         error_report("Error %d while closing the context SQLite database, %s", rc, sqlite3_errstr(rc));
+    db_context_meta = NULL;
 }
 
 //
