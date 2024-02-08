@@ -31,7 +31,7 @@ These customizations appear for anyone else with access to that War Room.
 ## See more metrics in Netdata Cloud
 
 If you want to add more metrics to your War Rooms and they don't show up when you add new metrics to Nodes, you likely
-need to configure those nodes to collect from additional data sources. See our [collectors configuration reference](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) 
+need to configure those nodes to collect from additional data sources. See our [collectors configuration reference](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md) 
 to learn how to use dozens of pre-installed collectors that can instantly collect from your favorite services and applications.
 
 If you want to see up to 30 days of historical metrics in Cloud (and more on individual node dashboards), read about [changing how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md). Also, see our

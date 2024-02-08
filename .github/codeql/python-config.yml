@@ -5,6 +5,6 @@ paths-ignore:
   - ml/json
   - tests/api
   - web/gui
-  - collectors/python.d.plugin/python_modules/pyyaml*
-  - collectors/python.d.plugin/python_modules/third_party
-  - collectors/python.d.plugin/python_modules/urllib3
+  - src/collectors/python.d.plugin/python_modules/pyyaml*
+  - src/collectors/python.d.plugin/python_modules/third_party
+  - src/collectors/python.d.plugin/python_modules/urllib3

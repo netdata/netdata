@@ -166,7 +166,7 @@ connectivity is not available.
       Copyright (c) 2014 Lucas Garron
       [MIT License](https://github.com/lgarron/clipboard-polyfill/blob/master/LICENSE.md)
 
--   [Utilities for writing code that runs on Python 2 and 3](https://raw.githubusercontent.com/netdata/netdata/master/collectors/python.d.plugin/python_modules/urllib3/packages/six.py)
+-   [Utilities for writing code that runs on Python 2 and 3](https://raw.githubusercontent.com/netdata/netdata/master/src/collectors/python.d.plugin/python_modules/urllib3/packages/six.py)
 
       Copyright (c) 2010-2015 Benjamin Peterson
       [MIT License](https://github.com/benjaminp/six/blob/master/LICENSE)

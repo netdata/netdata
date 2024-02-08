@@ -9,7 +9,7 @@ learn_rel_path: "Installation/Install on specific environments"
 # Install Netdata on macOS
 
 Netdata works on macOS, albeit with some limitations. 
-The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md) to monitor any services you might have installed on your macOS system. 
+The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md) to monitor any services you might have installed on your macOS system. 
 You could also use a macOS system as the parent node in a [streaming configuration](https://github.com/netdata/netdata/blob/master/src/streaming/README.md).
 
 You can install Netdata in one of the three following ways: 

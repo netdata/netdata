@@ -5,7 +5,7 @@ worked closely with our community of DevOps engineers, SREs, and developers to d
 alerts that work without any configuration.
 
 The Agent's health monitoring system is also dynamic and fully customizable. You can write entirely new alerts, tune the
-community-configured alerts for every app/service [the Agent collects metrics from](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md), or
+community-configured alerts for every app/service [the Agent collects metrics from](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md), or
 silence anything you're not interested in. You can even power complex lookups by running statistical algorithms against
 your metrics.
 

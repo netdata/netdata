@@ -35,7 +35,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Cloud** or **Netdata Cloud**](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
-- [**Collector**](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology): A catch-all term for any Netdata process that gathers metrics from an endpoint.
+- [**Collector**](https://github.com/netdata/netdata/blob/master/src/collectors/README.md#collector-architecture-and-terminology): A catch-all term for any Netdata process that gathers metrics from an endpoint.
 
 - [**Community**](https://community.netdata.cloud/): As a company with a passion and genesis in open-source, we are not just very proud of our community, but we consider our users, fans, and chatters to be an imperative part of the Netdata experience and culture.
 
@@ -57,7 +57,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## E
 
-- [**External Plugins**](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md): These gather metrics from external processes, such as a webserver or database, and run as independent processes that communicate with the Netdata daemon via pipes.
+- [**External Plugins**](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md): These gather metrics from external processes, such as a webserver or database, and run as independent processes that communicate with the Netdata daemon via pipes.
 
 ## F
 
@@ -85,7 +85,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## I
 
-- [**Internal plugins**](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology): These gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C` and run as threads within the Netdata daemon.
+- [**Internal plugins**](https://github.com/netdata/netdata/blob/master/src/collectors/README.md#collector-architecture-and-terminology): These gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C` and run as threads within the Netdata daemon.
 
 ## K
 
@@ -95,7 +95,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## M
 
-- [**Metrics Collection**](https://github.com/netdata/netdata/blob/master/collectors/README.md):  With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects per-second metrics. Netdata can immediately collect metrics from these endpoints thanks to 300+ collectors, which all come pre-installed when you install Netdata.
+- [**Metrics Collection**](https://github.com/netdata/netdata/blob/master/src/collectors/README.md):  With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects per-second metrics. Netdata can immediately collect metrics from these endpoints thanks to 300+ collectors, which all come pre-installed when you install Netdata.
 
 - [**Metric Correlations**](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md): A Netdata feature that lets you quickly find metrics and charts related to a particular window of interest that you want to explore further.
 
@@ -105,7 +105,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Metrics Streaming Replication**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md): Each node running Netdata can stream the metrics it collects, in real time, to another node. Metric streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB).
 
-- [**Module**](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module): A type of collector.
+- [**Module**](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module): A type of collector.
 
 ## N
 
@@ -128,7 +128,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Obsoletion**(of nodes)](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#obsoleting-offline-nodes-from-a-space): Removing nodes from a space.
 
-- [**Orchestrators**](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology): External plugins that run and manage one or more modules. They run as independent processes.
+- [**Orchestrators**](https://github.com/netdata/netdata/blob/master/src/collectors/README.md#collector-architecture-and-terminology): External plugins that run and manage one or more modules. They run as independent processes.
 
 - [**Overview** tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view): Tab in Netdata Cloud that uses composite charts. These charts display real-time aggregated metrics from all the nodes (or a filtered selection) in a given War Room.
 

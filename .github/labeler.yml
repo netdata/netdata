@@ -74,145 +74,145 @@ area/collectors:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/**
+              - src/collectors/**
 
 collectors/plugins.d:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/plugins.d/**
+              - src/collectors/plugins.d/**
 
 collectors/apps:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/apps.plugin/**
+              - src/collectors/apps.plugin/**
 
 collectors/cgroups:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/cgroups.plugin/**
+              - src/collectors/cgroups.plugin/**
 
 collectors/charts.d:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/charts.d.plugin/**
+              - src/collectors/charts.d.plugin/**
 
 collectors/cups:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/cups.plugin/**
+              - src/collectors/cups.plugin/**
 
 collectors/debugfs:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/debugfs.plugin/**
+              - src/collectors/debugfs.plugin/**
 
 collectors/diskspace:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/diskspace.plugin/**
+              - src/collectors/diskspace.plugin/**
 
 collectors/ebpf:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/ebpf.plugin/**
+              - src/collectors/ebpf.plugin/**
 
 collectors/freebsd:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/freebsd.plugin/**
+              - src/collectors/freebsd.plugin/**
 
 collectors/freeipmi:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/freeipmi.plugin/**
+              - src/collectors/freeipmi.plugin/**
 
 collectors/idlejitter:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/idlejitter.plugin/**
+              - src/collectors/idlejitter.plugin/**
 
 collectors/ioping:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/ioping.plugin/**
+              - src/collectors/ioping.plugin/**
 
 collectors/macos:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/macos.plugin/**
+              - src/collectors/macos.plugin/**
 
 collectors/nfacct:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/nfacct.plugin/**
+              - src/collectors/nfacct.plugin/**
 
 collectors/perf:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/perf.plugin/**
+              - src/collectors/perf.plugin/**
 
 collectors/proc:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/proc.plugin/**
+              - src/collectors/proc.plugin/**
 
 collectors/python.d:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/python.d.plugin/**
+              - src/collectors/python.d.plugin/**
 
 collectors/slabinfo:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/slabinfo.plugin/**
+              - src/collectors/slabinfo.plugin/**
 
 collectors/statsd:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/statsd.plugin/**
+              - src/collectors/statsd.plugin/**
 
 collectors/systemd-journal:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/systemd-journal.plugin/**
+              - src/collectors/systemd-journal.plugin/**
 
 collectors/tc:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/tc.plugin/**
+              - src/collectors/tc.plugin/**
 
 collectors/timex:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/timex.plugin/**
+              - src/collectors/timex.plugin/**
 
 collectors/xenstat:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - collectors/xenstat.plugin/**
+              - src/collectors/xenstat.plugin/**
 
 # ----------------/collectors----------------------
 

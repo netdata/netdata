@@ -152,7 +152,7 @@ When a Netdata program cannot run at all, a `FATAL` line is logged.
 
 ### collector.log
 
-The `collector.log` is the `stderr` of all [collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md)
+The `collector.log` is the `stderr` of all [collectors](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md)
  run by `netdata`.
 
 So if any process, in the Netdata process tree, writes anything to its standard error,

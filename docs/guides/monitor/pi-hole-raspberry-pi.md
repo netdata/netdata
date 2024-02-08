@@ -105,9 +105,9 @@ If you're completely new to Netdata, look at the [Introduction](https://github.c
 ### Enable temperature sensor monitoring
 
 You need to manually enable Netdata's built-in [temperature sensor
-collector](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/sensors/README.md) to start collecting metrics.
+collector](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/sensors/README.md) to start collecting metrics.
 
-> Netdata uses a few plugins to manage its [collectors](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md), each using a different language: Go,
+> Netdata uses a few plugins to manage its [collectors](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md), each using a different language: Go,
 > Python, Node.js, and Bash. While our Go collectors are undergoing the most active development, we still support the
 > other languages. In this case, you need to enable a temperature sensor collector that's written in Bash.
 

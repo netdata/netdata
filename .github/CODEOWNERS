@@ -8,13 +8,13 @@
 .github/ @Ferroin @tkatsoulas
 src/aclk/ @stelfrag
 contrib/debian @Ferroin @tkatsoulas
-collectors/ @thiagoftsm
-collectors/ebpf.plugin/ @thiagoftsm
-collectors/charts.d.plugin/ @ilyam8 @Ferroin
-collectors/freebsd.plugin/ @thiagoftsm
-collectors/macos.plugin/ @thiagoftsm
-collectors/python.d.plugin/ @ilyam8
-collectors/cups.plugin/ @thiagoftsm
+src/collectors/ @thiagoftsm
+src/collectors/ebpf.plugin/ @thiagoftsm
+src/collectors/charts.d.plugin/ @ilyam8 @Ferroin
+src/collectors/freebsd.plugin/ @thiagoftsm
+src/collectors/macos.plugin/ @thiagoftsm
+src/collectors/python.d.plugin/ @ilyam8
+src/collectors/cups.plugin/ @thiagoftsm
 src/exporting/ @thiagoftsm
 src/daemon/ @thiagoftsm @vkalintiris
 src/database/ @thiagoftsm @vkalintiris

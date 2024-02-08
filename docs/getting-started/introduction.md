@@ -63,7 +63,7 @@ Netdata works with tons of applications, notifications platforms, and other time
 
 - **300+ system, container, and application endpoints**: Collectors autodetect metrics from default endpoints and
     immediately visualize them into meaningful charts designed for troubleshooting. See [everything we
-    support](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
+    support](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md).
 - **20+ notification platforms**: Netdata's health watchdog sends warning and critical alerts to your [favorite
     platform](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to inform you of anomalies just seconds
     after they affect your node.

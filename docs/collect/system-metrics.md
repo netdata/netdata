@@ -17,23 +17,23 @@ To gather system metrics, Netdata uses roughly a dozen plugins, each of which ha
 specific metrics exposed by the host. The system metrics Netdata users interact with most for health monitoring and
 performance troubleshooting are collected and visualized by `proc.plugin`, `cgroups.plugin`, and `ebpf.plugin`.
 
-[**proc.plugin**](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md) gathers metrics from the `/proc` and `/sys` folders in Linux
+[**proc.plugin**](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/README.md) gathers metrics from the `/proc` and `/sys` folders in Linux
 systems, along with a few other endpoints, and is responsible for the bulk of the system metrics collected and
 visualized by Netdata. It collects CPU, memory, disks, load, networking, mount points, and more with zero configuration.
 It even allows Netdata to monitor its own resource utilization!
 
-[**cgroups.plugin**](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md) collects rich metrics about containers and virtual machines
+[**cgroups.plugin**](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/README.md) collects rich metrics about containers and virtual machines
 using the virtual files under `/sys/fs/cgroup`. By reading cgroups, Netdata can instantly collect resource utilization
 metrics for systemd services, all containers (Docker, LXC, LXD, Libvirt, systemd-nspawn), and more. Learn more in the
 [collecting container metrics](https://github.com/netdata/netdata/blob/master/docs/collect/container-metrics.md) doc.
 
-[**ebpf.plugin**](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md): Netdata's extended Berkeley Packet Filter (eBPF) collector
+[**ebpf.plugin**](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/README.md): Netdata's extended Berkeley Packet Filter (eBPF) collector
 monitors Linux kernel-level metrics for file descriptors, virtual filesystem IO, and process management. You can use our
 eBPF collector to analyze how and when a process accesses files, when it makes system calls, whether it leaks memory or
 creating zombie processes, and more.
 
 While the above plugins and associated collectors are the most important for system metrics, there are many others. You
-can find all system collectors in our [supported collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md#system-collectors).
+can find all system collectors in our [supported collectors list](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md#system-collectors).
 
 ## Collect Windows system metrics
 

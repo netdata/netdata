@@ -69,7 +69,7 @@ every 2 seconds. This will **cut in half** both CPU and RAM resources consumed b
 On very weak devices you might have to use `[db].update every = 5` and `[db].retention = 720` (still 1 hour of data, but
 1/5 of the CPU and RAM resources).
 
-You can also disable [data collection plugins](https://github.com/netdata/netdata/blob/master/collectors/README.md) that you don't need. Disabling such plugins will also
+You can also disable [data collection plugins](https://github.com/netdata/netdata/blob/master/src/collectors/README.md) that you don't need. Disabling such plugins will also
 free both CPU and RAM resources.
 
 ## Memory optimizations

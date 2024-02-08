@@ -36,7 +36,7 @@ netdataDashboard.menu = {
         title: 'Quality of Service',
         icon: '<i class="fas fa-globe"></i>',
         info: 'Netdata collects and visualizes <code>tc</code> class utilization using its ' +
-            '<a href="https://github.com/netdata/netdata/blob/master/collectors/tc.plugin/tc-qos-helper.sh.in" target="_blank">tc-helper plugin</a>. ' +
+            '<a href="https://github.com/netdata/netdata/blob/master/src/collectors/tc.plugin/tc-qos-helper.sh.in" target="_blank">tc-helper plugin</a>. ' +
             'If you also use <a href="http://firehol.org/#fireqos" target="_blank">FireQOS</a> for setting up QoS, ' +
             'netdata automatically collects interface and class names. If your QoS configuration includes overheads ' +
             'calculation, the values shown here will include these overheads (the total bandwidth for the same ' +
@@ -702,13 +702,13 @@ netdataDashboard.menu = {
     'anomalies': {
         title: 'Anomalies',
         icon: '<i class="fas fa-flask"></i>',
-        info: 'Anomaly scores relating to key system metrics. A high anomaly probability indicates strange behaviour and may trigger an anomaly prediction from the trained models. Read the <a href="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/anomalies" target="_blank">anomalies collector docs</a> for more details.'
+        info: 'Anomaly scores relating to key system metrics. A high anomaly probability indicates strange behaviour and may trigger an anomaly prediction from the trained models. Read the <a href="https://github.com/netdata/netdata/tree/master/src/collectors/python.d.plugin/anomalies" target="_blank">anomalies collector docs</a> for more details.'
     },
 
     'alarms': {
         title: 'Alarms',
         icon: '<i class="fas fa-bell"></i>',
-        info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
+        info: 'Charts showing alarm status over time. More details <a href="https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/alarms/README.md" target="_blank">here</a>.'
     },
 
     'statsd': { 
@@ -739,7 +739,7 @@ netdataDashboard.menu = {
     'changefinder': {
         title: 'ChangeFinder',
         icon: '<i class="fas fa-flask"></i>',
-        info: 'Online changepoint detection using machine learning. More details <a href="https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/changefinder/README.md" target="_blank">here</a>.'
+        info: 'Online changepoint detection using machine learning. More details <a href="https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/changefinder/README.md" target="_blank">here</a>.'
     },
 
     'zscores': {

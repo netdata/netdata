@@ -1,8 +1,8 @@
 # Develop a custom data collector in Python
 
-The Netdata Agent uses [data collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) to 
+The Netdata Agent uses [data collectors](https://github.com/netdata/netdata/blob/master/src/collectors/README.md) to 
 fetch metrics from hundreds of system, container, and service endpoints. While the Netdata team and community has built 
-[powerful collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for most system, container, 
+[powerful collectors](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md) for most system, container, 
 and service/application endpoints, some custom applications can't be monitored by default.
 
 In this tutorial, you'll learn how to leverage the [Python programming language](https://www.python.org/) to build a
@@ -27,7 +27,7 @@ want to make it available for other users, you should create the pull request in
 ### Quick start
 
 For a quick start, you can look at the 
-[example plugin](https://raw.githubusercontent.com/netdata/netdata/master/collectors/python.d.plugin/example/example.chart.py).
+[example plugin](https://raw.githubusercontent.com/netdata/netdata/master/src/collectors/python.d.plugin/example/example.chart.py).
 
 **Note**: If you are working 'locally' on a new collector and would like to run it in an already installed and running
 Netdata (as opposed to having to install Netdata from source again with your new changes) you can copy over the relevant
@@ -73,7 +73,7 @@ The basic elements of a Netdata collector are:
 - `get_data()`: The basic function of the plugin which will return to Netdata the correct values.
 
 **Note**: All names are better explained in the 
-[External Plugins Documentation](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md).
+[External Plugins Documentation](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md).
 Parameters like `priority` and `update_every` mentioned in that documentation are handled by the `python.d.plugin`,
 not by each collection module. 
 
@@ -487,7 +487,7 @@ configuration in [YAML](https://www.tutorialspoint.com/yaml/yaml_basics.htm) for
   more chances to work out-of-the-box. For example, if the data source supports both `HTTP` and `linux socket`, you can
   define 2 jobs named `local`, with each using a different method. 
 - Check the `example` collector configuration file on
-  [GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/example.conf) to get a
+  [GitHub](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/example/example.conf) to get a
   sense of the structure.
 
 ```yaml
@@ -518,10 +518,10 @@ find the configuration field. This allows you to define sane defaults for your c
 
 Moreover, when creating the configuration file, create a large comment section that describes the configuration
 variables and inform the user about the defaults. For example, take a look at the `example` collector on
-[GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/example.conf).
+[GitHub](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/example/example.conf).
 
 You can read more about the configuration file on the [`python.d.plugin`
-documentation](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md). 
+documentation](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/README.md). 
 
 You can find the source code for the above examples on [GitHub](https://github.com/papajohn-uop/netdata). 
 

@@ -911,7 +911,7 @@ bundle_libbpf() {
 bundle_libbpf
 
 copy_co_re() {
-  cp -R "${1}/includes" "collectors/ebpf.plugin/"
+  cp -R "${1}/includes" "src/collectors/ebpf.plugin/"
 }
 
 bundle_ebpf_co_re() {

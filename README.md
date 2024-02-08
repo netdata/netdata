@@ -122,7 +122,7 @@ On the same workload, Netdata uses **35% less CPU**, **49% less RAM**, **12% les
 
 NEW: **Netdata and LOGS !** 🥳</br>
 
-Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata/tree/master/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query `systemd` journal logs!
+Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata/tree/master/src/collectors/systemd-journal.plugin), that allows you to view, explore, analyze and query `systemd` journal logs!
 
 ![image](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
 
@@ -324,7 +324,7 @@ Netdata is built around a **modular metrics processing pipeline**.
 Each Netdata Agent can perform the following functions:
 
 1. **`COLLECT` metrics from their sources**<br/>
-   Uses [internal](https://github.com/netdata/netdata/tree/master/collectors) and [external](https://github.com/netdata/go.d.plugin/tree/master/modules) plugins to collect data from their sources.
+   Uses [internal](https://github.com/netdata/netdata/tree/master/src/collectors) and [external](https://github.com/netdata/go.d.plugin/tree/master/modules) plugins to collect data from their sources.
 
    Netdata auto-detects and collects almost everything from the operating system: including CPU, Interrupts, Memory, Disks, Mount Points, Filesystems, Network Stack, Network Interfaces, Containers, VMs, Processes, `systemd` units, Linux Performance Metrics, Linux eBPF, Hardware Sensors, IPMI, and more.
 
