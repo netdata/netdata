@@ -60,7 +60,7 @@ project(netdata
 find_package(PkgConfig REQUIRED)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 
 set(CMAKE_C_STANDARD_REQUIRED On)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
@@ -115,13 +115,62 @@ option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 
 option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
+option(ENABLE_GRPC "enable grpc" True)
 option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
+
+if(ENABLE_GRPC)
+        include(FetchContent)
+
+        set(FETCHCONTENT_QUIET OFF)
+        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
+
+        set(ABSL_ENABLE_INSTALL ON)
+
+        FetchContent_Declare(
+                gRPC
+                GIT_REPOSITORY https://github.com/grpc/grpc
+                GIT_TAG        v1.55.4
+        )
+        FetchContent_MakeAvailable(gRPC)
+        include(FindProtobuf)
+
+        set(_PROTOBUF_LIBPROTOBUF libprotobuf)
+        set(_PROTOBUF_PROTOC $<TARGET_FILE:protoc>)
+
+        set(_GRPC_GRPCPP grpc++)
+        set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:grpc_cpp_plugin>)
+
+        add_library(proto-objects OBJECT "src/foo/proto/hello.proto")
+
+        target_link_libraries(proto-objects PUBLIC protobuf::libprotobuf grpc++ grpc++_reflection)
+
+        set(PROTO_BINARY_DIR "${CMAKE_BINARY_DIR}/generated")
+        set(PROTO_IMPORT_DIRS "${CMAKE_SOURCE_DIR}/src/foo/proto")
+
+        target_include_directories(proto-objects PUBLIC "${PROTO_BINARY_DIR}")
+
+        protobuf_generate(
+            TARGET proto-objects
+            IMPORT_DIRS ${PROTO_IMPORT_DIRS}
+            PROTOC_OUT_DIR "${PROTO_BINARY_DIR}")
+
+        protobuf_generate(
+            TARGET proto-objects
+            LANGUAGE grpc
+            GENERATE_EXTENSIONS .grpc.pb.h .grpc.pb.cc
+            PLUGIN "protoc-gen-grpc=${_GRPC_CPP_PLUGIN_EXECUTABLE}"
+            IMPORT_DIRS ${PROTO_IMPORT_DIRS}
+            PROTOC_OUT_DIR "${PROTO_BINARY_DIR}")
+
+        add_library(foo STATIC "${CMAKE_SOURCE_DIR}/src/foo/foo_plugin.cc")
+        target_link_libraries(foo PUBLIC proto-objects)
+endif()
 
 if(ENABLE_SENTRY)
         include(FetchContent)
 
-        # ignore debhelper
+        set(FETCHCONTENT_QUIET OFF)
         set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
         set(SENTRY_VERSION 0.6.6)
@@ -2112,6 +2161,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
+        "$<$<BOOL:${ENABLE_GRPC}>:foo>"
 )
 
 #
