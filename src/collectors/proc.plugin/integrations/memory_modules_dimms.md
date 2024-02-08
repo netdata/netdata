@@ -83,7 +83,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| mem.edac_mc | correctable, uncorrectable, correctable_noinfo, uncorrectable_noinfo | errors/s |
+| mem.edac_mc_errors | correctable, uncorrectable, correctable_noinfo, uncorrectable_noinfo | errors |
 
 ### Per memory module
 
@@ -106,7 +106,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| mem.edac_mc | correctable, uncorrectable | errors/s |
+| mem.edac_mc_errors | correctable, uncorrectable | errors |
 
 
 
@@ -117,10 +117,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ecc_memory_mc_noinfo_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc | memory controller ${label:controller} ECC correctable errors (unknown DIMM slot) in the last 10 minutes |
-| [ ecc_memory_mc_noinfo_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc | memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot) in the last 10 minutes |
-| [ ecc_memory_dimm_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors in the last 10 minutes |
-| [ ecc_memory_dimm_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors in the last 10 minutes |
+| [ ecc_memory_mc_noinfo_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | memory controller ${label:controller} ECC correctable errors (unknown DIMM slot) |
+| [ ecc_memory_mc_noinfo_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot) |
+| [ ecc_memory_dimm_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm_errors | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors |
+| [ ecc_memory_dimm_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm_errors | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors |
 
 
 ## Setup
