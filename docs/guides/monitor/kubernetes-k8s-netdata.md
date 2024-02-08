@@ -241,6 +241,6 @@ clusters of all sizes.
   collector](https://github.com/netdata/go.d.plugin/blob/master/modules/k8s_kubelet/README.md)
 - [Netdata Agent · `kube-proxy`
   collector](https://github.com/netdata/go.d.plugin/blob/master/modules/k8s_kubeproxy/README.md)
-- [Netdata Agent · `cgroups.plugin`](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md)
+- [Netdata Agent · `cgroups.plugin`](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/README.md)
 
 

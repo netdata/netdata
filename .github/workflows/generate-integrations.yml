@@ -6,7 +6,7 @@ on:
     branches:
       - master
     paths: # If any of these files change, we need to regenerate integrations.js.
-      - 'collectors/**/metadata.yaml'
+      - 'src/collectors/**/metadata.yaml'
       - 'src/exporting/**/metadata.yaml'
       - 'src/health/notifications/**/metadata.yaml'
       - 'integrations/templates/**'
@@ -58,7 +58,7 @@ jobs:
         id: generate-integrations-documentation
         run: |
           python3 integrations/gen_docs_integrations.py
-      - name: Generate collectors/COLLECTORS.md
+      - name: Generate src/collectors/COLLECTORS.md
         id: generate-collectors-md
         run: |
           python3 integrations/gen_doc_collector_page.py
@@ -95,7 +95,7 @@ jobs:
               Prepare Dependencies: ${{ steps.prep-deps.outcome }}
               Generate Integrations: ${{ steps.generate.outcome }}
               Generate Integrations Documentation: ${{ steps.generate-integrations-documentation.outcome }}
-              Generate collectors/COLLECTORS.md: ${{ steps.generate-collectors-md.outcome }}
+              Generate src/collectors/COLLECTORS.md: ${{ steps.generate-collectors-md.outcome }}
               Clean Up Temporary Data: ${{ steps.clean.outcome }}
               Create PR: ${{ steps.create-pr.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

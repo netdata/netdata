@@ -18,7 +18,7 @@
         <mxCell id="7" value="" style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=none;gradientColor=#CCFFFF;fontSize=13;align=center;dashed=1;perimeterSpacing=0;opacity=30;rounded=0;shadow=0;glass=0;comic=0;strokeWidth=3;dashPattern=1 1;" parent="1" vertex="1">
           <mxGeometry x="70" y="552" width="1171" height="471" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;font&gt;&lt;b&gt;APM&lt;br&gt;Application Metrics&lt;/b&gt;&lt;/font&gt;&lt;div&gt;statsd protocol&lt;/div&gt;&lt;div&gt;(TCP or UDP)&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/statsd.plugin" id="9">
+        <UserObject label="&lt;font&gt;&lt;b&gt;APM&lt;br&gt;Application Metrics&lt;/b&gt;&lt;/font&gt;&lt;div&gt;statsd protocol&lt;/div&gt;&lt;div&gt;(TCP or UDP)&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/statsd.plugin" id="9">
           <mxCell style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;gradientColor=#CCFFFF;" parent="1" vertex="1">
             <mxGeometry x="1022" y="1032" width="208" height="158" as="geometry" />
           </mxCell>
@@ -33,7 +33,7 @@
             <mxGeometry x="484.33349609375" y="1034" width="110" height="60" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;freeipmi.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;enterprise h/w&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/freeipmi.plugin" id="14">
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;freeipmi.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;enterprise h/w&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/freeipmi.plugin" id="14">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=12;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="163" y="1034" width="110" height="60" as="geometry" />
           </mxCell>
@@ -78,27 +78,27 @@
             <mxGeometry x="254" y="690" width="770" height="93" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;plugins.d&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;external plugins API&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;text format, over pipes&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/plugins.d" id="32">
+        <UserObject label="&lt;div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;plugins.d&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;external plugins API&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;text format, over pipes&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/plugins.d" id="32">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=16;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="74" y="887" width="580" height="130" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;font style=&quot;font-size: 18px&quot;&gt;&lt;b&gt;internal&amp;nbsp;&lt;/b&gt;&lt;b&gt;data collection API&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;(with add-only access to the database)&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors#internal-plugins-api" id="33">
+        <UserObject label="&lt;font style=&quot;font-size: 18px&quot;&gt;&lt;b&gt;internal&amp;nbsp;&lt;/b&gt;&lt;b&gt;data collection API&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;(with add-only access to the database)&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors#internal-plugins-api" id="33">
           <mxCell style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="74" y="796" width="1160" height="77" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Linux&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;data collection&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(mainly /proc and /sys)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/proc.plugin#procplugin" id="34">
+        <UserObject label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Linux&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;data collection&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(mainly /proc and /sys)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/proc.plugin#procplugin" id="34">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;" parent="1" vertex="1">
             <mxGeometry x="684" y="897" width="177" height="60" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;FreeBSD&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;data collection&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(mainly sysctl)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/freebsd.plugin" id="35">
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;FreeBSD&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;data collection&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(mainly sysctl)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/freebsd.plugin" id="35">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;" parent="1" vertex="1">
             <mxGeometry x="871" y="897" width="110" height="60" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;MacOS&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;data collection&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(mainly sysctl)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/macos.plugin" id="36">
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;MacOS&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;data collection&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(mainly sysctl)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/macos.plugin" id="36">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;" parent="1" vertex="1">
             <mxGeometry x="991" y="897" width="110" height="60" as="geometry" />
           </mxCell>
@@ -109,12 +109,12 @@
         <mxCell id="38" value="&lt;div style=&quot;text-align: center&quot;&gt;&lt;span&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;netdata internal plugins&lt;/font&gt;&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left&quot;&gt;(running as threads inside netdata)&lt;/div&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=center;verticalAlign=top;spacingTop=-4;fontSize=14;" parent="1" vertex="1">
           <mxGeometry x="883" y="967" width="230" height="40" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;statsd&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(udp/tcp)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/statsd.plugin" id="39">
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;statsd&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(udp/tcp)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/statsd.plugin" id="39">
           <mxCell style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="1111" y="897" width="110" height="110" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;charts.d&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(bash plugins)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/charts.d.plugin" id="40">
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;charts.d&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(bash plugins)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/charts.d.plugin" id="40">
           <mxCell style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="85" y="1115" width="110" height="60" as="geometry" />
           </mxCell>
@@ -124,7 +124,7 @@
             <mxGeometry x="244" y="1116" width="110" height="60" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;python.d&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(python plugins)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin" id="42">
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;python.d&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(python plugins)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/python.d.plugin" id="42">
           <mxCell style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="404" y="1119" width="110" height="60" as="geometry" />
           </mxCell>
@@ -140,7 +140,7 @@
         <mxCell id="45" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15.21;dx=32.57;arrowHead=55;fontSize=16;direction=north;flipH=1;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="1150" y="997" width="75" height="93" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;cgroups&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/cgroups.plugin#cgroupsplugin" id="46">
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;cgroups&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/cgroups.plugin#cgroupsplugin" id="46">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;" parent="1" vertex="1">
             <mxGeometry x="774" y="957" width="87" height="53" as="geometry" />
           </mxCell>
@@ -160,7 +160,7 @@
         <mxCell id="55" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.29;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
           <mxGeometry x="264" y="1007" width="70" height="120" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;apps.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;process tree&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/apps.plugin" id="56">
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;apps.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;process tree&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/apps.plugin" id="56">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=12;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="324" y="1034" width="110" height="60" as="geometry" />
           </mxCell>
@@ -171,7 +171,7 @@
         <mxCell id="58" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="424" y="1007" width="70" height="120" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;QoS&lt;/b&gt;&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(tc classes)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/tc.plugin#tcplugin" id="59">
+        <UserObject label="&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;QoS&lt;/b&gt;&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(tc classes)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/tc.plugin#tcplugin" id="59">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;" parent="1" vertex="1">
             <mxGeometry x="684" y="957" width="80" height="53" as="geometry" />
           </mxCell>
@@ -421,7 +421,7 @@
         <mxCell id="161" value="" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26529042/23528fa8-43c1-11e7-94bd-d01e7ded928d.png;" parent="1" vertex="1">
           <mxGeometry x="1134" y="1991" width="116" height="40" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;font style=&quot;font-size: 20px&quot;&gt;system&lt;u&gt;d&lt;/u&gt;&lt;/font&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/cgroups.plugin#monitoring-systemd-services" id="162">
+        <UserObject label="&lt;font style=&quot;font-size: 20px&quot;&gt;system&lt;u&gt;d&lt;/u&gt;&lt;/font&gt;" link="https://github.com/netdata/netdata/tree/master/src/collectors/cgroups.plugin#monitoring-systemd-services" id="162">
           <mxCell style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=13;fontStyle=1" parent="1" vertex="1">
             <mxGeometry x="797" y="1145" width="90" height="20" as="geometry" />
           </mxCell>

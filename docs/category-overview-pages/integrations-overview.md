@@ -13,7 +13,7 @@ sidebar_position: 60
 Netdata's ability to monitor out of the box every potentially useful aspect of a node's operation is unparalleled.
 But Netdata also provides out of the box, meaningful charts and alerts for hundreds of applications, with the ability
 to be easily extended to monitor anything. See the full list of Netdata's capabilities and how you can extend them in the 
-[supported collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
+[supported collectors list](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md).
 
 Our out of the box alerts were created by expert professionals and have been validated on the field, countless times.
 Use them to trigger [alert notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) 

@@ -962,7 +962,7 @@ set(HEALTH_PLUGIN_FILES
         src/health/rrdvar.h
 )
 
-set(IDLEJITTER_PLUGIN_FILES collectors/idlejitter.plugin/plugin_idlejitter.c)
+set(IDLEJITTER_PLUGIN_FILES src/collectors/idlejitter.plugin/plugin_idlejitter.c)
 
 if(ENABLE_ML)
         set(ML_FILES
@@ -982,18 +982,18 @@ else()
 endif()
 
 set(PLUGINSD_PLUGIN_FILES
-        collectors/plugins.d/plugins_d.c
-        collectors/plugins.d/plugins_d.h
-        collectors/plugins.d/pluginsd_dyncfg.c
-        collectors/plugins.d/pluginsd_dyncfg.h
-        collectors/plugins.d/pluginsd_functions.c
-        collectors/plugins.d/pluginsd_functions.h
-        collectors/plugins.d/pluginsd_internals.c
-        collectors/plugins.d/pluginsd_internals.h
-        collectors/plugins.d/pluginsd_parser.c
-        collectors/plugins.d/pluginsd_parser.h
-        collectors/plugins.d/pluginsd_replication.c
-        collectors/plugins.d/pluginsd_replication.h
+        src/collectors/plugins.d/plugins_d.c
+        src/collectors/plugins.d/plugins_d.h
+        src/collectors/plugins.d/pluginsd_dyncfg.c
+        src/collectors/plugins.d/pluginsd_dyncfg.h
+        src/collectors/plugins.d/pluginsd_functions.c
+        src/collectors/plugins.d/pluginsd_functions.h
+        src/collectors/plugins.d/pluginsd_internals.c
+        src/collectors/plugins.d/pluginsd_internals.h
+        src/collectors/plugins.d/pluginsd_parser.c
+        src/collectors/plugins.d/pluginsd_parser.h
+        src/collectors/plugins.d/pluginsd_replication.c
+        src/collectors/plugins.d/pluginsd_replication.h
 )
 
 set(RRD_PLUGIN_FILES
@@ -1101,20 +1101,20 @@ set(REGISTRY_PLUGIN_FILES
 )
 
 set(STATSD_PLUGIN_FILES
-        collectors/statsd.plugin/statsd.c
+        src/collectors/statsd.plugin/statsd.c
 )
 
 set(SYSTEMD_JOURNAL_PLUGIN_FILES
-        collectors/systemd-journal.plugin/systemd-journal.c
-        collectors/systemd-journal.plugin/systemd-internals.h
-        collectors/systemd-journal.plugin/systemd-main.c
-        collectors/systemd-journal.plugin/systemd-units.c
-        collectors/systemd-journal.plugin/systemd-journal.c
-        collectors/systemd-journal.plugin/systemd-journal-annotations.c
-        collectors/systemd-journal.plugin/systemd-journal-files.c
-        collectors/systemd-journal.plugin/systemd-journal-fstat.c
-        collectors/systemd-journal.plugin/systemd-journal-watcher.c
-        collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
+        src/collectors/systemd-journal.plugin/systemd-journal.c
+        src/collectors/systemd-journal.plugin/systemd-internals.h
+        src/collectors/systemd-journal.plugin/systemd-main.c
+        src/collectors/systemd-journal.plugin/systemd-units.c
+        src/collectors/systemd-journal.plugin/systemd-journal.c
+        src/collectors/systemd-journal.plugin/systemd-journal-annotations.c
+        src/collectors/systemd-journal.plugin/systemd-journal-files.c
+        src/collectors/systemd-journal.plugin/systemd-journal-fstat.c
+        src/collectors/systemd-journal.plugin/systemd-journal-watcher.c
+        src/collectors/systemd-journal.plugin/systemd-journal-dyncfg.c
         src/libnetdata/maps/system-users.h
         src/libnetdata/maps/system-groups.h
 )
@@ -1177,97 +1177,97 @@ set(ACLK_ALWAYS_BUILD
 )
 
 set(TIMEX_PLUGIN_FILES
-        collectors/timex.plugin/plugin_timex.c
+        src/collectors/timex.plugin/plugin_timex.c
 )
 
 set(PROFILE_PLUGIN_FILES
-        collectors/profile.plugin/plugin_profile.cc
+        src/collectors/profile.plugin/plugin_profile.cc
 )
 
 set(CGROUPS_PLUGIN_FILES
-        collectors/cgroups.plugin/sys_fs_cgroup.c
-        collectors/cgroups.plugin/sys_fs_cgroup.h
-        collectors/cgroups.plugin/cgroup-internals.h
-        collectors/cgroups.plugin/cgroup-discovery.c
-        collectors/cgroups.plugin/cgroup-charts.c
-        collectors/cgroups.plugin/cgroup-top.c
+        src/collectors/cgroups.plugin/sys_fs_cgroup.c
+        src/collectors/cgroups.plugin/sys_fs_cgroup.h
+        src/collectors/cgroups.plugin/cgroup-internals.h
+        src/collectors/cgroups.plugin/cgroup-discovery.c
+        src/collectors/cgroups.plugin/cgroup-charts.c
+        src/collectors/cgroups.plugin/cgroup-top.c
 )
 
 set(DISKSPACE_PLUGIN_FILES
-        collectors/diskspace.plugin/plugin_diskspace.c
+        src/collectors/diskspace.plugin/plugin_diskspace.c
 )
 
 set(MACOS_PLUGIN_FILES
-        collectors/macos.plugin/plugin_macos.c
-        collectors/macos.plugin/plugin_macos.h
-        collectors/macos.plugin/macos_sysctl.c
-        collectors/macos.plugin/macos_mach_smi.c
-        collectors/macos.plugin/macos_fw.c
+        src/collectors/macos.plugin/plugin_macos.c
+        src/collectors/macos.plugin/plugin_macos.h
+        src/collectors/macos.plugin/macos_sysctl.c
+        src/collectors/macos.plugin/macos_mach_smi.c
+        src/collectors/macos.plugin/macos_fw.c
 )
 
 set(FREEBSD_PLUGIN_FILES
-        collectors/freebsd.plugin/plugin_freebsd.c
-        collectors/freebsd.plugin/plugin_freebsd.h
-        collectors/freebsd.plugin/freebsd_sysctl.c
-        collectors/freebsd.plugin/freebsd_getmntinfo.c
-        collectors/freebsd.plugin/freebsd_getifaddrs.c
-        collectors/freebsd.plugin/freebsd_devstat.c
-        collectors/freebsd.plugin/freebsd_kstat_zfs.c
-        collectors/freebsd.plugin/freebsd_ipfw.c
-        collectors/proc.plugin/zfs_common.c
-        collectors/proc.plugin/zfs_common.h
+        src/collectors/freebsd.plugin/plugin_freebsd.c
+        src/collectors/freebsd.plugin/plugin_freebsd.h
+        src/collectors/freebsd.plugin/freebsd_sysctl.c
+        src/collectors/freebsd.plugin/freebsd_getmntinfo.c
+        src/collectors/freebsd.plugin/freebsd_getifaddrs.c
+        src/collectors/freebsd.plugin/freebsd_devstat.c
+        src/collectors/freebsd.plugin/freebsd_kstat_zfs.c
+        src/collectors/freebsd.plugin/freebsd_ipfw.c
+        src/collectors/proc.plugin/zfs_common.c
+        src/collectors/proc.plugin/zfs_common.h
 )
 
 set(PROC_PLUGIN_FILES
-        collectors/proc.plugin/ipc.c
-        collectors/proc.plugin/plugin_proc.c
-        collectors/proc.plugin/plugin_proc.h
-        collectors/proc.plugin/proc_sys_fs_file_nr.c
-        collectors/proc.plugin/proc_diskstats.c
-        collectors/proc.plugin/proc_mdstat.c
-        collectors/proc.plugin/proc_interrupts.c
-        collectors/proc.plugin/proc_softirqs.c
-        collectors/proc.plugin/proc_loadavg.c
-        collectors/proc.plugin/proc_meminfo.c
-        collectors/proc.plugin/proc_pagetypeinfo.c
-        collectors/proc.plugin/proc_net_dev.c
-        collectors/proc.plugin/proc_net_dev_renames.c
-        collectors/proc.plugin/proc_net_dev_renames.h
-        collectors/proc.plugin/proc_net_wireless.c
-        collectors/proc.plugin/proc_net_ip_vs_stats.c
-        collectors/proc.plugin/proc_net_netstat.c
-        collectors/proc.plugin/proc_net_rpc_nfs.c
-        collectors/proc.plugin/proc_net_rpc_nfsd.c
-        collectors/proc.plugin/proc_net_sctp_snmp.c
-        collectors/proc.plugin/proc_net_sockstat.c
-        collectors/proc.plugin/proc_net_sockstat6.c
-        collectors/proc.plugin/proc_net_softnet_stat.c
-        collectors/proc.plugin/proc_net_stat_conntrack.c
-        collectors/proc.plugin/proc_net_stat_synproxy.c
-        collectors/proc.plugin/proc_self_mountinfo.c
-        collectors/proc.plugin/proc_self_mountinfo.h
-        collectors/proc.plugin/zfs_common.c
-        collectors/proc.plugin/zfs_common.h
-        collectors/proc.plugin/proc_spl_kstat_zfs.c
-        collectors/proc.plugin/proc_stat.c
-        collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c
-        collectors/proc.plugin/proc_vmstat.c
-        collectors/proc.plugin/proc_uptime.c
-        collectors/proc.plugin/proc_pressure.c
-        collectors/proc.plugin/proc_pressure.h
-        collectors/proc.plugin/sys_kernel_mm_ksm.c
-        collectors/proc.plugin/sys_block_zram.c
-        collectors/proc.plugin/sys_devices_system_edac_mc.c
-        collectors/proc.plugin/sys_devices_system_node.c
-        collectors/proc.plugin/sys_class_infiniband.c
-        collectors/proc.plugin/sys_fs_btrfs.c
-        collectors/proc.plugin/sys_class_power_supply.c
-        collectors/proc.plugin/sys_devices_pci_aer.c
-        collectors/proc.plugin/sys_class_drm.c
+        src/collectors/proc.plugin/ipc.c
+        src/collectors/proc.plugin/plugin_proc.c
+        src/collectors/proc.plugin/plugin_proc.h
+        src/collectors/proc.plugin/proc_sys_fs_file_nr.c
+        src/collectors/proc.plugin/proc_diskstats.c
+        src/collectors/proc.plugin/proc_mdstat.c
+        src/collectors/proc.plugin/proc_interrupts.c
+        src/collectors/proc.plugin/proc_softirqs.c
+        src/collectors/proc.plugin/proc_loadavg.c
+        src/collectors/proc.plugin/proc_meminfo.c
+        src/collectors/proc.plugin/proc_pagetypeinfo.c
+        src/collectors/proc.plugin/proc_net_dev.c
+        src/collectors/proc.plugin/proc_net_dev_renames.c
+        src/collectors/proc.plugin/proc_net_dev_renames.h
+        src/collectors/proc.plugin/proc_net_wireless.c
+        src/collectors/proc.plugin/proc_net_ip_vs_stats.c
+        src/collectors/proc.plugin/proc_net_netstat.c
+        src/collectors/proc.plugin/proc_net_rpc_nfs.c
+        src/collectors/proc.plugin/proc_net_rpc_nfsd.c
+        src/collectors/proc.plugin/proc_net_sctp_snmp.c
+        src/collectors/proc.plugin/proc_net_sockstat.c
+        src/collectors/proc.plugin/proc_net_sockstat6.c
+        src/collectors/proc.plugin/proc_net_softnet_stat.c
+        src/collectors/proc.plugin/proc_net_stat_conntrack.c
+        src/collectors/proc.plugin/proc_net_stat_synproxy.c
+        src/collectors/proc.plugin/proc_self_mountinfo.c
+        src/collectors/proc.plugin/proc_self_mountinfo.h
+        src/collectors/proc.plugin/zfs_common.c
+        src/collectors/proc.plugin/zfs_common.h
+        src/collectors/proc.plugin/proc_spl_kstat_zfs.c
+        src/collectors/proc.plugin/proc_stat.c
+        src/collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c
+        src/collectors/proc.plugin/proc_vmstat.c
+        src/collectors/proc.plugin/proc_uptime.c
+        src/collectors/proc.plugin/proc_pressure.c
+        src/collectors/proc.plugin/proc_pressure.h
+        src/collectors/proc.plugin/sys_kernel_mm_ksm.c
+        src/collectors/proc.plugin/sys_block_zram.c
+        src/collectors/proc.plugin/sys_devices_system_edac_mc.c
+        src/collectors/proc.plugin/sys_devices_system_node.c
+        src/collectors/proc.plugin/sys_class_infiniband.c
+        src/collectors/proc.plugin/sys_fs_btrfs.c
+        src/collectors/proc.plugin/sys_class_power_supply.c
+        src/collectors/proc.plugin/sys_devices_pci_aer.c
+        src/collectors/proc.plugin/sys_class_drm.c
 )
 
 set(TC_PLUGIN_FILES
-        collectors/tc.plugin/plugin_tc.c
+        src/collectors/tc.plugin/plugin_tc.c
 )
 
 set(LOGS_MANAGEMENT_PLUGIN_FILES
@@ -1309,7 +1309,7 @@ set(LOGS_MANAGEMENT_PLUGIN_FILES
 )
 
 set(NETDATA_FILES
-        collectors/all.h
+        src/collectors/all.h
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${EXPORTING_ENGINE_FILES}
@@ -1746,11 +1746,11 @@ endif()
 if(ENABLE_PLUGIN_DEBUGFS)
     pkg_check_modules(CAP QUIET libcap)
 
-    set(DEBUGFS_PLUGIN_FILES collectors/debugfs.plugin/debugfs_plugin.c
-                             collectors/debugfs.plugin/debugfs_plugin.h
-                             collectors/debugfs.plugin/debugfs_extfrag.c
-                             collectors/debugfs.plugin/debugfs_zswap.c
-                             collectors/debugfs.plugin/sys_devices_virtual_powercap.c)
+    set(DEBUGFS_PLUGIN_FILES src/collectors/debugfs.plugin/debugfs_plugin.c
+                             src/collectors/debugfs.plugin/debugfs_plugin.h
+                             src/collectors/debugfs.plugin/debugfs_extfrag.c
+                             src/collectors/debugfs.plugin/debugfs_zswap.c
+                             src/collectors/debugfs.plugin/sys_devices_virtual_powercap.c)
 
     add_executable(debugfs.plugin ${DEBUGFS_PLUGIN_FILES})
     target_link_libraries(debugfs.plugin libnetdata ${CAP_LIBRARIES})
@@ -1765,7 +1765,7 @@ endif()
 if(ENABLE_PLUGIN_APPS)
     pkg_check_modules(CAP QUIET libcap)
 
-    set(APPS_PLUGIN_FILES collectors/apps.plugin/apps_plugin.c)
+    set(APPS_PLUGIN_FILES src/collectors/apps.plugin/apps_plugin.c)
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
     target_link_libraries(apps.plugin libnetdata ${CAP_LIBRARIES})
@@ -1775,7 +1775,7 @@ if(ENABLE_PLUGIN_APPS)
     install(TARGETS apps.plugin
             COMPONENT apps_plugin
             DESTINATION usr/libexec/netdata/plugins.d)
-    install(FILES collectors/apps.plugin/apps_groups.conf
+    install(FILES src/collectors/apps.plugin/apps_groups.conf
             COMPONENT apps_plugin
             DESTINATION usr/lib/netdata/conf.d)
 endif()
@@ -1787,7 +1787,7 @@ endif()
 if(ENABLE_PLUGIN_FREEIPMI)
     pkg_check_modules(IPMI REQUIRED libipmimonitoring)
 
-    set(FREEIPMI_PLUGIN_FILES collectors/freeipmi.plugin/freeipmi_plugin.c)
+    set(FREEIPMI_PLUGIN_FILES src/collectors/freeipmi.plugin/freeipmi_plugin.c)
 
     add_executable(freeipmi.plugin ${FREEIPMI_PLUGIN_FILES})
     target_link_libraries (freeipmi.plugin libnetdata ${IPMI_LIBRARIES})
@@ -1806,7 +1806,7 @@ if(ENABLE_PLUGIN_NFACCT)
 
     pkg_check_modules(NFACCT REQUIRED libnetfilter_acct)
 
-    set(NFACCT_PLUGIN_FILES collectors/nfacct.plugin/plugin_nfacct.c)
+    set(NFACCT_PLUGIN_FILES src/collectors/nfacct.plugin/plugin_nfacct.c)
 
     add_executable(nfacct.plugin ${NFACCT_PLUGIN_FILES})
     target_link_libraries (nfacct.plugin libnetdata ${MNL_LIBRARIES} ${NFACCT_LIBRARIES})
@@ -1822,7 +1822,7 @@ if(ENABLE_PLUGIN_XENSTAT)
     pkg_check_modules(XENSTAT REQUIRED xenstat)
     pkg_check_modules(XENLIGHT REQUIRED xenlight)
 
-    set(XENSTAT_PLUGIN_FILES collectors/xenstat.plugin/xenstat_plugin.c)
+    set(XENSTAT_PLUGIN_FILES src/collectors/xenstat.plugin/xenstat_plugin.c)
 
     add_executable(xenstat.plugin ${XENSTAT_PLUGIN_FILES})
     target_link_libraries (xenstat.plugin libnetdata ${XENLIGHT_LIBRARIES} ${XENSTAT_LIBRARIES})
@@ -1835,7 +1835,7 @@ if(ENABLE_PLUGIN_XENSTAT)
 endif()
 
 if(ENABLE_PLUGIN_PERF)
-    set(PERF_PLUGIN_FILES collectors/perf.plugin/perf_plugin.c)
+    set(PERF_PLUGIN_FILES src/collectors/perf.plugin/perf_plugin.c)
 
     add_executable(perf.plugin ${PERF_PLUGIN_FILES})
     target_link_libraries(perf.plugin libnetdata)
@@ -1846,7 +1846,7 @@ if(ENABLE_PLUGIN_PERF)
 endif()
 
 if(ENABLE_PLUGIN_SLABINFO)
-    set(SLABINFO_PLUGIN_FILES collectors/slabinfo.plugin/slabinfo.c)
+    set(SLABINFO_PLUGIN_FILES src/collectors/slabinfo.plugin/slabinfo.c)
 
     add_executable(slabinfo.plugin ${SLABINFO_PLUGIN_FILES})
     target_link_libraries(slabinfo.plugin libnetdata)
@@ -1901,7 +1901,7 @@ if(ENABLE_PLUGIN_CUPS)
     if(NOT CUPS_FOUND)
         message(WARNING "Could not find cups cflags and libs.")
     else()
-        set(CUPS_PLUGIN_FILES collectors/cups.plugin/cups_plugin.c)
+        set(CUPS_PLUGIN_FILES src/collectors/cups.plugin/cups_plugin.c)
         add_executable(cups.plugin ${CUPS_PLUGIN_FILES})
         target_link_libraries (cups.plugin libnetdata ${CUPS_LIBRARIES})
         target_compile_options(cups.plugin PRIVATE ${CUPS_CFLAGS_OTHER})
@@ -1912,7 +1912,7 @@ if(ENABLE_PLUGIN_CUPS)
     endif()
 endif()
 
-set(NDSUDO_FILES collectors/plugins.d/ndsudo.c)
+set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
 
 add_executable(ndsudo ${NDSUDO_FILES})
 
@@ -1921,7 +1921,7 @@ install(TARGETS ndsudo
         DESTINATION usr/libexec/netdata/plugins.d)
 
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
-    set(CGROUP_NETWORK_FILES collectors/cgroups.plugin/cgroup-network.c)
+    set(CGROUP_NETWORK_FILES src/collectors/cgroups.plugin/cgroup-network.c)
 
     add_executable(cgroup-network ${CGROUP_NETWORK_FILES})
     target_link_libraries(cgroup-network libnetdata)
@@ -1942,48 +1942,48 @@ endif()
 
 if(ENABLE_PLUGIN_EBPF)
     set(EBPF_PLUGIN_FILES
-            collectors/ebpf.plugin/ebpf.c
-            collectors/ebpf.plugin/ebpf.h
-            collectors/ebpf.plugin/ebpf_cachestat.c
-            collectors/ebpf.plugin/ebpf_cachestat.h
-            collectors/ebpf.plugin/ebpf_dcstat.c
-            collectors/ebpf.plugin/ebpf_dcstat.h
-            collectors/ebpf.plugin/ebpf_disk.c
-            collectors/ebpf.plugin/ebpf_disk.h
-            collectors/ebpf.plugin/ebpf_fd.c
-            collectors/ebpf.plugin/ebpf_fd.h
-            collectors/ebpf.plugin/ebpf_hardirq.c
-            collectors/ebpf.plugin/ebpf_hardirq.h
-            collectors/ebpf.plugin/ebpf_mdflush.c
-            collectors/ebpf.plugin/ebpf_mdflush.h
-            collectors/ebpf.plugin/ebpf_mount.c
-            collectors/ebpf.plugin/ebpf_mount.h
-            collectors/ebpf.plugin/ebpf_filesystem.c
-            collectors/ebpf.plugin/ebpf_filesystem.h
-            collectors/ebpf.plugin/ebpf_oomkill.c
-            collectors/ebpf.plugin/ebpf_oomkill.h
-            collectors/ebpf.plugin/ebpf_process.c
-            collectors/ebpf.plugin/ebpf_process.h
-            collectors/ebpf.plugin/ebpf_shm.c
-            collectors/ebpf.plugin/ebpf_shm.h
-            collectors/ebpf.plugin/ebpf_socket.c
-            collectors/ebpf.plugin/ebpf_socket.h
-            collectors/ebpf.plugin/ebpf_softirq.c
-            collectors/ebpf.plugin/ebpf_softirq.h
-            collectors/ebpf.plugin/ebpf_sync.c
-            collectors/ebpf.plugin/ebpf_sync.h
-            collectors/ebpf.plugin/ebpf_swap.c
-            collectors/ebpf.plugin/ebpf_swap.h
-            collectors/ebpf.plugin/ebpf_vfs.c
-            collectors/ebpf.plugin/ebpf_vfs.h
-            collectors/ebpf.plugin/ebpf_apps.c
-            collectors/ebpf.plugin/ebpf_apps.h
-            collectors/ebpf.plugin/ebpf_cgroup.c
-            collectors/ebpf.plugin/ebpf_cgroup.h
-            collectors/ebpf.plugin/ebpf_unittest.c
-            collectors/ebpf.plugin/ebpf_unittest.h
-            collectors/ebpf.plugin/ebpf_functions.c
-            collectors/ebpf.plugin/ebpf_functions.h
+            src/collectors/ebpf.plugin/ebpf.c
+            src/collectors/ebpf.plugin/ebpf.h
+            src/collectors/ebpf.plugin/ebpf_cachestat.c
+            src/collectors/ebpf.plugin/ebpf_cachestat.h
+            src/collectors/ebpf.plugin/ebpf_dcstat.c
+            src/collectors/ebpf.plugin/ebpf_dcstat.h
+            src/collectors/ebpf.plugin/ebpf_disk.c
+            src/collectors/ebpf.plugin/ebpf_disk.h
+            src/collectors/ebpf.plugin/ebpf_fd.c
+            src/collectors/ebpf.plugin/ebpf_fd.h
+            src/collectors/ebpf.plugin/ebpf_hardirq.c
+            src/collectors/ebpf.plugin/ebpf_hardirq.h
+            src/collectors/ebpf.plugin/ebpf_mdflush.c
+            src/collectors/ebpf.plugin/ebpf_mdflush.h
+            src/collectors/ebpf.plugin/ebpf_mount.c
+            src/collectors/ebpf.plugin/ebpf_mount.h
+            src/collectors/ebpf.plugin/ebpf_filesystem.c
+            src/collectors/ebpf.plugin/ebpf_filesystem.h
+            src/collectors/ebpf.plugin/ebpf_oomkill.c
+            src/collectors/ebpf.plugin/ebpf_oomkill.h
+            src/collectors/ebpf.plugin/ebpf_process.c
+            src/collectors/ebpf.plugin/ebpf_process.h
+            src/collectors/ebpf.plugin/ebpf_shm.c
+            src/collectors/ebpf.plugin/ebpf_shm.h
+            src/collectors/ebpf.plugin/ebpf_socket.c
+            src/collectors/ebpf.plugin/ebpf_socket.h
+            src/collectors/ebpf.plugin/ebpf_softirq.c
+            src/collectors/ebpf.plugin/ebpf_softirq.h
+            src/collectors/ebpf.plugin/ebpf_sync.c
+            src/collectors/ebpf.plugin/ebpf_sync.h
+            src/collectors/ebpf.plugin/ebpf_swap.c
+            src/collectors/ebpf.plugin/ebpf_swap.h
+            src/collectors/ebpf.plugin/ebpf_vfs.c
+            src/collectors/ebpf.plugin/ebpf_vfs.h
+            src/collectors/ebpf.plugin/ebpf_apps.c
+            src/collectors/ebpf.plugin/ebpf_apps.h
+            src/collectors/ebpf.plugin/ebpf_cgroup.c
+            src/collectors/ebpf.plugin/ebpf_cgroup.h
+            src/collectors/ebpf.plugin/ebpf_unittest.c
+            src/collectors/ebpf.plugin/ebpf_unittest.h
+            src/collectors/ebpf.plugin/ebpf_functions.c
+            src/collectors/ebpf.plugin/ebpf_functions.h
     )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})
@@ -1996,7 +1996,7 @@ endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         set(LOCAL_LISTENERS_FILES
-                collectors/plugins.d/local_listeners.c
+                src/collectors/plugins.d/local_listeners.c
                 src/libnetdata/maps/local-sockets.h
         )
 
@@ -2018,7 +2018,7 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         set(NETWORK_VIEWER_FILES
                 src/libnetdata/maps/local-sockets.h
                 src/libnetdata/maps/system-users.h
-                collectors/network-viewer.plugin/network-viewer.c
+                src/collectors/network-viewer.plugin/network-viewer.c
         )
 
         add_executable(network-viewer.plugin ${NETWORK_VIEWER_FILES})
@@ -2136,19 +2136,19 @@ pkg_check_modules(PCRE2 libpcre2-8)
 if(PCRE2_FOUND)
         set(LOG2JOURNAL_FILES
                 ${CONFIG_H}
-                collectors/log2journal/log2journal.h
-                collectors/log2journal/log2journal.c
-                collectors/log2journal/log2journal-help.c
-                collectors/log2journal/log2journal-yaml.c
-                collectors/log2journal/log2journal-json.c
-                collectors/log2journal/log2journal-logfmt.c
-                collectors/log2journal/log2journal-pcre2.c
-                collectors/log2journal/log2journal-params.c
-                collectors/log2journal/log2journal-inject.c
-                collectors/log2journal/log2journal-pattern.c
-                collectors/log2journal/log2journal-replace.c
-                collectors/log2journal/log2journal-rename.c
-                collectors/log2journal/log2journal-rewrite.c
+                src/collectors/log2journal/log2journal.h
+                src/collectors/log2journal/log2journal.c
+                src/collectors/log2journal/log2journal-help.c
+                src/collectors/log2journal/log2journal-yaml.c
+                src/collectors/log2journal/log2journal-json.c
+                src/collectors/log2journal/log2journal-logfmt.c
+                src/collectors/log2journal/log2journal-pcre2.c
+                src/collectors/log2journal/log2journal-params.c
+                src/collectors/log2journal/log2journal-inject.c
+                src/collectors/log2journal/log2journal-pattern.c
+                src/collectors/log2journal/log2journal-replace.c
+                src/collectors/log2journal/log2journal-rename.c
+                src/collectors/log2journal/log2journal-rewrite.c
         )
 
         add_executable(log2journal ${LOG2JOURNAL_FILES})
@@ -2169,7 +2169,7 @@ if(PCRE2_FOUND)
                 COMPONENT log2journal
                 DESTINATION usr/sbin)
 
-        install(DIRECTORY collectors/log2journal/log2journal.d
+        install(DIRECTORY src/collectors/log2journal/log2journal.d
                 COMPONENT log2journal
                 DESTINATION usr/lib/netdata/conf.d)
 endif()
@@ -2287,26 +2287,26 @@ install(PROGRAMS
 # We don't check ENABLE_PLUGIN_CGROUP_NETWORK because rpm builds assume
 # the files exists unconditionally.
 #
-configure_file(collectors/cgroups.plugin/cgroup-network-helper.sh.in
-               collectors/cgroups.plugin/cgroup-network-helper.sh @ONLY)
+configure_file(src/collectors/cgroups.plugin/cgroup-network-helper.sh.in
+               src/collectors/cgroups.plugin/cgroup-network-helper.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/collectors/cgroups.plugin/cgroup-network-helper.sh
+        ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-network-helper.sh
         COMPONENT cgroup_network_plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
-configure_file(collectors/cgroups.plugin/cgroup-name.sh.in
-               collectors/cgroups.plugin/cgroup-name.sh @ONLY)
+configure_file(src/collectors/cgroups.plugin/cgroup-name.sh.in
+               src/collectors/cgroups.plugin/cgroup-name.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/collectors/cgroups.plugin/cgroup-name.sh
+        ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-name.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
 # statsd
 #
 install(FILES
-        collectors/statsd.plugin/asterisk.conf
-        collectors/statsd.plugin/example.conf
-        collectors/statsd.plugin/k6.conf
+        src/collectors/statsd.plugin/asterisk.conf
+        src/collectors/statsd.plugin/example.conf
+        src/collectors/statsd.plugin/k6.conf
         DESTINATION usr/lib/netdata/conf.d/statsd.d)
 
 #
@@ -2320,7 +2320,7 @@ install(FILES
 # ioping.plugin
 #
 install(FILES
-        collectors/ioping.plugin/ioping.conf
+        src/collectors/ioping.plugin/ioping.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 #
@@ -2493,53 +2493,53 @@ install(FILES
 # charts.d files
 #
 
-configure_file(collectors/charts.d.plugin/charts.d.plugin.in collectors/charts.d.plugin/charts.d.plugin @ONLY)
+configure_file(src/collectors/charts.d.plugin/charts.d.plugin.in src/collectors/charts.d.plugin/charts.d.plugin @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/collectors/charts.d.plugin/charts.d.plugin
+        ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES
-        collectors/charts.d.plugin/charts.d.dryrun-helper.sh
-        collectors/charts.d.plugin/loopsleepms.sh.inc
+        src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
+        src/collectors/charts.d.plugin/loopsleepms.sh.inc
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES
-        collectors/charts.d.plugin/charts.d.conf
+        src/collectors/charts.d.plugin/charts.d.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 #
 # tc-qos-helper
 #
 
-configure_file(collectors/tc.plugin/tc-qos-helper.sh.in collectors/tc.plugin/tc-qos-helper.sh @ONLY)
+configure_file(src/collectors/tc.plugin/tc-qos-helper.sh.in src/collectors/tc.plugin/tc-qos-helper.sh @ONLY)
 install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/collectors/tc.plugin/tc-qos-helper.sh
+        ${CMAKE_BINARY_DIR}/src/collectors/tc.plugin/tc-qos-helper.sh
         DESTINATION usr/libexec/netdata/plugins.d)
 
 # scripts
 
 install(FILES
-        collectors/charts.d.plugin/ap/ap.chart.sh
-        collectors/charts.d.plugin/apcupsd/apcupsd.chart.sh
-        collectors/charts.d.plugin/example/example.chart.sh
-        collectors/charts.d.plugin/libreswan/libreswan.chart.sh
-        collectors/charts.d.plugin/opensips/opensips.chart.sh
-        collectors/charts.d.plugin/sensors/sensors.chart.sh
+        src/collectors/charts.d.plugin/ap/ap.chart.sh
+        src/collectors/charts.d.plugin/apcupsd/apcupsd.chart.sh
+        src/collectors/charts.d.plugin/example/example.chart.sh
+        src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
+        src/collectors/charts.d.plugin/opensips/opensips.chart.sh
+        src/collectors/charts.d.plugin/sensors/sensors.chart.sh
         DESTINATION usr/libexec/netdata/charts.d)
 
 # confs
 
 install(FILES
-        collectors/charts.d.plugin/ap/ap.conf
-        collectors/charts.d.plugin/apcupsd/apcupsd.conf
-        collectors/charts.d.plugin/example/example.conf
-        collectors/charts.d.plugin/libreswan/libreswan.conf
-        collectors/charts.d.plugin/opensips/opensips.conf
-        collectors/charts.d.plugin/sensors/sensors.conf
+        src/collectors/charts.d.plugin/ap/ap.conf
+        src/collectors/charts.d.plugin/apcupsd/apcupsd.conf
+        src/collectors/charts.d.plugin/example/example.conf
+        src/collectors/charts.d.plugin/libreswan/libreswan.conf
+        src/collectors/charts.d.plugin/opensips/opensips.conf
+        src/collectors/charts.d.plugin/sensors/sensors.conf
         DESTINATION usr/lib/netdata/conf.d/charts.d)
 
 install(FILES
-        collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
+        src/collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
         src/health/schema.d/health:alert:prototype.json
         DESTINATION usr/lib/netdata/conf.d/schema.d)
 
@@ -2549,27 +2549,27 @@ install(FILES
 
 if(ENABLE_PLUGIN_EBPF)
         install(FILES
-                collectors/ebpf.plugin/ebpf.d.conf
+                src/collectors/ebpf.plugin/ebpf.d.conf
                 DESTINATION usr/lib/netdata/conf.d)
 
         install(FILES
-                collectors/ebpf.plugin/ebpf.d/cachestat.conf
-                collectors/ebpf.plugin/ebpf.d/dcstat.conf
-                collectors/ebpf.plugin/ebpf.d/disk.conf
-                collectors/ebpf.plugin/ebpf.d/ebpf_kernel_reject_list.txt
-                collectors/ebpf.plugin/ebpf.d/fd.conf
-                collectors/ebpf.plugin/ebpf.d/filesystem.conf
-                collectors/ebpf.plugin/ebpf.d/hardirq.conf
-                collectors/ebpf.plugin/ebpf.d/mdflush.conf
-                collectors/ebpf.plugin/ebpf.d/mount.conf
-                collectors/ebpf.plugin/ebpf.d/network.conf
-                collectors/ebpf.plugin/ebpf.d/oomkill.conf
-                collectors/ebpf.plugin/ebpf.d/process.conf
-                collectors/ebpf.plugin/ebpf.d/shm.conf
-                collectors/ebpf.plugin/ebpf.d/softirq.conf
-                collectors/ebpf.plugin/ebpf.d/swap.conf
-                collectors/ebpf.plugin/ebpf.d/sync.conf
-                collectors/ebpf.plugin/ebpf.d/vfs.conf
+                src/collectors/ebpf.plugin/ebpf.d/cachestat.conf
+                src/collectors/ebpf.plugin/ebpf.d/dcstat.conf
+                src/collectors/ebpf.plugin/ebpf.d/disk.conf
+                src/collectors/ebpf.plugin/ebpf.d/ebpf_kernel_reject_list.txt
+                src/collectors/ebpf.plugin/ebpf.d/fd.conf
+                src/collectors/ebpf.plugin/ebpf.d/filesystem.conf
+                src/collectors/ebpf.plugin/ebpf.d/hardirq.conf
+                src/collectors/ebpf.plugin/ebpf.d/mdflush.conf
+                src/collectors/ebpf.plugin/ebpf.d/mount.conf
+                src/collectors/ebpf.plugin/ebpf.d/network.conf
+                src/collectors/ebpf.plugin/ebpf.d/oomkill.conf
+                src/collectors/ebpf.plugin/ebpf.d/process.conf
+                src/collectors/ebpf.plugin/ebpf.d/shm.conf
+                src/collectors/ebpf.plugin/ebpf.d/softirq.conf
+                src/collectors/ebpf.plugin/ebpf.d/swap.conf
+                src/collectors/ebpf.plugin/ebpf.d/sync.conf
+                src/collectors/ebpf.plugin/ebpf.d/vfs.conf
                 DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 endif()
 
@@ -2577,121 +2577,121 @@ endif()
 # python.d files
 #
 
-configure_file(collectors/python.d.plugin/python.d.plugin.in collectors/python.d.plugin/python.d.plugin @ONLY)
-install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/python.d.plugin/python.d.plugin
+configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
-install(DIRECTORY collectors/python.d.plugin/python_modules
+install(DIRECTORY src/collectors/python.d.plugin/python_modules
         DESTINATION usr/libexec/netdata/python.d)
 
-install(FILES collectors/python.d.plugin/python.d.conf
+install(FILES src/collectors/python.d.plugin/python.d.conf
         DESTINATION usr/lib/netdata/conf.d)
 
 # conf files
 
 install(FILES
-        collectors/python.d.plugin/adaptec_raid/adaptec_raid.conf
-        collectors/python.d.plugin/alarms/alarms.conf
-        collectors/python.d.plugin/am2320/am2320.conf
-        collectors/python.d.plugin/anomalies/anomalies.conf
-        collectors/python.d.plugin/beanstalk/beanstalk.conf
-        collectors/python.d.plugin/bind_rndc/bind_rndc.conf
-        collectors/python.d.plugin/boinc/boinc.conf
-        collectors/python.d.plugin/ceph/ceph.conf
-        collectors/python.d.plugin/changefinder/changefinder.conf
-        collectors/python.d.plugin/dovecot/dovecot.conf
-        collectors/python.d.plugin/example/example.conf
-        collectors/python.d.plugin/exim/exim.conf
-        collectors/python.d.plugin/fail2ban/fail2ban.conf
-        collectors/python.d.plugin/gearman/gearman.conf
-        collectors/python.d.plugin/go_expvar/go_expvar.conf
-        collectors/python.d.plugin/haproxy/haproxy.conf
-        collectors/python.d.plugin/hddtemp/hddtemp.conf
-        collectors/python.d.plugin/hpssa/hpssa.conf
-        collectors/python.d.plugin/icecast/icecast.conf
-        collectors/python.d.plugin/ipfs/ipfs.conf
-        collectors/python.d.plugin/litespeed/litespeed.conf
-        collectors/python.d.plugin/megacli/megacli.conf
-        collectors/python.d.plugin/memcached/memcached.conf
-        collectors/python.d.plugin/monit/monit.conf
-        collectors/python.d.plugin/nsd/nsd.conf
-        collectors/python.d.plugin/nvidia_smi/nvidia_smi.conf
-        collectors/python.d.plugin/openldap/openldap.conf
-        collectors/python.d.plugin/oracledb/oracledb.conf
-        collectors/python.d.plugin/pandas/pandas.conf
-        collectors/python.d.plugin/postfix/postfix.conf
-        collectors/python.d.plugin/puppet/puppet.conf
-        collectors/python.d.plugin/rethinkdbs/rethinkdbs.conf
-        collectors/python.d.plugin/retroshare/retroshare.conf
-        collectors/python.d.plugin/riakkv/riakkv.conf
-        collectors/python.d.plugin/samba/samba.conf
-        collectors/python.d.plugin/sensors/sensors.conf
-        collectors/python.d.plugin/smartd_log/smartd_log.conf
-        collectors/python.d.plugin/spigotmc/spigotmc.conf
-        collectors/python.d.plugin/squid/squid.conf
-        collectors/python.d.plugin/tomcat/tomcat.conf
-        collectors/python.d.plugin/tor/tor.conf
-        collectors/python.d.plugin/traefik/traefik.conf
-        collectors/python.d.plugin/uwsgi/uwsgi.conf
-        collectors/python.d.plugin/varnish/varnish.conf
-        collectors/python.d.plugin/w1sensor/w1sensor.conf
-        collectors/python.d.plugin/zscores/zscores.conf
+        src/collectors/python.d.plugin/adaptec_raid/adaptec_raid.conf
+        src/collectors/python.d.plugin/alarms/alarms.conf
+        src/collectors/python.d.plugin/am2320/am2320.conf
+        src/collectors/python.d.plugin/anomalies/anomalies.conf
+        src/collectors/python.d.plugin/beanstalk/beanstalk.conf
+        src/collectors/python.d.plugin/bind_rndc/bind_rndc.conf
+        src/collectors/python.d.plugin/boinc/boinc.conf
+        src/collectors/python.d.plugin/ceph/ceph.conf
+        src/collectors/python.d.plugin/changefinder/changefinder.conf
+        src/collectors/python.d.plugin/dovecot/dovecot.conf
+        src/collectors/python.d.plugin/example/example.conf
+        src/collectors/python.d.plugin/exim/exim.conf
+        src/collectors/python.d.plugin/fail2ban/fail2ban.conf
+        src/collectors/python.d.plugin/gearman/gearman.conf
+        src/collectors/python.d.plugin/go_expvar/go_expvar.conf
+        src/collectors/python.d.plugin/haproxy/haproxy.conf
+        src/collectors/python.d.plugin/hddtemp/hddtemp.conf
+        src/collectors/python.d.plugin/hpssa/hpssa.conf
+        src/collectors/python.d.plugin/icecast/icecast.conf
+        src/collectors/python.d.plugin/ipfs/ipfs.conf
+        src/collectors/python.d.plugin/litespeed/litespeed.conf
+        src/collectors/python.d.plugin/megacli/megacli.conf
+        src/collectors/python.d.plugin/memcached/memcached.conf
+        src/collectors/python.d.plugin/monit/monit.conf
+        src/collectors/python.d.plugin/nsd/nsd.conf
+        src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.conf
+        src/collectors/python.d.plugin/openldap/openldap.conf
+        src/collectors/python.d.plugin/oracledb/oracledb.conf
+        src/collectors/python.d.plugin/pandas/pandas.conf
+        src/collectors/python.d.plugin/postfix/postfix.conf
+        src/collectors/python.d.plugin/puppet/puppet.conf
+        src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.conf
+        src/collectors/python.d.plugin/retroshare/retroshare.conf
+        src/collectors/python.d.plugin/riakkv/riakkv.conf
+        src/collectors/python.d.plugin/samba/samba.conf
+        src/collectors/python.d.plugin/sensors/sensors.conf
+        src/collectors/python.d.plugin/smartd_log/smartd_log.conf
+        src/collectors/python.d.plugin/spigotmc/spigotmc.conf
+        src/collectors/python.d.plugin/squid/squid.conf
+        src/collectors/python.d.plugin/tomcat/tomcat.conf
+        src/collectors/python.d.plugin/tor/tor.conf
+        src/collectors/python.d.plugin/traefik/traefik.conf
+        src/collectors/python.d.plugin/uwsgi/uwsgi.conf
+        src/collectors/python.d.plugin/varnish/varnish.conf
+        src/collectors/python.d.plugin/w1sensor/w1sensor.conf
+        src/collectors/python.d.plugin/zscores/zscores.conf
         DESTINATION usr/lib/netdata/conf.d/python.d)
 
 # scripts
 
 install(FILES
-        collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
-        collectors/python.d.plugin/alarms/alarms.chart.py
-        collectors/python.d.plugin/am2320/am2320.chart.py
-        collectors/python.d.plugin/anomalies/anomalies.chart.py
-        collectors/python.d.plugin/beanstalk/beanstalk.chart.py
-        collectors/python.d.plugin/bind_rndc/bind_rndc.chart.py
-        collectors/python.d.plugin/boinc/boinc.chart.py
-        collectors/python.d.plugin/ceph/ceph.chart.py
-        collectors/python.d.plugin/changefinder/changefinder.chart.py
-        collectors/python.d.plugin/dovecot/dovecot.chart.py
-        collectors/python.d.plugin/example/example.chart.py
-        collectors/python.d.plugin/exim/exim.chart.py
-        collectors/python.d.plugin/fail2ban/fail2ban.chart.py
-        collectors/python.d.plugin/gearman/gearman.chart.py
-        collectors/python.d.plugin/go_expvar/go_expvar.chart.py
-        collectors/python.d.plugin/haproxy/haproxy.chart.py
-        collectors/python.d.plugin/hddtemp/hddtemp.chart.py
-        collectors/python.d.plugin/hpssa/hpssa.chart.py
-        collectors/python.d.plugin/icecast/icecast.chart.py
-        collectors/python.d.plugin/ipfs/ipfs.chart.py
-        collectors/python.d.plugin/litespeed/litespeed.chart.py
-        collectors/python.d.plugin/megacli/megacli.chart.py
-        collectors/python.d.plugin/memcached/memcached.chart.py
-        collectors/python.d.plugin/monit/monit.chart.py
-        collectors/python.d.plugin/nsd/nsd.chart.py
-        collectors/python.d.plugin/nvidia_smi/nvidia_smi.chart.py
-        collectors/python.d.plugin/openldap/openldap.chart.py
-        collectors/python.d.plugin/oracledb/oracledb.chart.py
-        collectors/python.d.plugin/pandas/pandas.chart.py
-        collectors/python.d.plugin/postfix/postfix.chart.py
-        collectors/python.d.plugin/puppet/puppet.chart.py
-        collectors/python.d.plugin/rethinkdbs/rethinkdbs.chart.py
-        collectors/python.d.plugin/retroshare/retroshare.chart.py
-        collectors/python.d.plugin/riakkv/riakkv.chart.py
-        collectors/python.d.plugin/samba/samba.chart.py
-        collectors/python.d.plugin/sensors/sensors.chart.py
-        collectors/python.d.plugin/smartd_log/smartd_log.chart.py
-        collectors/python.d.plugin/spigotmc/spigotmc.chart.py
-        collectors/python.d.plugin/squid/squid.chart.py
-        collectors/python.d.plugin/tomcat/tomcat.chart.py
-        collectors/python.d.plugin/tor/tor.chart.py
-        collectors/python.d.plugin/traefik/traefik.chart.py
-        collectors/python.d.plugin/uwsgi/uwsgi.chart.py
-        collectors/python.d.plugin/varnish/varnish.chart.py
-        collectors/python.d.plugin/w1sensor/w1sensor.chart.py
-        collectors/python.d.plugin/zscores/zscores.chart.py
+        src/collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
+        src/collectors/python.d.plugin/alarms/alarms.chart.py
+        src/collectors/python.d.plugin/am2320/am2320.chart.py
+        src/collectors/python.d.plugin/anomalies/anomalies.chart.py
+        src/collectors/python.d.plugin/beanstalk/beanstalk.chart.py
+        src/collectors/python.d.plugin/bind_rndc/bind_rndc.chart.py
+        src/collectors/python.d.plugin/boinc/boinc.chart.py
+        src/collectors/python.d.plugin/ceph/ceph.chart.py
+        src/collectors/python.d.plugin/changefinder/changefinder.chart.py
+        src/collectors/python.d.plugin/dovecot/dovecot.chart.py
+        src/collectors/python.d.plugin/example/example.chart.py
+        src/collectors/python.d.plugin/exim/exim.chart.py
+        src/collectors/python.d.plugin/fail2ban/fail2ban.chart.py
+        src/collectors/python.d.plugin/gearman/gearman.chart.py
+        src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
+        src/collectors/python.d.plugin/haproxy/haproxy.chart.py
+        src/collectors/python.d.plugin/hddtemp/hddtemp.chart.py
+        src/collectors/python.d.plugin/hpssa/hpssa.chart.py
+        src/collectors/python.d.plugin/icecast/icecast.chart.py
+        src/collectors/python.d.plugin/ipfs/ipfs.chart.py
+        src/collectors/python.d.plugin/litespeed/litespeed.chart.py
+        src/collectors/python.d.plugin/megacli/megacli.chart.py
+        src/collectors/python.d.plugin/memcached/memcached.chart.py
+        src/collectors/python.d.plugin/monit/monit.chart.py
+        src/collectors/python.d.plugin/nsd/nsd.chart.py
+        src/collectors/python.d.plugin/nvidia_smi/nvidia_smi.chart.py
+        src/collectors/python.d.plugin/openldap/openldap.chart.py
+        src/collectors/python.d.plugin/oracledb/oracledb.chart.py
+        src/collectors/python.d.plugin/pandas/pandas.chart.py
+        src/collectors/python.d.plugin/postfix/postfix.chart.py
+        src/collectors/python.d.plugin/puppet/puppet.chart.py
+        src/collectors/python.d.plugin/rethinkdbs/rethinkdbs.chart.py
+        src/collectors/python.d.plugin/retroshare/retroshare.chart.py
+        src/collectors/python.d.plugin/riakkv/riakkv.chart.py
+        src/collectors/python.d.plugin/samba/samba.chart.py
+        src/collectors/python.d.plugin/sensors/sensors.chart.py
+        src/collectors/python.d.plugin/smartd_log/smartd_log.chart.py
+        src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
+        src/collectors/python.d.plugin/squid/squid.chart.py
+        src/collectors/python.d.plugin/tomcat/tomcat.chart.py
+        src/collectors/python.d.plugin/tor/tor.chart.py
+        src/collectors/python.d.plugin/traefik/traefik.chart.py
+        src/collectors/python.d.plugin/uwsgi/uwsgi.chart.py
+        src/collectors/python.d.plugin/varnish/varnish.chart.py
+        src/collectors/python.d.plugin/w1sensor/w1sensor.chart.py
+        src/collectors/python.d.plugin/zscores/zscores.chart.py
         DESTINATION usr/libexec/netdata/python.d)
 
 # FIXME: don't install this unconditionally
-configure_file(collectors/ioping.plugin/ioping.plugin.in collectors/ioping.plugin/ioping.plugin @ONLY)
-install(PROGRAMS ${CMAKE_BINARY_DIR}/collectors/ioping.plugin/ioping.plugin DESTINATION usr/libexec/netdata/plugins.d)
+configure_file(src/collectors/ioping.plugin/ioping.plugin.in src/collectors/ioping.plugin/ioping.plugin @ONLY)
+install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin DESTINATION usr/libexec/netdata/plugins.d)
 
 #
 # logs management

@@ -31,4 +31,4 @@ The following is required to be able to run Functions from Netdata Cloud.
 - [Netdata Functions](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md)
 
 #### Related References documentation
-- [External plugins overview](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md#function)
+- [External plugins overview](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#function)

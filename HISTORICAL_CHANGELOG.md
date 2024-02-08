@@ -133,7 +133,7 @@ netdata (1.6.0) - 2017-03-20
     disk metrics, disabling automatically their alarms too.
 
     For more information check:
-    <https://github.com/netdata/netdata/tree/master/collectors/cgroups.plugin#monitoring-ephemeral-containers>
+    <https://github.com/netdata/netdata/tree/master/src/collectors/cgroups.plugin#monitoring-ephemeral-containers>
 
 -   apps.plugin ported for FreeBSD
 
@@ -148,7 +148,7 @@ netdata (1.6.0) - 2017-03-20
     and web sites!
 
     For more information check:
-    <https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/web_log#web_log>
+    <https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/web_log#web_log>
 
 -   backends
 
@@ -174,7 +174,7 @@ netdata (1.6.0) - 2017-03-20
     It also supports alarms (including the number of sensors in critical state).
 
     For more information, check:
-    <https://github.com/netdata/netdata/tree/master/collectors/freeipmi.plugin>
+    <https://github.com/netdata/netdata/tree/master/src/collectors/freeipmi.plugin>
 
 -   new plugins
 

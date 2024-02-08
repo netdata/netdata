@@ -15,7 +15,7 @@ web servers, databases, message brokers, email servers, search platforms, and mu
 pre-installed with every Netdata Agent and usually require zero configuration. Netdata also collects and visualizes
 resource utilization per application on Linux systems using `apps.plugin`.
 
-[**apps.plugin**](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) looks at the Linux process tree every second, much like `top` or
+[**apps.plugin**](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/README.md) looks at the Linux process tree every second, much like `top` or
 `ps fax`, and collects resource utilization information on every running process. By reading the process tree, Netdata
 shows CPU, disk, networking, processes, and eBPF for every application or Linux user. Unlike `top` or `ps fax`, Netdata
 adds a layer of meaningful visualization on top of the process tree metrics, such as grouping applications into useful
@@ -45,7 +45,7 @@ Our most popular application collectors:
 - [PHP-FPM](https://github.com/netdata/go.d.plugin/blob/master/modules/phpfpm/README.md): Collect application summary
   and processes health metrics by scraping the status page (`/status?full`).
 
-Our [supported collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md#service-and-application-collectors) shows all Netdata's
+Our [supported collectors list](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md#service-and-application-collectors) shows all Netdata's
 application metrics collectors, including those for containers/k8s clusters.
 
 ## Collect metrics from applications running on Windows
@@ -54,7 +54,7 @@ Netdata is fully capable of collecting and visualizing metrics from applications
 caveat is that you must [install Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) on a separate system or a compatible VM because there
 is no native Windows version of the Netdata Agent.
 
-Once you have Netdata running on that separate system, you can follow the [collectors configuration reference](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) documentation to tell the collector to look for exposed metrics on the Windows system's IP
+Once you have Netdata running on that separate system, you can follow the [collectors configuration reference](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md) documentation to tell the collector to look for exposed metrics on the Windows system's IP
 address or hostname, plus the applicable port.
 
 For example, you have a MySQL database with a root password of `my-secret-pw` running on a Windows system with the IP
@@ -68,11 +68,11 @@ jobs:
 ```
 
 This same logic applies to any application in our [supported collectors
-list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md#service-and-application-collectors) that can run on Windows.
+list](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md#service-and-application-collectors) that can run on Windows.
 
 ## What's next?
 
-If you haven't yet seen the [supported collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) give it a once-over for any
+If you haven't yet seen the [supported collectors list](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md) give it a once-over for any
 additional applications you may want to monitor using Netdata's native collectors, or the [generic Prometheus
 collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md).
 

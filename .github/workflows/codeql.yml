@@ -57,7 +57,7 @@ jobs:
         id: python
         run: |
           if [ "${{ steps.always.outputs.run }}" = "false" ]; then
-            if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq 'collectors/python.d.plugin/.*\.py' ; then
+            if git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq 'src/collectors/python.d.plugin/.*\.py' ; then
               echo "run=true" >> "${GITHUB_OUTPUT}"
               echo '::notice::Python code has changed, need to run CodeQL.'
             else

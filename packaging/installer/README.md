@@ -47,8 +47,8 @@ metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metric
 #### Data collection
 
 If Netdata didn't autodetect all the hardware, containers, services, or applications running on your node, you should
-learn more about [how data collectors work](https://github.com/netdata/netdata/blob/master/collectors/README.md). If there's a [supported
-collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md)
+learn more about [how data collectors work](https://github.com/netdata/netdata/blob/master/src/collectors/README.md). If there's a [supported
+collector](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md)
 or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
 
 #### Alerts & notifications

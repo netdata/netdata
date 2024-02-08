@@ -4,8 +4,8 @@ Netdata's health watchdog is highly configurable, with support for dynamic thres
 more. You can tweak any of the existing alerts based on your infrastructure's topology or specific monitoring needs, or
 create new entities.
 
-You can use health alerts in conjunction with any of Netdata's [collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) (see
-the [supported collector list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md)) to monitor the health of your systems, containers, and
+You can use health alerts in conjunction with any of Netdata's [collectors](https://github.com/netdata/netdata/blob/master/src/collectors/README.md) (see
+the [supported collector list](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md)) to monitor the health of your systems, containers, and
 applications in real time.
 
 While you can see active alerts both on the local dashboard and Netdata Cloud, all health alerts are configured _per

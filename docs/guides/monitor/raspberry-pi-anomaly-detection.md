@@ -6,7 +6,7 @@ We love IoT and edge at Netdata, we also love machine learning. Even better if w
 of monitoring increasingly complex systems.
 
 We recently explored what might be involved in enabling our Python-based [anomalies
-collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md) on a Raspberry Pi. To our delight, it's actually quite
+collector](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/anomalies/README.md) on a Raspberry Pi. To our delight, it's actually quite
 straightforward! 
 
 Read on to learn all the steps and enable unsupervised anomaly detection on your on Raspberry Pi(s).
@@ -75,7 +75,7 @@ centralized cloud somewhere) is the resource utilization impact of running a mon
 
 With the default configuration, the anomalies collector uses about 6.5% of CPU at each run. During the retraining step,
 CPU utilization jumps to between 20-30% for a few seconds, but you can [configure
-retraining](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md#configuration) to happen less often if you wish.
+retraining](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/anomalies/README.md#configuration) to happen less often if you wish.
 
 ![CPU utilization of anomaly detection on the Raspberry
 Pi](https://user-images.githubusercontent.com/1153921/110149718-9d749c00-7d9b-11eb-9af8-46e2032cd1d0.png)

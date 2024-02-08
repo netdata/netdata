@@ -64,7 +64,7 @@ replacing `NODE` with the hostname or IP address of your system.
 There's nothing you need to do to enable [system monitoring](https://github.com/netdata/netdata/blob/master/docs/collect/system-metrics.md) and Linux monitoring with
 the Netdata Agent, which autodetects metrics from CPUs, memory, disks, networking devices, and Linux processes like
 systemd without any configuration. If you're using containers, Netdata automatically collects resource utilization
-metrics from each using the [cgroups data collector](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md).
+metrics from each using the [cgroups data collector](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/README.md).
 
 ## Enable Apache monitoring
 
@@ -110,7 +110,7 @@ system](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop
 ## Enable PHP monitoring
 
 Unlike Apache or MySQL, PHP isn't a service that you can monitor directly, unless you instrument a PHP-based application
-with [StatsD](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
+with [StatsD](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/README.md).
 
 However, if you use [PHP-FPM](https://php-fpm.org/) in your LAMP stack, you can monitor that process with our [PHP-FPM
 data collector](https://github.com/netdata/go.d.plugin/blob/master/modules/phpfpm/README.md).
