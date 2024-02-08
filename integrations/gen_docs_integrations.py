@@ -17,7 +17,8 @@ def cleanup():
             if "integrations" in str(element):
                 shutil.rmtree(element)
     else:
-        for element in Path("collectors").glob('**/*/'):
+        for element in Path("src/collectors").glob('**/*/'):
+            # print(element)
             if "integrations" in str(element):
                 shutil.rmtree(element)
 

@@ -28,9 +28,9 @@ DISTROS_FILE = REPO_PATH / '.github' / 'data' / 'distros.yml'
 METADATA_PATTERN = '*/metadata.yaml'
 
 COLLECTOR_SOURCES = [
-    (AGENT_REPO, REPO_PATH / 'collectors', True),
-    (AGENT_REPO, REPO_PATH / 'collectors' / 'charts.d.plugin', True),
-    (AGENT_REPO, REPO_PATH / 'collectors' / 'python.d.plugin', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
     (GO_REPO, GO_REPO_PATH / 'modules', True),
 ]
 
