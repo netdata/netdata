@@ -60,7 +60,13 @@ project(netdata
 find_package(PkgConfig REQUIRED)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
+
+option(USE_CXX_11 "use C++11 instead of C++14" False)
+
+if(USE_CXX_11)
+    set(CMAKE_CXX_STANDARD 11)
+endif()
 
 set(CMAKE_C_STANDARD_REQUIRED On)
 set(CMAKE_CXX_STANDARD_REQUIRED On)

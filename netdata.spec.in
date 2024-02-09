@@ -352,6 +352,11 @@ make download
 # Conf step
 %cmake -G Ninja \
 	-DCMAKE_INSTALL_PREFIX=/ \
+	%if 0%{?centos_ver:1}
+	%if %{centos_ver} < 8
+	-DUSE_CXX_11=On \
+	%endif
+	%endif
 	%if %{_have_cups}
 	-DENABLE_PLUGIN_CUPS=On \
 	%else

@@ -209,6 +209,7 @@ USAGE: ${PROGRAM} [options]
   --disable-ebpf             Disable eBPF Kernel plugin. Default: enabled.
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
+  --force-legacy-cxx         Force usage of an older C++ standard to allow building on older systems. This will usually be autodetected.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
   --disable-https            Explicitly disable TLS support.
@@ -257,6 +258,7 @@ ENABLE_H2O=1
 ENABLE_CLOUD=1
 ENABLE_LOGS_MANAGEMENT=1
 ENABLE_LOGS_MANAGEMENT_TESTS=0
+FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 
 RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
@@ -273,6 +275,7 @@ while [ -n "${1}" ]; do
     "--auto-update-type") ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
+    "--force-legacy-cxx") FORCE_LEGACY_CXX=1 ;;
     "--enable-plugin-freeipmi") ENABLE_FREEIPMI=1 ;;
     "--disable-plugin-freeipmi") ENABLE_FREEIPMI=0 ;;
     "--disable-https")
