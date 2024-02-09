@@ -6,10 +6,18 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#16974](https://github.com/netdata/netdata/pull/16974) ([netdatabot](https://github.com/netdatabot))
+- change edac ecc errors from incremental to absolute [\#16970](https://github.com/netdata/netdata/pull/16970) ([ilyam8](https://github.com/ilyam8))
+- update go.d.plugin version to v0.58.1 [\#16968](https://github.com/netdata/netdata/pull/16968) ([ilyam8](https://github.com/ilyam8))
+- fix move collectors to src/ leftovers [\#16967](https://github.com/netdata/netdata/pull/16967) ([ilyam8](https://github.com/ilyam8))
+- necessary changes for integrations to work after moving collectors/ i… [\#16966](https://github.com/netdata/netdata/pull/16966) ([Ancairon](https://github.com/Ancairon))
+- Move collectors/ under src/ [\#16965](https://github.com/netdata/netdata/pull/16965) ([vkalintiris](https://github.com/vkalintiris))
 - network-viewer: aggregated view improvements [\#16960](https://github.com/netdata/netdata/pull/16960) ([ktsaou](https://github.com/ktsaou))
+- Improve agent shutdown [\#16959](https://github.com/netdata/netdata/pull/16959) ([stelfrag](https://github.com/stelfrag))
 - DYNCFG: support test on new jobs [\#16958](https://github.com/netdata/netdata/pull/16958) ([ktsaou](https://github.com/ktsaou))
 - Updated txt - Prometheus section README.md [\#16957](https://github.com/netdata/netdata/pull/16957) ([Aliki92](https://github.com/Aliki92))
 - Fix path in health integrations [\#16956](https://github.com/netdata/netdata/pull/16956) ([Ancairon](https://github.com/Ancairon))
+- Regenerate integrations.js [\#16955](https://github.com/netdata/netdata/pull/16955) ([netdatabot](https://github.com/netdatabot))
 - Move health/ under src/ [\#16954](https://github.com/netdata/netdata/pull/16954) ([vkalintiris](https://github.com/vkalintiris))
 - fix linking of a markdown file [\#16952](https://github.com/netdata/netdata/pull/16952) ([tkatsoulas](https://github.com/tkatsoulas))
 - Do not declare struct meant for internal usage [\#16951](https://github.com/netdata/netdata/pull/16951) ([vkalintiris](https://github.com/vkalintiris))
@@ -393,16 +401,6 @@
 - Regenerate integrations.js [\#16384](https://github.com/netdata/netdata/pull/16384) ([netdatabot](https://github.com/netdatabot))
 - use pre-configured message\_ids to identify common logs [\#16383](https://github.com/netdata/netdata/pull/16383) ([ktsaou](https://github.com/ktsaou))
 - Handle ephemeral hosts [\#16381](https://github.com/netdata/netdata/pull/16381) ([stelfrag](https://github.com/stelfrag))
-- docs: remove 'families' from health reference [\#16380](https://github.com/netdata/netdata/pull/16380) ([ilyam8](https://github.com/ilyam8))
-- fix cloud aws sns notification meta [\#16379](https://github.com/netdata/netdata/pull/16379) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#16378](https://github.com/netdata/netdata/pull/16378) ([netdatabot](https://github.com/netdatabot))
-- update bundled UI to v6.59.0 [\#16377](https://github.com/netdata/netdata/pull/16377) ([ilyam8](https://github.com/ilyam8))
-- health guides: remove guides for alerts that don't exist in the repo [\#16375](https://github.com/netdata/netdata/pull/16375) ([ilyam8](https://github.com/ilyam8))
-- add pids current to cgroups meta [\#16374](https://github.com/netdata/netdata/pull/16374) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#16373](https://github.com/netdata/netdata/pull/16373) ([netdatabot](https://github.com/netdatabot))
-- docs: remove unused cloud notification methods mds [\#16372](https://github.com/netdata/netdata/pull/16372) ([ilyam8](https://github.com/ilyam8))
-- Add configuration documentation for Cloud AWS SNS [\#16371](https://github.com/netdata/netdata/pull/16371) ([car12o](https://github.com/car12o))
-- pacakging: add zstd dev to install-required-packages [\#16370](https://github.com/netdata/netdata/pull/16370) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
