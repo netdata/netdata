@@ -31,6 +31,7 @@ ebpf.plugin
 src/collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
 src/collectors/ebpf.plugin/includes/
+src/libnetdata/ebpf/includes/
 
 # protoc generated files
 *.pb.cc
