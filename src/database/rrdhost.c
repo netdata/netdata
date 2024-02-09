@@ -1107,7 +1107,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
                             rrdhost_function_progress);
 
     if (likely(system_info)) {
-        migrate_localhost(&localhost->host_uuid);
+        detect_machine_guid_change(&localhost->host_uuid);
         sql_aclk_sync_init();
         web_client_api_v1_management_init();
     }
