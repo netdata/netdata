@@ -47,8 +47,8 @@ jobs:
             netdata-installer.sh
             .github/workflows/docker.yml
             .github/scripts/docker-test.sh
-            packaging/docker/**
-            packaging/installer/**
+            packaging/docker/
+            packaging/installer/
             packaging/runtime-check.sh
             packaging/*.version
             packaging/*.checksums
@@ -59,6 +59,7 @@ jobs:
           files_ignore: |
             netdata.spec.in
             **.md
+          negation_patterns_first: true
       - name: Check Run
         id: check-run
         run: |

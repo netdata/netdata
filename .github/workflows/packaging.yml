@@ -53,7 +53,7 @@ jobs:
             **.patch
             **.cmake
             netdata.spec.in
-            contrib/debian/**
+            contrib/debian/
             CMakeLists.txt
             .github/data/distros.yml
             .github/workflows/packaging.yml
@@ -68,6 +68,7 @@ jobs:
             web/server/h2o/libh2o/
           files_ignore: |
             **.md
+          negation_patterns_first: true
       - name: Check Run
         id: check-run
         run: |

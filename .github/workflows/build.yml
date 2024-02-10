@@ -53,8 +53,8 @@ jobs:
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-build.py
             .github/scripts/run-updater-check.sh
-            packaging/makeself/**
-            packaging/installer/**
+            packaging/makeself/
+            packaging/installer/
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
@@ -65,6 +65,7 @@ jobs:
           files_ignore: |
             netdata.spec.in
             **.md
+          negation_patterns_first: true
       - name: Check Run
         id: check-run
         run: |
