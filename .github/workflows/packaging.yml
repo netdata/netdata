@@ -40,18 +40,18 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - name: Check files
-        id: file-check
+        id: check-files
         uses: tj-actions/changed-files@v42
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
-            **.c
-            **.cc
-            **.h
-            **.hh
-            **.in
-            **.patch
-            **.cmake
+            **/*.c
+            **/*.cc
+            **/*.h
+            **/*.hh
+            **/*.in
+            **/*.patch
+            **/*.cmake
             netdata.spec.in
             contrib/debian/
             CMakeLists.txt
@@ -67,12 +67,18 @@ jobs:
             src/fluent-bit/
             web/server/h2o/libh2o/
           files_ignore: |
-            **.md
-          negation_patterns_first: true
+            **/*.md
+      - name: List all modified files in pattern
+        env:
+          ALL_MODIFIED_FILES: ${{ steps.check-files.outputs.all_modified_files }}
+        run: |
+          for file in ${ALL_MODIFIED_FILES}; do
+            echo "$file was modified"
+          done
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.file-check.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"

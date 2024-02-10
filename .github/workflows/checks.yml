@@ -29,13 +29,13 @@ jobs:
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
-            **.c
-            **.cc
-            **.h
-            **.hh
-            **.in
-            **.patch
-            **.cmake
+            **/*.c
+            **/*.cc
+            **/*.h
+            **/*.hh
+            **/*.in
+            **/*.patch
+            **/*.cmake
             CMakeLists.txt
             .gitignore
             .github/data/distros.yml
@@ -52,8 +52,14 @@ jobs:
             web/server/h2o/libh2o/
           files_ignore: |
             netdata.spec.in
-            **.md
-          negation_patterns_first: true
+            **/*.md
+      - name: List all modified files in pattern
+        env:
+          ALL_MODIFIED_FILES: ${{ steps.check-files.outputs.all_modified_files }}
+        run: |
+          for file in ${ALL_MODIFIED_FILES}; do
+            echo "$file was modified"
+          done
       - name: Check Run
         id: check-run
         run: |
