@@ -65,6 +65,7 @@ jobs:
           files_ignore: |
             netdata.spec.in
             **.md
+          negation_patterns_first: true
       - name: Check Run
         id: check-run
         run: |
