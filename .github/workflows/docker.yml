@@ -61,7 +61,7 @@ jobs:
             **/*.md
       - name: List all modified files in pattern
         env:
-          ALL_MODIFIED_FILES: ${{ steps.check-files.outputs.any_modified }}
+          ALL_MODIFIED_FILES: ${{ steps.check-files.outputs.all_modified_files }}
         run: |
           for file in ${ALL_MODIFIED_FILES}; do
             echo "$file was modified"
