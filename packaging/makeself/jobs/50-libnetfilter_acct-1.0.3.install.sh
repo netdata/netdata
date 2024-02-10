@@ -7,7 +7,7 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 # Source of truth for all the packages we bundle in static builds
-. "$(dirname "${0}")/../bundled-packages" || exit 1
+. "$(dirname "${0}")/../bundled-packages.version" || exit 1
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building libnetfilter_acct" || true
