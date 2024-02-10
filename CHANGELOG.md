@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Regenerate integrations.js [\#16974](https://github.com/netdata/netdata/pull/16974) ([netdatabot](https://github.com/netdatabot))
+- Use C++14 by default when building on systems that support it. [\#16972](https://github.com/netdata/netdata/pull/16972) ([Ferroin](https://github.com/Ferroin))
 - change edac ecc errors from incremental to absolute [\#16970](https://github.com/netdata/netdata/pull/16970) ([ilyam8](https://github.com/ilyam8))
 - update go.d.plugin version to v0.58.1 [\#16968](https://github.com/netdata/netdata/pull/16968) ([ilyam8](https://github.com/ilyam8))
 - fix move collectors to src/ leftovers [\#16967](https://github.com/netdata/netdata/pull/16967) ([ilyam8](https://github.com/ilyam8))
@@ -399,8 +400,6 @@
 - Regenerate integrations.js [\#16386](https://github.com/netdata/netdata/pull/16386) ([netdatabot](https://github.com/netdatabot))
 - skip spaces when reading cpuset [\#16385](https://github.com/netdata/netdata/pull/16385) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16384](https://github.com/netdata/netdata/pull/16384) ([netdatabot](https://github.com/netdatabot))
-- use pre-configured message\_ids to identify common logs [\#16383](https://github.com/netdata/netdata/pull/16383) ([ktsaou](https://github.com/ktsaou))
-- Handle ephemeral hosts [\#16381](https://github.com/netdata/netdata/pull/16381) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
