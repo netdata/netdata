@@ -65,6 +65,13 @@ jobs:
           files_ignore: |
             netdata.spec.in
             **/*.md
+      - name: List all changed files in pattern
+        env:
+          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
+        run: |
+          for file in ${ALL_CHANGED_FILES}; do
+            echo "$file was changed"
+          done
       - name: Check Run
         id: check-run
         run: |
