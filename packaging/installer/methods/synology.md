@@ -16,6 +16,7 @@ learn_rel_path: "Installation/Install on specific environments"
 > [submitting a PR](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/synology.md) 
 > with your recommended improvements or changes. Thank you!
 
+Snap
 
 The good news is that our 
 [one-line installation script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md) 
