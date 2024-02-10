@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - name: Check files
-        id: file-check
+        id: check-files
         uses: tj-actions/changed-files@v42
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
@@ -70,15 +70,15 @@ jobs:
             **/*.md
       - name: List all changed files in pattern
         env:
-          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
+          ALL_MODIFIED_FILES: ${{ steps.check-files.outputs.all_modified_files }}
         run: |
-          for file in ${ALL_CHANGED_FILES}; do
-            echo "$file was changed"
+          for file in ${ALL_MODIFIED_FILES}; do
+            echo "$file was modified"
           done
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.file-check.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
