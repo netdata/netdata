@@ -53,7 +53,7 @@ jobs:
           files_ignore: |
             netdata.spec.in
             **/*.md
-      - name: List all changed files in pattern
+      - name: List all modified files in pattern
         env:
           ALL_MODIFIED_FILES: ${{ steps.check-files.outputs.all_modified_files }}
         run: |
