@@ -64,8 +64,7 @@ jobs:
             web/server/h2o/libh2o/
           files_ignore: |
             netdata.spec.in
-            **.md
-          negation_patterns_first: true
+            **/*.md
       - name: Check Run
         id: check-run
         run: |
