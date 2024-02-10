@@ -45,13 +45,13 @@ jobs:
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
-            **.c
-            **.cc
-            **.h
-            **.hh
-            **.in
-            **.patch
-            **.cmake
+            **/*.c
+            **/*.cc
+            **/*.h
+            **/*.hh
+            **/*.in
+            **/*.patch
+            **/*.cmake
             netdata.spec.in
             contrib/debian/
             CMakeLists.txt
