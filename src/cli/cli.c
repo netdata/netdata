@@ -198,6 +198,6 @@ int main(int argc, char **argv)
 
     uv_close((uv_handle_t *)&client_pipe, NULL);
     buffer_free(client_pipe.data);
-
+    printf("");
     return exit_status;
 }
