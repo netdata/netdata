@@ -4019,162 +4019,161 @@
           },
           "alarms": {
             "type": "object",
-            "properties": {
-              "chart-name.alarm-name": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "name": {
-                    "type": "string",
-                    "description": "Full alarm name."
-                  },
-                  "chart": {
-                    "type": "string"
-                  },
-                  "family": {
-                    "type": "string"
-                  },
-                  "active": {
-                    "type": "boolean",
-                    "description": "Will be false only if the alarm is disabled in the configuration."
-                  },
-                  "disabled": {
-                    "type": "boolean",
-                    "description": "Whether the health check for this alarm has been disabled via a health command API DISABLE command."
-                  },
-                  "silenced": {
-                    "type": "boolean",
-                    "description": "Whether notifications for this alarm have been silenced via a health command API SILENCE command."
-                  },
-                  "exec": {
-                    "type": "string"
-                  },
-                  "recipient": {
-                    "type": "string"
-                  },
-                  "source": {
-                    "type": "string"
-                  },
-                  "units": {
-                    "type": "string"
-                  },
-                  "info": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "last_status_change": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "last_updated": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "next_update": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "update_every": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "delay_up_duration": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "delay_down_duration": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "delay_max_duration": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "delay_multiplier": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "delay": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "delay_up_to_timestamp": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "value_string": {
-                    "type": "string"
-                  },
-                  "no_clear_notification": {
-                    "type": "boolean"
-                  },
-                  "lookup_dimensions": {
-                    "type": "string"
-                  },
-                  "db_after": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "db_before": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "lookup_method": {
-                    "type": "string"
-                  },
-                  "lookup_after": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "lookup_before": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "lookup_options": {
-                    "type": "string"
-                  },
-                  "calc": {
-                    "type": "string"
-                  },
-                  "calc_parsed": {
-                    "type": "string"
-                  },
-                  "warn": {
-                    "type": "string"
-                  },
-                  "warn_parsed": {
-                    "type": "string"
-                  },
-                  "crit": {
-                    "type": "string"
-                  },
-                  "crit_parsed": {
-                    "type": "string"
-                  },
-                  "warn_repeat_every": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "crit_repeat_every": {
-                    "type": "integer",
-                    "format": "int32"
-                  },
-                  "green": {
-                    "type": "string",
-                    "format": "nullable"
-                  },
-                  "red": {
-                    "type": "string",
-                    "format": "nullable"
-                  },
-                  "value": {
-                    "type": "number"
-                  }
+            "description": "The keys in this dictionary are made from `chart` and `name` parameters of the associated data, separated by a dot.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Full alarm name."
+                },
+                "chart": {
+                  "type": "string"
+                },
+                "family": {
+                  "type": "string"
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Will be false only if the alarm is disabled in the configuration."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Whether the health check for this alarm has been disabled via a health command API DISABLE command."
+                },
+                "silenced": {
+                  "type": "boolean",
+                  "description": "Whether notifications for this alarm have been silenced via a health command API SILENCE command."
+                },
+                "exec": {
+                  "type": "string"
+                },
+                "recipient": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "string"
+                },
+                "info": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "last_status_change": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "last_updated": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "next_update": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "update_every": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "delay_up_duration": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "delay_down_duration": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "delay_max_duration": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "delay_multiplier": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "delay": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "delay_up_to_timestamp": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "value_string": {
+                  "type": "string"
+                },
+                "no_clear_notification": {
+                  "type": "boolean"
+                },
+                "lookup_dimensions": {
+                  "type": "string"
+                },
+                "db_after": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "db_before": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "lookup_method": {
+                  "type": "string"
+                },
+                "lookup_after": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "lookup_before": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "lookup_options": {
+                  "type": "string"
+                },
+                "calc": {
+                  "type": "string"
+                },
+                "calc_parsed": {
+                  "type": "string"
+                },
+                "warn": {
+                  "type": "string"
+                },
+                "warn_parsed": {
+                  "type": "string"
+                },
+                "crit": {
+                  "type": "string"
+                },
+                "crit_parsed": {
+                  "type": "string"
+                },
+                "warn_repeat_every": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "crit_repeat_every": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "green": {
+                  "type": "string",
+                  "format": "nullable"
+                },
+                "red": {
+                  "type": "string",
+                  "format": "nullable"
+                },
+                "value": {
+                  "type": "number"
                 }
               }
             }
