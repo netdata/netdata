@@ -51,9 +51,7 @@
     "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES "                       \
     "(@uuid, @name, @value, UNIXEPOCH())"
 
-#define MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID                                                                          \
-    "UPDATE chart SET host_id = @host_id WHERE host_id in (SELECT host_id FROM host where host_id <> @host_id and hops = 0)"
-#define DELETE_NON_EXISTING_LOCALHOST "DELETE FROM host WHERE hops = 0 AND host_id <> @host_id"
+#define CONVERT_EXISTING_LOCALHOST "UPDATE host SET hops = 1 WHERE hops = 0 AND host_id <> @host_id"
 #define DELETE_MISSING_NODE_INSTANCES "DELETE FROM node_instance WHERE host_id NOT IN (SELECT host_id FROM host)"
 
 #define METADATA_MAINTENANCE_FIRST_CHECK (1800)     // Maintenance first run after agent startup in seconds
@@ -231,14 +229,12 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t
     return rc;
 }
 
-// Migrate all hosts with hops zero to this host_uuid
-void migrate_localhost(uuid_t *host_uuid)
+// If the machine guid has changed, then existing one with hops 0 will be marked as hops 1 (child)
+void detect_machine_guid_change(uuid_t *host_uuid)
 {
     int rc;
 
-    rc = exec_statement_with_uuid(MIGRATE_LOCALHOST_TO_NEW_MACHINE_GUID, host_uuid);
-    if (!rc)
-        rc = exec_statement_with_uuid(DELETE_NON_EXISTING_LOCALHOST, host_uuid);
+    rc = exec_statement_with_uuid(CONVERT_EXISTING_LOCALHOST, host_uuid);
     if (!rc) {
         if (unlikely(db_execute(db_meta, DELETE_MISSING_NODE_INSTANCES)))
             error_report("Failed to remove deleted hosts from node instances");
