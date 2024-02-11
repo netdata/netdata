@@ -27,8 +27,8 @@ fi
 
 cd "${NETDATA_MAKESELF_PATH}/tmp/curl" || exit 1
 
-export CFLAGS="-I/openssl-static/include -pipe"
-export LDFLAGS="-static -L/openssl-static/lib64"
+export CFLAGS="-pipe"
+export LDFLAGS="-static -L/openssl-static/lib64 -L/usr/lib -lidn2 -L/usr/lib -lpsl -L/usr/lib -lunistring"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig"
 
@@ -55,6 +55,7 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
         --enable-ipv6 \
         --enable-cookies \
         --with-ca-fallback \
+        --with-libidn2 \
         --with-openssl \
         --disable-dependency-tracking
 
