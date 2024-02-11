@@ -260,6 +260,7 @@ typedef struct storage_collect_handle {
 struct rrddim_tier {
     STORAGE_POINT virtual_point;
     STORAGE_ENGINE_BACKEND seb;
+    SPINLOCK spinlock;
     uint32_t tier_grouping;
     time_t next_point_end_time_s;
     STORAGE_METRIC_HANDLE *smh;                     // the metric handle inside the database

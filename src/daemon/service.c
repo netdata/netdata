@@ -36,20 +36,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
 
     if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         /* only a collector can mark a chart as obsolete, so we must remove the reference */
-
-        size_t tiers_available = 0, tiers_said_no_retention = 0;
-        for(size_t tier = 0; tier < storage_tiers ;tier++) {
-            if(rd->tiers[tier].sch) {
-                tiers_available++;
-
-                if(storage_engine_store_finalize(rd->tiers[tier].sch))
-                    tiers_said_no_retention++;
-
-                rd->tiers[tier].sch = NULL;
-            }
-        }
-
-        if (tiers_available == tiers_said_no_retention && tiers_said_no_retention) {
+        if (!rrddim_finalize_collection_and_check_retention(rd)) {
             /* This metric has no data and no references */
             metaqueue_delete_dimension_uuid(&rd->metric_uuid);
         }
