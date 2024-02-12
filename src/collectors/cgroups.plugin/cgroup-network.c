@@ -7,7 +7,6 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE             /* See feature_test_macros(7) */
 #endif
-#include <sched.h>
 #endif
 
 char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
