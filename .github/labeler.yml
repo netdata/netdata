@@ -265,8 +265,6 @@ area/tests:
               - tests/**
               - src/daemon/unit_test*
               - coverity-scan.sh
-              - cppcheck.sh
-              - netdata.cppcheck
 
 area/web:
   - any:
