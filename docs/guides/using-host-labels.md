@@ -140,7 +140,7 @@ child system. It's a vastly simplified way of accessing critical information abo
 > ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
 > kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming
 > documentation](https://github.com/netdata/netdata/blob/master/src/streaming/README.md#securing-streaming-communications) for details. You may also want to use
-> [access lists](https://github.com/netdata/netdata/blob/master/web/server/README.md#access-lists) or [expose the API only to LAN/localhost
+> [access lists](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#access-lists) or [expose the API only to LAN/localhost
 > connections](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md#expose-netdata-only-in-a-private-lan).
 
 You can also use `_is_parent`, `_is_child`, and any other host labels in both health entities and metrics

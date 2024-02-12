@@ -272,7 +272,7 @@ area/web:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - web/**
+              - src/web/**
 
 area/logs-management:
   - any:

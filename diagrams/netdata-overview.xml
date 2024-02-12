@@ -189,7 +189,7 @@
             <mxGeometry x="650" y="607" width="211" height="70" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;HTTP API&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/web/api" id="76">
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;HTTP API&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/src/web/api" id="76">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" parent="1" vertex="1">
             <mxGeometry x="74" y="557" width="800" height="40" as="geometry" />
           </mxCell>
@@ -489,7 +489,7 @@
         <mxCell id="182" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="357" y="533" width="70" height="30" as="geometry" />
         </mxCell>
-        <UserObject label="SVG badges from metrics" link="https://github.com/netdata/netdata/tree/master/web/api/badges" id="183">
+        <UserObject label="SVG badges from metrics" link="https://github.com/netdata/netdata/tree/master/src/web/api/badges" id="183">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528965/8993b082-43bf-11e7-8d5b-3eea117bbd55.png;fontSize=14;spacingTop=-3;" parent="1" vertex="1">
             <mxGeometry x="469" y="485" width="161" height="25" as="geometry" />
           </mxCell>
@@ -497,7 +497,7 @@
         <mxCell id="184" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="512" y="534" width="70" height="30" as="geometry" />
         </mxCell>
-        <UserObject label="use metrics&#xa;in your scripts" link="https://github.com/netdata/netdata/tree/master/web/api/exporters/shell" id="187">
+        <UserObject label="use metrics&#xa;in your scripts" link="https://github.com/netdata/netdata/tree/master/src/web/api/exporters/shell" id="187">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528672/84d2eda8-43b8-11e7-8385-6ad78be4d7cc.png;fontSize=14;spacing=2;spacingTop=-14;" parent="1" vertex="1">
             <mxGeometry x="352" y="438" width="77" height="66" as="geometry" />
           </mxCell>

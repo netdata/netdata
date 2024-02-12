@@ -147,7 +147,7 @@ followed by a similar spike from the Apache benchmark.
 > To see other charts, replace `apps.file_open` with the context of the chart you want to see data for.
 >
 > To see all the API options, visit our [Swagger
-> documentation](https://editor.swagger.io/?url=https://raw.githubusercontent.com/netdata/netdata/master/web/api/netdata-swagger.yaml)
+> documentation](https://editor.swagger.io/?url=https://raw.githubusercontent.com/netdata/netdata/master/src/web/api/netdata-swagger.yaml)
 > and look under the **/data** section.
 
 ## Troubleshoot and debug applications with eBPF

@@ -725,85 +725,85 @@ if(ENABLE_PLUGIN_EBPF)
 endif()
 
 set(LIBH2O_FILES
-        web/server/h2o/libh2o/deps/cloexec/cloexec.c
-        web/server/h2o/libh2o/deps/libgkc/gkc.c
-        web/server/h2o/libh2o/deps/libyrmcds/close.c
-        web/server/h2o/libh2o/deps/libyrmcds/connect.c
-        web/server/h2o/libh2o/deps/libyrmcds/recv.c
-        web/server/h2o/libh2o/deps/libyrmcds/send.c
-        web/server/h2o/libh2o/deps/libyrmcds/send_text.c
-        web/server/h2o/libh2o/deps/libyrmcds/socket.c
-        web/server/h2o/libh2o/deps/libyrmcds/strerror.c
-        web/server/h2o/libh2o/deps/libyrmcds/text_mode.c
-        web/server/h2o/libh2o/deps/picohttpparser/picohttpparser.c
-        web/server/h2o/libh2o/lib/common/cache.c
-        web/server/h2o/libh2o/lib/common/file.c
-        web/server/h2o/libh2o/lib/common/filecache.c
-        web/server/h2o/libh2o/lib/common/hostinfo.c
-        web/server/h2o/libh2o/lib/common/http1client.c
-        web/server/h2o/libh2o/lib/common/memcached.c
-        web/server/h2o/libh2o/lib/common/memory.c
-        web/server/h2o/libh2o/lib/common/multithread.c
-        web/server/h2o/libh2o/lib/common/serverutil.c
-        web/server/h2o/libh2o/lib/common/socket.c
-        web/server/h2o/libh2o/lib/common/socketpool.c
-        web/server/h2o/libh2o/lib/common/string.c
-        web/server/h2o/libh2o/lib/common/time.c
-        web/server/h2o/libh2o/lib/common/timeout.c
-        web/server/h2o/libh2o/lib/common/url.c
-        web/server/h2o/libh2o/lib/core/config.c
-        web/server/h2o/libh2o/lib/core/configurator.c
-        web/server/h2o/libh2o/lib/core/context.c
-        web/server/h2o/libh2o/lib/core/headers.c
-        web/server/h2o/libh2o/lib/core/logconf.c
-        web/server/h2o/libh2o/lib/core/proxy.c
-        web/server/h2o/libh2o/lib/core/request.c
-        web/server/h2o/libh2o/lib/core/token.c
-        web/server/h2o/libh2o/lib/core/util.c
-        web/server/h2o/libh2o/lib/handler/access_log.c
-        web/server/h2o/libh2o/lib/handler/chunked.c
-        web/server/h2o/libh2o/lib/handler/compress.c
-        web/server/h2o/libh2o/lib/handler/compress/gzip.c
-        web/server/h2o/libh2o/lib/handler/errordoc.c
-        web/server/h2o/libh2o/lib/handler/expires.c
-        web/server/h2o/libh2o/lib/handler/fastcgi.c
-        web/server/h2o/libh2o/lib/handler/file.c
-        web/server/h2o/libh2o/lib/handler/headers.c
-        web/server/h2o/libh2o/lib/handler/mimemap.c
-        web/server/h2o/libh2o/lib/handler/proxy.c
-        web/server/h2o/libh2o/lib/handler/redirect.c
-        web/server/h2o/libh2o/lib/handler/reproxy.c
-        web/server/h2o/libh2o/lib/handler/throttle_resp.c
-        web/server/h2o/libh2o/lib/handler/status.c
-        web/server/h2o/libh2o/lib/handler/headers_util.c
-        web/server/h2o/libh2o/lib/handler/status/events.c
-        web/server/h2o/libh2o/lib/handler/status/requests.c
-        web/server/h2o/libh2o/lib/handler/http2_debug_state.c
-        web/server/h2o/libh2o/lib/handler/status/durations.c
-        web/server/h2o/libh2o/lib/handler/configurator/access_log.c
-        web/server/h2o/libh2o/lib/handler/configurator/compress.c
-        web/server/h2o/libh2o/lib/handler/configurator/errordoc.c
-        web/server/h2o/libh2o/lib/handler/configurator/expires.c
-        web/server/h2o/libh2o/lib/handler/configurator/fastcgi.c
-        web/server/h2o/libh2o/lib/handler/configurator/file.c
-        web/server/h2o/libh2o/lib/handler/configurator/headers.c
-        web/server/h2o/libh2o/lib/handler/configurator/proxy.c
-        web/server/h2o/libh2o/lib/handler/configurator/redirect.c
-        web/server/h2o/libh2o/lib/handler/configurator/reproxy.c
-        web/server/h2o/libh2o/lib/handler/configurator/throttle_resp.c
-        web/server/h2o/libh2o/lib/handler/configurator/status.c
-        web/server/h2o/libh2o/lib/handler/configurator/http2_debug_state.c
-        web/server/h2o/libh2o/lib/handler/configurator/headers_util.c
-        web/server/h2o/libh2o/lib/http1.c
-        web/server/h2o/libh2o/lib/tunnel.c
-        web/server/h2o/libh2o/lib/http2/cache_digests.c
-        web/server/h2o/libh2o/lib/http2/casper.c
-        web/server/h2o/libh2o/lib/http2/connection.c
-        web/server/h2o/libh2o/lib/http2/frame.c
-        web/server/h2o/libh2o/lib/http2/hpack.c
-        web/server/h2o/libh2o/lib/http2/scheduler.c
-        web/server/h2o/libh2o/lib/http2/stream.c
-        web/server/h2o/libh2o/lib/http2/http2_debug_state.c
+        src/web/server/h2o/libh2o/deps/cloexec/cloexec.c
+        src/web/server/h2o/libh2o/deps/libgkc/gkc.c
+        src/web/server/h2o/libh2o/deps/libyrmcds/close.c
+        src/web/server/h2o/libh2o/deps/libyrmcds/connect.c
+        src/web/server/h2o/libh2o/deps/libyrmcds/recv.c
+        src/web/server/h2o/libh2o/deps/libyrmcds/send.c
+        src/web/server/h2o/libh2o/deps/libyrmcds/send_text.c
+        src/web/server/h2o/libh2o/deps/libyrmcds/socket.c
+        src/web/server/h2o/libh2o/deps/libyrmcds/strerror.c
+        src/web/server/h2o/libh2o/deps/libyrmcds/text_mode.c
+        src/web/server/h2o/libh2o/deps/picohttpparser/picohttpparser.c
+        src/web/server/h2o/libh2o/lib/common/cache.c
+        src/web/server/h2o/libh2o/lib/common/file.c
+        src/web/server/h2o/libh2o/lib/common/filecache.c
+        src/web/server/h2o/libh2o/lib/common/hostinfo.c
+        src/web/server/h2o/libh2o/lib/common/http1client.c
+        src/web/server/h2o/libh2o/lib/common/memcached.c
+        src/web/server/h2o/libh2o/lib/common/memory.c
+        src/web/server/h2o/libh2o/lib/common/multithread.c
+        src/web/server/h2o/libh2o/lib/common/serverutil.c
+        src/web/server/h2o/libh2o/lib/common/socket.c
+        src/web/server/h2o/libh2o/lib/common/socketpool.c
+        src/web/server/h2o/libh2o/lib/common/string.c
+        src/web/server/h2o/libh2o/lib/common/time.c
+        src/web/server/h2o/libh2o/lib/common/timeout.c
+        src/web/server/h2o/libh2o/lib/common/url.c
+        src/web/server/h2o/libh2o/lib/core/config.c
+        src/web/server/h2o/libh2o/lib/core/configurator.c
+        src/web/server/h2o/libh2o/lib/core/context.c
+        src/web/server/h2o/libh2o/lib/core/headers.c
+        src/web/server/h2o/libh2o/lib/core/logconf.c
+        src/web/server/h2o/libh2o/lib/core/proxy.c
+        src/web/server/h2o/libh2o/lib/core/request.c
+        src/web/server/h2o/libh2o/lib/core/token.c
+        src/web/server/h2o/libh2o/lib/core/util.c
+        src/web/server/h2o/libh2o/lib/handler/access_log.c
+        src/web/server/h2o/libh2o/lib/handler/chunked.c
+        src/web/server/h2o/libh2o/lib/handler/compress.c
+        src/web/server/h2o/libh2o/lib/handler/compress/gzip.c
+        src/web/server/h2o/libh2o/lib/handler/errordoc.c
+        src/web/server/h2o/libh2o/lib/handler/expires.c
+        src/web/server/h2o/libh2o/lib/handler/fastcgi.c
+        src/web/server/h2o/libh2o/lib/handler/file.c
+        src/web/server/h2o/libh2o/lib/handler/headers.c
+        src/web/server/h2o/libh2o/lib/handler/mimemap.c
+        src/web/server/h2o/libh2o/lib/handler/proxy.c
+        src/web/server/h2o/libh2o/lib/handler/redirect.c
+        src/web/server/h2o/libh2o/lib/handler/reproxy.c
+        src/web/server/h2o/libh2o/lib/handler/throttle_resp.c
+        src/web/server/h2o/libh2o/lib/handler/status.c
+        src/web/server/h2o/libh2o/lib/handler/headers_util.c
+        src/web/server/h2o/libh2o/lib/handler/status/events.c
+        src/web/server/h2o/libh2o/lib/handler/status/requests.c
+        src/web/server/h2o/libh2o/lib/handler/http2_debug_state.c
+        src/web/server/h2o/libh2o/lib/handler/status/durations.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/access_log.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/compress.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/errordoc.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/expires.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/fastcgi.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/file.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/headers.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/proxy.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/redirect.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/reproxy.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/throttle_resp.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/status.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/http2_debug_state.c
+        src/web/server/h2o/libh2o/lib/handler/configurator/headers_util.c
+        src/web/server/h2o/libh2o/lib/http1.c
+        src/web/server/h2o/libh2o/lib/tunnel.c
+        src/web/server/h2o/libh2o/lib/http2/cache_digests.c
+        src/web/server/h2o/libh2o/lib/http2/casper.c
+        src/web/server/h2o/libh2o/lib/http2/connection.c
+        src/web/server/h2o/libh2o/lib/http2/frame.c
+        src/web/server/h2o/libh2o/lib/http2/hpack.c
+        src/web/server/h2o/libh2o/lib/http2/scheduler.c
+        src/web/server/h2o/libh2o/lib/http2/stream.c
+        src/web/server/h2o/libh2o/lib/http2/http2_debug_state.c
 )
 
 set(DAEMON_FILES
@@ -844,14 +844,14 @@ set(DAEMON_FILES
 )
 
 set(H2O_FILES
-        web/server/h2o/http_server.c
-        web/server/h2o/http_server.h
-        web/server/h2o/h2o_utils.c
-        web/server/h2o/h2o_utils.h
-        web/server/h2o/streaming.c
-        web/server/h2o/streaming.h
-        web/server/h2o/connlist.c
-        web/server/h2o/connlist.h
+        src/web/server/h2o/http_server.c
+        src/web/server/h2o/http_server.h
+        src/web/server/h2o/h2o_utils.c
+        src/web/server/h2o/h2o_utils.h
+        src/web/server/h2o/streaming.c
+        src/web/server/h2o/streaming.h
+        src/web/server/h2o/connlist.c
+        src/web/server/h2o/connlist.h
 )
 
 if(ENABLE_H2O)
@@ -859,72 +859,72 @@ if(ENABLE_H2O)
 endif()
 
 set(API_PLUGIN_FILES
-        web/api/web_api.c
-        web/api/web_api.h
-        web/api/web_api_v1.c
-        web/api/web_api_v1.h
-        web/api/web_api_v2.c
-        web/api/web_api_v2.h
-        web/api/http_auth.c
-        web/api/http_auth.h
-        web/api/http_header.c
-        web/api/http_header.h
-        web/api/badges/web_buffer_svg.c
-        web/api/badges/web_buffer_svg.h
-        web/api/exporters/allmetrics.c
-        web/api/exporters/allmetrics.h
-        web/api/exporters/shell/allmetrics_shell.c
-        web/api/exporters/shell/allmetrics_shell.h
-        web/api/queries/rrdr.c
-        web/api/queries/rrdr.h
-        web/api/queries/query.c
-        web/api/queries/query.h
-        web/api/queries/average/average.c
-        web/api/queries/average/average.h
-        web/api/queries/countif/countif.c
-        web/api/queries/countif/countif.h
-        web/api/queries/incremental_sum/incremental_sum.c
-        web/api/queries/incremental_sum/incremental_sum.h
-        web/api/queries/max/max.c
-        web/api/queries/max/max.h
-        web/api/queries/min/min.c
-        web/api/queries/min/min.h
-        web/api/queries/sum/sum.c
-        web/api/queries/sum/sum.h
-        web/api/queries/median/median.c
-        web/api/queries/median/median.h
-        web/api/queries/percentile/percentile.c
-        web/api/queries/percentile/percentile.h
-        web/api/queries/stddev/stddev.c
-        web/api/queries/stddev/stddev.h
-        web/api/queries/ses/ses.c
-        web/api/queries/ses/ses.h
-        web/api/queries/des/des.c
-        web/api/queries/des/des.h
-        web/api/queries/trimmed_mean/trimmed_mean.c
-        web/api/queries/trimmed_mean/trimmed_mean.h
-        web/api/queries/weights.c
-        web/api/queries/weights.h
-        web/api/formatters/rrd2json.c
-        web/api/formatters/rrd2json.h
-        web/api/formatters/csv/csv.c
-        web/api/formatters/csv/csv.h
-        web/api/formatters/json/json.c
-        web/api/formatters/json/json.h
-        web/api/formatters/ssv/ssv.c
-        web/api/formatters/ssv/ssv.h
-        web/api/formatters/value/value.c
-        web/api/formatters/value/value.h
-        web/api/formatters/json_wrapper.c
-        web/api/formatters/json_wrapper.h
-        web/api/formatters/charts2json.c
-        web/api/formatters/charts2json.h
-        web/api/formatters/rrdset2json.c
-        web/api/formatters/rrdset2json.h
-        web/api/ilove/ilove.c
-        web/api/ilove/ilove.h
-        web/rtc/webrtc.c
-        web/rtc/webrtc.h
+        src/web/api/web_api.c
+        src/web/api/web_api.h
+        src/web/api/web_api_v1.c
+        src/web/api/web_api_v1.h
+        src/web/api/web_api_v2.c
+        src/web/api/web_api_v2.h
+        src/web/api/http_auth.c
+        src/web/api/http_auth.h
+        src/web/api/http_header.c
+        src/web/api/http_header.h
+        src/web/api/badges/web_buffer_svg.c
+        src/web/api/badges/web_buffer_svg.h
+        src/web/api/exporters/allmetrics.c
+        src/web/api/exporters/allmetrics.h
+        src/web/api/exporters/shell/allmetrics_shell.c
+        src/web/api/exporters/shell/allmetrics_shell.h
+        src/web/api/queries/rrdr.c
+        src/web/api/queries/rrdr.h
+        src/web/api/queries/query.c
+        src/web/api/queries/query.h
+        src/web/api/queries/average/average.c
+        src/web/api/queries/average/average.h
+        src/web/api/queries/countif/countif.c
+        src/web/api/queries/countif/countif.h
+        src/web/api/queries/incremental_sum/incremental_sum.c
+        src/web/api/queries/incremental_sum/incremental_sum.h
+        src/web/api/queries/max/max.c
+        src/web/api/queries/max/max.h
+        src/web/api/queries/min/min.c
+        src/web/api/queries/min/min.h
+        src/web/api/queries/sum/sum.c
+        src/web/api/queries/sum/sum.h
+        src/web/api/queries/median/median.c
+        src/web/api/queries/median/median.h
+        src/web/api/queries/percentile/percentile.c
+        src/web/api/queries/percentile/percentile.h
+        src/web/api/queries/stddev/stddev.c
+        src/web/api/queries/stddev/stddev.h
+        src/web/api/queries/ses/ses.c
+        src/web/api/queries/ses/ses.h
+        src/web/api/queries/des/des.c
+        src/web/api/queries/des/des.h
+        src/web/api/queries/trimmed_mean/trimmed_mean.c
+        src/web/api/queries/trimmed_mean/trimmed_mean.h
+        src/web/api/queries/weights.c
+        src/web/api/queries/weights.h
+        src/web/api/formatters/rrd2json.c
+        src/web/api/formatters/rrd2json.h
+        src/web/api/formatters/csv/csv.c
+        src/web/api/formatters/csv/csv.h
+        src/web/api/formatters/json/json.c
+        src/web/api/formatters/json/json.h
+        src/web/api/formatters/ssv/ssv.c
+        src/web/api/formatters/ssv/ssv.h
+        src/web/api/formatters/value/value.c
+        src/web/api/formatters/value/value.h
+        src/web/api/formatters/json_wrapper.c
+        src/web/api/formatters/json_wrapper.h
+        src/web/api/formatters/charts2json.c
+        src/web/api/formatters/charts2json.h
+        src/web/api/formatters/rrdset2json.c
+        src/web/api/formatters/rrdset2json.h
+        src/web/api/ilove/ilove.c
+        src/web/api/ilove/ilove.h
+        src/web/rtc/webrtc.c
+        src/web/rtc/webrtc.h
 )
 
 set(EXPORTING_ENGINE_FILES
@@ -1146,14 +1146,14 @@ set(STREAMING_PLUGIN_FILES
 )
 
 set(WEB_PLUGIN_FILES
-        web/server/web_client.c
-        web/server/web_client.h
-        web/server/web_server.c
-        web/server/web_server.h
-        web/server/static/static-threaded.c
-        web/server/static/static-threaded.h
-        web/server/web_client_cache.c
-        web/server/web_client_cache.h
+        src/web/server/web_client.c
+        src/web/server/web_client.h
+        src/web/server/web_server.c
+        src/web/server/web_server.h
+        src/web/server/static/static-threaded.c
+        src/web/server/static/static-threaded.h
+        src/web/server/web_client_cache.c
+        src/web/server/web_client_cache.h
 )
 
 set(CLAIM_PLUGIN_FILES
@@ -1462,18 +1462,18 @@ if(ENABLE_H2O)
         add_library(h2o STATIC ${LIBH2O_FILES})
 
         target_include_directories(h2o BEFORE PUBLIC
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/include"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/cloexec"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/brotli/enc"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/golombset"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/libgkc"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/libyrmcds"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/klib"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/neverbleed"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/picohttpparser"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/picotest"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/yaml/include"
-                "${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/deps/yoml"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/include"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/cloexec"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/brotli/enc"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/golombset"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/libgkc"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/libyrmcds"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/klib"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/neverbleed"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/picohttpparser"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/picotest"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/yaml/include"
+                "${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/deps/yoml"
         )
 
         target_compile_options(h2o PRIVATE
@@ -1724,7 +1724,7 @@ if(ENABLE_MQTTWEBSOCKETS)
                                                      -DMQTT_WSS_CPUSTATS)
 
         target_include_directories(mqttwebsockets PUBLIC ${CMAKE_SOURCE_DIR}/aclk/helpers
-                                                         ${CMAKE_SOURCE_DIR}/web/server/h2o/libh2o/include)
+                                                         ${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/include)
 
         target_link_libraries(mqttwebsockets PRIVATE libnetdata)
 
@@ -2336,8 +2336,8 @@ install(FILES
 # swagger
 #
 install(FILES
-        web/api/netdata-swagger.json
-        web/api/netdata-swagger.yaml
+        src/web/api/netdata-swagger.json
+        src/web/api/netdata-swagger.yaml
         DESTINATION ${WEB_DEST})
 
 #
@@ -2709,17 +2709,16 @@ endif()
 # dashboard
 #
 
-include(web/gui/v1/dashboard_v1.cmake)
-include(web/gui/v2/dashboard_v2.cmake)
-
-include(web/gui/gui.cmake)
+include(src/web/gui/v1/dashboard_v1.cmake)
+include(src/web/gui/v2/dashboard_v2.cmake)
+include(src/web/gui/gui.cmake)
 
 function(cat IN_FILE OUT_FILE)
         file(READ ${IN_FILE} CONTENTS)
         file(APPEND ${OUT_FILE} "${CONTENTS}")
 endfunction()
 
-file(WRITE ${CMAKE_BINARY_DIR}/web/gui/dashboard.js.in "")
+file(WRITE ${CMAKE_BINARY_DIR}/src/web/gui/dashboard.js.in "")
 foreach(JS_FILE ${DASHBOARD_JS_FILES})
   cat(${JS_FILE} ${CMAKE_BINARY_DIR}/dashboard.js.in)
 endforeach()
@@ -2731,36 +2730,36 @@ install(FILES
         DESTINATION ${WEB_DEST})
 
 install(FILES
-        web/gui/dashboard_info_custom_example.js
-        web/gui/dashboard_info.js
-        web/gui/index.html
-        web/gui/main.css
-        web/gui/main.js
-        web/gui/registry-access.html
-        web/gui/registry-alert-redirect.html
-        web/gui/registry-hello.html
-        web/gui/switch.html
-        web/gui/ilove.html
+        src/web/gui/dashboard_info_custom_example.js
+        src/web/gui/dashboard_info.js
+        src/web/gui/index.html
+        src/web/gui/main.css
+        src/web/gui/main.js
+        src/web/gui/registry-access.html
+        src/web/gui/registry-alert-redirect.html
+        src/web/gui/registry-hello.html
+        src/web/gui/switch.html
+        src/web/gui/ilove.html
         DESTINATION ${WEB_DEST})
 
 install(FILES
-        web/gui/old/index.html
+        src/web/gui/old/index.html
         DESTINATION ${WEB_DEST}/old)
 
 install(FILES
-        web/gui/static/img/netdata-logomark.svg
+        src/web/gui/static/img/netdata-logomark.svg
         DESTINATION ${WEB_DEST}/static/img)
 
 install(FILES
-        web/gui/css/morris-0.5.1.css
-        web/gui/css/c3-0.4.18.min.css
+        src/web/gui/css/morris-0.5.1.css
+        src/web/gui/css/c3-0.4.18.min.css
         DESTINATION ${WEB_DEST}/css)
 
 install(FILES
-        web/gui/.well-known/dnt/cookies
+        src/web/gui/.well-known/dnt/cookies
         DESTINATION ${WEB_DEST}/.well-known/dnt)
 
 # v0 dashboard
 install(FILES
-        web/gui/v0/index.html
+        src/web/gui/v0/index.html
         DESTINATION ${WEB_DEST}/v0)

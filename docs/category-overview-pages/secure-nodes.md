@@ -98,7 +98,7 @@ the internet using multiple hosting providers).
 ## Fine-grained access control
 
 If you want to keep using the local dashboard, but don't want it exposed to the internet, you can restrict access with
-[access lists](https://github.com/netdata/netdata/blob/master/web/server/README.md#access-lists). This method also fully 
+[access lists](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#access-lists). This method also fully 
 retains the ability to stream metrics
 on-demand through Netdata Cloud.
 
@@ -134,9 +134,9 @@ The `allow connections from` setting is global and restricts access to the dashb
     allow management from = localhost
 ```
 
-See the [web server](https://github.com/netdata/netdata/blob/master/web/server/README.md#access-lists) docs for additional details
+See the [web server](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#access-lists) docs for additional details
 about access lists. You can take
-access lists one step further by [enabling SSL](https://github.com/netdata/netdata/blob/master/web/server/README.md#enabling-tls-support) to encrypt data from local
+access lists one step further by [enabling SSL](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#enabling-tls-support) to encrypt data from local
 dashboard in transit. The connection to Netdata Cloud is always secured with TLS.
 
 ## Use an authenticating web server in proxy mode
