@@ -196,8 +196,8 @@ src/libnetdata/gorilla/fuzz-*.log
 build/
 
 # ignore rules for go plugin code
-src/go/go.d.plugin/bin/
-src/go/go.d.plugin/mocks/springboot2/.gradle/
-src/go/go.d.plugin/mocks/tmp/*
-!src/go/go.d.plugin/mocks/tmp/.gitkeep
-src/go/go.d.plugin/vendor
+src/go/collectors/go.d.plugin/bin/
+src/go/collectors/go.d.plugin/mocks/springboot2/.gradle/
+src/go/collectors/go.d.plugin/mocks/tmp/*
+!src/go/collectors/go.d.plugin/mocks/tmp/.gitkeep
+src/go/collectors/go.d.plugin/vendor

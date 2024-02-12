@@ -139,7 +139,7 @@ jobs:
     strategy:
       matrix:
         tree:
-          - src/go/go.d.plugin
+          - src/go/collectors/go.d.plugin
     permissions:
       security-events: write
     steps:
