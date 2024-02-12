@@ -10,6 +10,7 @@
 - Update input skip patterns [\#16984](https://github.com/netdata/netdata/pull/16984) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update input paths for tj-actions/changed-files [\#16982](https://github.com/netdata/netdata/pull/16982) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update synology.md [\#16980](https://github.com/netdata/netdata/pull/16980) ([pschaer](https://github.com/pschaer))
+- Detect machine GUID change [\#16979](https://github.com/netdata/netdata/pull/16979) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#16974](https://github.com/netdata/netdata/pull/16974) ([netdatabot](https://github.com/netdatabot))
 - Use C++14 by default when building on systems that support it. [\#16972](https://github.com/netdata/netdata/pull/16972) ([Ferroin](https://github.com/Ferroin))
 - change edac ecc errors from incremental to absolute [\#16970](https://github.com/netdata/netdata/pull/16970) ([ilyam8](https://github.com/ilyam8))
@@ -398,8 +399,6 @@
 - adaptec\_raid: fix parsing PD without NCQ status [\#16400](https://github.com/netdata/netdata/pull/16400) ([ilyam8](https://github.com/ilyam8))
 - eBPF apps order [\#16395](https://github.com/netdata/netdata/pull/16395) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix systemd-units func expiration time [\#16393](https://github.com/netdata/netdata/pull/16393) ([ilyam8](https://github.com/ilyam8))
-- docker: mount /etc/localtime [\#16392](https://github.com/netdata/netdata/pull/16392) ([ilyam8](https://github.com/ilyam8))
-- fix "differ in signedness" warn in cgroup [\#16391](https://github.com/netdata/netdata/pull/16391) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
