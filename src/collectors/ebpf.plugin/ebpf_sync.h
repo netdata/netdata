@@ -3,10 +3,6 @@
 #ifndef NETDATA_EBPF_SYNC_H
 #define NETDATA_EBPF_SYNC_H 1
 
-#ifdef LIBBPF_MAJOR_VERSION
-#include "includes/sync.skel.h"
-#endif
-
 // Module name & description
 #define NETDATA_EBPF_MODULE_NAME_SYNC "sync"
 #define NETDATA_EBPF_SYNC_MODULE_DESC "Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2)."

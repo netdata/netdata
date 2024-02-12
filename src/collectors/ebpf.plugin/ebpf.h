@@ -38,17 +38,19 @@
 #define NETDATA_EBPF_CONFIG_FILE "ebpf.d.conf"
 
 #ifdef LIBBPF_MAJOR_VERSION // BTF code
-#include "includes/cachestat.skel.h"
-#include "includes/dc.skel.h"
-#include "includes/disk.skel.h"
-#include "includes/fd.skel.h"
-#include "includes/hardirq.skel.h"
-#include "includes/mdflush.skel.h"
-#include "includes/mount.skel.h"
-#include "includes/shm.skel.h"
-#include "includes/socket.skel.h"
-#include "includes/swap.skel.h"
-#include "includes/vfs.skel.h"
+#include "libnetdata/ebpf/includes/cachestat.skel.h"
+#include "libnetdata/ebpf/includes/dc.skel.h"
+#include "libnetdata/ebpf/includes/disk.skel.h"
+#include "libnetdata/ebpf/includes/fd.skel.h"
+#include "libnetdata/ebpf/includes/filesystem.skel.h"
+#include "libnetdata/ebpf/includes/hardirq.skel.h"
+#include "libnetdata/ebpf/includes/mdflush.skel.h"
+#include "libnetdata/ebpf/includes/mount.skel.h"
+#include "libnetdata/ebpf/includes/shm.skel.h"
+#include "libnetdata/ebpf/includes/sync.skel.h"
+#include "libnetdata/ebpf/includes/socket.skel.h"
+#include "libnetdata/ebpf/includes/swap.skel.h"
+#include "libnetdata/ebpf/includes/vfs.skel.h"
 
 extern struct cachestat_bpf *cachestat_bpf_obj;
 extern struct dc_bpf *dc_bpf_obj;
