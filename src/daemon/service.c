@@ -191,6 +191,10 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
+
+        if (!service_running(SERVICE_MAINTENANCE))
+            break;
+
         if(rrdhost_receiver_replicating_charts(host) || rrdhost_sender_replicating_charts(host))
             continue;
 
@@ -308,7 +312,9 @@ void *service_main(void *ptr)
         real_step = USEC_PER_SEC;
 
         svc_rrd_cleanup_obsolete_charts_from_all_hosts();
-        svc_rrdhost_cleanup_orphan_hosts(localhost);
+
+        if (service_running(SERVICE_MAINTENANCE))
+            svc_rrdhost_cleanup_orphan_hosts(localhost);
     }
 
     netdata_thread_cleanup_pop(1);
