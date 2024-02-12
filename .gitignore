@@ -119,10 +119,10 @@ compile_commands.json
 webcopylocal*
 
 # converted diagrams
-diagrams/*.png
-diagrams/*.svg
-diagrams/*.atxt
-diagrams/plantuml.jar
+docs/diagrams/*.png
+docs/diagrams/*.svg
+docs/diagrams/*.atxt
+docs/diagrams/plantuml.jar
 
 # python virtual environment
 venv/
