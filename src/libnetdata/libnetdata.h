@@ -7,9 +7,7 @@
 extern "C" {
 # endif
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
+#include "config.h"
 
 #ifdef ENABLE_OPENSSL
 #define ENABLE_HTTPS 1
@@ -176,10 +174,8 @@ extern "C" {
 #include <sys/sysmacros.h>
 #endif
 
-#ifdef STORAGE_WITH_MATH
 #include <math.h>
 #include <float.h>
-#endif
 
 #if defined(HAVE_INTTYPES_H)
 #include <inttypes.h>

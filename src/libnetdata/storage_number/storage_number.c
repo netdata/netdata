@@ -147,13 +147,7 @@ storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
         r += (m << 27); // the divider m
     }
 
-#ifdef STORAGE_WITH_MATH
-    // without this there are rounding problems
-    // example: 0.9 becomes 0.89
     r += lrint((double) n);
-#else
-    r += (storage_number)n;
-#endif
 
     return r;
 }
@@ -174,60 +168,3 @@ __attribute__((constructor)) void initialize_lut(void) {
         unpack_storage_number_lut10x[3 * 8 + i] = pow(100, i);       // exp = 1
     }
 }
-
-/*
-int print_netdata_double(char *str, NETDATA_DOUBLE value)
-{
-    char *wstr = str;
-
-    int sign = (value < 0) ? 1 : 0;
-    if(sign) value = -value;
-
-#ifdef STORAGE_WITH_MATH
-    // without llrintl() there are rounding problems
-    // for example 0.9 becomes 0.89
-    unsigned long long uvalue = (unsigned long long int) llrintl(value * (NETDATA_DOUBLE)100000);
-#else
-    unsigned long long uvalue = value * (NETDATA_DOUBLE)100000;
-#endif
-
-    wstr = print_number_llu_r_smart(str, uvalue);
-
-    // make sure we have 6 bytes at least
-    while((wstr - str) < 6) *wstr++ = '0';
-
-    // put the sign back
-    if(sign) *wstr++ = '-';
-
-    // reverse it
-    char *begin = str, *end = --wstr, aux;
-    while (end > begin) aux = *end, *end-- = *begin, *begin++ = aux;
-    // wstr--;
-    // strreverse(str, wstr);
-
-    // remove trailing zeros
-    int decimal = 5;
-    while(decimal > 0 && *wstr == '0') {
-        *wstr-- = '\0';
-        decimal--;
-    }
-
-    // terminate it, one position to the right
-    // to let space for a dot
-    wstr[2] = '\0';
-
-    // make space for the dot
-    int i;
-    for(i = 0; i < decimal ;i++) {
-        wstr[1] = wstr[0];
-        wstr--;
-    }
-
-    // put the dot
-    if(wstr[2] == '\0') { wstr[1] = '\0'; decimal--; }
-    else wstr[1] = '.';
-
-    // return the buffer length
-    return (int) ((wstr - str) + 2 + decimal );
-}
-*/

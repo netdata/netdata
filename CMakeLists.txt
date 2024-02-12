@@ -2202,10 +2202,6 @@ install(TARGETS netdatacli
 # Generate config file
 #
 
-add_definitions(-DHAVE_CONFIG_H)
-
-set(STORAGE_WITH_MATH On)
-
 if(NOT CMAKE_INSTALL_PREFIX STREQUAL "")
   string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 endif()
