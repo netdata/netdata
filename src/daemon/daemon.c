@@ -60,7 +60,7 @@ static void fix_directory_file_permissions(const char *dirname, uid_t uid, gid_t
     closedir(dir);
 }
 
-void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive)
+static void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive)
 {
     if (chown(dir, uid, gid) == -1)
         netdata_log_error("Cannot chown directory '%s' to %u:%u", dir, (unsigned int)uid, (unsigned int)gid);
@@ -68,7 +68,7 @@ void change_dir_ownership(const char *dir, uid_t uid, gid_t gid, bool recursive)
     fix_directory_file_permissions(dir, uid, gid, recursive);
 }
 
-void clean_directory(char *dirname)
+static void clean_directory(char *dirname)
 {
     DIR *dir = opendir(dirname);
     if(!dir) return;
@@ -84,7 +84,7 @@ void clean_directory(char *dirname)
     closedir(dir);
 }
 
-void prepare_required_directories(uid_t uid, gid_t gid) {
+static void prepare_required_directories(uid_t uid, gid_t gid) {
     change_dir_ownership(netdata_configured_cache_dir, uid, gid, true);
     change_dir_ownership(netdata_configured_varlib_dir, uid, gid, false);
     change_dir_ownership(netdata_configured_lock_dir, uid, gid, false);
@@ -98,7 +98,7 @@ void prepare_required_directories(uid_t uid, gid_t gid) {
     clean_directory(netdata_configured_lock_dir);
 }
 
-int become_user(const char *username, int pid_fd) {
+static int become_user(const char *username, int pid_fd) {
     int am_i_root = (getuid() == 0)?1:0;
 
     struct passwd *pw = getpwnam(username);
