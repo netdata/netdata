@@ -180,6 +180,10 @@ jobs:
     name: golangci-lint
     needs: prep-review
     if: needs.prep-review.outputs.golangci-lint == 'true'
+    strategy:
+      matrix:
+        tree:
+          - src/go/go.d.plugin
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -190,6 +194,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
           golangci_lint_flags: '--timeout=10m'
+          workdir: ${{ matrix.tree }}
 
   hadolint:
     name: hadolint

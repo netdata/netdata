@@ -136,9 +136,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: prepare
     if: needs.prepare.outputs.go == 'true'
-    matrix:
-      tree:
-        - src/go/go.d.plugin
+    strategy:
+      matrix:
+        tree:
+          - src/go/go.d.plugin
     permissions:
       security-events: write
     steps:
