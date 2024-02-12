@@ -29,8 +29,8 @@ src/registry/ @novykh
 src/streaming/ @thiagoftsm
 system/ @Ferroin @tkatsoulas
 tests/ @Ferroin @vkalintiris @tkatsoulas
-web/ @thiagoftsm @vkalintiris
-web/gui/ @novykh
+src/web/ @thiagoftsm @vkalintiris
+src/web/gui/ @novykh
 src/logsmanagement/ @thiagoftsm
 
 # Ownership by filetype (overwrites ownership by directory)

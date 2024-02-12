@@ -146,7 +146,7 @@ others, and groups them into `sql`. That makes sense, since all these processes 
 sql: mysqld* mariad* postgres* postmaster* oracle_* ora_* sqlservr
 ```
 
-These groups are then reflected as [dimensions](https://github.com/netdata/netdata/blob/master/web/README.md#dimensions)
+These groups are then reflected as [dimensions](https://github.com/netdata/netdata/blob/master/src/web/README.md#dimensions)
 within Netdata's charts.
 
 ![An example per-process CPU utilization chart in Netdata

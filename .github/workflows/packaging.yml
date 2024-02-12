@@ -65,7 +65,7 @@ jobs:
             src/aclk/aclk-schemas/
             src/ml/dlib/
             src/fluent-bit/
-            web/server/h2o/libh2o/
+            src/web/server/h2o/libh2o/
           files_ignore: |
             **/*.md
       - name: List all changed files in pattern

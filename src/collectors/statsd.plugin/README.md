@@ -305,7 +305,7 @@ Synthetic charts are organized in
 -   **charts for each application** aka family in Netdata Dashboard.
 -   **StatsD metrics for each chart** /aka charts and context Netdata Dashboard.
 
-> You can read more about how the Netdata Agent organizes information in the relevant [documentation](https://github.com/netdata/netdata/blob/master/web/README.md)
+> You can read more about how the Netdata Agent organizes information in the relevant [documentation](https://github.com/netdata/netdata/blob/master/src/web/README.md)
 
 For each application you need to create a `.conf` file in `/etc/netdata/statsd.d`.
 
@@ -832,7 +832,7 @@ Context is a second way to group metrics, when the metrics are of the same natur
 our case, if we ran several different load testing experiments side-by-side, we could define the same app, 
 but different context (e.g `http_requests.experiment1`, `http_requests.experiment2`).
 
-Find more details about family and context in our [documentation](https://github.com/netdata/netdata/blob/master/web/README.md#families).
+Find more details about family and context in our [documentation](https://github.com/netdata/netdata/blob/master/src/web/README.md#families).
 
 #### Dimensions 
 
@@ -981,7 +981,7 @@ At this point, you have used StatsD to gather metrics for k6, creating a whole n
 Netdata dashboard in the process. Moreover, you can further customize the icon of the particular section, 
 as well as the description for each chart.
 
-To edit the section, please follow the Netdata [documentation](https://github.com/netdata/netdata/blob/master/web/gui/README.md#customizing-the-local-dashboard).
+To edit the section, please follow the Netdata [documentation](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md#customizing-the-local-dashboard).
 
 While the following configuration will be placed in a new file, as the documentation suggests, it is 
 instructing to use `dashboard_info.js` as a template. Open the file and see how the rest of sections and collectors have been defined.

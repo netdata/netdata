@@ -72,7 +72,7 @@ Save the file and [reload Netdata's health configuration](#reload-health-configu
 ## Disable or silence alerts
 
 Alerts and notifications can be disabled permanently via configuration changes, or temporarily, via the
-[health management API](https://github.com/netdata/netdata/blob/master/web/api/health/README.md). The
+[health management API](https://github.com/netdata/netdata/blob/master/src/web/api/health/README.md). The
 available options are described below.
 
 ### Disable all alerts
@@ -102,7 +102,7 @@ This action requires that you [reload Netdata's health configuration](#reload-he
 
 When you need to frequently disable all or some alerts from triggering during certain times (for instance
 when running backups) you can use the
-[health management API](https://github.com/netdata/netdata/blob/master/web/api/health/README.md).
+[health management API](https://github.com/netdata/netdata/blob/master/src/web/api/health/README.md).
 The API allows you to issue commands to control the health engine's behavior without changing configuration,
 or restarting the agent.
 
@@ -110,7 +110,7 @@ or restarting the agent.
 
 If you want health checks to keep running and alerts to keep getting triggered, but notifications to be
 suppressed temporarily, you can use the
-[health management API](https://github.com/netdata/netdata/blob/master/web/api/health/README.md).
+[health management API](https://github.com/netdata/netdata/blob/master/src/web/api/health/README.md).
 The API allows you to issue commands to control the health engine's behavior without changing configuration,
 or restarting the agent.
 
@@ -447,9 +447,9 @@ The format is:
 lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS] [foreach DIMENSIONS]
 ```
 
-The full [database query API](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md) is supported. In short:
+The full [database query API](https://github.com/netdata/netdata/blob/master/src/web/api/queries/README.md) is supported. In short:
 
-- `METHOD` is one of  the available [grouping methods](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md#grouping-methods) such as `average`, `min`, `max` etc.
+- `METHOD` is one of  the available [grouping methods](https://github.com/netdata/netdata/blob/master/src/web/api/queries/README.md#grouping-methods) such as `average`, `min`, `max` etc.
      This is required.
 
 - `AFTER` is a relative number of seconds, but it also accepts a single letter for changing
@@ -464,7 +464,7 @@ The full [database query API](https://github.com/netdata/netdata/blob/master/web
      above too).
 
 - `OPTIONS` is a space separated list of `percentage`, `absolute`, `min2max`, `unaligned`,
-     `match-ids`, `match-names`. Check the [badges](https://github.com/netdata/netdata/blob/master/web/api/badges/README.md) documentation for more info.
+     `match-ids`, `match-names`. Check the [badges](https://github.com/netdata/netdata/blob/master/src/web/api/badges/README.md) documentation for more info.
 
 - `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
      by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
@@ -860,14 +860,14 @@ You can find all the variables that can be used for a given chart, using
 Agent dashboard. For example, [variables for the `system.cpu` chart of the
 registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
 
-> If you don't know how to find the CHART_NAME, you can read about it [here](https://github.com/netdata/netdata/blob/master/web/README.md#charts).
+> If you don't know how to find the CHART_NAME, you can read about it [here](https://github.com/netdata/netdata/blob/master/src/web/README.md#charts).
 
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 
 <details><summary>The variables below can be used in both chart alerts and context templates.</summary>
 
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in
-templates for charts belonging to a given [context](https://github.com/netdata/netdata/blob/master/web/README.md#contexts). The reason is that all charts of a given
+templates for charts belonging to a given [context](https://github.com/netdata/netdata/blob/master/src/web/README.md#contexts). The reason is that all charts of a given
 context are essentially identical, with the only difference being the family that identifies a particular hardware or software instance.
 
 </details>

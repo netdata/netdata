@@ -59,13 +59,13 @@ README
 TODO.md
 TODO.txt
 
-web/gui/chart-info/
-web/gui/control.html
-web/gui/dashboard.js
-web/gui/datasource.css
-web/gui/gadget.xml
-web/gui/index_new.html
-web/gui/version.txt
+src/web/gui/chart-info/
+src/web/gui/control.html
+src/web/gui/dashboard.js
+src/web/gui/datasource.css
+src/web/gui/gadget.xml
+src/web/gui/index_new.html
+src/web/gui/version.txt
 
 # related to karma/javascript/node
 /node_modules/
@@ -95,7 +95,7 @@ src/collectors/charts.d.plugin/charts.d.plugin
 src/collectors/python.d.plugin/python.d.plugin
 src/collectors/ioping.plugin/ioping.plugin
 src/collectors/go.d.plugin
-web/netdata-switch-dashboard.sh
+src/web/netdata-switch-dashboard.sh
 
 src/logsmanagement/stress_test/stress_test
 

@@ -43,7 +43,7 @@ While Netdata's charts require no configuration and are easy to interact with, t
 
 Understanding how these work will help you more easily navigate the dashboard,
 [write new alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md), or play around
-with the [API](https://github.com/netdata/netdata/blob/master/web/api/README.md).
+with the [API](https://github.com/netdata/netdata/blob/master/src/web/api/README.md).
 
 ### Dimensions
 
@@ -262,7 +262,7 @@ By default the aggregation applied is _average_ but the user can choose differen
 - Delta
 - Single or Double exponential smoothing
 
-For more details on each, you can refer to our Agent's HTTP API details on [Data Queries - Data Grouping](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md#data-grouping).
+For more details on each, you can refer to our Agent's HTTP API details on [Data Queries - Data Grouping](https://github.com/netdata/netdata/blob/master/src/web/api/queries/README.md#data-grouping).
 
 ### Reset to defaults
 

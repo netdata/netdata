@@ -35,4 +35,4 @@ Netdata starts a web server for its dashboard at port `19999`. Open up your web 
 navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If installed on localhost, you can access it through `http://localhost:19999`.
 
 
-Documentation for previous Agent dashboard can still be found [here](https://github.com/netdata/netdata/blob/master/web/gui/README.md).
+Documentation for previous Agent dashboard can still be found [here](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md).

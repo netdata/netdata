@@ -237,7 +237,7 @@ outside your production infrastructure, or if you have cpu and memory to spare. 
 ## Run Netdata behind a proxy
 
 A dedicated web server like nginx provides more robustness than the Agent's
-internal [web server](https://github.com/netdata/netdata/blob/master/web/README.md).
+internal [web server](https://github.com/netdata/netdata/blob/master/src/web/README.md).
 Nginx can handle more concurrent connections, reuse idle connections, and use fast gzip compression to reduce payloads.
 
 For details on installing another web server as a proxy for the local Agent dashboard,

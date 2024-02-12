@@ -723,7 +723,7 @@ The Netdata Agent is shipped with multiple UI versions:
 
 - `http://agent.ip:19999/v0/`, the original open-source single-node UI, GPLv3+.
 - `http://agent.ip:19999/v1/`, the latest open-source single-node UI, GPLv3+.
-- `http://agent.ip:19999/v2/`, a snapshot of the latest Netdata Cloud UI as it was at the time the agent was released, licensed to be distributed with Netdata Agents under [NCUL1](https://github.com/netdata/netdata/blob/master/web/gui/v2/LICENSE.md).
+- `http://agent.ip:19999/v2/`, a snapshot of the latest Netdata Cloud UI as it was at the time the agent was released, licensed to be distributed with Netdata Agents under [NCUL1](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md).
 
 When you access a Netdata Agent via `http://agent.ip:19999/` a splash screen attempts to use the latest live version of Netdata Cloud UI (downloaded from Cloudflare). This only happens when the web browser has internet connectivity and Netdata Cloud is not disabled at the agent configuration. Otherwise, it falls back to `http://agent.ip:19999/v2/`.
 
@@ -830,4 +830,4 @@ instructions on building each Netdata component from the source and preparing a 
 Netdata is released under [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
 [third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
 
-The Latest Netdata UI, is distributed under [NCUL1](https://github.com/netdata/netdata/blob/master/web/gui/v2/LICENSE.md). It also uses third party open source components. Check the [UI third party licenses](https://github.com/netdata/netdata/blob/master/web/gui/v2/3D_PARTY_LICENSES.txt)
+The Latest Netdata UI, is distributed under [NCUL1](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md). It also uses third party open source components. Check the [UI third party licenses](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/3D_PARTY_LICENSES.txt)

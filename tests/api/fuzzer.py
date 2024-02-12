@@ -309,7 +309,7 @@ random.seed(7)      # Default is reproducible sequences
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--url', type=str,
-                    default='https://raw.githubusercontent.com/netdata/netdata/master/web/api/netdata-swagger.json',
+                    default='https://raw.githubusercontent.com/netdata/netdata/master/src/web/api/netdata-swagger.json',
                     help='The URL of the API definition in swagger. The default will pull the latest version '
                          'from the main branch.')
 parser.add_argument('--host', type=str,

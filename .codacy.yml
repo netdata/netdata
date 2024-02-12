@@ -6,19 +6,19 @@ exclude_paths:
   - src/collectors/python.d.plugin/python_modules/third_party/**
   - contrib/**
   - packaging/makeself/**
-  - web/gui/css/**
-  - web/gui/lib/**
-  - web/gui/old/**
-  - web/gui/src/**
-  - web/gui/v1/**
-  - web/gui/v2/**
-  - web/gui/main.js
+  - src/web/gui/css/**
+  - src/web/gui/lib/**
+  - src/web/gui/old/**
+  - src/web/gui/src/**
+  - src/web/gui/v1/**
+  - src/web/gui/v2/**
+  - src/web/gui/main.js
   - tests/**
   - aclk/tests/**
   - src/libnetdata/libjudy/**
   - src/database/sqlite/sqlite3.c
   - src/ml/dlib/**
-  - web/server/h2o/libh2o/**
+  - src/web/server/h2o/libh2o/**
   - build/**
   - build_external/**
   - packaging/**
