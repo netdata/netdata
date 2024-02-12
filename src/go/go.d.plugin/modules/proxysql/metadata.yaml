@@ -1,0 +1,434 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-proxysql
+      plugin_name: go.d.plugin
+      module_name: proxysql
+      monitored_instance:
+        name: ProxySQL
+        link: https://www.proxysql.com/
+        icon_filename: proxysql.png
+        categories:
+          - data-collection.database-servers
+      keywords:
+        - proxysql
+        - databases
+        - sql
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors ProxySQL servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/proxysql.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: dsn
+              description: Data Source Name. See [DSN syntax](https://github.com/go-sql-driver/mysql#dsn-data-source-name).
+              default_value: stats:stats@tcp(127.0.0.1:6032)/
+              required: true
+            - name: my.cnf
+              description: Specifies my.cnf file to read connection parameters from under the [client] section.
+              default_value: ""
+              required: false
+            - name: timeout
+              description: Query timeout in seconds.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: TCP socket
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: stats:stats@tcp(127.0.0.1:6032)/
+            - name: my.cnf
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    my.cnf: '/etc/my.cnf'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: stats:stats@tcp(127.0.0.1:6032)/
+                
+                  - name: remote
+                    dsn: stats:stats@tcp(203.0.113.0:6032)/
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: proxysql.client_connections_count
+              description: Client connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connected
+                - name: non_idle
+                - name: hostgroup_locked
+            - name: proxysql.client_connections_rate
+              description: Client connections rate
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: aborted
+            - name: proxysql.server_connections_count
+              description: Server connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connected
+            - name: proxysql.server_connections_rate
+              description: Server connections rate
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: aborted
+                - name: delayed
+            - name: proxysql.backends_traffic
+              description: Backends traffic
+              unit: B/s
+              chart_type: line
+              dimensions:
+                - name: recv
+                - name: sent
+            - name: proxysql.clients_traffic
+              description: Clients traffic
+              unit: B/s
+              chart_type: line
+              dimensions:
+                - name: recv
+                - name: sent
+            - name: proxysql.active_transactions_count
+              description: Client connections that are currently processing a transaction
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: client
+            - name: proxysql.questions_rate
+              description: Client requests / statements executed
+              unit: questions/s
+              chart_type: line
+              dimensions:
+                - name: questions
+            - name: proxysql.slow_queries_rate
+              description: Slow queries
+              unit: queries/s
+              chart_type: line
+              dimensions:
+                - name: slow
+            - name: proxysql.queries_rate
+              description: Queries rate
+              unit: queries/s
+              chart_type: stacked
+              dimensions:
+                - name: autocommit
+                - name: autocommit_filtered
+                - name: commit_filtered
+                - name: rollback
+                - name: rollback_filtered
+                - name: backend_change_user
+                - name: backend_init_db
+                - name: backend_set_names
+                - name: frontend_init_db
+                - name: frontend_set_names
+                - name: frontend_use_db
+            - name: proxysql.backend_statements_count
+              description: Statements available across all backend connections
+              unit: statements
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: unique
+            - name: proxysql.backend_statements_rate
+              description: Statements executed against the backends
+              unit: statements/s
+              chart_type: stacked
+              dimensions:
+                - name: prepare
+                - name: execute
+                - name: close
+            - name: proxysql.client_statements_count
+              description: Statements that are in use by clients
+              unit: statements
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: unique
+            - name: proxysql.client_statements_rate
+              description: Statements executed by clients
+              unit: statements/s
+              chart_type: stacked
+              dimensions:
+                - name: prepare
+                - name: execute
+                - name: close
+            - name: proxysql.cached_statements_count
+              description: Global prepared statements
+              unit: statements
+              chart_type: line
+              dimensions:
+                - name: cached
+            - name: proxysql.query_cache_entries_count
+              description: Query Cache entries
+              unit: entries
+              chart_type: line
+              dimensions:
+                - name: entries
+            - name: proxysql.query_cache_memory_used
+              description: Query Cache memory used
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: proxysql.query_cache_io
+              description: Query Cache I/O
+              unit: B/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: proxysql.query_cache_requests_rate
+              description: Query Cache requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: read_success
+            - name: proxysql.mysql_monitor_workers_count
+              description: MySQL monitor workers
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: workers
+                - name: auxiliary
+            - name: proxysql.mysql_monitor_workers_rate
+              description: MySQL monitor workers rate
+              unit: workers/s
+              chart_type: line
+              dimensions:
+                - name: started
+            - name: proxysql.mysql_monitor_connect_checks_rate
+              description: MySQL monitor connect checks
+              unit: checks/s
+              chart_type: line
+              dimensions:
+                - name: succeed
+                - name: failed
+            - name: proxysql.mysql_monitor_ping_checks_rate
+              description: MySQL monitor ping checks
+              unit: checks/s
+              chart_type: line
+              dimensions:
+                - name: succeed
+                - name: failed
+            - name: proxysql.mysql_monitor_read_only_checks_rate
+              description: MySQL monitor read only checks
+              unit: checks/s
+              chart_type: line
+              dimensions:
+                - name: succeed
+                - name: failed
+            - name: proxysql.mysql_monitor_replication_lag_checks_rate
+              description: MySQL monitor replication lag checks
+              unit: checks/s
+              chart_type: line
+              dimensions:
+                - name: succeed
+                - name: failed
+            - name: proxysql.jemalloc_memory_used
+              description: Jemalloc used memory
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: allocated
+                - name: mapped
+                - name: metadata
+                - name: resident
+                - name: retained
+            - name: proxysql.memory_used
+              description: Memory used
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: auth
+                - name: sqlite3
+                - name: query_digest
+                - name: query_rules
+                - name: firewall_users_table
+                - name: firewall_users_config
+                - name: firewall_rules_table
+                - name: firewall_rules_config
+                - name: mysql_threads
+                - name: admin_threads
+                - name: cluster_threads
+            - name: proxysql.uptime
+              description: Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: command
+          description: These metrics refer to the SQL command.
+          labels:
+            - name: command
+              description: SQL command.
+          metrics:
+            - name: proxysql.mysql_command_execution_rate
+              description: MySQL command execution
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: proxysql.mysql_command_execution_time
+              description: MySQL command execution time
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: proxysql.mysql_command_execution_duration
+              description: MySQL command execution duration histogram
+              unit: microseconds
+              chart_type: stacked
+              dimensions:
+                - name: 100us
+                - name: 500us
+                - name: 1ms
+                - name: 5ms
+                - name: 10ms
+                - name: 50ms
+                - name: 100ms
+                - name: 500ms
+                - name: 1s
+                - name: 5s
+                - name: 10s
+                - name: +Inf
+        - name: user
+          description: These metrics refer to the user.
+          labels:
+            - name: user
+              description: username from the mysql_users table
+          metrics:
+            - name: proxysql.mysql_user_connections_utilization
+              description: MySQL user connections utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: proxysql.mysql_user_connections_count
+              description: MySQL user connections used
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: used
+        - name: backend
+          description: These metrics refer to the backend server.
+          labels:
+            - name: host
+              description: backend server host
+            - name: port
+              description: backend server port
+          metrics:
+            - name: proxysql.backend_status
+              description: Backend status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: online
+                - name: shunned
+                - name: offline_soft
+                - name: offline_hard
+            - name: proxysql.backend_connections_usage
+              description: Backend connections usage
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: free
+                - name: used
+            - name: proxysql.backend_connections_rate
+              description: Backend connections established
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: succeed
+                - name: failed
+            - name: proxysql.backend_queries_rate
+              description: Backend queries
+              unit: queries/s
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: proxysql.backend_traffic
+              description: Backend traffic
+              unit: B/s
+              chart_type: line
+              dimensions:
+                - name: recv
+                - name: send
+            - name: proxysql.backend_latency
+              description: Backend latency
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: latency

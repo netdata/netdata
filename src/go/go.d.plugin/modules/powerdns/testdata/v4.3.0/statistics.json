@@ -1,0 +1,507 @@
+[
+  {
+    "name": "corrupt-packets",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "cpu-iowait",
+    "type": "StatisticItem",
+    "value": "513"
+  },
+  {
+    "name": "cpu-steal",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "deferred-cache-inserts",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "deferred-cache-lookup",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "deferred-packetcache-inserts",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "deferred-packetcache-lookup",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "dnsupdate-answers",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "dnsupdate-changes",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "dnsupdate-queries",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "dnsupdate-refused",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "fd-usage",
+    "type": "StatisticItem",
+    "value": "23"
+  },
+  {
+    "name": "incoming-notifications",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "key-cache-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "latency",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "meta-cache-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "open-tcp-connections",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "overload-drops",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "packetcache-hit",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "packetcache-miss",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "packetcache-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "qsize-q",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "query-cache-hit",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "query-cache-miss",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "query-cache-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "rd-queries",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "real-memory-usage",
+    "type": "StatisticItem",
+    "value": "164507648"
+  },
+  {
+    "name": "recursing-answers",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "recursing-questions",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "recursion-unanswered",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "ring-logmessages-capacity",
+    "type": "StatisticItem",
+    "value": "10000"
+  },
+  {
+    "name": "ring-logmessages-size",
+    "type": "StatisticItem",
+    "value": "10"
+  },
+  {
+    "name": "ring-noerror-queries-capacity",
+    "type": "StatisticItem",
+    "value": "10000"
+  },
+  {
+    "name": "ring-noerror-queries-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "ring-nxdomain-queries-capacity",
+    "type": "StatisticItem",
+    "value": "10000"
+  },
+  {
+    "name": "ring-nxdomain-queries-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "ring-queries-capacity",
+    "type": "StatisticItem",
+    "value": "10000"
+  },
+  {
+    "name": "ring-queries-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "ring-remotes-capacity",
+    "type": "StatisticItem",
+    "value": "10000"
+  },
+  {
+    "name": "ring-remotes-corrupt-capacity",
+    "type": "StatisticItem",
+    "value": "10000"
+  },
+  {
+    "name": "ring-remotes-corrupt-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "ring-remotes-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "ring-remotes-unauth-capacity",
+    "type": "StatisticItem",
+    "value": "10000"
+  },
+  {
+    "name": "ring-remotes-unauth-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "ring-servfail-queries-capacity",
+    "type": "StatisticItem",
+    "value": "10000"
+  },
+  {
+    "name": "ring-servfail-queries-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "ring-unauth-queries-capacity",
+    "type": "StatisticItem",
+    "value": "10000"
+  },
+  {
+    "name": "ring-unauth-queries-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "security-status",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "servfail-packets",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "signature-cache-size",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "signatures",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "sys-msec",
+    "type": "StatisticItem",
+    "value": "128"
+  },
+  {
+    "name": "tcp-answers",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "tcp-answers-bytes",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "tcp-queries",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "tcp4-answers",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "tcp4-answers-bytes",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "tcp4-queries",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "tcp6-answers",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "tcp6-answers-bytes",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "tcp6-queries",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "timedout-packets",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp-answers",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp-answers-bytes",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp-do-queries",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp-in-errors",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp-noport-errors",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp-queries",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp-recvbuf-errors",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp-sndbuf-errors",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp4-answers",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp4-answers-bytes",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp4-queries",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp6-answers",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp6-answers-bytes",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "udp6-queries",
+    "type": "StatisticItem",
+    "value": "1"
+  },
+  {
+    "name": "uptime",
+    "type": "StatisticItem",
+    "value": "207"
+  },
+  {
+    "name": "user-msec",
+    "type": "StatisticItem",
+    "value": "56"
+  },
+  {
+    "name": "response-by-qtype",
+    "type": "MapStatisticItem",
+    "value": []
+  },
+  {
+    "name": "response-sizes",
+    "type": "MapStatisticItem",
+    "value": []
+  },
+  {
+    "name": "response-by-rcode",
+    "type": "MapStatisticItem",
+    "value": []
+  },
+  {
+    "name": "logmessages",
+    "size": "10000",
+    "type": "RingStatisticItem",
+    "value": [
+      {
+        "name": "[webserver] 088688d6-9976-4e4d-a6aa-2272f8c6f173 HTTP Request \"/api/v1/servers/localhost/statistics\": Authentication by API Key failed",
+        "value": "1"
+      },
+      {
+        "name": "[webserver] 662e4249-4e9a-42e7-b780-b81929875b8f HTTP Request \"/api/v1/servers/localhost/statistics\": Authentication by API Key failed",
+        "value": "1"
+      },
+      {
+        "name": "[webserver] 8c79870a-9a47-4952-9166-02710d146ab3 HTTP Request \"/api/v1/servers/localhost/statistics\": Authentication by API Key failed",
+        "value": "1"
+      },
+      {
+        "name": "[webserver] dc029119-209f-4101-9e8f-82ab02d857d9 HTTP Request \"/api/v1/servers/localhost/statistics\": Authentication by API Key failed",
+        "value": "1"
+      },
+      {
+        "name": "[webserver] fa61f546-8607-4771-bc9a-48ddc5a85dc0 HTTP Request \"/api/v1/servers/localhost/statistics\": Authentication by API Key failed",
+        "value": "1"
+      },
+      {
+        "name": "About to create 3 backend threads for UDP",
+        "value": "1"
+      },
+      {
+        "name": "Creating backend connection for TCP",
+        "value": "1"
+      },
+      {
+        "name": "Done launching threads, ready to distribute questions",
+        "value": "1"
+      },
+      {
+        "name": "Master/slave communicator launching",
+        "value": "1"
+      },
+      {
+        "name": "No master domains need notifications",
+        "value": "1"
+      }
+    ]
+  },
+  {
+    "name": "remotes",
+    "size": "10000",
+    "type": "RingStatisticItem",
+    "value": []
+  },
+  {
+    "name": "remotes-corrupt",
+    "size": "10000",
+    "type": "RingStatisticItem",
+    "value": []
+  },
+  {
+    "name": "remotes-unauth",
+    "size": "10000",
+    "type": "RingStatisticItem",
+    "value": []
+  },
+  {
+    "name": "noerror-queries",
+    "size": "10000",
+    "type": "RingStatisticItem",
+    "value": []
+  },
+  {
+    "name": "nxdomain-queries",
+    "size": "10000",
+    "type": "RingStatisticItem",
+    "value": []
+  },
+  {
+    "name": "queries",
+    "size": "10000",
+    "type": "RingStatisticItem",
+    "value": []
+  },
+  {
+    "name": "servfail-queries",
+    "size": "10000",
+    "type": "RingStatisticItem",
+    "value": []
+  },
+  {
+    "name": "unauth-queries",
+    "size": "10000",
+    "type": "RingStatisticItem",
+    "value": []
+  }
+]

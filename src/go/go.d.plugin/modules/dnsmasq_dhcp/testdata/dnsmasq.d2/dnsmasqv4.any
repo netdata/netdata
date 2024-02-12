@@ -1,0 +1,10 @@
+dhcp-range=tag:green,192.168.2.1,192.168.2.100,12h
+
+dhcp-host=11:22:33:44:55:66,12:34:56:78:90:12,192.168.2.99
+
+conf-file=testdata/dnsmasq.conf
+conf-file=testdata/dnsmasq2.conf
+
+conf-dir=testdata/dnsmasq.d2
+conf-dir=testdata/dnsmasq.d3,.bak
+conf-dir=testdata/dnsmasq.d4,*.conf

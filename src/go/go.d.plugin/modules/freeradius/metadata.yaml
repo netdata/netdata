@@ -1,0 +1,206 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-freeradius
+      plugin_name: go.d.plugin
+      module_name: freeradius
+      monitored_instance:
+        name: FreeRADIUS
+        link: https://freeradius.org/
+        categories:
+          - data-collection.authentication-and-authorization
+        icon_filename: freeradius.svg
+      keywords:
+        - freeradius
+        - radius
+      most_popular: false
+      info_provided_to_referring_integrations:
+        description: ""
+      related_resources:
+        integrations:
+          list: []
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors FreeRADIUS servers.
+          
+          It collect metrics by sending [status-server](https://wiki.freeradius.org/config/Status) messages to the server.
+        method_description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            It automatically detects FreeRadius instances running on localhost.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Enable status server
+            description: |
+              To enable status server, follow the [official documentation](https://wiki.freeradius.org/config/Status).
+      configuration:
+        file:
+          name: go.d/freeradius.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: Server address.
+              default_value: 127.0.0.1
+              required: true
+            - name: port
+              description: Server port.
+              default_value: 18121
+              required: false
+            - name: secret
+              description: FreeRADIUS secret.
+              default_value: adminsecret
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1
+                    port: 18121
+                    secert: adminsecret
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1
+                    port: 18121
+                    secert: adminsecret
+                
+                  - name: remote
+                    address: 192.0.2.1
+                    port: 18121
+                    secert: adminsecret
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: freeradius.authentication
+              description: Authentication
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: responses
+            - name: freeradius.authentication_access_responses
+              description: Authentication Responses
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: accepts
+                - name: rejects
+                - name: challenges
+            - name: freeradius.bad_authentication
+              description: Bad Authentication Requests
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: dropped
+                - name: duplicate
+                - name: invalid
+                - name: malformed
+                - name: unknown-types
+            - name: freeradius.proxy_authentication
+              description: Authentication
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: responses
+            - name: freeradius.proxy_authentication_access_responses
+              description: Authentication Responses
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: accepts
+                - name: rejects
+                - name: challenges
+            - name: freeradius.proxy_bad_authentication
+              description: Bad Authentication Requests
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: dropped
+                - name: duplicate
+                - name: invalid
+                - name: malformed
+                - name: unknown-types
+            - name: freeradius.accounting
+              description: Accounting
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: responses
+            - name: freeradius.bad_accounting
+              description: Bad Accounting Requests
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: dropped
+                - name: duplicate
+                - name: invalid
+                - name: malformed
+                - name: unknown-types
+            - name: freeradius.proxy_accounting
+              description: Accounting
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: responses
+            - name: freeradius.proxy_bad_accounting
+              description: Bad Accounting Requests
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: dropped
+                - name: duplicate
+                - name: invalid
+                - name: malformed
+                - name: unknown-types

@@ -1,0 +1,11 @@
+- hostname: first
+  guid: 4ea21e84-93b4-418b-b83e-79397610cd6e
+  labels:
+    area: "41"
+    level: "82"
+
+- hostname: second
+  guid: 9486b0e1-b391-4d9a-bd88-5c703183f9b6
+  labels:
+    area: "51"
+    level: "92"

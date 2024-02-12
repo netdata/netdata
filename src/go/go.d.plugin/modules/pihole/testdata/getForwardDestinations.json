@@ -1,0 +1,7 @@
+{
+  "forward_destinations": {
+    "blocked|blocked": 2.2,
+    "cached|cached": 88.4,
+    "other|other": 9.4
+  }
+}

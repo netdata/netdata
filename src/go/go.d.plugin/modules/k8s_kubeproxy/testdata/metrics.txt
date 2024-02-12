@@ -1,0 +1,190 @@
+# HELP apiserver_audit_event_total Counter of audit events generated and sent to the audit backend.
+# TYPE apiserver_audit_event_total counter
+apiserver_audit_event_total 0
+# HELP apiserver_audit_requests_rejected_total Counter of apiserver requests rejected due to an error in audit logging backend.
+# TYPE apiserver_audit_requests_rejected_total counter
+apiserver_audit_requests_rejected_total 0
+# HELP go_gc_duration_seconds A summary of the GC invocation durations.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 2.2652e-05
+go_gc_duration_seconds{quantile="0.25"} 5.9037e-05
+go_gc_duration_seconds{quantile="0.5"} 0.000113147
+go_gc_duration_seconds{quantile="0.75"} 0.000232939
+go_gc_duration_seconds{quantile="1"} 0.009002756
+go_gc_duration_seconds_sum 0.294305823
+go_gc_duration_seconds_count 755
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 46
+# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 6.14748e+06
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 9.53406048e+08
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 1.535744e+06
+# HELP go_memstats_frees_total Total number of frees.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 8.247964e+06
+# HELP go_memstats_gc_cpu_fraction The fraction of this program's available CPU time used by the GC since the program started.
+# TYPE go_memstats_gc_cpu_fraction gauge
+go_memstats_gc_cpu_fraction 7.826953112615371e-06
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 2.387968e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and still in use.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 6.14748e+06
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 5.8466304e+07
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use.
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 7.82336e+06
+# HELP go_memstats_heap_objects Number of allocated objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 29543
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 0
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 6.6289664e+07
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 1.5530903816542802e+09
+# HELP go_memstats_lookups_total Total number of pointer lookups.
+# TYPE go_memstats_lookups_total counter
+go_memstats_lookups_total 0
+# HELP go_memstats_mallocs_total Total number of mallocs.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 8.277507e+06
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 3456
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 16384
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 89832
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 114688
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 7.132208e+06
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 596472
+# HELP go_memstats_stack_inuse_bytes Number of bytes in use by the stack allocator.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 819200
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 819200
+# HELP go_memstats_sys_bytes Number of bytes obtained from system.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 7.176012e+07
+# HELP go_threads Number of OS threads created
+# TYPE go_threads gauge
+go_threads 10
+# HELP http_request_duration_microseconds The HTTP request latencies in microseconds.
+# TYPE http_request_duration_microseconds summary
+http_request_duration_microseconds{handler="prometheus",quantile="0.5"} 1515.864
+http_request_duration_microseconds{handler="prometheus",quantile="0.9"} 3939.871
+http_request_duration_microseconds{handler="prometheus",quantile="0.99"} 9464.15
+http_request_duration_microseconds_sum{handler="prometheus"} 837819.5429999996
+http_request_duration_microseconds_count{handler="prometheus"} 378
+# HELP http_request_size_bytes The HTTP request sizes in bytes.
+# TYPE http_request_size_bytes summary
+http_request_size_bytes{handler="prometheus",quantile="0.5"} 377
+http_request_size_bytes{handler="prometheus",quantile="0.9"} 377
+http_request_size_bytes{handler="prometheus",quantile="0.99"} 377
+http_request_size_bytes_sum{handler="prometheus"} 142462
+http_request_size_bytes_count{handler="prometheus"} 378
+# HELP http_requests_total Total number of HTTP requests made.
+# TYPE http_requests_total counter
+http_requests_total{code="200",handler="prometheus",method="get"} 378
+# HELP http_response_size_bytes The HTTP response sizes in bytes.
+# TYPE http_response_size_bytes summary
+http_response_size_bytes{handler="prometheus",quantile="0.5"} 2414
+http_response_size_bytes{handler="prometheus",quantile="0.9"} 2419
+http_response_size_bytes{handler="prometheus",quantile="0.99"} 2423
+http_response_size_bytes_sum{handler="prometheus"} 911969
+http_response_size_bytes_count{handler="prometheus"} 378
+# HELP kubeproxy_sync_proxy_rules_latency_microseconds SyncProxyRules latency
+# TYPE kubeproxy_sync_proxy_rules_latency_microseconds histogram
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="1000"} 1
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="2000"} 1
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="4000"} 1
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="8000"} 1
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="16000"} 24
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="32000"} 2534
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="64000"} 2660
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="128000"} 2668
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="256000"} 2668
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="512000"} 2669
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="1.024e+06"} 2669
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="2.048e+06"} 2669
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="4.096e+06"} 2669
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="8.192e+06"} 2669
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="1.6384e+07"} 2669
+kubeproxy_sync_proxy_rules_latency_microseconds_bucket{le="+Inf"} 2669
+kubeproxy_sync_proxy_rules_latency_microseconds_sum 6.2885705e+07
+kubeproxy_sync_proxy_rules_latency_microseconds_count 2669
+# HELP kubernetes_build_info A metric with a constant '1' value labeled by major, minor, git version, git commit, git tree state, build date, Go version, and compiler from which Kubernetes was built, and platform on which it is running.
+# TYPE kubernetes_build_info gauge
+kubernetes_build_info{buildDate="2019-02-28T13:35:32Z",compiler="gc",gitCommit="c27b913fddd1a6c480c229191a087698aa92f0b1",gitTreeState="clean",gitVersion="v1.13.4",goVersion="go1.11.5",major="1",minor="13",platform="linux/amd64"} 1
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 156.15
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 11
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 3.5467264e+07
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.5530103809e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.4047232e+08
+# HELP rest_client_request_latency_seconds Request latency in seconds. Broken down by verb and URL.
+# TYPE rest_client_request_latency_seconds histogram
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.001"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.002"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.004"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.008"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.016"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.032"} 2
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.064"} 2
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.128"} 2
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.256"} 3
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="0.512"} 3
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET",le="+Inf"} 3
+rest_client_request_latency_seconds_sum{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET"} 0.28126861
+rest_client_request_latency_seconds_count{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="GET"} 3
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.001"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.002"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.004"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.008"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.016"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.032"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.064"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.128"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.256"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="0.512"} 0
+rest_client_request_latency_seconds_bucket{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST",le="+Inf"} 1
+rest_client_request_latency_seconds_sum{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST"} 4.008446017
+rest_client_request_latency_seconds_count{url="https://192.168.99.124:8443/%7Bprefix%7D",verb="POST"} 1
+# HELP rest_client_requests_total Number of HTTP requests, partitioned by status code, method, and host.
+# TYPE rest_client_requests_total counter
+rest_client_requests_total{code="200",host="192.168.99.124:8443",method="GET"} 362
+rest_client_requests_total{code="201",host="192.168.99.124:8443",method="POST"} 1

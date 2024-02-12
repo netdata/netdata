@@ -1,0 +1,346 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-vcsa
+      plugin_name: go.d.plugin
+      module_name: vcsa
+      monitored_instance:
+        name: vCenter Server Appliance
+        link: https://docs.vmware.com/en/VMware-vSphere/6.5/com.vmware.vsphere.vcsa.doc/GUID-223C2821-BD98-4C7A-936B-7DBE96291BA4.html
+        icon_filename: vmware.svg
+        categories:
+          - data-collection.containers-and-vms
+      keywords:
+        - vmware
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors [health statistics](https://developer.vmware.com/apis/vsphere-automation/latest/appliance/health/) of vCenter Server Appliance servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "go.d/vcsa.conf"
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: "5"
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: "0"
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: ""
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: "1"
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: true
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: true
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: "GET"
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: "false"
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: "false"
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: vcsa1
+                    url: https://203.0.113.1
+                    username: admin@vsphere.local
+                    password: password
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Two instances.
+              config: |
+                jobs:
+                  - name: vcsa1
+                    url: https://203.0.113.1
+                    username: admin@vsphere.local
+                    password: password
+                
+                  - name: vcsa2
+                    url: https://203.0.113.10
+                    username: admin@vsphere.local
+                    password: password
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: vcsa_system_health_warn
+        metric: vcsa.system_health_status
+        info: VCSA overall system status is orange. One or more components are degraded.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_system_health_crit
+        metric: vcsa.system_health_status
+        info: VCSA overall system status is red. One or more components are unavailable or will stop functioning soon.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_applmgmt_health_warn
+        metric: vcsa.applmgmt_health_status
+        info: VCSA ApplMgmt component status is orange. It is degraded, and may have serious problems.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_applmgmt_health_crit
+        metric: vcsa.applmgmt_health_status
+        info: VCSA ApplMgmt component status is red. It is unavailable, or will stop functioning soon.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_load_health_warn
+        metric: vcsa.load_health_status
+        info: VCSA Load component status is orange. It is degraded, and may have serious problems.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_load_health_crit
+        metric: vcsa.load_health_status
+        info: VCSA Load component status is red. It is unavailable, or will stop functioning soon.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_mem_health_warn
+        metric: vcsa.mem_health_status
+        info: VCSA Memory component status is orange. It is degraded, and may have serious problems.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_mem_health_crit
+        metric: vcsa.mem_health_status
+        info: VCSA Memory component status is red. It is unavailable, or will stop functioning soon.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_swap_health_warn
+        metric: vcsa.swap_health_status
+        info: VCSA Swap component status is orange. It is degraded, and may have serious problems.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_swap_health_crit
+        metric: vcsa.swap_health_status
+        info: VCSA Swap component status is red. It is unavailable, or will stop functioning soon.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_database_storage_health_warn
+        metric: vcsa.database_storage_health_status
+        info: VCSA Database Storage component status is orange. It is degraded, and may have serious problems.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_database_storage_health_crit
+        metric: vcsa.database_storage_health_status
+        info: VCSA Database Storage component status is red. It is unavailable, or will stop functioning soon.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_storage_health_warn
+        metric: vcsa.storage_health_status
+        info: VCSA Storage component status is orange. It is degraded, and may have serious problems.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_storage_health_crit
+        metric: vcsa.storage_health_status
+        info: VCSA Storage component status is red. It is unavailable, or will stop functioning soon.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+      - name: vcsa_software_packages_health_warn
+        metric: vcsa.software_packages_health_status
+        info: VCSA software packages security updates are available.
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vcsa.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: |
+            These metrics refer to the entire monitored application.
+            <details>
+            <summary>See health statuses</summary>
+            Overall System Health:
+            
+            | Status  | Description                                                                                                              |
+            |:-------:|:-------------------------------------------------------------------------------------------------------------------------|
+            |  green  | All components in the appliance are healthy.                                                                             |
+            | yellow  | One or more components in the appliance might become overloaded soon.                                                    |
+            | orange  | One or more components in the appliance might be degraded.                                                               |
+            |   red   | One or more components in the appliance might be in an unusable status and the appliance might become unresponsive soon. |
+            |  gray   | No health data is available.                                                                                             |
+            | unknown | Collector failed to decode status.                                                                                       |
+            
+            Components Health:
+            
+            | Status  | Description                                                  |
+            |:-------:|:-------------------------------------------------------------|
+            |  green  | The component is healthy.                                    |
+            | yellow  | The component is healthy, but may have some problems.        |
+            | orange  | The component is degraded, and may have serious problems.    |
+            |   red   | The component is unavailable, or will stop functioning soon. |
+            |  gray   | No health data is available.                                 |
+            | unknown | Collector failed to decode status.                           |
+            
+            Software Updates Health:
+            
+            | Status  | Description                                          |
+            |:-------:|:-----------------------------------------------------|
+            |  green  | No updates available.                                |
+            | orange  | Non-security patches might be available.             |
+            |   red   | Security patches might be available.                 |
+            |  gray   | An error retrieving information on software updates. |
+            | unknown | Collector failed to decode status.                   |
+            
+            </details>
+          labels: []
+          metrics:
+            - name: vcsa.system_health_status
+              description: VCSA Overall System health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: orange
+                - name: gray
+                - name: unknown
+            - name: vcsa.applmgmt_health_status
+              description: VCSA ApplMgmt health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: orange
+                - name: gray
+                - name: unknown
+            - name: vcsa.load_health_status
+              description: VCSA Load health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: orange
+                - name: gray
+                - name: unknown
+            - name: vcsa.mem_health_status
+              description: VCSA Memory health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: orange
+                - name: gray
+                - name: unknown
+            - name: vcsa.swap_health_status
+              description: VCSA Swap health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: orange
+                - name: gray
+                - name: unknown
+            - name: vcsa.database_storage_health_status
+              description: VCSA Database Storage health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: orange
+                - name: gray
+                - name: unknown
+            - name: vcsa.storage_health_status
+              description: VCSA Storage health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: yellow
+                - name: orange
+                - name: gray
+                - name: unknown
+            - name: vcsa.software_packages_health_status
+              description: VCSA Software Updates health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: red
+                - name: orange
+                - name: gray
+                - name: unknown

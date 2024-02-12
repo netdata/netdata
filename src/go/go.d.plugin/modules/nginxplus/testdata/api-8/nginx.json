@@ -1,0 +1,10 @@
+{
+  "version": "1.21.6",
+  "build": "nginx-plus-r27-p1",
+  "address": "127.0.0.1",
+  "generation": 1,
+  "load_timestamp": "2022-11-19T14:38:38.676Z",
+  "timestamp": "2022-11-19T14:38:57.031Z",
+  "pid": 2254633,
+  "ppid": 2254629
+}

@@ -1,0 +1,11 @@
+ datname  | schemaname |     relname      |      indexrelname       | idx_scan | idx_tup_read | idx_tup_fetch |   size
+----------+------------+------------------+-------------------------+----------+--------------+---------------+-----------
+ postgres | public     | pgbench_branches | pgbench_branches_pkey   |        0 |            0 |             0 |     16384
+ postgres | public     | pgbench_tellers  | pgbench_tellers_pkey    |        0 |            0 |             0 |     32768
+ postgres | public     | pgbench_accounts | pgbench_accounts_pkey   |        3 |      5000000 |             0 | 112336896
+ postgres | public     | myaccounts       | myaccounts_pkey         |        0 |            0 |             0 |      8192
+ postgres | public     | myaccounts       | myaccounts_username_key |        0 |            0 |             0 |      8192
+ postgres | public     | myaccounts       | myaccounts_email_key    |        0 |            0 |             0 |      8192
+ postgres | myschema   | myaccounts       | myaccounts_pkey         |        0 |            0 |             0 |      8192
+ postgres | myschema   | myaccounts       | myaccounts_username_key |        0 |            0 |             0 |      8192
+ postgres | myschema   | myaccounts       | myaccounts_email_key    |        0 |            0 |             0 |      8192

@@ -1,0 +1,50 @@
+{
+  "Config": {
+    "Datacenter": "us-central",
+    "PrimaryDatacenter": "us-central",
+    "NodeName": "satya-vm",
+    "NodeID": "d86b8af4-5dc5-d790-7c32-420d4ac1dd8d",
+    "Revision": "0e046bbb",
+    "Server": false,
+    "Version": "1.13.2",
+    "BuildDate": "2022-09-20T20:30:07Z"
+  },
+  "DebugConfig": {
+    "Telemetry": {
+      "AllowedPrefixes": [],
+      "BlockedPrefixes": [
+        "consul.rpc.server.call"
+      ],
+      "CirconusAPIApp": "",
+      "CirconusAPIToken": "hidden",
+      "CirconusAPIURL": "",
+      "CirconusBrokerID": "",
+      "CirconusBrokerSelectTag": "",
+      "CirconusCheckDisplayName": "",
+      "CirconusCheckForceMetricActivation": "",
+      "CirconusCheckID": "",
+      "CirconusCheckInstanceID": "",
+      "CirconusCheckSearchTag": "",
+      "CirconusCheckTags": "",
+      "CirconusSubmissionInterval": "",
+      "CirconusSubmissionURL": "",
+      "Disable": false,
+      "DisableHostname": false,
+      "DogstatsdAddr": "",
+      "DogstatsdTags": [],
+      "FilterDefault": true,
+      "MetricsPrefix": "consul",
+      "PrometheusOpts": {
+        "CounterDefinitions": [],
+        "Expiration": "10m0s",
+        "GaugeDefinitions": [],
+        "Name": "consul",
+        "Registerer": null,
+        "SummaryDefinitions": []
+      },
+      "RetryFailedConfiguration": true,
+      "StatsdAddr": "",
+      "StatsiteAddr": ""
+    }
+  }
+}

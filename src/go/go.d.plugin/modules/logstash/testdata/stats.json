@@ -1,0 +1,252 @@
+{
+  "host" : "<replaced>",
+  "version" : "7.3.0",
+  "http_address" : "0.0.0.0:9600",
+  "id" : "<replaced>",
+  "name" : "<replaced>",
+  "ephemeral_id" : "339d4ddb-8a6e-4ddc-b843-efd4abf4bf73",
+  "status" : "green",
+  "snapshot" : false,
+  "pipeline" : {
+    "workers" : 1,
+    "batch_size" : 125,
+    "batch_delay" : 50
+  },
+  "jvm" : {
+    "threads" : {
+      "count" : 28,
+      "peak_count" : 32
+    },
+    "mem" : {
+      "heap_used_percent" : 35,
+      "heap_committed_in_bytes" : 528154624,
+      "heap_max_in_bytes" : 528154624,
+      "heap_used_in_bytes" : 189973480,
+      "non_heap_used_in_bytes" : 178053280,
+      "non_heap_committed_in_bytes" : 235200512,
+      "pools" : {
+        "young" : {
+          "committed_in_bytes" : 69795840,
+          "peak_max_in_bytes" : 69795840,
+          "max_in_bytes" : 69795840,
+          "peak_used_in_bytes" : 69795840,
+          "used_in_bytes" : 2600120
+        },
+        "old" : {
+          "committed_in_bytes" : 449642496,
+          "peak_max_in_bytes" : 449642496,
+          "max_in_bytes" : 449642496,
+          "peak_used_in_bytes" : 185944824,
+          "used_in_bytes" : 185944824
+        },
+        "survivor" : {
+          "committed_in_bytes" : 8716288,
+          "peak_max_in_bytes" : 8716288,
+          "max_in_bytes" : 8716288,
+          "peak_used_in_bytes" : 8716288,
+          "used_in_bytes" : 1428536
+        }
+      }
+    },
+    "gc" : {
+      "collectors" : {
+        "young" : {
+          "collection_count" : 5796,
+          "collection_time_in_millis" : 45008
+        },
+        "old" : {
+          "collection_count" : 7,
+          "collection_time_in_millis" : 3263
+        }
+      }
+    },
+    "uptime_in_millis" : 699809475
+  },
+  "process" : {
+    "open_file_descriptors" : 101,
+    "peak_open_file_descriptors" : 105,
+    "max_file_descriptors" : 1048576,
+    "mem" : {
+      "total_virtual_in_bytes" : 5074657280
+    },
+    "cpu" : {
+      "total_in_millis" : 7304550,
+      "percent" : 0,
+      "load_average" : {
+        "1m" : 0.73,
+        "5m" : 1.13,
+        "15m" : 1.06
+      }
+    }
+  },
+  "events" : {
+    "in" : 567639,
+    "filtered" : 567639,
+    "out" : 567639,
+    "duration_in_millis" : 5027018,
+    "queue_push_duration_in_millis" : 84241
+  },
+  "pipelines" : {
+    "pipeline-1" : {
+      "events" : {
+        "queue_push_duration_in_millis" : 84241,
+        "filtered" : 567639,
+        "duration_in_millis" : 5027018,
+        "in" : 567639,
+        "out" : 567639
+      },
+      "plugins" : {
+        "inputs" : [ {
+          "id" : "kafka input",
+          "events" : {
+            "queue_push_duration_in_millis" : 84241,
+            "out" : 567639
+          },
+          "name" : "kafka"
+        } ],
+        "codecs" : [ {
+          "id" : "json_9562e6c4-7a1a-4c18-919f-f012e58923dd",
+          "decode" : {
+            "writes_in" : 567639,
+            "duration_in_millis" : 86778,
+            "out" : 567639
+          },
+          "name" : "json",
+          "encode" : {
+            "writes_in" : 0,
+            "duration_in_millis" : 0
+          }
+        }, {
+          "id" : "plain_13e28721-e681-43ec-aa2c-c0a4d856b9ed",
+          "decode" : {
+            "writes_in" : 0,
+            "duration_in_millis" : 0,
+            "out" : 0
+          },
+          "name" : "plain",
+          "encode" : {
+            "writes_in" : 0,
+            "duration_in_millis" : 0
+          }
+        } ],
+        "filters" : [ {
+          "id" : "set default timezone",
+          "events" : {
+            "duration_in_millis" : 340,
+            "in" : 326901,
+            "out" : 326901
+          },
+          "name" : "mutate"
+        }, {
+          "id" : "assign index (filebeat)",
+          "events" : {
+            "duration_in_millis" : 858,
+            "in" : 567639,
+            "out" : 567639
+          },
+          "name" : "mutate"
+        }, {
+          "id" : "parse JSON",
+          "events" : {
+            "duration_in_millis" : 112,
+            "in" : 0,
+            "out" : 0
+          },
+          "name" : "json"
+        }, {
+          "id" : "parse LTSV",
+          "events" : {
+            "duration_in_millis" : 130,
+            "in" : 0,
+            "out" : 0
+          },
+          "name" : "kv"
+        }, {
+          "id" : "assign document_id",
+          "events" : {
+            "duration_in_millis" : 2406,
+            "in" : 567639,
+            "out" : 567639
+          },
+          "name" : "fingerprint"
+        }, {
+          "id" : "assign index (fluentd)",
+          "events" : {
+            "duration_in_millis" : 140,
+            "in" : 0,
+            "out" : 0
+          },
+          "name" : "mutate"
+        }, {
+          "id" : "parse timestamp",
+          "events" : {
+            "duration_in_millis" : 7261,
+            "in" : 326901,
+            "out" : 326901
+          },
+          "name" : "date",
+          "failures" : 1,
+          "matches" : 326900
+        } ],
+        "outputs" : [ {
+          "id" : "0f72afb28c5ff3a3897d87b04fc1b0a5fe8358cb55bbc29b995056fd868e612b",
+          "events" : {
+            "duration_in_millis" : 4063485,
+            "in" : 567639,
+            "out" : 567639
+          },
+          "name" : "elasticsearch",
+          "documents" : {
+            "successes" : 567639
+          },
+          "bulk_requests" : {
+            "responses" : {
+              "200" : 50735
+            },
+            "successes" : 50735
+          }
+        } ]
+      },
+      "reloads" : {
+        "last_error" : null,
+        "last_failure_timestamp" : null,
+        "last_success_timestamp" : null,
+        "failures" : 0,
+        "successes" : 0
+      },
+      "queue" : {
+        "type" : "persisted",
+        "events_count" : 0,
+        "queue_size_in_bytes" : 45085456,
+        "max_queue_size_in_bytes" : 1073741824
+      },
+      "hash" : "46f5c757f55a52d08ed841e9f51698653cf228ff9be41b7372f20a1b699bf129",
+      "ephemeral_id" : "c43b3a8e-882c-4e3a-a2f2-8515a5ef4ecc"
+    }
+  },
+  "reloads" : {
+    "failures" : 0,
+    "successes" : 0
+  },
+  "os" : {
+    "cgroup" : {
+      "cpuacct" : {
+        "control_group" : "/",
+        "usage_nanos" : 7304416115351
+      },
+      "cpu" : {
+        "control_group" : "/",
+        "cfs_quota_micros" : 100000,
+        "cfs_period_micros" : 100000,
+        "stat" : {
+          "time_throttled_nanos" : 124716913549,
+          "number_of_elapsed_periods" : 5875889,
+          "number_of_times_throttled" : 1219
+        }
+      }
+    }
+  },
+  "queue" : {
+    "events_count" : 0
+  }
+}

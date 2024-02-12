@@ -1,0 +1,63 @@
+[
+    {
+        "changes_done": 64438,
+        "database": "mailbox",
+        "pid": "<0.12986.1>",
+        "progress": 84,
+        "started_on": 1376116576,
+        "total_changes": 76215,
+        "type": "database_compaction",
+        "updated_on": 1376116619
+    },
+    {
+        "changes_done": 26534,
+        "database": "mailbox",
+        "pid": "<0.12943.2>",
+        "progress": 23,
+        "started_on": 1376116592,
+        "total_changes": 76215,
+        "type": "view_compaction",
+        "updated_on": 1376116637
+    },
+    {
+        "changes_done": 14443,
+        "database": "mailbox",
+        "design_document": "c9753817b3ba7c674d92361f24f59b9f",
+        "pid": "<0.10461.3>",
+        "progress": 18,
+        "started_on": 1376116621,
+        "total_changes": 76215,
+        "type": "indexer",
+        "updated_on": 1376116650
+    },
+    {
+        "changes_done": 5454,
+        "database": "mailbox",
+        "design_document": "_design/meta",
+        "pid": "<0.6838.4>",
+        "progress": 7,
+        "started_on": 1376116632,
+        "total_changes": 76215,
+        "type": "indexer",
+        "updated_on": 1376116651
+    },
+    {
+        "checkpointed_source_seq": 68585,
+        "continuous": false,
+        "doc_id": null,
+        "doc_write_failures": 1,
+        "docs_read": 4524,
+        "docs_written": 4524,
+        "missing_revisions_found": 4524,
+        "pid": "<0.1538.5>",
+        "progress": 44,
+        "replication_id": "9bc1727d74d49d9e157e260bb8bbd1d5",
+        "revisions_checked": 4524,
+        "source": "mailbox",
+        "source_seq": 154419,
+        "started_on": 1376116644,
+        "target": "http://mailsrv:5984/mailbox",
+        "type": "replication",
+        "updated_on": 1376116651
+    }
+]

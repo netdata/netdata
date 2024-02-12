@@ -1,0 +1,231 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-lighttpd
+      plugin_name: go.d.plugin
+      module_name: lighttpd
+      monitored_instance:
+        name: Lighttpd
+        link: https://www.lighttpd.net/
+        icon_filename: lighttpd.svg
+        categories:
+          - data-collection.web-servers-and-web-proxies
+      keywords:
+        - webserver
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: go.d.plugin
+              module_name: weblog
+            - plugin_name: go.d.plugin
+              module_name: httpcheck
+            - plugin_name: apps.plugin
+              module_name: apps
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the activity and performance of Lighttpd servers, and collects metrics such as the number of connections, workers, requests and more.
+        method_description: |
+          It sends HTTP requests to the Lighttpd location [server-status](https://redmine.lighttpd.net/projects/lighttpd/wiki/Mod_status), 
+          which is a built-in location that provides metrics about the Lighttpd server.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Lighttpd instances running on localhost that are listening on port 80.
+            On startup, it tries to collect metrics from:
+            
+            - http://localhost/server-status?auto
+            - http://127.0.0.1/server-status?auto
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable Lighttpd status support
+            description: |
+              To enable status support, see the [official documentation](https://redmine.lighttpd.net/projects/lighttpd/wiki/Mod_status).
+      configuration:
+        file:
+          name: go.d/lighttpd.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1/server-status?auto
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: "GET"
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1/server-status?auto
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1/server-status?auto
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: Lighttpd with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1/server-status?auto
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1/server-status?auto
+                
+                  - name: remote
+                    url: http://192.0.2.1/server-status?auto
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: lighttpd.requests
+              description: Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: lighttpd.net
+              description: Bandwidth
+              unit: kilobits/s
+              chart_type: area
+              dimensions:
+                - name: sent
+            - name: lighttpd.workers
+              description: Servers
+              unit: servers
+              chart_type: stacked
+              dimensions:
+                - name: idle
+                - name: busy
+            - name: lighttpd.scoreboard
+              description: ScoreBoard
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: waiting
+                - name: open
+                - name: close
+                - name: hard_error
+                - name: keepalive
+                - name: read
+                - name: read_post
+                - name: write
+                - name: handle_request
+                - name: request_start
+                - name: request_end
+            - name: lighttpd.uptime
+              description: Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime

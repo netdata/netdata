@@ -1,0 +1,399 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-scaleio
+      plugin_name: go.d.plugin
+      module_name: scaleio
+      monitored_instance:
+        name: Dell EMC ScaleIO
+        link: https://www.dell.com/en-ca/dt/storage/scaleio/scaleioreadynode.htm
+        icon_filename: dell.svg
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+      keywords:
+        - scaleio
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors ScaleIO (VxFlex OS) instances via VxFlex OS Gateway API.
+          
+          It collects metrics for the following ScaleIO components:
+          
+          - System
+          - Storage Pool
+          - Sdc
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/scaleio.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: https://127.0.0.1:80
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: true
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: true
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1
+                    username: admin
+                    password: password
+                    tls_skip_verify: yes  # self-signed certificate
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Local and remote instance.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1
+                    username: admin
+                    password: password
+                    tls_skip_verify: yes  # self-signed certificate
+                
+                  - name: remote
+                    url: https://203.0.113.10
+                    username: admin
+                    password: password
+                    tls_skip_verify: yes
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: scaleio.system_capacity_total
+              description: Total Capacity
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: scaleio.system_capacity_in_use
+              description: Capacity In Use
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: in_use
+            - name: scaleio.system_capacity_usage
+              description: Capacity Usage
+              unit: KiB
+              chart_type: stacked
+              dimensions:
+                - name: thick
+                - name: decreased
+                - name: thin
+                - name: snapshot
+                - name: spare
+                - name: unused
+            - name: scaleio.system_capacity_available_volume_allocation
+              description: Available For Volume Allocation
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: available
+            - name: scaleio.system_capacity_health_state
+              description: Capacity Health State
+              unit: KiB
+              chart_type: stacked
+              dimensions:
+                - name: protected
+                - name: degraded
+                - name: in_maintenance
+                - name: failed
+                - name: unavailable
+            - name: scaleio.system_workload_primary_bandwidth_total
+              description: Primary Backend Bandwidth Total (Read and Write)
+              unit: KiB/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: scaleio.system_workload_primary_bandwidth
+              description: Primary Backend Bandwidth
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: scaleio.system_workload_primary_iops_total
+              description: Primary Backend IOPS Total (Read and Write)
+              unit: iops/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: scaleio.system_workload_primary_iops
+              description: Primary Backend IOPS
+              unit: iops/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: scaleio.system_workload_primary_io_size_total
+              description: Primary Backend I/O Size Total (Read and Write)
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: io_size
+            - name: scaleio.system_rebalance
+              description: Rebalance
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: scaleio.system_rebalance_left
+              description: Rebalance Pending Capacity
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: left
+            - name: scaleio.system_rebalance_time_until_finish
+              description: Rebalance Approximate Time Until Finish
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: scaleio.system_rebuild
+              description: Rebuild Bandwidth Total (Forward, Backward and Normal)
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: scaleio.system_rebuild_left
+              description: Rebuild Pending Capacity Total (Forward, Backward and Normal)
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: left
+            - name: scaleio.system_defined_components
+              description: Components
+              unit: components
+              chart_type: line
+              dimensions:
+                - name: devices
+                - name: fault_sets
+                - name: protection_domains
+                - name: rfcache_devices
+                - name: sdc
+                - name: sds
+                - name: snapshots
+                - name: storage_pools
+                - name: volumes
+                - name: vtrees
+            - name: scaleio.system_components_volumes_by_type
+              description: Volumes By Type
+              unit: volumes
+              chart_type: stacked
+              dimensions:
+                - name: thick
+                - name: thin
+            - name: scaleio.system_components_volumes_by_mapping
+              description: Volumes By Mapping
+              unit: volumes
+              chart_type: stacked
+              dimensions:
+                - name: mapped
+                - name: unmapped
+        - name: storage pool
+          description: These metrics refer to the storage pool.
+          labels: []
+          metrics:
+            - name: scaleio.storage_pool_capacity_total
+              description: Total Capacity
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: scaleio.storage_pool_capacity_in_use
+              description: Capacity In Use
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: in_use
+            - name: scaleio.storage_pool_capacity_usage
+              description: Capacity Usage
+              unit: KiB
+              chart_type: stacked
+              dimensions:
+                - name: thick
+                - name: decreased
+                - name: thin
+                - name: snapshot
+                - name: spare
+                - name: unused
+            - name: scaleio.storage_pool_capacity_utilization
+              description: Capacity Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: scaleio.storage_pool_capacity_available_volume_allocation
+              description: Available For Volume Allocation
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: available
+            - name: scaleio.storage_pool_capacity_health_state
+              description: Capacity Health State
+              unit: KiB
+              chart_type: stacked
+              dimensions:
+                - name: protected
+                - name: degraded
+                - name: in_maintenance
+                - name: failed
+                - name: unavailable
+            - name: scaleio.storage_pool_components
+              description: Components
+              unit: components
+              chart_type: line
+              dimensions:
+                - name: devices
+                - name: snapshots
+                - name: volumes
+                - name: vtrees
+        - name: sdc
+          description: These metrics refer to the SDC (ScaleIO Data Client).
+          labels: []
+          metrics:
+            - name: scaleio.sdc_mdm_connection_state
+              description: MDM Connection State
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: connected
+            - name: scaleio.sdc_bandwidth
+              description: Bandwidth
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: scaleio.sdc_iops
+              description: IOPS
+              unit: iops/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: scaleio.sdc_io_size
+              description: IOPS Size
+              unit: KiB
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: scaleio.sdc_num_of_mapped_volumed
+              description: Mapped Volumes
+              unit: volumes
+              chart_type: line
+              dimensions:
+                - name: mapped

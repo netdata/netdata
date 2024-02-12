@@ -1,0 +1,22 @@
+{
+    "user": "user1",
+    "name": "name1",
+    "namespace": "namespace",
+    "repository_type": "image",
+    "status": 1,
+    "description": "Description.",
+    "is_private": false,
+    "is_automated": false,
+    "can_edit": false,
+    "star_count": 45,
+    "pull_count": 18540191,
+    "last_updated": "2019-03-28T21:26:05.527650Z",
+    "is_migrated": false,
+    "has_starred": false,
+    "affiliation": null,
+    "permissions": {
+        "read": true,
+        "write": false,
+        "admin": false
+    }
+}

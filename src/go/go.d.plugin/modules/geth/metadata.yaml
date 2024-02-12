@@ -1,0 +1,291 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-geth
+      plugin_name: go.d.plugin
+      module_name: geth
+      monitored_instance:
+        name: Go-ethereum
+        link: https://github.com/ethereum/go-ethereum
+        icon_filename: geth.png
+        categories:
+          - data-collection.blockchain-servers
+      keywords:
+        - geth
+        - ethereum
+        - blockchain
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Go-ethereum instances.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Go-ethereum instances running on localhost.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/geth.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:6060/debug/metrics/prometheus
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:6060/debug/metrics/prometheus
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:6060/debug/metrics/prometheus
+                    username: username
+                    password: password
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:6060/debug/metrics/prometheus
+                
+                  - name: remote
+                    url: http://192.0.2.1:6060/debug/metrics/prometheus
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: geth.eth_db_chaindata_ancient_io_rate
+              description: Ancient Chaindata rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: geth.eth_db_chaindata_ancient_io
+              description: Session ancient Chaindata
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: geth.eth_db_chaindata_disk_io
+              description: Session chaindata on disk
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: geth.goroutines
+              description: Number of goroutines
+              unit: goroutines
+              chart_type: line
+              dimensions:
+                - name: goroutines
+            - name: geth.eth_db_chaindata_disk_io_rate
+              description: On disk Chaindata rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: geth.chaindata_db_size
+              description: Chaindata Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: level_db
+                - name: ancient_db
+            - name: geth.chainhead
+              description: Chainhead
+              unit: block
+              chart_type: line
+              dimensions:
+                - name: block
+                - name: receipt
+                - name: header
+            - name: geth.tx_pool_pending
+              description: Pending Transaction Pool
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: invalid
+                - name: pending
+                - name: local
+                - name: discard
+                - name: no_funds
+                - name: ratelimit
+                - name: replace
+            - name: geth.tx_pool_current
+              description: Transaction Pool
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: invalid
+                - name: pending
+                - name: local
+                - name: pool
+            - name: geth.tx_pool_queued
+              description: Queued Transaction Pool
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: discard
+                - name: eviction
+                - name: no_funds
+                - name: ratelimit
+            - name: geth.p2p_bandwidth
+              description: P2P bandwidth
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: ingress
+                - name: egress
+            - name: geth.reorgs
+              description: Executed Reorgs
+              unit: reorgs
+              chart_type: line
+              dimensions:
+                - name: executed
+            - name: geth.reorgs_blocks
+              description: Blocks Added/Removed from Reorg
+              unit: blocks
+              chart_type: line
+              dimensions:
+                - name: added
+                - name: dropped
+            - name: geth.p2p_peers
+              description: Number of Peers
+              unit: peers
+              chart_type: line
+              dimensions:
+                - name: peers
+            - name: geth.p2p_peers_calls
+              description: P2P Serves and Dials
+              unit: calls/s
+              chart_type: line
+              dimensions:
+                - name: dials
+                - name: serves
+            - name: geth.rpc_calls
+              description: rpc calls
+              unit: calls/s
+              chart_type: line
+              dimensions:
+                - name: failed
+                - name: successful

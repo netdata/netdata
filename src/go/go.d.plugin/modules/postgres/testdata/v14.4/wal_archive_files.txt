@@ -1,0 +1,3 @@
+ wal_archive_files_ready_count | wal_archive_files_done_count
+-------------------------------+------------------------------
+                             1 |                            1

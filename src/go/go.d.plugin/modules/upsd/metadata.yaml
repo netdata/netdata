@@ -1,0 +1,264 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-upsd
+      plugin_name: go.d.plugin
+      module_name: upsd
+      monitored_instance:
+        name: UPS (NUT)
+        link: ""
+        icon_filename: plug-circle-bolt.svg
+        categories:
+          - data-collection.ups
+      keywords:
+        - ups
+        - nut
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Uninterruptible Power Supplies by polling the UPS daemon using the NUT network protocol.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/upsd.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: UPS daemon address in IP:PORT format.
+              default_value: 127.0.0.1:3493
+              required: true
+            - name: timeout
+              description: Connection/read/write timeout in seconds. The timeout includes name resolution, if required.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:3493
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:3493
+                
+                  - name: remote
+                    address: 203.0.113.0:3493
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: upsd_10min_ups_load
+        metric: upsd.ups_load
+        info: "UPS ${label:ups_name} average load over the last 10 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/upsd.conf
+      - name: upsd_ups_battery_charge
+        metric: upsd.ups_battery_charge
+        info: "UPS ${label:ups_name} average battery charge over the last minute"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/upsd.conf
+      - name: upsd_ups_last_collected_secs
+        metric: upsd.ups_load
+        info: "UPS ${label:ups_name} number of seconds since the last successful data collection"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/upsd.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: ups
+          description: These metrics refer to the UPS unit.
+          labels:
+            - name: ups_name
+              description: UPS name.
+            - name: battery_type
+              description: Battery type (chemistry). "battery.type" variable value.
+            - name: device_model
+              description: Device model. "device.mode" variable value.
+            - name: device_serial
+              description: Device serial number. "device.serial" variable value.
+            - name: device_manufacturer
+              description: Device manufacturer. "device.mfr" variable value.
+            - name: device_type
+              description: Device type (ups, pdu, scd, psu, ats). "device.type" variable value.
+          metrics:
+            - name: upsd.ups_load
+              description: UPS load
+              unit: percentage
+              chart_type: area
+              dimensions:
+                - name: load
+            - name: upsd.ups_load_usage
+              description: UPS load usage (power output)
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: load_usage
+            - name: upsd.ups_status
+              description: UPS status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: on_line
+                - name: on_battery
+                - name: low_battery
+                - name: high_battery
+                - name: replace_battery
+                - name: charging
+                - name: discharging
+                - name: bypass
+                - name: calibration
+                - name: offline
+                - name: overloaded
+                - name: trim_input_voltage
+                - name: boost_input_voltage
+                - name: forced_shutdown
+                - name: other
+            - name: upsd.ups_temperature
+              description: UPS temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: upsd.ups_battery_charge
+              description: UPS Battery charge
+              unit: percentage
+              chart_type: area
+              dimensions:
+                - name: charge
+            - name: upsd.ups_battery_estimated_runtime
+              description: UPS Battery estimated runtime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: runtime
+            - name: upsd.ups_battery_voltage
+              description: UPS Battery voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: upsd.ups_battery_voltage_nominal
+              description: UPS Battery voltage nominal
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: nominal_voltage
+            - name: upsd.ups_input_voltage
+              description: UPS Input voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: upsd.ups_input_voltage_nominal
+              description: UPS Input voltage nominal
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: nominal_voltage
+            - name: upsd.ups_input_current
+              description: UPS Input current
+              unit: Ampere
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: upsd.ups_input_current_nominal
+              description: UPS Input current nominal
+              unit: Ampere
+              chart_type: line
+              dimensions:
+                - name: nominal_current
+            - name: upsd.ups_input_frequency
+              description: UPS Input frequency
+              unit: Hz
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: upsd.ups_input_frequency_nominal
+              description: UPS Input frequency nominal
+              unit: Hz
+              chart_type: line
+              dimensions:
+                - name: nominal_frequency
+            - name: upsd.ups_output_voltage
+              description: UPS Output voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: upsd.ups_output_voltage_nominal
+              description: UPS Output voltage nominal
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: nominal_voltage
+            - name: upsd.ups_output_current
+              description: UPS Output current
+              unit: Ampere
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: upsd.ups_output_current_nominal
+              description: UPS Output current nominal
+              unit: Ampere
+              chart_type: line
+              dimensions:
+                - name: nominal_current
+            - name: upsd.ups_output_frequency
+              description: UPS Output frequency
+              unit: Hz
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: upsd.ups_output_frequency_nominal
+              description: UPS Output frequency nominal
+              unit: Hz
+              chart_type: line
+              dimensions:
+                - name: nominal_frequency

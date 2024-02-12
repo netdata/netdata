@@ -1,0 +1,24 @@
+127.0.0.1
+ServerVersion: Apache/2.4.37 (Unix)
+ServerMPM: event
+Server Built: Oct 23 2018 18:27:46
+CurrentTime: Sunday, 13-Jan-2019 21:43:56 MSK
+RestartTime: Sunday, 13-Jan-2019 21:43:53 MSK
+ParentServerConfigGeneration: 1
+ParentServerMPMGeneration: 0
+ServerUptimeSeconds: 2
+ServerUptime: 2 seconds
+Load1: 0.77
+Load5: 0.93
+Load15: 1.03
+BusyWorkers: 1
+IdleWorkers: 74
+Processes: 3
+Stopping: 0
+BusyWorkers: 1
+IdleWorkers: 74
+ConnsTotal: 0
+ConnsAsyncWriting: 0
+ConnsAsyncKeepAlive: 0
+ConnsAsyncClosing: 0
+Scoreboard: ________________________________________________________________W__________.....................................................................................................................................................................................................................................................................................................................................

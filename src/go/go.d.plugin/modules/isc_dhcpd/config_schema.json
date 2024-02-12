@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/isc_dhcpd job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "leases_path": {
+      "type": "string"
+    },
+    "pools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "networks": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "networks"
+        ]
+      }
+    }
+  },
+  "required": [
+    "name",
+    "leases_path",
+    "pools"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/proxysql job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "dsn": {
+      "type": "string"
+    },
+    "my.cnf": {
+      "type": "string"
+    },
+    "timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "dsn"
+  ]
+}

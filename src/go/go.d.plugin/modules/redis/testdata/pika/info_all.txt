@@ -1,0 +1,67 @@
+$1315
+# Server
+pika_version:3.4.0
+pika_git_sha:bd30511bf82038c2c6531b3d84872c9825fe836a
+pika_build_compile_date: Dec  1 2020
+os:Linux 5.4.39-linuxkit x86_64
+arch_bits:64
+process_id:1
+tcp_port:9221
+thread_num:1
+sync_thread_num:6
+uptime_in_seconds:72089
+uptime_in_days:2
+config_file:/pika/conf/pika.conf
+server_id:1
+
+# Data
+db_size:473558
+db_size_human:0M
+log_size:4272095
+log_size_human:4M
+compression:snappy
+used_memory:8430
+used_memory_human:0M
+db_memtable_usage:8304
+db_tablereader_usage:126
+db_fatal:0
+db_fatal_msg:NULL
+
+# Clients
+connected_clients:1
+
+# Stats
+total_connections_received:14
+instantaneous_ops_per_sec:0
+total_commands_processed:14
+is_bgsaving:No
+is_scaning_keyspace:No
+is_compact:No
+compact_cron:
+compact_interval:
+
+# Command_Exec_Count
+INFO:9
+GET:2
+SET:1
+HGETALL:1
+HMSET:1
+
+# CPU
+used_cpu_sys:3638.63
+used_cpu_user:494.58
+used_cpu_sys_children:0.04
+used_cpu_user_children:0.02
+
+# Replication(MASTER)
+role:master
+connected_slaves:0
+db0 binlog_offset=0 440,safety_purge=none
+
+# Keyspace
+# Time:1970-01-01 08:00:00
+db0 Strings_keys=0, expires=0, invalid_keys=0
+db0 Hashes_keys=0, expires=0, invalid_keys=0
+db0 Lists_keys=0, expires=0, invalid_keys=0
+db0 Zsets_keys=0, expires=0, invalid_keys=0
+db0 Sets_keys=0, expires=0, invalid_keys=0

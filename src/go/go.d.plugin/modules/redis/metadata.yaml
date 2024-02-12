@@ -1,0 +1,343 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-redis
+      plugin_name: go.d.plugin
+      module_name: redis
+      monitored_instance:
+        name: Redis
+        link: https://redis.com/
+        categories:
+          - data-collection.database-servers
+        icon_filename: redis.svg
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - redis
+        - databases
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the health and performance of Redis servers and collects general statistics, CPU and memory consumption, replication information, command statistics, and more.
+        method_description: |
+          It connects to the Redis instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects instances running on localhost by attempting to connect using known Redis TCP and UNIX sockets:
+            
+            - 127.0.0.1:6379
+            - /tmp/redis.sock
+            - /var/run/redis/redis.sock
+            - /var/lib/redis/redis.sock
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/redis.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: Redis server address.
+              default_value: redis://@localhost:6379
+              required: true
+              details: |
+                There are two connection types: by tcp socket and by unix socket.
+                
+                - Tcp connection: `redis://<user>:<password>@<host>:<port>/<db_number>`
+                - Unix connection: `unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>`
+            - name: timeout
+              description: Dial (establishing new connections), read (socket reads) and write (socket writes) timeout in seconds.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username used for authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password used for authentication.
+              default_value: ""
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certificate authority that client use when verifying server certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client tls certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client tls key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: TCP socket
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 'redis://@127.0.0.1:6379'
+            - name: Unix socket
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 'unix://@/tmp/redis.sock'
+            - name: TCP socket with password
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 'redis://:password@127.0.0.1:6379'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 'redis://:password@127.0.0.1:6379'
+                
+                  - name: remote
+                    address: 'redis://user:password@203.0.113.0:6379'
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: redis_connections_rejected
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
+        metric: redis.connections
+        info: connections rejected because of maxclients limit in the last minute
+      - name: redis_bgsave_slow
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
+        metric: redis.bgsave_now
+        info: duration of the on-going RDB save operation
+      - name: redis_bgsave_broken
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
+        metric: redis.bgsave_health
+        info: 'status of the last RDB save operation (0: ok, 1: error)'
+      - name: redis_master_link_down
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
+        metric: redis.master_link_down_since_time
+        info: time elapsed since the link between master and slave is down
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: redis.connections
+              description: Accepted and rejected (maxclients limit) connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: accepted
+                - name: rejected
+            - name: redis.clients
+              description: Clients
+              unit: clients
+              chart_type: line
+              dimensions:
+                - name: connected
+                - name: blocked
+                - name: tracking
+                - name: in_timeout_table
+            - name: redis.ping_latency
+              description: Ping latency
+              unit: seconds
+              chart_type: area
+              dimensions:
+                - name: min
+                - name: max
+                - name: avg
+            - name: redis.commands
+              description: Processed commands
+              unit: commands/s
+              chart_type: line
+              dimensions:
+                - name: processes
+            - name: redis.keyspace_lookup_hit_rate
+              description: Keys lookup hit rate
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: lookup_hit_rate
+            - name: redis.memory
+              description: Memory usage
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: max
+                - name: used
+                - name: rss
+                - name: peak
+                - name: dataset
+                - name: lua
+                - name: scripts
+            - name: redis.mem_fragmentation_ratio
+              description: Ratio between used_memory_rss and used_memory
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: mem_fragmentation
+            - name: redis.key_eviction_events
+              description: Evicted keys due to maxmemory limit
+              unit: keys/s
+              chart_type: line
+              dimensions:
+                - name: evicted
+            - name: redis.net
+              description: Bandwidth
+              unit: kilobits/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redis.rdb_changes
+              description: Operations that produced changes since the last SAVE or BGSAVE
+              unit: operations
+              chart_type: line
+              dimensions:
+                - name: changes
+            - name: redis.bgsave_now
+              description: Duration of the on-going RDB save operation if any
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: current_bgsave_time
+            - name: redis.bgsave_health
+              description: 'Status of the last RDB save operation (0: ok, 1: err)'
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: last_bgsave
+            - name: redis.bgsave_last_rdb_save_since_time
+              description: Time elapsed since the last successful RDB save
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: last_bgsave_time
+            - name: redis.aof_file_size
+              description: AOF file size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: base
+            - name: redis.commands_calls
+              description: Calls per command
+              unit: calls
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per command
+            - name: redis.commands_usec
+              description: Total CPU time consumed by the commands
+              unit: microseconds
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per command
+            - name: redis.commands_usec_per_sec
+              description: Average CPU consumed per command execution
+              unit: microseconds/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per command
+            - name: redis.key_expiration_events
+              description: Expired keys
+              unit: keys/s
+              chart_type: line
+              dimensions:
+                - name: expired
+            - name: redis.database_keys
+              description: Keys per database
+              unit: keys
+              chart_type: line
+              dimensions:
+                - name: a dimension per database
+            - name: redis.database_expires_keys
+              description: Keys with an expiration per database
+              unit: keys
+              chart_type: line
+              dimensions:
+                - name: a dimension per database
+            - name: redis.connected_replicas
+              description: Connected replicas
+              unit: replicas
+              chart_type: line
+              dimensions:
+                - name: connected
+            - name: redis.master_link_status
+              description: Master link status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: redis.master_last_io_since_time
+              description: Time elapsed since the last interaction with master
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: redis.master_link_down_since_time
+              description: Time elapsed since the link between master and slave is down
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: redis.uptime
+              description: Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime

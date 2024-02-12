@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/postgres job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "dsn": {
+      "type": "string"
+    },
+    "timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    },
+    "collect_databases_matching": {
+      "type": "string"
+    },
+    "transaction_time_histogram": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "query_time_histogram": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "max_db_tables": {
+      "type": "integer"
+    },
+    "max_db_indexes": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "dsn"
+  ]
+}

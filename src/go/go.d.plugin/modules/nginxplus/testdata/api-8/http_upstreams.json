@@ -1,0 +1,76 @@
+{
+  "backend": {
+    "peers": [
+      {
+        "id": 0,
+        "server": "127.0.0.1:81",
+        "name": "127.0.0.1:81",
+        "backup": false,
+        "weight": 5,
+        "state": "unavail",
+        "active": 0,
+        "requests": 26,
+        "header_time": 0,
+        "response_time": 0,
+        "responses": {
+          "1xx": 0,
+          "2xx": 0,
+          "3xx": 0,
+          "4xx": 0,
+          "5xx": 0,
+          "codes": {},
+          "total": 0
+        },
+        "sent": 0,
+        "received": 0,
+        "fails": 26,
+        "unavail": 1,
+        "health_checks": {
+          "checks": 0,
+          "fails": 0,
+          "unhealthy": 0
+        },
+        "downtime": 1020702,
+        "downstart": "2022-11-18T19:17:09.258Z",
+        "selected": "2022-11-18T19:33:50Z"
+      },
+      {
+        "id": 1,
+        "server": "127.0.0.1:82",
+        "name": "127.0.0.1:82",
+        "backup": false,
+        "weight": 1,
+        "state": "up",
+        "active": 0,
+        "requests": 102,
+        "header_time": 1,
+        "response_time": 1,
+        "responses": {
+          "1xx": 0,
+          "2xx": 102,
+          "3xx": 0,
+          "4xx": 0,
+          "5xx": 0,
+          "codes": {
+            "200": 102
+          },
+          "total": 102
+        },
+        "sent": 9180,
+        "received": 86496,
+        "fails": 0,
+        "unavail": 0,
+        "health_checks": {
+          "checks": 0,
+          "fails": 0,
+          "unhealthy": 0
+        },
+        "downtime": 0,
+        "selected": "2022-11-18T19:34:00Z"
+      }
+    ],
+    "keepalive": 0,
+    "zombies": 0,
+    "zone": "http_backend"
+  }
+}

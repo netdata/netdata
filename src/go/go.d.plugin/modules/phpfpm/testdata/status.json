@@ -1,0 +1,16 @@
+{
+  "pool": "www",
+  "process manager": "dynamic",
+  "start time": 1566371090,
+  "start since": 1088,
+  "accepted conn": 21,
+  "listen queue": 0,
+  "max listen queue": 0,
+  "listen queue len": 0,
+  "idle processes": 1,
+  "active processes": 1,
+  "total processes": 2,
+  "max active processes": 1,
+  "max children reached": 0,
+  "slow requests": 0
+}

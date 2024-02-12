@@ -1,0 +1,4 @@
+  datname   |  size
+------------+--------
+ postgres   | 8758051
+ production | 8602115

@@ -1,0 +1,388 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-hfs
+      plugin_name: go.d.plugin
+      module_name: hfs
+      monitored_instance:
+        name: Hadoop Distributed File System (HDFS)
+        link: https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html
+        icon_filename: hadoop.svg
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+      keywords:
+        - hdfs
+        - hadoop
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors HDFS nodes.
+
+          Netdata accesses HDFS metrics over `Java Management Extensions` (JMX) through the web interface of an HDFS daemon.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/hdfs.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:9870/jmx
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: "GET"
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9870/jmx
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9870/jmx
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: |
+                Do not validate server certificate chain and hostname.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:9870/jmx
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9870/jmx
+                
+                  - name: remote
+                    url: http://192.0.2.1:9870/jmx
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: hdfs_capacity_usage
+        metric: hdfs.capacity
+        info: summary datanodes space capacity utilization
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
+      - name: hdfs_missing_blocks
+        metric: hdfs.blocks
+        info: number of missing blocks
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
+      - name: hdfs_stale_nodes
+        metric: hdfs.data_nodes
+        info: number of datanodes marked stale due to delayed heartbeat
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
+      - name: hdfs_dead_nodes
+        metric: hdfs.data_nodes
+        info: number of datanodes which are currently dead
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
+      - name: hdfs_num_failed_volumes
+        metric: hdfs.num_failed_volumes
+        info: number of failed volumes
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability:
+        - DataNode
+        - NameNode
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: hdfs.heap_memory
+              description: Heap Memory
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: committed
+                - name: used
+            - name: hdfs.gc_count_total
+              description: GC Events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: gc
+            - name: hdfs.gc_time_total
+              description: GC Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: ms
+            - name: hdfs.gc_threshold
+              description: Number of Times That the GC Threshold is Exceeded
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: info
+                - name: warn
+            - name: hdfs.threads
+              description: Number of Threads
+              unit: num
+              chart_type: stacked
+              dimensions:
+                - name: new
+                - name: runnable
+                - name: blocked
+                - name: waiting
+                - name: timed_waiting
+                - name: terminated
+            - name: hdfs.logs_total
+              description: Number of Logs
+              unit: logs/s
+              chart_type: stacked
+              dimensions:
+                - name: info
+                - name: error
+                - name: warn
+                - name: fatal
+            - name: hdfs.rpc_bandwidth
+              description: RPC Bandwidth
+              unit: kilobits/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: hdfs.rpc_calls
+              description: RPC Calls
+              unit: calls/s
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: hdfs.open_connections
+              description: RPC Open Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: hdfs.call_queue_length
+              description: RPC Call Queue Length
+              unit: num
+              chart_type: line
+              dimensions:
+                - name: length
+            - name: hdfs.avg_queue_time
+              description: RPC Avg Queue Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: hdfs.avg_processing_time
+              description: RPC Avg Processing Time
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: hdfs.capacity
+              description: Capacity Across All Datanodes
+              unit: KiB
+              chart_type: stacked
+              availability:
+                - NameNode
+              dimensions:
+                - name: remaining
+                - name: used
+            - name: hdfs.used_capacity
+              description: Used Capacity Across All Datanodes
+              unit: KiB
+              chart_type: stacked
+              availability:
+                - NameNode
+              dimensions:
+                - name: dfs
+                - name: non_dfs
+            - name: hdfs.load
+              description: Number of Concurrent File Accesses (read/write) Across All DataNodes
+              unit: load
+              chart_type: line
+              availability:
+                - NameNode
+              dimensions:
+                - name: load
+            - name: hdfs.volume_failures_total
+              description: Number of Volume Failures Across All Datanodes
+              unit: events/s
+              chart_type: line
+              availability:
+                - NameNode
+              dimensions:
+                - name: failures
+            - name: hdfs.files_total
+              description: Number of Tracked Files
+              unit: num
+              chart_type: line
+              availability:
+                - NameNode
+              dimensions:
+                - name: files
+            - name: hdfs.blocks_total
+              description: Number of Allocated Blocks in the System
+              unit: num
+              chart_type: line
+              availability:
+                - NameNode
+              dimensions:
+                - name: blocks
+            - name: hdfs.blocks
+              description: Number of Problem Blocks (can point to an unhealthy cluster)
+              unit: num
+              chart_type: line
+              availability:
+                - NameNode
+              dimensions:
+                - name: corrupt
+                - name: missing
+                - name: under_replicated
+            - name: hdfs.data_nodes
+              description: Number of Data Nodes By Status
+              unit: num
+              chart_type: stacked
+              availability:
+                - NameNode
+              dimensions:
+                - name: live
+                - name: dead
+                - name: stale
+            - name: hdfs.datanode_capacity
+              description: Capacity
+              unit: KiB
+              chart_type: stacked
+              availability:
+                - DataNode
+              dimensions:
+                - name: remaining
+                - name: used
+            - name: hdfs.datanode_used_capacity
+              description: Used Capacity
+              unit: KiB
+              chart_type: stacked
+              availability:
+                - DataNode
+              dimensions:
+                - name: dfs
+                - name: non_dfs
+            - name: hdfs.datanode_failed_volumes
+              description: Number of Failed Volumes
+              unit: num
+              chart_type: line
+              availability:
+                - DataNode
+              dimensions:
+                - name: failed volumes
+            - name: hdfs.datanode_bandwidth
+              description: Bandwidth
+              unit: KiB/s
+              chart_type: area
+              availability:
+                - DataNode
+              dimensions:
+                - name: reads
+                - name: writes

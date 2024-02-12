@@ -1,0 +1,519 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-pulsar
+      plugin_name: go.d.plugin
+      module_name: pulsar
+      monitored_instance:
+        name: Apache Pulsar
+        link: https://pulsar.apache.org/
+        icon_filename: pulsar.svg
+        categories:
+          - data-collection.message-brokers
+      keywords:
+        - pulsar
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Pulsar servers.
+        method_description: |
+          It collects broker statistics using Pulsar's [Prometheus endpoint](https://pulsar.apache.org/docs/en/deploy-monitoring/#broker-stats).
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Pulsar instances running on localhost.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/pulsar.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8080/metrics
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080/metrics
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080/metrics
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: |
+                Do not validate server certificate chain and hostname.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:8080/metrics
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080/metrics
+                
+                  - name: remote
+                    url: http://192.0.2.1:8080/metrics
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        - topic_* metrics are available when `exposeTopicLevelMetricsInPrometheus` is set to true.
+        - subscription_* and namespace_subscription metrics are available when `exposeTopicLevelMetricsInPrometheus` si set to true.
+        - replication_* and namespace_replication_* metrics are available when replication is configured and `replicationMetricsEnabled` is set to true.
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: pulsar.broker_components
+              description: Broker Components
+              unit: components
+              chart_type: line
+              dimensions:
+                - name: namespaces
+                - name: topics
+                - name: subscriptions
+                - name: producers
+                - name: consumers
+            - name: pulsar.messages_rate
+              description: Messages Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: publish
+                - name: dispatch
+            - name: pulsar.throughput_rate
+              description: Throughput Rate
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: publish
+                - name: dispatch
+            - name: pulsar.storage_size
+              description: Storage Size
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: pulsar.storage_operations_rate
+              description: Storage Read/Write Operations Rate
+              unit: message batches/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: pulsar.msg_backlog
+              description: Messages Backlog Size
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: backlog
+            - name: pulsar.storage_write_latency
+              description: Storage Write Latency
+              unit: entries/s
+              chart_type: stacked
+              dimensions:
+                - name: <=0.5ms
+                - name: <=1ms
+                - name: <=5ms
+                - name: =10ms
+                - name: <=20ms
+                - name: <=50ms
+                - name: <=100ms
+                - name: <=200ms
+                - name: <=1s
+                - name: '>1s'
+            - name: pulsar.entry_size
+              description: Entry Size
+              unit: entries/s
+              chart_type: stacked
+              dimensions:
+                - name: <=128B
+                - name: <=512B
+                - name: <=1KB
+                - name: <=2KB
+                - name: <=4KB
+                - name: <=16KB
+                - name: <=100KB
+                - name: <=1MB
+                - name: '>1MB'
+            - name: pulsar.subscription_delayed
+              description: Subscriptions Delayed for Dispatching
+              unit: message batches
+              chart_type: line
+              dimensions:
+                - name: delayed
+            - name: pulsar.subscription_msg_rate_redeliver
+              description: Subscriptions Redelivered Message Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: redelivered
+            - name: pulsar.subscription_blocked_on_unacked_messages
+              description: Subscriptions Blocked On Unacked Messages
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: blocked
+            - name: pulsar.replication_rate
+              description: Replication Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: pulsar.replication_throughput_rate
+              description: Replication Throughput Rate
+              unit: KiB/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: pulsar.replication_backlog
+              description: Replication Backlog
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: backlog
+        - name: namespace
+          description: TBD
+          labels: []
+          metrics:
+            - name: pulsar.namespace_broker_components
+              description: Broker Components
+              unit: components
+              chart_type: line
+              dimensions:
+                - name: topics
+                - name: subscriptions
+                - name: producers
+                - name: consumers
+            - name: pulsar.namespace_messages_rate
+              description: Messages Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: publish
+                - name: dispatch
+            - name: pulsar.namespace_throughput_rate
+              description: Throughput Rate
+              unit: KiB/s
+              chart_type: area
+              dimensions:
+                - name: publish
+                - name: dispatch
+            - name: pulsar.namespace_storage_size
+              description: Storage Size
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: pulsar.namespace_storage_operations_rate
+              description: Storage Read/Write Operations Rate
+              unit: message batches/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: pulsar.namespace_msg_backlog
+              description: Messages Backlog Size
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: backlog
+            - name: pulsar.namespace_storage_write_latency
+              description: Storage Write Latency
+              unit: entries/s
+              chart_type: stacked
+              dimensions:
+                - name: <=0.5ms
+                - name: <=1ms
+                - name: <=5ms
+                - name: =10ms
+                - name: <=20ms
+                - name: <=50ms
+                - name: <=100ms
+                - name: <=200ms
+                - name: <=1s
+                - name: '>1s'
+            - name: pulsar.namespace_entry_size
+              description: Entry Size
+              unit: entries/s
+              chart_type: stacked
+              dimensions:
+                - name: <=128B
+                - name: <=512B
+                - name: <=1KB
+                - name: <=2KB
+                - name: <=4KB
+                - name: <=16KB
+                - name: <=100KB
+                - name: <=1MB
+                - name: '>1MB'
+            - name: pulsar.namespace_subscription_delayed
+              description: Subscriptions Delayed for Dispatching
+              unit: message batches
+              chart_type: line
+              dimensions:
+                - name: delayed
+            - name: pulsar.namespace_subscription_msg_rate_redeliver
+              description: Subscriptions Redelivered Message Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: redelivered
+            - name: pulsar.namespace_subscription_blocked_on_unacked_messages
+              description: Subscriptions Blocked On Unacked Messages
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: blocked
+            - name: pulsar.namespace_replication_rate
+              description: Replication Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: pulsar.namespace_replication_throughput_rate
+              description: Replication Throughput Rate
+              unit: KiB/s
+              chart_type: line
+              dimensions:
+                - name: in
+                - name: out
+            - name: pulsar.namespace_replication_backlog
+              description: Replication Backlog
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: backlog
+            - name: pulsar.topic_producers
+              description: Topic Producers
+              unit: producers
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_subscriptions
+              description: Topic Subscriptions
+              unit: subscriptions
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_consumers
+              description: Topic Consumers
+              unit: consumers
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_messages_rate_in
+              description: Topic Publish Messages Rate
+              unit: publishes/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_messages_rate_out
+              description: Topic Dispatch Messages Rate
+              unit: dispatches/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_throughput_rate_in
+              description: Topic Publish Throughput Rate
+              unit: KiB/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_throughput_rate_out
+              description: Topic Dispatch Throughput Rate
+              unit: KiB/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_storage_size
+              description: Topic Storage Size
+              unit: KiB
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_storage_read_rate
+              description: Topic Storage Read Rate
+              unit: message batches/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_storage_write_rate
+              description: Topic Storage Write Rate
+              unit: message batches/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_msg_backlog
+              description: Topic Messages Backlog Size
+              unit: messages
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_subscription_delayed
+              description: Topic Subscriptions Delayed for Dispatching
+              unit: message batches
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_subscription_msg_rate_redeliver
+              description: Topic Subscriptions Redelivered Message Rate
+              unit: messages/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_subscription_blocked_on_unacked_messages
+              description: Topic Subscriptions Blocked On Unacked Messages
+              unit: blocked subscriptions
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_replication_rate_in
+              description: Topic Replication Rate From Remote Cluster
+              unit: messages/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_replication_rate_out
+              description: Topic Replication Rate To Remote Cluster
+              unit: messages/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_replication_throughput_rate_in
+              description: Topic Replication Throughput Rate From Remote Cluster
+              unit: messages/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_replication_throughput_rate_out
+              description: Topic Replication Throughput Rate To Remote Cluster
+              unit: messages/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic
+            - name: pulsar.topic_replication_backlog
+              description: Topic Replication Backlog
+              unit: messages
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per topic

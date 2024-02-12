@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/portcheck job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "host": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ports": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "minItems": 1
+    },
+    "timeout": {
+      "type": [
+        "string",
+        "integer"
+      ],
+      "minLength": 1,
+      "minimum": 1,
+      "description": "The timeout duration, in seconds. Must be at least 1."
+    }
+  },
+  "required": [
+    "name",
+    "host",
+    "ports"
+  ]
+}

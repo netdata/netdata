@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/openvpn_status_log job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "log_path": {
+      "type": "string"
+    },
+    "per_user_stats": {
+      "type": "object",
+      "properties": {
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "name",
+    "log_path"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/dns_query job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "servers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "network": {
+      "type": "string"
+    },
+    "record_type": {
+      "type": "string"
+    },
+    "record_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "port": {
+      "type": "integer"
+    },
+    "timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "domains",
+    "servers"
+  ]
+}
