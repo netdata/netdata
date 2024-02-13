@@ -1,0 +1,6 @@
+ database  |   user    | cl_active | cl_waiting | cl_cancel_req | sv_active | sv_idle | sv_used | sv_tested | sv_login | maxwait | maxwait_us | pool_mode
+-----------+-----------+-----------+------------+---------------+-----------+---------+---------+-----------+----------+---------+------------+-----------
+ myprod1   | postgres  |        15 |          0 |             0 |        15 |       5 |       0 |         0 |        0 |       0 |          0 | session
+ myprod2   | postgres  |        12 |          0 |             0 |        11 |       9 |       0 |         0 |        0 |       0 |          0 | session
+ pgbouncer | pgbouncer |         2 |          0 |             0 |         0 |       0 |       0 |         0 |        0 |       0 |          0 | statement
+ postgres  | postgres  |        18 |          0 |             0 |        18 |       2 |       0 |         0 |        0 |       0 |          0 | session

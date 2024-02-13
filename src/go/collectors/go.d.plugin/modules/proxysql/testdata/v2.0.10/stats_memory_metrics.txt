@@ -1,0 +1,21 @@
++------------------------------+----------------+
+| Variable_Name                | Variable_Value |
++------------------------------+----------------+
+| SQLite3_memory_bytes         | 6017144        |
+| jemalloc_resident            | 403759104      |
+| jemalloc_active              | 385101824      |
+| jemalloc_allocated           | 379402432      |
+| jemalloc_mapped              | 430993408      |
+| jemalloc_metadata            | 17418872       |
+| jemalloc_retained            | 260542464      |
+| Auth_memory                  | 1044           |
+| query_digest_memory          | 13688          |
+| mysql_query_rules_memory     | 22825          |
+| mysql_firewall_users_table   | 0              |
+| mysql_firewall_users_config  | 0              |
+| mysql_firewall_rules_table   | 0              |
+| mysql_firewall_rules_config  | 329            |
+| stack_memory_mysql_threads   | 33554432       |
+| stack_memory_admin_threads   | 16777216       |
+| stack_memory_cluster_threads | 0              |
++------------------------------+----------------+

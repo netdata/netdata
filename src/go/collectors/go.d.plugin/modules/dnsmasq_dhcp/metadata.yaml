@@ -1,0 +1,151 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-dnsmasq_dhcp
+      plugin_name: go.d.plugin
+      module_name: dnsmasq_dhcp
+      monitored_instance:
+        name: Dnsmasq DHCP
+        link: https://www.thekelleys.org.uk/dnsmasq/doc.html
+        icon_filename: dnsmasq.svg
+        categories:
+          - data-collection.dns-and-dhcp-servers
+      keywords:
+        - dnsmasq
+        - dhcp
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors  Dnsmasq DHCP leases databases, depending on your configuration.
+          
+          By default, it uses:
+
+          - `/var/lib/misc/dnsmasq.leases` to read leases.
+          - `/etc/dnsmasq.conf` to detect dhcp-ranges.
+          - `/etc/dnsmasq.d` to find additional configurations.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            All configured dhcp-ranges are detected automatically
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/dnsmasq_dhcp.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: leases_path
+              description: Path to dnsmasq DHCP leases file.
+              default_value: /var/lib/misc/dnsmasq.leases
+              required: false
+            - name: conf_path
+              description: Path to dnsmasq configuration file.
+              default_value: /etc/dnsmasq.conf
+              required: false
+            - name: conf_dir
+              description: Path to dnsmasq configuration directory.
+              default_value: /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: dnsmasq_dhcp
+                    leases_path: /var/lib/misc/dnsmasq.leases
+                    conf_path: /etc/dnsmasq.conf
+                    conf_dir: /etc/dnsmasq.d
+            - name: Pi-hole
+              description: Dnsmasq DHCP on Pi-hole.
+              config: |
+                jobs:
+                  - name: dnsmasq_dhcp
+                    leases_path: /etc/pihole/dhcp.leases
+                    conf_path: /etc/dnsmasq.conf
+                    conf_dir: /etc/dnsmasq.d
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: dnsmasq_dhcp_dhcp_range_utilization
+        metric: dnsmasq_dhcp.dhcp_range_utilization
+        info: DHCP range utilization
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: dnsmasq_dhcp.dhcp_ranges
+              description: Number of DHCP Ranges
+              unit: ranges
+              chart_type: stacked
+              dimensions:
+                - name: ipv4
+                - name: ipv6
+            - name: dnsmasq_dhcp.dhcp_hosts
+              description: Number of DHCP Hosts
+              unit: hosts
+              chart_type: stacked
+              dimensions:
+                - name: ipv4
+                - name: ipv6
+        - name: dhcp range
+          description: These metrics refer to the DHCP range.
+          labels:
+            - name: dhcp_range
+              description: DHCP range in `START_IP:END_IP` format
+          metrics:
+            - name: dnsmasq_dhcp.dhcp_range_utilization
+              description: DHCP Range utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: dnsmasq_dhcp.dhcp_range_allocated_leases
+              description: DHCP Range Allocated Leases
+              unit: leases
+              chart_type: line
+              dimensions:
+                - name: allocated

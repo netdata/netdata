@@ -1,0 +1,202 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-zookeeper
+      plugin_name: go.d.plugin
+      module_name: zookeeper
+      monitored_instance:
+        name: ZooKeeper
+        link: https://zookeeper.apache.org/
+        categories:
+          - data-collection.service-discovery-registry
+        icon_filename: zookeeper.svg
+      keywords:
+        - zookeeper
+      most_popular: false
+      info_provided_to_referring_integrations:
+        description: ""
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+    overview:
+      data_collection:
+        metrics_description: ""
+        method_description: |
+          It connects to the Zookeeper instance via a TCP and executes the following commands:
+          
+          - [mntr](https://zookeeper.apache.org/doc/r3.4.8/zookeeperAdmin.html#sc_zkCommands).
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects instances running on localhost by attempting to connect using known ZooKeeper TCP sockets:
+            
+            - 127.0.0.1:2181
+            - 127.0.0.1:2182
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Whitelist `mntr` command
+            description: |
+              Add `mntr` to Zookeeper's [4lw.commands.whitelist](https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_4lw).
+      configuration:
+        file:
+          name: "go.d/zookeeper.conf"
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: Server address. The format is IP:PORT.
+              default_value: 127.0.0.1:2181
+              required: true
+            - name: timeout
+              description: Connection/read/write/ssl handshake timeout.
+              default_value: 1
+              required: false
+            - name: use_tls
+              description: Whether to use TLS or not.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: Local server.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:2181
+            - name: TLS with self-signed certificate
+              description: Zookeeper with TLS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:2181
+                    use_tls: yes
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:2181
+                
+                  - name: remote
+                    address: 192.0.2.1:2181
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: zookeeper.requests
+              description: Outstanding Requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: outstanding
+            - name: zookeeper.requests_latency
+              description: Requests Latency
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: min
+                - name: avg
+                - name: max
+            - name: zookeeper.connections
+              description: Alive Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: alive
+            - name: zookeeper.packets
+              description: Packets
+              unit: pps
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: zookeeper.file_descriptor
+              description: Open File Descriptors
+              unit: file descriptors
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: zookeeper.nodes
+              description: Number of Nodes
+              unit: nodes
+              chart_type: line
+              dimensions:
+                - name: znode
+                - name: ephemerals
+            - name: zookeeper.watches
+              description: Number of Watches
+              unit: watches
+              chart_type: line
+              dimensions:
+                - name: watches
+            - name: zookeeper.approximate_data_size
+              description: Approximate Data Tree Size
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: zookeeper.server_state
+              description: Server State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: state

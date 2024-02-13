@@ -1,0 +1,34 @@
+{
+  "beans":[
+    {
+      "name":"Hadoop:service=UnknownNode,name=JvmMetrics",
+      "modelerType":"JvmMetrics",
+      "tag.Context":"jvm",
+      "tag.ProcessName":"UnknownNode",
+      "tag.SessionId":null,
+      "tag.Hostname":"dev-slave-01.dev.local",
+      "MemNonHeapUsedM":53.67546,
+      "MemNonHeapCommittedM":54.9375,
+      "MemNonHeapMaxM":-1.0,
+      "MemHeapUsedM":18.885735,
+      "MemHeapCommittedM":60.5,
+      "MemHeapMaxM":843.0,
+      "MemMaxM":843.0,
+      "GcCount":155,
+      "GcTimeMillis":672,
+      "GcNumWarnThresholdExceeded":0,
+      "GcNumInfoThresholdExceeded":0,
+      "GcTotalExtraSleepTime":8783,
+      "ThreadsNew":1,
+      "ThreadsRunnable":2,
+      "ThreadsBlocked":3,
+      "ThreadsWaiting":4,
+      "ThreadsTimedWaiting":5,
+      "ThreadsTerminated":6,
+      "LogFatal":10,
+      "LogError":11,
+      "LogWarn":12,
+      "LogInfo":13
+    }
+  ]
+}

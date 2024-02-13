@@ -1,0 +1,77 @@
+>CLIENT:ESTABLISHED,0
+>CLIENT:ENV,n_clients=1
+>CLIENT:ENV,ifconfig_pool_local_ip=10.9.0.6
+>CLIENT:ENV,ifconfig_pool_remote_ip=10.9.0.5
+>CLIENT:ENV,time_unix=1555439465
+>CLIENT:ENV,time_ascii=Wed Apr 17 03:31:05 2019
+>CLIENT:ENV,trusted_port=44347
+>CLIENT:ENV,trusted_ip=1.2.3.4
+>CLIENT:ENV,common_name=pepehome
+>CLIENT:ENV,auth_control_file=/tmp/openvpn_acf_ae7f48d495d3d4cfb3065763b916d9ab.tmp
+>CLIENT:ENV,untrusted_port=44347
+>CLIENT:ENV,untrusted_ip=1.2.3.4
+>CLIENT:ENV,username=pepe
+>CLIENT:ENV,tls_serial_hex_0=04
+>CLIENT:ENV,tls_serial_0=4
+>CLIENT:ENV,tls_digest_0=be:83:8c:95:21:bf:f3:87:1a:35:86:d9:2e:f3:f5:d7:08:a9:db:7e
+>CLIENT:ENV,tls_id_0=C=RU, ST=AM, L=Blagoveshchensk, O=L2ISBAD, OU=MyOrganizationalUnit, CN=pepehome, name=EasyRSA, emailAddress=me@myhost.mydomain
+>CLIENT:ENV,X509_0_emailAddress=me@myhost.mydomain
+>CLIENT:ENV,X509_0_name=EasyRSA
+>CLIENT:ENV,X509_0_CN=pepehome
+>CLIENT:ENV,X509_0_OU=MyOrganizationalUnit
+>CLIENT:ENV,X509_0_O=L2ISBAD
+>CLIENT:ENV,X509_0_L=Blagoveshchensk
+>CLIENT:ENV,X509_0_ST=AM
+>CLIENT:ENV,X509_0_C=RU
+>CLIENT:ENV,tls_serial_hex_1=ad:4c:1e:65:e8:3c:ec:6f
+>CLIENT:ENV,tls_serial_1=12487389289828379759
+>CLIENT:ENV,tls_digest_1=52:e2:1d:41:3f:34:09:70:4c:2d:71:8c:a7:28:fa:6b:66:2b:28:6e
+>CLIENT:ENV,tls_id_1=C=RU, ST=AM, L=Blagoveshchensk, O=L2ISBAD, OU=MyOrganizationalUnit, CN=L2ISBAD CA, name=EasyRSA, emailAddress=me@myhost.mydomain
+>CLIENT:ENV,X509_1_emailAddress=me@myhost.mydomain
+>CLIENT:ENV,X509_1_name=EasyRSA
+>CLIENT:ENV,X509_1_CN=L2ISBAD CA
+>CLIENT:ENV,X509_1_OU=MyOrganizationalUnit
+>CLIENT:ENV,X509_1_O=L2ISBAD
+>CLIENT:ENV,X509_1_L=Blagoveshchensk
+>CLIENT:ENV,X509_1_ST=AM
+>CLIENT:ENV,X509_1_C=RU
+>CLIENT:ENV,remote_port_1=1194
+>CLIENT:ENV,local_port_1=1194
+>CLIENT:ENV,proto_1=udp
+>CLIENT:ENV,daemon_pid=4237
+>CLIENT:ENV,daemon_start_time=1555439449
+>CLIENT:ENV,daemon_log_redirect=0
+>CLIENT:ENV,daemon=1
+>CLIENT:ENV,verb=3
+>CLIENT:ENV,config=/etc/openvpn/server.conf
+>CLIENT:ENV,ifconfig_local=10.8.0.1
+>CLIENT:ENV,ifconfig_remote=10.8.0.2
+>CLIENT:ENV,route_net_gateway=188.168.142.252
+>CLIENT:ENV,route_vpn_gateway=10.8.0.2
+>CLIENT:ENV,route_network_1=10.9.0.1
+>CLIENT:ENV,route_netmask_1=255.255.255.255
+>CLIENT:ENV,route_gateway_1=10.8.0.2
+>CLIENT:ENV,route_network_2=10.9.0.5
+>CLIENT:ENV,route_netmask_2=255.255.255.255
+>CLIENT:ENV,route_gateway_2=10.8.0.2
+>CLIENT:ENV,route_network_3=10.9.0.9
+>CLIENT:ENV,route_netmask_3=255.255.255.255
+>CLIENT:ENV,route_gateway_3=10.8.0.2
+>CLIENT:ENV,route_network_4=10.8.0.0
+>CLIENT:ENV,route_netmask_4=255.255.255.0
+>CLIENT:ENV,route_gateway_4=10.8.0.2
+>CLIENT:ENV,script_context=init
+>CLIENT:ENV,tun_mtu=1500
+>CLIENT:ENV,link_mtu=1558
+>CLIENT:ENV,dev=tun99
+>CLIENT:ENV,dev_type=tun
+>CLIENT:ENV,redirect_gateway=0
+>CLIENT:ENV,END
+TITLE	OpenVPN 2.3.4 i586-pc-linux-gnu [SSL (OpenSSL)] [LZO] [EPOLL] [PKCS11] [MH] [IPv6] built on Jun 26 2017
+TIME	Wed Apr 17 03:31:06 2019	1555439466
+HEADER	CLIENT_LIST	Common Name	Real Address	Virtual Address	Bytes Received	Bytes Sent	Connected Since	Connected Since (time_t)	Username
+CLIENT_LIST	pepehome	1.2.3.4:44347	10.9.0.5	6043	5661	Wed Apr 17 03:31:05 2019	1555439465	pepe
+HEADER	ROUTING_TABLE	Virtual Address	Common Name	Real Address	Last Ref	Last Ref (time_t)
+ROUTING_TABLE	10.9.0.5	pepehome	1.2.3.4:44347	Wed Apr 17 03:31:06 2019	1555439466
+GLOBAL_STATS	Max bcast/mcast queue length	0
+END

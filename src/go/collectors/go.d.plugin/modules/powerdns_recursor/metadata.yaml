@@ -1,0 +1,240 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-powerdns_recursor
+      plugin_name: go.d.plugin
+      module_name: powerdns_recursor
+      monitored_instance:
+        name: PowerDNS Recursor
+        link: https://doc.powerdns.com/recursor/
+        icon_filename: powerdns.svg
+        categories:
+          - data-collection.dns-and-dhcp-servers
+      keywords:
+        - powerdns
+        - dns
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors PowerDNS Recursor instances.
+          
+          It collects metrics from [the internal webserver](https://doc.powerdns.com/recursor/http-api/index.html#built-in-webserver-and-http-api).
+          
+          Used endpoints:
+          
+          - [`/api/v1/servers/localhost/statistics`](https://doc.powerdns.com/recursor/common/api/endpoint-statistics.html)
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable webserver
+            description: |
+              Follow [webserver](https://doc.powerdns.com/recursor/http-api/index.html#webserver) documentation.
+          - title: Enable HTTP API
+            description: |
+              Follow [HTTP API](https://doc.powerdns.com/recursor/http-api/index.html#enabling-the-api) documentation.
+      configuration:
+        file:
+          name: go.d/powerdns_recursor.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8081
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8081
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8081
+                    username: admin
+                    password: password
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8081
+                
+                  - name: remote
+                    url: http://203.0.113.0:8081
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: powerdns_recursor.questions_in
+              description: Incoming questions
+              unit: questions/s
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: tcp
+                - name: ipv6
+            - name: powerdns_recursor.questions_out
+              description: Outgoing questions
+              unit: questions/s
+              chart_type: line
+              dimensions:
+                - name: udp
+                - name: tcp
+                - name: ipv6
+                - name: throttled
+            - name: powerdns_recursor.answer_time
+              description: Queries answered within a time range
+              unit: queries/s
+              chart_type: line
+              dimensions:
+                - name: 0-1ms
+                - name: 1-10ms
+                - name: 10-100ms
+                - name: 100-1000ms
+                - name: slow
+            - name: powerdns_recursor.timeouts
+              description: Timeouts on outgoing UDP queries
+              unit: timeouts/s
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: ipv4
+                - name: ipv6
+            - name: powerdns_recursor.drops
+              description: Drops
+              unit: drops/s
+              chart_type: line
+              dimensions:
+                - name: over-capacity-drops
+                - name: query-pipe-full-drops
+                - name: too-old-drops
+                - name: truncated-drops
+                - name: empty-queries
+            - name: powerdns_recursor.cache_usage
+              description: Cache Usage
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: cache-hits
+                - name: cache-misses
+                - name: packet-cache-hits
+                - name: packet-cache-misses
+            - name: powerdns_recursor.cache_size
+              description: Cache Size
+              unit: entries
+              chart_type: line
+              dimensions:
+                - name: cache
+                - name: packet-cache
+                - name: negative-cache

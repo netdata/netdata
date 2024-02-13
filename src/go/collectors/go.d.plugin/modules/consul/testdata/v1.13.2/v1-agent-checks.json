@@ -1,0 +1,68 @@
+{
+  "chk1": {
+    "Node": "mysql1",
+    "CheckID": "chk1",
+    "Name": "ssh",
+    "Status": "passing",
+    "Notes": "",
+    "Output": "TCP connect 127.0.0.1:22: Success",
+    "ServiceID": "",
+    "ServiceName": "",
+    "ServiceTags": [
+    ],
+    "Definition": {
+    },
+    "CreateIndex": 0,
+    "ModifyIndex": 0
+  },
+  "chk2": {
+    "Node": "mysql1",
+    "CheckID": "chk2",
+    "Name": "telnet",
+    "Status": "critical",
+    "Notes": "",
+    "Output": "dial tcp 127.0.0.1:23: connect: connection refused",
+    "ServiceID": "",
+    "ServiceName": "",
+    "ServiceTags": [
+    ],
+    "Definition": {
+    },
+    "CreateIndex": 0,
+    "ModifyIndex": 0
+  },
+  "chk3": {
+    "Node": "mysql1",
+    "CheckID": "chk3",
+    "Name": "telnet",
+    "Status": "critical",
+    "Notes": "",
+    "Output": "dial tcp 127.0.0.1:23: connect: connection refused",
+    "ServiceID": "",
+    "ServiceName": "",
+    "ServiceTags": [
+    ],
+    "Definition": {
+    },
+    "CreateIndex": 0,
+    "ModifyIndex": 0
+  },
+  "mysql": {
+    "Node": "mysql1",
+    "CheckID": "mysql",
+    "Name": "MYSQL TCP on port 3336",
+    "Status": "critical",
+    "Notes": "",
+    "Output": "dial tcp 127.0.0.1:3336: connect: connection refused",
+    "ServiceID": "mysql0",
+    "ServiceName": "mysql",
+    "ServiceTags": [
+      "primary",
+      "secondary"
+    ],
+    "Definition": {
+    },
+    "CreateIndex": 0,
+    "ModifyIndex": 0
+  }
+}

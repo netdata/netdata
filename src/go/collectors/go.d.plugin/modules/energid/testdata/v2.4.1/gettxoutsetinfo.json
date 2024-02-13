@@ -1,0 +1,13 @@
+{
+  "result": {
+    "height": 1,
+    "bestblock": "ee84bfa5f6cafe2ba7f164cee0c33ec63aca76edffa4e8e94656a9be2262cf74",
+    "transactions": 1,
+    "txouts": 1,
+    "hash_serialized_2": "ba3631e5919f37c8f542658238de0516612a7063fbd6143ef813a4e1cc4548e1",
+    "disk_size": 1,
+    "total_amount": 1
+  },
+  "error": null,
+  "id": "1"
+}

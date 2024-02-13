@@ -1,0 +1,162 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-portcheck
+      plugin_name: go.d.plugin
+      module_name: portcheck
+      monitored_instance:
+        name: TCP Endpoints
+        link: ""
+        icon_filename: globe.svg
+        categories:
+          - data-collection.synthetic-checks
+      keywords: []
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors TCP services availability and response time.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/portcheck.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: host
+              description: Remote host address in IPv4, IPv6 format, or DNS name.
+              default_value: ""
+              required: true
+            - name: ports
+              description: Remote host ports. Must be specified in numeric format.
+              default_value: ""
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Check SSH and telnet
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: server1
+                    host: 127.0.0.1
+                    ports:
+                      - 22
+                      - 23
+            - name: Check webserver with IPv6 address
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: server2
+                    host: "[2001:DB8::1]"
+                    ports:
+                      - 80
+                      - 8080
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Multiple instances.
+              config: |
+                jobs:
+                  - name: server1
+                    host: 127.0.0.1
+                    ports:
+                      - 22
+                      - 23
+                
+                  - name: server2
+                    host: 203.0.113.10
+                    ports:
+                      - 22
+                      - 23
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: portcheck_service_reachable
+        metric: portcheck.status
+        info: "TCP host ${label:host} port ${label:port} liveness status"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf
+      - name: portcheck_connection_timeouts
+        metric: portcheck.status
+        info: "percentage of timed-out TCP connections to host ${label:host} port ${label:port} in the last 5 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf
+      - name: portcheck_connection_fails
+        metric: portcheck.status
+        info: "percentage of failed TCP connections to host ${label:host} port ${label:port} in the last 5 minutes"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: tcp endpoint
+          description: These metrics refer to the TCP endpoint.
+          labels:
+            - name: host
+              description: host
+            - name: port
+              description: port
+          metrics:
+            - name: portcheck.status
+              description: TCP Check Status
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failed
+                - name: timeout
+            - name: portcheck.state_duration
+              description: Current State Duration
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: portcheck.latency
+              description: TCP Connection Latency
+              unit: ms
+              chart_type: line
+              dimensions:
+                - name: time

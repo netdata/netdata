@@ -1,0 +1,5 @@
+ application_name | sent_delta | write_delta | flush_delta | replay_delta
+------------------+------------+-------------+-------------+--------------
+ walreceiver      |          1 |           1 |           1 |            1
+ walreceiver      |          1 |           1 |           1 |            1
+ phys-standby2    |          0 |           0 |           0 |            0

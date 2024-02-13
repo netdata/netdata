@@ -1,0 +1,52 @@
+[
+    {
+        "key": "db1",
+        "info": {
+            "db_name": "db1",
+            "purge_seq": "0-g1AAAABPeJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyEhlwqEtkSKqHKMgCAIT2GV4",
+            "update_seq": "14-g1AAAABPeJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyEjlxqEtkSKoHK2DNAgCGOxls",
+            "sizes": {
+                "file": 74115,
+                "external": 588,
+                "active": 2818
+            },
+            "props": {},
+            "doc_del_count": 1,
+            "doc_count": 14,
+            "disk_format_version": 8,
+            "compact_running": false,
+            "cluster": {
+                "q": 2,
+                "n": 1,
+                "w": 1,
+                "r": 1
+            },
+            "instance_start_time": "0"
+        }
+    },
+    {
+        "key": "db2",
+        "info": {
+            "db_name": "db2",
+            "purge_seq": "0-g1AAAABPeJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyEhlwqEtkSKqHKMgCAIT2GV5",
+            "update_seq": "14-g1AAAABPeJzLYWBgYMpgTmHgzcvPy09JdcjLz8gvLskBCeexAEmGBiD1HwiyEjlxqEtkSKoHK2DNAgCGOxlt",
+            "sizes": {
+                "file": 7415,
+                "external": 288,
+                "active": 1818
+            },
+            "props": {},
+            "doc_del_count": 1,
+            "doc_count": 15,
+            "disk_format_version": 8,
+            "compact_running": false,
+            "cluster": {
+                "q": 2,
+                "n": 1,
+                "w": 1,
+                "r": 1
+            },
+            "instance_start_time": "0"
+        }
+    }
+]

@@ -7,3 +7,9 @@ updates:
     labels:
       - "no changelog"
       - "area/ci"
+  - package-ecosystem: gomod
+    directory: /src/go/collectors/go.d.plugin
+    schedule:
+      interval: weekly
+    labels:
+      - "area/go"

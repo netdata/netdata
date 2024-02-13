@@ -1,0 +1,40 @@
+{
+  "cache_backend": {
+    "size": 0,
+    "cold": false,
+    "hit": {
+      "responses": 0,
+      "bytes": 0
+    },
+    "stale": {
+      "responses": 0,
+      "bytes": 0
+    },
+    "updating": {
+      "responses": 0,
+      "bytes": 0
+    },
+    "revalidated": {
+      "responses": 0,
+      "bytes": 0
+    },
+    "miss": {
+      "responses": 109,
+      "bytes": 67035,
+      "responses_written": 0,
+      "bytes_written": 0
+    },
+    "expired": {
+      "responses": 0,
+      "bytes": 0,
+      "responses_written": 0,
+      "bytes_written": 0
+    },
+    "bypass": {
+      "responses": 0,
+      "bytes": 0,
+      "responses_written": 0,
+      "bytes_written": 0
+    }
+  }
+}

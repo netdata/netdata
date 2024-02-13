@@ -1,0 +1,245 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-tengine
+      plugin_name: go.d.plugin
+      module_name: tengine
+      monitored_instance:
+        name: Tengine
+        link: https://tengine.taobao.org/
+        icon_filename: tengine.jpeg
+        categories:
+          - data-collection.web-servers-and-web-proxies
+      keywords:
+        - tengine
+        - web
+        - webserver
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Tengine servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable ngx_http_reqstat_module module.
+            description: |
+              To enable the module, see the [official documentation](ngx_http_reqstat_module](https://tengine.taobao.org/document/http_reqstat.html).
+              The default line format is the only supported format.
+      configuration:
+        file:
+          name: go.d/tengine.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1/us
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 2
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1/us
+            - name: HTTP authentication
+              description: Local server with basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1/us
+                    username: foo
+                    password: bar
+            - name: HTTPS with self-signed certificate
+              description: Tengine with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1/us
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Local and remote instances.
+              config: |
+                jobs:
+                 - name: local
+                   url: http://127.0.0.1/us
+                
+                 - name: remote
+                   url: http://203.0.113.10/us
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: tengine.bandwidth_total
+              description: Bandwidth
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out
+            - name: tengine.connections_total
+              description: Connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: accepted
+            - name: tengine.requests_total
+              description: Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: processed
+            - name: tengine.requests_per_response_code_family_total
+              description: Requests Per Response Code Family
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: 2xx
+                - name: 3xx
+                - name: 4xx
+                - name: 5xx
+                - name: other
+            - name: tengine.requests_per_response_code_detailed_total
+              description: Requests Per Response Code Detailed
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: "200"
+                - name: "206"
+                - name: "302"
+                - name: "304"
+                - name: "403"
+                - name: "404"
+                - name: "419"
+                - name: "499"
+                - name: "500"
+                - name: "502"
+                - name: "503"
+                - name: "504"
+                - name: "508"
+                - name: other
+            - name: tengine.requests_upstream_total
+              description: Number Of Requests Calling For Upstream
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: tengine.tries_upstream_total
+              description: Number Of Times Calling For Upstream
+              unit: calls/s
+              chart_type: line
+              dimensions:
+                - name: calls
+            - name: tengine.requests_upstream_per_response_code_family_total
+              description: Upstream Requests Per Response Code Family
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: 4xx
+                - name: 5xx

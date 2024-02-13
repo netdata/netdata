@@ -1,0 +1,10 @@
+ datname  |        state        | xact_running_time | query_running_time
+----------+---------------------+-------------------+--------------------
+ some_db  | idle in transaction |        574.530219 |         574.315061
+ some_db  | idle in transaction |        574.867167 |         574.330322
+ postgres | active              |          0.000000 |           0.000000
+ some_db  | idle in transaction |        574.807256 |         574.377105
+ some_db  | idle in transaction |        574.680244 |         574.357246
+ some_db  | idle in transaction |        574.800283 |         574.330328
+ some_db  | idle in transaction |        574.396730 |         574.290165
+ some_db  | idle in transaction |        574.665428 |         574.337164

@@ -1,0 +1,129 @@
+{
+  "Process": "mongos",
+  "OpCounters": {
+    "Insert": 0,
+    "Query": 10,
+    "Update": 0,
+    "Delete": 0,
+    "GetMore": 0,
+    "Command": 227283
+  },
+  "OpLatencies": null,
+  "Connections": {
+    "Current": 18,
+    "Available": 838842,
+    "TotalCreated": 89,
+    "Active": 5,
+    "Threaded": 18,
+    "ExhaustIsMaster": 0,
+    "ExhaustHello": 3,
+    "AwaitingTopologyChanges": 4
+  },
+  "Network": {
+    "BytesIn": 57943348,
+    "BytesOut": 247343709,
+    "NumRequests": 227310,
+    "NumSlowDNSOperations": 0,
+    "NumSlowSSLOperations": 0
+  },
+  "Memory": {
+    "Resident": 81,
+    "Virtual": 2476
+  },
+  "Metrics": {
+    "Cursor": {},
+    "Document": {
+      "Deleted": 0,
+      "Inserted": 0,
+      "Returned": 0,
+      "Updated": 0
+    },
+    "QueryExecutor": {
+      "Scanned": 0,
+      "ScannedObjects": 0
+    }
+  },
+  "ExtraInfo": {
+    "PageFaults": 526
+  },
+  "Asserts": {
+    "Regular": 0,
+    "Warning": 0,
+    "Msg": 0,
+    "User": 352,
+    "Tripwire": 0,
+    "Rollovers": 0
+  },
+  "Transactions": {
+    "CurrentActive": 0,
+    "CurrentInactive": 0,
+    "CurrentOpen": 0,
+    "CurrentPrepared": null,
+    "TotalAborted": 0,
+    "TotalCommitted": 0,
+    "TotalStarted": 0,
+    "TotalPrepared": null,
+    "CommitTypes": {
+      "NoShards": {
+        "initiated": 0,
+        "successful": 0,
+        "successfulDurationMicros": 0
+      },
+      "SingleShard": {
+        "initiated": 0,
+        "successful": 0,
+        "successfulDurationMicros": 0
+      },
+      "SingleWriteShard": {
+        "initiated": 0,
+        "successful": 0,
+        "successfulDurationMicros": 0
+      },
+      "ReadOnly": {
+        "initiated": 0,
+        "successful": 0,
+        "successfulDurationMicros": 0
+      },
+      "TwoPhaseCommit": {
+        "initiated": 0,
+        "successful": 0,
+        "successfulDurationMicros": 0
+      },
+      "RecoverWithToken": {
+        "initiated": 0,
+        "successful": 0,
+        "successfulDurationMicros": 0
+      }
+    }
+  },
+  "GlobalLock": null,
+  "Tcmalloc": {
+    "Generic": {
+      "CurrentAllocatedBytes": 13519784,
+      "HeapSize": 24576000
+    },
+    "Tcmalloc": {
+      "PageheapFreeBytes": 5697536,
+      "PageheapUnmappedBytes": 57344,
+      "MaxTotalThreadCacheBytes": 1042284544,
+      "CurrentTotalThreadCacheBytes": 1638104,
+      "TotalFreeBytes": 5301336,
+      "CentralCacheFreeBytes": 736960,
+      "TransferCacheFreeBytes": 2926272,
+      "ThreadCacheFreeBytes": 1638104,
+      "AggressiveMemoryDecommit": 0,
+      "PageheapCommittedBytes": 24518656,
+      "PageheapScavengeBytes": 0,
+      "PageheapCommitCount": 480,
+      "PageheapTotalCommitBytes": 84799488,
+      "PageheapDecommitCount": 127,
+      "PageheapTotalDecommitBytes": 60280832,
+      "PageheapReserveCount": 15,
+      "PageheapTotalReserveBytes": 24576000,
+      "SpinlockTotalDelayNs": 96785212
+    }
+  },
+  "Locks": null,
+  "WiredTiger": null,
+  "Repl": null
+}

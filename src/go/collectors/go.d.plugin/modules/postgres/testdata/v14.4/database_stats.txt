@@ -1,0 +1,4 @@
+datname   | numbackends | datconnlimit | xact_commit | xact_rollback | blks_read_bytes | blks_hit_bytes | tup_returned | tup_fetched | tup_inserted | tup_updated | tup_deleted | conflicts | temp_files | temp_bytes | deadlocks
+------------+-------------+--------------+-------------+---------------+-----------------+----------------+--------------+-------------+--------------+-------------+-------------+-----------+------------+------------+-----------
+postgres   |           3 |           30 |     1438660 |            70 |      3252       |  1221125       |     13207245 |      359833 |            0 |           0 |           0 |         0 |          0 |          0 |         0
+production |           1 |           -1 |           0 |             0 |         0       |        0       |            0 |           0 |            0 |           0 |           0 |         0 |          0 |          0 |         0

@@ -1,0 +1,11 @@
+# HELP test_gauge_metric_1 Test Gauge Metric 1
+# TYPE test_gauge_metric_1 gauge
+test_gauge_metric_1{label1="value1"} 11
+test_gauge_metric_1{label1="value2"} 12
+test_gauge_metric_1{label1="value3"} 13
+test_gauge_metric_1{label1="value4"} 14
+# TYPE test_gauge_metric_2 gauge
+test_gauge_metric_2{label1="value1"} 11
+test_gauge_metric_2{label1="value2"} 12
+test_gauge_metric_2{label1="value3"} 13
+test_gauge_metric_2{label1="value4"} 14

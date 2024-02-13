@@ -1,0 +1,16 @@
+{
+  "handshakes": 15804607,
+  "session_reuses": 13096060,
+  "handshakes_failed": 37862,
+  "no_common_protocol": 16648,
+  "no_common_cipher": 24,
+  "handshake_timeout": 4,
+  "peer_rejected_cert": 0,
+  "verify_failures": {
+    "no_cert": 0,
+    "expired_cert": 0,
+    "revoked_cert": 0,
+    "hostname_mismatch": 0,
+    "other": 0
+  }
+}

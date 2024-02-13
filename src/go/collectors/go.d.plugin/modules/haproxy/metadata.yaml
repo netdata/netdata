@@ -1,0 +1,231 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-haproxy
+      plugin_name: go.d.plugin
+      module_name: haproxy
+      monitored_instance:
+        name: HAProxy
+        link: https://www.haproxy.org/
+        icon_filename: haproxy.svg
+        categories:
+          - data-collection.web-servers-and-web-proxies
+      keywords:
+        - haproxy
+        - web
+        - webserver
+        - http
+        - proxy
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors HAProxy servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable PROMEX addon.
+            description: |
+              To enable PROMEX addon, follow the [official documentation](https://github.com/haproxy/haproxy/tree/master/addons/promex).
+      configuration:
+        file:
+          name: go.d/haproxy.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8404/metrics
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8404/metrics
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: NGINX Plus with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:8404/metrics
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8404/metrics
+                
+                  - name: remote
+                    url: http://192.0.2.1:8404/metrics
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: haproxy.backend_current_sessions
+              description: Current number of active sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: a dimension per proxy
+            - name: haproxy.backend_sessions
+              description: Sessions rate
+              unit: sessions/s
+              chart_type: line
+              dimensions:
+                - name: a dimension per proxy
+            - name: haproxy.backend_response_time_average
+              description: Average response time for last 1024 successful connections
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: a dimension per proxy
+            - name: haproxy.backend_queue_time_average
+              description: Average queue time for last 1024 successful connections
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: a dimension per proxy
+            - name: haproxy.backend_current_queue
+              description: Current number of queued requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: a dimension per proxy
+        - name: proxy
+          description: These metrics refer to the Proxy.
+          labels: []
+          metrics:
+            - name: haproxy.backend_http_responses
+              description: HTTP responses by code class
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: 1xx
+                - name: 2xx
+                - name: 3xx
+                - name: 4xx
+                - name: 5xx
+                - name: other
+            - name: haproxy.backend_network_io
+              description: Network traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: in
+                - name: out

@@ -1,0 +1,6 @@
+ datname  | schemaname |     relname      | heap_blks_read_bytes | heap_blks_hit_bytes | idx_blks_read_bytes | idx_blks_hit_bytes | toast_blks_read_bytes | toast_blks_hit_bytes | tidx_blks_read_bytes | tidx_blks_hit_bytes
+----------+------------+------------------+----------------------+---------------------+---------------------+--------------------+-----------------------+----------------------+----------------------+---------------------
+ postgres | public     | pgbench_tellers  |            623828992 |           491937792 |           101433344 |                  0 |                       |                      |                      |
+ postgres | public     | pgbench_history  |                    0 |                   0 |                     |                    |                       |                      |                      |
+ postgres | public     | pgbench_accounts |        1803882668032 |        224484753408 |        973310976000 |      7138635948032 |                       |                      |                      |
+ postgres | public     | pgbench_branches |            507150336 |           304316416 |           101425152 |          101441536 |                       |                      |                      |

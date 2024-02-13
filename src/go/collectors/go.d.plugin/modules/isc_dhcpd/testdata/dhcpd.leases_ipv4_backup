@@ -1,0 +1,39 @@
+# The format of this file is documented in the dhcpd.leases(5) manual page.
+# This lease file was written by isc-dhcp-4.4.2
+
+# authoring-byte-order entry is generated, DO NOT DELETE
+authoring-byte-order little-endian;
+
+lease 10.254.253.103 {
+  starts 6 2020/10/03 08:57:02;
+  ends 6 2020/10/03 10:37:02;
+  cltt 6 2020/10/03 08:57:02;
+  binding state active;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 34:ce:00:03:08:57;
+  uid "\0014\316\000\003\010W";
+  set vendor-class-identifier = "udhcp 1.24.2";
+}
+lease 192.168.3.1 {
+  starts 6 2018/02/17 01:13:21;
+  tsfp 6 2018/02/17 01:13:21;
+  atsfp 6 2018/02/17 01:13:21;
+  binding state backup;
+}
+lease 192.168.3.11 {
+  starts 6 2020/10/03 09:01:22;
+  ends 6 2020/10/03 10:41:22;
+  cltt 6 2020/10/03 09:01:22;
+  binding state active;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 60:a4:4c:3f:6e:78;
+  uid "\001`\244L?nx";
+}
+lease 192.168.3.2 {
+  starts 6 2018/02/17 01:13:21;
+  tsfp 6 2018/02/17 01:13:21;
+  atsfp 6 2018/02/17 01:13:21;
+  binding state backup;
+}

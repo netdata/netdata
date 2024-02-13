@@ -1,0 +1,38 @@
+# HELP coredns_build_info A metric with a constant '1' value labeled by version, revision, and goversion from which CoreDNS was built.
+# TYPE coredns_build_info gauge
+coredns_build_info{goversion="go1.14.4",revision="f59c03d",version="1.7.0"} 1
+# HELP coredns_panics_total A metrics that counts the number of panics.
+# TYPE coredns_panics_total counter
+coredns_panics_total 0
+# HELP coredns_dns_requests_total Counter of DNS requests made per zone, protocol and family.
+# TYPE coredns_dns_requests_total counter
+coredns_dns_requests_total{family="1",proto="udp",server="",type="A",zone="dropped"} 7
+coredns_dns_requests_total{family="1",proto="udp",server="",type="AAAA",zone="dropped"} 7
+coredns_dns_requests_total{family="1",proto="udp",server="",type="MX",zone="dropped"} 7
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:53",type="A",zone="coredns.io."} 2
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:53",type="A",zone="dropped"} 3
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:53",type="A",zone="ya.ru."} 3
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:53",type="AAAA",zone="coredns.io."} 2
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:53",type="AAAA",zone="dropped"} 3
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:53",type="AAAA",zone="ya.ru."} 3
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:53",type="MX",zone="coredns.io."} 2
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:53",type="MX",zone="dropped"} 3
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:53",type="MX",zone="ya.ru."} 3
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:54",type="A",zone="coredns.io."} 4
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:54",type="A",zone="dropped"} 4
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:54",type="A",zone="ya.ru."} 4
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:54",type="AAAA",zone="coredns.io."} 4
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:54",type="AAAA",zone="dropped"} 4
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:54",type="AAAA",zone="ya.ru."} 4
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:54",type="MX",zone="coredns.io."} 5
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:54",type="MX",zone="dropped"} 4
+coredns_dns_requests_total{family="1",proto="udp",server="dns://:54",type="MX",zone="ya.ru."} 4
+# HELP coredns_dns_response_rcode_count_total Counter of response status codes.
+# TYPE coredns_dns_response_rcode_count_total counter
+coredns_dns_responses_total{rcode="NOERROR",server="dns://:53",zone="coredns.io."} 6
+coredns_dns_responses_total{rcode="NOERROR",server="dns://:54",zone="coredns.io."} 13
+coredns_dns_responses_total{rcode="REFUSED",server="",zone="dropped"} 21
+coredns_dns_responses_total{rcode="SERVFAIL",server="dns://:53",zone="dropped"} 9
+coredns_dns_responses_total{rcode="SERVFAIL",server="dns://:53",zone="ya.ru."} 9
+coredns_dns_responses_total{rcode="SERVFAIL",server="dns://:54",zone="dropped"} 12
+coredns_dns_responses_total{rcode="SERVFAIL",server="dns://:54",zone="ya.ru."} 12

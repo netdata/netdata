@@ -1,0 +1,36 @@
+{
+  "resolver-http": {
+    "requests": {
+      "name": 0,
+      "srv": 2939408,
+      "addr": 0
+    },
+    "responses": {
+      "noerror": 0,
+      "formerr": 0,
+      "servfail": 0,
+      "nxdomain": 2939404,
+      "notimp": 0,
+      "refused": 0,
+      "timedout": 4,
+      "unknown": 0
+    }
+  },
+  "resolver-stream": {
+    "requests": {
+      "name": 638797,
+      "srv": 0,
+      "addr": 0
+    },
+    "responses": {
+      "noerror": 433136,
+      "formerr": 0,
+      "servfail": 0,
+      "nxdomain": 40022,
+      "notimp": 0,
+      "refused": 165639,
+      "timedout": 0,
+      "unknown": 0
+    }
+  }
+}

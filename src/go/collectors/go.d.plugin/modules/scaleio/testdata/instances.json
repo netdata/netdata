@@ -1,0 +1,1160 @@
+{
+  "System": {
+    "authenticationMethod": "Native",
+    "capacityAlertCriticalThresholdPercent": 90,
+    "capacityAlertHighThresholdPercent": 80,
+    "capacityTimeLeftInDays": "Unlimited",
+    "cliPasswordAllowed": true,
+    "daysInstalled": 17,
+    "defaultIsVolumeObfuscated": false,
+    "enterpriseFeaturesEnabled": true,
+    "id": "499634a44778afc0",
+    "installId": "3e9fc5811a7efb00",
+    "isInitialLicense": true,
+    "links": [
+      {
+        "href": "/api/instances/System::499634a44778afc0",
+        "rel": "self"
+      },
+      {
+        "href": "/api/instances/System::499634a44778afc0/relationships/Statistics",
+        "rel": "/api/System/relationship/Statistics"
+      },
+      {
+        "href": "/api/instances/System::499634a44778afc0/relationships/ProtectionDomain",
+        "rel": "/api/System/relationship/ProtectionDomain"
+      },
+      {
+        "href": "/api/instances/System::499634a44778afc0/relationships/Sdc",
+        "rel": "/api/System/relationship/Sdc"
+      },
+      {
+        "href": "/api/instances/System::499634a44778afc0/relationships/User",
+        "rel": "/api/System/relationship/User"
+      }
+    ],
+    "managementClientSecureCommunicationEnabled": true,
+    "maxCapacityInGb": "Unlimited",
+    "mdmCluster": {
+      "clusterMode": "ThreeNodes",
+      "clusterState": "ClusteredNormal",
+      "goodNodesNum": 3,
+      "goodReplicasNum": 2,
+      "id": "5302483491453710272",
+      "master": {
+        "id": "65ed0ee3247d0a00",
+        "ips": [
+          "100.127.0.10"
+        ],
+        "managementIPs": [
+          "100.127.0.10"
+        ],
+        "name": "Manager1",
+        "opensslVersion": "OpenSSL 1.0.2g  1 Mar 2016",
+        "port": 9011,
+        "role": "Manager",
+        "versionInfo": "R2_6.11000.0",
+        "virtualInterfaces": []
+      },
+      "slaves": [
+        {
+          "id": "4cc44104130ce7b1",
+          "ips": [
+            "100.127.0.11"
+          ],
+          "managementIPs": [
+            "100.127.0.11"
+          ],
+          "name": "Manager2",
+          "opensslVersion": "OpenSSL 1.0.2g  1 Mar 2016",
+          "port": 9011,
+          "role": "Manager",
+          "status": "Normal",
+          "versionInfo": "R2_6.11000.0",
+          "virtualInterfaces": []
+        }
+      ],
+      "tieBreakers": [
+        {
+          "id": "35bf9d62661a6db2",
+          "ips": [
+            "100.127.0.12"
+          ],
+          "managementIPs": [
+            "100.127.0.12"
+          ],
+          "name": "Tie-Breaker1",
+          "opensslVersion": "N/A",
+          "port": 9011,
+          "role": "TieBreaker",
+          "status": "Normal",
+          "versionInfo": "R2_6.11000.0"
+        }
+      ]
+    },
+    "mdmManagementPort": 6611,
+    "mdmToSdsPolicy": "Authentication",
+    "perfProfile": "Default",
+    "remoteReadOnlyLimitState": false,
+    "restrictedSdcMode": "None",
+    "restrictedSdcModeEnabled": false,
+    "sdcLongOperationsCounterParameters": {
+      "longWindow": {
+        "threshold": 1000000,
+        "windowSizeInSec": 86400
+      },
+      "mediumWindow": {
+        "threshold": 100000,
+        "windowSizeInSec": 3600
+      },
+      "shortWindow": {
+        "threshold": 10000,
+        "windowSizeInSec": 60
+      }
+    },
+    "sdcMdmNetworkDisconnectionsCounterParameters": {
+      "longWindow": {
+        "threshold": 700,
+        "windowSizeInSec": 86400
+      },
+      "mediumWindow": {
+        "threshold": 500,
+        "windowSizeInSec": 3600
+      },
+      "shortWindow": {
+        "threshold": 300,
+        "windowSizeInSec": 60
+      }
+    },
+    "sdcMemoryAllocationFailuresCounterParameters": {
+      "longWindow": {
+        "threshold": 700,
+        "windowSizeInSec": 86400
+      },
+      "mediumWindow": {
+        "threshold": 500,
+        "windowSizeInSec": 3600
+      },
+      "shortWindow": {
+        "threshold": 300,
+        "windowSizeInSec": 60
+      }
+    },
+    "sdcSdsConnectivityInfo": {
+      "disconnectedSdcId": null,
+      "disconnectedSdcName": null,
+      "disconnectedSdsId": null,
+      "disconnectedSdsIp": null,
+      "disconnectedSdsName": null,
+      "sdcSdsConnectivityStatus": "AllConnected"
+    },
+    "sdcSdsNetworkDisconnectionsCounterParameters": {
+      "longWindow": {
+        "threshold": 20000,
+        "windowSizeInSec": 86400
+      },
+      "mediumWindow": {
+        "threshold": 4000,
+        "windowSizeInSec": 3600
+      },
+      "shortWindow": {
+        "threshold": 800,
+        "windowSizeInSec": 60
+      }
+    },
+    "sdcSocketAllocationFailuresCounterParameters": {
+      "longWindow": {
+        "threshold": 700,
+        "windowSizeInSec": 86400
+      },
+      "mediumWindow": {
+        "threshold": 500,
+        "windowSizeInSec": 3600
+      },
+      "shortWindow": {
+        "threshold": 300,
+        "windowSizeInSec": 60
+      }
+    },
+    "showGuid": true,
+    "swid": "",
+    "systemVersionName": "DellEMC ScaleIO Version: R2_6.11000.113",
+    "tlsVersion": "TLSv1.2",
+    "upgradeState": "NoUpgrade"
+  },
+  "deviceList": [
+    {
+      "aggregatedState": "NeverFailed",
+      "capacityLimitInKb": 103808000,
+      "deviceCurrentPathName": "/dev/sdb",
+      "deviceOriginalPathName": "/dev/sdb",
+      "deviceState": "Normal",
+      "errorState": "None",
+      "id": "ebbf9d6500010000",
+      "ledSetting": "Off",
+      "links": [
+        {
+          "href": "/api/instances/Device::ebbf9d6500010000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Device::ebbf9d6500010000/relationships/Statistics",
+          "rel": "/api/Device/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabe00000001",
+          "rel": "/api/parent/relationship/sdsId"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "longSuccessfulIos": {
+        "longWindow": null,
+        "mediumWindow": null,
+        "shortWindow": null
+      },
+      "maxCapacityInKb": 103808000,
+      "name": "sdb",
+      "rfcacheErrorDeviceDoesNotExist": false,
+      "sdsId": "130dcabe00000001",
+      "ssdEndOfLifeState": "NeverFailed",
+      "storagePoolId": "40395b7b00000000",
+      "temperatureState": "NeverFailed"
+    },
+    {
+      "aggregatedState": "NeverFailed",
+      "capacityLimitInKb": 114293760,
+      "deviceCurrentPathName": "/dev/sdc",
+      "deviceOriginalPathName": "/dev/sdc",
+      "deviceState": "Normal",
+      "errorState": "None",
+      "id": "ebbfc47300010001",
+      "ledSetting": "Off",
+      "links": [
+        {
+          "href": "/api/instances/Device::ebbfc47300010001",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Device::ebbfc47300010001/relationships/Statistics",
+          "rel": "/api/Device/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabe00000001",
+          "rel": "/api/parent/relationship/sdsId"
+        },
+        {
+          "href": "/api/instances/StoragePool::4039828b00000001",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "longSuccessfulIos": {
+        "longWindow": null,
+        "mediumWindow": null,
+        "shortWindow": null
+      },
+      "maxCapacityInKb": 114293760,
+      "name": "sdc",
+      "rfcacheErrorDeviceDoesNotExist": false,
+      "sdsId": "130dcabe00000001",
+      "ssdEndOfLifeState": "NeverFailed",
+      "storagePoolId": "4039828b00000001",
+      "temperatureState": "NeverFailed"
+    },
+    {
+      "aggregatedState": "NeverFailed",
+      "capacityLimitInKb": 103808000,
+      "deviceCurrentPathName": "/dev/sdb",
+      "deviceOriginalPathName": "/dev/sdb",
+      "deviceState": "Normal",
+      "errorState": "None",
+      "id": "ebbd9d6400000000",
+      "ledSetting": "Off",
+      "links": [
+        {
+          "href": "/api/instances/Device::ebbd9d6400000000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Device::ebbd9d6400000000/relationships/Statistics",
+          "rel": "/api/Device/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabd00000000",
+          "rel": "/api/parent/relationship/sdsId"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "longSuccessfulIos": {
+        "longWindow": null,
+        "mediumWindow": null,
+        "shortWindow": null
+      },
+      "maxCapacityInKb": 103808000,
+      "name": "sdb",
+      "rfcacheErrorDeviceDoesNotExist": false,
+      "sdsId": "130dcabd00000000",
+      "ssdEndOfLifeState": "NeverFailed",
+      "storagePoolId": "40395b7b00000000",
+      "temperatureState": "NeverFailed"
+    },
+    {
+      "aggregatedState": "NeverFailed",
+      "capacityLimitInKb": 114293760,
+      "deviceCurrentPathName": "/dev/sdc",
+      "deviceOriginalPathName": "/dev/sdc",
+      "deviceState": "Normal",
+      "errorState": "None",
+      "id": "ebbfc47700020001",
+      "ledSetting": "Off",
+      "links": [
+        {
+          "href": "/api/instances/Device::ebbfc47700020001",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Device::ebbfc47700020001/relationships/Statistics",
+          "rel": "/api/Device/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabf00000002",
+          "rel": "/api/parent/relationship/sdsId"
+        },
+        {
+          "href": "/api/instances/StoragePool::4039828b00000001",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "longSuccessfulIos": {
+        "longWindow": null,
+        "mediumWindow": null,
+        "shortWindow": null
+      },
+      "maxCapacityInKb": 114293760,
+      "name": "sdc",
+      "rfcacheErrorDeviceDoesNotExist": false,
+      "sdsId": "130dcabf00000002",
+      "ssdEndOfLifeState": "NeverFailed",
+      "storagePoolId": "4039828b00000001",
+      "temperatureState": "NeverFailed"
+    },
+    {
+      "aggregatedState": "NeverFailed",
+      "capacityLimitInKb": 103808000,
+      "deviceCurrentPathName": "/dev/sdc",
+      "deviceOriginalPathName": "/dev/sdc",
+      "deviceState": "Normal",
+      "errorState": "None",
+      "id": "ebbdc47600000001",
+      "ledSetting": "Off",
+      "links": [
+        {
+          "href": "/api/instances/Device::ebbdc47600000001",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Device::ebbdc47600000001/relationships/Statistics",
+          "rel": "/api/Device/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabd00000000",
+          "rel": "/api/parent/relationship/sdsId"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "longSuccessfulIos": {
+        "longWindow": null,
+        "mediumWindow": null,
+        "shortWindow": null
+      },
+      "maxCapacityInKb": 103808000,
+      "name": "sdc",
+      "rfcacheErrorDeviceDoesNotExist": false,
+      "sdsId": "130dcabd00000000",
+      "ssdEndOfLifeState": "NeverFailed",
+      "storagePoolId": "40395b7b00000000",
+      "temperatureState": "NeverFailed"
+    },
+    {
+      "aggregatedState": "NeverFailed",
+      "capacityLimitInKb": 103808000,
+      "deviceCurrentPathName": "/dev/sdb",
+      "deviceOriginalPathName": "/dev/sdb",
+      "deviceState": "Normal",
+      "errorState": "None",
+      "id": "ebbfc47800020000",
+      "ledSetting": "Off",
+      "links": [
+        {
+          "href": "/api/instances/Device::ebbfc47800020000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Device::ebbfc47800020000/relationships/Statistics",
+          "rel": "/api/Device/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabf00000002",
+          "rel": "/api/parent/relationship/sdsId"
+        },
+        {
+          "href": "/api/instances/StoragePool::4039828b00000001",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "longSuccessfulIos": {
+        "longWindow": null,
+        "mediumWindow": null,
+        "shortWindow": null
+      },
+      "maxCapacityInKb": 103808000,
+      "name": "sdb",
+      "rfcacheErrorDeviceDoesNotExist": false,
+      "sdsId": "130dcabf00000002",
+      "ssdEndOfLifeState": "NeverFailed",
+      "storagePoolId": "4039828b00000001",
+      "temperatureState": "NeverFailed"
+    }
+  ],
+  "faultSetList": [
+    {
+      "id": "a6a7b4cf00000000",
+      "links": [
+        {
+          "href": "/api/instances/FaultSet::a6a7b4cf00000000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/FaultSet::a6a7b4cf00000000/relationships/Statistics",
+          "rel": "/api/FaultSet/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/FaultSet::a6a7b4cf00000000/relationships/Sds",
+          "rel": "/api/FaultSet/relationship/Sds"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000",
+          "rel": "/api/parent/relationship/protectionDomainId"
+        }
+      ],
+      "name": "MyFaultSet",
+      "protectionDomainId": "74d855a900000000"
+    }
+  ],
+  "isDirty": false,
+  "lastDeviceVersion": 47,
+  "lastFaultSetVersion": 2,
+  "lastProtectionDomainVersion": 2,
+  "lastRfcacheDeviceVersion": 1,
+  "lastSdcVersion": 7,
+  "lastSdsVersion": 19,
+  "lastStoragePoolVersion": 4,
+  "lastSystemVersion": 2,
+  "lastVTreeVersion": 3,
+  "lastVolumeVersion": 3,
+  "protectionDomainList": [
+    {
+      "id": "74d855a900000000",
+      "links": [
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000/relationships/Statistics",
+          "rel": "/api/ProtectionDomain/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000/relationships/StoragePool",
+          "rel": "/api/ProtectionDomain/relationship/StoragePool"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000/relationships/Sds",
+          "rel": "/api/ProtectionDomain/relationship/Sds"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000/relationships/FaultSet",
+          "rel": "/api/ProtectionDomain/relationship/FaultSet"
+        },
+        {
+          "href": "/api/instances/System::499634a44778afc0",
+          "rel": "/api/parent/relationship/systemId"
+        }
+      ],
+      "mdmSdsNetworkDisconnectionsCounterParameters": {
+        "longWindow": {
+          "threshold": 700,
+          "windowSizeInSec": 86400
+        },
+        "mediumWindow": {
+          "threshold": 500,
+          "windowSizeInSec": 3600
+        },
+        "shortWindow": {
+          "threshold": 300,
+          "windowSizeInSec": 60
+        }
+      },
+      "name": "default",
+      "overallIoNetworkThrottlingEnabled": false,
+      "overallIoNetworkThrottlingInKbps": null,
+      "protectionDomainState": "Active",
+      "rebalanceNetworkThrottlingEnabled": false,
+      "rebalanceNetworkThrottlingInKbps": null,
+      "rebuildNetworkThrottlingEnabled": false,
+      "rebuildNetworkThrottlingInKbps": null,
+      "rfcacheEnabled": true,
+      "rfcacheMaxIoSizeKb": 128,
+      "rfcacheOpertionalMode": "WriteMiss",
+      "rfcachePageSizeKb": 64,
+      "sdsConfigurationFailureCounterParameters": {
+        "longWindow": {
+          "threshold": 700,
+          "windowSizeInSec": 86400
+        },
+        "mediumWindow": {
+          "threshold": 500,
+          "windowSizeInSec": 3600
+        },
+        "shortWindow": {
+          "threshold": 300,
+          "windowSizeInSec": 60
+        }
+      },
+      "sdsDecoupledCounterParameters": {
+        "longWindow": {
+          "threshold": 700,
+          "windowSizeInSec": 86400
+        },
+        "mediumWindow": {
+          "threshold": 500,
+          "windowSizeInSec": 3600
+        },
+        "shortWindow": {
+          "threshold": 300,
+          "windowSizeInSec": 60
+        }
+      },
+      "sdsReceiveBufferAllocationFailuresCounterParameters": {
+        "longWindow": {
+          "threshold": 2000000,
+          "windowSizeInSec": 86400
+        },
+        "mediumWindow": {
+          "threshold": 200000,
+          "windowSizeInSec": 3600
+        },
+        "shortWindow": {
+          "threshold": 20000,
+          "windowSizeInSec": 60
+        }
+      },
+      "sdsSdsNetworkDisconnectionsCounterParameters": {
+        "longWindow": {
+          "threshold": 700,
+          "windowSizeInSec": 86400
+        },
+        "mediumWindow": {
+          "threshold": 500,
+          "windowSizeInSec": 3600
+        },
+        "shortWindow": {
+          "threshold": 300,
+          "windowSizeInSec": 60
+        }
+      },
+      "systemId": "499634a44778afc0"
+    }
+  ],
+  "rfcacheDeviceList": null,
+  "sdcList": [
+    {
+      "id": "6076fd1100000002",
+      "installedSoftwareVersionInfo": "R2_6.11000.0",
+      "kernelBuildNumber": null,
+      "kernelVersion": "4.15.18",
+      "links": [
+        {
+          "href": "/api/instances/Sdc::6076fd1100000002",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Sdc::6076fd1100000002/relationships/Statistics",
+          "rel": "/api/Sdc/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sdc::6076fd1100000002/relationships/Volume",
+          "rel": "/api/Sdc/relationship/Volume"
+        },
+        {
+          "href": "/api/instances/System::499634a44778afc0",
+          "rel": "/api/parent/relationship/systemId"
+        }
+      ],
+      "mdmConnectionState": "Disconnected",
+      "memoryAllocationFailure": null,
+      "name": null,
+      "osType": "Linux",
+      "perfProfile": "Default",
+      "sdcApproved": true,
+      "sdcApprovedIps": [
+        "100.127.0.12"
+      ],
+      "sdcGuid": "B71F01AE-FF7A-47C5-A303-583FFD416818",
+      "sdcIp": "100.127.0.12",
+      "socketAllocationFailure": null,
+      "softwareVersionInfo": null,
+      "systemId": "499634a44778afc0",
+      "versionInfo": null
+    },
+    {
+      "id": "6076fd1000000001",
+      "installedSoftwareVersionInfo": "R2_6.11000.0",
+      "kernelBuildNumber": null,
+      "kernelVersion": "4.15.18",
+      "links": [
+        {
+          "href": "/api/instances/Sdc::6076fd1000000001",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Sdc::6076fd1000000001/relationships/Statistics",
+          "rel": "/api/Sdc/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sdc::6076fd1000000001/relationships/Volume",
+          "rel": "/api/Sdc/relationship/Volume"
+        },
+        {
+          "href": "/api/instances/System::499634a44778afc0",
+          "rel": "/api/parent/relationship/systemId"
+        }
+      ],
+      "mdmConnectionState": "Disconnected",
+      "memoryAllocationFailure": null,
+      "name": null,
+      "osType": "Linux",
+      "perfProfile": "Default",
+      "sdcApproved": true,
+      "sdcApprovedIps": [
+        "100.127.0.11"
+      ],
+      "sdcGuid": "5D2B24F9-5D49-4688-A67D-88AF8790BC05",
+      "sdcIp": "100.127.0.11",
+      "socketAllocationFailure": null,
+      "softwareVersionInfo": null,
+      "systemId": "499634a44778afc0",
+      "versionInfo": null
+    },
+    {
+      "id": "6076fd0f00000000",
+      "installedSoftwareVersionInfo": "R2_6.11000.0",
+      "kernelBuildNumber": null,
+      "kernelVersion": "4.15.18",
+      "links": [
+        {
+          "href": "/api/instances/Sdc::6076fd0f00000000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Sdc::6076fd0f00000000/relationships/Statistics",
+          "rel": "/api/Sdc/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sdc::6076fd0f00000000/relationships/Volume",
+          "rel": "/api/Sdc/relationship/Volume"
+        },
+        {
+          "href": "/api/instances/System::499634a44778afc0",
+          "rel": "/api/parent/relationship/systemId"
+        }
+      ],
+      "mdmConnectionState": "Connected",
+      "memoryAllocationFailure": null,
+      "name": null,
+      "osType": "Linux",
+      "perfProfile": "Default",
+      "sdcApproved": true,
+      "sdcApprovedIps": [
+        "100.127.0.10"
+      ],
+      "sdcGuid": "974F4AC7-FF37-4909-8713-D1BD3F002843",
+      "sdcIp": "100.127.0.10",
+      "socketAllocationFailure": null,
+      "softwareVersionInfo": "R2_6.11000.0",
+      "systemId": "499634a44778afc0",
+      "versionInfo": "R2_6.11000.0"
+    }
+  ],
+  "sdsList": [
+    {
+      "authenticationError": "None",
+      "certificateInfo": {
+        "issuer": "/GN=MDM/CN=test-VirtualBox/L=Hopkinton/ST=Massachusetts/C=US/O=EMC/OU=ASD",
+        "subject": "/GN=SDS-000/CN=scaleIOslave1/L=Hopkinton/ST=Massachusetts/C=US/O=EMC/OU=ASD",
+        "thumbprint": "FD:00:99:E9:40:90:A5:CE:85:B8:A9:07:86:BB:7E:F0:E0:DE:F9:75",
+        "validFrom": "Nov 12 19:17:22 2019 GMT",
+        "validFromAsn1Format": "191112191722Z",
+        "validTo": "Nov 10 20:17:22 2029 GMT",
+        "validToAsn1Format": "291110201722Z"
+      },
+      "drlMode": "Volatile",
+      "faultSetId": null,
+      "id": "130dcabd00000000",
+      "ipList": [
+        {
+          "ip": "100.127.0.11",
+          "role": "all"
+        }
+      ],
+      "links": [
+        {
+          "href": "/api/instances/Sds::130dcabd00000000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabd00000000/relationships/Statistics",
+          "rel": "/api/Sds/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabd00000000/relationships/Device",
+          "rel": "/api/Sds/relationship/Device"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabd00000000/relationships/RfcacheDevice",
+          "rel": "/api/Sds/relationship/RfcacheDevice"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000",
+          "rel": "/api/parent/relationship/protectionDomainId"
+        }
+      ],
+      "maintenanceState": "NoMaintenance",
+      "mdmConnectionState": "Connected",
+      "membershipState": "Joined",
+      "name": "SDS_[100.127.0.11]",
+      "numOfIoBuffers": null,
+      "onVmWare": false,
+      "perfProfile": "Default",
+      "port": 7072,
+      "protectionDomainId": "74d855a900000000",
+      "rfcacheEnabled": true,
+      "rfcacheErrorApiVersionMismatch": false,
+      "rfcacheErrorDeviceDoesNotExist": false,
+      "rfcacheErrorInconsistentCacheConfiguration": false,
+      "rfcacheErrorInconsistentSourceConfiguration": false,
+      "rfcacheErrorInvalidDriverPath": false,
+      "rfcacheErrorLowResources": false,
+      "rmcacheEnabled": true,
+      "rmcacheFrozen": false,
+      "rmcacheMemoryAllocationState": "AllocationPending",
+      "rmcacheSizeInKb": 131072,
+      "sdsConfigurationFailure": null,
+      "sdsDecoupled": null,
+      "sdsReceiveBufferAllocationFailures": null,
+      "sdsState": "Normal",
+      "softwareVersionInfo": "R2_6.11000.0"
+    },
+    {
+      "authenticationError": "None",
+      "certificateInfo": {
+        "issuer": "/GN=MDM/CN=test-VirtualBox/L=Hopkinton/ST=Massachusetts/C=US/O=EMC/OU=ASD",
+        "subject": "/GN=SDS-001/CN=test-VirtualBox/L=Hopkinton/ST=Massachusetts/C=US/O=EMC/OU=ASD",
+        "thumbprint": "B2:F9:88:84:55:94:A1:D8:7F:C1:4F:50:81:17:56:AC:72:B7:A2:AD",
+        "validFrom": "Nov 12 19:17:22 2019 GMT",
+        "validFromAsn1Format": "191112191722Z",
+        "validTo": "Nov 10 20:17:22 2029 GMT",
+        "validToAsn1Format": "291110201722Z"
+      },
+      "drlMode": "Volatile",
+      "faultSetId": null,
+      "id": "130dcabe00000001",
+      "ipList": [
+        {
+          "ip": "100.127.0.10",
+          "role": "all"
+        }
+      ],
+      "links": [
+        {
+          "href": "/api/instances/Sds::130dcabe00000001",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabe00000001/relationships/Statistics",
+          "rel": "/api/Sds/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabe00000001/relationships/Device",
+          "rel": "/api/Sds/relationship/Device"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabe00000001/relationships/RfcacheDevice",
+          "rel": "/api/Sds/relationship/RfcacheDevice"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000",
+          "rel": "/api/parent/relationship/protectionDomainId"
+        }
+      ],
+      "maintenanceState": "NoMaintenance",
+      "mdmConnectionState": "Connected",
+      "membershipState": "Joined",
+      "name": "SDS_[100.127.0.10]",
+      "numOfIoBuffers": null,
+      "onVmWare": false,
+      "perfProfile": "Default",
+      "port": 7072,
+      "protectionDomainId": "74d855a900000000",
+      "rfcacheEnabled": true,
+      "rfcacheErrorApiVersionMismatch": false,
+      "rfcacheErrorDeviceDoesNotExist": false,
+      "rfcacheErrorInconsistentCacheConfiguration": false,
+      "rfcacheErrorInconsistentSourceConfiguration": false,
+      "rfcacheErrorInvalidDriverPath": false,
+      "rfcacheErrorLowResources": false,
+      "rmcacheEnabled": true,
+      "rmcacheFrozen": false,
+      "rmcacheMemoryAllocationState": "AllocationPending",
+      "rmcacheSizeInKb": 131072,
+      "sdsConfigurationFailure": null,
+      "sdsDecoupled": null,
+      "sdsReceiveBufferAllocationFailures": null,
+      "sdsState": "Normal",
+      "softwareVersionInfo": "R2_6.11000.0"
+    },
+    {
+      "authenticationError": "None",
+      "certificateInfo": {
+        "issuer": "/GN=MDM/CN=test-VirtualBox/L=Hopkinton/ST=Massachusetts/C=US/O=EMC/OU=ASD",
+        "subject": "/GN=SDS-002/CN=scaleIOSlave2/L=Hopkinton/ST=Massachusetts/C=US/O=EMC/OU=ASD",
+        "thumbprint": "CC:A0:E8:B7:84:9B:E5:D1:2E:F6:7C:3A:AC:21:D6:5C:5F:D1:47:D1",
+        "validFrom": "Nov 12 19:17:21 2019 GMT",
+        "validFromAsn1Format": "191112191721Z",
+        "validTo": "Nov 10 20:17:21 2029 GMT",
+        "validToAsn1Format": "291110201721Z"
+      },
+      "drlMode": "Volatile",
+      "faultSetId": null,
+      "id": "130dcabf00000002",
+      "ipList": [
+        {
+          "ip": "100.127.0.12",
+          "role": "all"
+        }
+      ],
+      "links": [
+        {
+          "href": "/api/instances/Sds::130dcabf00000002",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabf00000002/relationships/Statistics",
+          "rel": "/api/Sds/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabf00000002/relationships/Device",
+          "rel": "/api/Sds/relationship/Device"
+        },
+        {
+          "href": "/api/instances/Sds::130dcabf00000002/relationships/RfcacheDevice",
+          "rel": "/api/Sds/relationship/RfcacheDevice"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000",
+          "rel": "/api/parent/relationship/protectionDomainId"
+        }
+      ],
+      "maintenanceState": "NoMaintenance",
+      "mdmConnectionState": "Connected",
+      "membershipState": "Joined",
+      "name": "SDS_[100.127.0.12]",
+      "numOfIoBuffers": null,
+      "onVmWare": false,
+      "perfProfile": "Default",
+      "port": 7072,
+      "protectionDomainId": "74d855a900000000",
+      "rfcacheEnabled": true,
+      "rfcacheErrorApiVersionMismatch": false,
+      "rfcacheErrorDeviceDoesNotExist": false,
+      "rfcacheErrorInconsistentCacheConfiguration": false,
+      "rfcacheErrorInconsistentSourceConfiguration": false,
+      "rfcacheErrorInvalidDriverPath": false,
+      "rfcacheErrorLowResources": false,
+      "rmcacheEnabled": true,
+      "rmcacheFrozen": false,
+      "rmcacheMemoryAllocationState": "AllocationPending",
+      "rmcacheSizeInKb": 131072,
+      "sdsConfigurationFailure": null,
+      "sdsDecoupled": null,
+      "sdsReceiveBufferAllocationFailures": null,
+      "sdsState": "Normal",
+      "softwareVersionInfo": "R2_6.11000.0"
+    }
+  ],
+  "sessionTag": 19,
+  "storagePoolList": [
+    {
+      "backgroundScannerBWLimitKBps": 0,
+      "backgroundScannerMode": "Disabled",
+      "capacityAlertCriticalThreshold": 90,
+      "capacityAlertHighThreshold": 80,
+      "checksumEnabled": false,
+      "id": "4039828b00000001",
+      "links": [
+        {
+          "href": "/api/instances/StoragePool::4039828b00000001",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/StoragePool::4039828b00000001/relationships/Statistics",
+          "rel": "/api/StoragePool/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/StoragePool::4039828b00000001/relationships/Volume",
+          "rel": "/api/StoragePool/relationship/Volume"
+        },
+        {
+          "href": "/api/instances/StoragePool::4039828b00000001/relationships/Device",
+          "rel": "/api/StoragePool/relationship/Device"
+        },
+        {
+          "href": "/api/instances/StoragePool::4039828b00000001/relationships/VTree",
+          "rel": "/api/StoragePool/relationship/VTree"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000",
+          "rel": "/api/parent/relationship/protectionDomainId"
+        }
+      ],
+      "name": "StoragePool2",
+      "numOfParallelRebuildRebalanceJobsPerDevice": 2,
+      "protectionDomainId": "74d855a900000000",
+      "rebalanceEnabled": true,
+      "rebalanceIoPriorityAppBwPerDeviceThresholdInKbps": null,
+      "rebalanceIoPriorityAppIopsPerDeviceThreshold": null,
+      "rebalanceIoPriorityBwLimitPerDeviceInKbps": 10240,
+      "rebalanceIoPriorityNumOfConcurrentIosPerDevice": 1,
+      "rebalanceIoPriorityPolicy": "favorAppIos",
+      "rebalanceIoPriorityQuietPeriodInMsec": null,
+      "rebuildEnabled": true,
+      "rebuildIoPriorityAppBwPerDeviceThresholdInKbps": null,
+      "rebuildIoPriorityAppIopsPerDeviceThreshold": null,
+      "rebuildIoPriorityBwLimitPerDeviceInKbps": 10240,
+      "rebuildIoPriorityNumOfConcurrentIosPerDevice": 1,
+      "rebuildIoPriorityPolicy": "limitNumOfConcurrentIos",
+      "rebuildIoPriorityQuietPeriodInMsec": null,
+      "rmcacheWriteHandlingMode": "Cached",
+      "sparePercentage": 10,
+      "useRfcache": false,
+      "useRmcache": false,
+      "zeroPaddingEnabled": false
+    },
+    {
+      "backgroundScannerBWLimitKBps": 0,
+      "backgroundScannerMode": "Disabled",
+      "capacityAlertCriticalThreshold": 90,
+      "capacityAlertHighThreshold": 80,
+      "checksumEnabled": false,
+      "id": "40395b7b00000000",
+      "links": [
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000/relationships/Statistics",
+          "rel": "/api/StoragePool/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000/relationships/Volume",
+          "rel": "/api/StoragePool/relationship/Volume"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000/relationships/Device",
+          "rel": "/api/StoragePool/relationship/Device"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000/relationships/VTree",
+          "rel": "/api/StoragePool/relationship/VTree"
+        },
+        {
+          "href": "/api/instances/ProtectionDomain::74d855a900000000",
+          "rel": "/api/parent/relationship/protectionDomainId"
+        }
+      ],
+      "name": "StoragePool1",
+      "numOfParallelRebuildRebalanceJobsPerDevice": 2,
+      "protectionDomainId": "74d855a900000000",
+      "rebalanceEnabled": true,
+      "rebalanceIoPriorityAppBwPerDeviceThresholdInKbps": null,
+      "rebalanceIoPriorityAppIopsPerDeviceThreshold": null,
+      "rebalanceIoPriorityBwLimitPerDeviceInKbps": 10240,
+      "rebalanceIoPriorityNumOfConcurrentIosPerDevice": 1,
+      "rebalanceIoPriorityPolicy": "favorAppIos",
+      "rebalanceIoPriorityQuietPeriodInMsec": null,
+      "rebuildEnabled": true,
+      "rebuildIoPriorityAppBwPerDeviceThresholdInKbps": null,
+      "rebuildIoPriorityAppIopsPerDeviceThreshold": null,
+      "rebuildIoPriorityBwLimitPerDeviceInKbps": 10240,
+      "rebuildIoPriorityNumOfConcurrentIosPerDevice": 1,
+      "rebuildIoPriorityPolicy": "limitNumOfConcurrentIos",
+      "rebuildIoPriorityQuietPeriodInMsec": null,
+      "rmcacheWriteHandlingMode": "Cached",
+      "sparePercentage": 10,
+      "useRfcache": false,
+      "useRmcache": false,
+      "zeroPaddingEnabled": false
+    }
+  ],
+  "vTreeList": [
+    {
+      "baseVolumeId": "993a355e00000001",
+      "id": "252fd6e400000001",
+      "links": [
+        {
+          "href": "/api/instances/VTree::252fd6e400000001",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/VTree::252fd6e400000001/relationships/Statistics",
+          "rel": "/api/VTree/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/VTree::252fd6e400000001/relationships/Volume",
+          "rel": "/api/VTree/relationship/Volume"
+        },
+        {
+          "href": "/api/instances/Volume::993a355e00000001",
+          "rel": "/api/parent/relationship/baseVolumeId"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "name": null,
+      "storagePoolId": "40395b7b00000000"
+    },
+    {
+      "baseVolumeId": "993a355d00000000",
+      "id": "252fd6e300000000",
+      "links": [
+        {
+          "href": "/api/instances/VTree::252fd6e300000000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/VTree::252fd6e300000000/relationships/Statistics",
+          "rel": "/api/VTree/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/VTree::252fd6e300000000/relationships/Volume",
+          "rel": "/api/VTree/relationship/Volume"
+        },
+        {
+          "href": "/api/instances/Volume::993a355d00000000",
+          "rel": "/api/parent/relationship/baseVolumeId"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "name": null,
+      "storagePoolId": "40395b7b00000000"
+    }
+  ],
+  "volumeList": [
+    {
+      "ancestorVolumeId": null,
+      "consistencyGroupId": null,
+      "creationTime": 1574882772,
+      "id": "993a355e00000001",
+      "isObfuscated": false,
+      "isVvol": false,
+      "links": [
+        {
+          "href": "/api/instances/Volume::993a355e00000001",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Volume::993a355e00000001/relationships/Statistics",
+          "rel": "/api/Volume/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/VTree::252fd6e400000001",
+          "rel": "/api/parent/relationship/vtreeId"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "mappedSdcInfo": [
+        {
+          "limitBwInMbps": 0,
+          "limitIops": 0,
+          "sdcId": "6076fd1100000002",
+          "sdcIp": "100.127.0.12"
+        }
+      ],
+      "mappingToAllSdcsEnabled": false,
+      "name": "volume2-16",
+      "sizeInKb": 16777216,
+      "storagePoolId": "40395b7b00000000",
+      "useRmcache": false,
+      "volumeType": "ThinProvisioned",
+      "vtreeId": "252fd6e400000001"
+    },
+    {
+      "ancestorVolumeId": null,
+      "consistencyGroupId": null,
+      "creationTime": 1574882580,
+      "id": "993a355d00000000",
+      "isObfuscated": false,
+      "isVvol": false,
+      "links": [
+        {
+          "href": "/api/instances/Volume::993a355d00000000",
+          "rel": "self"
+        },
+        {
+          "href": "/api/instances/Volume::993a355d00000000/relationships/Statistics",
+          "rel": "/api/Volume/relationship/Statistics"
+        },
+        {
+          "href": "/api/instances/VTree::252fd6e300000000",
+          "rel": "/api/parent/relationship/vtreeId"
+        },
+        {
+          "href": "/api/instances/StoragePool::40395b7b00000000",
+          "rel": "/api/parent/relationship/storagePoolId"
+        }
+      ],
+      "mappedSdcInfo": [
+        {
+          "limitBwInMbps": 0,
+          "limitIops": 0,
+          "sdcId": "6076fd1000000001",
+          "sdcIp": "100.127.0.11"
+        }
+      ],
+      "mappingToAllSdcsEnabled": false,
+      "name": "volume1-16",
+      "sizeInKb": 16777216,
+      "storagePoolId": "40395b7b00000000",
+      "useRmcache": false,
+      "volumeType": "ThinProvisioned",
+      "vtreeId": "252fd6e300000000"
+    }
+  ]
+}

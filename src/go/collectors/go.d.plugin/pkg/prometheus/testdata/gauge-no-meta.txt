@@ -1,0 +1,8 @@
+test_gauge_no_meta_metric_1{label1="value1"} 11
+test_gauge_no_meta_metric_1{label1="value2"} 12
+test_gauge_no_meta_metric_1{label1="value3"} 13
+test_gauge_no_meta_metric_1{label1="value4"} 14
+test_gauge_no_meta_metric_2{label1="value1"} 11
+test_gauge_no_meta_metric_2{label1="value2"} 12
+test_gauge_no_meta_metric_2{label1="value3"} 13
+test_gauge_no_meta_metric_2{label1="value4"} 14

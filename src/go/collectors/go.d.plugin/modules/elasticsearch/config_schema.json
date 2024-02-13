@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/elasticsearch job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string"
+    },
+    "timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    },
+    "cluster_mode": {
+      "type": "boolean"
+    },
+    "collect_node_stats": {
+      "type": "boolean"
+    },
+    "collect_cluster_health": {
+      "type": "boolean"
+    },
+    "collect_cluster_stats": {
+      "type": "boolean"
+    },
+    "collect_indices_stats": {
+      "type": "boolean"
+    },
+    "username": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string"
+    },
+    "proxy_url": {
+      "type": "string"
+    },
+    "proxy_username": {
+      "type": "string"
+    },
+    "proxy_password": {
+      "type": "string"
+    },
+    "headers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "not_follow_redirects": {
+      "type": "boolean"
+    },
+    "tls_ca": {
+      "type": "string"
+    },
+    "tls_cert": {
+      "type": "string"
+    },
+    "tls_key": {
+      "type": "string"
+    },
+    "insecure_skip_verify": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "url"
+  ]
+}

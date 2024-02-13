@@ -1,0 +1,31 @@
+lowercaseOutputLabelNames: true
+lowercaseOutputName: true
+whitelistObjectNames: ["org.apache.cassandra.metrics:*"]
+blacklistObjectNames:
+  - "org.apache.cassandra.metrics:type=ColumnFamily,*"
+  - "org.apache.cassandra.metrics:type=Table,*"
+rules:
+  # Throughput and Latency
+  - pattern: org.apache.cassandra.metrics<type=(ClientRequest), scope=(Write|Read), name=(TotalLatency|Latency|Timeouts|Unavailables|Failures)><>(Count)
+  - pattern: org.apache.cassandra.metrics<type=(ClientRequest), scope=(Write|Read), name=(Latency)><>(\S*Percentile)
+
+  # Dropped messages
+  - pattern: org.apache.cassandra.metrics<type=(DroppedMessage), scope=(\S*), name=(Dropped)><>(Count)
+
+  # Cache
+  - pattern: org.apache.cassandra.metrics<type=Cache, scope=(KeyCache|RowCache), name=(Hits|Misses)><>(Count)
+  - pattern: org.apache.cassandra.metrics<type=Cache, scope=(KeyCache|RowCache), name=(Capacity|Size)><>(Value)
+
+  # Storage
+  - pattern: org.apache.cassandra.metrics<type=(Storage), name=(Load|Exceptions)><>(Count)
+
+  # Tables
+  #  - pattern: org.apache.cassandra.metrics<type=(Table), keyspace=(\S*), scope=(\S*), name=(TotalDiskSpaceUsed)><>(Count)
+
+  # Compaction
+  - pattern: org.apache.cassandra.metrics<type=(Compaction), name=(CompletedTasks|PendingTasks)><>(Value)
+  - pattern: org.apache.cassandra.metrics<type=(Compaction), name=(BytesCompacted)><>(Count)
+
+  # Thread Pools
+  - pattern: org.apache.cassandra.metrics<type=(ThreadPools), path=(\S*), scope=(\S*), name=(ActiveTasks|PendingTasks)><>(Value)
+  - pattern: org.apache.cassandra.metrics<type=(ThreadPools), path=(\S*), scope=(\S*), name=(CurrentlyBlockedTasks|TotalBlockedTasks)><>(Count)

@@ -1,0 +1,1509 @@
+# HELP consul_acl_ResolveToken This measures the time it takes to resolve an ACL token.
+# TYPE consul_acl_ResolveToken summary
+consul_acl_ResolveToken{quantile="0.5"} NaN
+consul_acl_ResolveToken{quantile="0.9"} NaN
+consul_acl_ResolveToken{quantile="0.99"} NaN
+consul_acl_ResolveToken_sum 0
+consul_acl_ResolveToken_count 0
+# HELP consul_acl_authmethod_delete
+# TYPE consul_acl_authmethod_delete summary
+consul_acl_authmethod_delete{quantile="0.5"} NaN
+consul_acl_authmethod_delete{quantile="0.9"} NaN
+consul_acl_authmethod_delete{quantile="0.99"} NaN
+consul_acl_authmethod_delete_sum 0
+consul_acl_authmethod_delete_count 0
+# HELP consul_acl_authmethod_upsert
+# TYPE consul_acl_authmethod_upsert summary
+consul_acl_authmethod_upsert{quantile="0.5"} NaN
+consul_acl_authmethod_upsert{quantile="0.9"} NaN
+consul_acl_authmethod_upsert{quantile="0.99"} NaN
+consul_acl_authmethod_upsert_sum 0
+consul_acl_authmethod_upsert_count 0
+# HELP consul_acl_bindingrule_delete
+# TYPE consul_acl_bindingrule_delete summary
+consul_acl_bindingrule_delete{quantile="0.5"} NaN
+consul_acl_bindingrule_delete{quantile="0.9"} NaN
+consul_acl_bindingrule_delete{quantile="0.99"} NaN
+consul_acl_bindingrule_delete_sum 0
+consul_acl_bindingrule_delete_count 0
+# HELP consul_acl_bindingrule_upsert
+# TYPE consul_acl_bindingrule_upsert summary
+consul_acl_bindingrule_upsert{quantile="0.5"} NaN
+consul_acl_bindingrule_upsert{quantile="0.9"} NaN
+consul_acl_bindingrule_upsert{quantile="0.99"} NaN
+consul_acl_bindingrule_upsert_sum 0
+consul_acl_bindingrule_upsert_count 0
+# HELP consul_acl_blocked_check_deregistration Increments whenever a deregistration fails for a check (blocked by an ACL)
+# TYPE consul_acl_blocked_check_deregistration counter
+consul_acl_blocked_check_deregistration 0
+# HELP consul_acl_blocked_check_registration Increments whenever a registration fails for a check (blocked by an ACL)
+# TYPE consul_acl_blocked_check_registration counter
+consul_acl_blocked_check_registration 0
+# HELP consul_acl_blocked_node_registration Increments whenever a registration fails for a node (blocked by an ACL)
+# TYPE consul_acl_blocked_node_registration counter
+consul_acl_blocked_node_registration 0
+# HELP consul_acl_blocked_service_deregistration Increments whenever a deregistration fails for a service (blocked by an ACL)
+# TYPE consul_acl_blocked_service_deregistration counter
+consul_acl_blocked_service_deregistration 0
+# HELP consul_acl_blocked_service_registration Increments whenever a registration fails for a service (blocked by an ACL)
+# TYPE consul_acl_blocked_service_registration counter
+consul_acl_blocked_service_registration 0
+# HELP consul_acl_login
+# TYPE consul_acl_login summary
+consul_acl_login{quantile="0.5"} NaN
+consul_acl_login{quantile="0.9"} NaN
+consul_acl_login{quantile="0.99"} NaN
+consul_acl_login_sum 0
+consul_acl_login_count 0
+# HELP consul_acl_logout
+# TYPE consul_acl_logout summary
+consul_acl_logout{quantile="0.5"} NaN
+consul_acl_logout{quantile="0.9"} NaN
+consul_acl_logout{quantile="0.99"} NaN
+consul_acl_logout_sum 0
+consul_acl_logout_count 0
+# HELP consul_acl_policy_delete
+# TYPE consul_acl_policy_delete summary
+consul_acl_policy_delete{quantile="0.5"} NaN
+consul_acl_policy_delete{quantile="0.9"} NaN
+consul_acl_policy_delete{quantile="0.99"} NaN
+consul_acl_policy_delete_sum 0
+consul_acl_policy_delete_count 0
+# HELP consul_acl_policy_upsert
+# TYPE consul_acl_policy_upsert summary
+consul_acl_policy_upsert{quantile="0.5"} NaN
+consul_acl_policy_upsert{quantile="0.9"} NaN
+consul_acl_policy_upsert{quantile="0.99"} NaN
+consul_acl_policy_upsert_sum 0
+consul_acl_policy_upsert_count 0
+# HELP consul_acl_role_delete
+# TYPE consul_acl_role_delete summary
+consul_acl_role_delete{quantile="0.5"} NaN
+consul_acl_role_delete{quantile="0.9"} NaN
+consul_acl_role_delete{quantile="0.99"} NaN
+consul_acl_role_delete_sum 0
+consul_acl_role_delete_count 0
+# HELP consul_acl_role_upsert
+# TYPE consul_acl_role_upsert summary
+consul_acl_role_upsert{quantile="0.5"} NaN
+consul_acl_role_upsert{quantile="0.9"} NaN
+consul_acl_role_upsert{quantile="0.99"} NaN
+consul_acl_role_upsert_sum 0
+consul_acl_role_upsert_count 0
+# HELP consul_acl_token_cache_hit Increments if Consul is able to resolve a token's identity, or a legacy token, from the cache.
+# TYPE consul_acl_token_cache_hit counter
+consul_acl_token_cache_hit 0
+# HELP consul_acl_token_cache_miss Increments if Consul cannot resolve a token's identity, or a legacy token, from the cache.
+# TYPE consul_acl_token_cache_miss counter
+consul_acl_token_cache_miss 0
+# HELP consul_acl_token_clone
+# TYPE consul_acl_token_clone summary
+consul_acl_token_clone{quantile="0.5"} NaN
+consul_acl_token_clone{quantile="0.9"} NaN
+consul_acl_token_clone{quantile="0.99"} NaN
+consul_acl_token_clone_sum 0
+consul_acl_token_clone_count 0
+# HELP consul_acl_token_delete
+# TYPE consul_acl_token_delete summary
+consul_acl_token_delete{quantile="0.5"} NaN
+consul_acl_token_delete{quantile="0.9"} NaN
+consul_acl_token_delete{quantile="0.99"} NaN
+consul_acl_token_delete_sum 0
+consul_acl_token_delete_count 0
+# HELP consul_acl_token_upsert
+# TYPE consul_acl_token_upsert summary
+consul_acl_token_upsert{quantile="0.5"} NaN
+consul_acl_token_upsert{quantile="0.9"} NaN
+consul_acl_token_upsert{quantile="0.99"} NaN
+consul_acl_token_upsert_sum 0
+consul_acl_token_upsert_count 0
+# HELP consul_agent_tls_cert_expiry Seconds until the agent tls certificate expires. Updated every hour
+# TYPE consul_agent_tls_cert_expiry gauge
+consul_agent_tls_cert_expiry 0
+# HELP consul_api_http Samples how long it takes to service the given HTTP request for the given verb and path.
+# TYPE consul_api_http summary
+consul_api_http{quantile="0.5"} NaN
+consul_api_http{quantile="0.9"} NaN
+consul_api_http{quantile="0.99"} NaN
+consul_api_http_sum 0
+consul_api_http_count 0
+consul_api_http{method="GET",path="v1_agent_checks",quantile="0.5"} 0.10910899937152863
+consul_api_http{method="GET",path="v1_agent_checks",quantile="0.9"} 0.2985079884529114
+consul_api_http{method="GET",path="v1_agent_checks",quantile="0.99"} 0.2985079884529114
+consul_api_http_sum{method="GET",path="v1_agent_checks"} 85.87442895025015
+consul_api_http_count{method="GET",path="v1_agent_checks"} 588
+consul_api_http{method="GET",path="v1_agent_metrics",quantile="0.5"} 0.5271260142326355
+consul_api_http{method="GET",path="v1_agent_metrics",quantile="0.9"} 1.2289390563964844
+consul_api_http{method="GET",path="v1_agent_metrics",quantile="0.99"} 1.2289390563964844
+consul_api_http_sum{method="GET",path="v1_agent_metrics"} 409.6580027639866
+consul_api_http_count{method="GET",path="v1_agent_metrics"} 592
+# HELP consul_autopilot_failure_tolerance Tracks the number of voting servers that the cluster can lose while continuing to function.
+# TYPE consul_autopilot_failure_tolerance gauge
+consul_autopilot_failure_tolerance 0
+# HELP consul_autopilot_healthy Tracks the overall health of the local server cluster. 1 if all servers are healthy, 0 if one or more are unhealthy.
+# TYPE consul_autopilot_healthy gauge
+consul_autopilot_healthy 0
+# HELP consul_catalog_connect_not_found Increments for each connect-based catalog query where the given service could not be found.
+# TYPE consul_catalog_connect_not_found counter
+consul_catalog_connect_not_found 0
+# HELP consul_catalog_connect_query Increments for each connect-based catalog query for the given service.
+# TYPE consul_catalog_connect_query counter
+consul_catalog_connect_query 0
+# HELP consul_catalog_connect_query_tag Increments for each connect-based catalog query for the given service with the given tag.
+# TYPE consul_catalog_connect_query_tag counter
+consul_catalog_connect_query_tag 0
+# HELP consul_catalog_connect_query_tags Increments for each connect-based catalog query for the given service with the given tags.
+# TYPE consul_catalog_connect_query_tags counter
+consul_catalog_connect_query_tags 0
+# HELP consul_catalog_deregister Measures the time it takes to complete a catalog deregister operation.
+# TYPE consul_catalog_deregister summary
+consul_catalog_deregister{quantile="0.5"} NaN
+consul_catalog_deregister{quantile="0.9"} NaN
+consul_catalog_deregister{quantile="0.99"} NaN
+consul_catalog_deregister_sum 0
+consul_catalog_deregister_count 0
+# HELP consul_catalog_register Measures the time it takes to complete a catalog register operation.
+# TYPE consul_catalog_register summary
+consul_catalog_register{quantile="0.5"} NaN
+consul_catalog_register{quantile="0.9"} NaN
+consul_catalog_register{quantile="0.99"} NaN
+consul_catalog_register_sum 45.98546886444092
+consul_catalog_register_count 2
+# HELP consul_catalog_service_not_found Increments for each catalog query where the given service could not be found.
+# TYPE consul_catalog_service_not_found counter
+consul_catalog_service_not_found 0
+# HELP consul_catalog_service_query Increments for each catalog query for the given service.
+# TYPE consul_catalog_service_query counter
+consul_catalog_service_query 0
+# HELP consul_catalog_service_query_tag Increments for each catalog query for the given service with the given tag.
+# TYPE consul_catalog_service_query_tag counter
+consul_catalog_service_query_tag 0
+# HELP consul_catalog_service_query_tags Increments for each catalog query for the given service with the given tags.
+# TYPE consul_catalog_service_query_tags counter
+consul_catalog_service_query_tags 0
+# HELP consul_client_api_catalog_datacenters Increments whenever a Consul agent receives a request to list datacenters in the catalog.
+# TYPE consul_client_api_catalog_datacenters counter
+consul_client_api_catalog_datacenters 0
+# HELP consul_client_api_catalog_deregister Increments whenever a Consul agent receives a catalog deregister request.
+# TYPE consul_client_api_catalog_deregister counter
+consul_client_api_catalog_deregister 0
+# HELP consul_client_api_catalog_gateway_services Increments whenever a Consul agent receives a request to list services associated with a gateway.
+# TYPE consul_client_api_catalog_gateway_services counter
+consul_client_api_catalog_gateway_services 0
+# HELP consul_client_api_catalog_node_service_list Increments whenever a Consul agent receives a request to list a node's registered services.
+# TYPE consul_client_api_catalog_node_service_list counter
+consul_client_api_catalog_node_service_list 0
+# HELP consul_client_api_catalog_node_services Increments whenever a Consul agent successfully responds to a request to list nodes offering a service.
+# TYPE consul_client_api_catalog_node_services counter
+consul_client_api_catalog_node_services 0
+# HELP consul_client_api_catalog_nodes Increments whenever a Consul agent receives a request to list nodes from the catalog.
+# TYPE consul_client_api_catalog_nodes counter
+consul_client_api_catalog_nodes 0
+# HELP consul_client_api_catalog_register Increments whenever a Consul agent receives a catalog register request.
+# TYPE consul_client_api_catalog_register counter
+consul_client_api_catalog_register 0
+# HELP consul_client_api_catalog_service_nodes Increments whenever a Consul agent receives a request to list nodes offering a service.
+# TYPE consul_client_api_catalog_service_nodes counter
+consul_client_api_catalog_service_nodes 0
+# HELP consul_client_api_catalog_services Increments whenever a Consul agent receives a request to list services from the catalog.
+# TYPE consul_client_api_catalog_services counter
+consul_client_api_catalog_services 0
+# HELP consul_client_api_error_catalog_service_nodes Increments whenever a Consul agent receives an RPC error for request to list nodes offering a service.
+# TYPE consul_client_api_error_catalog_service_nodes counter
+consul_client_api_error_catalog_service_nodes 0
+# HELP consul_client_api_success_catalog_datacenters Increments whenever a Consul agent successfully responds to a request to list datacenters.
+# TYPE consul_client_api_success_catalog_datacenters counter
+consul_client_api_success_catalog_datacenters 0
+# HELP consul_client_api_success_catalog_deregister Increments whenever a Consul agent successfully responds to a catalog deregister request.
+# TYPE consul_client_api_success_catalog_deregister counter
+consul_client_api_success_catalog_deregister 0
+# HELP consul_client_api_success_catalog_gateway_services Increments whenever a Consul agent successfully responds to a request to list services associated with a gateway.
+# TYPE consul_client_api_success_catalog_gateway_services counter
+consul_client_api_success_catalog_gateway_services 0
+# HELP consul_client_api_success_catalog_node_service_list Increments whenever a Consul agent successfully responds to a request to list a node's registered services.
+# TYPE consul_client_api_success_catalog_node_service_list counter
+consul_client_api_success_catalog_node_service_list 0
+# HELP consul_client_api_success_catalog_node_services Increments whenever a Consul agent successfully responds to a request to list services in a node.
+# TYPE consul_client_api_success_catalog_node_services counter
+consul_client_api_success_catalog_node_services 0
+# HELP consul_client_api_success_catalog_nodes Increments whenever a Consul agent successfully responds to a request to list nodes.
+# TYPE consul_client_api_success_catalog_nodes counter
+consul_client_api_success_catalog_nodes 0
+# HELP consul_client_api_success_catalog_register Increments whenever a Consul agent successfully responds to a catalog register request.
+# TYPE consul_client_api_success_catalog_register counter
+consul_client_api_success_catalog_register 0
+# HELP consul_client_api_success_catalog_service_nodes Increments whenever a Consul agent successfully responds to a request to list nodes offering a service.
+# TYPE consul_client_api_success_catalog_service_nodes counter
+consul_client_api_success_catalog_service_nodes 0
+# HELP consul_client_api_success_catalog_services Increments whenever a Consul agent successfully responds to a request to list services.
+# TYPE consul_client_api_success_catalog_services counter
+consul_client_api_success_catalog_services 0
+# HELP consul_client_rpc Increments whenever a Consul agent in client mode makes an RPC request to a Consul server.
+# TYPE consul_client_rpc counter
+consul_client_rpc 46
+# HELP consul_client_rpc_error_catalog_datacenters Increments whenever a Consul agent receives an RPC error for a request to list datacenters.
+# TYPE consul_client_rpc_error_catalog_datacenters counter
+consul_client_rpc_error_catalog_datacenters 0
+# HELP consul_client_rpc_error_catalog_deregister Increments whenever a Consul agent receives an RPC error for a catalog deregister request.
+# TYPE consul_client_rpc_error_catalog_deregister counter
+consul_client_rpc_error_catalog_deregister 0
+# HELP consul_client_rpc_error_catalog_gateway_services Increments whenever a Consul agent receives an RPC error for a request to list services associated with a gateway.
+# TYPE consul_client_rpc_error_catalog_gateway_services counter
+consul_client_rpc_error_catalog_gateway_services 0
+# HELP consul_client_rpc_error_catalog_node_service_list Increments whenever a Consul agent receives an RPC error for request to list a node's registered services.
+# TYPE consul_client_rpc_error_catalog_node_service_list counter
+consul_client_rpc_error_catalog_node_service_list 0
+# HELP consul_client_rpc_error_catalog_node_services Increments whenever a Consul agent receives an RPC error for a request to list services in a node.
+# TYPE consul_client_rpc_error_catalog_node_services counter
+consul_client_rpc_error_catalog_node_services 0
+# HELP consul_client_rpc_error_catalog_nodes Increments whenever a Consul agent receives an RPC error for a request to list nodes.
+# TYPE consul_client_rpc_error_catalog_nodes counter
+consul_client_rpc_error_catalog_nodes 0
+# HELP consul_client_rpc_error_catalog_register Increments whenever a Consul agent receives an RPC error for a catalog register request.
+# TYPE consul_client_rpc_error_catalog_register counter
+consul_client_rpc_error_catalog_register 0
+# HELP consul_client_rpc_error_catalog_service_nodes Increments whenever a Consul agent receives an RPC error for a request to list nodes offering a service.
+# TYPE consul_client_rpc_error_catalog_service_nodes counter
+consul_client_rpc_error_catalog_service_nodes 0
+# HELP consul_client_rpc_error_catalog_services Increments whenever a Consul agent receives an RPC error for a request to list services.
+# TYPE consul_client_rpc_error_catalog_services counter
+consul_client_rpc_error_catalog_services 0
+# HELP consul_client_rpc_exceeded Increments whenever a Consul agent in client mode makes an RPC request to a Consul server gets rate limited by that agent's limits configuration.
+# TYPE consul_client_rpc_exceeded counter
+consul_client_rpc_exceeded 0
+# HELP consul_client_rpc_failed Increments whenever a Consul agent in client mode makes an RPC request to a Consul server and fails.
+# TYPE consul_client_rpc_failed counter
+consul_client_rpc_failed 0
+# HELP consul_consul_cache_bypass Counts how many times a request bypassed the cache because no cache-key was provided.
+# TYPE consul_consul_cache_bypass counter
+consul_consul_cache_bypass 0
+# HELP consul_consul_cache_entries_count Represents the number of entries in this cache.
+# TYPE consul_consul_cache_entries_count gauge
+consul_consul_cache_entries_count 0
+# HELP consul_consul_cache_evict_expired Counts the number of expired entries that are evicted.
+# TYPE consul_consul_cache_evict_expired counter
+consul_consul_cache_evict_expired 0
+# HELP consul_consul_cache_fetch_error Counts the number of failed fetches by the cache.
+# TYPE consul_consul_cache_fetch_error counter
+consul_consul_cache_fetch_error 0
+# HELP consul_consul_cache_fetch_success Counts the number of successful fetches by the cache.
+# TYPE consul_consul_cache_fetch_success counter
+consul_consul_cache_fetch_success 0
+# HELP consul_consul_fsm_ca Deprecated - use fsm_ca instead
+# TYPE consul_consul_fsm_ca summary
+consul_consul_fsm_ca{quantile="0.5"} NaN
+consul_consul_fsm_ca{quantile="0.9"} NaN
+consul_consul_fsm_ca{quantile="0.99"} NaN
+consul_consul_fsm_ca_sum 0
+consul_consul_fsm_ca_count 0
+# HELP consul_consul_fsm_intention Deprecated - use fsm_intention instead
+# TYPE consul_consul_fsm_intention summary
+consul_consul_fsm_intention{quantile="0.5"} NaN
+consul_consul_fsm_intention{quantile="0.9"} NaN
+consul_consul_fsm_intention{quantile="0.99"} NaN
+consul_consul_fsm_intention_sum 0
+consul_consul_fsm_intention_count 0
+# HELP consul_consul_intention_apply
+# TYPE consul_consul_intention_apply summary
+consul_consul_intention_apply{quantile="0.5"} NaN
+consul_consul_intention_apply{quantile="0.9"} NaN
+consul_consul_intention_apply{quantile="0.99"} NaN
+consul_consul_intention_apply_sum 0
+consul_consul_intention_apply_count 0
+# HELP consul_consul_members_clients Measures the current number of client agents registered with Consul. It is only emitted by Consul servers. Added in v1.9.6.
+# TYPE consul_consul_members_clients gauge
+consul_consul_members_clients 0
+# HELP consul_consul_members_servers Measures the current number of server agents registered with Consul. It is only emitted by Consul servers. Added in v1.9.6.
+# TYPE consul_consul_members_servers gauge
+consul_consul_members_servers 0
+# HELP consul_consul_peering_exported_services A gauge that tracks how many services are exported for the peering. The labels are "peering" and, for enterprise, "partition". We emit this metric every 9 seconds
+# TYPE consul_consul_peering_exported_services gauge
+consul_consul_peering_exported_services 0
+# HELP consul_consul_state_config_entries Measures the current number of unique configuration entries registered with Consul, labeled by Kind. It is only emitted by Consul servers. Added in v1.10.4.
+# TYPE consul_consul_state_config_entries gauge
+consul_consul_state_config_entries 0
+# HELP consul_consul_state_connect_instances Measures the current number of unique connect service instances registered with Consul, labeled by Kind. It is only emitted by Consul servers. Added in v1.10.4.
+# TYPE consul_consul_state_connect_instances gauge
+consul_consul_state_connect_instances 0
+# HELP consul_consul_state_kv_entries Measures the current number of entries in the Consul KV store. It is only emitted by Consul servers. Added in v1.10.3.
+# TYPE consul_consul_state_kv_entries gauge
+consul_consul_state_kv_entries 0
+# HELP consul_consul_state_nodes Measures the current number of nodes registered with Consul. It is only emitted by Consul servers. Added in v1.9.0.
+# TYPE consul_consul_state_nodes gauge
+consul_consul_state_nodes 0
+# HELP consul_consul_state_peerings Measures the current number of peerings registered with Consul. It is only emitted by Consul servers. Added in v1.13.0.
+# TYPE consul_consul_state_peerings gauge
+consul_consul_state_peerings 0
+# HELP consul_consul_state_service_instances Measures the current number of unique services registered with Consul, based on service name. It is only emitted by Consul servers. Added in v1.9.0.
+# TYPE consul_consul_state_service_instances gauge
+consul_consul_state_service_instances 0
+# HELP consul_consul_state_services Measures the current number of unique services registered with Consul, based on service name. It is only emitted by Consul servers. Added in v1.9.0.
+# TYPE consul_consul_state_services gauge
+consul_consul_state_services 0
+# HELP consul_federation_state_apply
+# TYPE consul_federation_state_apply summary
+consul_federation_state_apply{quantile="0.5"} NaN
+consul_federation_state_apply{quantile="0.9"} NaN
+consul_federation_state_apply{quantile="0.99"} NaN
+consul_federation_state_apply_sum 0
+consul_federation_state_apply_count 0
+# HELP consul_federation_state_get
+# TYPE consul_federation_state_get summary
+consul_federation_state_get{quantile="0.5"} NaN
+consul_federation_state_get{quantile="0.9"} NaN
+consul_federation_state_get{quantile="0.99"} NaN
+consul_federation_state_get_sum 0
+consul_federation_state_get_count 0
+# HELP consul_federation_state_list
+# TYPE consul_federation_state_list summary
+consul_federation_state_list{quantile="0.5"} NaN
+consul_federation_state_list{quantile="0.9"} NaN
+consul_federation_state_list{quantile="0.99"} NaN
+consul_federation_state_list_sum 0
+consul_federation_state_list_count 0
+# HELP consul_federation_state_list_mesh_gateways
+# TYPE consul_federation_state_list_mesh_gateways summary
+consul_federation_state_list_mesh_gateways{quantile="0.5"} NaN
+consul_federation_state_list_mesh_gateways{quantile="0.9"} NaN
+consul_federation_state_list_mesh_gateways{quantile="0.99"} NaN
+consul_federation_state_list_mesh_gateways_sum 0
+consul_federation_state_list_mesh_gateways_count 0
+# HELP consul_fsm_acl Measures the time it takes to apply the given ACL operation to the FSM.
+# TYPE consul_fsm_acl summary
+consul_fsm_acl{quantile="0.5"} NaN
+consul_fsm_acl{quantile="0.9"} NaN
+consul_fsm_acl{quantile="0.99"} NaN
+consul_fsm_acl_sum 0
+consul_fsm_acl_count 0
+# HELP consul_fsm_acl_authmethod Measures the time it takes to apply an ACL authmethod operation to the FSM.
+# TYPE consul_fsm_acl_authmethod summary
+consul_fsm_acl_authmethod{quantile="0.5"} NaN
+consul_fsm_acl_authmethod{quantile="0.9"} NaN
+consul_fsm_acl_authmethod{quantile="0.99"} NaN
+consul_fsm_acl_authmethod_sum 0
+consul_fsm_acl_authmethod_count 0
+# HELP consul_fsm_acl_bindingrule Measures the time it takes to apply an ACL binding rule operation to the FSM.
+# TYPE consul_fsm_acl_bindingrule summary
+consul_fsm_acl_bindingrule{quantile="0.5"} NaN
+consul_fsm_acl_bindingrule{quantile="0.9"} NaN
+consul_fsm_acl_bindingrule{quantile="0.99"} NaN
+consul_fsm_acl_bindingrule_sum 0
+consul_fsm_acl_bindingrule_count 0
+# HELP consul_fsm_acl_policy Measures the time it takes to apply an ACL policy operation to the FSM.
+# TYPE consul_fsm_acl_policy summary
+consul_fsm_acl_policy{quantile="0.5"} NaN
+consul_fsm_acl_policy{quantile="0.9"} NaN
+consul_fsm_acl_policy{quantile="0.99"} NaN
+consul_fsm_acl_policy_sum 0
+consul_fsm_acl_policy_count 0
+# HELP consul_fsm_acl_token Measures the time it takes to apply an ACL token operation to the FSM.
+# TYPE consul_fsm_acl_token summary
+consul_fsm_acl_token{quantile="0.5"} NaN
+consul_fsm_acl_token{quantile="0.9"} NaN
+consul_fsm_acl_token{quantile="0.99"} NaN
+consul_fsm_acl_token_sum 0
+consul_fsm_acl_token_count 0
+# HELP consul_fsm_autopilot Measures the time it takes to apply the given autopilot update to the FSM.
+# TYPE consul_fsm_autopilot summary
+consul_fsm_autopilot{quantile="0.5"} NaN
+consul_fsm_autopilot{quantile="0.9"} NaN
+consul_fsm_autopilot{quantile="0.99"} NaN
+consul_fsm_autopilot_sum 0
+consul_fsm_autopilot_count 0
+# HELP consul_fsm_ca Measures the time it takes to apply CA configuration operations to the FSM.
+# TYPE consul_fsm_ca summary
+consul_fsm_ca{quantile="0.5"} NaN
+consul_fsm_ca{quantile="0.9"} NaN
+consul_fsm_ca{quantile="0.99"} NaN
+consul_fsm_ca_sum 0
+consul_fsm_ca_count 0
+# HELP consul_fsm_ca_leaf Measures the time it takes to apply an operation while signing a leaf certificate.
+# TYPE consul_fsm_ca_leaf summary
+consul_fsm_ca_leaf{quantile="0.5"} NaN
+consul_fsm_ca_leaf{quantile="0.9"} NaN
+consul_fsm_ca_leaf{quantile="0.99"} NaN
+consul_fsm_ca_leaf_sum 0
+consul_fsm_ca_leaf_count 0
+# HELP consul_fsm_coordinate_batch_update Measures the time it takes to apply the given batch coordinate update to the FSM.
+# TYPE consul_fsm_coordinate_batch_update summary
+consul_fsm_coordinate_batch_update{quantile="0.5"} 0.10997900366783142
+consul_fsm_coordinate_batch_update{quantile="0.9"} 0.10997900366783142
+consul_fsm_coordinate_batch_update{quantile="0.99"} 0.10997900366783142
+consul_fsm_coordinate_batch_update_sum 240.22869294136763
+consul_fsm_coordinate_batch_update_count 11035
+# HELP consul_fsm_deregister Measures the time it takes to apply a catalog deregister operation to the FSM.
+# TYPE consul_fsm_deregister summary
+consul_fsm_deregister{quantile="0.5"} NaN
+consul_fsm_deregister{quantile="0.9"} NaN
+consul_fsm_deregister{quantile="0.99"} NaN
+consul_fsm_deregister_sum 1.4027419984340668
+consul_fsm_deregister_count 3
+# HELP consul_fsm_intention Measures the time it takes to apply an intention operation to the FSM.
+# TYPE consul_fsm_intention summary
+consul_fsm_intention{quantile="0.5"} NaN
+consul_fsm_intention{quantile="0.9"} NaN
+consul_fsm_intention{quantile="0.99"} NaN
+consul_fsm_intention_sum 0
+consul_fsm_intention_count 0
+# HELP consul_fsm_kvs Measures the time it takes to apply the given KV operation to the FSM.
+# TYPE consul_fsm_kvs summary
+consul_fsm_kvs{quantile="0.5"} NaN
+consul_fsm_kvs{quantile="0.9"} NaN
+consul_fsm_kvs{quantile="0.99"} NaN
+consul_fsm_kvs_sum 0
+consul_fsm_kvs_count 0
+# HELP consul_fsm_peering Measures the time it takes to apply a peering operation to the FSM.
+# TYPE consul_fsm_peering summary
+consul_fsm_peering{quantile="0.5"} NaN
+consul_fsm_peering{quantile="0.9"} NaN
+consul_fsm_peering{quantile="0.99"} NaN
+consul_fsm_peering_sum 0
+consul_fsm_peering_count 0
+# HELP consul_fsm_persist Measures the time it takes to persist the FSM to a raft snapshot.
+# TYPE consul_fsm_persist summary
+consul_fsm_persist{quantile="0.5"} NaN
+consul_fsm_persist{quantile="0.9"} NaN
+consul_fsm_persist{quantile="0.99"} NaN
+consul_fsm_persist_sum 0
+consul_fsm_persist_count 0
+# HELP consul_fsm_prepared_query Measures the time it takes to apply the given prepared query update operation to the FSM.
+# TYPE consul_fsm_prepared_query summary
+consul_fsm_prepared_query{quantile="0.5"} NaN
+consul_fsm_prepared_query{quantile="0.9"} NaN
+consul_fsm_prepared_query{quantile="0.99"} NaN
+consul_fsm_prepared_query_sum 0
+consul_fsm_prepared_query_count 0
+# HELP consul_fsm_register Measures the time it takes to apply a catalog register operation to the FSM.
+# TYPE consul_fsm_register summary
+consul_fsm_register{quantile="0.5"} NaN
+consul_fsm_register{quantile="0.9"} NaN
+consul_fsm_register{quantile="0.99"} NaN
+consul_fsm_register_sum 20.184059869498014
+consul_fsm_register_count 210
+# HELP consul_fsm_session Measures the time it takes to apply the given session operation to the FSM.
+# TYPE consul_fsm_session summary
+consul_fsm_session{quantile="0.5"} NaN
+consul_fsm_session{quantile="0.9"} NaN
+consul_fsm_session{quantile="0.99"} NaN
+consul_fsm_session_sum 0
+consul_fsm_session_count 0
+# HELP consul_fsm_system_metadata Measures the time it takes to apply a system metadata operation to the FSM.
+# TYPE consul_fsm_system_metadata summary
+consul_fsm_system_metadata{quantile="0.5"} NaN
+consul_fsm_system_metadata{quantile="0.9"} NaN
+consul_fsm_system_metadata{quantile="0.99"} NaN
+consul_fsm_system_metadata_sum 0
+consul_fsm_system_metadata_count 0
+# HELP consul_fsm_tombstone Measures the time it takes to apply the given tombstone operation to the FSM.
+# TYPE consul_fsm_tombstone summary
+consul_fsm_tombstone{quantile="0.5"} NaN
+consul_fsm_tombstone{quantile="0.9"} NaN
+consul_fsm_tombstone{quantile="0.99"} NaN
+consul_fsm_tombstone_sum 0
+consul_fsm_tombstone_count 0
+# HELP consul_fsm_txn Measures the time it takes to apply the given transaction update to the FSM.
+# TYPE consul_fsm_txn summary
+consul_fsm_txn{quantile="0.5"} NaN
+consul_fsm_txn{quantile="0.9"} NaN
+consul_fsm_txn{quantile="0.99"} NaN
+consul_fsm_txn_sum 0
+consul_fsm_txn_count 0
+# HELP consul_grpc_client_connection_count Counts the number of new gRPC connections opened by the client agent to a Consul server.
+# TYPE consul_grpc_client_connection_count counter
+consul_grpc_client_connection_count 9
+# HELP consul_grpc_client_connections Measures the number of active gRPC connections open from the client agent to any Consul servers.
+# TYPE consul_grpc_client_connections gauge
+consul_grpc_client_connections 0
+# HELP consul_grpc_client_request_count Counts the number of gRPC requests made by the client agent to a Consul server.
+# TYPE consul_grpc_client_request_count counter
+consul_grpc_client_request_count 0
+# HELP consul_grpc_server_connection_count Counts the number of new gRPC connections received by the server.
+# TYPE consul_grpc_server_connection_count counter
+consul_grpc_server_connection_count 6
+# HELP consul_grpc_server_connections Measures the number of active gRPC connections open on the server.
+# TYPE consul_grpc_server_connections gauge
+consul_grpc_server_connections 0
+# HELP consul_grpc_server_request_count Counts the number of gRPC requests received by the server.
+# TYPE consul_grpc_server_request_count counter
+consul_grpc_server_request_count 0
+# HELP consul_grpc_server_stream_count Counts the number of new gRPC streams received by the server.
+# TYPE consul_grpc_server_stream_count counter
+consul_grpc_server_stream_count 0
+# HELP consul_grpc_server_streams Measures the number of active gRPC streams handled by the server.
+# TYPE consul_grpc_server_streams gauge
+consul_grpc_server_streams 0
+# HELP consul_intention_apply
+# TYPE consul_intention_apply summary
+consul_intention_apply{quantile="0.5"} NaN
+consul_intention_apply{quantile="0.9"} NaN
+consul_intention_apply{quantile="0.99"} NaN
+consul_intention_apply_sum 0
+consul_intention_apply_count 0
+# HELP consul_kvs_apply Measures the time it takes to complete an update to the KV store.
+# TYPE consul_kvs_apply summary
+consul_kvs_apply{quantile="0.5"} NaN
+consul_kvs_apply{quantile="0.9"} NaN
+consul_kvs_apply{quantile="0.99"} NaN
+consul_kvs_apply_sum 0
+consul_kvs_apply_count 0
+# HELP consul_leader_barrier Measures the time spent waiting for the raft barrier upon gaining leadership.
+# TYPE consul_leader_barrier summary
+consul_leader_barrier{quantile="0.5"} NaN
+consul_leader_barrier{quantile="0.9"} NaN
+consul_leader_barrier{quantile="0.99"} NaN
+consul_leader_barrier_sum 168.71699333190918
+consul_leader_barrier_count 8
+# HELP consul_leader_reapTombstones Measures the time spent clearing tombstones.
+# TYPE consul_leader_reapTombstones summary
+consul_leader_reapTombstones{quantile="0.5"} NaN
+consul_leader_reapTombstones{quantile="0.9"} NaN
+consul_leader_reapTombstones{quantile="0.99"} NaN
+consul_leader_reapTombstones_sum 0
+consul_leader_reapTombstones_count 0
+# HELP consul_leader_reconcile Measures the time spent updating the raft store from the serf member information.
+# TYPE consul_leader_reconcile summary
+consul_leader_reconcile{quantile="0.5"} NaN
+consul_leader_reconcile{quantile="0.9"} NaN
+consul_leader_reconcile{quantile="0.99"} NaN
+consul_leader_reconcile_sum 2.5833420008420944
+consul_leader_reconcile_count 8
+# HELP consul_leader_reconcileMember Measures the time spent updating the raft store for a single serf member's information.
+# TYPE consul_leader_reconcileMember summary
+consul_leader_reconcileMember{quantile="0.5"} NaN
+consul_leader_reconcileMember{quantile="0.9"} NaN
+consul_leader_reconcileMember{quantile="0.99"} NaN
+consul_leader_reconcileMember_sum 60.76006331667304
+consul_leader_reconcileMember_count 26
+# HELP consul_leader_replication_acl_policies_index Tracks the index of ACL policies in the primary that the secondary has successfully replicated
+# TYPE consul_leader_replication_acl_policies_index gauge
+consul_leader_replication_acl_policies_index 0
+# HELP consul_leader_replication_acl_policies_status Tracks the current health of ACL policy replication on the leader
+# TYPE consul_leader_replication_acl_policies_status gauge
+consul_leader_replication_acl_policies_status 0
+# HELP consul_leader_replication_acl_roles_index Tracks the index of ACL roles in the primary that the secondary has successfully replicated
+# TYPE consul_leader_replication_acl_roles_index gauge
+consul_leader_replication_acl_roles_index 0
+# HELP consul_leader_replication_acl_roles_status Tracks the current health of ACL role replication on the leader
+# TYPE consul_leader_replication_acl_roles_status gauge
+consul_leader_replication_acl_roles_status 0
+# HELP consul_leader_replication_acl_tokens_index Tracks the index of ACL tokens in the primary that the secondary has successfully replicated
+# TYPE consul_leader_replication_acl_tokens_index gauge
+consul_leader_replication_acl_tokens_index 0
+# HELP consul_leader_replication_acl_tokens_status Tracks the current health of ACL token replication on the leader
+# TYPE consul_leader_replication_acl_tokens_status gauge
+consul_leader_replication_acl_tokens_status 0
+# HELP consul_leader_replication_config_entries_index Tracks the index of config entries in the primary that the secondary has successfully replicated
+# TYPE consul_leader_replication_config_entries_index gauge
+consul_leader_replication_config_entries_index 0
+# HELP consul_leader_replication_config_entries_status Tracks the current health of config entry replication on the leader
+# TYPE consul_leader_replication_config_entries_status gauge
+consul_leader_replication_config_entries_status 0
+# HELP consul_leader_replication_federation_state_index Tracks the index of federation states in the primary that the secondary has successfully replicated
+# TYPE consul_leader_replication_federation_state_index gauge
+consul_leader_replication_federation_state_index 0
+# HELP consul_leader_replication_federation_state_status Tracks the current health of federation state replication on the leader
+# TYPE consul_leader_replication_federation_state_status gauge
+consul_leader_replication_federation_state_status 0
+# HELP consul_leader_replication_namespaces_index Tracks the index of federation states in the primary that the secondary has successfully replicated
+# TYPE consul_leader_replication_namespaces_index gauge
+consul_leader_replication_namespaces_index 0
+# HELP consul_leader_replication_namespaces_status Tracks the current health of federation state replication on the leader
+# TYPE consul_leader_replication_namespaces_status gauge
+consul_leader_replication_namespaces_status 0
+# HELP consul_memberlist_degraded_probe consul_memberlist_degraded_probe
+# TYPE consul_memberlist_degraded_probe counter
+consul_memberlist_degraded_probe{network="lan"} 1
+consul_memberlist_degraded_probe{network="wan"} 1
+# HELP consul_memberlist_gossip consul_memberlist_gossip
+# TYPE consul_memberlist_gossip summary
+consul_memberlist_gossip{network="lan",quantile="0.5"} 0.019190000370144844
+consul_memberlist_gossip{network="lan",quantile="0.9"} 0.04447900131344795
+consul_memberlist_gossip{network="lan",quantile="0.99"} 0.06036800146102905
+consul_memberlist_gossip_sum{network="lan"} 72.94090104475617
+consul_memberlist_gossip_count{network="lan"} 2984
+consul_memberlist_gossip{network="wan",quantile="0.5"} 0.020829999819397926
+consul_memberlist_gossip{network="wan",quantile="0.9"} 0.04980999976396561
+consul_memberlist_gossip{network="wan",quantile="0.99"} 0.06190900132060051
+consul_memberlist_gossip_sum{network="wan"} 31.62462099501863
+consul_memberlist_gossip_count{network="wan"} 1193
+# HELP consul_memberlist_msg_alive consul_memberlist_msg_alive
+# TYPE consul_memberlist_msg_alive counter
+consul_memberlist_msg_alive{network="lan"} 5
+consul_memberlist_msg_alive{network="wan"} 5
+# HELP consul_memberlist_msg_dead consul_memberlist_msg_dead
+# TYPE consul_memberlist_msg_dead counter
+consul_memberlist_msg_dead{network="lan"} 2
+consul_memberlist_msg_dead{network="wan"} 2
+# HELP consul_memberlist_probeNode consul_memberlist_probeNode
+# TYPE consul_memberlist_probeNode summary
+consul_memberlist_probeNode{network="lan",quantile="0.5"} 0.9080119729042053
+consul_memberlist_probeNode{network="lan",quantile="0.9"} 1.071262001991272
+consul_memberlist_probeNode{network="lan",quantile="0.99"} 1.071262001991272
+consul_memberlist_probeNode_sum{network="lan"} 560.697409927845
+consul_memberlist_probeNode_count{network="lan"} 559
+consul_memberlist_probeNode{network="wan",quantile="0.5"} 0.7037429809570312
+consul_memberlist_probeNode{network="wan",quantile="0.9"} 1.0175219774246216
+consul_memberlist_probeNode{network="wan",quantile="0.99"} 1.0175219774246216
+consul_memberlist_probeNode_sum{network="wan"} 133.5382086634636
+consul_memberlist_probeNode_count{network="wan"} 112
+# HELP consul_memberlist_pushPullNode consul_memberlist_pushPullNode
+# TYPE consul_memberlist_pushPullNode summary
+consul_memberlist_pushPullNode{network="lan",quantile="0.5"} NaN
+consul_memberlist_pushPullNode{network="lan",quantile="0.9"} NaN
+consul_memberlist_pushPullNode{network="lan",quantile="0.99"} NaN
+consul_memberlist_pushPullNode_sum{network="lan"} 32.9423828125
+consul_memberlist_pushPullNode_count{network="lan"} 23
+consul_memberlist_pushPullNode{network="wan",quantile="0.5"} NaN
+consul_memberlist_pushPullNode{network="wan",quantile="0.9"} NaN
+consul_memberlist_pushPullNode{network="wan",quantile="0.99"} NaN
+consul_memberlist_pushPullNode_sum{network="wan"} 14.840403079986572
+consul_memberlist_pushPullNode_count{network="wan"} 10
+# HELP consul_memberlist_tcp_accept consul_memberlist_tcp_accept
+# TYPE consul_memberlist_tcp_accept counter
+consul_memberlist_tcp_accept{network="lan"} 23
+consul_memberlist_tcp_accept{network="wan"} 10
+# HELP consul_memberlist_tcp_connect consul_memberlist_tcp_connect
+# TYPE consul_memberlist_tcp_connect counter
+consul_memberlist_tcp_connect{network="lan"} 23
+consul_memberlist_tcp_connect{network="wan"} 10
+# HELP consul_memberlist_tcp_sent consul_memberlist_tcp_sent
+# TYPE consul_memberlist_tcp_sent counter
+consul_memberlist_tcp_sent{network="lan"} 39810
+consul_memberlist_tcp_sent{network="wan"} 15776
+# HELP consul_memberlist_udp_received consul_memberlist_udp_received
+# TYPE consul_memberlist_udp_received counter
+consul_memberlist_udp_received{network="lan"} 168805
+consul_memberlist_udp_received{network="wan"} 42596
+# HELP consul_memberlist_udp_sent consul_memberlist_udp_sent
+# TYPE consul_memberlist_udp_sent counter
+consul_memberlist_udp_sent{network="lan"} 168852
+consul_memberlist_udp_sent{network="wan"} 41510
+# HELP consul_mesh_active_root_ca_expiry Seconds until the service mesh root certificate expires. Updated every hour
+# TYPE consul_mesh_active_root_ca_expiry gauge
+consul_mesh_active_root_ca_expiry 0
+# HELP consul_mesh_active_signing_ca_expiry Seconds until the service mesh signing certificate expires. Updated every hour
+# TYPE consul_mesh_active_signing_ca_expiry gauge
+consul_mesh_active_signing_ca_expiry 0
+# HELP consul_prepared_query_apply Measures the time it takes to apply a prepared query update.
+# TYPE consul_prepared_query_apply summary
+consul_prepared_query_apply{quantile="0.5"} NaN
+consul_prepared_query_apply{quantile="0.9"} NaN
+consul_prepared_query_apply{quantile="0.99"} NaN
+consul_prepared_query_apply_sum 0
+consul_prepared_query_apply_count 0
+# HELP consul_prepared_query_execute Measures the time it takes to process a prepared query execute request.
+# TYPE consul_prepared_query_execute summary
+consul_prepared_query_execute{quantile="0.5"} NaN
+consul_prepared_query_execute{quantile="0.9"} NaN
+consul_prepared_query_execute{quantile="0.99"} NaN
+consul_prepared_query_execute_sum 0
+consul_prepared_query_execute_count 0
+# HELP consul_prepared_query_execute_remote Measures the time it takes to process a prepared query execute request that was forwarded to another datacenter.
+# TYPE consul_prepared_query_execute_remote summary
+consul_prepared_query_execute_remote{quantile="0.5"} NaN
+consul_prepared_query_execute_remote{quantile="0.9"} NaN
+consul_prepared_query_execute_remote{quantile="0.99"} NaN
+consul_prepared_query_execute_remote_sum 0
+consul_prepared_query_execute_remote_count 0
+# HELP consul_prepared_query_explain Measures the time it takes to process a prepared query explain request.
+# TYPE consul_prepared_query_explain summary
+consul_prepared_query_explain{quantile="0.5"} NaN
+consul_prepared_query_explain{quantile="0.9"} NaN
+consul_prepared_query_explain{quantile="0.99"} NaN
+consul_prepared_query_explain_sum 0
+consul_prepared_query_explain_count 0
+# HELP consul_raft_applied_index Represents the raft applied index.
+# TYPE consul_raft_applied_index gauge
+consul_raft_applied_index 0
+# HELP consul_raft_apply This counts the number of Raft transactions occurring over the interval.
+# TYPE consul_raft_apply counter
+consul_raft_apply 52
+# HELP consul_raft_barrier consul_raft_barrier
+# TYPE consul_raft_barrier counter
+consul_raft_barrier 8
+# HELP consul_raft_boltdb_getLog consul_raft_boltdb_getLog
+# TYPE consul_raft_boltdb_getLog summary
+consul_raft_boltdb_getLog{quantile="0.5"} 0.04751899838447571
+consul_raft_boltdb_getLog{quantile="0.9"} 0.04751899838447571
+consul_raft_boltdb_getLog{quantile="0.99"} 0.04751899838447571
+consul_raft_boltdb_getLog_sum 177.71392010012642
+consul_raft_boltdb_getLog_count 25884
+# HELP consul_raft_boltdb_logBatchSize consul_raft_boltdb_logBatchSize
+# TYPE consul_raft_boltdb_logBatchSize summary
+consul_raft_boltdb_logBatchSize{quantile="0.5"} 414
+consul_raft_boltdb_logBatchSize{quantile="0.9"} 414
+consul_raft_boltdb_logBatchSize{quantile="0.99"} 414
+consul_raft_boltdb_logBatchSize_sum 32278
+consul_raft_boltdb_logBatchSize_count 93
+# HELP consul_raft_boltdb_logSize consul_raft_boltdb_logSize
+# TYPE consul_raft_boltdb_logSize summary
+consul_raft_boltdb_logSize{quantile="0.5"} 414
+consul_raft_boltdb_logSize{quantile="0.9"} 414
+consul_raft_boltdb_logSize{quantile="0.99"} 414
+consul_raft_boltdb_logSize_sum 32278
+consul_raft_boltdb_logSize_count 95
+# HELP consul_raft_boltdb_logsPerBatch consul_raft_boltdb_logsPerBatch
+# TYPE consul_raft_boltdb_logsPerBatch summary
+consul_raft_boltdb_logsPerBatch{quantile="0.5"} 1
+consul_raft_boltdb_logsPerBatch{quantile="0.9"} 1
+consul_raft_boltdb_logsPerBatch{quantile="0.99"} 1
+consul_raft_boltdb_logsPerBatch_sum 95
+consul_raft_boltdb_logsPerBatch_count 93
+# HELP consul_raft_boltdb_storeLogs consul_raft_boltdb_storeLogs
+# TYPE consul_raft_boltdb_storeLogs summary
+consul_raft_boltdb_storeLogs{quantile="0.5"} 17.80512237548828
+consul_raft_boltdb_storeLogs{quantile="0.9"} 17.80512237548828
+consul_raft_boltdb_storeLogs{quantile="0.99"} 17.80512237548828
+consul_raft_boltdb_storeLogs_sum 1006.1075472831726
+consul_raft_boltdb_storeLogs_count 93
+# HELP consul_raft_boltdb_totalReadTxn consul_raft_boltdb_totalReadTxn
+# TYPE consul_raft_boltdb_totalReadTxn counter
+consul_raft_boltdb_totalReadTxn 25946
+# HELP consul_raft_boltdb_txstats_cursorCount consul_raft_boltdb_txstats_cursorCount
+# TYPE consul_raft_boltdb_txstats_cursorCount counter
+consul_raft_boltdb_txstats_cursorCount 52198
+# HELP consul_raft_boltdb_txstats_nodeCount consul_raft_boltdb_txstats_nodeCount
+# TYPE consul_raft_boltdb_txstats_nodeCount counter
+consul_raft_boltdb_txstats_nodeCount 386
+# HELP consul_raft_boltdb_txstats_nodeDeref consul_raft_boltdb_txstats_nodeDeref
+# TYPE consul_raft_boltdb_txstats_nodeDeref counter
+consul_raft_boltdb_txstats_nodeDeref 0
+# HELP consul_raft_boltdb_txstats_rebalance consul_raft_boltdb_txstats_rebalance
+# TYPE consul_raft_boltdb_txstats_rebalance counter
+consul_raft_boltdb_txstats_rebalance 0
+# HELP consul_raft_boltdb_txstats_rebalanceTime consul_raft_boltdb_txstats_rebalanceTime
+# TYPE consul_raft_boltdb_txstats_rebalanceTime summary
+consul_raft_boltdb_txstats_rebalanceTime{quantile="0.5"} 0
+consul_raft_boltdb_txstats_rebalanceTime{quantile="0.9"} 0
+consul_raft_boltdb_txstats_rebalanceTime{quantile="0.99"} 0
+consul_raft_boltdb_txstats_rebalanceTime_sum 0
+consul_raft_boltdb_txstats_rebalanceTime_count 120
+# HELP consul_raft_boltdb_txstats_spill consul_raft_boltdb_txstats_spill
+# TYPE consul_raft_boltdb_txstats_spill counter
+consul_raft_boltdb_txstats_spill 398
+# HELP consul_raft_boltdb_txstats_spillTime consul_raft_boltdb_txstats_spillTime
+# TYPE consul_raft_boltdb_txstats_spillTime summary
+consul_raft_boltdb_txstats_spillTime{quantile="0.5"} 0.018939999863505363
+consul_raft_boltdb_txstats_spillTime{quantile="0.9"} 0.04575999826192856
+consul_raft_boltdb_txstats_spillTime{quantile="0.99"} 0.04575999826192856
+consul_raft_boltdb_txstats_spillTime_sum 2.559216999274213
+consul_raft_boltdb_txstats_spillTime_count 120
+# HELP consul_raft_boltdb_txstats_split consul_raft_boltdb_txstats_split
+# TYPE consul_raft_boltdb_txstats_split counter
+consul_raft_boltdb_txstats_split 19
+# HELP consul_raft_boltdb_txstats_write consul_raft_boltdb_txstats_write
+# TYPE consul_raft_boltdb_txstats_write counter
+consul_raft_boltdb_txstats_write 600
+# HELP consul_raft_boltdb_txstats_writeTime consul_raft_boltdb_txstats_writeTime
+# TYPE consul_raft_boltdb_txstats_writeTime summary
+consul_raft_boltdb_txstats_writeTime{quantile="0.5"} 17.56859588623047
+consul_raft_boltdb_txstats_writeTime{quantile="0.9"} 17.67194366455078
+consul_raft_boltdb_txstats_writeTime{quantile="0.99"} 17.67194366455078
+consul_raft_boltdb_txstats_writeTime_sum 1048.4321446418762
+consul_raft_boltdb_txstats_writeTime_count 120
+# HELP consul_raft_boltdb_writeCapacity consul_raft_boltdb_writeCapacity
+# TYPE consul_raft_boltdb_writeCapacity summary
+consul_raft_boltdb_writeCapacity{quantile="0.5"} 56.34065628051758
+consul_raft_boltdb_writeCapacity{quantile="0.9"} 56.34065628051758
+consul_raft_boltdb_writeCapacity{quantile="0.99"} 56.34065628051758
+consul_raft_boltdb_writeCapacity_sum 11092.64028930664
+consul_raft_boltdb_writeCapacity_count 93
+# HELP consul_raft_candidate_electSelf consul_raft_candidate_electSelf
+# TYPE consul_raft_candidate_electSelf summary
+consul_raft_candidate_electSelf{quantile="0.5"} NaN
+consul_raft_candidate_electSelf{quantile="0.9"} NaN
+consul_raft_candidate_electSelf{quantile="0.99"} NaN
+consul_raft_candidate_electSelf_sum 64.78176307678223
+consul_raft_candidate_electSelf_count 2
+# HELP consul_raft_commitTime This measures the time it takes to commit a new entry to the Raft log on the leader.
+# TYPE consul_raft_commitTime summary
+consul_raft_commitTime{quantile="0.5"} 58.47069549560547
+consul_raft_commitTime{quantile="0.9"} 58.47069549560547
+consul_raft_commitTime{quantile="0.99"} 58.47069549560547
+consul_raft_commitTime_sum 1418.8827295303345
+consul_raft_commitTime_count 64
+# HELP consul_raft_fsm_apply consul_raft_fsm_apply
+# TYPE consul_raft_fsm_apply summary
+consul_raft_fsm_apply{quantile="0.5"} 0.1474989950656891
+consul_raft_fsm_apply{quantile="0.9"} 0.1474989950656891
+consul_raft_fsm_apply{quantile="0.99"} 0.1474989950656891
+consul_raft_fsm_apply_sum 368.55326924845576
+consul_raft_fsm_apply_count 11248
+# HELP consul_raft_fsm_enqueue consul_raft_fsm_enqueue
+# TYPE consul_raft_fsm_enqueue summary
+consul_raft_fsm_enqueue{quantile="0.5"} 0.01882000081241131
+consul_raft_fsm_enqueue{quantile="0.9"} 0.01882000081241131
+consul_raft_fsm_enqueue{quantile="0.99"} 0.01882000081241131
+consul_raft_fsm_enqueue_sum 1.6373119996860623
+consul_raft_fsm_enqueue_count 64
+# HELP consul_raft_fsm_lastRestoreDuration This measures how long the last FSM restore (from disk or leader) took.
+# TYPE consul_raft_fsm_lastRestoreDuration gauge
+consul_raft_fsm_lastRestoreDuration 0
+# HELP consul_raft_fsm_restore consul_raft_fsm_restore
+# TYPE consul_raft_fsm_restore summary
+consul_raft_fsm_restore{quantile="0.5"} NaN
+consul_raft_fsm_restore{quantile="0.9"} NaN
+consul_raft_fsm_restore{quantile="0.99"} NaN
+consul_raft_fsm_restore_sum 2.6886210441589355
+consul_raft_fsm_restore_count 1
+# HELP consul_raft_last_index Represents the raft last index.
+# TYPE consul_raft_last_index gauge
+consul_raft_last_index 0
+# HELP consul_raft_leader_dispatchLog consul_raft_leader_dispatchLog
+# TYPE consul_raft_leader_dispatchLog summary
+consul_raft_leader_dispatchLog{quantile="0.5"} 17.841020584106445
+consul_raft_leader_dispatchLog{quantile="0.9"} 17.841020584106445
+consul_raft_leader_dispatchLog{quantile="0.99"} 17.841020584106445
+consul_raft_leader_dispatchLog_sum 614.3611516952515
+consul_raft_leader_dispatchLog_count 64
+# HELP consul_raft_leader_lastContact Measures the time since the leader was last able to contact the follower nodes when checking its leader lease.
+# TYPE consul_raft_leader_lastContact summary
+consul_raft_leader_lastContact{quantile="0.5"} 30
+consul_raft_leader_lastContact{quantile="0.9"} 67
+consul_raft_leader_lastContact{quantile="0.99"} 67
+consul_raft_leader_lastContact_sum 13872
+consul_raft_leader_lastContact_count 364
+# HELP consul_raft_leader_oldestLogAge This measures how old the oldest log in the leader's log store is.
+# TYPE consul_raft_leader_oldestLogAge gauge
+consul_raft_leader_oldestLogAge 0
+# HELP consul_raft_net_getRPCType consul_raft_net_getRPCType
+# TYPE consul_raft_net_getRPCType summary
+consul_raft_net_getRPCType{quantile="0.5"} NaN
+consul_raft_net_getRPCType{quantile="0.9"} NaN
+consul_raft_net_getRPCType{quantile="0.99"} NaN
+consul_raft_net_getRPCType_sum 269090.0442453362
+consul_raft_net_getRPCType_count 2002
+# HELP consul_raft_net_rpcDecode consul_raft_net_rpcDecode
+# TYPE consul_raft_net_rpcDecode summary
+consul_raft_net_rpcDecode{rpcType="AppendEntries",quantile="0.5"} NaN
+consul_raft_net_rpcDecode{rpcType="AppendEntries",quantile="0.9"} NaN
+consul_raft_net_rpcDecode{rpcType="AppendEntries",quantile="0.99"} NaN
+consul_raft_net_rpcDecode_sum{rpcType="AppendEntries"} 50.56464605871588
+consul_raft_net_rpcDecode_count{rpcType="AppendEntries"} 1811
+consul_raft_net_rpcDecode{rpcType="Heartbeat",quantile="0.5"} NaN
+consul_raft_net_rpcDecode{rpcType="Heartbeat",quantile="0.9"} NaN
+consul_raft_net_rpcDecode{rpcType="Heartbeat",quantile="0.99"} NaN
+consul_raft_net_rpcDecode_sum{rpcType="Heartbeat"} 4.609708994626999
+consul_raft_net_rpcDecode_count{rpcType="Heartbeat"} 189
+consul_raft_net_rpcDecode{rpcType="RequestVote",quantile="0.5"} NaN
+consul_raft_net_rpcDecode{rpcType="RequestVote",quantile="0.9"} NaN
+consul_raft_net_rpcDecode{rpcType="RequestVote",quantile="0.99"} NaN
+consul_raft_net_rpcDecode_sum{rpcType="RequestVote"} 0.052609000355005264
+consul_raft_net_rpcDecode_count{rpcType="RequestVote"} 1
+consul_raft_net_rpcDecode{rpcType="TimeoutNow",quantile="0.5"} NaN
+consul_raft_net_rpcDecode{rpcType="TimeoutNow",quantile="0.9"} NaN
+consul_raft_net_rpcDecode{rpcType="TimeoutNow",quantile="0.99"} NaN
+consul_raft_net_rpcDecode_sum{rpcType="TimeoutNow"} 0.07034999877214432
+consul_raft_net_rpcDecode_count{rpcType="TimeoutNow"} 1
+# HELP consul_raft_net_rpcEnqueue consul_raft_net_rpcEnqueue
+# TYPE consul_raft_net_rpcEnqueue summary
+consul_raft_net_rpcEnqueue{rpcType="AppendEntries",quantile="0.5"} NaN
+consul_raft_net_rpcEnqueue{rpcType="AppendEntries",quantile="0.9"} NaN
+consul_raft_net_rpcEnqueue{rpcType="AppendEntries",quantile="0.99"} NaN
+consul_raft_net_rpcEnqueue_sum{rpcType="AppendEntries"} 61.944881823379546
+consul_raft_net_rpcEnqueue_count{rpcType="AppendEntries"} 1811
+consul_raft_net_rpcEnqueue{rpcType="Heartbeat",quantile="0.5"} NaN
+consul_raft_net_rpcEnqueue{rpcType="Heartbeat",quantile="0.9"} NaN
+consul_raft_net_rpcEnqueue{rpcType="Heartbeat",quantile="0.99"} NaN
+consul_raft_net_rpcEnqueue_sum{rpcType="Heartbeat"} 4.966151000931859
+consul_raft_net_rpcEnqueue_count{rpcType="Heartbeat"} 189
+consul_raft_net_rpcEnqueue{rpcType="RequestVote",quantile="0.5"} NaN
+consul_raft_net_rpcEnqueue{rpcType="RequestVote",quantile="0.9"} NaN
+consul_raft_net_rpcEnqueue{rpcType="RequestVote",quantile="0.99"} NaN
+consul_raft_net_rpcEnqueue_sum{rpcType="RequestVote"} 0.012551000341773033
+consul_raft_net_rpcEnqueue_count{rpcType="RequestVote"} 1
+consul_raft_net_rpcEnqueue{rpcType="TimeoutNow",quantile="0.5"} NaN
+consul_raft_net_rpcEnqueue{rpcType="TimeoutNow",quantile="0.9"} NaN
+consul_raft_net_rpcEnqueue{rpcType="TimeoutNow",quantile="0.99"} NaN
+consul_raft_net_rpcEnqueue_sum{rpcType="TimeoutNow"} 0.021700000390410423
+consul_raft_net_rpcEnqueue_count{rpcType="TimeoutNow"} 1
+# HELP consul_raft_net_rpcRespond consul_raft_net_rpcRespond
+# TYPE consul_raft_net_rpcRespond summary
+consul_raft_net_rpcRespond{rpcType="AppendEntries",quantile="0.5"} NaN
+consul_raft_net_rpcRespond{rpcType="AppendEntries",quantile="0.9"} NaN
+consul_raft_net_rpcRespond{rpcType="AppendEntries",quantile="0.99"} NaN
+consul_raft_net_rpcRespond_sum{rpcType="AppendEntries"} 632.5211075674742
+consul_raft_net_rpcRespond_count{rpcType="AppendEntries"} 1811
+consul_raft_net_rpcRespond{rpcType="Heartbeat",quantile="0.5"} NaN
+consul_raft_net_rpcRespond{rpcType="Heartbeat",quantile="0.9"} NaN
+consul_raft_net_rpcRespond{rpcType="Heartbeat",quantile="0.99"} NaN
+consul_raft_net_rpcRespond_sum{rpcType="Heartbeat"} 2.6388960042968392
+consul_raft_net_rpcRespond_count{rpcType="Heartbeat"} 189
+consul_raft_net_rpcRespond{rpcType="RequestVote",quantile="0.5"} NaN
+consul_raft_net_rpcRespond{rpcType="RequestVote",quantile="0.9"} NaN
+consul_raft_net_rpcRespond{rpcType="RequestVote",quantile="0.99"} NaN
+consul_raft_net_rpcRespond_sum{rpcType="RequestVote"} 27.120553970336914
+consul_raft_net_rpcRespond_count{rpcType="RequestVote"} 1
+consul_raft_net_rpcRespond{rpcType="TimeoutNow",quantile="0.5"} NaN
+consul_raft_net_rpcRespond{rpcType="TimeoutNow",quantile="0.9"} NaN
+consul_raft_net_rpcRespond{rpcType="TimeoutNow",quantile="0.99"} NaN
+consul_raft_net_rpcRespond_sum{rpcType="TimeoutNow"} 0.18450799584388733
+consul_raft_net_rpcRespond_count{rpcType="TimeoutNow"} 1
+# HELP consul_raft_replication_appendEntries_logs consul_raft_replication_appendEntries_logs
+# TYPE consul_raft_replication_appendEntries_logs counter
+consul_raft_replication_appendEntries_logs{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae"} 64
+consul_raft_replication_appendEntries_logs{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7"} 64
+# HELP consul_raft_replication_appendEntries_logs_3e75e0af_859b_83e8_779f_f3a6d12f02ae consul_raft_replication_appendEntries_logs_3e75e0af_859b_83e8_779f_f3a6d12f02ae
+# TYPE consul_raft_replication_appendEntries_logs_3e75e0af_859b_83e8_779f_f3a6d12f02ae counter
+consul_raft_replication_appendEntries_logs_3e75e0af_859b_83e8_779f_f3a6d12f02ae 64
+# HELP consul_raft_replication_appendEntries_logs_72849161_41cb_14df_fc9b_563ddff3bae7 consul_raft_replication_appendEntries_logs_72849161_41cb_14df_fc9b_563ddff3bae7
+# TYPE consul_raft_replication_appendEntries_logs_72849161_41cb_14df_fc9b_563ddff3bae7 counter
+consul_raft_replication_appendEntries_logs_72849161_41cb_14df_fc9b_563ddff3bae7 64
+# HELP consul_raft_replication_appendEntries_rpc consul_raft_replication_appendEntries_rpc
+# TYPE consul_raft_replication_appendEntries_rpc summary
+consul_raft_replication_appendEntries_rpc{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae",quantile="0.5"} 0.7193149924278259
+consul_raft_replication_appendEntries_rpc{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae",quantile="0.9"} 1.123671054840088
+consul_raft_replication_appendEntries_rpc{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae",quantile="0.99"} 2.9677159786224365
+consul_raft_replication_appendEntries_rpc_sum{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae"} 5982.053934007883
+consul_raft_replication_appendEntries_rpc_count{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae"} 6008
+consul_raft_replication_appendEntries_rpc{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7",quantile="0.5"} 0.6742749810218811
+consul_raft_replication_appendEntries_rpc{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7",quantile="0.9"} 1.1206400394439697
+consul_raft_replication_appendEntries_rpc{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7",quantile="0.99"} 4.632521152496338
+consul_raft_replication_appendEntries_rpc_sum{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7"} 5640.875204831362
+consul_raft_replication_appendEntries_rpc_count{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7"} 6125
+# HELP consul_raft_replication_appendEntries_rpc_3e75e0af_859b_83e8_779f_f3a6d12f02ae consul_raft_replication_appendEntries_rpc_3e75e0af_859b_83e8_779f_f3a6d12f02ae
+# TYPE consul_raft_replication_appendEntries_rpc_3e75e0af_859b_83e8_779f_f3a6d12f02ae summary
+consul_raft_replication_appendEntries_rpc_3e75e0af_859b_83e8_779f_f3a6d12f02ae{quantile="0.5"} 0.7773330211639404
+consul_raft_replication_appendEntries_rpc_3e75e0af_859b_83e8_779f_f3a6d12f02ae{quantile="0.9"} 1.177711009979248
+consul_raft_replication_appendEntries_rpc_3e75e0af_859b_83e8_779f_f3a6d12f02ae{quantile="0.99"} 3.0745749473571777
+consul_raft_replication_appendEntries_rpc_3e75e0af_859b_83e8_779f_f3a6d12f02ae_sum 6255.161469876766
+consul_raft_replication_appendEntries_rpc_3e75e0af_859b_83e8_779f_f3a6d12f02ae_count 6008
+# HELP consul_raft_replication_appendEntries_rpc_72849161_41cb_14df_fc9b_563ddff3bae7 consul_raft_replication_appendEntries_rpc_72849161_41cb_14df_fc9b_563ddff3bae7
+# TYPE consul_raft_replication_appendEntries_rpc_72849161_41cb_14df_fc9b_563ddff3bae7 summary
+consul_raft_replication_appendEntries_rpc_72849161_41cb_14df_fc9b_563ddff3bae7{quantile="0.5"} 0.7206940054893494
+consul_raft_replication_appendEntries_rpc_72849161_41cb_14df_fc9b_563ddff3bae7{quantile="0.9"} 1.1687090396881104
+consul_raft_replication_appendEntries_rpc_72849161_41cb_14df_fc9b_563ddff3bae7{quantile="0.99"} 4.6782097816467285
+consul_raft_replication_appendEntries_rpc_72849161_41cb_14df_fc9b_563ddff3bae7_sum 5913.810284465551
+consul_raft_replication_appendEntries_rpc_72849161_41cb_14df_fc9b_563ddff3bae7_count 6125
+# HELP consul_raft_replication_heartbeat consul_raft_replication_heartbeat
+# TYPE consul_raft_replication_heartbeat summary
+consul_raft_replication_heartbeat{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae",quantile="0.5"} 0.6244940161705017
+consul_raft_replication_heartbeat{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae",quantile="0.9"} 1.0416409969329834
+consul_raft_replication_heartbeat{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae",quantile="0.99"} 1.4274380207061768
+consul_raft_replication_heartbeat_sum{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae"} 488.172178208828
+consul_raft_replication_heartbeat_count{peer_id="3e75e0af-859b-83e8-779f-f3a6d12f02ae"} 601
+consul_raft_replication_heartbeat{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7",quantile="0.5"} 0.6106240153312683
+consul_raft_replication_heartbeat{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7",quantile="0.9"} 0.9524030089378357
+consul_raft_replication_heartbeat{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7",quantile="0.99"} 0.9726319909095764
+consul_raft_replication_heartbeat_sum{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7"} 459.77358454465866
+consul_raft_replication_heartbeat_count{peer_id="72849161-41cb-14df-fc9b-563ddff3bae7"} 625
+# HELP consul_raft_replication_heartbeat_3e75e0af_859b_83e8_779f_f3a6d12f02ae consul_raft_replication_heartbeat_3e75e0af_859b_83e8_779f_f3a6d12f02ae
+# TYPE consul_raft_replication_heartbeat_3e75e0af_859b_83e8_779f_f3a6d12f02ae summary
+consul_raft_replication_heartbeat_3e75e0af_859b_83e8_779f_f3a6d12f02ae{quantile="0.5"} 0.65802401304245
+consul_raft_replication_heartbeat_3e75e0af_859b_83e8_779f_f3a6d12f02ae{quantile="0.9"} 1.0810810327529907
+consul_raft_replication_heartbeat_3e75e0af_859b_83e8_779f_f3a6d12f02ae{quantile="0.99"} 1.4524680376052856
+consul_raft_replication_heartbeat_3e75e0af_859b_83e8_779f_f3a6d12f02ae_sum 509.27614790201187
+consul_raft_replication_heartbeat_3e75e0af_859b_83e8_779f_f3a6d12f02ae_count 601
+# HELP consul_raft_replication_heartbeat_72849161_41cb_14df_fc9b_563ddff3bae7 consul_raft_replication_heartbeat_72849161_41cb_14df_fc9b_563ddff3bae7
+# TYPE consul_raft_replication_heartbeat_72849161_41cb_14df_fc9b_563ddff3bae7 summary
+consul_raft_replication_heartbeat_72849161_41cb_14df_fc9b_563ddff3bae7{quantile="0.5"} 0.6355040073394775
+consul_raft_replication_heartbeat_72849161_41cb_14df_fc9b_563ddff3bae7{quantile="0.9"} 1.000391960144043
+consul_raft_replication_heartbeat_72849161_41cb_14df_fc9b_563ddff3bae7{quantile="0.99"} 1.0161620378494263
+consul_raft_replication_heartbeat_72849161_41cb_14df_fc9b_563ddff3bae7_sum 480.9242581129074
+consul_raft_replication_heartbeat_72849161_41cb_14df_fc9b_563ddff3bae7_count 625
+# HELP consul_raft_rpc_appendEntries consul_raft_rpc_appendEntries
+# TYPE consul_raft_rpc_appendEntries summary
+consul_raft_rpc_appendEntries{quantile="0.5"} NaN
+consul_raft_rpc_appendEntries{quantile="0.9"} NaN
+consul_raft_rpc_appendEntries{quantile="0.99"} NaN
+consul_raft_rpc_appendEntries_sum 573.4200130868703
+consul_raft_rpc_appendEntries_count 2000
+# HELP consul_raft_rpc_appendEntries_processLogs consul_raft_rpc_appendEntries_processLogs
+# TYPE consul_raft_rpc_appendEntries_processLogs summary
+consul_raft_rpc_appendEntries_processLogs{quantile="0.5"} NaN
+consul_raft_rpc_appendEntries_processLogs{quantile="0.9"} NaN
+consul_raft_rpc_appendEntries_processLogs{quantile="0.99"} NaN
+consul_raft_rpc_appendEntries_processLogs_sum 148.3990723239258
+consul_raft_rpc_appendEntries_processLogs_count 28
+# HELP consul_raft_rpc_appendEntries_storeLogs consul_raft_rpc_appendEntries_storeLogs
+# TYPE consul_raft_rpc_appendEntries_storeLogs summary
+consul_raft_rpc_appendEntries_storeLogs{quantile="0.5"} NaN
+consul_raft_rpc_appendEntries_storeLogs{quantile="0.9"} NaN
+consul_raft_rpc_appendEntries_storeLogs{quantile="0.99"} NaN
+consul_raft_rpc_appendEntries_storeLogs_sum 395.2212791442871
+consul_raft_rpc_appendEntries_storeLogs_count 29
+# HELP consul_raft_rpc_installSnapshot Measures the time it takes the raft leader to install a snapshot on a follower that is catching up after being down or has just joined the cluster.
+# TYPE consul_raft_rpc_installSnapshot summary
+consul_raft_rpc_installSnapshot{quantile="0.5"} NaN
+consul_raft_rpc_installSnapshot{quantile="0.9"} NaN
+consul_raft_rpc_installSnapshot{quantile="0.99"} NaN
+consul_raft_rpc_installSnapshot_sum 0
+consul_raft_rpc_installSnapshot_count 0
+# HELP consul_raft_rpc_processHeartbeat consul_raft_rpc_processHeartbeat
+# TYPE consul_raft_rpc_processHeartbeat summary
+consul_raft_rpc_processHeartbeat{quantile="0.5"} NaN
+consul_raft_rpc_processHeartbeat{quantile="0.9"} NaN
+consul_raft_rpc_processHeartbeat{quantile="0.99"} NaN
+consul_raft_rpc_processHeartbeat_sum 3.374873999040574
+consul_raft_rpc_processHeartbeat_count 189
+# HELP consul_raft_rpc_requestVote consul_raft_rpc_requestVote
+# TYPE consul_raft_rpc_requestVote summary
+consul_raft_rpc_requestVote{quantile="0.5"} NaN
+consul_raft_rpc_requestVote{quantile="0.9"} NaN
+consul_raft_rpc_requestVote{quantile="0.99"} NaN
+consul_raft_rpc_requestVote_sum 27.062883377075195
+consul_raft_rpc_requestVote_count 1
+# HELP consul_raft_snapshot_persist Measures the time it takes raft to write a new snapshot to disk.
+# TYPE consul_raft_snapshot_persist summary
+consul_raft_snapshot_persist{quantile="0.5"} NaN
+consul_raft_snapshot_persist{quantile="0.9"} NaN
+consul_raft_snapshot_persist{quantile="0.99"} NaN
+consul_raft_snapshot_persist_sum 0
+consul_raft_snapshot_persist_count 0
+# HELP consul_raft_state_candidate This increments whenever a Consul server starts an election.
+# TYPE consul_raft_state_candidate counter
+consul_raft_state_candidate 1
+# HELP consul_raft_state_follower consul_raft_state_follower
+# TYPE consul_raft_state_follower counter
+consul_raft_state_follower 1
+# HELP consul_raft_state_leader This increments whenever a Consul server becomes a leader.
+# TYPE consul_raft_state_leader counter
+consul_raft_state_leader 1
+# HELP consul_raft_thread_fsm_saturation consul_raft_thread_fsm_saturation
+# TYPE consul_raft_thread_fsm_saturation summary
+consul_raft_thread_fsm_saturation{quantile="0.5"} 0
+consul_raft_thread_fsm_saturation{quantile="0.9"} 0
+consul_raft_thread_fsm_saturation{quantile="0.99"} 0
+consul_raft_thread_fsm_saturation_sum 0.14000000059604645
+consul_raft_thread_fsm_saturation_count 75
+# HELP consul_raft_thread_main_saturation consul_raft_thread_main_saturation
+# TYPE consul_raft_thread_main_saturation summary
+consul_raft_thread_main_saturation{quantile="0.5"} 0
+consul_raft_thread_main_saturation{quantile="0.9"} 0.009999999776482582
+consul_raft_thread_main_saturation{quantile="0.99"} 0.009999999776482582
+consul_raft_thread_main_saturation_sum 0.9699999857693911
+consul_raft_thread_main_saturation_count 328
+# HELP consul_raft_verify_leader consul_raft_verify_leader
+# TYPE consul_raft_verify_leader counter
+consul_raft_verify_leader 6
+# HELP consul_rpc_accept_conn Increments when a server accepts an RPC connection.
+# TYPE consul_rpc_accept_conn counter
+consul_rpc_accept_conn 15
+# HELP consul_rpc_consistentRead Measures the time spent confirming that a consistent read can be performed.
+# TYPE consul_rpc_consistentRead summary
+consul_rpc_consistentRead{quantile="0.5"} NaN
+consul_rpc_consistentRead{quantile="0.9"} NaN
+consul_rpc_consistentRead{quantile="0.99"} NaN
+consul_rpc_consistentRead_sum 3.1557260155677795
+consul_rpc_consistentRead_count 6
+# HELP consul_rpc_cross_dc Increments when a server sends a (potentially blocking) cross datacenter RPC query.
+# TYPE consul_rpc_cross_dc counter
+consul_rpc_cross_dc 0
+# HELP consul_rpc_queries_blocking Shows the current number of in-flight blocking queries the server is handling.
+# TYPE consul_rpc_queries_blocking gauge
+consul_rpc_queries_blocking 0
+# HELP consul_rpc_query Increments when a server receives a read request, indicating the rate of new read queries.
+# TYPE consul_rpc_query counter
+consul_rpc_query 19
+# HELP consul_rpc_raft_handoff Increments when a server accepts a Raft-related RPC connection.
+# TYPE consul_rpc_raft_handoff counter
+consul_rpc_raft_handoff 4
+# HELP consul_rpc_request Increments when a server receives a Consul-related RPC request.
+# TYPE consul_rpc_request counter
+consul_rpc_request 936
+# HELP consul_rpc_request_error Increments when a server returns an error from an RPC request.
+# TYPE consul_rpc_request_error counter
+consul_rpc_request_error 0
+# HELP consul_runtime_gc_pause_ns consul_runtime_gc_pause_ns
+# TYPE consul_runtime_gc_pause_ns summary
+consul_runtime_gc_pause_ns{quantile="0.5"} NaN
+consul_runtime_gc_pause_ns{quantile="0.9"} NaN
+consul_runtime_gc_pause_ns{quantile="0.99"} NaN
+consul_runtime_gc_pause_ns_sum 1.565053e+07
+consul_runtime_gc_pause_ns_count 42
+# HELP consul_satya_vm_autopilot_failure_tolerance consul_satya_vm_autopilot_failure_tolerance
+# TYPE consul_satya_vm_autopilot_failure_tolerance gauge
+consul_satya_vm_autopilot_failure_tolerance 1
+# HELP consul_satya_vm_autopilot_healthy consul_satya_vm_autopilot_healthy
+# TYPE consul_satya_vm_autopilot_healthy gauge
+consul_satya_vm_autopilot_healthy 1
+# HELP consul_satya_vm_consul_members_clients consul_satya_vm_consul_members_clients
+# TYPE consul_satya_vm_consul_members_clients gauge
+consul_satya_vm_consul_members_clients{datacenter="us-central"} 0
+# HELP consul_satya_vm_consul_members_servers consul_satya_vm_consul_members_servers
+# TYPE consul_satya_vm_consul_members_servers gauge
+consul_satya_vm_consul_members_servers{datacenter="us-central"} 3
+# HELP consul_satya_vm_consul_state_config_entries consul_satya_vm_consul_state_config_entries
+# TYPE consul_satya_vm_consul_state_config_entries gauge
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="exported-services"} 0
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="ingress-gateway"} 0
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="mesh"} 0
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="proxy-defaults"} 0
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="service-defaults"} 0
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="service-intentions"} 0
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="service-resolver"} 0
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="service-router"} 0
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="service-splitter"} 0
+consul_satya_vm_consul_state_config_entries{datacenter="us-central",kind="terminating-gateway"} 0
+# HELP consul_satya_vm_consul_state_connect_instances consul_satya_vm_consul_state_connect_instances
+# TYPE consul_satya_vm_consul_state_connect_instances gauge
+consul_satya_vm_consul_state_connect_instances{datacenter="us-central",kind="connect-native"} 0
+consul_satya_vm_consul_state_connect_instances{datacenter="us-central",kind="connect-proxy"} 0
+consul_satya_vm_consul_state_connect_instances{datacenter="us-central",kind="ingress-gateway"} 0
+consul_satya_vm_consul_state_connect_instances{datacenter="us-central",kind="mesh-gateway"} 0
+consul_satya_vm_consul_state_connect_instances{datacenter="us-central",kind="terminating-gateway"} 0
+# HELP consul_satya_vm_consul_state_kv_entries consul_satya_vm_consul_state_kv_entries
+# TYPE consul_satya_vm_consul_state_kv_entries gauge
+consul_satya_vm_consul_state_kv_entries{datacenter="us-central"} 1
+# HELP consul_satya_vm_consul_state_nodes consul_satya_vm_consul_state_nodes
+# TYPE consul_satya_vm_consul_state_nodes gauge
+consul_satya_vm_consul_state_nodes{datacenter="us-central"} 3
+# HELP consul_satya_vm_consul_state_peerings consul_satya_vm_consul_state_peerings
+# TYPE consul_satya_vm_consul_state_peerings gauge
+consul_satya_vm_consul_state_peerings{datacenter="us-central"} 0
+# HELP consul_satya_vm_consul_state_service_instances consul_satya_vm_consul_state_service_instances
+# TYPE consul_satya_vm_consul_state_service_instances gauge
+consul_satya_vm_consul_state_service_instances{datacenter="us-central"} 4
+# HELP consul_satya_vm_consul_state_services consul_satya_vm_consul_state_services
+# TYPE consul_satya_vm_consul_state_services gauge
+consul_satya_vm_consul_state_services{datacenter="us-central"} 2
+# HELP consul_satya_vm_grpc_client_connections consul_satya_vm_grpc_client_connections
+# TYPE consul_satya_vm_grpc_client_connections gauge
+consul_satya_vm_grpc_client_connections 1
+# HELP consul_satya_vm_grpc_server_connections consul_satya_vm_grpc_server_connections
+# TYPE consul_satya_vm_grpc_server_connections gauge
+consul_satya_vm_grpc_server_connections 0
+# HELP consul_satya_vm_memberlist_health_score consul_satya_vm_memberlist_health_score
+# TYPE consul_satya_vm_memberlist_health_score gauge
+consul_satya_vm_memberlist_health_score{network="lan"} 0
+consul_satya_vm_memberlist_health_score{network="wan"} 0
+# HELP consul_satya_vm_mesh_active_root_ca_expiry consul_satya_vm_mesh_active_root_ca_expiry
+# TYPE consul_satya_vm_mesh_active_root_ca_expiry gauge
+consul_satya_vm_mesh_active_root_ca_expiry NaN
+# HELP consul_satya_vm_mesh_active_signing_ca_expiry consul_satya_vm_mesh_active_signing_ca_expiry
+# TYPE consul_satya_vm_mesh_active_signing_ca_expiry gauge
+consul_satya_vm_mesh_active_signing_ca_expiry NaN
+# HELP consul_satya_vm_raft_applied_index consul_satya_vm_raft_applied_index
+# TYPE consul_satya_vm_raft_applied_index gauge
+consul_satya_vm_raft_applied_index 455437
+# HELP consul_satya_vm_raft_boltdb_freePageBytes consul_satya_vm_raft_boltdb_freePageBytes
+# TYPE consul_satya_vm_raft_boltdb_freePageBytes gauge
+consul_satya_vm_raft_boltdb_freePageBytes 3.960832e+06
+# HELP consul_satya_vm_raft_boltdb_freelistBytes consul_satya_vm_raft_boltdb_freelistBytes
+# TYPE consul_satya_vm_raft_boltdb_freelistBytes gauge
+consul_satya_vm_raft_boltdb_freelistBytes 7752
+# HELP consul_satya_vm_raft_boltdb_numFreePages consul_satya_vm_raft_boltdb_numFreePages
+# TYPE consul_satya_vm_raft_boltdb_numFreePages gauge
+consul_satya_vm_raft_boltdb_numFreePages 961
+# HELP consul_satya_vm_raft_boltdb_numPendingPages consul_satya_vm_raft_boltdb_numPendingPages
+# TYPE consul_satya_vm_raft_boltdb_numPendingPages gauge
+consul_satya_vm_raft_boltdb_numPendingPages 6
+# HELP consul_satya_vm_raft_boltdb_openReadTxn consul_satya_vm_raft_boltdb_openReadTxn
+# TYPE consul_satya_vm_raft_boltdb_openReadTxn gauge
+consul_satya_vm_raft_boltdb_openReadTxn 0
+# HELP consul_satya_vm_raft_boltdb_txstats_pageAlloc consul_satya_vm_raft_boltdb_txstats_pageAlloc
+# TYPE consul_satya_vm_raft_boltdb_txstats_pageAlloc gauge
+consul_satya_vm_raft_boltdb_txstats_pageAlloc 2.465792e+06
+# HELP consul_satya_vm_raft_boltdb_txstats_pageCount consul_satya_vm_raft_boltdb_txstats_pageCount
+# TYPE consul_satya_vm_raft_boltdb_txstats_pageCount gauge
+consul_satya_vm_raft_boltdb_txstats_pageCount 602
+# HELP consul_satya_vm_raft_commitNumLogs consul_satya_vm_raft_commitNumLogs
+# TYPE consul_satya_vm_raft_commitNumLogs gauge
+consul_satya_vm_raft_commitNumLogs 1
+# HELP consul_satya_vm_raft_fsm_lastRestoreDuration consul_satya_vm_raft_fsm_lastRestoreDuration
+# TYPE consul_satya_vm_raft_fsm_lastRestoreDuration gauge
+consul_satya_vm_raft_fsm_lastRestoreDuration 2
+# HELP consul_satya_vm_raft_last_index consul_satya_vm_raft_last_index
+# TYPE consul_satya_vm_raft_last_index gauge
+consul_satya_vm_raft_last_index 455437
+# HELP consul_satya_vm_raft_leader_dispatchNumLogs consul_satya_vm_raft_leader_dispatchNumLogs
+# TYPE consul_satya_vm_raft_leader_dispatchNumLogs gauge
+consul_satya_vm_raft_leader_dispatchNumLogs 1
+# HELP consul_satya_vm_raft_leader_oldestLogAge consul_satya_vm_raft_leader_oldestLogAge
+# TYPE consul_satya_vm_raft_leader_oldestLogAge gauge
+consul_satya_vm_raft_leader_oldestLogAge 1.86193632e+08
+# HELP consul_satya_vm_raft_peers consul_satya_vm_raft_peers
+# TYPE consul_satya_vm_raft_peers gauge
+consul_satya_vm_raft_peers 3
+# HELP consul_satya_vm_rpc_queries_blocking consul_satya_vm_rpc_queries_blocking
+# TYPE consul_satya_vm_rpc_queries_blocking gauge
+consul_satya_vm_rpc_queries_blocking 1
+# HELP consul_satya_vm_runtime_alloc_bytes consul_satya_vm_runtime_alloc_bytes
+# TYPE consul_satya_vm_runtime_alloc_bytes gauge
+consul_satya_vm_runtime_alloc_bytes 3.2406104e+07
+# HELP consul_satya_vm_runtime_free_count consul_satya_vm_runtime_free_count
+# TYPE consul_satya_vm_runtime_free_count gauge
+consul_satya_vm_runtime_free_count 8.260123e+06
+# HELP consul_satya_vm_runtime_heap_objects consul_satya_vm_runtime_heap_objects
+# TYPE consul_satya_vm_runtime_heap_objects gauge
+consul_satya_vm_runtime_heap_objects 118531
+# HELP consul_satya_vm_runtime_malloc_count consul_satya_vm_runtime_malloc_count
+# TYPE consul_satya_vm_runtime_malloc_count gauge
+consul_satya_vm_runtime_malloc_count 8.378654e+06
+# HELP consul_satya_vm_runtime_num_goroutines consul_satya_vm_runtime_num_goroutines
+# TYPE consul_satya_vm_runtime_num_goroutines gauge
+consul_satya_vm_runtime_num_goroutines 123
+# HELP consul_satya_vm_runtime_sys_bytes consul_satya_vm_runtime_sys_bytes
+# TYPE consul_satya_vm_runtime_sys_bytes gauge
+consul_satya_vm_runtime_sys_bytes 7.3614344e+07
+# HELP consul_satya_vm_runtime_total_gc_pause_ns consul_satya_vm_runtime_total_gc_pause_ns
+# TYPE consul_satya_vm_runtime_total_gc_pause_ns gauge
+consul_satya_vm_runtime_total_gc_pause_ns 1.565053e+07
+# HELP consul_satya_vm_runtime_total_gc_runs consul_satya_vm_runtime_total_gc_runs
+# TYPE consul_satya_vm_runtime_total_gc_runs gauge
+consul_satya_vm_runtime_total_gc_runs 42
+# HELP consul_satya_vm_server_isLeader consul_satya_vm_server_isLeader
+# TYPE consul_satya_vm_server_isLeader gauge
+consul_satya_vm_server_isLeader 1
+# HELP consul_satya_vm_session_ttl_active consul_satya_vm_session_ttl_active
+# TYPE consul_satya_vm_session_ttl_active gauge
+consul_satya_vm_session_ttl_active 0
+# HELP consul_satya_vm_version consul_satya_vm_version
+# TYPE consul_satya_vm_version gauge
+consul_satya_vm_version{pre_release="",version="1.13.2"} 1
+# HELP consul_serf_coordinate_adjustment_ms consul_serf_coordinate_adjustment_ms
+# TYPE consul_serf_coordinate_adjustment_ms summary
+consul_serf_coordinate_adjustment_ms{network="lan",quantile="0.5"} 0.18447500467300415
+consul_serf_coordinate_adjustment_ms{network="lan",quantile="0.9"} 0.23558799922466278
+consul_serf_coordinate_adjustment_ms{network="lan",quantile="0.99"} 0.3543170094490051
+consul_serf_coordinate_adjustment_ms_sum{network="lan"} 127.64726796071045
+consul_serf_coordinate_adjustment_ms_count{network="lan"} 559
+consul_serf_coordinate_adjustment_ms{network="wan",quantile="0.5"} 0.11145199835300446
+consul_serf_coordinate_adjustment_ms{network="wan",quantile="0.9"} 0.12108899652957916
+consul_serf_coordinate_adjustment_ms{network="wan",quantile="0.99"} 0.12108899652957916
+consul_serf_coordinate_adjustment_ms_sum{network="wan"} 29.19709792546928
+consul_serf_coordinate_adjustment_ms_count{network="wan"} 112
+# HELP consul_serf_events consul_serf_events
+# TYPE consul_serf_events counter
+consul_serf_events{network="lan"} 2
+# HELP consul_serf_events_consul:new_leader consul_serf_events_consul:new_leader
+# TYPE consul_serf_events_consul:new_leader counter
+consul_serf_events_consul:new_leader{network="lan"} 2
+# HELP consul_serf_member_join consul_serf_member_join
+# TYPE consul_serf_member_join counter
+consul_serf_member_join{network="lan"} 5
+consul_serf_member_join{network="wan"} 5
+# HELP consul_serf_member_left consul_serf_member_left
+# TYPE consul_serf_member_left counter
+consul_serf_member_left{network="lan"} 2
+consul_serf_member_left{network="wan"} 2
+# HELP consul_serf_msgs_received consul_serf_msgs_received
+# TYPE consul_serf_msgs_received summary
+consul_serf_msgs_received{network="lan",quantile="0.5"} NaN
+consul_serf_msgs_received{network="lan",quantile="0.9"} NaN
+consul_serf_msgs_received{network="lan",quantile="0.99"} NaN
+consul_serf_msgs_received_sum{network="lan"} 1066
+consul_serf_msgs_received_count{network="lan"} 33
+consul_serf_msgs_received{network="wan",quantile="0.5"} NaN
+consul_serf_msgs_received{network="wan",quantile="0.9"} NaN
+consul_serf_msgs_received{network="wan",quantile="0.99"} NaN
+consul_serf_msgs_received_sum{network="wan"} 909
+consul_serf_msgs_received_count{network="wan"} 23
+# HELP consul_serf_msgs_sent consul_serf_msgs_sent
+# TYPE consul_serf_msgs_sent summary
+consul_serf_msgs_sent{network="lan",quantile="0.5"} NaN
+consul_serf_msgs_sent{network="lan",quantile="0.9"} NaN
+consul_serf_msgs_sent{network="lan",quantile="0.99"} NaN
+consul_serf_msgs_sent_sum{network="lan"} 1204
+consul_serf_msgs_sent_count{network="lan"} 36
+consul_serf_msgs_sent{network="wan",quantile="0.5"} NaN
+consul_serf_msgs_sent{network="wan",quantile="0.9"} NaN
+consul_serf_msgs_sent{network="wan",quantile="0.99"} NaN
+consul_serf_msgs_sent_sum{network="wan"} 792
+consul_serf_msgs_sent_count{network="wan"} 20
+# HELP consul_serf_queue_Event consul_serf_queue_Event
+# TYPE consul_serf_queue_Event summary
+consul_serf_queue_Event{network="lan",quantile="0.5"} NaN
+consul_serf_queue_Event{network="lan",quantile="0.9"} NaN
+consul_serf_queue_Event{network="lan",quantile="0.99"} NaN
+consul_serf_queue_Event_sum{network="lan"} 0
+consul_serf_queue_Event_count{network="lan"} 19
+consul_serf_queue_Event{network="wan",quantile="0.5"} NaN
+consul_serf_queue_Event{network="wan",quantile="0.9"} NaN
+consul_serf_queue_Event{network="wan",quantile="0.99"} NaN
+consul_serf_queue_Event_sum{network="wan"} 0
+consul_serf_queue_Event_count{network="wan"} 19
+# HELP consul_serf_queue_Intent consul_serf_queue_Intent
+# TYPE consul_serf_queue_Intent summary
+consul_serf_queue_Intent{network="lan",quantile="0.5"} NaN
+consul_serf_queue_Intent{network="lan",quantile="0.9"} NaN
+consul_serf_queue_Intent{network="lan",quantile="0.99"} NaN
+consul_serf_queue_Intent_sum{network="lan"} 0
+consul_serf_queue_Intent_count{network="lan"} 19
+consul_serf_queue_Intent{network="wan",quantile="0.5"} NaN
+consul_serf_queue_Intent{network="wan",quantile="0.9"} NaN
+consul_serf_queue_Intent{network="wan",quantile="0.99"} NaN
+consul_serf_queue_Intent_sum{network="wan"} 1
+consul_serf_queue_Intent_count{network="wan"} 19
+# HELP consul_serf_queue_Query consul_serf_queue_Query
+# TYPE consul_serf_queue_Query summary
+consul_serf_queue_Query{network="lan",quantile="0.5"} NaN
+consul_serf_queue_Query{network="lan",quantile="0.9"} NaN
+consul_serf_queue_Query{network="lan",quantile="0.99"} NaN
+consul_serf_queue_Query_sum{network="lan"} 0
+consul_serf_queue_Query_count{network="lan"} 19
+consul_serf_queue_Query{network="wan",quantile="0.5"} NaN
+consul_serf_queue_Query{network="wan",quantile="0.9"} NaN
+consul_serf_queue_Query{network="wan",quantile="0.99"} NaN
+consul_serf_queue_Query_sum{network="wan"} 0
+consul_serf_queue_Query_count{network="wan"} 19
+# HELP consul_serf_snapshot_appendLine consul_serf_snapshot_appendLine
+# TYPE consul_serf_snapshot_appendLine summary
+consul_serf_snapshot_appendLine{network="lan",quantile="0.5"} NaN
+consul_serf_snapshot_appendLine{network="lan",quantile="0.9"} NaN
+consul_serf_snapshot_appendLine{network="lan",quantile="0.99"} NaN
+consul_serf_snapshot_appendLine_sum{network="lan"} 0.3810300036566332
+consul_serf_snapshot_appendLine_count{network="lan"} 15
+consul_serf_snapshot_appendLine{network="wan",quantile="0.5"} NaN
+consul_serf_snapshot_appendLine{network="wan",quantile="0.9"} NaN
+consul_serf_snapshot_appendLine{network="wan",quantile="0.99"} NaN
+consul_serf_snapshot_appendLine_sum{network="wan"} 0.3907299981219694
+consul_serf_snapshot_appendLine_count{network="wan"} 13
+# HELP consul_server_isLeader Tracks if the server is a leader.
+# TYPE consul_server_isLeader gauge
+consul_server_isLeader 0
+# HELP consul_session_apply Measures the time spent applying a session update.
+# TYPE consul_session_apply summary
+consul_session_apply{quantile="0.5"} NaN
+consul_session_apply{quantile="0.9"} NaN
+consul_session_apply{quantile="0.99"} NaN
+consul_session_apply_sum 0
+consul_session_apply_count 0
+# HELP consul_session_renew Measures the time spent renewing a session.
+# TYPE consul_session_renew summary
+consul_session_renew{quantile="0.5"} NaN
+consul_session_renew{quantile="0.9"} NaN
+consul_session_renew{quantile="0.99"} NaN
+consul_session_renew_sum 0
+consul_session_renew_count 0
+# HELP consul_session_ttl_active Tracks the active number of sessions being tracked.
+# TYPE consul_session_ttl_active gauge
+consul_session_ttl_active 0
+# HELP consul_session_ttl_invalidate Measures the time spent invalidating an expired session.
+# TYPE consul_session_ttl_invalidate summary
+consul_session_ttl_invalidate{quantile="0.5"} NaN
+consul_session_ttl_invalidate{quantile="0.9"} NaN
+consul_session_ttl_invalidate{quantile="0.99"} NaN
+consul_session_ttl_invalidate_sum 0
+consul_session_ttl_invalidate_count 0
+# HELP consul_txn_apply Measures the time spent applying a transaction operation.
+# TYPE consul_txn_apply summary
+consul_txn_apply{quantile="0.5"} NaN
+consul_txn_apply{quantile="0.9"} NaN
+consul_txn_apply{quantile="0.99"} NaN
+consul_txn_apply_sum 0
+consul_txn_apply_count 0
+# HELP consul_txn_read Measures the time spent returning a read transaction.
+# TYPE consul_txn_read summary
+consul_txn_read{quantile="0.5"} NaN
+consul_txn_read{quantile="0.9"} NaN
+consul_txn_read{quantile="0.99"} NaN
+consul_txn_read_sum 0
+consul_txn_read_count 0
+# HELP consul_version Represents the Consul version.
+# TYPE consul_version gauge
+consul_version 0
+# HELP consul_xds_server_streams Measures the number of active xDS streams handled by the server split by protocol version.
+# TYPE consul_xds_server_streams gauge
+consul_xds_server_streams 0
+# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 5.3269e-05
+go_gc_duration_seconds{quantile="0.25"} 0.000130599
+go_gc_duration_seconds{quantile="0.5"} 0.000271028
+go_gc_duration_seconds{quantile="0.75"} 0.000362027
+go_gc_duration_seconds{quantile="1"} 0.002227924
+go_gc_duration_seconds_sum 0.01565053
+go_gc_duration_seconds_count 42
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 130
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.18.1"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 3.2922384e+07
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated, even if freed.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 7.39548784e+08
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 1.625099e+06
+# HELP go_memstats_frees_total Total number of frees.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 8.260339e+06
+# HELP go_memstats_gc_cpu_fraction The fraction of this program's available CPU time used by the GC since the program started.
+# TYPE go_memstats_gc_cpu_fraction gauge
+go_memstats_gc_cpu_fraction 7.265691723511656e-05
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 6.583e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and still in use.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 3.2922384e+07
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 2.3904256e+07
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use.
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 3.72736e+07
+# HELP go_memstats_heap_objects Number of allocated objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 122074
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 1.6113664e+07
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 6.1177856e+07
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 1.6713887082058973e+09
+# HELP go_memstats_lookups_total Total number of pointer lookups.
+# TYPE go_memstats_lookups_total counter
+go_memstats_lookups_total 0
+# HELP go_memstats_mallocs_total Total number of mallocs.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 8.382413e+06
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 9600
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 15600
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 375768
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 603840
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 4.5858448e+07
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 1.872245e+06
+# HELP go_memstats_stack_inuse_bytes Number of bytes in use by the stack allocator.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 1.736704e+06
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 1.736704e+06
+# HELP go_memstats_sys_bytes Number of bytes obtained from system.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 7.3614344e+07
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 14
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 20.7
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1024
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 33
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 1.22032128e+08
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.67138812259e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 8.48359424e+08
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes -1

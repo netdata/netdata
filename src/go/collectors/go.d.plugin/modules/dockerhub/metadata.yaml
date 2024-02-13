@@ -1,0 +1,190 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-dockerhub
+      plugin_name: go.d.plugin
+      module_name: dockerhub
+      monitored_instance:
+        name: Docker Hub repository
+        link: https://hub.docker.com/
+        icon_filename: docker.svg
+        categories:
+          - data-collection.containers-and-vms # FIXME
+      keywords:
+        - dockerhub
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector keeps track of DockerHub repositories statistics such as the number of stars, pulls, current status, and more.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/dockerhub.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: DockerHub URL.
+              default_value: https://hub.docker.com/v2/repositories
+              required: true
+            - name: repositories
+              description: List of repositories to monitor.
+              default_value: ""
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: "GET"
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: dockerhub
+                    repositories:
+                      - 'user1/name1'
+                      - 'user2/name2'
+                      - 'user3/name3'
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: dockerhub.pulls_sum
+              description: Pulls Summary
+              unit: pulls
+              chart_type: line
+              dimensions:
+                - name: sum
+            - name: dockerhub.pulls
+              description: Pulls
+              unit: pulls
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per repository
+            - name: dockerhub.pulls_rate
+              description: Pulls Rate
+              unit: pulls/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per repository
+            - name: dockerhub.stars
+              description: Stars
+              unit: stars
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per repository
+            - name: dockerhub.status
+              description: Current Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: a dimension per repository
+            - name: dockerhub.last_updated
+              description: Time Since Last Updated
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: a dimension per repository

@@ -1,0 +1,9 @@
+{
+  "error": {
+    "status": 404,
+    "text": "path not found",
+    "code": "PathNotFound"
+  },
+  "request_id": "f0d20aca461d043e787ebaa52f018cb2",
+  "href": "https://nginx.org/en/docs/http/ngx_http_api_module.html"
+}

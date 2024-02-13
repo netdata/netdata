@@ -1,0 +1,4 @@
+  datname   | confl_tablespace | confl_lock | confl_snapshot | confl_bufferpin | confl_deadlock
+------------+------------------+------------+----------------+-----------------+----------------
+ postgres   |                0 |          0 |              0 |               0 |              0
+ production |                0 |          0 |              0 |               0 |              0

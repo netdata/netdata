@@ -1,0 +1,27 @@
+{
+  "Date": "2022-12-30T22:19:29.572Z",
+  "Members": [
+    {
+      "Name": "mongodb-primary:27017",
+      "Self": true,
+      "State": 1,
+      "Health": 1,
+      "OptimeDate": "2022-12-30T22:19:25Z",
+      "LastHeartbeat": null,
+      "LastHeartbeatRecv": null,
+      "PingMs": null,
+      "Uptime": 192588
+    },
+    {
+      "Name": "mongodb-secondary:27017",
+      "Self": null,
+      "State": 2,
+      "Health": 1,
+      "OptimeDate": "2022-12-30T22:19:25Z",
+      "LastHeartbeat": "2022-12-30T22:19:28.214Z",
+      "LastHeartbeatRecv": "2022-12-30T22:19:28.213Z",
+      "PingMs": 0,
+      "Uptime": 192370
+    }
+  ]
+}

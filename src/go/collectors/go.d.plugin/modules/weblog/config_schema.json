@@ -1,0 +1,208 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/web_log job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "parser": {
+      "type": "object",
+      "properties": {
+        "log_type": {
+          "type": "string"
+        },
+        "csv_config": {
+          "type": "object",
+          "properties": {
+            "fields_per_record": {
+              "type": "integer"
+            },
+            "delimiter": {
+              "type": "string"
+            },
+            "trim_leading_space": {
+              "type": "boolean"
+            },
+            "format": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "fields_per_record",
+            "delimiter",
+            "trim_leading_space",
+            "format"
+          ]
+        },
+        "ltsv_config": {
+          "type": "object",
+          "properties": {
+            "field_delimiter": {
+              "type": "string"
+            },
+            "value_delimiter": {
+              "type": "string"
+            },
+            "mapping": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "field_delimiter",
+            "value_delimiter",
+            "mapping"
+          ]
+        },
+        "regexp_config": {
+          "type": "object",
+          "properties": {
+            "pattern": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "pattern"
+          ]
+        },
+        "json_config": {
+          "type": "object",
+          "properties": {
+            "mapping": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "mapping"
+          ]
+        }
+      },
+      "required": [
+        "log_type"
+      ]
+    },
+    "path": {
+      "type": "string"
+    },
+    "exclude_path": {
+      "type": "string"
+    },
+    "url_patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "match": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "match"
+        ]
+      }
+    },
+    "custom_fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "patterns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "match": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "match"
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "patterns"
+        ]
+      }
+    },
+    "custom_time_fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "histogram": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "histogram"
+        ]
+      }
+    },
+    "custom_numeric_fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "units": {
+            "type": "string"
+          },
+          "multiplier": {
+            "type": "integer"
+          },
+          "divisor": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "units",
+          "multiplier",
+          "divisor"
+        ]
+      }
+    },
+    "histogram": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "group_response_codes": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "path"
+  ]
+}

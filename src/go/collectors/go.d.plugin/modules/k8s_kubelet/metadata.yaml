@@ -1,0 +1,331 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-k8s_kubelet
+      plugin_name: go.d.plugin
+      module_name: k8s_kubelet
+      monitored_instance:
+        name: Kubelet
+        link: https://kubernetes.io/docs/concepts/overview/components/#kubelet
+        icon_filename: kubernetes.svg
+        categories:
+          - data-collection.kubernetes
+      keywords:
+        - kubelet
+        - kubernetes
+        - k8s
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Kubelet instances.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/k8s_kubelet.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:10255/metrics
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: "GET"
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:10255/metrics
+            - name: HTTPS with self-signed certificate
+              description: |
+                Do not validate server certificate chain and hostname.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:10250/metrics
+                    tls_skip_verify: yes
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: kubelet_node_config_error
+        metric: k8s_kubelet.kubelet_node_config_error
+        info: "the node is experiencing a configuration-related error (0: false, 1: true)"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
+      - name: kubelet_token_requests
+        metric: k8s_kubelet.kubelet_token_requests
+        info: "number of failed Token() requests to the alternate token source"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
+      - name: kubelet_token_requests
+        metric: k8s_kubelet.kubelet_token_requests
+        info: "number of failed Token() requests to the alternate token source"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
+      - name: kubelet_operations_error
+        metric: k8s_kubelet.kubelet_operations_errors
+        info: number of Docker or runtime operation errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
+      - name: kubelet_operations_error
+        metric: k8s_kubelet.kubelet_operations_errors
+        info: number of Docker or runtime operation errors
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: k8s_kubelet.apiserver_audit_requests_rejected
+              description: API Server Audit Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: rejected
+            - name: k8s_kubelet.apiserver_storage_data_key_generation_failures
+              description: API Server Failed Data Encryption Key(DEK) Generation Operations
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: k8s_kubelet.apiserver_storage_data_key_generation_latencies
+              description: API Server Latencies Of Data Encryption Key(DEK) Generation Operations
+              unit: observes/s
+              chart_type: stacked
+              dimensions:
+                - name: 5_µs
+                - name: 10_µs
+                - name: 20_µs
+                - name: 40_µs
+                - name: 80_µs
+                - name: 160_µs
+                - name: 320_µs
+                - name: 640_µs
+                - name: 1280_µs
+                - name: 2560_µs
+                - name: 5120_µs
+                - name: 10240_µs
+                - name: 20480_µs
+                - name: 40960_µs
+                - name: +Inf
+            - name: k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent
+              description: API Server Latencies Of Data Encryption Key(DEK) Generation Operations Percentage
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: 5_µs
+                - name: 10_µs
+                - name: 20_µs
+                - name: 40_µs
+                - name: 80_µs
+                - name: 160_µs
+                - name: 320_µs
+                - name: 640_µs
+                - name: 1280_µs
+                - name: 2560_µs
+                - name: 5120_µs
+                - name: 10240_µs
+                - name: 20480_µs
+                - name: 40960_µs
+                - name: +Inf
+            - name: k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses
+              description: API Server Storage Envelope Transformation Cache Misses
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: cache misses
+            - name: k8s_kubelet.kubelet_containers_running
+              description: Number Of Containers Currently Running
+              unit: running_containers
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: k8s_kubelet.kubelet_pods_running
+              description: Number Of Pods Currently Running
+              unit: running_pods
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: k8s_kubelet.kubelet_pods_log_filesystem_used_bytes
+              description: Bytes Used By The Pod Logs On The Filesystem
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per namespace and pod
+            - name: k8s_kubelet.kubelet_runtime_operations
+              description: Runtime Operations By Type
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per operation type
+            - name: k8s_kubelet.kubelet_runtime_operations_errors
+              description: Runtime Operations Errors By Type
+              unit: errors/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per operation type
+            - name: k8s_kubelet.kubelet_docker_operations
+              description: Docker Operations By Type
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per operation type
+            - name: k8s_kubelet.kubelet_docker_operations_errors
+              description: Docker Operations Errors By Type
+              unit: errors/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per operation type
+            - name: k8s_kubelet.kubelet_node_config_error
+              description: Node Configuration-Related Error
+              unit: bool
+              chart_type: line
+              dimensions:
+                - name: experiencing_error
+            - name: k8s_kubelet.kubelet_pleg_relist_interval_microseconds
+              description: PLEG Relisting Interval Summary
+              unit: microseconds
+              chart_type: stacked
+              dimensions:
+                - name: "0.5"
+                - name: "0.9"
+                - name: "0.99"
+            - name: k8s_kubelet.kubelet_pleg_relist_latency_microseconds
+              description: PLEG Relisting Latency Summary
+              unit: microseconds
+              chart_type: stacked
+              dimensions:
+                - name: "0.5"
+                - name: "0.9"
+                - name: "0.99"
+            - name: k8s_kubelet.kubelet_token_requests
+              description: Token() Requests To The Alternate Token Source
+              unit: token_requests/s
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: failed
+            - name: k8s_kubelet.rest_client_requests_by_code
+              description: HTTP Requests By Status Code
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per HTTP status code
+            - name: k8s_kubelet.rest_client_requests_by_method
+              description: HTTP Requests By Status Method
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per HTTP method
+        - name: volume manager
+          description: These metrics refer to the Volume Manager.
+          labels: []
+          metrics:
+            - name: k8s_kubelet.volume_manager_total_volumes
+              description: Volume Manager State Of The World
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: actual
+                - name: desired

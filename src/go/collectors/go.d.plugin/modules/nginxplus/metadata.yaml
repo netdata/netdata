@@ -1,0 +1,584 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-nginxplus
+      plugin_name: go.d.plugin
+      module_name: nginxplus
+      monitored_instance:
+        name: NGINX Plus
+        link: https://www.nginx.com/products/nginx/
+        icon_filename: nginxplus.svg
+        categories:
+          - data-collection.web-servers-and-web-proxies
+      keywords:
+        - nginxplus
+        - nginx
+        - web
+        - webserver
+        - http
+        - proxy
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors NGINX Plus servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Config API
+            description: |
+              To configure API, see the [official documentation](https://docs.nginx.com/nginx/admin-guide/monitoring/live-activity-monitoring/#configuring-the-api).
+      configuration:
+        file:
+          name: go.d/nginxplus.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: NGINX Plus with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1
+                
+                  - name: remote
+                    url: http://192.0.2.1
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: nginxplus.client_connections_rate
+              description: Client connections rate
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: accepted
+                - name: dropped
+            - name: nginxplus.client_connections_count
+              description: Client connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: idle
+            - name: nginxplus.ssl_handshakes_rate
+              description: SSL handshakes rate
+              unit: handshakes/s
+              chart_type: line
+              dimensions:
+                - name: successful
+                - name: failed
+            - name: nginxplus.ssl_handshakes_failures_rate
+              description: SSL handshakes failures rate
+              unit: failures/s
+              chart_type: stacked
+              dimensions:
+                - name: no_common_protocol
+                - name: no_common_cipher
+                - name: timeout
+                - name: peer_rejected_cert
+            - name: nginxplus.ssl_verification_errors_rate
+              description: SSL verification errors rate
+              unit: errors/s
+              chart_type: stacked
+              dimensions:
+                - name: no_cert
+                - name: expired_cert
+                - name: revoked_cert
+                - name: hostname_mismatch
+                - name: other
+            - name: nginxplus.ssl_session_reuses_rate
+              description: Session reuses during SSL handshak
+              unit: reuses/s
+              chart_type: line
+              dimensions:
+                - name: ssl_session
+            - name: nginxplus.http_requests_rate
+              description: HTTP requests rate
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: nginxplus.http_requests_count
+              description: HTTP requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: nginxplus.uptime
+              description: Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: http server zone
+          description: These metrics refer to the HTTP server zone.
+          labels:
+            - name: http_server_zone
+              description: HTTP server zone name
+          metrics:
+            - name: nginxplus.http_server_zone_requests_rate
+              description: HTTP Server Zone requests rate
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: nginxplus.http_server_zone_responses_per_code_class_rate
+              description: HTTP Server Zone responses rate
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: 1xx
+                - name: 2xx
+                - name: 3xx
+                - name: 4xx
+                - name: 5xx
+            - name: nginxplus.http_server_zone_traffic_rate
+              description: HTTP Server Zone traffic
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nginxplus.http_server_zone_requests_processing_count
+              description: HTTP Server Zone currently processed requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: processing
+            - name: nginxplus.http_server_zone_requests_discarded_rate
+              description: HTTP Server Zone requests discarded rate
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: discarded
+        - name: http location zone
+          description: These metrics refer to the HTTP location zone.
+          labels:
+            - name: http_location_zone
+              description: HTTP location zone name
+          metrics:
+            - name: nginxplus.http_location_zone_requests_rate
+              description: HTTP Location Zone requests rate
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: nginxplus.http_location_zone_responses_per_code_class_rate
+              description: HTTP Location Zone responses rate
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: 1xx
+                - name: 2xx
+                - name: 3xx
+                - name: 4xx
+                - name: 5xx
+            - name: nginxplus.http_location_zone_traffic_rate
+              description: HTTP Location Zone traffic rate
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nginxplus.http_location_zone_requests_discarded_rate
+              description: HTTP Location Zone requests discarded rate
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: discarded
+        - name: http upstream
+          description: These metrics refer to the HTTP upstream.
+          labels:
+            - name: http_upstream_name
+              description: HTTP upstream name
+            - name: http_upstream_zone
+              description: HTTP upstream zone name
+          metrics:
+            - name: nginxplus.http_upstream_peers_count
+              description: HTTP Upstream peers
+              unit: peers
+              chart_type: line
+              dimensions:
+                - name: peers
+            - name: nginxplus.http_upstream_zombies_count
+              description: HTTP Upstream zombies
+              unit: servers
+              chart_type: line
+              dimensions:
+                - name: zombie
+            - name: nginxplus.http_upstream_keepalive_count
+              description: HTTP Upstream keepalive
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: keepalive
+        - name: http upstream server
+          description: These metrics refer to the HTTP upstream server.
+          labels:
+            - name: http_upstream_name
+              description: HTTP upstream name
+            - name: http_upstream_zone
+              description: HTTP upstream zone name
+            - name: http_upstream_server_address
+              description: HTTP upstream server address (e.g. 127.0.0.1:81)
+            - name: http_upstream_server_name
+              description: HTTP upstream server name
+          metrics:
+            - name: nginxplus.http_upstream_server_requests_rate
+              description: HTTP Upstream Server requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: nginxplus.http_upstream_server_responses_per_code_class_rate
+              description: HTTP Upstream Server responses
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: 1xx
+                - name: 2xx
+                - name: 3xx
+                - name: 4xx
+                - name: 5xx
+            - name: nginxplus.http_upstream_server_response_time
+              description: HTTP Upstream Server average response time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: response
+            - name: nginxplus.http_upstream_server_response_header_time
+              description: HTTP Upstream Server average response header time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: header
+            - name: nginxplus.http_upstream_server_traffic_rate
+              description: HTTP Upstream Server traffic rate
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nginxplus.http_upstream_server_state
+              description: HTTP Upstream Server state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: draining
+                - name: unavail
+                - name: checking
+                - name: unhealthy
+            - name: nginxplus.http_upstream_server_connections_count
+              description: HTTP Upstream Server connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nginxplus.http_upstream_server_downtime
+              description: HTTP Upstream Server downtime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: downtime
+        - name: http cache
+          description: These metrics refer to the HTTP cache.
+          labels:
+            - name: http_cache
+              description: HTTP cache name
+          metrics:
+            - name: nginxplus.http_cache_state
+              description: HTTP Cache state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: warm
+                - name: cold
+            - name: nginxplus.http_cache_iops
+              description: HTTP Cache size
+              unit: responses/s
+              chart_type: line
+              dimensions:
+                - name: served
+                - name: written
+                - name: bypass
+            - name: nginxplus.http_cache_io
+              description: HTTP Cache IOPS
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: served
+                - name: written
+                - name: bypass
+            - name: nginxplus.http_cache_size
+              description: HTTP Cache IO
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+        - name: stream server zone
+          description: These metrics refer to the Stream server zone.
+          labels:
+            - name: stream_server_zone
+              description: Stream server zone name
+          metrics:
+            - name: nginxplus.stream_server_zone_connections_rate
+              description: Stream Server Zone connections rate
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: accepted
+            - name: nginxplus.stream_server_zone_sessions_per_code_class_rate
+              description: Stream Server Zone sessions rate
+              unit: sessions/s
+              chart_type: stacked
+              dimensions:
+                - name: 2xx
+                - name: 4xx
+                - name: 5xx
+            - name: nginxplus.stream_server_zone_traffic_rate
+              description: Stream Server Zone traffic rate
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nginxplus.stream_server_zone_connections_processing_count
+              description: Stream Server Zone connections processed
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: processing
+            - name: nginxplus.stream_server_zone_connections_discarded_rate
+              description: Stream Server Zone connections discarded
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: discarded
+        - name: stream upstream
+          description: These metrics refer to the Stream upstream.
+          labels:
+            - name: stream_upstream_name
+              description: Stream upstream name
+            - name: stream_upstream_zone
+              description: Stream upstream zone name
+          metrics:
+            - name: nginxplus.stream_upstream_peers_count
+              description: Stream Upstream peers
+              unit: peers
+              chart_type: line
+              dimensions:
+                - name: peers
+            - name: nginxplus.stream_upstream_zombies_count
+              description: Stream Upstream zombies
+              unit: servers
+              chart_type: line
+              dimensions:
+                - name: zombie
+        - name: stream upstream server
+          description: These metrics refer to the Stream upstream server.
+          labels:
+            - name: stream_upstream_name
+              description: Stream upstream name
+            - name: stream_upstream_zone
+              description: Stream upstream zone name
+            - name: stream_upstream_server_address
+              description: Stream upstream server address (e.g. 127.0.0.1:12346)
+            - name: stream_upstream_server_name
+              description: Stream upstream server name
+          metrics:
+            - name: nginxplus.stream_upstream_server_connections_rate
+              description: Stream Upstream Server connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: forwarded
+            - name: nginxplus.stream_upstream_server_traffic_rate
+              description: Stream Upstream Server traffic rate
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nginxplus.stream_upstream_server_state
+              description: Stream Upstream Server state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: unavail
+                - name: checking
+                - name: unhealthy
+            - name: nginxplus.stream_upstream_server_downtime
+              description: Stream Upstream Server downtime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: downtime
+            - name: nginxplus.stream_upstream_server_connections_count
+              description: Stream Upstream Server connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+        - name: resolver zone
+          description: These metrics refer to the resolver zone.
+          labels:
+            - name: resolver_zone
+              description: resolver zone name
+          metrics:
+            - name: nginxplus.resolver_zone_requests_rate
+              description: Resolver requests rate
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: name
+                - name: srv
+                - name: addr
+            - name: nginxplus.resolver_zone_responses_rate
+              description: Resolver responses rate
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: noerror
+                - name: formerr
+                - name: servfail
+                - name: nxdomain
+                - name: notimp
+                - name: refused
+                - name: timedout
+                - name: unknown

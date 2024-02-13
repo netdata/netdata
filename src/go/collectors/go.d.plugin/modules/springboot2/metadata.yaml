@@ -1,0 +1,239 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-springboot2
+      plugin_name: go.d.plugin
+      module_name: springboot2
+      monitored_instance:
+        name: Java Spring-boot 2 applications
+        link: ""
+        icon_filename: springboot.png
+        categories:
+          - data-collection.apm
+      keywords:
+        - springboot
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Java Spring-boot 2 applications that expose their metrics using the Spring Boot Actuator included in the Spring Boot library.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects applications running on localhost.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Configure Spring Boot Actuator
+            description: |
+              The Spring Boot Actuator exposes metrics over HTTP, to use it:
+
+              - add `org.springframework.boot:spring-boot-starter-actuator` and `io.micrometer:micrometer-registry-prometheus` to your application dependencies.
+              - set `management.endpoints.web.exposure.include=*` in your `application.properties`.
+
+              Refer to the [Spring Boot Actuator: Production-ready features](https://docs.spring.io/spring-boot/docs/current/reference/html/production-ready.html) and [81. Actuator - Part IX. ‘How-to’ guides](https://docs.spring.io/spring-boot/docs/current/reference/html/howto-actuator.html) for more information.
+      configuration:
+        file:
+          name: go.d/springboot2.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: ""
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080/actuator/prometheus
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080/actuator/prometheus
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: |
+                Do not validate server certificate chain and hostname.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:8080/actuator/prometheus
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8080/actuator/prometheus
+                
+                  - name: remote
+                    url: http://192.0.2.1:8080/actuator/prometheus
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: springboot2.response_codes
+              description: Response Codes
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: 1xx
+                - name: 2xx
+                - name: 3xx
+                - name: 4xx
+                - name: 5xx
+            - name: springboot2.thread
+              description: Threads
+              unit: threads
+              chart_type: area
+              dimensions:
+                - name: daemon
+                - name: total
+            - name: springboot2.heap
+              description: Overview
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: eden
+                - name: survivor
+                - name: old
+            - name: springboot2.heap_eden
+              description: Eden Space
+              unit: B
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: commited
+            - name: springboot2.heap_survivor
+              description: Survivor Space
+              unit: B
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: commited
+            - name: springboot2.heap_old
+              description: Old Space
+              unit: B
+              chart_type: area
+              dimensions:
+                - name: used
+                - name: commited
+            - name: springboot2.uptime
+              description: TThe uptime of the Java virtual machine
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime

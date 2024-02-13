@@ -1,0 +1,277 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-pika
+      plugin_name: go.d.plugin
+      module_name: pika
+      monitored_instance:
+        name: Pika
+        link: https://github.com/OpenAtomFoundation/pika
+        icon_filename: pika.svg
+        categories:
+          - data-collection.database-servers
+      keywords:
+        - pika
+        - databases
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Pika servers.
+          
+          It collects information and statistics about the server executing the following commands:
+          
+          - [`INFO ALL`](https://github.com/OpenAtomFoundation/pika/wiki/pika-info%E4%BF%A1%E6%81%AF%E8%AF%B4%E6%98%8E)
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/pika.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: Pika server address.
+              default_value: redis://@localhost:9221
+              required: true
+              details: |
+                There are two connection types: by tcp socket and by unix socket.
+                
+                - Tcp connection: `redis://<user>:<password>@<host>:<port>/<db_number>`
+                - Unix connection: `unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>`
+            - name: timeout
+              description: Dial (establishing new connections), read (socket reads) and write (socket writes) timeout in seconds.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username used for authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password used for authentication.
+              default_value: ""
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certificate authority that client use when verifying server certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client tls certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client tls key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: TCP socket
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 'redis://@localhost:9221'
+            - name: TCP socket with password
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 'redis://:password@127.0.0.1:9221'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 'redis://:password@127.0.0.1:9221'
+                
+                  - name: remote
+                    address: 'redis://user:password@203.0.113.0:9221'
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: pika.connections
+              description: Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: accepted
+            - name: pika.clients
+              description: Clients
+              unit: clients
+              chart_type: line
+              dimensions:
+                - name: connected
+            - name: pika.memory
+              description: Memory usage
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: pika.connected_replicas
+              description: Connected replicas
+              unit: replicas
+              chart_type: line
+              dimensions:
+                - name: connected
+            - name: pika.commands
+              description: Processed commands
+              unit: commands/s
+              chart_type: line
+              dimensions:
+                - name: processed
+            - name: pika.commands_calls
+              description: Calls per command
+              unit: calls/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per command
+            - name: pika.database_strings_keys
+              description: Strings type keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_strings_expires_keys
+              description: Strings type expires keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_strings_invalid_keys
+              description: Strings type invalid keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_hashes_keys
+              description: Hashes type keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_hashes_expires_keys
+              description: Hashes type expires keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_hashes_invalid_keys
+              description: Hashes type invalid keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_lists_keys
+              description: Lists type keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_lists_expires_keys
+              description: Lists type expires keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_lists_invalid_keys
+              description: Lists type invalid keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_zsets_keys
+              description: Zsets type keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_zsets_expires_keys
+              description: Zsets type expires keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_zsets_invalid_keys
+              description: Zsets type invalid keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_sets_keys
+              description: Sets type keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_sets_expires_keys
+              description: Sets type expires keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.database_sets_invalid_keys
+              description: Sets invalid keys per database
+              unit: keys
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per database
+            - name: pika.uptime
+              description: Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime

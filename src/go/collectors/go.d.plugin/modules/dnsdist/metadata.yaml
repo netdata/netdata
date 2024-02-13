@@ -1,0 +1,259 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-dnsdist
+      plugin_name: go.d.plugin
+      module_name: dnsdist
+      monitored_instance:
+        name: DNSdist
+        link: https://dnsdist.org/
+        icon_filename: network-wired.svg
+        categories:
+          - data-collection.dns-and-dhcp-servers
+      keywords:
+        - dnsdist
+        - dns
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors DNSDist servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable DNSdist built-in Webserver
+            description: |
+              For collecting metrics via HTTP, you need to [enable the built-in webserver](https://dnsdist.org/guides/webserver.html).
+      configuration:
+        file:
+          name: go.d/dnsdist.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8083
+              required: true
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client tls certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client tls key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8083
+                    headers:
+                      X-API-Key: your-api-key # static pre-shared authentication key for access to the REST API (api-key).
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8083
+                    headers:
+                      X-API-Key: 'your-api-key' # static pre-shared authentication key for access to the REST API (api-key).
+                
+                  - name: remote
+                    url: http://203.0.113.0:8083
+                    headers:
+                      X-API-Key: 'your-api-key'
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: dnsdist.queries
+              description: Client queries received
+              unit: queries/s
+              chart_type: line
+              dimensions:
+                - name: all
+                - name: recursive
+                - name: empty
+            - name: dnsdist.queries_dropped
+              description: Client queries dropped
+              unit: queries/s
+              chart_type: line
+              dimensions:
+                - name: rule_drop
+                - name: dynamic_blocked
+                - name: no_policy
+                - name: non_queries
+            - name: dnsdist.packets_dropped
+              description: Packets dropped
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: acl
+            - name: dnsdist.answers
+              description: Answers statistics
+              unit: answers/s
+              chart_type: line
+              dimensions:
+                - name: self_answered
+                - name: nxdomain
+                - name: refused
+                - name: trunc_failures
+            - name: dnsdist.backend_responses
+              description: Backend responses
+              unit: responses/s
+              chart_type: line
+              dimensions:
+                - name: responses
+            - name: dnsdist.backend_commerrors
+              description: Backend communication errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: send_errors
+            - name: dnsdist.backend_errors
+              description: Backend error responses
+              unit: responses/s
+              chart_type: line
+              dimensions:
+                - name: timeouts
+                - name: servfail
+                - name: non_compliant
+            - name: dnsdist.cache
+              description: Cache performance
+              unit: answers/s
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: dnsdist.servercpu
+              description: DNSdist server CPU utilization
+              unit: ms/s
+              chart_type: stacked
+              dimensions:
+                - name: system_state
+                - name: user_state
+            - name: dnsdist.servermem
+              description: DNSdist server memory utilization
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: memory_usage
+            - name: dnsdist.query_latency
+              description: Query latency
+              unit: queries/s
+              chart_type: stacked
+              dimensions:
+                - name: 1ms
+                - name: 10ms
+                - name: 50ms
+                - name: 100ms
+                - name: 1sec
+                - name: slow
+            - name: dnsdist.query_latency_avg
+              description: Average latency for the last N queries
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: "100"
+                - name: 1k
+                - name: 10k
+                - name: 1000k

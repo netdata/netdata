@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="/bind9.xsl"?>
+<statistics version="3.8">
+    <server>
+        <boot-time>2018-04-26T08:27:05.582Z</boot-time>
+        <config-time>2019-02-06T12:25:35.919Z</config-time>
+        <current-time>2019-02-06T12:29:31.168Z</current-time>
+        <version>9.11.3-1~bpo9+1-Debian</version>
+        <counters type="opcode">
+            <counter name="QUERY">36823356081</counter>
+            <counter name="IQUERY">199</counter>
+            <counter name="STATUS">35585</counter>
+            <counter name="RESERVED3">2</counter>
+            <counter name="NOTIFY">390521</counter>
+            <counter name="UPDATE">18839</counter>
+            <counter name="RESERVED6">7401</counter>
+            <counter name="RESERVED7">0</counter>
+            <counter name="RESERVED8">0</counter>
+            <counter name="RESERVED9">0</counter>
+            <counter name="RESERVED10">5</counter>
+            <counter name="RESERVED11">3</counter>
+            <counter name="RESERVED12">1</counter>
+            <counter name="RESERVED13">8</counter>
+            <counter name="RESERVED14">0</counter>
+            <counter name="RESERVED15">0</counter>
+        </counters>
+        <counters type="rcode">
+            <counter name="NOERROR">30124773524</counter>
+            <counter name="FORMERR">0</counter>
+            <counter name="SERVFAIL">219790234</counter>
+            <counter name="NXDOMAIN">5911582433</counter>
+            <counter name="NOTIMP">0</counter>
+            <counter name="REFUSED">225996286</counter>
+            <counter name="YXDOMAIN">0</counter>
+            <counter name="YXRRSET">0</counter>
+            <counter name="NXRRSET">0</counter>
+            <counter name="NOTAUTH">0</counter>
+            <counter name="NOTZONE">0</counter>
+            <counter name="RESERVED11">0</counter>
+            <counter name="RESERVED12">0</counter>
+            <counter name="RESERVED13">0</counter>
+            <counter name="RESERVED14">0</counter>
+            <counter name="RESERVED15">0</counter>
+            <counter name="BADVERS">0</counter>
+            <counter name="17">0</counter>
+            <counter name="18">0</counter>
+            <counter name="19">0</counter>
+            <counter name="20">0</counter>
+            <counter name="21">0</counter>
+            <counter name="22">0</counter>
+            <counter name="BADCOOKIE">0</counter>
+        </counters>
+        <counters type="qtype">
+            <counter name="RESERVED0">13705</counter>
+            <counter name="A">32377004350</counter>
+            <counter name="NS">5545011</counter>
+            <counter name="CNAME">535141</counter>
+            <counter name="SOA">3863889</counter>
+            <counter name="MG">4</counter>
+            <counter name="NULL">3606</counter>
+            <counter name="PTR">694347710</counter>
+            <counter name="HINFO">9</counter>
+            <counter name="MX">1484497</counter>
+            <counter name="TXT">100195931</counter>
+            <counter name="X25">2</counter>
+            <counter name="AAAA">3309600766</counter>
+            <counter name="LOC">52</counter>
+            <counter name="SRV">27709732</counter>
+            <counter name="NAPTR">109998</counter>
+            <counter name="A6">539773</counter>
+            <counter name="DNAME">1</counter>
+            <counter name="DS">1688561</counter>
+            <counter name="RRSIG">25193</counter>
+            <counter name="NSEC">81</counter>
+            <counter name="DNSKEY">143600</counter>
+            <counter name="TLSA">299</counter>
+            <counter name="SPF">2887</counter>
+            <counter name="EUI64">627</counter>
+            <counter name="TYPE115">285</counter>
+            <counter name="TYPE127">1</counter>
+            <counter name="TYPE223">2</counter>
+            <counter name="IXFR">33</counter>
+            <counter name="AXFR">105</counter>
+            <counter name="MAILB">42</counter>
+            <counter name="MAILA">44</counter>
+            <counter name="ANY">298567781</counter>
+            <counter name="DLV">37712</counter>
+            <counter name="Others">74007</counter>
+        </counters>
+        <counters type="nsstat">
+            <counter name="Requestv4">36823884979</counter>
+            <counter name="Requestv6">156</counter>
+            <counter name="ReqEdns0">532586114</counter>
+            <counter name="ReqBadEDNSVer">450</counter>
+            <counter name="ReqTSIG">0</counter>
+            <counter name="ReqSIG0">0</counter>
+            <counter name="ReqBadSIG">0</counter>
+            <counter name="ReqTCP">4241537</counter>
+            <counter name="AuthQryRej">148159</counter>
+            <counter name="RecQryRej">225832466</counter>
+            <counter name="XfrRej">97</counter>
+            <counter name="UpdateRej">15661</counter>
+            <counter name="Response">36482142477</counter>
+            <counter name="TruncatedResp">25899017</counter>
+            <counter name="RespEDNS0">528451140</counter>
+            <counter name="RespTSIG">0</counter>
+            <counter name="RespSIG0">0</counter>
+            <counter name="QrySuccess">28810069822</counter>
+            <counter name="QryAuthAns">440885288</counter>
+            <counter name="QryNoauthAns">35593104164</counter>
+            <counter name="QryReferral">1152178</counter>
+            <counter name="QryNxrrset">1311185019</counter>
+            <counter name="QrySERVFAIL">219790234</counter>
+            <counter name="QryFORMERR">8</counter>
+            <counter name="QryNXDOMAIN">5911582433</counter>
+            <counter name="QryRecursion">3671792792</counter>
+            <counter name="QryDuplicate">289518897</counter>
+            <counter name="QryDropped">52215943</counter>
+            <counter name="QryFailure">225980711</counter>
+            <counter name="XfrReqDone">0</counter>
+            <counter name="UpdateReqFwd">0</counter>
+            <counter name="UpdateRespFwd">0</counter>
+            <counter name="UpdateFwdFail">0</counter>
+            <counter name="UpdateDone">0</counter>
+            <counter name="UpdateFail">0</counter>
+            <counter name="UpdateBadPrereq">0</counter>
+            <counter name="RecursClients">64</counter>
+            <counter name="DNS64">0</counter>
+            <counter name="RateDropped">230</counter>
+            <counter name="RateSlipped">0</counter>
+            <counter name="RPZRewrites">0</counter>
+            <counter name="QryUDP">36511992002</counter>
+            <counter name="QryTCP">4233061</counter>
+            <counter name="NSIDOpt">81</counter>
+            <counter name="ExpireOpt">195</counter>
+            <counter name="OtherOpt">3431439</counter>
+            <counter name="CookieIn">1220424</counter>
+            <counter name="CookieNew">1061071</counter>
+            <counter name="CookieBadSize">0</counter>
+            <counter name="CookieBadTime">0</counter>
+            <counter name="CookieNoMatch">34013</counter>
+            <counter name="CookieMatch">125340</counter>
+            <counter name="ECSOpt">8743959</counter>
+            <counter name="QryNXRedir">0</counter>
+            <counter name="QryNXRedirRLookup">0</counter>
+            <counter name="QryBADCOOKIE">0</counter>
+            <counter name="KeyTagOpt">0</counter>
+        </counters>
+        <counters type="zonestat">
+            <counter name="NotifyOutv4">992895</counter>
+            <counter name="NotifyOutv6">691254</counter>
+            <counter name="NotifyInv4">376354</counter>
+            <counter name="NotifyInv6">0</counter>
+            <counter name="NotifyRej">1</counter>
+            <counter name="SOAOutv4">130105</counter>
+            <counter name="SOAOutv6">0</counter>
+            <counter name="AXFRReqv4">2047</counter>
+            <counter name="AXFRReqv6">0</counter>
+            <counter name="IXFRReqv4">22814</counter>
+            <counter name="IXFRReqv6">0</counter>
+            <counter name="XfrSuccess">50</counter>
+            <counter name="XfrFail">25155</counter>
+        </counters>
+        <counters type="resstat">
+            <counter name="Mismatch">20059475</counter>
+            <counter name="QuerySockFail">341338</counter>
+            <counter name="QueryCurUDP">58</counter>
+            <counter name="QueryCurTCP">1</counter>
+        </counters>
+    </server>
+    <views>
+        <view name="_default">
+            <counters type="resqtype">
+                <counter name="RESERVED0">19</counter>
+                <counter name="A">3678445415</counter>
+                <counter name="NS">676773</counter>
+                <counter name="CNAME">38213966</counter>
+                <counter name="SOA">1327966</counter>
+                <counter name="NULL">3554</counter>
+                <counter name="PTR">208337408</counter>
+                <counter name="HINFO">1</counter>
+                <counter name="MX">1576150</counter>
+                <counter name="TXT">43650696</counter>
+                <counter name="RP">134</counter>
+                <counter name="AFSDB">5</counter>
+                <counter name="AAAA">818803359</counter>
+                <counter name="LOC">21</counter>
+                <counter name="SRV">3855156</counter>
+                <counter name="NAPTR">30706</counter>
+                <counter name="A6">558874</counter>
+                <counter name="DNAME">6</counter>
+                <counter name="DS">974240</counter>
+                <counter name="RRSIG">191877</counter>
+                <counter name="NSEC">53712</counter>
+                <counter name="DNSKEY">182399</counter>
+                <counter name="NSEC3PARAM">995</counter>
+                <counter name="CDS">251</counter>
+                <counter name="SPF">16563</counter>
+                <counter name="EUI64">2087</counter>
+                <counter name="TYPE115">112</counter>
+                <counter name="TYPE127">2</counter>
+                <counter name="ANY">5149916</counter>
+                <counter name="DLV">20468</counter>
+                <counter name="Others">813</counter>
+            </counters>
+            <counters type="resstats">
+                <counter name="Queryv4">4509791268</counter>
+                <counter name="Queryv6">292282376</counter>
+                <counter name="Responsev4">4175093103</counter>
+                <counter name="Responsev6">152</counter>
+                <counter name="NXDOMAIN">1247746765</counter>
+                <counter name="SERVFAIL">6533579</counter>
+                <counter name="FORMERR">3831796</counter>
+                <counter name="OtherError">1464741</counter>
+                <counter name="EDNS0Fail">3987571</counter>
+                <counter name="Mismatch">0</counter>
+                <counter name="Truncated">14028716</counter>
+                <counter name="Lame">1979599</counter>
+                <counter name="Retry">784916992</counter>
+                <counter name="QueryAbort">0</counter>
+                <counter name="QuerySockFail">0</counter>
+                <counter name="QueryCurUDP">0</counter>
+                <counter name="QueryCurTCP">0</counter>
+                <counter name="QueryTimeout">336165169</counter>
+                <counter name="GlueFetchv4">110749701</counter>
+                <counter name="GlueFetchv6">121268854</counter>
+                <counter name="GlueFetchv4Fail">3964627</counter>
+                <counter name="GlueFetchv6Fail">91852240</counter>
+                <counter name="ValAttempt">0</counter>
+                <counter name="ValOk">0</counter>
+                <counter name="ValNegOk">0</counter>
+                <counter name="ValFail">0</counter>
+                <counter name="QryRTT10">629577</counter>
+                <counter name="QryRTT100">2087797539</counter>
+                <counter name="QryRTT500">2075608518</counter>
+                <counter name="QryRTT800">2712733</counter>
+                <counter name="QryRTT1600">455849</counter>
+                <counter name="QryRTT1600+">27681</counter>
+                <counter name="NumFetch">62</counter>
+                <counter name="BucketSize">31</counter>
+                <counter name="REFUSED">106782830</counter>
+                <counter name="ClientCookieOut">3795901994</counter>
+                <counter name="ServerCookieOut">365308714</counter>
+                <counter name="CookieIn">298556974</counter>
+                <counter name="CookieClientOk">298237641</counter>
+                <counter name="BadEDNSVersion">0</counter>
+                <counter name="BadCookieRcode">15399</counter>
+                <counter name="ZoneQuota">0</counter>
+                <counter name="ServerQuota">0</counter>
+                <counter name="NextItem">1790135</counter>
+            </counters>
+            <cache name="_default">
+                <rrset>
+                    <name>A</name>
+                    <counter>192185</counter>
+                </rrset>
+                <rrset>
+                    <name>NS</name>
+                    <counter>326554</counter>
+                </rrset>
+                <rrset>
+                    <name>CNAME</name>
+                    <counter>41900</counter>
+                </rrset>
+                <rrset>
+                    <name>SOA</name>
+                    <counter>15</counter>
+                </rrset>
+                <rrset>
+                    <name>PTR</name>
+                    <counter>82398</counter>
+                </rrset>
+                <rrset>
+                    <name>MX</name>
+                    <counter>80</counter>
+                </rrset>
+                <rrset>
+                    <name>TXT</name>
+                    <counter>11952</counter>
+                </rrset>
+                <rrset>
+                    <name>AAAA</name>
+                    <counter>16361</counter>
+                </rrset>
+                <rrset>
+                    <name>SRV</name>
+                    <counter>55</counter>
+                </rrset>
+                <rrset>
+                    <name>NAPTR</name>
+                    <counter>1</counter>
+                </rrset>
+                <rrset>
+                    <name>DNAME</name>
+                    <counter>1</counter>
+                </rrset>
+                <rrset>
+                    <name>DS</name>
+                    <counter>3760</counter>
+                </rrset>
+                <rrset>
+                    <name>RRSIG</name>
+                    <counter>28542</counter>
+                </rrset>
+                <rrset>
+                    <name>NSEC</name>
+                    <counter>19250</counter>
+                </rrset>
+                <rrset>
+                    <name>DNSKEY</name>
+                    <counter>57</counter>
+                </rrset>
+                <rrset>
+                    <name>NSEC3PARAM</name>
+                    <counter>1</counter>
+                </rrset>
+                <rrset>
+                    <name>SPF</name>
+                    <counter>4</counter>
+                </rrset>
+                <rrset>
+                    <name>Others</name>
+                    <counter>2</counter>
+                </rrset>
+                <rrset>
+                    <name>!A</name>
+                    <counter>287</counter>
+                </rrset>
+                <rrset>
+                    <name>!NS</name>
+                    <counter>42</counter>
+                </rrset>
+                <rrset>
+                    <name>!SOA</name>
+                    <counter>10</counter>
+                </rrset>
+                <rrset>
+                    <name>!PTR</name>
+                    <counter>6</counter>
+                </rrset>
+                <rrset>
+                    <name>!MX</name>
+                    <counter>2</counter>
+                </rrset>
+                <rrset>
+                    <name>!TXT</name>
+                    <counter>280</counter>
+                </rrset>
+                <rrset>
+                    <name>!AAAA</name>
+                    <counter>27381</counter>
+                </rrset>
+                <rrset>
+                    <name>!SRV</name>
+                    <counter>81</counter>
+                </rrset>
+                <rrset>
+                    <name>!NAPTR</name>
+                    <counter>2</counter>
+                </rrset>
+                <rrset>
+                    <name>!A6</name>
+                    <counter>38</counter>
+                </rrset>
+                <rrset>
+                    <name>!DS</name>
+                    <counter>20</counter>
+                </rrset>
+                <rrset>
+                    <name>NXDOMAIN</name>
+                    <counter>315286</counter>
+                </rrset>
+            </cache>
+            <counters type="adbstat">
+                <counter name="nentries">2039</counter>
+                <counter name="entriescnt">14535</counter>
+                <counter name="nnames">2039</counter>
+                <counter name="namescnt">12286</counter>
+            </counters>
+            <counters type="cachestats">
+                <counter name="CacheHits">405816752908</counter>
+                <counter name="CacheMisses">127371</counter>
+                <counter name="QueryHits">171876840110</counter>
+                <counter name="QueryMisses">5120854081</counter>
+                <counter name="DeleteLRU">0</counter>
+                <counter name="DeleteTTL">1675820766</counter>
+                <counter name="CacheNodes">1000477</counter>
+                <counter name="CacheBuckets">532479</counter>
+                <counter name="TreeMemTotal">1440529356195</counter>
+                <counter name="TreeMemInUse">642752571</counter>
+                <counter name="TreeMemMax">820437431</counter>
+                <counter name="HeapMemTotal">455163904</counter>
+                <counter name="HeapMemInUse">10855424</counter>
+                <counter name="HeapMemMax">11527168</counter>
+            </counters>
+        </view>
+        <view name="_bind">
+            <counters type="resqtype" />
+            <counters type="resstats">
+                <counter name="Queryv4">0</counter>
+                <counter name="Queryv6">0</counter>
+                <counter name="Responsev4">0</counter>
+                <counter name="Responsev6">0</counter>
+                <counter name="NXDOMAIN">0</counter>
+                <counter name="SERVFAIL">0</counter>
+                <counter name="FORMERR">0</counter>
+                <counter name="OtherError">0</counter>
+                <counter name="EDNS0Fail">0</counter>
+                <counter name="Mismatch">0</counter>
+                <counter name="Truncated">0</counter>
+                <counter name="Lame">0</counter>
+                <counter name="Retry">0</counter>
+                <counter name="QueryAbort">0</counter>
+                <counter name="QuerySockFail">0</counter>
+                <counter name="QueryCurUDP">0</counter>
+                <counter name="QueryCurTCP">0</counter>
+                <counter name="QueryTimeout">0</counter>
+                <counter name="GlueFetchv4">0</counter>
+                <counter name="GlueFetchv6">0</counter>
+                <counter name="GlueFetchv4Fail">0</counter>
+                <counter name="GlueFetchv6Fail">0</counter>
+                <counter name="ValAttempt">0</counter>
+                <counter name="ValOk">0</counter>
+                <counter name="ValNegOk">0</counter>
+                <counter name="ValFail">0</counter>
+                <counter name="QryRTT10">0</counter>
+                <counter name="QryRTT100">0</counter>
+                <counter name="QryRTT500">0</counter>
+                <counter name="QryRTT800">0</counter>
+                <counter name="QryRTT1600">0</counter>
+                <counter name="QryRTT1600+">0</counter>
+                <counter name="NumFetch">0</counter>
+                <counter name="BucketSize">31</counter>
+                <counter name="REFUSED">0</counter>
+                <counter name="ClientCookieOut">0</counter>
+                <counter name="ServerCookieOut">0</counter>
+                <counter name="CookieIn">0</counter>
+                <counter name="CookieClientOk">0</counter>
+                <counter name="BadEDNSVersion">0</counter>
+                <counter name="BadCookieRcode">0</counter>
+                <counter name="ZoneQuota">0</counter>
+                <counter name="ServerQuota">0</counter>
+                <counter name="NextItem">0</counter>
+            </counters>
+            <cache name="_bind" />
+            <counters type="adbstat">
+                <counter name="nentries">1021</counter>
+                <counter name="entriescnt">0</counter>
+                <counter name="nnames">1021</counter>
+                <counter name="namescnt">0</counter>
+            </counters>
+            <counters type="cachestats">
+                <counter name="CacheHits">0</counter>
+                <counter name="CacheMisses">509</counter>
+                <counter name="QueryHits">0</counter>
+                <counter name="QueryMisses">509</counter>
+                <counter name="DeleteLRU">0</counter>
+                <counter name="DeleteTTL">0</counter>
+                <counter name="CacheNodes">0</counter>
+                <counter name="CacheBuckets">64</counter>
+                <counter name="TreeMemTotal">287792</counter>
+                <counter name="TreeMemInUse">29952</counter>
+                <counter name="TreeMemMax">29952</counter>
+                <counter name="HeapMemTotal">262144</counter>
+                <counter name="HeapMemInUse">1024</counter>
+                <counter name="HeapMemMax">1024</counter>
+            </counters>
+        </view>
+    </views>
+</statistics>

@@ -1,0 +1,3 @@
+# HELP test_gauge_metric_1 \n			First line.\n			Second line.\n
+# TYPE test_gauge_metric_1 gauge
+test_gauge_metric_1{label1="value1"} 11

@@ -1,0 +1,161 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-supervisord
+      plugin_name: go.d.plugin
+      module_name: supervisord
+      monitored_instance:
+        name: Supervisor
+        link: http://supervisord.org/
+        icon_filename: supervisord.png
+        categories:
+          - data-collection.processes-and-system-services
+      keywords:
+        - supervisor
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Supervisor instances.
+          
+          It can collect metrics from:
+          
+          - [unix socket](http://supervisord.org/configuration.html?highlight=unix_http_server#unix-http-server-section-values)
+          - [internal http server](http://supervisord.org/configuration.html?highlight=unix_http_server#inet-http-server-section-settings)
+          
+          Used methods:
+          
+          - [`supervisor.getAllProcessInfo`](http://supervisord.org/api.html#supervisor.rpcinterface.SupervisorNamespaceRPCInterface.getAllProcessInfo)
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/supervisord.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:9001/RPC2
+              required: true
+            - name: timeout
+              description: System bus requests timeout.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: HTTP
+              description: Collect metrics via HTTP.
+              config: |
+                jobs:
+                  - name: local
+                    url: 'http://127.0.0.1:9001/RPC2'
+            - name: Socket
+              description: Collect metrics via Unix socket.
+              config: |
+                - name: local
+                  url: 'unix:///run/supervisor.sock'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collect metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: 'http://127.0.0.1:9001/RPC2'
+                
+                  - name: remote
+                    url: 'http://192.0.2.1:9001/RPC2'
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: supervisord.summary_processes
+              description: Processes
+              unit: processes
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: non-running
+        - name: process group
+          description: These metrics refer to the process group.
+          labels: []
+          metrics:
+            - name: supervisord.processes
+              description: Processes
+              unit: processes
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: non-running
+            - name: supervisord.process_state_code
+              description: State code
+              unit: code
+              chart_type: line
+              dimensions:
+                - name: a dimension per process
+            - name: supervisord.process_exit_status
+              description: Exit status
+              unit: exit status
+              chart_type: line
+              dimensions:
+                - name: a dimension per process
+            - name: supervisord.process_uptime
+              description: Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: a dimension per process
+            - name: supervisord.process_downtime
+              description: Downtime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: a dimension per process

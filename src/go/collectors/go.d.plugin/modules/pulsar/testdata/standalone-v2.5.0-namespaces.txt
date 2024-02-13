@@ -1,0 +1,500 @@
+# TYPE zk_read_latency summary
+zk_read_latency{cluster="standalone",quantile="0.5"} NaN
+zk_read_latency{cluster="standalone",quantile="0.75"} NaN
+zk_read_latency{cluster="standalone",quantile="0.95"} NaN
+zk_read_latency{cluster="standalone",quantile="0.99"} NaN
+zk_read_latency{cluster="standalone",quantile="0.999"} NaN
+zk_read_latency{cluster="standalone",quantile="0.9999"} NaN
+zk_read_latency_count{cluster="standalone"} 0.0
+zk_read_latency_sum{cluster="standalone"} 0.0
+# TYPE zk_write_latency summary
+zk_write_latency{cluster="standalone",quantile="0.5"} NaN
+zk_write_latency{cluster="standalone",quantile="0.75"} NaN
+zk_write_latency{cluster="standalone",quantile="0.95"} NaN
+zk_write_latency{cluster="standalone",quantile="0.99"} NaN
+zk_write_latency{cluster="standalone",quantile="0.999"} NaN
+zk_write_latency{cluster="standalone",quantile="0.9999"} NaN
+zk_write_latency_count{cluster="standalone"} 0.0
+zk_write_latency_sum{cluster="standalone"} 0.0
+# TYPE jvm_memory_direct_bytes_max gauge
+jvm_memory_direct_bytes_max{cluster="standalone"} 4.294967296E9
+# TYPE log4j2_appender_total counter
+log4j2_appender_total{cluster="standalone",level="debug"} 0.0
+log4j2_appender_total{cluster="standalone",level="warn"} 68.0
+log4j2_appender_total{cluster="standalone",level="trace"} 0.0
+log4j2_appender_total{cluster="standalone",level="error"} 0.0
+log4j2_appender_total{cluster="standalone",level="fatal"} 0.0
+log4j2_appender_total{cluster="standalone",level="info"} 3773.0
+# TYPE jvm_threads_current gauge
+jvm_threads_current{cluster="standalone"} 293.0
+# TYPE jvm_threads_daemon gauge
+jvm_threads_daemon{cluster="standalone"} 49.0
+# TYPE jvm_threads_peak gauge
+jvm_threads_peak{cluster="standalone"} 295.0
+# TYPE jvm_threads_started_total counter
+jvm_threads_started_total{cluster="standalone"} 343.0
+# TYPE jvm_threads_deadlocked gauge
+jvm_threads_deadlocked{cluster="standalone"} 0.0
+# TYPE jvm_threads_deadlocked_monitor gauge
+jvm_threads_deadlocked_monitor{cluster="standalone"} 0.0
+# TYPE zookeeper_server_requests counter
+zookeeper_server_requests{cluster="standalone",type="getData"} 1091.0
+zookeeper_server_requests{cluster="standalone",type="setData"} 56.0
+zookeeper_server_requests{cluster="standalone",type="ping"} 1673.0
+zookeeper_server_requests{cluster="standalone",type="unknown"} 2.0
+zookeeper_server_requests{cluster="standalone",type="sync"} 53.0
+zookeeper_server_requests{cluster="standalone",type="delete"} 189.0
+zookeeper_server_requests{cluster="standalone",type="createSession"} 14.0
+zookeeper_server_requests{cluster="standalone",type="multi"} 54.0
+zookeeper_server_requests{cluster="standalone",type="getChildren"} 172.0
+zookeeper_server_requests{cluster="standalone",type="getChildren2"} 250.0
+zookeeper_server_requests{cluster="standalone",type="closeSession"} 5.0
+zookeeper_server_requests{cluster="standalone",type="create"} 119.0
+zookeeper_server_requests{cluster="standalone",type="exists"} 577.0
+# TYPE jetty_requests_total counter
+jetty_requests_total{cluster="standalone"} 2182.0
+# TYPE jetty_requests_active gauge
+jetty_requests_active{cluster="standalone"} 1.0
+# TYPE jetty_requests_active_max gauge
+jetty_requests_active_max{cluster="standalone"} 2.0
+# TYPE jetty_request_time_max_seconds gauge
+jetty_request_time_max_seconds{cluster="standalone"} 0.539
+# TYPE jetty_request_time_seconds_total counter
+jetty_request_time_seconds_total{cluster="standalone"} 10.786
+# TYPE jetty_dispatched_total counter
+jetty_dispatched_total{cluster="standalone"} 2182.0
+# TYPE jetty_dispatched_active gauge
+jetty_dispatched_active{cluster="standalone"} 0.0
+# TYPE jetty_dispatched_active_max gauge
+jetty_dispatched_active_max{cluster="standalone"} 2.0
+# TYPE jetty_dispatched_time_max gauge
+jetty_dispatched_time_max{cluster="standalone"} 539.0
+# TYPE jetty_dispatched_time_seconds_total counter
+jetty_dispatched_time_seconds_total{cluster="standalone"} 1.745
+# TYPE jetty_async_requests_total counter
+jetty_async_requests_total{cluster="standalone"} 1070.0
+# TYPE jetty_async_requests_waiting gauge
+jetty_async_requests_waiting{cluster="standalone"} 1.0
+# TYPE jetty_async_requests_waiting_max gauge
+jetty_async_requests_waiting_max{cluster="standalone"} 1.0
+# TYPE jetty_async_dispatches_total counter
+jetty_async_dispatches_total{cluster="standalone"} 0.0
+# TYPE jetty_expires_total counter
+jetty_expires_total{cluster="standalone"} 0.0
+# TYPE jetty_responses_total counter
+jetty_responses_total{cluster="standalone",code="1xx"} 0.0
+jetty_responses_total{cluster="standalone",code="2xx"} 1113.0
+jetty_responses_total{cluster="standalone",code="3xx"} 1067.0
+jetty_responses_total{cluster="standalone",code="4xx"} 1.0
+jetty_responses_total{cluster="standalone",code="5xx"} 0.0
+# TYPE jetty_stats_seconds gauge
+jetty_stats_seconds{cluster="standalone"} 1001.006
+# TYPE jetty_responses_bytes_total counter
+jetty_responses_bytes_total{cluster="standalone"} 3.7698452E7
+# TYPE pulsar_broker_publish_latency summary
+pulsar_broker_publish_latency{cluster="standalone",quantile="0.0"} 1.821
+pulsar_broker_publish_latency{cluster="standalone",quantile="0.5"} 2.559
+pulsar_broker_publish_latency{cluster="standalone",quantile="0.95"} 6.8
+pulsar_broker_publish_latency{cluster="standalone",quantile="0.99"} 10.992
+pulsar_broker_publish_latency{cluster="standalone",quantile="0.999"} 10.992
+pulsar_broker_publish_latency{cluster="standalone",quantile="0.9999"} 10.992
+pulsar_broker_publish_latency{cluster="standalone",quantile="1.0"} 10.992
+pulsar_broker_publish_latency_count{cluster="standalone"} 95832.0
+pulsar_broker_publish_latency_sum{cluster="standalone"} 234677.0
+# TYPE zookeeper_server_connections gauge
+zookeeper_server_connections{cluster="standalone"} 10.0
+# TYPE jvm_info gauge
+jvm_info{cluster="standalone",version="1.8.0_232-b09",vendor="Oracle Corporation",runtime="OpenJDK Runtime Environment"} 1.0
+# TYPE topic_load_times summary
+topic_load_times{cluster="standalone",quantile="0.5"} NaN
+topic_load_times{cluster="standalone",quantile="0.75"} NaN
+topic_load_times{cluster="standalone",quantile="0.95"} NaN
+topic_load_times{cluster="standalone",quantile="0.99"} NaN
+topic_load_times{cluster="standalone",quantile="0.999"} NaN
+topic_load_times{cluster="standalone",quantile="0.9999"} NaN
+topic_load_times_count{cluster="standalone"} 0.0
+topic_load_times_sum{cluster="standalone"} 0.0
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total{cluster="standalone"} 492.64
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds{cluster="standalone"} 1.583774770759E9
+# TYPE process_open_fds gauge
+process_open_fds{cluster="standalone"} 676.0
+# TYPE process_max_fds gauge
+process_max_fds{cluster="standalone"} 1048576.0
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes{cluster="standalone"} 8.727437312E9
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes{cluster="standalone"} 1.642012672E9
+# TYPE jvm_classes_loaded gauge
+jvm_classes_loaded{cluster="standalone"} 14402.0
+# TYPE jvm_classes_loaded_total counter
+jvm_classes_loaded_total{cluster="standalone"} 14402.0
+# TYPE jvm_classes_unloaded_total counter
+jvm_classes_unloaded_total{cluster="standalone"} 0.0
+# TYPE zookeeper_server_requests_latency_ms summary
+zookeeper_server_requests_latency_ms{cluster="standalone",type="read",quantile="0.5"} 0.0
+zookeeper_server_requests_latency_ms{cluster="standalone",type="read",quantile="0.75"} 0.0
+zookeeper_server_requests_latency_ms{cluster="standalone",type="read",quantile="0.95"} 1.0
+zookeeper_server_requests_latency_ms{cluster="standalone",type="read",quantile="0.99"} 1.0
+zookeeper_server_requests_latency_ms{cluster="standalone",type="read",quantile="0.999"} 2.0
+zookeeper_server_requests_latency_ms{cluster="standalone",type="read",quantile="0.9999"} 2.0
+zookeeper_server_requests_latency_ms{cluster="standalone",type="read",quantile="1.0"} 2.0
+zookeeper_server_requests_latency_ms_count{cluster="standalone",type="read"} 3819.0
+zookeeper_server_requests_latency_ms_sum{cluster="standalone",type="read"} 2033.0
+zookeeper_server_requests_latency_ms{cluster="standalone",type="write",quantile="0.5"} NaN
+zookeeper_server_requests_latency_ms{cluster="standalone",type="write",quantile="0.75"} NaN
+zookeeper_server_requests_latency_ms{cluster="standalone",type="write",quantile="0.95"} NaN
+zookeeper_server_requests_latency_ms{cluster="standalone",type="write",quantile="0.99"} NaN
+zookeeper_server_requests_latency_ms{cluster="standalone",type="write",quantile="0.999"} NaN
+zookeeper_server_requests_latency_ms{cluster="standalone",type="write",quantile="0.9999"} NaN
+zookeeper_server_requests_latency_ms{cluster="standalone",type="write",quantile="1.0"} NaN
+zookeeper_server_requests_latency_ms_count{cluster="standalone",type="write"} 436.0
+zookeeper_server_requests_latency_ms_sum{cluster="standalone",type="write"} 832.0
+# TYPE zookeeper_server_watches_count gauge
+zookeeper_server_watches_count{cluster="standalone"} 37.0
+# TYPE zookeeper_server_ephemerals_count gauge
+zookeeper_server_ephemerals_count{cluster="standalone"} 12.0
+# TYPE caffeine_cache_hit_total counter
+caffeine_cache_hit_total{cluster="standalone",cache="owned-bundles"} 143.0
+caffeine_cache_hit_total{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_hit_total{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_hit_total{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_hit_total{cluster="standalone",cache="local-zk-exists"} 2.0
+caffeine_cache_hit_total{cluster="standalone",cache="local-zk-children"} 2.0
+caffeine_cache_hit_total{cluster="standalone",cache="bundles"} 156.0
+caffeine_cache_hit_total{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_hit_total{cluster="standalone",cache="local-zk-data"} 7.0
+caffeine_cache_hit_total{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_hit_total{cluster="standalone",cache="global-zk-exists"} 0.0
+# TYPE caffeine_cache_miss_total counter
+caffeine_cache_miss_total{cluster="standalone",cache="owned-bundles"} 11.0
+caffeine_cache_miss_total{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_miss_total{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_miss_total{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_miss_total{cluster="standalone",cache="local-zk-exists"} 7.0
+caffeine_cache_miss_total{cluster="standalone",cache="local-zk-children"} 4.0
+caffeine_cache_miss_total{cluster="standalone",cache="bundles"} 4.0
+caffeine_cache_miss_total{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_miss_total{cluster="standalone",cache="local-zk-data"} 22.0
+caffeine_cache_miss_total{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_miss_total{cluster="standalone",cache="global-zk-exists"} 0.0
+# TYPE caffeine_cache_requests_total counter
+caffeine_cache_requests_total{cluster="standalone",cache="owned-bundles"} 154.0
+caffeine_cache_requests_total{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_requests_total{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_requests_total{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_requests_total{cluster="standalone",cache="local-zk-exists"} 9.0
+caffeine_cache_requests_total{cluster="standalone",cache="local-zk-children"} 6.0
+caffeine_cache_requests_total{cluster="standalone",cache="bundles"} 160.0
+caffeine_cache_requests_total{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_requests_total{cluster="standalone",cache="local-zk-data"} 29.0
+caffeine_cache_requests_total{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_requests_total{cluster="standalone",cache="global-zk-exists"} 0.0
+# TYPE caffeine_cache_eviction_total counter
+caffeine_cache_eviction_total{cluster="standalone",cache="owned-bundles"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="local-zk-exists"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="local-zk-children"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="bundles"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="local-zk-data"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_eviction_total{cluster="standalone",cache="global-zk-exists"} 0.0
+# TYPE caffeine_cache_eviction_weight gauge
+caffeine_cache_eviction_weight{cluster="standalone",cache="owned-bundles"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="local-zk-exists"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="local-zk-children"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="bundles"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="local-zk-data"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_eviction_weight{cluster="standalone",cache="global-zk-exists"} 0.0
+# TYPE caffeine_cache_load_failure_total counter
+caffeine_cache_load_failure_total{cluster="standalone",cache="owned-bundles"} 0.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="local-zk-exists"} 0.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="local-zk-children"} 0.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="bundles"} 0.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="local-zk-data"} 17.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_load_failure_total{cluster="standalone",cache="global-zk-exists"} 0.0
+# TYPE caffeine_cache_loads_total counter
+caffeine_cache_loads_total{cluster="standalone",cache="owned-bundles"} 6.0
+caffeine_cache_loads_total{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_loads_total{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_loads_total{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_loads_total{cluster="standalone",cache="local-zk-exists"} 7.0
+caffeine_cache_loads_total{cluster="standalone",cache="local-zk-children"} 4.0
+caffeine_cache_loads_total{cluster="standalone",cache="bundles"} 4.0
+caffeine_cache_loads_total{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_loads_total{cluster="standalone",cache="local-zk-data"} 22.0
+caffeine_cache_loads_total{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_loads_total{cluster="standalone",cache="global-zk-exists"} 0.0
+# TYPE caffeine_cache_estimated_size gauge
+caffeine_cache_estimated_size{cluster="standalone",cache="owned-bundles"} 6.0
+caffeine_cache_estimated_size{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_estimated_size{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_estimated_size{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_estimated_size{cluster="standalone",cache="local-zk-exists"} 7.0
+caffeine_cache_estimated_size{cluster="standalone",cache="local-zk-children"} 4.0
+caffeine_cache_estimated_size{cluster="standalone",cache="bundles"} 4.0
+caffeine_cache_estimated_size{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_estimated_size{cluster="standalone",cache="local-zk-data"} 5.0
+caffeine_cache_estimated_size{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_estimated_size{cluster="standalone",cache="global-zk-exists"} 0.0
+# TYPE caffeine_cache_load_duration_seconds summary
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="owned-bundles"} 6.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="owned-bundles"} 0.05334063
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="bookies-racks-exists"} 0.0
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="global-zk-children"} 0.0
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="bookies-racks-children"} 0.0
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="local-zk-exists"} 7.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="local-zk-exists"} 0.039758752
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="local-zk-children"} 4.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="local-zk-children"} 0.027705247
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="bundles"} 4.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="bundles"} 0.076995851
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="global-zk-data"} 0.0
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="local-zk-data"} 22.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="local-zk-data"} 0.156849343
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="bookies-racks-data"} 0.0
+caffeine_cache_load_duration_seconds_count{cluster="standalone",cache="global-zk-exists"} 0.0
+caffeine_cache_load_duration_seconds_sum{cluster="standalone",cache="global-zk-exists"} 0.0
+# TYPE jvm_memory_direct_bytes_used gauge
+jvm_memory_direct_bytes_used{cluster="standalone"} 2.28189827E9
+# TYPE jvm_memory_bytes_used gauge
+jvm_memory_bytes_used{cluster="standalone",area="heap"} 3.01123632E8
+jvm_memory_bytes_used{cluster="standalone",area="nonheap"} 1.27959784E8
+# TYPE jvm_memory_bytes_committed gauge
+jvm_memory_bytes_committed{cluster="standalone",area="heap"} 2.147483648E9
+jvm_memory_bytes_committed{cluster="standalone",area="nonheap"} 1.33287936E8
+# TYPE jvm_memory_bytes_max gauge
+jvm_memory_bytes_max{cluster="standalone",area="heap"} 2.147483648E9
+jvm_memory_bytes_max{cluster="standalone",area="nonheap"} -1.0
+# TYPE jvm_memory_bytes_init gauge
+jvm_memory_bytes_init{cluster="standalone",area="heap"} 2.147483648E9
+jvm_memory_bytes_init{cluster="standalone",area="nonheap"} 2555904.0
+# TYPE jvm_memory_pool_bytes_used gauge
+jvm_memory_pool_bytes_used{cluster="standalone",pool="Code Cache"} 3.5528384E7
+jvm_memory_pool_bytes_used{cluster="standalone",pool="Metaspace"} 8.2704856E7
+jvm_memory_pool_bytes_used{cluster="standalone",pool="Compressed Class Space"} 9726544.0
+jvm_memory_pool_bytes_used{cluster="standalone",pool="G1 Eden Space"} 1.75112192E8
+jvm_memory_pool_bytes_used{cluster="standalone",pool="G1 Survivor Space"} 6.3963136E7
+jvm_memory_pool_bytes_used{cluster="standalone",pool="G1 Old Gen"} 6.2048304E7
+# TYPE jvm_memory_pool_bytes_committed gauge
+jvm_memory_pool_bytes_committed{cluster="standalone",pool="Code Cache"} 3.5782656E7
+jvm_memory_pool_bytes_committed{cluster="standalone",pool="Metaspace"} 8.6863872E7
+jvm_memory_pool_bytes_committed{cluster="standalone",pool="Compressed Class Space"} 1.0641408E7
+jvm_memory_pool_bytes_committed{cluster="standalone",pool="G1 Eden Space"} 1.06430464E9
+jvm_memory_pool_bytes_committed{cluster="standalone",pool="G1 Survivor Space"} 6.3963136E7
+jvm_memory_pool_bytes_committed{cluster="standalone",pool="G1 Old Gen"} 1.019215872E9
+# TYPE jvm_memory_pool_bytes_max gauge
+jvm_memory_pool_bytes_max{cluster="standalone",pool="Code Cache"} 2.5165824E8
+jvm_memory_pool_bytes_max{cluster="standalone",pool="Metaspace"} -1.0
+jvm_memory_pool_bytes_max{cluster="standalone",pool="Compressed Class Space"} 1.073741824E9
+jvm_memory_pool_bytes_max{cluster="standalone",pool="G1 Eden Space"} -1.0
+jvm_memory_pool_bytes_max{cluster="standalone",pool="G1 Survivor Space"} -1.0
+jvm_memory_pool_bytes_max{cluster="standalone",pool="G1 Old Gen"} 2.147483648E9
+# TYPE jvm_memory_pool_bytes_init gauge
+jvm_memory_pool_bytes_init{cluster="standalone",pool="Code Cache"} 2555904.0
+jvm_memory_pool_bytes_init{cluster="standalone",pool="Metaspace"} 0.0
+jvm_memory_pool_bytes_init{cluster="standalone",pool="Compressed Class Space"} 0.0
+jvm_memory_pool_bytes_init{cluster="standalone",pool="G1 Eden Space"} 1.128267776E9
+jvm_memory_pool_bytes_init{cluster="standalone",pool="G1 Survivor Space"} 0.0
+jvm_memory_pool_bytes_init{cluster="standalone",pool="G1 Old Gen"} 1.019215872E9
+# TYPE jvm_buffer_pool_used_bytes gauge
+jvm_buffer_pool_used_bytes{cluster="standalone",pool="direct"} 697534.0
+jvm_buffer_pool_used_bytes{cluster="standalone",pool="mapped"} 0.0
+# TYPE jvm_buffer_pool_capacity_bytes gauge
+jvm_buffer_pool_capacity_bytes{cluster="standalone",pool="direct"} 697533.0
+jvm_buffer_pool_capacity_bytes{cluster="standalone",pool="mapped"} 0.0
+# TYPE jvm_buffer_pool_used_buffers gauge
+jvm_buffer_pool_used_buffers{cluster="standalone",pool="direct"} 82.0
+jvm_buffer_pool_used_buffers{cluster="standalone",pool="mapped"} 0.0
+# TYPE zookeeper_server_znode_count gauge
+zookeeper_server_znode_count{cluster="standalone"} 4175.0
+# TYPE zookeeper_server_data_size_bytes gauge
+zookeeper_server_data_size_bytes{cluster="standalone"} 459126.0
+# TYPE jvm_gc_collection_seconds summary
+jvm_gc_collection_seconds_count{cluster="standalone",gc="G1 Young Generation"} 14.0
+jvm_gc_collection_seconds_sum{cluster="standalone",gc="G1 Young Generation"} 3.13
+jvm_gc_collection_seconds_count{cluster="standalone",gc="G1 Old Generation"} 0.0
+jvm_gc_collection_seconds_sum{cluster="standalone",gc="G1 Old Generation"} 0.0
+# TYPE pulsar_topics_count gauge
+pulsar_topics_count{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_subscriptions_count gauge
+pulsar_subscriptions_count{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_producers_count gauge
+pulsar_producers_count{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_consumers_count gauge
+pulsar_consumers_count{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_rate_in gauge
+pulsar_rate_in{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_rate_out gauge
+pulsar_rate_out{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_throughput_in gauge
+pulsar_throughput_in{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_throughput_out gauge
+pulsar_throughput_out{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_storage_size gauge
+pulsar_storage_size{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_storage_write_rate gauge
+pulsar_storage_write_rate{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_storage_read_rate gauge
+pulsar_storage_read_rate{cluster="standalone"} 0 1583775788853
+# TYPE pulsar_msg_backlog gauge
+pulsar_msg_backlog{cluster="standalone"} 0 1583775788853
+pulsar_topics_count{cluster="standalone",namespace="sample/dev"} 2 1583775788853
+pulsar_subscriptions_count{cluster="standalone",namespace="sample/dev"} 6 1583775788853
+pulsar_producers_count{cluster="standalone",namespace="sample/dev"} 4 1583775788853
+pulsar_consumers_count{cluster="standalone",namespace="sample/dev"} 10 1583775788853
+pulsar_rate_in{cluster="standalone",namespace="sample/dev"} 48.004 1583775788853
+pulsar_rate_out{cluster="standalone",namespace="sample/dev"} 146.018 1583775788853
+pulsar_throughput_in{cluster="standalone",namespace="sample/dev"} 2736.243 1583775788853
+pulsar_throughput_out{cluster="standalone",namespace="sample/dev"} 8323.043 1583775788853
+pulsar_storage_size{cluster="standalone",namespace="sample/dev"} 2684208 1583775788853
+# TYPE pulsar_storage_backlog_size gauge
+pulsar_storage_backlog_size{cluster="standalone",namespace="sample/dev"} 35452322 1583775788853
+# TYPE pulsar_storage_offloaded_size gauge
+pulsar_storage_offloaded_size{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+pulsar_storage_write_rate{cluster="standalone",namespace="sample/dev"} 50.200 1583775788853
+pulsar_storage_read_rate{cluster="standalone",namespace="sample/dev"} 0.0 1583775788853
+# TYPE pulsar_subscription_delayed gauge
+pulsar_subscription_delayed{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+pulsar_msg_backlog{cluster="standalone",namespace="sample/dev",remote_cluster="local"} 8.0 1583775788853
+# TYPE pulsar_storage_write_latency_le_0_5 gauge
+pulsar_storage_write_latency_le_0_5{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_storage_write_latency_le_1 gauge
+pulsar_storage_write_latency_le_1{cluster="standalone",namespace="sample/dev"} 23 1583775788853
+# TYPE pulsar_storage_write_latency_le_5 gauge
+pulsar_storage_write_latency_le_5{cluster="standalone",namespace="sample/dev"} 2900 1583775788853
+# TYPE pulsar_storage_write_latency_le_10 gauge
+pulsar_storage_write_latency_le_10{cluster="standalone",namespace="sample/dev"} 82 1583775788853
+# TYPE pulsar_storage_write_latency_le_20 gauge
+pulsar_storage_write_latency_le_20{cluster="standalone",namespace="sample/dev"} 6 1583775788853
+# TYPE pulsar_storage_write_latency_le_50 gauge
+pulsar_storage_write_latency_le_50{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_storage_write_latency_le_100 gauge
+pulsar_storage_write_latency_le_100{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_storage_write_latency_le_200 gauge
+pulsar_storage_write_latency_le_200{cluster="standalone",namespace="sample/dev"} 1 1583775788853
+# TYPE pulsar_storage_write_latency_le_1000 gauge
+pulsar_storage_write_latency_le_1000{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_storage_write_latency_overflow gauge
+pulsar_storage_write_latency_overflow{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_storage_write_latency_count gauge
+pulsar_storage_write_latency_count{cluster="standalone",namespace="sample/dev"} 3012 1583775788853
+# TYPE pulsar_storage_write_latency_sum gauge
+pulsar_storage_write_latency_sum{cluster="standalone",namespace="sample/dev"} 3012 1583775788853
+# TYPE pulsar_entry_size_le_128 gauge
+pulsar_entry_size_le_128{cluster="standalone",namespace="sample/dev"} 3012 1583775788853
+# TYPE pulsar_entry_size_le_512 gauge
+pulsar_entry_size_le_512{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_entry_size_le_1_kb gauge
+pulsar_entry_size_le_1_kb{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_entry_size_le_2_kb gauge
+pulsar_entry_size_le_2_kb{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_entry_size_le_4_kb gauge
+pulsar_entry_size_le_4_kb{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_entry_size_le_16_kb gauge
+pulsar_entry_size_le_16_kb{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_entry_size_le_100_kb gauge
+pulsar_entry_size_le_100_kb{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_entry_size_le_1_mb gauge
+pulsar_entry_size_le_1_mb{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_entry_size_le_overflow gauge
+pulsar_entry_size_le_overflow{cluster="standalone",namespace="sample/dev"} 0 1583775788853
+# TYPE pulsar_entry_size_count gauge
+pulsar_entry_size_count{cluster="standalone",namespace="sample/dev"} 3012 1583775788853
+# TYPE pulsar_entry_size_sum gauge
+pulsar_entry_size_sum{cluster="standalone",namespace="sample/dev"} 3012 1583775788853
+pulsar_topics_count{cluster="standalone",namespace="public/functions"} 3 1583775788853
+pulsar_subscriptions_count{cluster="standalone",namespace="public/functions"} 3 1583775788853
+pulsar_producers_count{cluster="standalone",namespace="public/functions"} 2 1583775788853
+pulsar_consumers_count{cluster="standalone",namespace="public/functions"} 3 1583775788853
+pulsar_rate_in{cluster="standalone",namespace="public/functions"} 0.0 1583775788853
+pulsar_rate_out{cluster="standalone",namespace="public/functions"} 0.0 1583775788853
+pulsar_throughput_in{cluster="standalone",namespace="public/functions"} 0.0 1583775788853
+pulsar_throughput_out{cluster="standalone",namespace="public/functions"} 0.0 1583775788853
+pulsar_storage_size{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_backlog_size{cluster="standalone",namespace="public/functions"} 35452322 1583775788853
+pulsar_storage_offloaded_size{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_rate{cluster="standalone",namespace="public/functions"} 0.0 1583775788853
+pulsar_storage_read_rate{cluster="standalone",namespace="public/functions"} 0.0 1583775788853
+pulsar_subscription_delayed{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_msg_backlog{cluster="standalone",namespace="public/functions",remote_cluster="local"} 0.0 1583775788853
+pulsar_storage_write_latency_le_0_5{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_le_1{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_le_5{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_le_10{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_le_20{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_le_50{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_le_100{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_le_200{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_le_1000{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_overflow{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_count{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_storage_write_latency_sum{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_le_128{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_le_512{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_le_1_kb{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_le_2_kb{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_le_4_kb{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_le_16_kb{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_le_100_kb{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_le_1_mb{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_le_overflow{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_count{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_entry_size_sum{cluster="standalone",namespace="public/functions"} 0 1583775788853
+pulsar_topics_count{cluster="standalone",namespace="sample/prod"} 2 1583775788853
+pulsar_subscriptions_count{cluster="standalone",namespace="sample/prod"} 4 1583775788853
+pulsar_producers_count{cluster="standalone",namespace="sample/prod"} 4 1583775788853
+pulsar_consumers_count{cluster="standalone",namespace="sample/prod"} 8 1583775788853
+pulsar_rate_in{cluster="standalone",namespace="sample/prod"} 48.019 1583775788853
+pulsar_rate_out{cluster="standalone",namespace="sample/prod"} 96.039 1583775788853
+pulsar_throughput_in{cluster="standalone",namespace="sample/prod"} 2833.158 1583775788853
+pulsar_throughput_out{cluster="standalone",namespace="sample/prod"} 5666.330 1583775788853
+pulsar_storage_size{cluster="standalone",namespace="sample/prod"} 2784216 1583775788853
+pulsar_storage_backlog_size{cluster="standalone",namespace="sample/prod"} 35455322 1583775788853
+pulsar_storage_offloaded_size{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_storage_write_rate{cluster="standalone",namespace="sample/prod"} 50.016 1583775788853
+pulsar_storage_read_rate{cluster="standalone",namespace="sample/prod"} 0.0 1583775788853
+pulsar_subscription_delayed{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_msg_backlog{cluster="standalone",namespace="sample/prod",remote_cluster="local"} 0.0 1583775788853
+pulsar_storage_write_latency_le_0_5{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_storage_write_latency_le_1{cluster="standalone",namespace="sample/prod"} 20 1583775788853
+pulsar_storage_write_latency_le_5{cluster="standalone",namespace="sample/prod"} 2897 1583775788853
+pulsar_storage_write_latency_le_10{cluster="standalone",namespace="sample/prod"} 81 1583775788853
+pulsar_storage_write_latency_le_20{cluster="standalone",namespace="sample/prod"} 1 1583775788853
+pulsar_storage_write_latency_le_50{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_storage_write_latency_le_100{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_storage_write_latency_le_200{cluster="standalone",namespace="sample/prod"} 1 1583775788853
+pulsar_storage_write_latency_le_1000{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_storage_write_latency_overflow{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_storage_write_latency_count{cluster="standalone",namespace="sample/prod"} 3000 1583775788853
+pulsar_storage_write_latency_sum{cluster="standalone",namespace="sample/prod"} 3000 1583775788853
+pulsar_entry_size_le_128{cluster="standalone",namespace="sample/prod"} 3001 1583775788853
+pulsar_entry_size_le_512{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_entry_size_le_1_kb{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_entry_size_le_2_kb{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_entry_size_le_4_kb{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_entry_size_le_16_kb{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_entry_size_le_100_kb{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_entry_size_le_1_mb{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_entry_size_le_overflow{cluster="standalone",namespace="sample/prod"} 0 1583775788853
+pulsar_entry_size_count{cluster="standalone",namespace="sample/prod"} 3001 1583775788853
+pulsar_entry_size_sum{cluster="standalone",namespace="sample/prod"} 3001 1583775788853

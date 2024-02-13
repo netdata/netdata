@@ -1,0 +1,39 @@
+127.0.0.1
+ServerVersion: Apache/2.4.37 (Unix)
+ServerMPM: event
+Server Built: Oct 23 2018 18:27:46
+CurrentTime: Sunday, 13-Jan-2019 20:39:30 MSK
+RestartTime: Sunday, 13-Jan-2019 20:35:13 MSK
+ParentServerConfigGeneration: 1
+ParentServerMPMGeneration: 0
+ServerUptimeSeconds: 256
+ServerUptime: 4 minutes 16 seconds
+Load1: 1.02
+Load5: 1.30
+Load15: 1.41
+Total Accesses: 9
+Total kBytes: 12
+Total Duration: 1
+CPUUser: 0
+CPUSystem: .01
+CPUChildrenUser: 0
+CPUChildrenSystem: 0
+CPULoad: .00390625
+Uptime: 256
+ReqPerSec: .0351563
+BytesPerSec: 48
+BytesPerReq: 1365.33
+DurationPerReq: .111111
+BusyWorkers: 1
+IdleWorkers: 99
+Processes: 4
+Stopping: 0
+BusyWorkers: 1
+IdleWorkers: 99
+ConnsTotal: 0
+ConnsAsyncWriting: 0
+ConnsAsyncKeepAlive: 0
+ConnsAsyncClosing: 0
+Scoreboard: ____________________________________________________________W_______________________________________............................................................................................................................................................................................................................................................................................................
+Using GnuTLS version: 3.6.5
+Built against GnuTLS version: 3.5.19

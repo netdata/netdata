@@ -1,0 +1,4 @@
+.gradle/
+.idea/
+springboot2.*
+/build

@@ -1,0 +1,10 @@
+ datname  | schemaname |     relname      | attname  | typname | null_percent | distinct
+----------+------------+------------------+----------+---------+--------------+----------
+ postgres | public     | pgbench_accounts | abalance | int4    |            0 |        1
+ postgres | public     | pgbench_accounts | aid      | int4    |            0 |    5e+06
+ postgres | public     | pgbench_accounts | bid      | int4    |            0 |       50
+ postgres | public     | pgbench_accounts | filler   | bpchar  |            0 |        1
+ postgres | public     | pgbench_tellers  | bid      | int4    |            0 |       50
+ postgres | public     | pgbench_tellers  | filler   | bpchar  |          100 |        0
+ postgres | public     | pgbench_tellers  | tbalance | int4    |            0 |        1
+ postgres | public     | pgbench_tellers  | tid      | int4    |            0 |      500
