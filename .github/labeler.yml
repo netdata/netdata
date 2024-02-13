@@ -264,7 +264,7 @@ area/tests:
           - any-glob-to-any-file:
               - tests/**
               - src/daemon/unit_test*
-              - coverity-scan.sh
+              - packaging/utils/coverity-scan.sh
 
 area/web:
   - any:
