@@ -1,0 +1,5 @@
+ application_name | write_lag | flush_lag | replay_lag
+------------------+-----------+-----------+------------
+ walreceiver      |         1 |         1 |          1
+ walreceiver      |         1 |         1 |          1
+ phys-standby2    |         0 |         0 |          0

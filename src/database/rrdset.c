@@ -2,7 +2,6 @@
 
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
-#include <sched.h>
 #include "storage_engine.h"
 
 

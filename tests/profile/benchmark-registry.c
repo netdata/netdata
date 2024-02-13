@@ -2,7 +2,7 @@
 
 /*
  * compile with
- *  gcc -O1 -ggdb -Wall -Wextra -I ../src/ -I ../ -o benchmark-registry benchmark-registry.c ../src/dictionary.o ../src/log.o ../src/avl.o ../src/common.o ../src/appconfig.o ../src/web_buffer.o ../src/storage_number.o ../src/rrd.o ../src/health.o -pthread -luuid -lm -DHAVE_CONFIG_H -DVARLIB_DIR="\"/tmp\""
+ *  gcc -O1 -ggdb -Wall -Wextra -I ../src/ -I ../ -o benchmark-registry benchmark-registry.c ../src/dictionary.o ../src/log.o ../src/avl.o ../src/common.o ../src/appconfig.o ../src/web_buffer.o ../src/storage_number.o ../src/rrd.o ../src/health.o -pthread -luuid -lm -DVARLIB_DIR="\"/tmp\""
  */
 
 char *hostname = "me";

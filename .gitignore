@@ -30,7 +30,7 @@ artifacts/
 ebpf.plugin
 src/collectors/ebpf.plugin/reset_netdata_trace.sh
 !ebpf.plugin/
-src/collectors/ebpf.plugin/includes/
+src/libnetdata/ebpf/includes/
 
 # protoc generated files
 *.pb.cc
@@ -59,13 +59,13 @@ README
 TODO.md
 TODO.txt
 
-web/gui/chart-info/
-web/gui/control.html
-web/gui/dashboard.js
-web/gui/datasource.css
-web/gui/gadget.xml
-web/gui/index_new.html
-web/gui/version.txt
+src/web/gui/chart-info/
+src/web/gui/control.html
+src/web/gui/dashboard.js
+src/web/gui/datasource.css
+src/web/gui/gadget.xml
+src/web/gui/index_new.html
+src/web/gui/version.txt
 
 # related to karma/javascript/node
 /node_modules/
@@ -95,7 +95,7 @@ src/collectors/charts.d.plugin/charts.d.plugin
 src/collectors/python.d.plugin/python.d.plugin
 src/collectors/ioping.plugin/ioping.plugin
 src/collectors/go.d.plugin
-web/netdata-switch-dashboard.sh
+src/web/netdata-switch-dashboard.sh
 
 src/logsmanagement/stress_test/stress_test
 
@@ -119,13 +119,10 @@ compile_commands.json
 webcopylocal*
 
 # converted diagrams
-diagrams/*.png
-diagrams/*.svg
-diagrams/*.atxt
-diagrams/plantuml.jar
-
-# cppcheck
-cppcheck-build/
+docs/diagrams/*.png
+docs/diagrams/*.svg
+docs/diagrams/*.atxt
+docs/diagrams/plantuml.jar
 
 # python virtual environment
 venv/
@@ -194,3 +191,10 @@ src/libnetdata/gorilla/fuzz-*.log
 
 # ignore build/ directory (default dir for many IDEs/LSPs)
 build/
+
+# ignore rules for go plugin code
+src/go/collectors/go.d.plugin/bin/
+src/go/collectors/go.d.plugin/mocks/springboot2/.gradle/
+src/go/collectors/go.d.plugin/mocks/tmp/*
+!src/go/collectors/go.d.plugin/mocks/tmp/.gitkeep
+src/go/collectors/go.d.plugin/vendor

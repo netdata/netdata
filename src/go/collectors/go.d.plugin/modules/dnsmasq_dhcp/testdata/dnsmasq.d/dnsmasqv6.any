@@ -1,0 +1,10 @@
+dhcp-range = 1231::1, 1231::64
+
+dhcp-host=id:00:01:00:01:16:d2:83:fc:92:d4:19:e2:d8:b2, fred, [1231::63]
+
+conf-file=testdata/dnsmasq.conf
+conf-file=testdata/dnsmasq2.conf
+
+conf-dir=testdata/dnsmasq.d2
+conf-dir=testdata/dnsmasq.d3,.bak
+conf-dir=testdata/dnsmasq.d4,*.conf

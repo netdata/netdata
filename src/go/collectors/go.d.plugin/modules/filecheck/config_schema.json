@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/filecheck job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "discovery_every": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    },
+    "files": {
+      "type": "object",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "include",
+        "exclude"
+      ]
+    },
+    "dirs": {
+      "type": "object",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "collect_dir_size": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "include",
+        "exclude"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "name",
+        "files"
+      ]
+    },
+    {
+      "required": [
+        "name",
+        "dirs"
+      ]
+    }
+  ]
+}

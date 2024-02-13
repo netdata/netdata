@@ -38,13 +38,13 @@ jobs:
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
-            **.c
-            **.cc
-            **.h
-            **.hh
-            **.in
-            **.patch
-            **.cmake
+            **/*.c
+            **/*.cc
+            **/*.h
+            **/*.hh
+            **/*.in
+            **/*.patch
+            **/*.cmake
             CMakeLists.txt
             netdata-installer.sh
             .github/data/distros.yml
@@ -53,18 +53,26 @@ jobs:
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-build.py
             .github/scripts/run-updater-check.sh
-            packaging/makeself/**
-            packaging/installer/**
+            packaging/makeself/
+            packaging/installer/
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
             src/aclk/aclk-schemas/
             src/ml/dlib/
             src/fluent-bit/
-            web/server/h2o/libh2o/
+            src/web/server/h2o/libh2o/
           files_ignore: |
             netdata.spec.in
-            **.md
+            **/*.md
+      - name: List all changed files in pattern
+        continue-on-error: true
+        env:
+          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
+        run: |
+          for file in ${ALL_CHANGED_FILES}; do
+            echo "$file was changed"
+          done
       - name: Check Run
         id: check-run
         run: |

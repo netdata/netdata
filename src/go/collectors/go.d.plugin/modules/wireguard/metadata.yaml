@@ -1,0 +1,121 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-wireguard
+      plugin_name: go.d.plugin
+      module_name: wireguard
+      monitored_instance:
+        name: WireGuard
+        link: https://www.wireguard.com/
+        categories:
+          - data-collection.vpns
+        icon_filename: wireguard.svg
+      keywords:
+        - wireguard
+        - vpn
+        - security
+      most_popular: false
+      info_provided_to_referring_integrations:
+        description: ""
+      related_resources:
+        integrations:
+          list: []
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors WireGuard VPN devices and peers traffic.
+        method_description: |
+          It connects to the local WireGuard instance using [wireguard-go client](https://github.com/WireGuard/wireguard-go).
+      default_behavior:
+        auto_detection:
+          description: |
+            It automatically detects instances running on localhost.
+        limits:
+          description: |
+            Doesn't work if Netdata or WireGuard is installed in the container.
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: |
+          This collector requires the CAP_NET_ADMIN capability, but it is set automatically during installation, so no manual configuration is needed.
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/wireguard.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: device
+          description: These metrics refer to the VPN network interface.
+          labels:
+            - name: device
+              description: VPN network interface
+          metrics:
+            - name: wireguard.device_network_io
+              description: Device traffic
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: receive
+                - name: transmit
+            - name: wireguard.device_peers
+              description: Device peers
+              unit: peers
+              chart_type: line
+              dimensions:
+                - name: peers
+        - name: peer
+          description: These metrics refer to the VPN peer.
+          labels:
+            - name: device
+              description: VPN network interface
+            - name: public_key
+              description: Public key of a peer
+          metrics:
+            - name: wireguard.peer_network_io
+              description: Peer traffic
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: receive
+                - name: transmit
+            - name: wireguard.peer_latest_handshake_ago
+              description: Peer time elapsed since the latest handshake
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time

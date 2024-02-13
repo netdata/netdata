@@ -1,0 +1,50 @@
+[
+  {
+    "health": "yellow",
+    "status": "open",
+    "index": "my-index-000003",
+    "uuid": "Clrvbw-AQ5CB3xWI3MUXFg",
+    "pri": "1",
+    "rep": "1",
+    "docs.count": "1",
+    "docs.deleted": "1",
+    "store.size": "208b",
+    "pri.store.size": "208b"
+  },
+  {
+    "health": "yellow",
+    "status": "open",
+    "index": "my-index-000002",
+    "uuid": "z7cy4d2PQYSSJDhi8dIjWg",
+    "pri": "1",
+    "rep": "1",
+    "docs.count": "1",
+    "docs.deleted": "1",
+    "store.size": "208b",
+    "pri.store.size": "208b"
+  },
+  {
+    "health": "yellow",
+    "status": "open",
+    "index": "my-index-000001",
+    "uuid": "08YTiZfmQUiO67VOGZOfVg",
+    "pri": "1",
+    "rep": "1",
+    "docs.count": "1",
+    "docs.deleted": "1",
+    "store.size": "208b",
+    "pri.store.size": "208b"
+  },
+  {
+    "health": "yellow",
+    "status": "open",
+    "index": ".my-system-index-000001",
+    "uuid": "08YTiZfmQUiO67VOGZOfVg",
+    "pri": "1",
+    "rep": "1",
+    "docs.count": "1",
+    "docs.deleted": "1",
+    "store.size": "208b",
+    "pri.store.size": "208b"
+  }
+]

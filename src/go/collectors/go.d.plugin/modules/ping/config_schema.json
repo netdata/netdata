@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "go.d/ping job configuration schema.",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "update_every": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "hosts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "network": {
+      "type": "string",
+      "enum": [
+        "ip",
+        "ip4",
+        "ip6"
+      ]
+    },
+    "privileged": {
+      "type": "boolean"
+    },
+    "sendPackets": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "interval": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "interface": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "hosts"
+  ]
+}

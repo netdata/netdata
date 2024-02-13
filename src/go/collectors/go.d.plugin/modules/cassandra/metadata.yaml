@@ -1,0 +1,410 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-cassandra
+      module_name: cassandra
+      plugin_name: go.d.plugin
+      monitored_instance:
+        categories:
+          - data-collection.database-servers
+        icon_filename: cassandra.svg
+        name: Cassandra
+        link: https://cassandra.apache.org/_/index.html
+      alternative_monitored_instances: []
+      keywords:
+        - nosql
+        - dbms
+        - db
+        - database
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector gathers metrics about client requests, cache hits, and many more, while also providing metrics per each thread pool.
+        method_description: |
+          The [JMX Exporter](https://github.com/prometheus/jmx_exporter) is used to fetch metrics from a Cassandra instance and make them available at an endpoint like `http://127.0.0.1:7072/metrics`.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector discovers instances running on the local host that provide metrics on port 7072.
+            
+            On startup, it tries to collect metrics from:
+            
+            - http://127.0.0.1:7072/metrics
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Configure Cassandra with Prometheus JMX Exporter
+            description: |
+              To configure Cassandra with the [JMX Exporter](https://github.com/prometheus/jmx_exporter):
+              
+              > **Note**: paths can differ depends on your setup.
+              
+              - Download latest [jmx_exporter](https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/) jar file
+                and install it in a directory where Cassandra can access it.
+              - Add
+                the [jmx_exporter.yaml](https://raw.githubusercontent.com/netdata/go.d.plugin/master/modules/cassandra/jmx_exporter.yaml)
+                file to `/etc/cassandra`.
+              - Add the following line to `/etc/cassandra/cassandra-env.sh`
+                ```
+                JVM_OPTS="$JVM_OPTS $JVM_EXTRA_OPTS -javaagent:/opt/jmx_exporter/jmx_exporter.jar=7072:/etc/cassandra/jmx_exporter.yaml
+                ```
+              - Restart cassandra service.
+      configuration:
+        file:
+          name: go.d/cassandra.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:7072/metrics
+              required: true
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 2
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:7072/metrics
+            - name: HTTP authentication
+              description: Local server with basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:7072/metrics
+                    username: foo
+                    password: bar
+            - name: HTTPS with self-signed certificate
+              description: Local server with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:7072/metrics
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:7072/metrics
+                
+                  - name: remote
+                    url: http://192.0.2.1:7072/metrics
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: cassandra.client_requests_rate
+              availability: []
+              description: Client requests rate
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: cassandra.client_request_read_latency_histogram
+              availability: []
+              description: Client request read latency histogram
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p75
+                - name: p95
+                - name: p98
+                - name: p99
+                - name: p999
+            - name: cassandra.client_request_write_latency_histogram
+              availability: []
+              description: Client request write latency histogram
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: p50
+                - name: p75
+                - name: p95
+                - name: p98
+                - name: p99
+                - name: p999
+            - name: cassandra.client_requests_latency
+              availability: []
+              description: Client requests total latency
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: cassandra.row_cache_hit_ratio
+              availability: []
+              description: Key cache hit ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hit_ratio
+            - name: cassandra.row_cache_hit_rate
+              availability: []
+              description: Key cache hit rate
+              unit: events/s
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: cassandra.row_cache_utilization
+              availability: []
+              description: Key cache utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: cassandra.row_cache_size
+              availability: []
+              description: Key cache size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: cassandra.key_cache_hit_ratio
+              availability: []
+              description: Row cache hit ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hit_ratio
+            - name: cassandra.key_cache_hit_rate
+              availability: []
+              description: Row cache hit rate
+              unit: events/s
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: cassandra.key_cache_utilization
+              availability: []
+              description: Row cache utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: cassandra.key_cache_size
+              availability: []
+              description: Row cache size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: cassandra.storage_live_disk_space_used
+              availability: []
+              description: Disk space used by live data
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: cassandra.compaction_completed_tasks_rate
+              availability: []
+              description: Completed compactions rate
+              unit: tasks/s
+              chart_type: line
+              dimensions:
+                - name: completed
+            - name: cassandra.compaction_pending_tasks_count
+              availability: []
+              description: Pending compactions
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: cassandra.compaction_compacted_rate
+              availability: []
+              description: Compaction data rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: compacted
+            - name: cassandra.jvm_memory_used
+              availability: []
+              description: Memory used
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: heap
+                - name: nonheap
+            - name: cassandra.jvm_gc_rate
+              availability: []
+              description: Garbage collections rate
+              unit: gc/s
+              chart_type: line
+              dimensions:
+                - name: parnew
+                - name: cms
+            - name: cassandra.jvm_gc_time
+              availability: []
+              description: Garbage collection time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: parnew
+                - name: cms
+            - name: cassandra.dropped_messages_rate
+              availability: []
+              description: Dropped messages rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: dropped
+            - name: cassandra.client_requests_timeouts_rate
+              availability: []
+              description: Client requests timeouts rate
+              unit: timeout/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: cassandra.client_requests_unavailables_rate
+              availability: []
+              description: Client requests unavailable exceptions rate
+              unit: exceptions/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: cassandra.client_requests_failures_rate
+              availability: []
+              description: Client requests failures rate
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: cassandra.storage_exceptions_rate
+              availability: []
+              description: Storage exceptions rate
+              unit: exceptions/s
+              chart_type: line
+              dimensions:
+                - name: storage
+        - name: thread pool
+          description: Metrics related to Cassandra's thread pools. Each thread pool provides its own set of the following metrics.
+          labels:
+            - name: thread_pool
+              description: thread pool name
+          metrics:
+            - name: cassandra.thread_pool_active_tasks_count
+              availability: []
+              description: Active tasks
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: cassandra.thread_pool_pending_tasks_count
+              availability: []
+              description: Pending tasks
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: cassandra.thread_pool_blocked_tasks_count
+              availability: []
+              description: Blocked tasks
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: blocked
+            - name: cassandra.thread_pool_blocked_tasks_rate
+              availability: []
+              description: Blocked tasks rate
+              unit: tasks/s
+              chart_type: line
+              dimensions:
+                - name: blocked

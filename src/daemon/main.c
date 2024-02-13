@@ -303,7 +303,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     do {                                                \
         usec_t now_ut = now_monotonic_usec();           \
         if(prev_msg)                                    \
-            netdata_log_info("NETDATA SHUTDOWN: in %7llu ms, %s%s - next: %s", (now_ut - last_ut) / USEC_PER_MS, (timeout)?"(TIMEOUT) ":"", prev_msg, msg); \
+            netdata_log_info("NETDATA SHUTDOWN: in %llu ms, %s%s - next: %s", (now_ut - last_ut) / USEC_PER_MS, (timeout)?"(TIMEOUT) ":"", prev_msg, msg); \
         else                                            \
             netdata_log_info("NETDATA SHUTDOWN: next: %s", msg);    \
         last_ut = now_ut;                               \

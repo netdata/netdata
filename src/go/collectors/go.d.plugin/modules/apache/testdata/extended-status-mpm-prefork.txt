@@ -1,0 +1,48 @@
+some.host.name
+ServerVersion: Apache/2.4.53 (Unix) OpenSSL/1.1.1
+ServerMPM: prefork
+Server Built: Apr  6 2022 16:30:59
+CurrentTime: Monday, 18-Apr-2022 11:52:39 CEST
+RestartTime: Sunday, 10-Apr-2022 06:57:34 CEST
+ParentServerConfigGeneration: 9
+ParentServerMPMGeneration: 8
+ServerUptimeSeconds: 708904
+ServerUptime: 8 days 4 hours 55 minutes 4 seconds
+Load1: 7.18
+Load5: 7.29
+Load15: 8.25
+Total Accesses: 120358784
+Total kBytes: 4252382776
+Total Duration: 35583107177
+CPUUser: 4549.96
+CPUSystem: 4142.92
+CPUChildrenUser: 776666
+CPUChildrenSystem: 609619
+CPULoad: 196.78
+Uptime: 708904
+ReqPerSec: 169.781
+BytesPerSec: 6142500
+BytesPerReq: 36178.8
+DurationPerReq: 295.642
+BusyWorkers: 70
+IdleWorkers: 1037
+Scoreboard: ___...
+TLSSessionCacheStatus
+CacheType: SHMCB
+CacheSharedMemory: 512000
+CacheCurrentEntries: 1969
+CacheSubcaches: 32
+CacheIndexesPerSubcaches: 88
+CacheTimeLeftOldestAvg: 295
+CacheTimeLeftOldestMin: 295
+CacheTimeLeftOldestMax: 296
+CacheIndexUsage: 69%
+CacheUsage: 99%
+CacheStoreCount: 22984008
+CacheReplaceCount: 0
+CacheExpireCount: 0
+CacheDiscardCount: 22976594
+CacheRetrieveHitCount: 5501
+CacheRetrieveMissCount: 4630
+CacheRemoveHitCount: 5491
+CacheRemoveMissCount: 51

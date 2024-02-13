@@ -117,7 +117,7 @@ context, charttype]`, where:
   that is `A.B`, with `A` being the name of the collector, and `B` being the name of the specific metric.
 - `charttype`: Either `line`, `area`, or `stacked`. If null line is the default value.
 
-You can read more about `family` and `context` in the [web dashboard](https://github.com/netdata/netdata/blob/master/web/README.md#families) doc.
+You can read more about `family` and `context` in the [web dashboard](https://github.com/netdata/netdata/blob/master/src/web/README.md#families) doc.
 
 Once the chart has been defined, you should define the dimensions of the chart. Dimensions are basically the metrics to
 be represented in this chart and each chart can have more than one dimension. In order to define the dimensions, the
@@ -539,7 +539,7 @@ At minimum, to be buildable and testable, the PR needs to include:
 -   A basic configuration for the plugin in the appropriate global config file: `collectors/python.d.plugin/python.d.conf`, which is also in YAML format.  Either add a line that reads `# <module_name>: yes` if the module is to be enabled by default, or one that reads `<module_name>: no` if it is to be disabled by default.
 -   A makefile for the plugin at `collectors/python.d.plugin/<module_dir>/Makefile.inc`.  Check an existing plugin for what this should look like.
 -   A line in `collectors/python.d.plugin/Makefile.am` including the above-mentioned makefile. Place it with the other plugin includes (please keep the includes sorted alphabetically).
--   Optionally, chart information in `web/gui/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
+-   Optionally, chart information in `src/web/gui/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
 -   Optionally, some default alert configurations for your collector in `health/health.d/<module_name>.conf` and a line adding `<module_name>.conf` in `health/Makefile.am`.
 
 ## Framework class reference

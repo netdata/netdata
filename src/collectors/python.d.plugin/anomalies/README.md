@@ -219,7 +219,7 @@ If you would like to go deeper on what exactly the anomalies collector is doing 
 
 ## Notes
 
-- Python 3 is required as the [`netdata-pandas`](https://github.com/netdata/netdata-pandas) package uses Python async libraries ([asks](https://pypi.org/project/asks/) and [trio](https://pypi.org/project/trio/)) to make asynchronous calls to the [Netdata REST API](https://github.com/netdata/netdata/blob/master/web/api/README.md) to get the required data for each chart.
+- Python 3 is required as the [`netdata-pandas`](https://github.com/netdata/netdata-pandas) package uses Python async libraries ([asks](https://pypi.org/project/asks/) and [trio](https://pypi.org/project/trio/)) to make asynchronous calls to the [Netdata REST API](https://github.com/netdata/netdata/blob/master/src/web/api/README.md) to get the required data for each chart.
 - Python 3 is also required for the underlying ML libraries of [numba](https://pypi.org/project/numba/), [scikit-learn](https://pypi.org/project/scikit-learn/), and [PyOD](https://pypi.org/project/pyod/).
 - It may take a few hours or so (depending on your choice of `train_secs_n`) for the collector to 'settle' into it's typical behaviour in terms of the trained models and probabilities you will see in the normal running of your node.
 - As this collector does most of the work in Python itself, with [PyOD](https://pyod.readthedocs.io/en/latest/) leveraging [numba](https://numba.pydata.org/) under the hood, you may want to try it out first on a test or development system to get a sense of its performance characteristics on a node similar to where you would like to use it.

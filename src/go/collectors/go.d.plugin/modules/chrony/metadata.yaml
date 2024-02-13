@@ -1,0 +1,208 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-chrony
+      module_name: chrony
+      plugin_name: go.d.plugin
+      monitored_instance:
+        categories:
+          - data-collection.system-clock-and-ntp
+        icon_filename: chrony.jpg
+        name: Chrony
+        link: https://chrony.tuxfamily.org/
+      alternative_monitored_instances: []
+      keywords: []
+      info_provided_to_referring_integrations:
+        description: ""
+      related_resources:
+        integrations:
+          list: []
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: This collector monitors the system's clock performance and peers activity status
+        method_description: It collects metrics by sending UDP packets to chronyd using the Chrony communication protocol v6.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector discovers Chrony instance running on the local host and listening on port 323.
+            On startup, it tries to collect metrics from:
+            
+            - 127.0.0.1:323
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/chrony.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: Server address. The format is IP:PORT.
+              default_value: 127.0.0.1:323
+              required: true
+            - name: timeout
+              description: Connection timeout. Zero means no timeout.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:323
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:323
+                
+                  - name: remote
+                    address: 192.0.2.1:323
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: chrony.stratum
+              availability: []
+              description: Distance to the reference clock
+              unit: level
+              chart_type: line
+              dimensions:
+                - name: stratum
+            - name: chrony.current_correction
+              availability: []
+              description: Current correction
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: current_correction
+            - name: chrony.root_delay
+              availability: []
+              description: Network path delay to stratum-1
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: root_delay
+            - name: chrony.root_dispersion
+              availability: []
+              description: Dispersion accumulated back to stratum-1
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: root_delay
+            - name: chrony.last_offset
+              availability: []
+              description: Offset on the last clock update
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: offset
+            - name: chrony.rms_offset
+              availability: []
+              description: Long-term average of the offset value
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: offset
+            - name: chrony.frequency
+              availability: []
+              description: Frequency
+              unit: ppm
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: chrony.residual_frequency
+              availability: []
+              description: Residual frequency
+              unit: ppm
+              chart_type: line
+              dimensions:
+                - name: residual_frequency
+            - name: chrony.skew
+              availability: []
+              description: Skew
+              unit: ppm
+              chart_type: line
+              dimensions:
+                - name: skew
+            - name: chrony.update_interval
+              availability: []
+              description: Interval between the last two clock updates
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: update_interval
+            - name: chrony.ref_measurement_time
+              availability: []
+              description: Time since the last measurement
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: ref_measurement_time
+            - name: chrony.leap_status
+              availability: []
+              description: Leap status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: normal
+                - name: insert_second
+                - name: delete_second
+                - name: unsynchronised
+            - name: chrony.activity
+              availability: []
+              description: Peers activity
+              unit: sources
+              chart_type: stacked
+              dimensions:
+                - name: online
+                - name: offline
+                - name: burst_online
+                - name: burst_offline
+                - name: unresolved

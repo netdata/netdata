@@ -8,9 +8,6 @@
 #define NETDATA_EBPF_FS_MODULE_DESC "Monitor filesystem latency for: btrfs, ext4, nfs, xfs and zfs."
 
 #include "ebpf.h"
-#ifdef LIBBPF_MAJOR_VERSION
-#include "includes/filesystem.skel.h"
-#endif
 
 #define NETDATA_FS_MAX_DIST_NAME 64UL
 

@@ -1,0 +1,43 @@
+# HELP test_histogram_1_duration_seconds Test Histogram Metric 1
+# TYPE test_histogram_1_duration_seconds histogram
+test_histogram_1_duration_seconds_bucket{label1="value1",le="0.1"} 4
+test_histogram_1_duration_seconds_bucket{label1="value1",le="0.5"} 5
+test_histogram_1_duration_seconds_bucket{label1="value1",le="+Inf"} 6
+test_histogram_1_duration_seconds_sum{label1="value1"} 0.00147889
+test_histogram_1_duration_seconds_count{label1="value1"} 6
+test_histogram_1_duration_seconds_bucket{label1="value2",le="0.1"} 4
+test_histogram_1_duration_seconds_bucket{label1="value2",le="0.5"} 5
+test_histogram_1_duration_seconds_bucket{label1="value2",le="+Inf"} 6
+test_histogram_1_duration_seconds_sum{label1="value2"} 0.00147889
+test_histogram_1_duration_seconds_count{label1="value2"} 6
+test_histogram_1_duration_seconds_bucket{label1="value3",le="0.1"} 4
+test_histogram_1_duration_seconds_bucket{label1="value3",le="0.5"} 5
+test_histogram_1_duration_seconds_bucket{label1="value3",le="+Inf"} 6
+test_histogram_1_duration_seconds_sum{label1="value3"} 0.00147889
+test_histogram_1_duration_seconds_count{label1="value3"} 6
+test_histogram_1_duration_seconds_bucket{label1="value4",le="0.1"} 4
+test_histogram_1_duration_seconds_bucket{label1="value4",le="0.5"} 5
+test_histogram_1_duration_seconds_bucket{label1="value4",le="+Inf"} 6
+test_histogram_1_duration_seconds_sum{label1="value4"} 0.00147889
+test_histogram_1_duration_seconds_count{label1="value4"} 6
+# TYPE test_histogram_2_duration_seconds histogram
+test_histogram_2_duration_seconds_bucket{label1="value1",le="0.1"} 7
+test_histogram_2_duration_seconds_bucket{label1="value1",le="0.5"} 8
+test_histogram_2_duration_seconds_bucket{label1="value1",le="+Inf"} 9
+test_histogram_2_duration_seconds_sum{label1="value1"} 0.00247889
+test_histogram_2_duration_seconds_count{label1="value1"} 9
+test_histogram_2_duration_seconds_bucket{label1="value2",le="0.1"} 7
+test_histogram_2_duration_seconds_bucket{label1="value2",le="0.5"} 8
+test_histogram_2_duration_seconds_bucket{label1="value2",le="+Inf"} 9
+test_histogram_2_duration_seconds_sum{label1="value2"} 0.00247889
+test_histogram_2_duration_seconds_count{label1="value2"} 9
+test_histogram_2_duration_seconds_bucket{label1="value3",le="0.1"} 7
+test_histogram_2_duration_seconds_bucket{label1="value3",le="0.5"} 8
+test_histogram_2_duration_seconds_bucket{label1="value3",le="+Inf"} 9
+test_histogram_2_duration_seconds_sum{label1="value3"} 0.00247889
+test_histogram_2_duration_seconds_count{label1="value3"} 9
+test_histogram_2_duration_seconds_bucket{label1="value4",le="0.1"} 7
+test_histogram_2_duration_seconds_bucket{label1="value4",le="0.5"} 8
+test_histogram_2_duration_seconds_bucket{label1="value4",le="+Inf"} 9
+test_histogram_2_duration_seconds_sum{label1="value4"} 0.00247889
+test_histogram_2_duration_seconds_count{label1="value4"} 9

@@ -1,0 +1,377 @@
+{
+  "_nodes": {
+    "total": 3,
+    "successful": 3,
+    "failed": 0
+  },
+  "cluster_name": "36928dce44074ceba64d7b3d698443a7",
+  "cluster_uuid": "5jO2X31FQ32kJAWoCsp3Vw",
+  "timestamp": 1687866240414,
+  "status": "green",
+  "indices": {
+    "count": 97,
+    "shards": {
+      "total": 194,
+      "primaries": 97,
+      "replication": 1,
+      "index": {
+        "shards": {
+          "min": 2,
+          "max": 2,
+          "avg": 2
+        },
+        "primaries": {
+          "min": 1,
+          "max": 1,
+          "avg": 1
+        },
+        "replication": {
+          "min": 1,
+          "max": 1,
+          "avg": 1
+        }
+      }
+    },
+    "docs": {
+      "count": 402750703,
+      "deleted": 1603
+    },
+    "store": {
+      "size_in_bytes": 380826136962,
+      "total_data_set_size_in_bytes": 380826136962,
+      "reserved_in_bytes": 0
+    },
+    "fielddata": {
+      "memory_size_in_bytes": 600,
+      "evictions": 0
+    },
+    "query_cache": {
+      "memory_size_in_bytes": 37465951,
+      "total_count": 684606952,
+      "hit_count": 96838726,
+      "miss_count": 587768226,
+      "cache_size": 22571,
+      "cache_count": 91319,
+      "evictions": 68748
+    },
+    "completion": {
+      "size_in_bytes": 0
+    },
+    "segments": {
+      "count": 614,
+      "memory_in_bytes": 0,
+      "terms_memory_in_bytes": 0,
+      "stored_fields_memory_in_bytes": 0,
+      "term_vectors_memory_in_bytes": 0,
+      "norms_memory_in_bytes": 0,
+      "points_memory_in_bytes": 0,
+      "doc_values_memory_in_bytes": 0,
+      "index_writer_memory_in_bytes": 368167356,
+      "version_map_memory_in_bytes": 54470768,
+      "fixed_bit_set_memory_in_bytes": 57736,
+      "max_unsafe_auto_id_timestamp": 1679747033889,
+      "file_sizes": {}
+    },
+    "mappings": {
+      "total_field_count": 10467,
+      "total_deduplicated_field_count": 2070,
+      "total_deduplicated_mapping_size_in_bytes": 26441,
+      "field_types": [
+        {
+          "name": "alias",
+          "count": 1,
+          "index_count": 1,
+          "script_count": 0
+        },
+        {
+          "name": "boolean",
+          "count": 77,
+          "index_count": 37,
+          "script_count": 0
+        },
+        {
+          "name": "constant_keyword",
+          "count": 10,
+          "index_count": 4,
+          "script_count": 0
+        },
+        {
+          "name": "date",
+          "count": 763,
+          "index_count": 86,
+          "script_count": 0
+        },
+        {
+          "name": "flattened",
+          "count": 27,
+          "index_count": 27,
+          "script_count": 0
+        },
+        {
+          "name": "float",
+          "count": 8,
+          "index_count": 4,
+          "script_count": 0
+        },
+        {
+          "name": "integer",
+          "count": 279,
+          "index_count": 70,
+          "script_count": 0
+        },
+        {
+          "name": "ip",
+          "count": 4,
+          "index_count": 4,
+          "script_count": 0
+        },
+        {
+          "name": "keyword",
+          "count": 4345,
+          "index_count": 86,
+          "script_count": 0
+        },
+        {
+          "name": "long",
+          "count": 1143,
+          "index_count": 79,
+          "script_count": 0
+        },
+        {
+          "name": "match_only_text",
+          "count": 1170,
+          "index_count": 69,
+          "script_count": 0
+        },
+        {
+          "name": "nested",
+          "count": 4,
+          "index_count": 4,
+          "script_count": 0
+        },
+        {
+          "name": "object",
+          "count": 2583,
+          "index_count": 85,
+          "script_count": 0
+        },
+        {
+          "name": "text",
+          "count": 49,
+          "index_count": 17,
+          "script_count": 0
+        },
+        {
+          "name": "version",
+          "count": 4,
+          "index_count": 4,
+          "script_count": 0
+        }
+      ],
+      "runtime_field_types": []
+    },
+    "analysis": {
+      "char_filter_types": [],
+      "tokenizer_types": [],
+      "filter_types": [],
+      "analyzer_types": [],
+      "built_in_char_filters": [],
+      "built_in_tokenizers": [],
+      "built_in_filters": [],
+      "built_in_analyzers": []
+    },
+    "versions": [
+      {
+        "version": "8.4.2",
+        "index_count": 97,
+        "primary_shard_count": 97,
+        "total_primary_bytes": 189671468048
+      }
+    ]
+  },
+  "nodes": {
+    "count": {
+      "total": 3,
+      "coordinating_only": 0,
+      "data": 0,
+      "data_cold": 0,
+      "data_content": 2,
+      "data_frozen": 0,
+      "data_hot": 2,
+      "data_warm": 0,
+      "ingest": 2,
+      "master": 3,
+      "ml": 0,
+      "remote_cluster_client": 2,
+      "transform": 2,
+      "voting_only": 1
+    },
+    "versions": [
+      "8.4.2"
+    ],
+    "os": {
+      "available_processors": 8,
+      "allocated_processors": 8,
+      "names": [
+        {
+          "name": "Linux",
+          "count": 3
+        }
+      ],
+      "pretty_names": [
+        {
+          "pretty_name": "Ubuntu 20.04.5 LTS",
+          "count": 3
+        }
+      ],
+      "architectures": [
+        {
+          "arch": "amd64",
+          "count": 3
+        }
+      ],
+      "mem": {
+        "total_in_bytes": 33285996544,
+        "adjusted_total_in_bytes": 32153534464,
+        "free_in_bytes": 1732333568,
+        "used_in_bytes": 31553662976,
+        "free_percent": 5,
+        "used_percent": 95
+      }
+    },
+    "process": {
+      "cpu": {
+        "percent": 26
+      },
+      "open_file_descriptors": {
+        "min": 557,
+        "max": 1185,
+        "avg": 968
+      }
+    },
+    "jvm": {
+      "max_uptime_in_millis": 23671188288,
+      "versions": [
+        {
+          "version": "18.0.2.1",
+          "vm_name": "OpenJDK 64-Bit Server VM",
+          "vm_version": "18.0.2.1+1-1",
+          "vm_vendor": "Oracle Corporation",
+          "bundled_jdk": true,
+          "using_bundled_jdk": true,
+          "count": 3
+        }
+      ],
+      "mem": {
+        "heap_used_in_bytes": 8044798544,
+        "heap_max_in_bytes": 16009658368
+      },
+      "threads": 272
+    },
+    "fs": {
+      "total_in_bytes": 979252543488,
+      "free_in_bytes": 595738775552,
+      "available_in_bytes": 595738775552
+    },
+    "plugins": [],
+    "network_types": {
+      "transport_types": {
+        "security4": 3
+      },
+      "http_types": {
+        "security4": 3
+      }
+    },
+    "discovery_types": {
+      "multi-node": 3
+    },
+    "packaging_types": [
+      {
+        "flavor": "default",
+        "type": "docker",
+        "count": 3
+      }
+    ],
+    "ingest": {
+      "number_of_pipelines": 20,
+      "processor_stats": {
+        "conditional": {
+          "count": 0,
+          "failed": 0,
+          "current": 0,
+          "time_in_millis": 0
+        },
+        "date": {
+          "count": 0,
+          "failed": 0,
+          "current": 0,
+          "time_in_millis": 0
+        },
+        "geoip": {
+          "count": 0,
+          "failed": 0,
+          "current": 0,
+          "time_in_millis": 0
+        },
+        "pipeline": {
+          "count": 0,
+          "failed": 0,
+          "current": 0,
+          "time_in_millis": 0
+        },
+        "remove": {
+          "count": 0,
+          "failed": 0,
+          "current": 0,
+          "time_in_millis": 0
+        },
+        "rename": {
+          "count": 0,
+          "failed": 0,
+          "current": 0,
+          "time_in_millis": 0
+        },
+        "script": {
+          "count": 0,
+          "failed": 0,
+          "current": 0,
+          "time_in_millis": 0
+        },
+        "set": {
+          "count": 0,
+          "failed": 0,
+          "current": 0,
+          "time_in_millis": 0
+        },
+        "set_security_user": {
+          "count": 0,
+          "failed": 0,
+          "current": 0,
+          "time_in_millis": 0
+        }
+      }
+    },
+    "indexing_pressure": {
+      "memory": {
+        "current": {
+          "combined_coordinating_and_primary_in_bytes": 0,
+          "coordinating_in_bytes": 0,
+          "primary_in_bytes": 0,
+          "replica_in_bytes": 0,
+          "all_in_bytes": 0
+        },
+        "total": {
+          "combined_coordinating_and_primary_in_bytes": 0,
+          "coordinating_in_bytes": 0,
+          "primary_in_bytes": 0,
+          "replica_in_bytes": 0,
+          "all_in_bytes": 0,
+          "coordinating_rejections": 0,
+          "primary_rejections": 0,
+          "replica_rejections": 0
+        },
+        "limit_in_bytes": 0
+      }
+    }
+  }
+}

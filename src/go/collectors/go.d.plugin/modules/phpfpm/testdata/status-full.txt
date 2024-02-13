@@ -1,0 +1,59 @@
+pool:                 www
+process manager:      dynamic
+start time:           21/Aug/2019:09:04:50 +0200
+start since:          1079
+accepted conn:        20
+listen queue:         0
+max listen queue:     0
+listen queue len:     0
+idle processes:       1
+active processes:     1
+total processes:      2
+max active processes: 1
+max children reached: 0
+slow requests:        0
+
+************************
+pid:                  67858
+state:                Running
+start time:           21/Aug/2019:09:04:50 +0200
+start since:          1079
+requests:             10
+request duration:     697
+request method:       GET
+request URI:          /status?full
+content length:       0
+user:                 -
+script:               -
+last request cpu:     0.00
+last request memory:  0
+
+************************
+pid:                  67859
+state:                Idle
+start time:           21/Aug/2019:09:04:50 +0200
+start since:          1079
+requests:             10
+request duration:     536
+request method:       GET
+request URI:          /status
+content length:       0
+user:                 -
+script:               -
+last request cpu:     0.00
+last request memory:  2097152
+
+************************
+pid:                  67860
+state:                Idle
+start time:           21/Aug/2019:09:04:50 +0200
+start since:          1079
+requests:             10
+request duration:     18446744073709551227
+request method:       GET
+request URI:          /status?full
+content length:       0
+user:                 -
+script:               -
+last request cpu:     10.00
+last request memory:  2093045

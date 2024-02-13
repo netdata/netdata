@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/logind job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

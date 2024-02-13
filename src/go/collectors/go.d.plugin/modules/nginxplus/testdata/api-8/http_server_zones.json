@@ -1,0 +1,21 @@
+{
+  "server_backend": {
+    "processing": 1,
+    "requests": 8962,
+    "responses": {
+      "1xx": 0,
+      "2xx": 8960,
+      "3xx": 0,
+      "4xx": 1,
+      "5xx": 0,
+      "codes": {
+        "200": 8960,
+        "404": 1
+      },
+      "total": 8961
+    },
+    "discarded": 0,
+    "received": 1773834,
+    "sent": 4585734
+  }
+}

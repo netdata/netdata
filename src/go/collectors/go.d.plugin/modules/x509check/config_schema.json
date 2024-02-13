@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "go.d/x509check job configuration schema.",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    },
+    "tlscfg": {
+      "type": "object",
+      "properties": {
+        "tls_ca": {
+          "type": "string"
+        },
+        "tls_cert": {
+          "type": "string"
+        },
+        "tls_key": {
+          "type": "string"
+        },
+        "tls_skip_verify": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tls_ca",
+        "tls_cert",
+        "tls_key"
+      ]
+    },
+    "days_until_expiration_warning": {
+      "type": "integer"
+    },
+    "days_until_expiration_critical": {
+      "type": "integer"
+    },
+    "check_revocation_status": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "source"
+  ]
+}

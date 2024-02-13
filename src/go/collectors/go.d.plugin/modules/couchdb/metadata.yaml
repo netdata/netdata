@@ -1,0 +1,323 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-couchdb
+      plugin_name: go.d.plugin
+      module_name: couchdb
+      monitored_instance:
+        name: CouchDB
+        link: https://couchdb.apache.org/
+        icon_filename: couchdb.svg
+        categories:
+          - data-collection.database-servers
+      keywords:
+        - couchdb
+        - databases
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors CouchDB servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/couchdb.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:5984
+              required: true
+            - name: node
+              description: CouchDB node name. Same as -name vm.args argument.
+              default_value: "_local"
+              required: false
+            - name: databases
+              description: List of database names for which db-specific stats should be displayed, space separated.
+              default_value: ""
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 2
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client tls certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client tls key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              folding:
+                title: Example
+                enabled: true
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:5984
+            - name: Basic HTTP auth
+              description: >
+                Local server with basic HTTP authentication, node name and multiple databases defined.
+                Make sure to match the node name with the `NODENAME` value in your CouchDB's `etc/vm.args` file. 
+                Typically, this is of the form `couchdb@fully.qualified.domain.name` in a cluster, or `couchdb@127.0.0.1` for a single-node server.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:5984
+                    node: couchdb@127.0.0.1
+                    databases: my-db other-db
+                    username: foo
+                    password: bar
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:5984
+                
+                  - name: remote
+                    url: http://203.0.113.0:5984
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: couchdb.activity
+              description: Overall Activity
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: db_reads
+                - name: db_writes
+                - name: view_reads
+            - name: couchdb.request_methods
+              description: HTTP request methods
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: copy
+                - name: delete
+                - name: get
+                - name: head
+                - name: options
+                - name: post
+                - name: put
+            - name: couchdb.response_codes
+              description: HTTP response status codes
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: "200"
+                - name: "201"
+                - name: "202"
+                - name: "204"
+                - name: "206"
+                - name: "301"
+                - name: "302"
+                - name: "304"
+                - name: "400"
+                - name: "401"
+                - name: "403"
+                - name: "404"
+                - name: "406"
+                - name: "409"
+                - name: "412"
+                - name: "413"
+                - name: "414"
+                - name: "415"
+                - name: "416"
+                - name: "417"
+                - name: "500"
+                - name: "501"
+                - name: "503"
+            - name: couchdb.response_code_classes
+              description: HTTP response status code classes
+              unit: responses/s
+              chart_type: stacked
+              dimensions:
+                - name: 2xx
+                - name: 3xx
+                - name: 4xx
+                - name: 5xx
+            - name: couchdb.active_tasks
+              description: Active task breakdown
+              unit: tasks
+              chart_type: stacked
+              dimensions:
+                - name: indexer
+                - name: db_compaction
+                - name: replication
+                - name: view_compaction
+            - name: couchdb.replicator_jobs
+              description: Replicator job breakdown
+              unit: jobs
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: pending
+                - name: crashed
+                - name: internal_replication_jobs
+            - name: couchdb.open_files
+              description: Open files
+              unit: files
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: couchdb.erlang_vm_memory
+              description: Erlang VM memory usage
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: atom
+                - name: binaries
+                - name: code
+                - name: ets
+                - name: procs
+                - name: other
+            - name: couchdb.proccounts
+              description: Process counts
+              unit: processes
+              chart_type: line
+              dimensions:
+                - name: os_procs
+                - name: erl_procs
+            - name: couchdb.peakmsgqueue
+              description: Peak message queue size
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: peak_size
+            - name: couchdb.reductions
+              description: Erlang reductions
+              unit: reductions
+              chart_type: line
+              dimensions:
+                - name: reductions
+            - name: couchdb.db_sizes_file
+              description: Database sizes (file)
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: a dimension per database
+            - name: couchdb.db_sizes_external
+              description: Database sizes (external)
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: a dimension per database
+            - name: couchdb.db_sizes_active
+              description: Database sizes (active)
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: a dimension per database
+            - name: couchdb.db_doc_count
+              description: 'Database # of docs'
+              unit: docs
+              chart_type: line
+              dimensions:
+                - name: a dimension per database
+            - name: couchdb.db_doc_del_count
+              description: 'Database # of deleted docs'
+              unit: docs
+              chart_type: line
+              dimensions:
+                - name: a dimension per database

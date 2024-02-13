@@ -1,0 +1,14 @@
+{
+  "result": {
+    "locked": {
+      "used": 288,
+      "free": 65248,
+      "total": 65536,
+      "locked": 65536,
+      "chunks_used": 4,
+      "chunks_free": 2
+    }
+  },
+  "error": null,
+  "id": "1"
+}

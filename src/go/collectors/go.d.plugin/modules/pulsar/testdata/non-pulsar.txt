@@ -1,0 +1,27 @@
+# HELP wmi_os_process_memory_limix_bytes OperatingSystem.MaxProcessMemorySize
+# TYPE wmi_os_process_memory_limix_bytes gauge
+wmi_os_process_memory_limix_bytes 1.40737488224256e+14
+# HELP wmi_os_processes OperatingSystem.NumberOfProcesses
+# TYPE wmi_os_processes gauge
+wmi_os_processes 124
+# HELP wmi_os_processes_limit OperatingSystem.MaxNumberOfProcesses
+# TYPE wmi_os_processes_limit gauge
+wmi_os_processes_limit 4.294967295e+09
+# HELP wmi_os_time OperatingSystem.LocalDateTime
+# TYPE wmi_os_time gauge
+wmi_os_time 1.57804974e+09
+# HELP wmi_os_timezone OperatingSystem.LocalDateTime
+# TYPE wmi_os_timezone gauge
+wmi_os_timezone{timezone="MSK"} 1
+# HELP wmi_os_users OperatingSystem.NumberOfUsers
+# TYPE wmi_os_users gauge
+wmi_os_users 2
+# HELP wmi_os_virtual_memory_bytes OperatingSystem.TotalVirtualMemorySize
+# TYPE wmi_os_virtual_memory_bytes gauge
+wmi_os_virtual_memory_bytes 5.770891264e+09
+# HELP wmi_os_virtual_memory_free_bytes OperatingSystem.FreeVirtualMemory
+# TYPE wmi_os_virtual_memory_free_bytes gauge
+wmi_os_virtual_memory_free_bytes 3.76489984e+09
+# HELP wmi_os_visible_memory_bytes OperatingSystem.TotalVisibleMemorySize
+# TYPE wmi_os_visible_memory_bytes gauge
+wmi_os_visible_memory_bytes 4.294496256e+09

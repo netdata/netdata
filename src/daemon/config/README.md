@@ -25,7 +25,7 @@ adapt the general behavior of Netdata, in great detail. You can find all these s
 accessing the URL `https://netdata.server.hostname:19999/netdata.conf`. For example check the configuration file
 of [netdata.firehol.org](http://netdata.firehol.org/netdata.conf). HTTP access to this file is limited by default to
 [private IPs](https://en.wikipedia.org/wiki/Private_network), via
-the [web server access lists](https://github.com/netdata/netdata/blob/master/web/server/README.md#access-lists).
+the [web server access lists](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#access-lists).
 
 `netdata.conf` has sections stated with `[section]`. You will see the following sections:
 
@@ -38,7 +38,7 @@ the [web server access lists](https://github.com/netdata/netdata/blob/master/web
 6. `[sqlite]` to [configure](#sqlite-section-options) the [Netdata daemon](https://github.com/netdata/netdata/blob/master/src/daemon/README.md) SQLite settings.
 7. `[ml]` to configure settings for [machine learning](https://github.com/netdata/netdata/blob/master/src/ml/README.md).
 8. `[health]` to [configure](#health-section-options) general settings for [health monitoring](https://github.com/netdata/netdata/blob/master/src/health/README.md).
-9. `[web]` to [configure the web server](https://github.com/netdata/netdata/blob/master/web/server/README.md).
+9. `[web]` to [configure the web server](https://github.com/netdata/netdata/blob/master/src/web/server/README.md).
 10. `[registry]` for the [Netdata registry](https://github.com/netdata/netdata/blob/master/src/registry/README.md).
 11. `[global statistics]` for the [Netdata registry](https://github.com/netdata/netdata/blob/master/src/registry/README.md).
 12. `[statsd]` for the general settings of the [stats.d.plugin](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/README.md).
@@ -181,7 +181,7 @@ monitoring](https://github.com/netdata/netdata/blob/master/src/health/README.md)
 
 ### [web] section options
 
-Refer to the [web server documentation](https://github.com/netdata/netdata/blob/master/web/server/README.md)
+Refer to the [web server documentation](https://github.com/netdata/netdata/blob/master/src/web/server/README.md)
 
 ### [plugins] section options
 

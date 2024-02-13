@@ -3,7 +3,7 @@
 If you need to access a Netdata agent's user interface or API in a production environment we recommend you put Netdata behind
 another web server and secure access to the dashboard via SSL, user authentication and firewall rules. 
 
-A dedicated web server also provides more robustness and capabilities than the Agent's [internal web server](https://github.com/netdata/netdata/blob/master/web/README.md).
+A dedicated web server also provides more robustness and capabilities than the Agent's [internal web server](https://github.com/netdata/netdata/blob/master/src/web/README.md).
 
 We have documented running behind
 [nginx](https://github.com/netdata/netdata/blob/master/docs/Running-behind-nginx.md),

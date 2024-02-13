@@ -1,0 +1,190 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-docker
+      plugin_name: go.d.plugin
+      module_name: docker
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: Docker
+        link: https://www.docker.com/
+        categories:
+          - data-collection.containers-and-vms
+        icon_filename: docker.svg
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - container
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Docker containers state, health status and more.
+        method_description: |
+          It connects to the Docker instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [System info](https://docs.docker.com/engine/api/v1.43/#tag/System/operation/SystemInfo).
+          - [List images](https://docs.docker.com/engine/api/v1.43/#tag/Image/operation/ImageList).
+          - [List containers](https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerList).
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: Requires netdata user to be in the docker group.
+      default_behavior:
+        auto_detection:
+          description: |
+            It discovers instances running on localhost by attempting to connect to a known Docker UNIX socket: `/var/run/docker.sock`.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            Enabling `collect_container_size` may result in high CPU usage depending on the version of Docker Engine.
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/docker.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: 'Docker daemon''s listening address. When using a TCP socket, the format is: tcp://[ip]:[port]'
+              default_value: unix:///var/run/docker.sock
+              required: true
+            - name: timeout
+              description: Request timeout in seconds.
+              default_value: 1
+              required: false
+            - name: collect_container_size
+              description: Whether to collect container writable layer size.
+              default_value: "no"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: An example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    address: 'unix:///var/run/docker.sock'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 'unix:///var/run/docker.sock'
+                
+                  - name: remote
+                    address: 'tcp://203.0.113.10:2375'
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: docker_container_unhealthy
+        metric: docker.container_health_status
+        info: ${label:container_name} docker container health status is unhealthy
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/docker.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: docker.containers_state
+              description: Total number of Docker containers in various states
+              unit: containers
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: paused
+                - name: stopped
+            - name: docker.containers_health_status
+              description: Total number of Docker containers in various health states
+              unit: containers
+              chart_type: line
+              dimensions:
+                - name: healthy
+                - name: unhealthy
+                - name: not_running_unhealthy
+                - name: starting
+                - name: no_healthcheck
+            - name: docker.images
+              description: Total number of Docker images in various states
+              unit: images
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: dangling
+            - name: docker.images_size
+              description: Total size of all Docker images
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+        - name: container
+          description: Metrics related to containers. Each container provides its own set of the following metrics.
+          labels:
+            - name: container_name
+              description: The container's name
+            - name: image
+              description: The image name the container uses
+          metrics:
+            - name: docker.container_state
+              description: Docker container state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: paused
+                - name: exited
+                - name: created
+                - name: restarting
+                - name: removing
+                - name: dead
+            - name: docker.container_health_status
+              description: Docker container health status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: healthy
+                - name: unhealthy
+                - name: not_running_unhealthy
+                - name: starting
+                - name: no_healthcheck
+            - name: docker.container_writeable_layer_size
+              description: Docker container writable layer size
+              unit: size
+              chart_type: line
+              dimensions:
+                - name: writeable_layer

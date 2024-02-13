@@ -1,0 +1,431 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-unbound
+      plugin_name: go.d.plugin
+      module_name: unbound
+      monitored_instance:
+        name: Unbound
+        link: https://nlnetlabs.nl/projects/unbound/about/
+        icon_filename: unbound.png
+        categories:
+          - data-collection.dns-and-dhcp-servers
+      keywords:
+        - unbound
+        - dns
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Unbound servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable remote control interface
+            description: |
+              Set `control-enable` to yes in [unbound.conf](https://nlnetlabs.nl/documentation/unbound/unbound.conf).
+          - title: Check permissions and adjust if necessary
+            description: |
+              If using unix socket:
+              
+              - socket should be readable and writeable by `netdata` user
+              
+              If using ip socket and TLS is disabled:
+              
+              - socket should be accessible via network
+              
+              If TLS is enabled, in addition:
+              
+              - `control-key-file` should be readable by `netdata` user
+              - `control-cert-file` should be readable by `netdata` user
+              
+              For auto-detection parameters from `unbound.conf`:
+              
+              - `unbound.conf` should be readable by `netdata` user
+              - if you have several configuration files (include feature) all of them should be readable by `netdata` user
+      configuration:
+        file:
+          name: go.d/unbound.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: Server address in IP:PORT format.
+              default_value: 127.0.0.1:8953
+              required: true
+            - name: timeout
+              description: Connection/read/write/ssl handshake timeout.
+              default_value: 1
+              required: false
+            - name: conf_path
+              description: Absolute path to the unbound configuration file.
+              default_value: /etc/unbound/unbound.conf
+              required: false
+            - name: cumulative_stats
+              description: Statistics collection mode. Should have the same value as the `statistics-cumulative` parameter in the unbound configuration file.
+              default_value: /etc/unbound/unbound.conf
+              required: false
+            - name: use_tls
+              description: Whether to use TLS or not.
+              default_value: true
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: true
+              required: false
+            - name: tls_ca
+              description: Certificate authority that client use when verifying server certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client tls certificate.
+              default_value: /etc/unbound/unbound_control.pem
+              required: false
+            - name: tls_key
+              description: Client tls key.
+              default_value: /etc/unbound/unbound_control.key
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:8953
+            - name: Unix socket
+              description: Connecting through Unix socket.
+              config: |
+                jobs:
+                  - name: socket
+                    address: /var/run/unbound.sock
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:8953
+                
+                  - name: remote
+                    address: 203.0.113.11:8953
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: unbound.queries
+              description: Received Queries
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: unbound.queries_ip_ratelimited
+              description: Rate Limited Queries
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: ratelimited
+            - name: unbound.dnscrypt_queries
+              description: DNSCrypt Queries
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: crypted
+                - name: cert
+                - name: cleartext
+                - name: malformed
+            - name: unbound.cache
+              description: Cache Statistics
+              unit: events
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: miss
+            - name: unbound.cache_percentage
+              description: Cache Statistics Percentage
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: hits
+                - name: miss
+            - name: unbound.prefetch
+              description: Cache Prefetches
+              unit: prefetches
+              chart_type: line
+              dimensions:
+                - name: prefetches
+            - name: unbound.expired
+              description: Replies Served From Expired Cache
+              unit: replies
+              chart_type: line
+              dimensions:
+                - name: expired
+            - name: unbound.zero_ttl_replies
+              description: Replies Served From Expired Cache
+              unit: replies
+              chart_type: line
+              dimensions:
+                - name: zero_ttl
+            - name: unbound.recursive_replies
+              description: Replies That Needed Recursive Processing
+              unit: replies
+              chart_type: line
+              dimensions:
+                - name: recursive
+            - name: unbound.recursion_time
+              description: Time Spent On Recursive Processing
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: avg
+                - name: median
+            - name: unbound.request_list_usage
+              description: Request List Usage
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: avg
+                - name: max
+            - name: unbound.current_request_list_usage
+              description: Current Request List Usage
+              unit: queries
+              chart_type: area
+              dimensions:
+                - name: all
+                - name: users
+            - name: unbound.request_list_jostle_list
+              description: Request List Jostle List Events
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: overwritten
+                - name: dropped
+            - name: unbound.tcpusage
+              description: TCP Handler Buffers
+              unit: buffers
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: unbound.uptime
+              description: Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: unbound.cache_memory
+              description: Cache Memory
+              unit: KB
+              chart_type: stacked
+              dimensions:
+                - name: message
+                - name: rrset
+                - name: dnscrypt_nonce
+                - name: dnscrypt_shared_secret
+            - name: unbound.mod_memory
+              description: Module Memory
+              unit: KB
+              chart_type: stacked
+              dimensions:
+                - name: iterator
+                - name: respip
+                - name: validator
+                - name: subnet
+                - name: ipsec
+            - name: unbound.mem_streamwait
+              description: TCP and TLS Stream Waif Buffer Memory
+              unit: KB
+              chart_type: line
+              dimensions:
+                - name: streamwait
+            - name: unbound.cache_count
+              description: Cache Items Count
+              unit: items
+              chart_type: stacked
+              dimensions:
+                - name: infra
+                - name: key
+                - name: msg
+                - name: rrset
+                - name: dnscrypt_nonce
+                - name: shared_secret
+            - name: unbound.type_queries
+              description: Queries By Type
+              unit: queries
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per query type
+            - name: unbound.class_queries
+              description: Queries By Class
+              unit: queries
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per query class
+            - name: unbound.opcode_queries
+              description: Queries By OpCode
+              unit: queries
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per query opcode
+            - name: unbound.flag_queries
+              description: Queries By Flag
+              unit: queries
+              chart_type: stacked
+              dimensions:
+                - name: qr
+                - name: aa
+                - name: tc
+                - name: rd
+                - name: ra
+                - name: z
+                - name: ad
+                - name: cd
+            - name: unbound.rcode_answers
+              description: Replies By RCode
+              unit: replies
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per reply rcode
+        - name: thread
+          description: These metrics refer to threads.
+          labels: []
+          metrics:
+            - name: unbound.thread_queries
+              description: Thread Received Queries
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: unbound.thread_queries_ip_ratelimited
+              description: Thread Rate Limited Queries
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: ratelimited
+            - name: unbound.thread_dnscrypt_queries
+              description: Thread DNSCrypt Queries
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: crypted
+                - name: cert
+                - name: cleartext
+                - name: malformed
+            - name: unbound.thread_cache
+              description: Cache Statistics
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: miss
+            - name: unbound.thread_cache_percentage
+              description: Cache Statistics Percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: miss
+            - name: unbound.thread_prefetch
+              description: Cache Prefetches
+              unit: prefetches
+              chart_type: line
+              dimensions:
+                - name: prefetches
+            - name: unbound.thread_expired
+              description: Replies Served From Expired Cache
+              unit: replies
+              chart_type: line
+              dimensions:
+                - name: expired
+            - name: unbound.thread_zero_ttl_replies
+              description: Replies Served From Expired Cache
+              unit: replies
+              chart_type: line
+              dimensions:
+                - name: zero_ttl
+            - name: unbound.thread_recursive_replies
+              description: Replies That Needed Recursive Processing
+              unit: replies
+              chart_type: line
+              dimensions:
+                - name: recursive
+            - name: unbound.thread_recursion_time
+              description: Time Spent On Recursive Processing
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: avg
+                - name: median
+            - name: unbound.thread_request_list_usage
+              description: Time Spent On Recursive Processing
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: avg
+                - name: max
+            - name: unbound.thread_current_request_list_usage
+              description: Current Request List Usage
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: all
+                - name: users
+            - name: unbound.thread_request_list_jostle_list
+              description: Request List Jostle List Events
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: overwritten
+                - name: dropped
+            - name: unbound.thread_tcpusage
+              description: TCP Handler Buffers
+              unit: buffers
+              chart_type: line
+              dimensions:
+                - name: usage

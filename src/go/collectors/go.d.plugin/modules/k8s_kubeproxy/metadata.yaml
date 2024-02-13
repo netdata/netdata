@@ -1,0 +1,227 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-k8s_kubeproxy
+      plugin_name: go.d.plugin
+      module_name: k8s_kubeproxy
+      monitored_instance:
+        name: Kubeproxy
+        link: https://kubernetes.io/docs/concepts/overview/components/#kube-proxy
+        icon_filename: kubernetes.svg
+        categories:
+          - data-collection.kubernetes
+      keywords:
+        - kubeproxy
+        - kubernetes
+        - k8s
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Kubeproxy instances.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/k8s_kubeproxy.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:10249/metrics
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:10249/metrics
+            - name: HTTPS with self-signed certificate
+              description: |
+                Do not validate server certificate chain and hostname.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:10249/metrics
+                    tls_skip_verify: yes
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: k8s_kubeproxy.kubeproxy_sync_proxy_rules
+              description: Sync Proxy Rules
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: sync_proxy_rules
+            - name: k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency_microsecond
+              description: Sync Proxy Rules Latency
+              unit: observes/s
+              chart_type: stacked
+              dimensions:
+                - name: "0.001"
+                - name: "0.002"
+                - name: "0.004"
+                - name: "0.008"
+                - name: "0.016"
+                - name: "0.032"
+                - name: "0.064"
+                - name: "0.128"
+                - name: "0.256"
+                - name: "0.512"
+                - name: "1.024"
+                - name: "2.048"
+                - name: "4.096"
+                - name: "8.192"
+                - name: "16.384"
+                - name: +Inf
+            - name: k8s_kubeproxy.kubeproxy_sync_proxy_rules_latency
+              description: Sync Proxy Rules Latency Percentage
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: "0.001"
+                - name: "0.002"
+                - name: "0.004"
+                - name: "0.008"
+                - name: "0.016"
+                - name: "0.032"
+                - name: "0.064"
+                - name: "0.128"
+                - name: "0.256"
+                - name: "0.512"
+                - name: "1.024"
+                - name: "2.048"
+                - name: "4.096"
+                - name: "8.192"
+                - name: "16.384"
+                - name: +Inf
+            - name: k8s_kubeproxy.rest_client_requests_by_code
+              description: HTTP Requests By Status Code
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per HTTP status code
+            - name: k8s_kubeproxy.rest_client_requests_by_method
+              description: HTTP Requests By Status Method
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per HTTP method
+            - name: k8s_kubeproxy.http_request_duration
+              description: HTTP Requests Duration
+              unit: microseconds
+              chart_type: stacked
+              dimensions:
+                - name: "0.5"
+                - name: "0.9"
+                - name: "0.99"

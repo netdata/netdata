@@ -6,8 +6,8 @@
 	url = https://github.com/davisking/dlib.git
 	shallow = true
 	ignore = dirty
-[submodule "web/server/h2o/libh2o"]
-	path = web/server/h2o/libh2o
+[submodule "src/web/server/h2o/libh2o"]
+	path = src/web/server/h2o/libh2o
 	url = https://github.com/h2o/h2o.git
 	ignore = untracked
 [submodule "fluent-bit"]

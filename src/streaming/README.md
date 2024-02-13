@@ -153,7 +153,7 @@ cache size` and `dbengine multihost disk space` settings in the `[global]` secti
 | `[global]` section                         |                   |                                                                                                                                                                                                                                                                                                                 |
 | `memory mode`                              | `dbengine`        | Determines the [database type](https://github.com/netdata/netdata/blob/master/src/database/README.md) to be used on that node. Other options settings include `none`, and `ram`. `none` disables the database at this host. This also disables alerts and notifications, as those can't run without a database. |
 | `[web]` section                            |                   |                                                                                                                                                                                                                                                                                                                 |
-| `mode`                                     | `static-threaded` | Determines the [web server](https://github.com/netdata/netdata/blob/master/web/server/README.md) type. The other option is `none`, which disables the dashboard, API, and registry.                                                                                                                             |
+| `mode`                                     | `static-threaded` | Determines the [web server](https://github.com/netdata/netdata/blob/master/src/web/server/README.md) type. The other option is `none`, which disables the dashboard, API, and registry.                                                                                                                             |
 | `accept a streaming request every seconds` | `0`               | Set a limit on how often a parent node accepts streaming requests from child nodes. `0` equals no limit. If this is set, you may see `... too busy to accept new streaming request. Will be allowed in X secs` in Netdata's `error.log`.                                                                        |
 
 ### Basic use cases
@@ -287,7 +287,7 @@ Same thing applies with the `[MACHINE_GUID]` configuration.
 ### Securing streaming with TLS/SSL
 
 Netdata does not activate TLS encryption by default. To encrypt streaming connections, you first need to [enable TLS
-support](https://github.com/netdata/netdata/blob/master/web/server/README.md#enabling-tls-support) on the parent. With encryption enabled on the receiving side, you
+support](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#enabling-tls-support) on the parent. With encryption enabled on the receiving side, you
 need to instruct the child to use TLS/SSL as well. On the child's `stream.conf`, configure the destination as follows:
 
 ```

@@ -1,0 +1,239 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-pgbouncer
+      plugin_name: go.d.plugin
+      module_name: pgbouncer
+      monitored_instance:
+        name: PgBouncer
+        link: https://www.pgbouncer.org/
+        icon_filename: postgres.svg
+        categories:
+          - data-collection.database-servers
+      keywords:
+        - pgbouncer
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors PgBouncer servers.
+          
+          Executed queries:
+          
+          - `SHOW VERSION;`
+          - `SHOW CONFIG;`
+          - `SHOW DATABASES;`
+          - `SHOW STATS;`
+          - `SHOW POOLS;`
+          
+          Information about the queries can be found in the [PgBouncer Documentation](https://www.pgbouncer.org/usage.html).
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Create netdata user
+            description: |
+              Create a user with `stats_users` permissions to query your PgBouncer instance.
+              
+              To create the `netdata` user:
+              
+              - Add `netdata` user to the `pgbouncer.ini` file:
+              
+                ```text
+                stats_users = netdata
+                ```
+              
+              - Add a password for the `netdata` user to the `userlist.txt` file:
+              
+                ```text
+                "netdata" "<PASSWORD>"
+                ```
+              
+              - To verify the credentials, run the following command
+              
+                ```bash
+                psql -h localhost -U netdata -p 6432 pgbouncer -c "SHOW VERSION;" >/dev/null 2>&1 && echo OK || echo FAIL
+                ```
+              
+                When it prompts for a password, enter the password you added to `userlist.txt`.
+      configuration:
+        file:
+          name: go.d/pgbouncer.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: dsn
+              description: PgBouncer server DSN (Data Source Name). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).
+              default_value: postgres://postgres:postgres@127.0.0.1:6432/pgbouncer
+              required: true
+            - name: timeout
+              description: Query timeout in seconds.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: TCP socket
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: 'postgres://postgres:postgres@127.0.0.1:6432/pgbouncer'
+            - name: Unix socket
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: 'host=/tmp dbname=pgbouncer user=postgres port=6432'
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    dsn: 'postgres://postgres:postgres@127.0.0.1:6432/pgbouncer'
+                
+                  - name: remote
+                    dsn: 'postgres://postgres:postgres@203.0.113.10:6432/pgbouncer'
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: pgbouncer.client_connections_utilization
+              description: Client connections utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+        - name: database
+          description: These metrics refer to the database.
+          labels:
+            - name: database
+              description: database name
+            - name: postgres_database
+              description: Postgres database name
+          metrics:
+            - name: pgbouncer.db_client_connections
+              description: Database client connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: waiting
+                - name: cancel_req
+            - name: pgbouncer.db_server_connections
+              description: Database server connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: idle
+                - name: used
+                - name: tested
+                - name: login
+            - name: pgbouncer.db_server_connections_utilization
+              description: Database server connections utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: pgbouncer.db_clients_wait_time
+              description: Database clients wait time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: pgbouncer.db_client_max_wait_time
+              description: Database client max wait time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: pgbouncer.db_transactions
+              description: Database pooled SQL transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: transactions
+            - name: pgbouncer.db_transactions_time
+              description: Database transactions time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: pgbouncer.db_transaction_avg_time
+              description: Database transaction average time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: pgbouncer.db_queries
+              description: Database pooled SQL queries
+              unit: queries/s
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: pgbouncer.db_queries_time
+              description: Database queries time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: pgbouncer.db_query_avg_time
+              description: Database query average time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: pgbouncer.db_network_io
+              description: Database traffic
+              unit: B/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent

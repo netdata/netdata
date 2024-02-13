@@ -179,7 +179,7 @@ sudo chown netdata:netdata /etc/netdata/ssl/cert.pem /etc/netdata/ssl/key.pem
 
 Next, enforce TLS/SSL on the web server. Open `netdata.conf`, scroll down to the `[web]` section, and look for the `bind
 to` setting. Add `^SSL=force` to turn on TLS/SSL. See the [web server
-reference](https://github.com/netdata/netdata/blob/master/web/server/README.md#enabling-tls-support) for other TLS/SSL options.
+reference](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#enabling-tls-support) for other TLS/SSL options.
 
 ```conf
 [web]

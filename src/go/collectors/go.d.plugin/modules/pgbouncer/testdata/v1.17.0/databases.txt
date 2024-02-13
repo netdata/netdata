@@ -1,0 +1,6 @@
+   name    |   host    | port | database  | force_user | pool_size | min_pool_size | reserve_pool | pool_mode | max_connections | current_connections | paused | disabled
+-----------+-----------+------+-----------+------------+-----------+---------------+--------------+-----------+-----------------+---------------------+--------+----------
+ myprod1   | 127.0.0.1 | 5432 | myprod1   | postgres   |        20 |             0 |            0 |           |               0 |                  20 |      0 |        0
+ myprod2   | 127.0.0.1 | 5432 | myprod2   | postgres   |        20 |             0 |            0 |           |               0 |                  20 |      0 |        0
+ pgbouncer |           | 6432 | pgbouncer | pgbouncer  |         2 |             0 |            0 | statement |               0 |                   0 |      0 |        0
+ postgres  | 127.0.0.1 | 5432 | postgres  | postgres   |        20 |             0 |            0 |           |               0 |                  20 |      0 |        0

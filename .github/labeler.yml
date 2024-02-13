@@ -66,7 +66,7 @@ area/docs:
               - "*.md"
               - "**/*.md"
               - "**/*.mdx"
-              - diagrams/**
+              - docs/diagrams/**
 
 # -----------------collectors----------------------
 
@@ -75,6 +75,7 @@ area/collectors:
       - changed-files:
           - any-glob-to-any-file:
               - src/collectors/**
+              - src/go/collectors/go.d.plugin/**
 
 collectors/plugins.d:
   - any:
@@ -135,6 +136,12 @@ collectors/freeipmi:
       - changed-files:
           - any-glob-to-any-file:
               - src/collectors/freeipmi.plugin/**
+
+collectors/go.d.plugin:
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - src/go/collectors/go.d.plugin/**
 
 collectors/idlejitter:
   - any:
@@ -216,6 +223,12 @@ collectors/xenstat:
 
 # ----------------/collectors----------------------
 
+area/go:
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - src/go/**
+
 area/health:
   - any:
       - changed-files:
@@ -265,14 +278,12 @@ area/tests:
               - tests/**
               - src/daemon/unit_test*
               - coverity-scan.sh
-              - cppcheck.sh
-              - netdata.cppcheck
 
 area/web:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - web/**
+              - src/web/**
 
 area/logs-management:
   - any:

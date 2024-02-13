@@ -43,7 +43,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Context**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
 
-- [**Custom dashboards**](https://github.com/netdata/netdata/blob/master/web/gui/custom/README.md) A dashboard that you can create using simple HTML (no javascript is required for basic dashboards).
+- [**Custom dashboards**](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md) A dashboard that you can create using simple HTML (no javascript is required for basic dashboards).
 
 ## D
 
