@@ -257,6 +257,12 @@ prepare_cmake_options() {
     NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DUSE_CXX_11=On"
   fi
 
+  if [ "${ENABLE_GO:-1}" -eq 1 ]; then
+    enable_feature PLUGIN_GO 1
+  else
+    enable_feature PLUGIN_GO 0
+  fi
+
   if [ "${USE_SYSTEM_PROTOBUF:-1}" -eq 1 ]; then
     enable_feature BUNDLED_PROTOBUF 0
   else

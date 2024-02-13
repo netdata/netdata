@@ -16,6 +16,7 @@
 GOLANG_MIN_MAJOR_VERSION='1'
 GOLANG_MIN_MINOR_VERSION='21'
 GOLANG_MIN_PATCH_VERSION='0'
+GOLANG_MIN_VERSION="${GOLANG_MIN_MAJOR_VERSION}.${GOLANG_MIN_MINOR_VERSION}.${GOLANG_MIN_PATCH_VERSION}"
 
 GOLANG_TEMP_PATH="${TMPDIR}/go-toolchain"
 
@@ -88,9 +89,13 @@ install_go_toolchain() {
             ;;
     esac
 
-    if [ -d '/usr/local/go' ]; then
-        GOLANG_FAILURE_REASON="Refusing to overwrite existing Go toolchain install at /usr/local/go, it needs to be updated manually."
-        return 1
+    if [ -d '/usr/local/go' ]; then 
+        if [ ! -f '/usr/local/go/.installed-by-netdata' ]; then
+            rm -rf /usr/local/go
+        else
+            GOLANG_FAILURE_REASON="Refusing to overwrite existing Go toolchain install at /usr/local/go, it needs to be updated manually."
+            return 1
+        fi
     fi
 
     mkdir -p "${GOLANG_TEMP_PATH}"
@@ -111,6 +116,8 @@ install_go_toolchain() {
         GOLANG_FAILURE_REASON="Failed to extract Go toolchain."
         return 1
     fi
+
+    touch /usr/local/go/.installed-by-netdata
 
     rm -rf "${GOLANG_TEMP_PATH}"
 }
