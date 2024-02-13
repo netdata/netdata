@@ -1522,7 +1522,7 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
-include(systemd.cmake)
+include(packaging/cmake/systemd.cmake)
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
@@ -2229,7 +2229,7 @@ if (NOT NETDATA_USER)
 endif()
 set(VERSION "${GIT_DESCRIBE_OUTPUT}")
 
-configure_file(config.cmake.h.in config.h)
+configure_file(packaging/cmake/config.cmake.h.in config.h)
 
 #
 # install
