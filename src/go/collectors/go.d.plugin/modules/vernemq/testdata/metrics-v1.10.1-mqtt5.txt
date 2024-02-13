@@ -1,0 +1,416 @@
+# HELP socket_open The number of times an MQTT socket has been opened.
+# TYPE socket_open counter
+socket_open{node="VerneMQ@172.17.0.2"} 338956
+# HELP socket_close The number of times an MQTT socket has been closed.
+# TYPE socket_close counter
+socket_close{node="VerneMQ@172.17.0.2"} 338956
+# HELP socket_close_timeout The number of times VerneMQ closed an MQTT socket due to no CONNECT frame has been received on time.
+# TYPE socket_close_timeout counter
+socket_close_timeout{node="VerneMQ@172.17.0.2"} 0
+# HELP socket_error The total number of socket errors that have occurred.
+# TYPE socket_error counter
+socket_error{node="VerneMQ@172.17.0.2"} 0
+# HELP bytes_received The total number of bytes received.
+# TYPE bytes_received counter
+bytes_received{node="VerneMQ@172.17.0.2"} 36796908
+# HELP bytes_sent The total number of bytes sent.
+# TYPE bytes_sent counter
+bytes_sent{node="VerneMQ@172.17.0.2"} 23361693
+# HELP mqtt_connect_received The number of CONNECT packets received.
+# TYPE mqtt_connect_received counter
+mqtt_connect_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 338956
+# HELP mqtt_publish_received The number of PUBLISH packets received.
+# TYPE mqtt_publish_received counter
+mqtt_publish_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 537088
+# HELP mqtt_puback_received The number of PUBACK packets received.
+# TYPE mqtt_puback_received counter
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 525694
+# HELP mqtt_pubrec_received The number of PUBREC packets received.
+# TYPE mqtt_pubrec_received counter
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_pubrel_received The number of PUBREL packets received.
+# TYPE mqtt_pubrel_received counter
+mqtt_pubrel_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_pubcomp_received The number of PUBCOMP packets received.
+# TYPE mqtt_pubcomp_received counter
+mqtt_pubcomp_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_subscribe_received The number of SUBSCRIBE packets received.
+# TYPE mqtt_subscribe_received counter
+mqtt_subscribe_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 122
+# HELP mqtt_unsubscribe_received The number of UNSUBSCRIBE packets received.
+# TYPE mqtt_unsubscribe_received counter
+mqtt_unsubscribe_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 108
+# HELP mqtt_pingreq_received The number of PINGREQ packets received.
+# TYPE mqtt_pingreq_received counter
+mqtt_pingreq_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 205
+# HELP mqtt_disconnect_received The number of DISCONNECT packets received.
+# TYPE mqtt_disconnect_received counter
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="4"} 107
+# HELP mqtt_connack_accepted_sent The number of times a connection has been accepted.
+# TYPE mqtt_connack_accepted_sent counter
+mqtt_connack_accepted_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_connack_unacceptable_protocol_sent The number of times the broker is not able to support the requested protocol.
+# TYPE mqtt_connack_unacceptable_protocol_sent counter
+mqtt_connack_unacceptable_protocol_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_connack_identifier_rejected_sent The number of times a client was rejected due to a unacceptable identifier.
+# TYPE mqtt_connack_identifier_rejected_sent counter
+mqtt_connack_identifier_rejected_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_connack_server_unavailable_sent The number of times a client was rejected due the the broker being unavailable.
+# TYPE mqtt_connack_server_unavailable_sent counter
+mqtt_connack_server_unavailable_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_connack_bad_credentials_sent The number of times a client sent bad credentials.
+# TYPE mqtt_connack_bad_credentials_sent counter
+mqtt_connack_bad_credentials_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_connack_not_authorized_sent The number of times a client was rejected due to insufficient authorization.
+# TYPE mqtt_connack_not_authorized_sent counter
+mqtt_connack_not_authorized_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_publish_sent The number of PUBLISH packets sent.
+# TYPE mqtt_publish_sent counter
+mqtt_publish_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 525721
+# HELP mqtt_puback_sent The number of PUBACK packets sent.
+# TYPE mqtt_puback_sent counter
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 537068
+# HELP mqtt_pubrec_sent The number of PUBREC packets sent.
+# TYPE mqtt_pubrec_sent counter
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_pubrel_sent The number of PUBREL packets sent.
+# TYPE mqtt_pubrel_sent counter
+mqtt_pubrel_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_pubcomp_sent The number of PUBCOMP packets sent.
+# TYPE mqtt_pubcomp_sent counter
+mqtt_pubcomp_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_suback_sent The number of SUBACK packets sent.
+# TYPE mqtt_suback_sent counter
+mqtt_suback_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 122
+# HELP mqtt_unsuback_sent The number of UNSUBACK packets sent.
+# TYPE mqtt_unsuback_sent counter
+mqtt_unsuback_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 108
+# HELP mqtt_pingresp_sent The number of PINGRESP packets sent.
+# TYPE mqtt_pingresp_sent counter
+mqtt_pingresp_sent{node="VerneMQ@172.17.0.2",mqtt_version="4"} 205
+# HELP mqtt_publish_auth_error The number of unauthorized publish attempts.
+# TYPE mqtt_publish_auth_error counter
+mqtt_publish_auth_error{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_subscribe_auth_error The number of unauthorized subscription attempts.
+# TYPE mqtt_subscribe_auth_error counter
+mqtt_subscribe_auth_error{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_invalid_msg_size_error The number of packages exceeding the maximum allowed size.
+# TYPE mqtt_invalid_msg_size_error counter
+mqtt_invalid_msg_size_error{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_puback_invalid_error The number of unexpected PUBACK messages received.
+# TYPE mqtt_puback_invalid_error counter
+mqtt_puback_invalid_error{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_pubrec_invalid_error The number of unexpected PUBREC messages received.
+# TYPE mqtt_pubrec_invalid_error counter
+mqtt_pubrec_invalid_error{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_pubcomp_invalid_error The number of unexpected PUBCOMP messages received.
+# TYPE mqtt_pubcomp_invalid_error counter
+mqtt_pubcomp_invalid_error{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_publish_error The number of times a PUBLISH operation failed due to a netsplit.
+# TYPE mqtt_publish_error counter
+mqtt_publish_error{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_subscribe_error The number of times a SUBSCRIBE operation failed due to a netsplit.
+# TYPE mqtt_subscribe_error counter
+mqtt_subscribe_error{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP mqtt_unsubscribe_error The number of times an UNSUBSCRIBE operation failed due to a netsplit.
+# TYPE mqtt_unsubscribe_error counter
+mqtt_unsubscribe_error{node="VerneMQ@172.17.0.2",mqtt_version="4"} 0
+# HELP client_keepalive_expired The number of clients which failed to communicate within the keepalive time period.
+# TYPE client_keepalive_expired counter
+client_keepalive_expired{node="VerneMQ@172.17.0.2",mqtt_version="4"} 1
+mqtt_connect_received{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_invalid_msg_size_error{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_pingreq_received{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_pingresp_sent{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_puback_invalid_error{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_pubcomp_invalid_error{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_publish_auth_error{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_publish_error{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_publish_received{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_publish_sent{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_suback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_subscribe_auth_error{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_subscribe_error{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_subscribe_received{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_unsuback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_unsubscribe_error{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+mqtt_unsubscribe_received{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+client_keepalive_expired{node="VerneMQ@172.17.0.2",mqtt_version="5"} 0
+# HELP queue_setup The number of times a MQTT queue process has been started.
+# TYPE queue_setup counter
+queue_setup{node="VerneMQ@172.17.0.2"} 338948
+# HELP queue_initialized_from_storage The number of times a MQTT queue process has been initialized from offline storage.
+# TYPE queue_initialized_from_storage counter
+queue_initialized_from_storage{node="VerneMQ@172.17.0.2"} 0
+# HELP queue_teardown The number of times a MQTT queue process has been terminated.
+# TYPE queue_teardown counter
+queue_teardown{node="VerneMQ@172.17.0.2"} 338948
+# HELP queue_message_drop The number of messages dropped due to full queues.
+# TYPE queue_message_drop counter
+queue_message_drop{node="VerneMQ@172.17.0.2"} 0
+# HELP queue_message_expired The number of messages which expired before delivery.
+# TYPE queue_message_expired counter
+queue_message_expired{node="VerneMQ@172.17.0.2"} 0
+# HELP queue_message_unhandled The number of unhandled messages when connecting with clean session=true.
+# TYPE queue_message_unhandled counter
+queue_message_unhandled{node="VerneMQ@172.17.0.2"} 1
+# HELP queue_message_in The number of PUBLISH packets received by MQTT queue processes.
+# TYPE queue_message_in counter
+queue_message_in{node="VerneMQ@172.17.0.2"} 525722
+# HELP queue_message_out The number of PUBLISH packets sent from MQTT queue processes.
+# TYPE queue_message_out counter
+queue_message_out{node="VerneMQ@172.17.0.2"} 525721
+# HELP client_expired Not in use (deprecated)
+# TYPE client_expired counter
+client_expired{node="VerneMQ@172.17.0.2"} 0
+# HELP cluster_bytes_received The number of bytes received from other cluster nodes.
+# TYPE cluster_bytes_received counter
+cluster_bytes_received{node="VerneMQ@172.17.0.2"} 0
+# HELP cluster_bytes_sent The number of bytes send to other cluster nodes.
+# TYPE cluster_bytes_sent counter
+cluster_bytes_sent{node="VerneMQ@172.17.0.2"} 0
+# HELP cluster_bytes_dropped The number of bytes dropped while sending data to other cluster nodes.
+# TYPE cluster_bytes_dropped counter
+cluster_bytes_dropped{node="VerneMQ@172.17.0.2"} 0
+# HELP router_matches_local The number of matched local subscriptions.
+# TYPE router_matches_local counter
+router_matches_local{node="VerneMQ@172.17.0.2"} 525722
+# HELP router_matches_remote The number of matched remote subscriptions.
+# TYPE router_matches_remote counter
+router_matches_remote{node="VerneMQ@172.17.0.2"} 0
+# HELP mqtt_connack_sent The number of CONNACK packets sent.
+# TYPE mqtt_connack_sent counter
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="4",return_code="success"} 338948
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="4",return_code="unsupported_protocol_version"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="4",return_code="client_identifier_not_valid"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="4",return_code="server_unavailable"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="4",return_code="bad_username_or_password"} 4
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="4",return_code="not_authorized"} 4
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="normal_disconnect"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="disconnect_with_will_msg"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="unspecified_error"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="malformed_packet"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="protocol_error"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="impl_specific_error"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_name_invalid"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="receive_max_exceeded"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_alias_invalid"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_too_large"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="message_rate_too_high"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="quota_exceeded"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="administrative_action"} 0
+mqtt_disconnect_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="payload_format_invalid"} 0
+# HELP mqtt_disconnect_sent The number of DISCONNECT packets sent.
+# TYPE mqtt_disconnect_sent counter
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="normal_disconnect"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="unspecified_error"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="malformed_packet"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="protocol_error"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="impl_specific_error"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="not_authorized"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="server_busy"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="server_shutting_down"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="keep_alive_timeout"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="session_taken_over"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_filter_invalid"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_name_invalid"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="receive_max_exceeded"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_alias_invalid"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_too_large"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="message_rate_too_high"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="quota_exceeded"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="administrative_action"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="payload_format_invalid"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="retain_not_supported"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="qos_not_supported"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="use_another_server"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="server_moved"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="shared_subs_not_supported"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="connection_rate_exceeded"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="max_connect_time"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="subscription_ids_not_supported"} 0
+mqtt_disconnect_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="wildcard_subs_not_supported"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="unspecified_error"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="malformed_packet"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="protocol_error"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="impl_specific_error"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="unsupported_protocol_version"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="client_identifier_not_valid"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="bad_username_or_password"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="not_authorized"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="server_unavailable"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="server_busy"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="banned"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="bad_authentication_method"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_name_invalid"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_too_large"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="quota_exceeded"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="payload_format_invalid"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="retain_not_supported"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="qos_not_supported"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="use_another_server"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="server_moved"} 0
+mqtt_connack_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="connection_rate_exceeded"} 0
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="no_matching_subscribers"} 0
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="unspecified_error"} 0
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="impl_specific_error"} 0
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="not_authorized"} 0
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_name_invalid"} 0
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_id_in_use"} 0
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="quota_exceeded"} 0
+mqtt_puback_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="payload_format_invalid"} 0
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="no_matching_subscribers"} 0
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="unspecified_error"} 0
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="impl_specific_error"} 0
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="not_authorized"} 0
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_name_invalid"} 0
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_id_in_use"} 0
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="quota_exceeded"} 0
+mqtt_puback_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="payload_format_invalid"} 0
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="no_matching_subscribers"} 0
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="unspecified_error"} 0
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="impl_specific_error"} 0
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="not_authorized"} 0
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_name_invalid"} 0
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_id_in_use"} 0
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="quota_exceeded"} 0
+mqtt_pubrec_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="payload_format_invalid"} 0
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="no_matching_subscribers"} 0
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="unspecified_error"} 0
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="impl_specific_error"} 0
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="not_authorized"} 0
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="topic_name_invalid"} 0
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_id_in_use"} 0
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="quota_exceeded"} 0
+mqtt_pubrec_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="payload_format_invalid"} 0
+mqtt_pubrel_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_pubrel_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_id_not_found"} 0
+mqtt_pubrel_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_pubrel_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_id_not_found"} 0
+mqtt_pubcomp_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_pubcomp_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_id_not_found"} 0
+mqtt_pubcomp_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_pubcomp_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="packet_id_not_found"} 0
+# HELP mqtt_auth_sent The number of AUTH packets sent.
+# TYPE mqtt_auth_sent counter
+mqtt_auth_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_auth_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="continue_authentication"} 0
+mqtt_auth_sent{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="reauthenticate"} 0
+# HELP mqtt_auth_received The number of AUTH packets received.
+# TYPE mqtt_auth_received counter
+mqtt_auth_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="success"} 0
+mqtt_auth_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="continue_authentication"} 0
+mqtt_auth_received{node="VerneMQ@172.17.0.2",mqtt_version="5",reason_code="reauthenticate"} 0
+# HELP queue_processes The number of MQTT queue processes.
+# TYPE queue_processes gauge
+queue_processes{node="VerneMQ@172.17.0.2"} 0
+# HELP retain_memory The number of bytes used for storing retained messages.
+# TYPE retain_memory gauge
+retain_memory{node="VerneMQ@172.17.0.2"} 11344
+# HELP retain_messages The number of currently stored retained messages.
+# TYPE retain_messages gauge
+retain_messages{node="VerneMQ@172.17.0.2"} 0
+# HELP router_memory The number of bytes used by the routing table.
+# TYPE router_memory gauge
+router_memory{node="VerneMQ@172.17.0.2"} 12752
+# HELP router_subscriptions The number of subscriptions in the routing table.
+# TYPE router_subscriptions gauge
+router_subscriptions{node="VerneMQ@172.17.0.2"} 0
+# HELP netsplit_resolved The number of resolved netsplits.
+# TYPE netsplit_resolved counter
+netsplit_resolved{node="VerneMQ@172.17.0.2"} 0
+# HELP netsplit_detected The number of detected netsplits.
+# TYPE netsplit_detected counter
+netsplit_detected{node="VerneMQ@172.17.0.2"} 0
+# HELP system_utilization_scheduler_8 Scheduler 8 utilization (percentage)
+# TYPE system_utilization_scheduler_8 gauge
+system_utilization_scheduler_8{node="VerneMQ@172.17.0.2"} 0
+# HELP system_utilization_scheduler_7 Scheduler 7 utilization (percentage)
+# TYPE system_utilization_scheduler_7 gauge
+system_utilization_scheduler_7{node="VerneMQ@172.17.0.2"} 0
+# HELP system_utilization_scheduler_6 Scheduler 6 utilization (percentage)
+# TYPE system_utilization_scheduler_6 gauge
+system_utilization_scheduler_6{node="VerneMQ@172.17.0.2"} 0
+# HELP system_utilization_scheduler_5 Scheduler 5 utilization (percentage)
+# TYPE system_utilization_scheduler_5 gauge
+system_utilization_scheduler_5{node="VerneMQ@172.17.0.2"} 0
+# HELP system_utilization_scheduler_4 Scheduler 4 utilization (percentage)
+# TYPE system_utilization_scheduler_4 gauge
+system_utilization_scheduler_4{node="VerneMQ@172.17.0.2"} 19
+# HELP system_utilization_scheduler_3 Scheduler 3 utilization (percentage)
+# TYPE system_utilization_scheduler_3 gauge
+system_utilization_scheduler_3{node="VerneMQ@172.17.0.2"} 14
+# HELP system_utilization_scheduler_2 Scheduler 2 utilization (percentage)
+# TYPE system_utilization_scheduler_2 gauge
+system_utilization_scheduler_2{node="VerneMQ@172.17.0.2"} 8
+# HELP system_utilization_scheduler_1 Scheduler 1 utilization (percentage)
+# TYPE system_utilization_scheduler_1 gauge
+system_utilization_scheduler_1{node="VerneMQ@172.17.0.2"} 34
+# HELP system_utilization The average system (scheduler) utilization (percentage).
+# TYPE system_utilization gauge
+system_utilization{node="VerneMQ@172.17.0.2"} 9
+# HELP vm_memory_ets The amount of memory allocated for ETS tables.
+# TYPE vm_memory_ets gauge
+vm_memory_ets{node="VerneMQ@172.17.0.2"} 6065944
+# HELP vm_memory_code The amount of memory allocated for code.
+# TYPE vm_memory_code gauge
+vm_memory_code{node="VerneMQ@172.17.0.2"} 11372082
+# HELP vm_memory_binary The amount of memory allocated for binaries.
+# TYPE vm_memory_binary gauge
+vm_memory_binary{node="VerneMQ@172.17.0.2"} 1293672
+# HELP vm_memory_atom_used The amount of memory used by atoms.
+# TYPE vm_memory_atom_used gauge
+vm_memory_atom_used{node="VerneMQ@172.17.0.2"} 755998
+# HELP vm_memory_atom The amount of memory allocated for atoms.
+# TYPE vm_memory_atom gauge
+vm_memory_atom{node="VerneMQ@172.17.0.2"} 768953
+# HELP vm_memory_system The amount of memory allocated for the emulator.
+# TYPE vm_memory_system gauge
+vm_memory_system{node="VerneMQ@172.17.0.2"} 27051848
+# HELP vm_memory_processes_used The amount of memory used by processes.
+# TYPE vm_memory_processes_used gauge
+vm_memory_processes_used{node="VerneMQ@172.17.0.2"} 8671232
+# HELP vm_memory_processes The amount of memory allocated for processes.
+# TYPE vm_memory_processes gauge
+vm_memory_processes{node="VerneMQ@172.17.0.2"} 8673288
+# HELP vm_memory_total The total amount of memory allocated.
+# TYPE vm_memory_total gauge
+vm_memory_total{node="VerneMQ@172.17.0.2"} 35725136
+# HELP system_process_count The number of Erlang processes.
+# TYPE system_process_count gauge
+system_process_count{node="VerneMQ@172.17.0.2"} 329
+# HELP system_wallclock The number of milli-seconds passed since the node was started.
+# TYPE system_wallclock counter
+system_wallclock{node="VerneMQ@172.17.0.2"} 163457858
+# HELP system_runtime The sum of the runtime for all threads in the Erlang runtime system.
+# TYPE system_runtime counter
+system_runtime{node="VerneMQ@172.17.0.2"} 1775355
+# HELP system_run_queue The total number of processes and ports ready to run on all run-queues.
+# TYPE system_run_queue gauge
+system_run_queue{node="VerneMQ@172.17.0.2"} 0
+# HELP system_reductions The number of reductions performed in the VM since the node was started.
+# TYPE system_reductions counter
+system_reductions{node="VerneMQ@172.17.0.2"} 3857458067
+# HELP system_io_out The total number of bytes sent through ports.
+# TYPE system_io_out counter
+system_io_out{node="VerneMQ@172.17.0.2"} 961001488
+# HELP system_io_in The total number of bytes received through ports.
+# TYPE system_io_in counter
+system_io_in{node="VerneMQ@172.17.0.2"} 68998296
+# HELP system_words_reclaimed_by_gc The number of words reclaimed by the garbage collector.
+# TYPE system_words_reclaimed_by_gc counter
+system_words_reclaimed_by_gc{node="VerneMQ@172.17.0.2"} 7158470019
+# HELP system_gc_count The number of garbage collections performed.
+# TYPE system_gc_count counter
+system_gc_count{node="VerneMQ@172.17.0.2"} 12189976
+# HELP system_exact_reductions The exact number of reductions performed.
+# TYPE system_exact_reductions counter
+system_exact_reductions{node="VerneMQ@172.17.0.2"} 3854024620
+# HELP system_context_switches The total number of context switches.
+# TYPE system_context_switches counter
+system_context_switches{node="VerneMQ@172.17.0.2"} 39088198

@@ -1,0 +1,226 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-nginx
+      plugin_name: go.d.plugin
+      module_name: nginx
+      monitored_instance:
+        name: NGINX
+        link: https://www.nginx.com/
+        categories:
+          - data-collection.web-servers-and-web-proxies
+        icon_filename: nginx.svg
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: go.d.plugin
+              module_name: httpcheck
+            - plugin_name: go.d.plugin
+              module_name: web_log
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - nginx
+        - web
+        - webserver
+        - http
+        - proxy
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the activity and performance of NGINX servers, and collects metrics such as the number of connections, their status, and client requests.
+        method_description: |
+          It sends HTTP requests to the NGINX location [stub-status](https://nginx.org/en/docs/http/ngx_http_stub_status_module.html), which is a built-in location that provides metrics about the NGINX server.
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects NGINX instances running on localhost that are listening on port 80.
+            On startup, it tries to collect metrics from:
+            
+            - http://127.0.0.1/basic_status
+            - http://localhost/stub_status
+            - http://127.0.0.1/stub_status
+            - http://127.0.0.1/nginx_status
+            - http://127.0.0.1/status
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+      additional_permissions:
+        description: ""
+      multi_instance: true
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Enable status support
+            description: |
+              Configure [ngx_http_stub_status_module](https://nginx.org/en/docs/http/ngx_http_stub_status_module.html).
+      configuration:
+        file:
+          name: go.d/nginx.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1/stub_status
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1/stub_status
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1/stub_status
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: NGINX with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1/stub_status
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1/stub_status
+                
+                  - name: remote
+                    url: http://192.0.2.1/stub_status
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: nginx.connections
+              description: Active Client Connections Including Waiting Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: nginx.connections_status
+              description: Active Connections Per Status
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: reading
+                - name: writing
+                - name: idle
+            - name: nginx.connections_accepted_handled
+              description: Accepted And Handled Connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: accepted
+                - name: handled
+            - name: nginx.requests
+              description: Client Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests

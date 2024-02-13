@@ -1,0 +1,402 @@
+# HELP jvm_threads_current Current thread count of a JVM
+# TYPE jvm_threads_current gauge
+jvm_threads_current 93.0
+# HELP jvm_threads_daemon Daemon thread count of a JVM
+# TYPE jvm_threads_daemon gauge
+jvm_threads_daemon 82.0
+# HELP jvm_threads_peak Peak thread count of a JVM
+# TYPE jvm_threads_peak gauge
+jvm_threads_peak 94.0
+# HELP jvm_threads_started_total Started thread count of a JVM
+# TYPE jvm_threads_started_total counter
+jvm_threads_started_total 1860.0
+# HELP jvm_threads_deadlocked Cycles of JVM-threads that are in deadlock waiting to acquire object monitors or ownable synchronizers
+# TYPE jvm_threads_deadlocked gauge
+jvm_threads_deadlocked 0.0
+# HELP jvm_threads_deadlocked_monitor Cycles of JVM-threads that are in deadlock waiting to acquire object monitors
+# TYPE jvm_threads_deadlocked_monitor gauge
+jvm_threads_deadlocked_monitor 0.0
+# HELP jvm_threads_state Current count of threads by state
+# TYPE jvm_threads_state gauge
+jvm_threads_state{state="NEW",} 0.0
+jvm_threads_state{state="TERMINATED",} 0.0
+jvm_threads_state{state="RUNNABLE",} 16.0
+jvm_threads_state{state="BLOCKED",} 0.0
+jvm_threads_state{state="WAITING",} 46.0
+jvm_threads_state{state="TIMED_WAITING",} 31.0
+jvm_threads_state{state="UNKNOWN",} 0.0
+# HELP jvm_memory_pool_allocated_bytes_total Total bytes allocated in a given JVM memory pool. Only updated after GC, not continuously.
+# TYPE jvm_memory_pool_allocated_bytes_total counter
+jvm_memory_pool_allocated_bytes_total{pool="Par Survivor Space",} 1.52801872E8
+jvm_memory_pool_allocated_bytes_total{pool="CMS Old Gen",} 8.55035344E8
+jvm_memory_pool_allocated_bytes_total{pool="CodeHeap 'profiled nmethods'",} 2.4841216E7
+jvm_memory_pool_allocated_bytes_total{pool="CodeHeap 'non-profiled nmethods'",} 1.3023104E7
+jvm_memory_pool_allocated_bytes_total{pool="Compressed Class Space",} 6640584.0
+jvm_memory_pool_allocated_bytes_total{pool="Metaspace",} 5.3862968E7
+jvm_memory_pool_allocated_bytes_total{pool="Par Eden Space",} 7.3147804328E10
+jvm_memory_pool_allocated_bytes_total{pool="CodeHeap 'non-nmethods'",} 1530112.0
+# HELP jvm_gc_collection_seconds Time spent in a given JVM garbage collector in seconds.
+# TYPE jvm_gc_collection_seconds summary
+jvm_gc_collection_seconds_count{gc="ParNew",} 218.0
+jvm_gc_collection_seconds_sum{gc="ParNew",} 1.617
+jvm_gc_collection_seconds_count{gc="ConcurrentMarkSweep",} 1.0
+jvm_gc_collection_seconds_sum{gc="ConcurrentMarkSweep",} 0.059
+# HELP jvm_classes_currently_loaded The number of classes that are currently loaded in the JVM
+# TYPE jvm_classes_currently_loaded gauge
+jvm_classes_currently_loaded 9663.0
+# HELP jvm_classes_loaded_total The total number of classes that have been loaded since the JVM has started execution
+# TYPE jvm_classes_loaded_total counter
+jvm_classes_loaded_total 9663.0
+# HELP jvm_classes_unloaded_total The total number of classes that have been unloaded since the JVM has started execution
+# TYPE jvm_classes_unloaded_total counter
+jvm_classes_unloaded_total 0.0
+# HELP jmx_config_reload_success_total Number of times configuration have successfully been reloaded.
+# TYPE jmx_config_reload_success_total counter
+jmx_config_reload_success_total 0.0
+# HELP jmx_config_reload_failure_total Number of times configuration have failed to be reloaded.
+# TYPE jmx_config_reload_failure_total counter
+jmx_config_reload_failure_total 0.0
+# HELP org_apache_cassandra_metrics_clientrequest_50thpercentile Attribute exposed for management org.apache.cassandra.metrics:name=Latency,type=ClientRequest,attribute=50thPercentile
+# TYPE org_apache_cassandra_metrics_clientrequest_50thpercentile untyped
+org_apache_cassandra_metrics_clientrequest_50thpercentile{scope="Read",name="Latency",} 61.214
+org_apache_cassandra_metrics_clientrequest_50thpercentile{scope="Write",name="Latency",} 35.425000000000004
+# HELP org_apache_cassandra_metrics_clientrequest_95thpercentile Attribute exposed for management org.apache.cassandra.metrics:name=Latency,type=ClientRequest,attribute=95thPercentile
+# TYPE org_apache_cassandra_metrics_clientrequest_95thpercentile untyped
+org_apache_cassandra_metrics_clientrequest_95thpercentile{scope="Read",name="Latency",} 126.934
+org_apache_cassandra_metrics_clientrequest_95thpercentile{scope="Write",name="Latency",} 105.778
+# HELP org_apache_cassandra_metrics_cache_count Attribute exposed for management org.apache.cassandra.metrics:name=Misses,type=Cache,attribute=Count
+# TYPE org_apache_cassandra_metrics_cache_count untyped
+org_apache_cassandra_metrics_cache_count{scope="KeyCache",name="Misses",} 194890.0
+org_apache_cassandra_metrics_cache_count{scope="KeyCache",name="Hits",} 1336427.0
+org_apache_cassandra_metrics_cache_count{scope="RowCache",name="Hits",} 0.0
+org_apache_cassandra_metrics_cache_count{scope="RowCache",name="Misses",} 0.0
+# HELP org_apache_cassandra_metrics_storage_count Attribute exposed for management org.apache.cassandra.metrics:name=Exceptions,type=Storage,attribute=Count
+# TYPE org_apache_cassandra_metrics_storage_count untyped
+org_apache_cassandra_metrics_storage_count{name="Exceptions",} 0.0
+org_apache_cassandra_metrics_storage_count{name="Load",} 8.58272986E8
+# HELP org_apache_cassandra_metrics_compaction_count Attribute exposed for management org.apache.cassandra.metrics:name=BytesCompacted,type=Compaction,attribute=Count
+# TYPE org_apache_cassandra_metrics_compaction_count untyped
+org_apache_cassandra_metrics_compaction_count{name="BytesCompacted",} 2532.0
+# HELP org_apache_cassandra_metrics_clientrequest_count Attribute exposed for management org.apache.cassandra.metrics:name=Timeouts,type=ClientRequest,attribute=Count
+# TYPE org_apache_cassandra_metrics_clientrequest_count untyped
+org_apache_cassandra_metrics_clientrequest_count{scope="Write",name="Timeouts",} 0.0
+org_apache_cassandra_metrics_clientrequest_count{scope="Read",name="Latency",} 333316.0
+org_apache_cassandra_metrics_clientrequest_count{scope="Read",name="Unavailables",} 0.0
+org_apache_cassandra_metrics_clientrequest_count{scope="Write",name="TotalLatency",} 1.4253267E7
+org_apache_cassandra_metrics_clientrequest_count{scope="Read",name="Timeouts",} 0.0
+org_apache_cassandra_metrics_clientrequest_count{scope="Write",name="Failures",} 0.0
+org_apache_cassandra_metrics_clientrequest_count{scope="Write",name="Latency",} 331841.0
+org_apache_cassandra_metrics_clientrequest_count{scope="Read",name="Failures",} 0.0
+org_apache_cassandra_metrics_clientrequest_count{scope="Read",name="TotalLatency",} 2.3688998E7
+org_apache_cassandra_metrics_clientrequest_count{scope="Write",name="Unavailables",} 0.0
+# HELP org_apache_cassandra_metrics_cache_value Attribute exposed for management org.apache.cassandra.metrics:name=Size,type=Cache,attribute=Value
+# TYPE org_apache_cassandra_metrics_cache_value untyped
+org_apache_cassandra_metrics_cache_value{scope="RowCache",name="Size",} 0.0
+org_apache_cassandra_metrics_cache_value{scope="KeyCache",name="Size",} 1.96559936E8
+org_apache_cassandra_metrics_cache_value{scope="RowCache",name="Capacity",} 0.0
+org_apache_cassandra_metrics_cache_value{scope="KeyCache",name="Capacity",} 9.437184E8
+# HELP org_apache_cassandra_metrics_clientrequest_75thpercentile Attribute exposed for management org.apache.cassandra.metrics:name=Latency,type=ClientRequest,attribute=75thPercentile
+# TYPE org_apache_cassandra_metrics_clientrequest_75thpercentile untyped
+org_apache_cassandra_metrics_clientrequest_75thpercentile{scope="Read",name="Latency",} 88.148
+org_apache_cassandra_metrics_clientrequest_75thpercentile{scope="Write",name="Latency",} 61.214
+# HELP org_apache_cassandra_metrics_clientrequest_999thpercentile Attribute exposed for management org.apache.cassandra.metrics:name=Latency,type=ClientRequest,attribute=999thPercentile
+# TYPE org_apache_cassandra_metrics_clientrequest_999thpercentile untyped
+org_apache_cassandra_metrics_clientrequest_999thpercentile{scope="Read",name="Latency",} 454.826
+org_apache_cassandra_metrics_clientrequest_999thpercentile{scope="Write",name="Latency",} 315.85200000000003
+# HELP org_apache_cassandra_metrics_clientrequest_99thpercentile Attribute exposed for management org.apache.cassandra.metrics:name=Latency,type=ClientRequest,attribute=99thPercentile
+# TYPE org_apache_cassandra_metrics_clientrequest_99thpercentile untyped
+org_apache_cassandra_metrics_clientrequest_99thpercentile{scope="Read",name="Latency",} 219.342
+org_apache_cassandra_metrics_clientrequest_99thpercentile{scope="Write",name="Latency",} 152.321
+# HELP org_apache_cassandra_metrics_threadpools_value Attribute exposed for management org.apache.cassandra.metrics:name=ActiveTasks,type=ThreadPools,attribute=Value
+# TYPE org_apache_cassandra_metrics_threadpools_value untyped
+org_apache_cassandra_metrics_threadpools_value{path="transport",scope="Native-Transport-Requests",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="HintsDispatcher",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="transport",scope="Native-Transport-Requests",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="MemtableFlushWriter",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="CompactionExecutor",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="Sampler",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="MemtableReclaimMemory",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="ViewBuildExecutor",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="MemtableReclaimMemory",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="PerDiskMemtableFlushWriter_0",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="MemtablePostFlush",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="SecondaryIndexManagement",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="ValidationExecutor",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="Sampler",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="MemtableFlushWriter",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="ValidationExecutor",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="HintsDispatcher",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="SecondaryIndexManagement",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="request",scope="MutationStage",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="request",scope="ReadStage",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="GossipStage",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="CacheCleanupExecutor",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="CompactionExecutor",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="request",scope="MutationStage",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="PendingRangeCalculator",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="CacheCleanupExecutor",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="MemtablePostFlush",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="ViewBuildExecutor",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="request",scope="ReadStage",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="PerDiskMemtableFlushWriter_0",name="PendingTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="PendingRangeCalculator",name="ActiveTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_value{path="internal",scope="GossipStage",name="ActiveTasks",} 0.0
+# HELP org_apache_cassandra_metrics_droppedmessage_count Attribute exposed for management org.apache.cassandra.metrics:name=Dropped,type=DroppedMessage,attribute=Count
+# TYPE org_apache_cassandra_metrics_droppedmessage_count untyped
+org_apache_cassandra_metrics_droppedmessage_count{scope="FINALIZE_PROPOSE_MSG",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="COUNTER_MUTATION_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="BATCH_REMOVE",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="MUTATION_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SCHEMA_PULL_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="READ_REPAIR",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="_TEST_2",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="BATCH_STORE_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PAXOS_COMMIT_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PAXOS_PROPOSE_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="RANGE_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SNAPSHOT_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SCHEMA_VERSION_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PING_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SNAPSHOT_MSG",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="VALIDATION_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="GOSSIP_DIGEST_SYN",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="HINT_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="FINALIZE_PROMISE_MSG",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="GOSSIP_SHUTDOWN",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PAXOS_PROPOSE_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="RANGE_SLICE",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="REPAIR_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="COUNTER_MUTATION_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="MUTATION",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="_TRACE",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PING_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="CLEANUP_MSG",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="BATCH_STORE",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="REQUEST_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="BATCH_STORE_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="ECHO_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="READ_REPAIR_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="READ_REPAIR_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="STATUS_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="REPLICATION_DONE_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="REQUEST_RESPONSE",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PREPARE_CONSISTENT_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="_SAMPLE",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SCHEMA_VERSION_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="FAILURE_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="GOSSIP_DIGEST_ACK2",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SYNC_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="TRUNCATE_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="COUNTER_MUTATION",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="UNUSED_CUSTOM_VERB",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="READ_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PREPARE_MSG",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="BATCH_REMOVE_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="ECHO_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="FAILED_SESSION_MSG",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PAXOS_PREPARE_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="STATUS_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="_TEST_1",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="HINT",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SCHEMA_PUSH_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PREPARE_CONSISTENT_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="REPLICATION_DONE_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="MUTATION_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SCHEMA_PULL_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="READ_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="GOSSIP_DIGEST_ACK",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="FINALIZE_COMMIT_MSG",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="RANGE_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SYNC_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="INTERNAL_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="TRUNCATE_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PAXOS_COMMIT_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="READ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="BATCH_REMOVE_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="HINT_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SNAPSHOT_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="PAXOS_PREPARE_REQ",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="VALIDATION_RSP",name="Dropped",} 0.0
+org_apache_cassandra_metrics_droppedmessage_count{scope="SCHEMA_PUSH_RSP",name="Dropped",} 0.0
+# HELP org_apache_cassandra_metrics_clientrequest_98thpercentile Attribute exposed for management org.apache.cassandra.metrics:name=Latency,type=ClientRequest,attribute=98thPercentile
+# TYPE org_apache_cassandra_metrics_clientrequest_98thpercentile untyped
+org_apache_cassandra_metrics_clientrequest_98thpercentile{scope="Read",name="Latency",} 182.785
+org_apache_cassandra_metrics_clientrequest_98thpercentile{scope="Write",name="Latency",} 126.934
+# HELP org_apache_cassandra_metrics_threadpools_count Attribute exposed for management org.apache.cassandra.metrics:name=TotalBlockedTasks,type=ThreadPools,attribute=Count
+# TYPE org_apache_cassandra_metrics_threadpools_count untyped
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="HintsDispatcher",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="request",scope="MutationStage",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="Sampler",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="GossipStage",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="MemtableFlushWriter",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="Sampler",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="PerDiskMemtableFlushWriter_0",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="MemtableFlushWriter",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="CacheCleanupExecutor",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="ValidationExecutor",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="MemtableReclaimMemory",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="GossipStage",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="MemtablePostFlush",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="ViewBuildExecutor",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="CacheCleanupExecutor",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="PendingRangeCalculator",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="MemtableReclaimMemory",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="HintsDispatcher",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="CompactionExecutor",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="transport",scope="Native-Transport-Requests",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="transport",scope="Native-Transport-Requests",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="SecondaryIndexManagement",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="MemtablePostFlush",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="request",scope="MutationStage",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="ValidationExecutor",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="PerDiskMemtableFlushWriter_0",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="request",scope="ReadStage",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="ViewBuildExecutor",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="SecondaryIndexManagement",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="PendingRangeCalculator",name="CurrentlyBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="internal",scope="CompactionExecutor",name="TotalBlockedTasks",} 0.0
+org_apache_cassandra_metrics_threadpools_count{path="request",scope="ReadStage",name="TotalBlockedTasks",} 0.0
+# HELP org_apache_cassandra_metrics_compaction_value Attribute exposed for management org.apache.cassandra.metrics:name=CompletedTasks,type=Compaction,attribute=Value
+# TYPE org_apache_cassandra_metrics_compaction_value untyped
+org_apache_cassandra_metrics_compaction_value{name="CompletedTasks",} 1078.0
+org_apache_cassandra_metrics_compaction_value{name="PendingTasks",} 0.0
+# HELP jmx_scrape_duration_seconds Time this JMX scrape took, in seconds.
+# TYPE jmx_scrape_duration_seconds gauge
+jmx_scrape_duration_seconds 0.102931999
+# HELP jmx_scrape_error Non-zero if this scrape failed.
+# TYPE jmx_scrape_error gauge
+jmx_scrape_error 0.0
+# HELP jmx_scrape_cached_beans Number of beans with their matching rule cached
+# TYPE jmx_scrape_cached_beans gauge
+jmx_scrape_cached_beans 0.0
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 155.0
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.666810482687E9
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 213.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 100000.0
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 5.105344512E9
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 3.464957952E9
+# HELP jvm_memory_objects_pending_finalization The number of objects waiting in the finalizer queue.
+# TYPE jvm_memory_objects_pending_finalization gauge
+jvm_memory_objects_pending_finalization 0.0
+# HELP jvm_memory_bytes_used Used bytes of a given JVM memory area.
+# TYPE jvm_memory_bytes_used gauge
+jvm_memory_bytes_used{area="heap",} 1.134866288E9
+jvm_memory_bytes_used{area="nonheap",} 9.6565696E7
+# HELP jvm_memory_bytes_committed Committed (bytes) of a given JVM memory area.
+# TYPE jvm_memory_bytes_committed gauge
+jvm_memory_bytes_committed{area="heap",} 2.0447232E9
+jvm_memory_bytes_committed{area="nonheap",} 1.01838848E8
+# HELP jvm_memory_bytes_max Max (bytes) of a given JVM memory area.
+# TYPE jvm_memory_bytes_max gauge
+jvm_memory_bytes_max{area="heap",} 2.0447232E9
+jvm_memory_bytes_max{area="nonheap",} -1.0
+# HELP jvm_memory_bytes_init Initial bytes of a given JVM memory area.
+# TYPE jvm_memory_bytes_init gauge
+jvm_memory_bytes_init{area="heap",} 2.08666624E9
+jvm_memory_bytes_init{area="nonheap",} 7667712.0
+# HELP jvm_memory_pool_bytes_used Used bytes of a given JVM memory pool.
+# TYPE jvm_memory_pool_bytes_used gauge
+jvm_memory_pool_bytes_used{pool="CodeHeap 'non-nmethods'",} 1443712.0
+jvm_memory_pool_bytes_used{pool="Metaspace",} 5.386508E7
+jvm_memory_pool_bytes_used{pool="CodeHeap 'profiled nmethods'",} 2.2212992E7
+jvm_memory_pool_bytes_used{pool="Compressed Class Space",} 6640584.0
+jvm_memory_pool_bytes_used{pool="Par Eden Space",} 2.6869912E8
+jvm_memory_pool_bytes_used{pool="Par Survivor Space",} 1.1131824E7
+jvm_memory_pool_bytes_used{pool="CodeHeap 'non-profiled nmethods'",} 1.2403328E7
+jvm_memory_pool_bytes_used{pool="CMS Old Gen",} 8.55035344E8
+# HELP jvm_memory_pool_bytes_committed Committed bytes of a given JVM memory pool.
+# TYPE jvm_memory_pool_bytes_committed gauge
+jvm_memory_pool_bytes_committed{pool="CodeHeap 'non-nmethods'",} 2555904.0
+jvm_memory_pool_bytes_committed{pool="Metaspace",} 5.574656E7
+jvm_memory_pool_bytes_committed{pool="CodeHeap 'profiled nmethods'",} 2.3724032E7
+jvm_memory_pool_bytes_committed{pool="Compressed Class Space",} 7360512.0
+jvm_memory_pool_bytes_committed{pool="Par Eden Space",} 3.3554432E8
+jvm_memory_pool_bytes_committed{pool="Par Survivor Space",} 4.194304E7
+jvm_memory_pool_bytes_committed{pool="CodeHeap 'non-profiled nmethods'",} 1.245184E7
+jvm_memory_pool_bytes_committed{pool="CMS Old Gen",} 1.66723584E9
+# HELP jvm_memory_pool_bytes_max Max bytes of a given JVM memory pool.
+# TYPE jvm_memory_pool_bytes_max gauge
+jvm_memory_pool_bytes_max{pool="CodeHeap 'non-nmethods'",} 5832704.0
+jvm_memory_pool_bytes_max{pool="Metaspace",} -1.0
+jvm_memory_pool_bytes_max{pool="CodeHeap 'profiled nmethods'",} 1.22912768E8
+jvm_memory_pool_bytes_max{pool="Compressed Class Space",} 1.073741824E9
+jvm_memory_pool_bytes_max{pool="Par Eden Space",} 3.3554432E8
+jvm_memory_pool_bytes_max{pool="Par Survivor Space",} 4.194304E7
+jvm_memory_pool_bytes_max{pool="CodeHeap 'non-profiled nmethods'",} 1.22912768E8
+jvm_memory_pool_bytes_max{pool="CMS Old Gen",} 1.66723584E9
+# HELP jvm_memory_pool_bytes_init Initial bytes of a given JVM memory pool.
+# TYPE jvm_memory_pool_bytes_init gauge
+jvm_memory_pool_bytes_init{pool="CodeHeap 'non-nmethods'",} 2555904.0
+jvm_memory_pool_bytes_init{pool="Metaspace",} 0.0
+jvm_memory_pool_bytes_init{pool="CodeHeap 'profiled nmethods'",} 2555904.0
+jvm_memory_pool_bytes_init{pool="Compressed Class Space",} 0.0
+jvm_memory_pool_bytes_init{pool="Par Eden Space",} 3.3554432E8
+jvm_memory_pool_bytes_init{pool="Par Survivor Space",} 4.194304E7
+jvm_memory_pool_bytes_init{pool="CodeHeap 'non-profiled nmethods'",} 2555904.0
+jvm_memory_pool_bytes_init{pool="CMS Old Gen",} 1.66723584E9
+# HELP jvm_memory_pool_collection_used_bytes Used bytes after last collection of a given JVM memory pool.
+# TYPE jvm_memory_pool_collection_used_bytes gauge
+jvm_memory_pool_collection_used_bytes{pool="Par Eden Space",} 0.0
+jvm_memory_pool_collection_used_bytes{pool="Par Survivor Space",} 1.1131824E7
+jvm_memory_pool_collection_used_bytes{pool="CMS Old Gen",} 0.0
+# HELP jvm_memory_pool_collection_committed_bytes Committed after last collection bytes of a given JVM memory pool.
+# TYPE jvm_memory_pool_collection_committed_bytes gauge
+jvm_memory_pool_collection_committed_bytes{pool="Par Eden Space",} 3.3554432E8
+jvm_memory_pool_collection_committed_bytes{pool="Par Survivor Space",} 4.194304E7
+jvm_memory_pool_collection_committed_bytes{pool="CMS Old Gen",} 1.66723584E9
+# HELP jvm_memory_pool_collection_max_bytes Max bytes after last collection of a given JVM memory pool.
+# TYPE jvm_memory_pool_collection_max_bytes gauge
+jvm_memory_pool_collection_max_bytes{pool="Par Eden Space",} 3.3554432E8
+jvm_memory_pool_collection_max_bytes{pool="Par Survivor Space",} 4.194304E7
+jvm_memory_pool_collection_max_bytes{pool="CMS Old Gen",} 1.66723584E9
+# HELP jvm_memory_pool_collection_init_bytes Initial after last collection bytes of a given JVM memory pool.
+# TYPE jvm_memory_pool_collection_init_bytes gauge
+jvm_memory_pool_collection_init_bytes{pool="Par Eden Space",} 3.3554432E8
+jvm_memory_pool_collection_init_bytes{pool="Par Survivor Space",} 4.194304E7
+jvm_memory_pool_collection_init_bytes{pool="CMS Old Gen",} 1.66723584E9
+# HELP jvm_info VM version info
+# TYPE jvm_info gauge
+jvm_info{runtime="OpenJDK Runtime Environment",vendor="Debian",version="11.0.16+8-post-Debian-1deb11u1",} 1.0
+# HELP jvm_buffer_pool_used_bytes Used bytes of a given JVM buffer pool.
+# TYPE jvm_buffer_pool_used_bytes gauge
+jvm_buffer_pool_used_bytes{pool="mapped",} 9.20360582E8
+jvm_buffer_pool_used_bytes{pool="direct",} 5.1679788E7
+# HELP jvm_buffer_pool_capacity_bytes Bytes capacity of a given JVM buffer pool.
+# TYPE jvm_buffer_pool_capacity_bytes gauge
+jvm_buffer_pool_capacity_bytes{pool="mapped",} 9.20360582E8
+jvm_buffer_pool_capacity_bytes{pool="direct",} 5.1679786E7
+# HELP jvm_buffer_pool_used_buffers Used buffers of a given JVM buffer pool.
+# TYPE jvm_buffer_pool_used_buffers gauge
+jvm_buffer_pool_used_buffers{pool="mapped",} 74.0
+jvm_buffer_pool_used_buffers{pool="direct",} 34.0
+# HELP jmx_exporter_build_info A metric with a constant '1' value labeled with the version of the JMX exporter.
+# TYPE jmx_exporter_build_info gauge
+jmx_exporter_build_info{version="0.17.2",name="jmx_prometheus_javaagent",} 1.0
+# HELP jmx_config_reload_failure_created Number of times configuration have failed to be reloaded.
+# TYPE jmx_config_reload_failure_created gauge
+jmx_config_reload_failure_created 1.666810482756E9
+# HELP jmx_config_reload_success_created Number of times configuration have successfully been reloaded.
+# TYPE jmx_config_reload_success_created gauge
+jmx_config_reload_success_created 1.666810482755E9
+# HELP jvm_memory_pool_allocated_bytes_created Total bytes allocated in a given JVM memory pool. Only updated after GC, not continuously.
+# TYPE jvm_memory_pool_allocated_bytes_created gauge
+jvm_memory_pool_allocated_bytes_created{pool="Par Survivor Space",} 1.666810483789E9
+jvm_memory_pool_allocated_bytes_created{pool="CMS Old Gen",} 1.666810484715E9
+jvm_memory_pool_allocated_bytes_created{pool="CodeHeap 'profiled nmethods'",} 1.666810483788E9
+jvm_memory_pool_allocated_bytes_created{pool="CodeHeap 'non-profiled nmethods'",} 1.666810483789E9
+jvm_memory_pool_allocated_bytes_created{pool="Compressed Class Space",} 1.666810483789E9
+jvm_memory_pool_allocated_bytes_created{pool="Metaspace",} 1.666810483789E9
+jvm_memory_pool_allocated_bytes_created{pool="Par Eden Space",} 1.666810483789E9
+jvm_memory_pool_allocated_bytes_created{pool="CodeHeap 'non-nmethods'",} 1.666810483789E9

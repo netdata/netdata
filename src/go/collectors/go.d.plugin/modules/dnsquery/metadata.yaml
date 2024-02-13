@@ -1,0 +1,142 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-dns_query
+      plugin_name: go.d.plugin
+      module_name: dns_query
+      monitored_instance:
+        name: DNS query
+        link: ""
+        icon_filename: network-wired.svg
+        categories:
+          - data-collection.dns-and-dhcp-servers
+      keywords:
+        - dns
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This module monitors DNS query round-trip time (RTT).
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/dns_query.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: All options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: domains
+              description: Domain or subdomains to query. The collector will choose a random domain from the list on every iteration.
+              default_value: ""
+              required: true
+            - name: servers
+              description: Servers to query.
+              default_value: ""
+              required: true
+            - name: port
+              description: DNS server port.
+              default_value: 53
+              required: false
+            - name: network
+              description: "Network protocol name. Available options: udp, tcp, tcp-tls."
+              default_value: udp
+              required: false
+            - name: record_types
+              description: "Query record type. Available options: A, AAAA, CNAME, MX, NS, PTR, TXT, SOA, SPF, TXT, SRV."
+              default_value: A
+              required: false
+            - name: timeout
+              description: Query read timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: job1
+                    record_types:
+                      - A
+                      - AAAA
+                    domains:
+                      - google.com
+                      - github.com
+                      - reddit.com
+                    servers:
+                      - 8.8.8.8
+                      - 8.8.4.4
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: dns_query_query_status
+        metric: dns_query.query_status
+        info: "DNS request type ${label:record_type} to server ${label:server} is unsuccessful"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dns_query.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: server
+          description: These metrics refer to the DNS server.
+          labels:
+            - name: server
+              description: DNS server address.
+            - name: network
+              description: Network protocol name (tcp, udp, tcp-tls).
+            - name: record_type
+              description: DNS record type (e.g. A, AAAA, CNAME).
+          metrics:
+            - name: dns_query.query_status
+              description: DNS Query Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: network_error
+                - name: dns_error
+            - name: dns_query.query_time
+              description: DNS Query Time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: query_time

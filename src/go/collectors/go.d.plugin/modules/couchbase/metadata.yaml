@@ -1,0 +1,214 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-couchbase
+      plugin_name: go.d.plugin
+      module_name: couchbase
+      monitored_instance:
+        name: Couchbase
+        link: https://www.couchbase.com/
+        icon_filename: couchbase.svg
+        categories:
+          - data-collection.database-servers
+      keywords:
+        - couchbase
+        - databases
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Couchbase servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/couchbase.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: All options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:8091
+              required: true
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 2
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: false
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: false
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client tls certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client tls key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8091
+            - name: Basic HTTP auth
+              description: Local server with basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8091
+                    username: foo
+                    password: bar
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:8091
+                
+                  - name: remote
+                    url: http://203.0.113.0:8091
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: couchbase.bucket_quota_percent_used
+              description: Quota Percent Used Per Bucket
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: a dimension per bucket
+            - name: couchbase.bucket_ops_per_sec
+              description: Operations Per Second Per Bucket
+              unit: ops/s
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per bucket
+            - name: couchbase.bucket_disk_fetches
+              description: Disk Fetches Per Bucket
+              unit: fetches
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per bucket
+            - name: couchbase.bucket_item_count
+              description: Item Count Per Bucket
+              unit: items
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per bucket
+            - name: couchbase.bucket_disk_used_stats
+              description: Disk Used Per Bucket
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per bucket
+            - name: couchbase.bucket_data_used
+              description: Data Used Per Bucket
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per bucket
+            - name: couchbase.bucket_mem_used
+              description: Memory Used Per Bucket
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per bucket
+            - name: couchbase.bucket_vb_active_num_non_resident
+              description: Number Of Non-Resident Items Per Bucket
+              unit: items
+              chart_type: stacked
+              dimensions:
+                - name: a dimension per bucket

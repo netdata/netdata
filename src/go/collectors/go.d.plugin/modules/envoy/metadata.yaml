@@ -1,0 +1,538 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-envoy
+      plugin_name: go.d.plugin
+      module_name: envoy
+      monitored_instance:
+        name: Envoy
+        link: https://www.envoyproxy.io/
+        icon_filename: envoy.svg
+        categories:
+          - data-collection.web-servers-and-web-proxies
+      keywords:
+        - envoy
+        - proxy
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Envoy proxies. It collects server, cluster, and listener metrics.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects Envoy instances running on localhost.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/envoy.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:9091/stats/prometheus
+              required: true
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              folding:
+                enabled: false
+              description: A basic example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9901/stats/prometheus
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9901/stats/prometheus
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: |
+                Do not validate server certificate chain and hostname.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:9901/stats/prometheus
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9901/stats/prometheus
+                
+                  - name: remote
+                    url: http://192.0.2.1:9901/stats/prometheus
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: Envoy exposes metrics in Prometheus format. All metric labels are added to charts.
+          labels: []
+          metrics:
+            - name: envoy.server_state
+              description: Server current state
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: live
+                - name: draining
+                - name: pre_initializing
+                - name: initializing
+            - name: envoy.server_connections_count
+              description: Server current connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: envoy.server_parent_connections_count
+              description: Server current parent connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: envoy.server_memory_allocated_size
+              description: Server memory allocated size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: allocated
+            - name: envoy.server_memory_heap_size
+              description: Server memory heap size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: heap
+            - name: envoy.server_memory_physical_size
+              description: Server memory physical size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: physical
+            - name: envoy.server_uptime
+              description: Server uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: envoy.cluster_manager_cluster_count
+              description: Cluster manager current clusters
+              unit: clusters
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: not_active
+            - name: envoy.cluster_manager_cluster_changes_rate
+              description: Cluster manager cluster changes
+              unit: clusters/s
+              chart_type: line
+              dimensions:
+                - name: added
+                - name: modified
+                - name: removed
+            - name: envoy.cluster_manager_cluster_updates_rate
+              description: Cluster manager updates
+              unit: updates/s
+              chart_type: line
+              dimensions:
+                - name: cluster
+            - name: envoy.cluster_manager_cluster_updated_via_merge_rate
+              description: Cluster manager updates applied as merged updates
+              unit: updates/s
+              chart_type: line
+              dimensions:
+                - name: via_merge
+            - name: envoy.cluster_manager_update_merge_cancelled_rate
+              description: Cluster manager cancelled merged updates
+              unit: updates/s
+              chart_type: line
+              dimensions:
+                - name: merge_cancelled
+            - name: envoy.cluster_manager_update_out_of_merge_window_rate
+              description: Cluster manager out of a merge window updates
+              unit: updates/s
+              chart_type: line
+              dimensions:
+                - name: out_of_merge_window
+            - name: envoy.cluster_membership_endpoints_count
+              description: Cluster membership current endpoints
+              unit: endpoints
+              chart_type: line
+              dimensions:
+                - name: healthy
+                - name: degraded
+                - name: excluded
+            - name: envoy.cluster_membership_changes_rate
+              description: Cluster membership changes
+              unit: changes/s
+              chart_type: line
+              dimensions:
+                - name: membership
+            - name: envoy.cluster_membership_updates_rate
+              description: Cluster membership updates
+              unit: updates/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failure
+                - name: empty
+                - name: no_rebuild
+            - name: envoy.cluster_upstream_cx_active_count
+              description: Cluster upstream current active connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: envoy.cluster_upstream_cx_rate
+              description: Cluster upstream connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: envoy.cluster_upstream_cx_http_rate
+              description: Cluster upstream connections by HTTP version
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: http1
+                - name: http2
+                - name: http3
+            - name: envoy.cluster_upstream_cx_destroy_rate
+              description: Cluster upstream destroyed connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: local
+                - name: remote
+            - name: envoy.cluster_upstream_cx_connect_fail_rate
+              description: Cluster upstream failed connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: failed
+            - name: envoy.cluster_upstream_cx_connect_timeout_rate
+              description: Cluster upstream timed out connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: timeout
+            - name: envoy.cluster_upstream_cx_bytes_rate
+              description: Cluster upstream connection traffic
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: envoy.cluster_upstream_cx_bytes_buffered_size
+              description: Cluster upstream current connection buffered size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: send
+            - name: envoy.cluster_upstream_rq_active_count
+              description: Cluster upstream current active requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: envoy.cluster_upstream_rq_rate
+              description: Cluster upstream requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: envoy.cluster_upstream_rq_failed_rate
+              description: Cluster upstream failed requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: cancelled
+                - name: maintenance_mode
+                - name: timeout
+                - name: max_duration_reached
+                - name: per_try_timeout
+                - name: reset_local
+                - name: reset_remote
+            - name: envoy.cluster_upstream_rq_pending_active_count
+              description: Cluster upstream current active pending requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: active_pending
+            - name: envoy.cluster_upstream_rq_pending_rate
+              description: Cluster upstream pending requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: envoy.cluster_upstream_rq_pending_failed_rate
+              description: Cluster upstream failed pending requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: overflow
+                - name: failure_eject
+            - name: envoy.cluster_upstream_rq_retry_rate
+              description: Cluster upstream request retries
+              unit: retries/s
+              chart_type: line
+              dimensions:
+                - name: request
+            - name: envoy.cluster_upstream_rq_retry_success_rate
+              description: Cluster upstream request successful retries
+              unit: retries/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: envoy.cluster_upstream_rq_retry_backoff_rate
+              description: Cluster upstream request backoff retries
+              unit: retries/s
+              chart_type: line
+              dimensions:
+                - name: exponential
+                - name: ratelimited
+            - name: envoy.listener_manager_listeners_count
+              description: Listener manager current listeners
+              unit: listeners
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: warming
+                - name: draining
+            - name: envoy.listener_manager_listener_changes_rate
+              description: Listener manager listener changes
+              unit: listeners/s
+              chart_type: line
+              dimensions:
+                - name: added
+                - name: modified
+                - name: removed
+                - name: stopped
+            - name: envoy.listener_manager_listener_object_events_rate
+              description: Listener manager listener object events
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: create_success
+                - name: create_failure
+                - name: in_place_updated
+            - name: envoy.listener_admin_downstream_cx_active_count
+              description: Listener admin downstream current active connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: envoy.listener_admin_downstream_cx_rate
+              description: Listener admin downstream connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: envoy.listener_admin_downstream_cx_destroy_rate
+              description: Listener admin downstream destroyed connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: destroyed
+            - name: envoy.listener_admin_downstream_cx_transport_socket_connect_timeout_rate
+              description: Listener admin downstream timed out connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: timeout
+            - name: envoy.listener_admin_downstream_cx_rejected_rate
+              description: Listener admin downstream rejected connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: overflow
+                - name: overload
+                - name: global_overflow
+            - name: envoy.listener_admin_downstream_listener_filter_remote_close_rate
+              description: Listener admin downstream connections closed by remote when peek data for listener filters
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: closed
+            - name: envoy.listener_admin_downstream_listener_filter_error_rate
+              description: Listener admin downstream read errors when peeking data for listener filters
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: envoy.listener_admin_downstream_pre_cx_active_count
+              description: Listener admin downstream current active sockets
+              unit: sockets
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: envoy.listener_admin_downstream_pre_cx_timeout_rate
+              description: Listener admin downstream timed out sockets
+              unit: sockets/s
+              chart_type: line
+              dimensions:
+                - name: timeout
+            - name: envoy.listener_downstream_cx_active_count
+              description: Listener downstream current active connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: envoy.listener_downstream_cx_rate
+              description: Listener downstream connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: envoy.listener_downstream_cx_destroy_rate
+              description: Listener downstream destroyed connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: destroyed
+            - name: envoy.listener_downstream_cx_transport_socket_connect_timeout_rate
+              description: Listener downstream timed out connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: timeout
+            - name: envoy.listener_downstream_cx_rejected_rate
+              description: Listener downstream rejected connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: overflow
+                - name: overload
+                - name: global_overflow
+            - name: envoy.listener_downstream_listener_filter_remote_close_rate
+              description: Listener downstream connections closed by remote when peek data for listener filters
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: closed
+            - name: envoy.listener_downstream_listener_filter_error_rate
+              description: Listener downstream read errors when peeking data for listener filters
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: envoy.listener_downstream_pre_cx_active_count
+              description: Listener downstream current active sockets
+              unit: sockets
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: envoy.listener_downstream_pre_cx_timeout_rate
+              description: Listener downstream timed out sockets
+              unit: sockets/s
+              chart_type: line
+              dimensions:
+                - name: timeout

@@ -1,0 +1,3 @@
+ checkpoints_timed | checkpoints_req | checkpoint_write_time | checkpoint_sync_time | buffers_checkpoint_bytes | buffers_clean_bytes | maxwritten_clean | buffers_backend_bytes | buffers_backend_fsync | buffers_alloc_bytes
+-------------------+-----------------+-----------------------+----------------------+--------------------------+---------------------+------------------+-----------------------+-----------------------+--------------------
+              1814 |              16 |                   167 |                   47 |              32768       |             0       |                0 |               0       |                     0 |      27295744

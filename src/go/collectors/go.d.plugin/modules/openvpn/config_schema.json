@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/openvpn job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "connect_timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    },
+    "read_timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    },
+    "write_timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    },
+    "per_user_stats": {
+      "type": "object",
+      "properties": {
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "name",
+    "address"
+  ]
+}

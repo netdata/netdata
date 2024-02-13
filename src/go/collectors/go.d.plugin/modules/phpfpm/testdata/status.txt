@@ -1,0 +1,14 @@
+pool:                 www
+process manager:      dynamic
+start time:           21/Aug/2019:09:04:50 +0200
+start since:          1066
+accepted conn:        19
+listen queue:         0
+max listen queue:     0
+listen queue len:     0
+idle processes:       1
+active processes:     1
+total processes:      2
+max active processes: 1
+max children reached: 0
+slow requests:        0

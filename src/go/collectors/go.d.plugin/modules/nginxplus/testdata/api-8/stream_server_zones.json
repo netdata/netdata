@@ -1,0 +1,15 @@
+{
+  "tcp_server": {
+    "processing": 0,
+    "connections": 0,
+    "sessions": {
+      "2xx": 0,
+      "4xx": 0,
+      "5xx": 0,
+      "total": 0
+    },
+    "discarded": 0,
+    "received": 0,
+    "sent": 0
+  }
+}

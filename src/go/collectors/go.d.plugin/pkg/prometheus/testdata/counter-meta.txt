@@ -1,0 +1,11 @@
+# HELP test_counter_metric_1_total Test Counter Metric 1
+# TYPE test_counter_metric_1_total counter
+test_counter_metric_1_total{label1="value1"} 11
+test_counter_metric_1_total{label1="value2"} 12
+test_counter_metric_1_total{label1="value3"} 13
+test_counter_metric_1_total{label1="value4"} 14
+# TYPE test_counter_metric_2_total counter
+test_counter_metric_2_total{label1="value1"} 11
+test_counter_metric_2_total{label1="value2"} 12
+test_counter_metric_2_total{label1="value3"} 13
+test_counter_metric_2_total{label1="value4"} 14

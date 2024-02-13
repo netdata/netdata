@@ -1,0 +1,1 @@
+integrations/powerdns_authoritative_server.md

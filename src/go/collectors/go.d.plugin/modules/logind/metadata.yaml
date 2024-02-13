@@ -1,0 +1,105 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-logind
+      plugin_name: go.d.plugin
+      module_name: logind
+      monitored_instance:
+        name: systemd-logind users
+        link: https://www.freedesktop.org/software/systemd/man/systemd-logind.service.html
+        icon_filename: users.svg
+        categories:
+          - data-collection.systemd
+      keywords:
+        - logind
+        - systemd
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors number of sessions and users as reported by the `org.freedesktop.login1` DBus API.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/logind.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list: []
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: logind.sessions
+              description: Logind Sessions
+              unit: sessions
+              chart_type: stacked
+              dimensions:
+                - name: remote
+                - name: local
+            - name: logind.sessions_type
+              description: Logind Sessions By Type
+              unit: sessions
+              chart_type: stacked
+              dimensions:
+                - name: console
+                - name: graphical
+                - name: other
+            - name: logind.sessions_state
+              description: Logind Sessions By State
+              unit: sessions
+              chart_type: stacked
+              dimensions:
+                - name: online
+                - name: closing
+                - name: active
+            - name: logind.users_state
+              description: Logind Users By State
+              unit: users
+              chart_type: stacked
+              dimensions:
+                - name: offline
+                - name: closing
+                - name: online
+                - name: lingering
+                - name: active

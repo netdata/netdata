@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/redis job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "password": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    },
+    "ping_samples": {
+      "type": "integer"
+    },
+    "tls_ca": {
+      "type": "string"
+    },
+    "tls_cert": {
+      "type": "string"
+    },
+    "tls_key": {
+      "type": "string"
+    },
+    "tls_skip_verify": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name",
+    "address"
+  ]
+}

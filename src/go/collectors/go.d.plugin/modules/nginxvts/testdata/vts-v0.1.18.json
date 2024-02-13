@@ -1,0 +1,44 @@
+{
+  "hostName": "Web",
+  "nginxVersion": "1.18.0",
+  "loadMsec": 1606489796895,
+  "nowMsec": 1606490116734,
+  "connections": {
+    "active": 2,
+    "reading": 0,
+    "writing": 1,
+    "waiting": 1,
+    "accepted": 12,
+    "handled": 12,
+    "requests": 17
+  },
+  "sharedZones": {
+    "name": "ngx_http_vhost_traffic_status",
+    "maxSize": 1048575,
+    "usedSize": 45799,
+    "usedNode": 13
+  },
+  "serverZones": {
+    "*": {
+      "requestCounter": 2,
+      "inBytes": 156,
+      "outBytes": 692,
+      "responses": {
+        "1xx": 1,
+        "2xx": 2,
+        "3xx": 3,
+        "4xx": 4,
+        "5xx": 5,
+        "miss": 2,
+        "bypass": 4,
+        "expired": 6,
+        "stale": 8,
+        "updating": 10,
+        "revalidated": 12,
+        "hit": 14,
+        "scarce": 16
+      }
+    }
+  }
+}
+

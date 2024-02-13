@@ -1,0 +1,41 @@
+{
+  "result": {
+    "version": 2040100,
+    "subversion": "/Energi Core:2.4.1/",
+    "protocolversion": 70213,
+    "localservices": "0000000000000005",
+    "localrelay": true,
+    "timeoffset": 1,
+    "networkactive": true,
+    "connections": 1,
+    "networks": [
+      {
+        "name": "ipv4",
+        "limited": false,
+        "reachable": true,
+        "proxy": "",
+        "proxy_randomize_credentials": false
+      },
+      {
+        "name": "ipv6",
+        "limited": false,
+        "reachable": true,
+        "proxy": "",
+        "proxy_randomize_credentials": false
+      },
+      {
+        "name": "onion",
+        "limited": true,
+        "reachable": false,
+        "proxy": "",
+        "proxy_randomize_credentials": false
+      }
+    ],
+    "relayfee": 1e-05,
+    "incrementalfee": 1e-05,
+    "localaddresses": [],
+    "warnings": ""
+  },
+  "error": null,
+  "id": "1"
+}

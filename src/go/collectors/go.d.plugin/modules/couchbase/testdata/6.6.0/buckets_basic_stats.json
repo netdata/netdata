@@ -1,0 +1,422 @@
+[
+  {
+    "name": "beer-sample",
+    "uuid": "bf10ab11911f1c065db5fd58c5fbc0b6",
+    "bucketType": "membase",
+    "authType": "sasl",
+    "uri": "/pools/default/buckets/beer-sample?bucket_uuid=bf10ab11911f1c065db5fd58c5fbc0b6",
+    "streamingUri": "/pools/default/bucketsStreaming/beer-sample?bucket_uuid=bf10ab11911f1c065db5fd58c5fbc0b6",
+    "localRandomKeyUri": "/pools/default/buckets/beer-sample/localRandomKey",
+    "controllers": {
+      "compactAll": "/pools/default/buckets/beer-sample/controller/compactBucket",
+      "compactDB": "/pools/default/buckets/beer-sample/controller/compactDatabases",
+      "purgeDeletes": "/pools/default/buckets/beer-sample/controller/unsafePurgeBucket",
+      "startRecovery": "/pools/default/buckets/beer-sample/controller/startRecovery"
+    },
+    "nodes": [
+      {
+        "couchApiBaseHTTPS": "https://172.17.0.2:18092/beer-sample%2Bbf10ab11911f1c065db5fd58c5fbc0b6",
+        "couchApiBase": "http://172.17.0.2:8092/beer-sample%2Bbf10ab11911f1c065db5fd58c5fbc0b6",
+        "systemStats": {
+          "cpu_utilization_rate": 15.21035598705502,
+          "cpu_stolen_rate": 0,
+          "swap_total": 0,
+          "swap_used": 0,
+          "mem_total": 33587437568,
+          "mem_free": 30532227072,
+          "mem_limit": 33587437568,
+          "cpu_cores_available": 6,
+          "allocstall": 0
+        },
+        "interestingStats": {
+          "cmd_get": 0,
+          "couch_docs_actual_disk_size": 102960477,
+          "couch_docs_data_size": 72439963,
+          "couch_spatial_data_size": 0,
+          "couch_spatial_disk_size": 0,
+          "couch_views_actual_disk_size": 796048,
+          "couch_views_data_size": 787744,
+          "curr_items": 39480,
+          "curr_items_tot": 39480,
+          "ep_bg_fetched": 0,
+          "get_hits": 0,
+          "mem_used": 118199752,
+          "ops": 0,
+          "vb_active_num_non_resident": 0,
+          "vb_replica_curr_items": 0
+        },
+        "uptime": "638",
+        "memoryTotal": 33587437568,
+        "memoryFree": 30532227072,
+        "mcdMemoryReserved": 25625,
+        "mcdMemoryAllocated": 25625,
+        "replication": 0,
+        "clusterMembership": "active",
+        "recoveryType": "none",
+        "status": "healthy",
+        "otpNode": "ns_1@cb.local",
+        "thisNode": true,
+        "hostname": "172.17.0.2:8091",
+        "nodeUUID": "da79fcb65d6ae1f8b4fdfa3ccb2e4500",
+        "clusterCompatibility": 393222,
+        "version": "6.6.0-7909-enterprise",
+        "os": "x86_64-unknown-linux-gnu",
+        "cpuCount": 6,
+        "ports": {
+          "direct": 11210,
+          "httpsCAPI": 18092,
+          "httpsMgmt": 18091,
+          "distTCP": 21100,
+          "distTLS": 21150
+        },
+        "services": [
+          "cbas",
+          "eventing",
+          "fts",
+          "index",
+          "kv",
+          "n1ql"
+        ],
+        "nodeEncryption": false,
+        "configuredHostname": "127.0.0.1:8091",
+        "addressFamily": "inet",
+        "externalListeners": [
+          {
+            "afamily": "inet",
+            "nodeEncryption": false
+          },
+          {
+            "afamily": "inet6",
+            "nodeEncryption": false
+          }
+        ]
+      }
+    ],
+    "stats": {
+      "uri": "/pools/default/buckets/beer-sample/stats",
+      "directoryURI": "/pools/default/buckets/beer-sample/statsDirectory",
+      "nodeStatsListURI": "/pools/default/buckets/beer-sample/nodes"
+    },
+    "nodeLocator": "vbucket",
+    "saslPassword": "47809efed0156c874b91bbdfeba89912",
+    "ddocs": {
+      "uri": "/pools/default/buckets/beer-sample/ddocs"
+    },
+    "replicaIndex": true,
+    "autoCompactionSettings": false,
+    "maxTTL": 0,
+    "compressionMode": "passive",
+    "replicaNumber": 1,
+    "threadsNumber": 3,
+    "quota": {
+      "ram": 104857600,
+      "rawRAM": 104857600
+    },
+    "basicStats": {
+      "quotaPercentUsed": 32.70613861083984,
+      "opsPerSec": 1.1,
+      "diskFetches": 1,
+      "itemCount": 7303,
+      "diskUsed": 27690472,
+      "dataUsed": 13990431,
+      "memUsed": 34294872,
+      "vbActiveNumNonResident": 1
+    },
+    "evictionPolicy": "valueOnly",
+    "durabilityMinLevel": "none",
+    "conflictResolutionType": "seqno",
+    "bucketCapabilitiesVer": "",
+    "bucketCapabilities": [
+      "durableWrite",
+      "tombstonedUserXAttrs",
+      "couchapi",
+      "dcp",
+      "cbhello",
+      "touch",
+      "cccp",
+      "xdcrCheckpointing",
+      "nodesExt",
+      "xattr"
+    ]
+  },
+  {
+    "name": "gamesim-sample",
+    "uuid": "23ff61363bc4df9af4eb9c2198fc74d3",
+    "bucketType": "membase",
+    "authType": "sasl",
+    "uri": "/pools/default/buckets/gamesim-sample?bucket_uuid=23ff61363bc4df9af4eb9c2198fc74d3",
+    "streamingUri": "/pools/default/bucketsStreaming/gamesim-sample?bucket_uuid=23ff61363bc4df9af4eb9c2198fc74d3",
+    "localRandomKeyUri": "/pools/default/buckets/gamesim-sample/localRandomKey",
+    "controllers": {
+      "compactAll": "/pools/default/buckets/gamesim-sample/controller/compactBucket",
+      "compactDB": "/pools/default/buckets/gamesim-sample/controller/compactDatabases",
+      "purgeDeletes": "/pools/default/buckets/gamesim-sample/controller/unsafePurgeBucket",
+      "startRecovery": "/pools/default/buckets/gamesim-sample/controller/startRecovery"
+    },
+    "nodes": [
+      {
+        "couchApiBaseHTTPS": "https://172.17.0.2:18092/gamesim-sample%2B23ff61363bc4df9af4eb9c2198fc74d3",
+        "couchApiBase": "http://172.17.0.2:8092/gamesim-sample%2B23ff61363bc4df9af4eb9c2198fc74d3",
+        "systemStats": {
+          "cpu_utilization_rate": 15.21035598705502,
+          "cpu_stolen_rate": 0,
+          "swap_total": 0,
+          "swap_used": 0,
+          "mem_total": 33587437568,
+          "mem_free": 30532227072,
+          "mem_limit": 33587437568,
+          "cpu_cores_available": 6,
+          "allocstall": 0
+        },
+        "interestingStats": {
+          "cmd_get": 0,
+          "couch_docs_actual_disk_size": 102960477,
+          "couch_docs_data_size": 72439963,
+          "couch_spatial_data_size": 0,
+          "couch_spatial_disk_size": 0,
+          "couch_views_actual_disk_size": 796048,
+          "couch_views_data_size": 787744,
+          "curr_items": 39480,
+          "curr_items_tot": 39480,
+          "ep_bg_fetched": 0,
+          "get_hits": 0,
+          "mem_used": 118199752,
+          "ops": 0,
+          "vb_active_num_non_resident": 0,
+          "vb_replica_curr_items": 0
+        },
+        "uptime": "638",
+        "memoryTotal": 33587437568,
+        "memoryFree": 30532227072,
+        "mcdMemoryReserved": 25625,
+        "mcdMemoryAllocated": 25625,
+        "replication": 0,
+        "clusterMembership": "active",
+        "recoveryType": "none",
+        "status": "healthy",
+        "otpNode": "ns_1@cb.local",
+        "thisNode": true,
+        "hostname": "172.17.0.2:8091",
+        "nodeUUID": "da79fcb65d6ae1f8b4fdfa3ccb2e4500",
+        "clusterCompatibility": 393222,
+        "version": "6.6.0-7909-enterprise",
+        "os": "x86_64-unknown-linux-gnu",
+        "cpuCount": 6,
+        "ports": {
+          "direct": 11210,
+          "httpsCAPI": 18092,
+          "httpsMgmt": 18091,
+          "distTCP": 21100,
+          "distTLS": 21150
+        },
+        "services": [
+          "cbas",
+          "eventing",
+          "fts",
+          "index",
+          "kv",
+          "n1ql"
+        ],
+        "nodeEncryption": false,
+        "configuredHostname": "127.0.0.1:8091",
+        "addressFamily": "inet",
+        "externalListeners": [
+          {
+            "afamily": "inet",
+            "nodeEncryption": false
+          },
+          {
+            "afamily": "inet6",
+            "nodeEncryption": false
+          }
+        ]
+      }
+    ],
+    "stats": {
+      "uri": "/pools/default/buckets/gamesim-sample/stats",
+      "directoryURI": "/pools/default/buckets/gamesim-sample/statsDirectory",
+      "nodeStatsListURI": "/pools/default/buckets/gamesim-sample/nodes"
+    },
+    "nodeLocator": "vbucket",
+    "saslPassword": "39cf71a1da3f298bed52d19973dce967",
+    "ddocs": {
+      "uri": "/pools/default/buckets/gamesim-sample/ddocs"
+    },
+    "replicaIndex": true,
+    "autoCompactionSettings": false,
+    "maxTTL": 0,
+    "compressionMode": "passive",
+    "replicaNumber": 1,
+    "threadsNumber": 3,
+    "quota": {
+      "ram": 104857600,
+      "rawRAM": 104857600
+    },
+    "basicStats": {
+      "quotaPercentUsed": 28.21607208251953,
+      "opsPerSec": 1.1,
+      "diskFetches": 1,
+      "itemCount": 586,
+      "diskUsed": 13821793,
+      "dataUsed": 5371804,
+      "memUsed": 29586696,
+      "vbActiveNumNonResident": 1
+    },
+    "evictionPolicy": "valueOnly",
+    "durabilityMinLevel": "none",
+    "conflictResolutionType": "seqno",
+    "bucketCapabilitiesVer": "",
+    "bucketCapabilities": [
+      "durableWrite",
+      "tombstonedUserXAttrs",
+      "couchapi",
+      "dcp",
+      "cbhello",
+      "touch",
+      "cccp",
+      "xdcrCheckpointing",
+      "nodesExt",
+      "xattr"
+    ]
+  },
+  {
+    "name": "travel-sample",
+    "uuid": "68a336f9ec0e0d2150d56298c896d0a9",
+    "bucketType": "membase",
+    "authType": "sasl",
+    "uri": "/pools/default/buckets/travel-sample?bucket_uuid=68a336f9ec0e0d2150d56298c896d0a9",
+    "streamingUri": "/pools/default/bucketsStreaming/travel-sample?bucket_uuid=68a336f9ec0e0d2150d56298c896d0a9",
+    "localRandomKeyUri": "/pools/default/buckets/travel-sample/localRandomKey",
+    "controllers": {
+      "compactAll": "/pools/default/buckets/travel-sample/controller/compactBucket",
+      "compactDB": "/pools/default/buckets/travel-sample/controller/compactDatabases",
+      "purgeDeletes": "/pools/default/buckets/travel-sample/controller/unsafePurgeBucket",
+      "startRecovery": "/pools/default/buckets/travel-sample/controller/startRecovery"
+    },
+    "nodes": [
+      {
+        "couchApiBaseHTTPS": "https://172.17.0.2:18092/travel-sample%2B68a336f9ec0e0d2150d56298c896d0a9",
+        "couchApiBase": "http://172.17.0.2:8092/travel-sample%2B68a336f9ec0e0d2150d56298c896d0a9",
+        "systemStats": {
+          "cpu_utilization_rate": 15.21035598705502,
+          "cpu_stolen_rate": 0,
+          "swap_total": 0,
+          "swap_used": 0,
+          "mem_total": 33587437568,
+          "mem_free": 30532227072,
+          "mem_limit": 33587437568,
+          "cpu_cores_available": 6,
+          "allocstall": 0
+        },
+        "interestingStats": {
+          "cmd_get": 0,
+          "couch_docs_actual_disk_size": 102960477,
+          "couch_docs_data_size": 72439963,
+          "couch_spatial_data_size": 0,
+          "couch_spatial_disk_size": 0,
+          "couch_views_actual_disk_size": 796048,
+          "couch_views_data_size": 787744,
+          "curr_items": 39480,
+          "curr_items_tot": 39480,
+          "ep_bg_fetched": 0,
+          "get_hits": 0,
+          "mem_used": 118199752,
+          "ops": 0,
+          "vb_active_num_non_resident": 0,
+          "vb_replica_curr_items": 0
+        },
+        "uptime": "638",
+        "memoryTotal": 33587437568,
+        "memoryFree": 30532227072,
+        "mcdMemoryReserved": 25625,
+        "mcdMemoryAllocated": 25625,
+        "replication": 0,
+        "clusterMembership": "active",
+        "recoveryType": "none",
+        "status": "healthy",
+        "otpNode": "ns_1@cb.local",
+        "thisNode": true,
+        "hostname": "172.17.0.2:8091",
+        "nodeUUID": "da79fcb65d6ae1f8b4fdfa3ccb2e4500",
+        "clusterCompatibility": 393222,
+        "version": "6.6.0-7909-enterprise",
+        "os": "x86_64-unknown-linux-gnu",
+        "cpuCount": 6,
+        "ports": {
+          "direct": 11210,
+          "httpsCAPI": 18092,
+          "httpsMgmt": 18091,
+          "distTCP": 21100,
+          "distTLS": 21150
+        },
+        "services": [
+          "cbas",
+          "eventing",
+          "fts",
+          "index",
+          "kv",
+          "n1ql"
+        ],
+        "nodeEncryption": false,
+        "configuredHostname": "127.0.0.1:8091",
+        "addressFamily": "inet",
+        "externalListeners": [
+          {
+            "afamily": "inet",
+            "nodeEncryption": false
+          },
+          {
+            "afamily": "inet6",
+            "nodeEncryption": false
+          }
+        ]
+      }
+    ],
+    "stats": {
+      "uri": "/pools/default/buckets/travel-sample/stats",
+      "directoryURI": "/pools/default/buckets/travel-sample/statsDirectory",
+      "nodeStatsListURI": "/pools/default/buckets/travel-sample/nodes"
+    },
+    "nodeLocator": "vbucket",
+    "saslPassword": "c6be6d9be723b8b1f8eac4edb84a06ed",
+    "ddocs": {
+      "uri": "/pools/default/buckets/travel-sample/ddocs"
+    },
+    "replicaIndex": true,
+    "autoCompactionSettings": false,
+    "maxTTL": 0,
+    "compressionMode": "passive",
+    "replicaNumber": 1,
+    "threadsNumber": 3,
+    "quota": {
+      "ram": 104857600,
+      "rawRAM": 104857600
+    },
+    "basicStats": {
+      "quotaPercentUsed": 51.80185699462891,
+      "opsPerSec": 1.1,
+      "diskFetches": 1,
+      "itemCount": 31591,
+      "diskUsed": 62244260,
+      "dataUsed": 53865472,
+      "memUsed": 54318184,
+      "vbActiveNumNonResident": 1
+    },
+    "evictionPolicy": "valueOnly",
+    "durabilityMinLevel": "none",
+    "conflictResolutionType": "seqno",
+    "bucketCapabilitiesVer": "",
+    "bucketCapabilities": [
+      "durableWrite",
+      "tombstonedUserXAttrs",
+      "couchapi",
+      "dcp",
+      "cbhello",
+      "touch",
+      "cccp",
+      "xdcrCheckpointing",
+      "nodesExt",
+      "xattr"
+    ]
+  }
+]

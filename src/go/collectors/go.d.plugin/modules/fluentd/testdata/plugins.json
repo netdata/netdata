@@ -1,0 +1,101 @@
+{
+  "plugins": [
+    {
+      "plugin_id": "input_forward",
+      "plugin_category": "input",
+      "type": "forward",
+      "config": {
+        "@type": "forward",
+        "@id": "input_forward"
+      },
+      "output_plugin": false,
+      "retry_count": null
+    },
+    {
+      "plugin_id": "input_http",
+      "plugin_category": "input",
+      "type": "http",
+      "config": {
+        "@type": "http",
+        "@id": "input_http",
+        "port": "8888"
+      },
+      "output_plugin": false,
+      "retry_count": null
+    },
+    {
+      "plugin_id": "input_debug_agent",
+      "plugin_category": "input",
+      "type": "debug_agent",
+      "config": {
+        "@type": "debug_agent",
+        "@id": "input_debug_agent",
+        "bind": "127.0.0.1",
+        "port": "24230"
+      },
+      "output_plugin": false,
+      "retry_count": null
+    },
+    {
+      "plugin_id": "object:3f7e4d08e3e0",
+      "plugin_category": "input",
+      "type": "monitor_agent",
+      "config": {
+        "@type": "monitor_agent",
+        "bind": "0.0.0.0",
+        "port": "24220"
+      },
+      "output_plugin": false,
+      "retry_count": null
+    },
+    {
+      "plugin_id": "output_td",
+      "plugin_category": "output",
+      "type": "tdlog",
+      "config": {
+        "@type": "tdlog",
+        "@id": "output_td",
+        "apikey": "xxxxxx",
+        "auto_create_table": ""
+      },
+      "output_plugin": true,
+      "buffer_queue_length": 0,
+      "buffer_total_queued_size": 0,
+      "retry_count": 0,
+      "retry": {}
+    },
+    {
+      "plugin_id": "output_stdout",
+      "plugin_category": "output",
+      "type": "stdout",
+      "config": {
+        "@type": "stdout",
+        "@id": "output_stdout"
+      },
+      "output_plugin": true,
+      "retry_count": 0,
+      "retry": {}
+    },
+    {
+      "plugin_id": "object:3f7e4b836770",
+      "plugin_category": "filter",
+      "type": "grep",
+      "config": {
+        "@type": "grep",
+        "regexp1": "message cool"
+      },
+      "output_plugin": false,
+      "retry_count": null
+    },
+    {
+      "plugin_id": "object:3f7e4bbe5a38",
+      "plugin_category": "filter",
+      "type": "record_transformer",
+      "config": {
+        "@type": "record_transformer"
+      },
+      "output_plugin": false,
+      "retry_count": null
+    }
+  ]
+}

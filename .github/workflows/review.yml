@@ -17,6 +17,7 @@ jobs:
       actionlint: ${{ steps.actionlint.outputs.run }}
       clangformat: ${{ steps.clangformat.outputs.run }}
       flake8: ${{ steps.flake8.outputs.run }}
+      golangci-lint: ${{ steps.golangci-lint.outputs.run }}
       hadolint: ${{ steps.hadolint.outputs.run }}
       shellcheck: ${{ steps.shellcheck.outputs.run }}
       yamllint: ${{ steps.yamllint.outputs.run }}
@@ -58,6 +59,17 @@ jobs:
             echo 'Python files have changed, need to run flake8.'
           else
             echo "run=false" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check files for golangci-lint
+        id: golangci-lint
+        run: |
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/golangci-lint') }}" = "true" ]; then
+            echo "run=true" >> "${GITHUB_OUTPUT}"
+          elif git diff --name-only origin/${{ github.base_ref }} HEAD -- | grep -Eq '.*\.go' ; then
+            echo "run=true" >> $GITHUB_OUTPUT
+            echo 'Go code has changed, need to run golangci-lint.'
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
           fi
       - name: Check files for hadolint
         id: hadolint
@@ -163,6 +175,26 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
+
+  golangci-lint:
+    name: golangci-lint
+    needs: prep-review
+    if: needs.prep-review.outputs.golangci-lint == 'true'
+    strategy:
+      matrix:
+        tree:
+          - src/go/collectors/go.d.plugin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run golangci-lint
+        uses: reviewdog/action-golangci-lint@v2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
+          golangci_lint_flags: '--timeout=10m'
+          workdir: ${{ matrix.tree }}
 
   hadolint:
     name: hadolint

@@ -1,0 +1,8 @@
+        state                  | count
+-------------------------------+-------
+ active                        |     1
+ idle                          |    14
+ idle in transaction           |     7
+ idle in transaction (aborted) |     1
+ fastpath function call        |     1
+ disabled                      |     1

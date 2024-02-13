@@ -557,7 +557,9 @@ void finalize_data_files(struct rrdengine_instance *ctx)
 {
     bool logged = false;
 
-    logged = false;
+    if (!ctx->datafiles.first)
+        return;
+
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
         if(!logged) {
             netdata_log_info("Waiting for inflight flush to finish on tier %d...", ctx->config.tier);

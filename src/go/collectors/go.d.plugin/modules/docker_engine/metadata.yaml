@@ -1,0 +1,263 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-docker_engine
+      plugin_name: go.d.plugin
+      module_name: docker_engine
+      alternative_monitored_instances: []
+      monitored_instance:
+        name: Docker Engine
+        link: https://docs.docker.com/engine/
+        categories:
+          - data-collection.containers-and-vms
+        icon_filename: docker.svg
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - docker
+        - container
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the activity and health of Docker Engine and Docker Swarm.
+        method_description: |
+          The [built-in](https://docs.docker.com/config/daemon/prometheus/) Prometheus exporter is used to get the metrics.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            It discovers instances running on localhost by attempting to connect to a known Docker TCP socket: `http://127.0.0.1:9323/metrics`.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable built-in Prometheus exporter
+            description: |
+              To enable built-in Prometheus exporter, follow the [official documentation](https://docs.docker.com/config/daemon/prometheus/#configure-docker).
+      configuration:
+        file:
+          name: go.d/docker_engine.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:9323/metrics
+              required: true
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 1
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: GET
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: "no"
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: "no"
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9323/metrics
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9323/metrics
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: Configuration with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9323/metrics
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9323/metrics
+                
+                  - name: remote
+                    url: http://192.0.2.1:9323/metrics
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored application.
+          labels: []
+          metrics:
+            - name: docker_engine.engine_daemon_container_actions
+              description: Container Actions
+              unit: actions/s
+              chart_type: stacked
+              dimensions:
+                - name: changes
+                - name: commit
+                - name: create
+                - name: delete
+                - name: start
+            - name: docker_engine.engine_daemon_container_states_containers
+              description: Containers In Various States
+              unit: containers
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: paused
+                - name: stopped
+            - name: docker_engine.builder_builds_failed_total
+              description: Builder Builds Fails By Reason
+              unit: fails/s
+              chart_type: stacked
+              dimensions:
+                - name: build_canceled
+                - name: build_target_not_reachable_error
+                - name: command_not_supported_error
+                - name: dockerfile_empty_error
+                - name: dockerfile_syntax_error
+                - name: error_processing_commands_error
+                - name: missing_onbuild_arguments_error
+                - name: unknown_instruction_error
+            - name: docker_engine.engine_daemon_health_checks_failed_total
+              description: Health Checks
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: fails
+            - name: docker_engine.swarm_manager_leader
+              description: Swarm Manager Leader
+              unit: bool
+              chart_type: line
+              dimensions:
+                - name: is_leader
+            - name: docker_engine.swarm_manager_object_store
+              description: Swarm Manager Object Store
+              unit: objects
+              chart_type: stacked
+              dimensions:
+                - name: nodes
+                - name: services
+                - name: tasks
+                - name: networks
+                - name: secrets
+                - name: configs
+            - name: docker_engine.swarm_manager_nodes_per_state
+              description: Swarm Manager Nodes Per State
+              unit: nodes
+              chart_type: stacked
+              dimensions:
+                - name: ready
+                - name: down
+                - name: unknown
+                - name: disconnected
+            - name: docker_engine.swarm_manager_tasks_per_state
+              description: Swarm Manager Tasks Per State
+              unit: tasks
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: failed
+                - name: ready
+                - name: rejected
+                - name: starting
+                - name: shutdown
+                - name: new
+                - name: orphaned
+                - name: preparing
+                - name: pending
+                - name: complete
+                - name: remove
+                - name: accepted
+                - name: assigned

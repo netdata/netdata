@@ -1,0 +1,382 @@
+# HELP haproxy_frontend_status Current status of the service (frontend: 0=STOP, 1=UP - backend: 0=DOWN, 1=UP - server: 0=DOWN, 1=UP, 2=MAINT, 3=DRAIN, 4=NOLB).
+# TYPE haproxy_frontend_status gauge
+haproxy_frontend_status{proxy="healthz"} 1
+haproxy_frontend_status{proxy="http"} 1
+haproxy_frontend_status{proxy="https"} 1
+haproxy_frontend_status{proxy="stats"} 1
+# HELP haproxy_frontend_current_sessions Current number of active sessions.
+# TYPE haproxy_frontend_current_sessions gauge
+haproxy_frontend_current_sessions{proxy="healthz"} 1
+haproxy_frontend_current_sessions{proxy="http"} 1
+haproxy_frontend_current_sessions{proxy="https"} 1348
+haproxy_frontend_current_sessions{proxy="stats"} 2
+# HELP haproxy_frontend_max_sessions Maximum observed number of active sessions.
+# TYPE haproxy_frontend_max_sessions gauge
+haproxy_frontend_max_sessions{proxy="healthz"} 10
+haproxy_frontend_max_sessions{proxy="http"} 5
+haproxy_frontend_max_sessions{proxy="https"} 1389
+haproxy_frontend_max_sessions{proxy="stats"} 8
+# HELP haproxy_frontend_limit_sessions Configured session limit.
+# TYPE haproxy_frontend_limit_sessions gauge
+haproxy_frontend_limit_sessions{proxy="healthz"} 524181
+haproxy_frontend_limit_sessions{proxy="http"} 524181
+haproxy_frontend_limit_sessions{proxy="https"} 524181
+haproxy_frontend_limit_sessions{proxy="stats"} 524181
+# HELP haproxy_frontend_sessions_total Total number of sessions.
+# TYPE haproxy_frontend_sessions_total counter
+haproxy_frontend_sessions_total{proxy="healthz"} 723971
+haproxy_frontend_sessions_total{proxy="http"} 1392
+haproxy_frontend_sessions_total{proxy="https"} 23433914
+haproxy_frontend_sessions_total{proxy="stats"} 4207
+# HELP haproxy_frontend_limit_session_rate Configured limit on new sessions per second.
+# TYPE haproxy_frontend_limit_session_rate gauge
+haproxy_frontend_limit_session_rate{proxy="healthz"} 1
+haproxy_frontend_limit_session_rate{proxy="http"} 1
+haproxy_frontend_limit_session_rate{proxy="https"} 1
+haproxy_frontend_limit_session_rate{proxy="stats"} 1
+# HELP haproxy_frontend_max_session_rate Maximum observed number of sessions per second.
+# TYPE haproxy_frontend_max_session_rate gauge
+haproxy_frontend_max_session_rate{proxy="healthz"} 1
+haproxy_frontend_max_session_rate{proxy="http"} 12
+haproxy_frontend_max_session_rate{proxy="https"} 96
+haproxy_frontend_max_session_rate{proxy="stats"} 2
+# HELP haproxy_frontend_connections_rate_max Maximum observed number of connections per second.
+# TYPE haproxy_frontend_connections_rate_max gauge
+haproxy_frontend_connections_rate_max{proxy="healthz"} 1
+haproxy_frontend_connections_rate_max{proxy="http"} 12
+haproxy_frontend_connections_rate_max{proxy="https"} 85
+haproxy_frontend_connections_rate_max{proxy="stats"} 2
+# HELP haproxy_frontend_connections_total Total number of connections.
+# TYPE haproxy_frontend_connections_total counter
+haproxy_frontend_connections_total{proxy="healthz"} 723971
+haproxy_frontend_connections_total{proxy="http"} 1392
+haproxy_frontend_connections_total{proxy="https"} 23476808
+haproxy_frontend_connections_total{proxy="stats"} 4207
+# HELP haproxy_frontend_bytes_in_total Current total of incoming bytes.
+# TYPE haproxy_frontend_bytes_in_total counter
+haproxy_frontend_bytes_in_total{proxy="healthz"} 79636810
+haproxy_frontend_bytes_in_total{proxy="http"} 73990
+haproxy_frontend_bytes_in_total{proxy="https"} 2514816135823
+haproxy_frontend_bytes_in_total{proxy="stats"} 14694474
+# HELP haproxy_frontend_bytes_out_total Current total of outgoing bytes.
+# TYPE haproxy_frontend_bytes_out_total counter
+haproxy_frontend_bytes_out_total{proxy="healthz"} 112215505
+haproxy_frontend_bytes_out_total{proxy="http"} 260431
+haproxy_frontend_bytes_out_total{proxy="https"} 46485344378
+haproxy_frontend_bytes_out_total{proxy="stats"} 23646727611
+# HELP haproxy_frontend_requests_denied_total Total number of denied requests.
+# TYPE haproxy_frontend_requests_denied_total counter
+haproxy_frontend_requests_denied_total{proxy="healthz"} 1
+haproxy_frontend_requests_denied_total{proxy="http"} 1
+haproxy_frontend_requests_denied_total{proxy="https"} 1
+haproxy_frontend_requests_denied_total{proxy="stats"} 1
+# HELP haproxy_frontend_responses_denied_total Total number of denied responses.
+# TYPE haproxy_frontend_responses_denied_total counter
+haproxy_frontend_responses_denied_total{proxy="healthz"} 1
+haproxy_frontend_responses_denied_total{proxy="http"} 1
+haproxy_frontend_responses_denied_total{proxy="https"} 1
+haproxy_frontend_responses_denied_total{proxy="stats"} 1
+# HELP haproxy_frontend_request_errors_total Total number of request errors.
+# TYPE haproxy_frontend_request_errors_total counter
+haproxy_frontend_request_errors_total{proxy="healthz"} 1
+haproxy_frontend_request_errors_total{proxy="http"} 1107
+haproxy_frontend_request_errors_total{proxy="https"} 5922
+haproxy_frontend_request_errors_total{proxy="stats"} 12
+# HELP haproxy_frontend_denied_connections_total Total number of requests denied by "tcp-request connection" rules.
+# TYPE haproxy_frontend_denied_connections_total counter
+haproxy_frontend_denied_connections_total{proxy="healthz"} 1
+haproxy_frontend_denied_connections_total{proxy="http"} 1
+haproxy_frontend_denied_connections_total{proxy="https"} 1
+haproxy_frontend_denied_connections_total{proxy="stats"} 1
+# HELP haproxy_frontend_denied_sessions_total Total number of requests denied by "tcp-request session" rules.
+# TYPE haproxy_frontend_denied_sessions_total counter
+haproxy_frontend_denied_sessions_total{proxy="healthz"} 1
+haproxy_frontend_denied_sessions_total{proxy="http"} 1
+haproxy_frontend_denied_sessions_total{proxy="https"} 1
+haproxy_frontend_denied_sessions_total{proxy="stats"} 1
+# HELP haproxy_frontend_failed_header_rewriting_total Total number of failed header rewriting warnings.
+# TYPE haproxy_frontend_failed_header_rewriting_total counter
+haproxy_frontend_failed_header_rewriting_total{proxy="healthz"} 1
+haproxy_frontend_failed_header_rewriting_total{proxy="http"} 1
+haproxy_frontend_failed_header_rewriting_total{proxy="https"} 1
+haproxy_frontend_failed_header_rewriting_total{proxy="stats"} 1
+# HELP haproxy_frontend_internal_errors_total Total number of internal errors.
+# TYPE haproxy_frontend_internal_errors_total counter
+haproxy_frontend_internal_errors_total{proxy="healthz"} 1
+haproxy_frontend_internal_errors_total{proxy="http"} 1
+haproxy_frontend_internal_errors_total{proxy="https"} 1
+haproxy_frontend_internal_errors_total{proxy="stats"} 1
+# HELP haproxy_frontend_http_requests_rate_max Maximum observed number of HTTP requests per second.
+# TYPE haproxy_frontend_http_requests_rate_max gauge
+haproxy_frontend_http_requests_rate_max{proxy="healthz"} 1
+haproxy_frontend_http_requests_rate_max{proxy="http"} 12
+haproxy_frontend_http_requests_rate_max{proxy="https"} 101
+haproxy_frontend_http_requests_rate_max{proxy="stats"} 2
+# HELP haproxy_frontend_http_requests_total Total number of HTTP requests received.
+# TYPE haproxy_frontend_http_requests_total counter
+haproxy_frontend_http_requests_total{proxy="healthz"} 723971
+haproxy_frontend_http_requests_total{proxy="http"} 1402
+haproxy_frontend_http_requests_total{proxy="https"} 35664484
+haproxy_frontend_http_requests_total{proxy="stats"} 60011
+# HELP haproxy_frontend_http_responses_total Total number of HTTP responses.
+# TYPE haproxy_frontend_http_responses_total counter
+haproxy_frontend_http_responses_total{proxy="healthz",code="1xx"} 1
+haproxy_frontend_http_responses_total{proxy="http",code="1xx"} 1
+haproxy_frontend_http_responses_total{proxy="https",code="1xx"} 4130401
+haproxy_frontend_http_responses_total{proxy="stats",code="1xx"} 1
+haproxy_frontend_http_responses_total{proxy="healthz",code="2xx"} 723971
+haproxy_frontend_http_responses_total{proxy="http",code="2xx"} 1
+haproxy_frontend_http_responses_total{proxy="https",code="2xx"} 21338013
+haproxy_frontend_http_responses_total{proxy="stats",code="2xx"} 59998
+haproxy_frontend_http_responses_total{proxy="healthz",code="3xx"} 1
+haproxy_frontend_http_responses_total{proxy="http",code="3xx"} 147
+haproxy_frontend_http_responses_total{proxy="https",code="3xx"} 10004
+haproxy_frontend_http_responses_total{proxy="stats",code="3xx"} 1
+haproxy_frontend_http_responses_total{proxy="healthz",code="4xx"} 1
+haproxy_frontend_http_responses_total{proxy="http",code="4xx"} 1107
+haproxy_frontend_http_responses_total{proxy="https",code="4xx"} 10175979
+haproxy_frontend_http_responses_total{proxy="stats",code="4xx"} 12
+haproxy_frontend_http_responses_total{proxy="healthz",code="5xx"} 1
+haproxy_frontend_http_responses_total{proxy="http",code="5xx"} 148
+haproxy_frontend_http_responses_total{proxy="https",code="5xx"} 3108
+haproxy_frontend_http_responses_total{proxy="stats",code="5xx"} 1
+haproxy_frontend_http_responses_total{proxy="healthz",code="other"} 1
+haproxy_frontend_http_responses_total{proxy="http",code="other"} 1
+haproxy_frontend_http_responses_total{proxy="https",code="other"} 5657
+haproxy_frontend_http_responses_total{proxy="stats",code="other"} 1
+# HELP haproxy_frontend_intercepted_requests_total Total number of intercepted HTTP requests.
+# TYPE haproxy_frontend_intercepted_requests_total counter
+haproxy_frontend_intercepted_requests_total{proxy="healthz"} 723971
+haproxy_frontend_intercepted_requests_total{proxy="http"} 147
+haproxy_frontend_intercepted_requests_total{proxy="https"} 1
+haproxy_frontend_intercepted_requests_total{proxy="stats"} 59999
+# HELP haproxy_frontend_http_cache_lookups_total Total number of HTTP cache lookups.
+# TYPE haproxy_frontend_http_cache_lookups_total counter
+haproxy_frontend_http_cache_lookups_total{proxy="healthz"} 1
+haproxy_frontend_http_cache_lookups_total{proxy="http"} 1
+haproxy_frontend_http_cache_lookups_total{proxy="https"} 1
+haproxy_frontend_http_cache_lookups_total{proxy="stats"} 1
+# HELP haproxy_frontend_http_cache_hits_total Total number of HTTP cache hits.
+# TYPE haproxy_frontend_http_cache_hits_total counter
+haproxy_frontend_http_cache_hits_total{proxy="healthz"} 1
+haproxy_frontend_http_cache_hits_total{proxy="http"} 1
+haproxy_frontend_http_cache_hits_total{proxy="https"} 1
+haproxy_frontend_http_cache_hits_total{proxy="stats"} 1
+# HELP haproxy_frontend_http_comp_bytes_in_total Total number of HTTP response bytes fed to the compressor.
+# TYPE haproxy_frontend_http_comp_bytes_in_total counter
+haproxy_frontend_http_comp_bytes_in_total{proxy="healthz"} 1
+haproxy_frontend_http_comp_bytes_in_total{proxy="http"} 1
+haproxy_frontend_http_comp_bytes_in_total{proxy="https"} 1
+haproxy_frontend_http_comp_bytes_in_total{proxy="stats"} 1
+# HELP haproxy_frontend_http_comp_bytes_out_total Total number of HTTP response bytes emitted by the compressor.
+# TYPE haproxy_frontend_http_comp_bytes_out_total counter
+haproxy_frontend_http_comp_bytes_out_total{proxy="healthz"} 1
+haproxy_frontend_http_comp_bytes_out_total{proxy="http"} 1
+haproxy_frontend_http_comp_bytes_out_total{proxy="https"} 1
+haproxy_frontend_http_comp_bytes_out_total{proxy="stats"} 1
+# HELP haproxy_frontend_http_comp_bytes_bypassed_total Total number of bytes that bypassed the HTTP compressor (CPU/BW limit).
+# TYPE haproxy_frontend_http_comp_bytes_bypassed_total counter
+haproxy_frontend_http_comp_bytes_bypassed_total{proxy="healthz"} 1
+haproxy_frontend_http_comp_bytes_bypassed_total{proxy="http"} 1
+haproxy_frontend_http_comp_bytes_bypassed_total{proxy="https"} 1
+haproxy_frontend_http_comp_bytes_bypassed_total{proxy="stats"} 1
+# HELP haproxy_frontend_http_comp_responses_total Total number of HTTP responses that were compressed.
+# TYPE haproxy_frontend_http_comp_responses_total counter
+haproxy_frontend_http_comp_responses_total{proxy="healthz"} 1
+haproxy_frontend_http_comp_responses_total{proxy="http"} 1
+haproxy_frontend_http_comp_responses_total{proxy="https"} 1
+haproxy_frontend_http_comp_responses_total{proxy="stats"} 1
+# HELP haproxy_backend_status Current status of the service (frontend: 0=STOP, 1=UP - backend: 0=DOWN, 1=UP - server: 0=DOWN, 1=UP, 2=MAINT, 3=DRAIN, 4=NOLB).
+# TYPE haproxy_backend_status gauge
+haproxy_backend_status{proxy="proxy1"} 1
+haproxy_backend_status{proxy="proxy2"} 1
+# HELP haproxy_backend_current_sessions Current number of active sessions.
+# TYPE haproxy_backend_current_sessions gauge
+haproxy_backend_current_sessions{proxy="proxy1"} 1
+haproxy_backend_current_sessions{proxy="proxy2"} 1322
+# HELP haproxy_backend_max_sessions Maximum observed number of active sessions.
+# TYPE haproxy_backend_max_sessions gauge
+haproxy_backend_max_sessions{proxy="proxy1"} 112
+haproxy_backend_max_sessions{proxy="proxy2"} 1367
+# HELP haproxy_backend_limit_sessions Configured session limit.
+# TYPE haproxy_backend_limit_sessions gauge
+haproxy_backend_limit_sessions{proxy="proxy1"} 1
+haproxy_backend_limit_sessions{proxy="proxy2"} 1
+# HELP haproxy_backend_sessions_total Total number of sessions.
+# TYPE haproxy_backend_sessions_total counter
+haproxy_backend_sessions_total{proxy="proxy1"} 31527507
+haproxy_backend_sessions_total{proxy="proxy2"} 4131723
+# HELP haproxy_backend_max_session_rate Maximum observed number of sessions per second.
+# TYPE haproxy_backend_max_session_rate gauge
+haproxy_backend_max_session_rate{proxy="proxy1"} 82
+haproxy_backend_max_session_rate{proxy="proxy2"} 41
+# HELP haproxy_backend_last_session_seconds Number of seconds since last session assigned to server/backend.
+# TYPE haproxy_backend_last_session_seconds gauge
+haproxy_backend_last_session_seconds{proxy="proxy1"} 1
+haproxy_backend_last_session_seconds{proxy="proxy2"} 3
+# HELP haproxy_backend_current_queue Current number of queued requests.
+# TYPE haproxy_backend_current_queue gauge
+haproxy_backend_current_queue{proxy="proxy1"} 1
+haproxy_backend_current_queue{proxy="proxy2"} 1
+# HELP haproxy_backend_max_queue Maximum observed number of queued requests.
+# TYPE haproxy_backend_max_queue gauge
+haproxy_backend_max_queue{proxy="proxy1"} 1
+haproxy_backend_max_queue{proxy="proxy2"} 1
+# HELP haproxy_backend_connection_attempts_total Total number of connection establishment attempts.
+# TYPE haproxy_backend_connection_attempts_total counter
+haproxy_backend_connection_attempts_total{proxy="proxy1"} 19864884
+haproxy_backend_connection_attempts_total{proxy="proxy2"} 4131723
+# HELP haproxy_backend_connection_reuses_total Total number of connection reuses.
+# TYPE haproxy_backend_connection_reuses_total counter
+haproxy_backend_connection_reuses_total{proxy="proxy1"} 11661922
+haproxy_backend_connection_reuses_total{proxy="proxy2"} 1
+# HELP haproxy_backend_bytes_in_total Current total of incoming bytes.
+# TYPE haproxy_backend_bytes_in_total counter
+haproxy_backend_bytes_in_total{proxy="proxy1"} 21057046294
+haproxy_backend_bytes_in_total{proxy="proxy2"} 2493759083896
+# HELP haproxy_backend_bytes_out_total Current total of outgoing bytes.
+# TYPE haproxy_backend_bytes_out_total counter
+haproxy_backend_bytes_out_total{proxy="proxy1"} 41352782609
+haproxy_backend_bytes_out_total{proxy="proxy2"} 5131407558
+# HELP haproxy_backend_queue_time_average_seconds Avg. queue time for last 1024 successful connections.
+# TYPE haproxy_backend_queue_time_average_seconds gauge
+haproxy_backend_queue_time_average_seconds{proxy="proxy1"} 0.000000
+haproxy_backend_queue_time_average_seconds{proxy="proxy2"} 0.000000
+# HELP haproxy_backend_connect_time_average_seconds Avg. connect time for last 1024 successful connections.
+# TYPE haproxy_backend_connect_time_average_seconds gauge
+haproxy_backend_connect_time_average_seconds{proxy="proxy1"} 0.000000
+haproxy_backend_connect_time_average_seconds{proxy="proxy2"} 0.001000
+# HELP haproxy_backend_response_time_average_seconds Avg. response time for last 1024 successful connections.
+# TYPE haproxy_backend_response_time_average_seconds gauge
+haproxy_backend_response_time_average_seconds{proxy="proxy1"} 0.052000
+haproxy_backend_response_time_average_seconds{proxy="proxy2"} 0.001000
+# HELP haproxy_backend_total_time_average_seconds Avg. total time for last 1024 successful connections.
+# TYPE haproxy_backend_total_time_average_seconds gauge
+haproxy_backend_total_time_average_seconds{proxy="proxy1"} 1.746000
+haproxy_backend_total_time_average_seconds{proxy="proxy2"} 198.639000
+# HELP haproxy_backend_max_queue_time_seconds Maximum observed time spent in the queue
+# TYPE haproxy_backend_max_queue_time_seconds gauge
+haproxy_backend_max_queue_time_seconds{proxy="proxy1"} 0.000000
+haproxy_backend_max_queue_time_seconds{proxy="proxy2"} 0.000000
+# HELP haproxy_backend_max_connect_time_seconds Maximum observed time spent waiting for a connection to complete
+# TYPE haproxy_backend_max_connect_time_seconds gauge
+haproxy_backend_max_connect_time_seconds{proxy="proxy1"} 1.063000
+haproxy_backend_max_connect_time_seconds{proxy="proxy2"} 1.061000
+# HELP haproxy_backend_max_response_time_seconds Maximum observed time spent waiting for a server response
+# TYPE haproxy_backend_max_response_time_seconds gauge
+haproxy_backend_max_response_time_seconds{proxy="proxy1"} 74.050000
+haproxy_backend_max_response_time_seconds{proxy="proxy2"} 1.396000
+# HELP haproxy_backend_max_total_time_seconds Maximum observed total request+response time (request+queue+connect+response+processing)
+# TYPE haproxy_backend_max_total_time_seconds gauge
+haproxy_backend_max_total_time_seconds{proxy="proxy1"} 331.297000
+haproxy_backend_max_total_time_seconds{proxy="proxy2"} 3116820.243000
+# HELP haproxy_backend_requests_denied_total Total number of denied requests.
+# TYPE haproxy_backend_requests_denied_total counter
+haproxy_backend_requests_denied_total{proxy="proxy1"} 1
+haproxy_backend_requests_denied_total{proxy="proxy2"} 1
+# HELP haproxy_backend_responses_denied_total Total number of denied responses.
+# TYPE haproxy_backend_responses_denied_total counter
+haproxy_backend_responses_denied_total{proxy="proxy1"} 1
+haproxy_backend_responses_denied_total{proxy="proxy2"} 1
+# HELP haproxy_backend_connection_errors_total Total number of connection errors.
+# TYPE haproxy_backend_connection_errors_total counter
+haproxy_backend_connection_errors_total{proxy="proxy1"} 1
+haproxy_backend_connection_errors_total{proxy="proxy2"} 1
+# HELP haproxy_backend_response_errors_total Total number of response errors.
+# TYPE haproxy_backend_response_errors_total counter
+haproxy_backend_response_errors_total{proxy="proxy1"} 13
+haproxy_backend_response_errors_total{proxy="proxy2"} 4122625
+# HELP haproxy_backend_retry_warnings_total Total number of retry warnings.
+# TYPE haproxy_backend_retry_warnings_total counter
+haproxy_backend_retry_warnings_total{proxy="proxy1"} 1
+haproxy_backend_retry_warnings_total{proxy="proxy2"} 1
+# HELP haproxy_backend_redispatch_warnings_total Total number of redispatch warnings.
+# TYPE haproxy_backend_redispatch_warnings_total counter
+haproxy_backend_redispatch_warnings_total{proxy="proxy1"} 1
+haproxy_backend_redispatch_warnings_total{proxy="proxy2"} 1
+# HELP haproxy_backend_failed_header_rewriting_total Total number of failed header rewriting warnings.
+# TYPE haproxy_backend_failed_header_rewriting_total counter
+haproxy_backend_failed_header_rewriting_total{proxy="proxy1"} 1
+haproxy_backend_failed_header_rewriting_total{proxy="proxy2"} 1
+# HELP haproxy_backend_internal_errors_total Total number of internal errors.
+# TYPE haproxy_backend_internal_errors_total counter
+haproxy_backend_internal_errors_total{proxy="proxy1"} 1
+haproxy_backend_internal_errors_total{proxy="proxy2"} 1
+# HELP haproxy_backend_client_aborts_total Total number of data transfers aborted by the client.
+# TYPE haproxy_backend_client_aborts_total counter
+haproxy_backend_client_aborts_total{proxy="proxy1"} 27231
+haproxy_backend_client_aborts_total{proxy="proxy2"} 7777
+# HELP haproxy_backend_server_aborts_total Total number of data transfers aborted by the server.
+# TYPE haproxy_backend_server_aborts_total counter
+haproxy_backend_server_aborts_total{proxy="proxy1"} 1
+haproxy_backend_server_aborts_total{proxy="proxy2"} 4122625
+# HELP haproxy_backend_weight Service weight.
+# TYPE haproxy_backend_weight gauge
+haproxy_backend_weight{proxy="proxy1"} 256
+haproxy_backend_weight{proxy="proxy2"} 640
+# HELP haproxy_backend_active_servers Current number of active servers.
+# TYPE haproxy_backend_active_servers gauge
+haproxy_backend_active_servers{proxy="proxy1"} 2
+haproxy_backend_active_servers{proxy="proxy2"} 5
+# HELP haproxy_backend_backup_servers Current number of backup servers.
+# TYPE haproxy_backend_backup_servers gauge
+haproxy_backend_backup_servers{proxy="proxy1"} 1
+haproxy_backend_backup_servers{proxy="proxy2"} 1
+# HELP haproxy_backend_check_up_down_total Total number of UP->DOWN transitions.
+# TYPE haproxy_backend_check_up_down_total counter
+haproxy_backend_check_up_down_total{proxy="proxy1"} 1
+haproxy_backend_check_up_down_total{proxy="proxy2"} 1
+# HELP haproxy_backend_check_last_change_seconds Number of seconds since the last UP<->DOWN transition.
+# TYPE haproxy_backend_check_last_change_seconds gauge
+haproxy_backend_check_last_change_seconds{proxy="proxy1"} 3619864
+haproxy_backend_check_last_change_seconds{proxy="proxy2"} 3619864
+# HELP haproxy_backend_downtime_seconds_total Total downtime (in seconds) for the service.
+# TYPE haproxy_backend_downtime_seconds_total counter
+haproxy_backend_downtime_seconds_total{proxy="proxy1"} 1
+haproxy_backend_downtime_seconds_total{proxy="proxy2"} 1
+# HELP haproxy_backend_loadbalanced_total Total number of times a service was selected, either for new sessions, or when redispatching.
+# TYPE haproxy_backend_loadbalanced_total counter
+haproxy_backend_loadbalanced_total{proxy="proxy1"} 31526806
+haproxy_backend_loadbalanced_total{proxy="proxy2"} 4131723
+# HELP haproxy_backend_http_requests_total Total number of HTTP requests received.
+# TYPE haproxy_backend_http_requests_total counter
+haproxy_backend_http_requests_total{proxy="proxy1"} 31527507
+haproxy_backend_http_requests_total{proxy="proxy2"} 4130401
+# HELP haproxy_backend_http_responses_total Total number of HTTP responses.
+# TYPE haproxy_backend_http_responses_total counter
+haproxy_backend_http_responses_total{proxy="proxy1",code="1xx"} 1
+haproxy_backend_http_responses_total{proxy="proxy2",code="1xx"} 4130401
+haproxy_backend_http_responses_total{proxy="proxy1",code="2xx"} 21338013
+haproxy_backend_http_responses_total{proxy="proxy2",code="2xx"} 1
+haproxy_backend_http_responses_total{proxy="proxy1",code="3xx"} 10004
+haproxy_backend_http_responses_total{proxy="proxy2",code="3xx"} 1
+haproxy_backend_http_responses_total{proxy="proxy1",code="4xx"} 10170758
+haproxy_backend_http_responses_total{proxy="proxy2",code="4xx"} 1
+haproxy_backend_http_responses_total{proxy="proxy1",code="5xx"} 3075
+haproxy_backend_http_responses_total{proxy="proxy2",code="5xx"} 1
+haproxy_backend_http_responses_total{proxy="proxy1",code="other"} 5657
+haproxy_backend_http_responses_total{proxy="proxy2",code="other"} 1
+# HELP haproxy_backend_http_cache_lookups_total Total number of HTTP cache lookups.
+# TYPE haproxy_backend_http_cache_lookups_total counter
+haproxy_backend_http_cache_lookups_total{proxy="proxy1"} 1
+haproxy_backend_http_cache_lookups_total{proxy="proxy2"} 1
+# HELP haproxy_backend_http_cache_hits_total Total number of HTTP cache hits.
+# TYPE haproxy_backend_http_cache_hits_total counter
+haproxy_backend_http_cache_hits_total{proxy="proxy1"} 1
+haproxy_backend_http_cache_hits_total{proxy="proxy2"} 1
+# HELP haproxy_backend_http_comp_bytes_in_total Total number of HTTP response bytes fed to the compressor.
+# TYPE haproxy_backend_http_comp_bytes_in_total counter
+haproxy_backend_http_comp_bytes_in_total{proxy="proxy1"} 1
+haproxy_backend_http_comp_bytes_in_total{proxy="proxy2"} 1
+# HELP haproxy_backend_http_comp_bytes_out_total Total number of HTTP response bytes emitted by the compressor.
+# TYPE haproxy_backend_http_comp_bytes_out_total counter
+haproxy_backend_http_comp_bytes_out_total{proxy="proxy1"} 1
+haproxy_backend_http_comp_bytes_out_total{proxy="proxy2"} 1
+# HELP haproxy_backend_http_comp_bytes_bypassed_total Total number of bytes that bypassed the HTTP compressor (CPU/BW limit).
+# TYPE haproxy_backend_http_comp_bytes_bypassed_total counter
+haproxy_backend_http_comp_bytes_bypassed_total{proxy="proxy1"} 1
+haproxy_backend_http_comp_bytes_bypassed_total{proxy="proxy2"} 1
+# HELP haproxy_backend_http_comp_responses_total Total number of HTTP responses that were compressed.
+# TYPE haproxy_backend_http_comp_responses_total counter
+haproxy_backend_http_comp_responses_total{proxy="proxy1"} 1
+haproxy_backend_http_comp_responses_total{proxy="proxy2"} 1

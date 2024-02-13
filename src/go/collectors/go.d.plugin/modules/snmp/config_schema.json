@@ -1,0 +1,188 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "update_every": {
+      "type": "integer"
+    },
+    "hostname": {
+      "type": "string"
+    },
+    "community": {
+      "type": "string"
+    },
+    "user": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "none",
+            "authNoPriv",
+            "authPriv"
+          ]
+        },
+        "auth_proto": {
+          "type": "string",
+          "enum": [
+            "none",
+            "md5",
+            "sha",
+            "sha224",
+            "sha256",
+            "sha384",
+            "sha512"
+          ]
+        },
+        "auth_key": {
+          "type": "string"
+        },
+        "priv_proto": {
+          "type": "string",
+          "enum": [
+            "none",
+            "des",
+            "aes",
+            "aes192",
+            "aes256",
+            "aes192c"
+          ]
+        },
+        "priv_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "level",
+        "auth_proto",
+        "auth_key",
+        "priv_proto",
+        "priv_key"
+      ]
+    },
+    "options": {
+      "type": "object",
+      "properties": {
+        "port": {
+          "type": "integer"
+        },
+        "retries": {
+          "type": "integer"
+        },
+        "timeout": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "string",
+          "enum": [
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        "max_request_size": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "port",
+        "retries",
+        "timeout",
+        "version",
+        "max_request_size"
+      ]
+    },
+    "charts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "units": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "multiply_range": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "oid": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "algorithm": {
+                  "type": "string",
+                  "enum": [
+                    "absolute",
+                    "incremental"
+                  ]
+                },
+                "multiplier": {
+                  "type": "integer"
+                },
+                "divisor": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "oid",
+                "name",
+                "algorithm",
+                "multiplier",
+                "divisor"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "units",
+          "family",
+          "type",
+          "priority",
+          "multiply_range",
+          "dimensions"
+        ]
+      }
+    }
+  },
+  "required": [
+    "name",
+    "update_every",
+    "hostname",
+    "community",
+    "user",
+    "options",
+    "charts"
+  ]
+}

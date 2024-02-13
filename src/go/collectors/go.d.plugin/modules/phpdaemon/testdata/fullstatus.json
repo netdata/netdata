@@ -1,0 +1,10 @@
+{
+  "idle": 50,
+  "busy": 200,
+  "alive": 350,
+  "shutdown": 500,
+  "preinit": 20,
+  "init": 20,
+  "reloading": 100,
+  "uptime": 15765
+}

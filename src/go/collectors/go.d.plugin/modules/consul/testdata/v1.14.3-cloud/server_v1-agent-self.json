@@ -1,0 +1,71 @@
+{
+  "Config": {
+    "Datacenter": "consul-sandbox-cluster-0159c9d3",
+    "PrimaryDatacenter": "consul-sandbox-cluster-0159c9d3",
+    "NodeName": "ip-172-25-37-57",
+    "NodeID": "b1906d81-c585-7c2c-1236-a5404b7fa7ca",
+    "Revision": "55a184d3",
+    "Server": true,
+    "Version": "1.14.3+ent",
+    "BuildDate": "2022-12-13T17:12:10Z"
+  },
+  "DebugConfig": {
+    "Cloud": {
+      "AuthURL": "",
+      "ClientID": "492e9e67-6386-4727-964f-8a41305f30a5",
+      "ClientSecret": "hidden",
+      "Hostname": "",
+      "ResourceID": "organization/1/project/2/hashicorp.consul.cluster/3",
+      "ScadaAddress": ""
+    },
+    "Telemetry": {
+      "AllowedPrefixes": [],
+      "BlockedPrefixes": [
+        "consul.rpc.server.call"
+      ],
+      "CirconusAPIApp": "",
+      "CirconusAPIToken": "hidden",
+      "CirconusAPIURL": "",
+      "CirconusBrokerID": "",
+      "CirconusBrokerSelectTag": "",
+      "CirconusCheckDisplayName": "",
+      "CirconusCheckForceMetricActivation": "",
+      "CirconusCheckID": "",
+      "CirconusCheckInstanceID": "",
+      "CirconusCheckSearchTag": "",
+      "CirconusCheckTags": "",
+      "CirconusSubmissionInterval": "",
+      "CirconusSubmissionURL": "",
+      "Disable": false,
+      "DisableHostname": false,
+      "DogstatsdAddr": "127.0.0.1:8125",
+      "DogstatsdTags": [],
+      "FilterDefault": true,
+      "MetricsPrefix": "consul",
+      "PrometheusOpts": {
+        "CounterDefinitions": [],
+        "Expiration": "5m0s",
+        "GaugeDefinitions": [],
+        "Name": "consul",
+        "Registerer": null,
+        "SummaryDefinitions": []
+      },
+      "RetryFailedConfiguration": true,
+      "StatsdAddr": "",
+      "StatsiteAddr": ""
+    }
+  },
+  "Stats": {
+    "license": {
+      "customer": "a1c27ed4-43a4-4192-9f39-14e1166d2d2e",
+      "expiration_time": "2023-02-22 14:11:12.877172615 +0000 UTC",
+      "features": "Automated Backups, Automated Upgrades, Namespaces, SSO, Audit Logging, Admin Partitions",
+      "id": "492e9e67-6386-4727-964f-8a41305f30a5",
+      "install_id": "*",
+      "issue_time": "2023-01-15 14:11:12.877172615 +0000 UTC",
+      "modules": "Governance and Policy",
+      "product": "consul",
+      "start_time": "2023-01-15 14:11:12.877172615 +0000 UTC"
+    }
+  }
+}

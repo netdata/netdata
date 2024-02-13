@@ -1,0 +1,144 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-dnsmasq
+      plugin_name: go.d.plugin
+      module_name: dnsmasq
+      monitored_instance:
+        name: Dnsmasq
+        link: https://thekelleys.org.uk/dnsmasq/doc.html
+        icon_filename: dnsmasq.svg
+        categories:
+          - data-collection.dns-and-dhcp-servers
+      keywords:
+        - dnsmasq
+        - dns
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Dnsmasq servers.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/dnsmasq.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: address
+              description: Server address in `ip:port` format.
+              default_value: 127.0.0.1:53
+              required: true
+            - name: protocol
+              description: 'DNS query transport protocol. Supported protocols: udp, tcp, tcp-tls.'
+              default_value: udp
+              required: false
+            - name: timeout
+              description: DNS query timeout (dial, write and read) in seconds.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: An example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:53
+            - name: Using TCP protocol
+              description: Local server with specific DNS query transport protocol.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:53
+                    protocol: tcp
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    address: 127.0.0.1:53
+                
+                  - name: remote
+                    address: 203.0.113.0:53
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: The metrics apply to the entire monitored application.
+          labels: []
+          metrics:
+            - name: dnsmasq.servers_queries
+              description: Queries forwarded to the upstream servers
+              unit: queries/s
+              chart_type: line
+              dimensions:
+                - name: success
+                - name: failed
+            - name: dnsmasq.cache_performance
+              description: Cache performance
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: hist
+                - name: misses
+            - name: dnsmasq.cache_operations
+              description: Cache operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: insertions
+                - name: evictions
+            - name: dnsmasq.cache_size
+              description: Cache size
+              unit: entries
+              chart_type: line
+              dimensions:
+                - name: size

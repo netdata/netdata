@@ -1,0 +1,67 @@
+# The format of this file is documented in the dhcpd.leases(5) manual page.
+# This lease file was written by isc-dhcp-4.3.6b1
+
+# authoring-byte-order entry is generated, DO NOT DELETE
+authoring-byte-order little-endian;
+
+server-duid "\000\001\002\003!\004\005\006\007\008)^6\257";
+
+ia-na "'\000\010\016\000\001\000\001!\320\263\003\010\000'\327\337\354" {
+  cltt 0 2017/12/24 10:53:29;
+  iaaddr 2001:db8:: {
+    binding state active;
+    preferred-life 604800;
+    max-life 2592000;
+    ends 2 2020/09/30 10:53:29;
+  }
+}
+
+ia-na "#\2340\000\000\000\000\000!\300\021]0\234#e\212\261" {
+  cltt 6 2017/12/23 23:59:58;
+  iaaddr 2001:db8::1 {
+    binding state active;
+    preferred-life 604800;
+    max-life 2592000;
+    ends 2 2020/09/30 23:59:58;
+  }
+}
+
+ia-na "\000\000\000\000\000\001\000\000 \000\301\267xOCl\313\310" {
+  cltt 0 2017/12/24 02:11:08;
+  iaaddr 2001:db8::2 {
+    binding state active;
+    preferred-life 604800;
+    max-life 2592000;
+    ends 2 2020/09/30 02:11:08;
+  }
+}
+
+ia-na "'\000\000\000\000\000\000\001\027.\010\225\010\000'C8\353" {
+  cltt 0 2017/12/24 00:48:39;
+  iaaddr 2001:db8::3 {
+    binding state active;
+    preferred-life 604800;
+    max-life 2592000;
+    ends 2 2020/09/30 18:48:39;
+  }
+}
+
+ia-na "\000\000\000\000\000\000\000\265H\006n\305F\351\270i\014\326q\023J\347" {
+  cltt 0 2017/12/24 01:53:15;
+  iaaddr 2001:db8::4 {
+    binding state active;
+    preferred-life 604800;
+    max-life 2592000;
+    ends 2 2020/09/30 14:53:15;
+  }
+}
+
+ia-na "\000\000\000\000\000\000\000\000 \010\351\267xOCl\313\310" {
+  cltt 0 2017/12/24 11:33:17;
+  iaaddr 2001:db8::5 {
+    binding state active;
+    preferred-life 604800;
+    max-life 2592000;
+    ends 2 2020/09/30 11:33:17;
+  }
+}

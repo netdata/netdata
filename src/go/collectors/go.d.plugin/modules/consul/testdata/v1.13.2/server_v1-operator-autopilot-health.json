@@ -1,0 +1,48 @@
+{
+  "Healthy": true,
+  "FailureTolerance": 1,
+  "Servers": [
+    {
+      "ID": "72849161-41cb-14df-fc9b-563ddff3bae7",
+      "Name": "satya-vm3",
+      "Address": "10.10.30.119:8300",
+      "SerfStatus": "alive",
+      "Version": "1.13.2",
+      "Leader": false,
+      "LastContact": "54.653679ms",
+      "LastTerm": 29,
+      "LastIndex": 486777,
+      "Healthy": true,
+      "Voter": true,
+      "StableSince": "2022-12-21T13:53:42Z"
+    },
+    {
+      "ID": "3e75e0af-859b-83e8-779f-f3a6d12f02ae",
+      "Name": "satya-vm2",
+      "Address": "10.10.30.176:8300",
+      "SerfStatus": "alive",
+      "Version": "1.13.2",
+      "Leader": true,
+      "LastContact": "0ms",
+      "LastTerm": 29,
+      "LastIndex": 486777,
+      "Healthy": true,
+      "Voter": true,
+      "StableSince": "2022-12-21T13:53:46Z"
+    },
+    {
+      "ID": "d86b8af4-5dc5-d790-7c32-420d4ac1dd8d",
+      "Name": "satya-vm",
+      "Address": "10.10.30.177:8300",
+      "SerfStatus": "alive",
+      "Version": "1.13.2",
+      "Leader": false,
+      "LastContact": "13.211617ms",
+      "LastTerm": 29,
+      "LastIndex": 486777,
+      "Healthy": true,
+      "Voter": true,
+      "StableSince": "2022-12-20T09:55:28Z"
+    }
+  ]
+}

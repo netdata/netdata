@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/example job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "charts": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "num": {
+          "type": "integer"
+        },
+        "contexts": {
+          "type": "integer"
+        },
+        "dimensions": {
+          "type": "integer"
+        },
+        "labels": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "num",
+        "contexts",
+        "dimensions",
+        "labels"
+      ]
+    },
+    "hidden_charts": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "num": {
+          "type": "integer"
+        },
+        "contexts": {
+          "type": "integer"
+        },
+        "dimensions": {
+          "type": "integer"
+        },
+        "labels": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "num",
+        "contexts",
+        "dimensions",
+        "labels"
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "charts"
+  ]
+}

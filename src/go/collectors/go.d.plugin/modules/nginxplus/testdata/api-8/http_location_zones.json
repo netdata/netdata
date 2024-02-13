@@ -1,0 +1,35 @@
+{
+  "server_api": {
+    "requests": 9188,
+    "responses": {
+      "1xx": 0,
+      "2xx": 9187,
+      "3xx": 0,
+      "4xx": 1,
+      "5xx": 0,
+      "codes": {
+        "200": 9187,
+        "404": 1
+      },
+      "total": 9188
+    },
+    "discarded": 0,
+    "received": 1854427,
+    "sent": 4668778
+  },
+  "server_dashboard": {
+    "requests": 0,
+    "responses": {
+      "1xx": 0,
+      "2xx": 0,
+      "3xx": 0,
+      "4xx": 0,
+      "5xx": 0,
+      "codes": {},
+      "total": 0
+    },
+    "discarded": 0,
+    "received": 0,
+    "sent": 0
+  }
+}

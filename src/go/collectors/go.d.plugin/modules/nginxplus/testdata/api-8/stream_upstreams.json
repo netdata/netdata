@@ -1,0 +1,48 @@
+{
+  "stream_backend": {
+    "peers": [
+      {
+        "id": 0,
+        "server": "127.0.0.1:12346",
+        "name": "127.0.0.1:12346",
+        "backup": false,
+        "weight": 1,
+        "state": "up",
+        "active": 0,
+        "connections": 0,
+        "sent": 0,
+        "received": 0,
+        "fails": 0,
+        "unavail": 0,
+        "health_checks": {
+          "checks": 0,
+          "fails": 0,
+          "unhealthy": 0
+        },
+        "downtime": 0
+      },
+      {
+        "id": 1,
+        "server": "127.0.0.1:12347",
+        "name": "127.0.0.1:12347",
+        "backup": false,
+        "weight": 1,
+        "state": "up",
+        "active": 0,
+        "connections": 0,
+        "sent": 0,
+        "received": 0,
+        "fails": 0,
+        "unavail": 0,
+        "health_checks": {
+          "checks": 0,
+          "fails": 0,
+          "unhealthy": 0
+        },
+        "downtime": 0
+      }
+    ],
+    "zombies": 0,
+    "zone": "tcp_servers"
+  }
+}

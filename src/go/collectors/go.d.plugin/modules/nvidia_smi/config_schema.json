@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "go.d/nvidia_smi job configuration schema.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "timeout": {
+      "type": [
+        "string",
+        "integer"
+      ]
+    },
+    "binary_path": {
+      "type": "string"
+    },
+    "use_csv_format": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

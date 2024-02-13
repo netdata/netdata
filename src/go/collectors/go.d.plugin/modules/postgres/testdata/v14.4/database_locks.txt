@@ -1,0 +1,7 @@
+ datname    |      mode                | granted | locks_count
+------------+--------------------------+---------+-------------
+ postgres   | AccessShareLock          | t       |           99
+ postgres   | RowShareLock             | t       |           99
+ postgres   | RowExclusiveLock         | t       |           99
+ production | ShareUpdateExclusiveLock | t       |           99
+ production | ShareLock                | f       |           99

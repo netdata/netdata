@@ -1,0 +1,634 @@
+plugin_name: go.d.plugin
+modules:
+  - &module
+    meta: &meta
+      id: collector-go.d.plugin-elasticsearch
+      module_name: elasticsearch
+      plugin_name: go.d.plugin
+      monitored_instance:
+        name: Elasticsearch
+        link: https://www.elastic.co/elasticsearch/
+        icon_filename: elasticsearch.svg
+        categories:
+          - data-collection.search-engines
+      keywords:
+        - elastic
+        - elasticsearch
+        - opensearch
+        - search engine
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: true
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the performance and health of the Elasticsearch cluster.
+        method_description: |
+          It uses [Cluster APIs](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster.html) to collect metrics.
+          
+          Used endpoints:
+          
+          | Endpoint               | Description          | API                                                                                                         |
+          |------------------------|----------------------|-------------------------------------------------------------------------------------------------------------|
+          | `/`                    | Node info            |                                                                                                             |
+          | `/_nodes/stats`        | Nodes metrics        | [Nodes stats API](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-nodes-stats.html) |
+          | `/_nodes/_local/stats` | Local node metrics   | [Nodes stats API](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-nodes-stats.html) |
+          | `/_cluster/health`     | Cluster health stats | [Cluster health API](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-health.html)   |
+          | `/_cluster/stats`      | Cluster metrics      | [Cluster stats API](https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-stats.html)     |
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            By default, it detects instances running on localhost by attempting to connect to port 9200:
+            
+            - http://127.0.0.1:9200
+            - https://127.0.0.1:9200
+        limits:
+          description: |
+            By default, this collector monitors only the node it is connected to. To monitor all cluster nodes, set the `cluster_mode` configuration option to `yes`.
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "go.d/elasticsearch.conf"
+        options:
+          description: |
+            The following options can be defined globally: update_every, autodetection_retry.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 5
+              required: false
+            - name: autodetection_retry
+              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              default_value: 0
+              required: false
+            - name: url
+              description: Server URL.
+              default_value: http://127.0.0.1:9200
+              required: true
+            - name: cluster_mode
+              description: Controls whether to collect metrics for all nodes in the cluster or only for the local node.
+              default_value: "false"
+              required: false
+            - name: collect_node_stats
+              description: Controls whether to collect nodes metrics.
+              default_value: "true"
+              required: false
+            - name: collect_cluster_health
+              description: Controls whether to collect cluster health metrics.
+              default_value: "true"
+              required: false
+            - name: collect_cluster_stats
+              description: Controls whether to collect cluster stats metrics.
+              default_value: "true"
+              required: false
+            - name: collect_indices_stats
+              description: Controls whether to collect indices metrics.
+              default_value: "false"
+              required: false
+            - name: timeout
+              description: HTTP request timeout.
+              default_value: 5
+              required: false
+            - name: username
+              description: Username for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: password
+              description: Password for basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_url
+              description: Proxy URL.
+              default_value: ""
+              required: false
+            - name: proxy_username
+              description: Username for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: proxy_password
+              description: Password for proxy basic HTTP authentication.
+              default_value: ""
+              required: false
+            - name: method
+              description: HTTP request method.
+              default_value: "GET"
+              required: false
+            - name: body
+              description: HTTP request body.
+              default_value: ""
+              required: false
+            - name: headers
+              description: HTTP request headers.
+              default_value: ""
+              required: false
+            - name: not_follow_redirects
+              description: Redirect handling policy. Controls whether the client follows redirects.
+              default_value: no
+              required: false
+            - name: tls_skip_verify
+              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              default_value: no
+              required: false
+            - name: tls_ca
+              description: Certification authority that the client uses when verifying the server's certificates.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              description: Client TLS certificate.
+              default_value: ""
+              required: false
+            - name: tls_key
+              description: Client TLS key.
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic single node mode
+              description: A basic example configuration.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9200
+            - name: Cluster mode
+              description: Cluster mode example configuration.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9200
+                    cluster_mode: yes
+            - name: HTTP authentication
+              description: Basic HTTP authentication.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9200
+                    username: username
+                    password: password
+            - name: HTTPS with self-signed certificate
+              description: Elasticsearch with enabled HTTPS and self-signed certificate.
+              config: |
+                jobs:
+                  - name: local
+                    url: https://127.0.0.1:9200
+                    tls_skip_verify: yes
+            - name: Multi-instance
+              description: |
+                > **Note**: When you define multiple jobs, their names must be unique.
+                
+                Collecting metrics from local and remote instances.
+              config: |
+                jobs:
+                  - name: local
+                    url: http://127.0.0.1:9200
+                
+                  - name: remote
+                    url: http://192.0.2.1:9200
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: elasticsearch_node_indices_search_time_query
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
+        metric: elasticsearch.node_indices_search_time
+        info: search performance is degraded, queries run slowly.
+      - name: elasticsearch_node_indices_search_time_fetch
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
+        metric: elasticsearch.node_indices_search_time
+        info: search performance is degraded, fetches run slowly.
+      - name: elasticsearch_cluster_health_status_red
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
+        metric: elasticsearch.cluster_health_status
+        info: cluster health status is red.
+      - name: elasticsearch_cluster_health_status_yellow
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
+        metric: elasticsearch.cluster_health_status
+        info: cluster health status is yellow.
+      - name: elasticsearch_node_index_health_red
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
+        metric: elasticsearch.node_index_health
+        info: node index $label:index health status is red.
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: node
+          description: These metrics refer to the cluster node.
+          labels:
+            - name: cluster_name
+              description: |
+                Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name).
+            - name: node_name
+              description: |
+                Human-readable identifier for the node. Based on the [Node name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#node-name).
+            - name: host
+              description: |
+                Network host for the node, based on the [Network host setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#network.host).
+          metrics:
+            - name: elasticsearch.node_indices_indexing
+              description: Indexing Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: index
+            - name: elasticsearch.node_indices_indexing_current
+              description: Indexing Operations Current
+              unit: operations
+              chart_type: line
+              dimensions:
+                - name: index
+            - name: elasticsearch.node_indices_indexing_time
+              description: Time Spent On Indexing Operations
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: index
+            - name: elasticsearch.node_indices_search
+              description: Search Operations
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: queries
+                - name: fetches
+            - name: elasticsearch.node_indices_search_current
+              description: Search Operations Current
+              unit: operations
+              chart_type: stacked
+              dimensions:
+                - name: queries
+                - name: fetches
+            - name: elasticsearch.node_indices_search_time
+              description: node_indices_search_time
+              unit: milliseconds
+              chart_type: stacked
+              dimensions:
+                - name: queries
+                - name: fetches
+            - name: elasticsearch.node_indices_refresh
+              description: Refresh Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: refresh
+            - name: elasticsearch.node_indices_refresh_time
+              description: Time Spent On Refresh Operations
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: refresh
+            - name: elasticsearch.node_indices_flush
+              description: Flush Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: flush
+            - name: elasticsearch.node_indices_flush_time
+              description: Time Spent On Flush Operations
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: flush
+            - name: elasticsearch.node_indices_fielddata_memory_usage
+              description: Fielddata Cache Memory Usage
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: elasticsearch.node_indices_fielddata_evictions
+              description: Fielddata Evictions
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: evictions
+            - name: elasticsearch.node_indices_segments_count
+              description: Segments Count
+              unit: segments
+              chart_type: line
+              dimensions:
+                - name: segments
+            - name: elasticsearch.node_indices_segments_memory_usage_total
+              description: Segments Memory Usage Total
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: elasticsearch.node_indices_segments_memory_usage
+              description: Segments Memory Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: terms
+                - name: stored_fields
+                - name: term_vectors
+                - name: norms
+                - name: points
+                - name: doc_values
+                - name: index_writer
+                - name: version_map
+                - name: fixed_bit_set
+            - name: elasticsearch.node_indices_translog_operations
+              description: Translog Operations
+              unit: operations
+              chart_type: area
+              dimensions:
+                - name: total
+                - name: uncommitted
+            - name: elasticsearch.node_indices_translog_size
+              description: Translog Size
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: total
+                - name: uncommitted
+            - name: elasticsearch.node_file_descriptors
+              description: Process File Descriptors
+              unit: fd
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: elasticsearch.node_jvm_heap
+              description: JVM Heap Percentage Currently in Use
+              unit: percentage
+              chart_type: area
+              dimensions:
+                - name: inuse
+            - name: elasticsearch.node_jvm_heap_bytes
+              description: JVM Heap Commit And Usage
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: committed
+                - name: used
+            - name: elasticsearch.node_jvm_buffer_pools_count
+              description: JVM Buffer Pools Count
+              unit: pools
+              chart_type: line
+              dimensions:
+                - name: direct
+                - name: mapped
+            - name: elasticsearch.node_jvm_buffer_pool_direct_memory
+              description: JVM Buffer Pool Direct Memory
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: total
+                - name: used
+            - name: elasticsearch.node_jvm_buffer_pool_mapped_memory
+              description: JVM Buffer Pool Mapped Memory
+              unit: bytes
+              chart_type: area
+              dimensions:
+                - name: total
+                - name: used
+            - name: elasticsearch.node_jvm_gc_count
+              description: JVM Garbage Collections
+              unit: gc/s
+              chart_type: stacked
+              dimensions:
+                - name: young
+                - name: old
+            - name: elasticsearch.node_jvm_gc_time
+              description: JVM Time Spent On Garbage Collections
+              unit: milliseconds
+              chart_type: stacked
+              dimensions:
+                - name: young
+                - name: old
+            - name: elasticsearch.node_thread_pool_queued
+              description: Thread Pool Queued Threads Count
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: generic
+                - name: search
+                - name: search_throttled
+                - name: get
+                - name: analyze
+                - name: write
+                - name: snapshot
+                - name: warmer
+                - name: refresh
+                - name: listener
+                - name: fetch_shard_started
+                - name: fetch_shard_store
+                - name: flush
+                - name: force_merge
+                - name: management
+            - name: elasticsearch.node_thread_pool_rejected
+              description: Thread Pool Rejected Threads Count
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: generic
+                - name: search
+                - name: search_throttled
+                - name: get
+                - name: analyze
+                - name: write
+                - name: snapshot
+                - name: warmer
+                - name: refresh
+                - name: listener
+                - name: fetch_shard_started
+                - name: fetch_shard_store
+                - name: flush
+                - name: force_merge
+                - name: management
+            - name: elasticsearch.node_cluster_communication_packets
+              description: Cluster Communication
+              unit: pps
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: elasticsearch.node_cluster_communication_traffic
+              description: Cluster Communication Bandwidth
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: elasticsearch.node_http_connections
+              description: HTTP Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: elasticsearch.node_breakers_trips
+              description: Circuit Breaker Trips Count
+              unit: trips/s
+              chart_type: stacked
+              dimensions:
+                - name: requests
+                - name: fielddata
+                - name: in_flight_requests
+                - name: model_inference
+                - name: accounting
+                - name: parent
+        - name: cluster
+          description: These metrics refer to the cluster.
+          labels:
+            - name: cluster_name
+              description: |
+                Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name).
+          metrics:
+            - name: elasticsearch.cluster_health_status
+              description: Cluster Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: yellow
+                - name: red
+            - name: elasticsearch.cluster_number_of_nodes
+              description: Cluster Nodes Count
+              unit: nodes
+              chart_type: line
+              dimensions:
+                - name: nodes
+                - name: data_nodes
+            - name: elasticsearch.cluster_shards_count
+              description: Cluster Shards Count
+              unit: shards
+              chart_type: line
+              dimensions:
+                - name: active_primary
+                - name: active
+                - name: relocating
+                - name: initializing
+                - name: unassigned
+                - name: delayed_unaasigned
+            - name: elasticsearch.cluster_pending_tasks
+              description: Cluster Pending Tasks
+              unit: tasks
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: elasticsearch.cluster_number_of_in_flight_fetch
+              description: Cluster Unfinished Fetches
+              unit: fetches
+              chart_type: line
+              dimensions:
+                - name: in_flight_fetch
+            - name: elasticsearch.cluster_indices_count
+              description: Cluster Indices Count
+              unit: indices
+              chart_type: line
+              dimensions:
+                - name: indices
+            - name: elasticsearch.cluster_indices_shards_count
+              description: Cluster Indices Shards Count
+              unit: shards
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: primaries
+                - name: replication
+            - name: elasticsearch.cluster_indices_docs_count
+              description: Cluster Indices Docs Count
+              unit: docs
+              chart_type: line
+              dimensions:
+                - name: docs
+            - name: elasticsearch.cluster_indices_store_size
+              description: Cluster Indices Store Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: elasticsearch.cluster_indices_query_cache
+              description: Cluster Indices Query Cache
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: hit
+                - name: miss
+            - name: elasticsearch.cluster_nodes_by_role_count
+              description: Cluster Nodes By Role Count
+              unit: nodes
+              chart_type: line
+              dimensions:
+                - name: coordinating_only
+                - name: data
+                - name: data_cold
+                - name: data_content
+                - name: data_frozen
+                - name: data_hot
+                - name: data_warm
+                - name: ingest
+                - name: master
+                - name: ml
+                - name: remote_cluster_client
+                - name: voting_only
+        - name: index
+          description: These metrics refer to the index.
+          labels:
+            - name: cluster_name
+              description: |
+                Name of the cluster. Based on the [Cluster name setting](https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name).
+            - name: index
+              description: Name of the index.
+          metrics:
+            - name: elasticsearch.node_index_health
+              description: Index Health
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: green
+                - name: yellow
+                - name: red
+            - name: elasticsearch.node_index_shards_count
+              description: Index Shards Count
+              unit: shards
+              chart_type: line
+              dimensions:
+                - name: shards
+            - name: elasticsearch.node_index_docs_count
+              description: Index Docs Count
+              unit: docs
+              chart_type: line
+              dimensions:
+                - name: docs
+            - name: elasticsearch.node_index_store_size
+              description: Index Store Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: store_size
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-opensearch
+      monitored_instance:
+        name: OpenSearch
+        link: https://opensearch.org/
+        icon_filename: opensearch.svg
+        categories:
+          - data-collection.search-engines

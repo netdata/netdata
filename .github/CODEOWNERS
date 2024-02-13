@@ -19,6 +19,7 @@ src/exporting/ @thiagoftsm
 src/daemon/ @thiagoftsm @vkalintiris
 src/database/ @thiagoftsm @vkalintiris
 docs/ @tkatsoulas @Ancairon
+src/go/ @ilyam8
 src/health/ @thiagoftsm @vkalintiris
 src/health/health.d/ @thiagoftsm
 src/health/notifications/ @Ferroin @thiagoftsm

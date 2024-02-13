@@ -1,0 +1,63 @@
+{
+  "pool": "www",
+  "process manager": "dynamic",
+  "start time": 1566371090,
+  "start since": 1119,
+  "accepted conn": 22,
+  "listen queue": 0,
+  "max listen queue": 0,
+  "listen queue len": 0,
+  "idle processes": 1,
+  "active processes": 1,
+  "total processes": 2,
+  "max active processes": 1,
+  "max children reached": 0,
+  "slow requests": 0,
+  "processes": [
+    {
+      "pid": 67858,
+      "state": "Running",
+      "start time": 1566371090,
+      "start since": 1119,
+      "requests": 11,
+      "request duration": 834,
+      "request method": "GET",
+      "request uri": "/status?json&full",
+      "content length": 0,
+      "user": "-",
+      "script": "-",
+      "last request cpu": 0,
+      "last request memory": 0
+    },
+    {
+      "pid": 67859,
+      "state": "Running",
+      "start time": 1566371090,
+      "start since": 1119,
+      "requests": 11,
+      "request duration": 919,
+      "request method": "GET",
+      "request uri": "/status?json",
+      "content length": 0,
+      "user": "-",
+      "script": "-",
+      "last request cpu": 0,
+      "last request memory": 2097152
+    },
+    {
+      "pid": 67860,
+      "state": "Running",
+      "start time": 1566371090,
+      "start since": 1119,
+      "requests": 11,
+      "request duration": 18446744073709551227,
+      "request method": "GET",
+      "request uri": "/status?json&full",
+      "content length": 0,
+      "user": "-",
+      "script": "-",
+      "last request cpu": 10.0,
+      "last request memory": 2093045
+    }
+  ]
+}

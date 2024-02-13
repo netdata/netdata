@@ -1,0 +1,8 @@
++--------------------+-------+
+| Variable_name      | Value |
++--------------------+-------+
+| log_bin            | ON    |
+| max_connections    | 151   |
+| performance_schema | ON    |
+| table_open_cache   | 2000  |
++--------------------+-------+

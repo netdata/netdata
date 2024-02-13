@@ -1,0 +1,54 @@
+version: '3'
+services:
+  netdata:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - '19999:19999'
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - ./mocks/tmp:/usr/local/apache2/logs:ro
+    depends_on:
+      - springboot2
+      - httpd
+
+  springboot2:
+    build: mocks/springboot2
+    ports:
+      - '8080:8080'
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.3.1
+    ports:
+    - '9600:9600'
+
+  httpd:
+    image: httpd:2.4
+    volumes:
+      - ./mocks/httpd/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - ./mocks/tmp:/usr/local/apache2/logs:rw
+
+  blackbox_probe:
+    build: mocks/blackbox
+    depends_on:
+      - springboot2
+      - httpd
+    command:
+      - '/bin/sh'
+      - '-c'
+      - |
+        while :; do
+          curl -o /dev/null http://springboot2:8080/hello || :
+          curl -o /dev/null http://springboot2:8080/hello || :
+          curl -o /dev/null http://springboot2:8080/ || :
+          curl -o /dev/null http://httpd/ || :
+          curl -o /dev/null -XPOST http://httpd/post || :
+          curl -o /dev/null http://httpd/not_exist || :
+          sleep 0.7
+        done

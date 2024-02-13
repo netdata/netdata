@@ -1,0 +1,370 @@
+# The format of this file is documented in the dhcpd.leases(5) manual page.
+# This lease file was written by isc-dhcp-4.3.1
+
+lease 10.254.252.2 {
+  starts 3 2014/07/23 07:32:16;
+  ends 3 2014/07/23 09:12:16;
+  tstp 3 2014/07/23 09:12:16;
+  cltt 3 2014/07/23 07:32:16;
+  binding state free;
+  hardware ethernet f0:de:f1:89:24:1f;
+  uid "\001\360\336\361\211$\037";
+}
+lease 10.254.252.3 {
+  starts 5 2014/11/28 05:49:01;
+  ends 5 2014/11/28 07:29:01;
+  tstp 5 2014/11/28 07:29:01;
+  cltt 5 2014/11/28 05:49:01;
+  binding state free;
+  hardware ethernet c0:4a:00:00:f5:fa;
+  uid "\001\300J\000\000\365\372";
+}
+lease 10.254.252.4 {
+  starts 5 2016/03/11 01:03:59;
+  ends 5 2016/03/11 02:33:20;
+  tstp 5 2016/03/11 02:33:20;
+  cltt 5 2016/03/11 01:12:33;
+  binding state free;
+  hardware ethernet 00:1c:c0:7a:38:3f;
+  uid "\001\000\034\300z8?";
+  set vendor-class-identifier = "MSFT 5.0";
+}
+lease 10.254.252.5 {
+  starts 1 2016/09/05 23:53:19;
+  ends 2 2016/09/06 01:33:19;
+  tstp 2 2016/09/06 01:33:19;
+  cltt 1 2016/09/05 23:53:19;
+  binding state free;
+  hardware ethernet 28:28:5d:65:30:ef;
+  uid "\001((]e0\357";
+}
+lease 10.254.252.6 {
+  starts 4 2016/09/29 01:41:23;
+  ends 4 2016/09/29 03:21:23;
+  tstp 4 2016/09/29 03:21:23;
+  cltt 4 2016/09/29 01:41:23;
+  binding state free;
+  hardware ethernet 04:bf:6d:94:1b:0d;
+  uid "\001\004\277m\224\033\015";
+}
+lease 10.254.252.7 {
+  starts 1 2016/10/03 08:23:14;
+  ends 1 2016/10/03 10:03:14;
+  tstp 1 2016/10/03 10:03:14;
+  cltt 1 2016/10/03 08:23:14;
+  binding state free;
+  hardware ethernet ec:22:80:f7:3f:44;
+  uid "\001\354\"\200\367?D";
+}
+lease 10.254.252.8 {
+  starts 5 2016/10/07 05:43:11;
+  ends 5 2016/10/07 05:58:31;
+  tstp 5 2016/10/07 05:58:31;
+  cltt 5 2016/10/07 05:43:11;
+  binding state free;
+  hardware ethernet 70:62:b8:bf:b5:b3;
+  uid "\001pb\270\277\265\263";
+}
+lease 192.168.3.15 {
+  starts 2 2019/01/08 06:29:58;
+  ends 2 2019/01/08 08:09:58;
+  tstp 2 2019/01/08 08:09:58;
+  cltt 2 2019/01/08 06:29:58;
+  binding state free;
+  hardware ethernet a8:f9:4b:20:99:9c;
+  uid "\001\250\371K \231\234";
+}
+lease 192.168.3.18 {
+  starts 2 2020/03/10 01:46:07;
+  ends 2 2020/03/10 03:22:21;
+  tstp 2 2020/03/10 03:22:21;
+  cltt 2 2020/03/10 01:46:08;
+  binding state free;
+  hardware ethernet 04:bf:6d:0d:e2:35;
+  uid "\001\004\277m\015\3425";
+  set vendor-class-identifier = "ndhcpc";
+}
+lease 192.168.3.11 {
+  starts 6 2020/10/03 07:52:36;
+  ends 6 2020/10/03 09:32:36;
+  cltt 6 2020/10/03 07:52:36;
+  binding state free;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 60:a4:4c:3f:6e:78;
+  uid "\001`\244L?nx";
+}
+lease 192.168.3.10 {
+  starts 6 2020/10/03 08:18:50;
+  ends 6 2020/10/03 09:58:50;
+  cltt 6 2020/10/03 08:18:50;
+  binding state free;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 70:62:b8:bf:b5:b3;
+  uid "\001pb\270\277\265\263";
+  set vendor-class-identifier = "dslforum.org";
+}
+lease 10.254.251.101 {
+  starts 0 2017/03/12 22:11:59;
+  ends 0 2017/03/12 23:51:58;
+  tstp 0 2017/03/12 23:51:58;
+  cltt 0 2017/03/12 22:11:59;
+  binding state free;
+  hardware ethernet b4:ce:f6:01:83:73;
+  set vendor-class-identifier = "dhcpcd-5.5.6";
+}
+lease 10.254.251.102 {
+  starts 5 2017/05/19 06:07:39;
+  ends 5 2017/05/19 07:47:39;
+  tstp 5 2017/05/19 07:47:39;
+  cltt 5 2017/05/19 06:07:39;
+  binding state free;
+  hardware ethernet 34:51:c9:4c:40:c9;
+  uid "\0014Q\311L@\311";
+}
+lease 10.254.251.103 {
+  starts 2 2018/04/24 13:18:00;
+  ends 2 2018/04/24 14:58:00;
+  tstp 2 2018/04/24 14:58:00;
+  cltt 2 2018/04/24 13:18:00;
+  binding state free;
+  hardware ethernet 70:8a:09:da:74:d0;
+  set vendor-class-identifier = "dhcpcd-5.5.6";
+}
+lease 10.254.251.104 {
+  starts 2 2018/04/24 12:54:27;
+  ends 3 2018/04/25 06:47:20;
+  tstp 3 2018/04/25 06:47:20;
+  cltt 2 2018/04/24 12:54:28;
+  binding state free;
+  hardware ethernet 78:a3:e4:e8:12:1f;
+  uid "\001x\243\344\350\022\037";
+}
+lease 10.254.251.100 {
+  starts 6 2020/10/03 07:58:45;
+  ends 6 2020/10/03 09:38:45;
+  cltt 6 2020/10/03 07:58:45;
+  binding state free;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 74:ea:3a:a6:a9:c7;
+  uid "\001t\352:\246\251\307";
+  set vendor-class-identifier = "MSFT 5.0";
+  client-hostname "TL-WR741N";
+}
+lease 10.254.255.104 {
+  starts 1 2017/07/10 09:35:24;
+  ends 1 2017/07/10 09:37:24;
+  tstp 1 2017/07/10 09:37:24;
+  cltt 1 2017/07/10 09:35:24;
+  binding state free;
+  hardware ethernet 50:85:69:11:b6:ff;
+  uid "\001P\205i\021\266\377";
+}
+lease 10.254.255.102 {
+  starts 3 2017/08/16 22:01:09;
+  ends 3 2017/08/16 23:41:09;
+  tstp 3 2017/08/16 23:41:09;
+  cltt 3 2017/08/16 22:01:09;
+  binding state free;
+  hardware ethernet c8:d3:a3:54:31:3a;
+  uid "\001\310\323\243T1:";
+}
+lease 10.254.255.103 {
+  starts 0 2018/12/16 00:54:07;
+  ends 0 2018/12/16 02:34:07;
+  tstp 0 2018/12/16 02:34:07;
+  cltt 0 2018/12/16 00:54:07;
+  binding state free;
+  hardware ethernet 08:c6:b3:01:e8:18;
+  uid "\001\010\306\263\001\350\030";
+  set vendor-class-identifier = "QTCH-QBR1041WUV2";
+}
+lease 10.254.255.100 {
+  starts 2 2018/12/18 09:21:24;
+  ends 2 2018/12/18 10:32:36;
+  tstp 2 2018/12/18 10:32:36;
+  cltt 2 2018/12/18 09:21:30;
+  binding state free;
+  hardware ethernet 70:62:b8:c3:51:a3;
+  uid "\001pb\270\303Q\243";
+}
+lease 10.254.255.105 {
+  starts 5 2019/03/22 07:42:55;
+  ends 5 2019/03/22 09:22:55;
+  tstp 5 2019/03/22 09:22:55;
+  cltt 5 2019/03/22 07:42:55;
+  binding state free;
+  hardware ethernet 58:d5:6e:95:88:30;
+  uid "\001X\325n\225\2100";
+  set vendor-class-identifier = "dslforum.org";
+}
+lease 10.254.255.101 {
+  starts 6 2020/10/03 07:29:24;
+  ends 6 2020/10/03 09:09:24;
+  cltt 6 2020/10/03 07:29:24;
+  binding state free;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 28:3b:82:58:f4:58;
+  uid "\001(;\202X\364X";
+  set vendor-class-identifier = "dslforum.org";
+}
+lease 10.254.253.104 {
+  starts 4 2018/03/15 12:01:12;
+  ends 4 2018/03/15 12:34:35;
+  tstp 4 2018/03/15 12:34:35;
+  cltt 4 2018/03/15 12:02:58;
+  binding state free;
+  hardware ethernet 50:64:2b:4f:fd:3d;
+  uid "\001Pd+O\375=";
+  set vendor-class-identifier = "udhcp 1.19.4";
+}
+lease 10.254.253.105 {
+  starts 4 2018/03/15 12:39:46;
+  ends 4 2018/03/15 14:17:39;
+  tstp 4 2018/03/15 14:17:39;
+  cltt 4 2018/03/15 12:39:47;
+  binding state free;
+  hardware ethernet 50:64:2b:4f:fd:3d;
+  set vendor-class-identifier = "udhcp 1.19.4";
+}
+lease 10.254.253.101 {
+  starts 5 2018/03/16 11:00:43;
+  ends 5 2018/03/16 12:40:15;
+  tstp 5 2018/03/16 12:40:15;
+  cltt 5 2018/03/16 11:00:43;
+  binding state free;
+  hardware ethernet d0:66:7b:8b:e5:ff;
+  uid "\001\320f{\213\345\377";
+  set vendor-class-identifier = "udhcp 1.14.3-VD Linux VDLinux.1.2.1.x";
+}
+lease 10.254.253.102 {
+  starts 5 2018/03/16 11:26:21;
+  ends 5 2018/03/16 13:06:21;
+  tstp 5 2018/03/16 13:06:21;
+  cltt 5 2018/03/16 11:26:21;
+  binding state free;
+  hardware ethernet 50:64:2b:4f:fd:3f;
+  uid "\001Pd+O\375?";
+}
+lease 10.254.253.100 {
+  starts 2 2018/08/21 05:48:43;
+  ends 2 2018/08/21 07:23:13;
+  tstp 2 2018/08/21 07:23:13;
+  cltt 2 2018/08/21 05:48:44;
+  binding state free;
+  hardware ethernet 20:cf:30:ef:8e:a4;
+  uid "\001 \3170\357\216\244";
+  set vendor-class-identifier = "udhcp 0.9.8-asus";
+}
+lease 10.254.253.103 {
+  starts 6 2020/10/03 08:07:02;
+  ends 6 2020/10/03 09:47:02;
+  cltt 6 2020/10/03 08:07:02;
+  binding state free;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 34:ce:00:03:08:57;
+  uid "\0014\316\000\003\010W";
+  set vendor-class-identifier = "udhcp 1.24.2";
+}
+lease 10.254.254.103 {
+  starts 3 2015/11/11 09:03:11;
+  ends 3 2015/11/11 09:05:11;
+  tstp 3 2015/11/11 09:05:11;
+  cltt 3 2015/11/11 09:03:11;
+  binding state free;
+  hardware ethernet 74:d0:2b:0e:9b:d6;
+}
+lease 10.254.254.104 {
+  starts 0 2017/12/03 15:57:29;
+  ends 0 2017/12/03 17:37:29;
+  tstp 0 2017/12/03 17:37:29;
+  cltt 0 2017/12/03 15:57:29;
+  binding state free;
+  hardware ethernet ac:22:0b:78:00:78;
+  uid "\377\3139\012\307\000\002\000\000\253\021(CC\252e\021\000\017";
+}
+lease 10.254.254.105 {
+  starts 2 2018/06/26 12:30:04;
+  ends 2 2018/06/26 13:09:10;
+  tstp 2 2018/06/26 13:09:10;
+  cltt 2 2018/06/26 12:30:04;
+  binding state free;
+  hardware ethernet cc:2d:e0:3f:bc:5c;
+  uid "\001\314-\340?\274\\";
+}
+lease 10.254.254.101 {
+  starts 3 2018/07/25 09:33:10;
+  ends 3 2018/07/25 11:13:10;
+  tstp 3 2018/07/25 11:13:10;
+  cltt 3 2018/07/25 09:33:10;
+  binding state free;
+  hardware ethernet 74:d0:2b:0e:9b:d6;
+  uid "\001t\320+\016\233\326";
+  set vendor-class-identifier = "MSFT 5.0";
+}
+lease 10.254.254.100 {
+  starts 2 2020/09/22 11:19:29;
+  ends 2 2020/09/22 11:21:29;
+  cltt 2 2020/09/22 11:19:29;
+  binding state free;
+  hardware ethernet 30:45:96:6a:f3:de;
+  uid "\0010E\226j\363\336";
+  client-hostname "Honor_7C-bb23201389a3c44";
+}
+lease 10.254.254.102 {
+  starts 2 2020/09/22 11:25:14;
+  ends 2 2020/09/22 11:27:14;
+  cltt 2 2020/09/22 11:25:14;
+  binding state free;
+  hardware ethernet c8:3d:dc:be:d2:cf;
+  uid "\001\310=\334\276\322\317";
+  client-hostname "Redmi7A-Redmi";
+}
+lease 10.254.255.101 {
+  starts 6 2020/10/03 08:19:24;
+  ends 6 2020/10/03 09:59:24;
+  cltt 6 2020/10/03 08:19:24;
+  binding state free;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 28:3b:82:58:f4:58;
+  uid "\001(;\202X\364X";
+  set vendor-class-identifier = "dslforum.org";
+}
+lease 10.254.251.100 {
+  starts 6 2020/10/03 08:48:45;
+  ends 6 2020/10/03 10:28:45;
+  cltt 6 2020/10/03 08:48:45;
+  binding state free;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 74:ea:3a:a6:a9:c7;
+  uid "\001t\352:\246\251\307";
+  set vendor-class-identifier = "MSFT 5.0";
+  client-hostname "TL-WR741N";
+}
+lease 10.254.253.103 {
+  starts 6 2020/10/03 08:57:02;
+  ends 6 2020/10/03 10:37:02;
+  cltt 6 2020/10/03 08:57:02;
+  binding state free;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 34:ce:00:03:08:57;
+  uid "\0014\316\000\003\010W";
+  set vendor-class-identifier = "udhcp 1.24.2";
+}
+lease 192.168.3.11 {
+  starts 6 2020/10/03 09:01:22;
+  ends 6 2020/10/03 10:41:22;
+  cltt 6 2020/10/03 09:01:22;
+  binding state free;
+  next binding state free;
+  rewind binding state free;
+  hardware ethernet 60:a4:4c:3f:6e:78;
+  uid "\001`\244L?nx";
+}

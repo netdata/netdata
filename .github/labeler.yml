@@ -75,6 +75,7 @@ area/collectors:
       - changed-files:
           - any-glob-to-any-file:
               - src/collectors/**
+              - src/go/collectors/go.d.plugin/**
 
 collectors/plugins.d:
   - any:
@@ -135,6 +136,12 @@ collectors/freeipmi:
       - changed-files:
           - any-glob-to-any-file:
               - src/collectors/freeipmi.plugin/**
+
+collectors/go.d.plugin:
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - src/go/collectors/go.d.plugin/**
 
 collectors/idlejitter:
   - any:
@@ -215,6 +222,12 @@ collectors/xenstat:
               - src/collectors/xenstat.plugin/**
 
 # ----------------/collectors----------------------
+
+area/go:
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - src/go/**
 
 area/health:
   - any:
