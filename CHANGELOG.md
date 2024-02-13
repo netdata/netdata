@@ -2,15 +2,23 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.44.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.44.3...HEAD)
 
 **Merged pull requests:**
 
+- Move diagrams/ under docs/ [\#16998](https://github.com/netdata/netdata/pull/16998) ([vkalintiris](https://github.com/vkalintiris))
+- Small cleanup [\#16996](https://github.com/netdata/netdata/pull/16996) ([vkalintiris](https://github.com/vkalintiris))
+- Remove historical changelog and cppcheck [\#16995](https://github.com/netdata/netdata/pull/16995) ([vkalintiris](https://github.com/vkalintiris))
+- Remove config macros that are always set. [\#16994](https://github.com/netdata/netdata/pull/16994) ([vkalintiris](https://github.com/vkalintiris))
+- Use changed files in check-files workflow [\#16993](https://github.com/netdata/netdata/pull/16993) ([tkatsoulas](https://github.com/tkatsoulas))
+- Move web/ under src/ [\#16992](https://github.com/netdata/netdata/pull/16992) ([vkalintiris](https://github.com/vkalintiris))
+- Add spinlock to protect metric release [\#16989](https://github.com/netdata/netdata/pull/16989) ([stelfrag](https://github.com/stelfrag))
 - updated message ids for systemd and dbus [\#16987](https://github.com/netdata/netdata/pull/16987) ([ktsaou](https://github.com/ktsaou))
 - Update input skip patterns [\#16984](https://github.com/netdata/netdata/pull/16984) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update input paths for tj-actions/changed-files [\#16982](https://github.com/netdata/netdata/pull/16982) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update synology.md [\#16980](https://github.com/netdata/netdata/pull/16980) ([pschaer](https://github.com/pschaer))
 - Detect machine GUID change [\#16979](https://github.com/netdata/netdata/pull/16979) ([stelfrag](https://github.com/stelfrag))
+- Move CO-RE headers \(integration between eBPF and Network Viewer\) [\#16978](https://github.com/netdata/netdata/pull/16978) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations.js [\#16974](https://github.com/netdata/netdata/pull/16974) ([netdatabot](https://github.com/netdatabot))
 - Use C++14 by default when building on systems that support it. [\#16972](https://github.com/netdata/netdata/pull/16972) ([Ferroin](https://github.com/Ferroin))
 - change edac ecc errors from incremental to absolute [\#16970](https://github.com/netdata/netdata/pull/16970) ([ilyam8](https://github.com/ilyam8))
@@ -279,6 +287,10 @@
 - Remove openSUSE 15.4 from CI [\#16449](https://github.com/netdata/netdata/pull/16449) ([tkatsoulas](https://github.com/tkatsoulas))
 - Remove fedora 37 from CI [\#16422](https://github.com/netdata/netdata/pull/16422) ([tkatsoulas](https://github.com/tkatsoulas))
 
+## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.44.2...v1.44.3)
+
 ## [v1.44.2](https://github.com/netdata/netdata/tree/v1.44.2) (2024-02-06)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.44.1...v1.44.2)
@@ -395,10 +407,6 @@
 - Regenerate integrations.js [\#16409](https://github.com/netdata/netdata/pull/16409) ([netdatabot](https://github.com/netdatabot))
 - Improve handling around EPEL requirement for RPM packages. [\#16406](https://github.com/netdata/netdata/pull/16406) ([Ferroin](https://github.com/Ferroin))
 - Fix typo in metadata \(eBPF\) [\#16405](https://github.com/netdata/netdata/pull/16405) ([thiagoftsm](https://github.com/thiagoftsm))
-- docker: use /host/etc/hostname if mounted [\#16401](https://github.com/netdata/netdata/pull/16401) ([ilyam8](https://github.com/ilyam8))
-- adaptec\_raid: fix parsing PD without NCQ status [\#16400](https://github.com/netdata/netdata/pull/16400) ([ilyam8](https://github.com/ilyam8))
-- eBPF apps order [\#16395](https://github.com/netdata/netdata/pull/16395) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix systemd-units func expiration time [\#16393](https://github.com/netdata/netdata/pull/16393) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
