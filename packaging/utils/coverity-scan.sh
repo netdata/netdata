@@ -42,7 +42,19 @@ INSTALL_DIR="/opt"
 # the version of coverity to use
 COVERITY_BUILD_VERSION="${COVERITY_BUILD_VERSION:-cov-analysis-linux64-2023.6.2}"
 
-. packaging/installer/functions.sh
+SCRIPT_SOURCE="$(
+    self=${0}
+    while [ -L "${self}" ]
+    do
+        cd "${self%/*}" || exit 1
+        self=$(readlink "${self}")
+    done
+    cd "${self%/*}" || exit 1
+    echo "$(pwd -P)/${self##*/}"
+)"
+REPO_ROOT="${SCRIPT_SOURCE}/../.."
+
+. "${REPO_ROOT}/packaging/installer/functions.sh"
 
 JOBS=$(find_processors)
 [ -z "${JOBS}" ] && JOBS=1
@@ -105,6 +117,8 @@ scanit() {
   elif [ ! -x "${covbuild}" ]; then
     fatal "The command '${covbuild}' is not executable. Export variable COVERITY_BUILD_PATH or set it in .coverity-scan.conf"
   fi
+
+  cd "${REPO_ROOT}" || exit 1
 
   version="$(grep "^#define PACKAGE_VERSION" config.h | cut -d '"' -f 2)"
   progress "Working on netdata version: ${version}"
