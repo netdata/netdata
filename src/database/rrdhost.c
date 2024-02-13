@@ -879,23 +879,12 @@ void dbengine_init(char *hostname) {
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
+    bool tiers_adjusted = false;
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
     int divisor = 1;
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(tier == 0)
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
-        else
-            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
-
-        int ret = mkdir(dbenginepath, 0775);
-        if (ret != 0 && errno != EEXIST) {
-            nd_log(NDLS_DAEMON, NDLP_CRIT,
-                   "DBENGINE on '%s': cannot create directory '%s'",
-                   hostname, dbenginepath);
-            break;
-        }
 
         if(tier > 0)
             divisor *= 2;
@@ -924,10 +913,7 @@ void dbengine_init(char *hostname) {
             else if(strcmp(bf, "full") == 0) backfill = RRD_BACKFILL_FULL;
             else if(strcmp(bf, "none") == 0) backfill = RRD_BACKFILL_NONE;
             else {
-                nd_log(NDLS_DAEMON, NDLP_WARNING,
-                       "DBENGINE: unknown backfill value '%s', assuming 'new'",
-                       bf);
-
+                nd_log(NDLS_DAEMON, NDLP_WARNING, "DBENGINE: unknown backfill value '%s', assuming 'new'", bf);
                 config_set(CONFIG_SECTION_DB, dbengineconfig, "new");
                 backfill = RRD_BACKFILL_NEW;
             }
@@ -940,8 +926,21 @@ void dbengine_init(char *hostname) {
             storage_tiers_grouping_iterations[tier] = 1;
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "DBENGINE on '%s': dbengine tier %zu gives aggregation of more than 65535 points of tier 0. "
-                   "Disabling tiers above %zu",
+                   "Disabling tiers %zu and above",
                    hostname, tier, tier);
+            storage_tiers = tier;
+            tiers_adjusted = true;
+            break;
+        }
+
+        if(tier == 0)
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
+        else
+            snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
+
+        int ret = mkdir(dbenginepath, 0775);
+        if (ret != 0 && errno != EEXIST) {
+            nd_log(NDLS_DAEMON, NDLP_CRIT, "DBENGINE on '%s': cannot create directory '%s'", hostname, dbenginepath);
             break;
         }
 
@@ -961,6 +960,8 @@ void dbengine_init(char *hostname) {
         else
             dbengine_tier_init(&tiers_init[tier]);
     }
+    if (tiers_adjusted)
+        config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         void *ptr;
