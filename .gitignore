@@ -191,3 +191,6 @@ src/libnetdata/gorilla/fuzz-*.log
 
 # ignore build/ directory (default dir for many IDEs/LSPs)
 build/
+
+# cp'd from packaging/utils/ when CI job runs for shellcheck
+.shellcheckrc

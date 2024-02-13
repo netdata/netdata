@@ -191,6 +191,8 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Copy .shellcheckrc to top-level directory
+        run: cp packaging/utils/shellcheckrc .shellcheckrc
       - name: Run shellcheck
         uses: reviewdog/action-shellcheck@v1
         with:
