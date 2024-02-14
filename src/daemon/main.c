@@ -511,13 +511,19 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 
     delta_shutdown_time("exit");
 
-#ifdef ENABLE_SENTRY
-    sentry_native_fini();
-#endif
-
     usec_t ended_ut = now_monotonic_usec();
     netdata_log_info("NETDATA SHUTDOWN: completed in %llu ms - netdata is now exiting - bye bye...", (ended_ut - started_ut) / USEC_PER_MS);
+
+#ifdef ENABLE_SENTRY
+    if (ret)
+        abort();
+    else {
+        sentry_native_fini();
+        exit(ret);
+    }
+#else
     exit(ret);
+#endif
 }
 
 void web_server_threading_selection(void) {
