@@ -299,7 +299,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
     json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
 
     buffer_flush(wb);
-    buffer_sprintf(wb, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
+    buffer_sprintf(wb, "{\"status\":%d,\"error_message\":\"%s\",\"message\":\"%s\"}", code, buffer, buffer);
     wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     return code;
