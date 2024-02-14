@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef DAEMON_WATCHER_H
 #define DAEMON_WATCHER_H
 
