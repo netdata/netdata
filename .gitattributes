@@ -1,3 +1,0 @@
-*.c	diff=cpp
-*.h	diff=cpp
-*.ksy.in linguist-language=ksy

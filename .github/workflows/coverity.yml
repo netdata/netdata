@@ -7,7 +7,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/coverity.yml
-      - coverity-scan.sh
+      - packaging/utils/coverity-scan.sh
 env:
   DISABLE_TELEMETRY: 1
 concurrency:
@@ -42,7 +42,7 @@ jobs:
           COVERITY_SCAN_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
           COVERITY_SCAN_SUBMIT_MAIL: ${{ secrets.COVERITY_SCAN_SUBMIT_MAIL }}
         run: |
-          bash -x ./coverity-scan.sh --with-install
+          bash -x ./packaging/utils/coverity-scan.sh --with-install
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
