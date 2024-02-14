@@ -14,7 +14,7 @@ void *service_main(void *ptr);
 void *statsd_main(void *ptr);
 void *timex_main(void *ptr);
 void *profile_main(void *ptr);
-void *replication_thread_main(void *ptr __maybe_unused);
+void *replication_thread_main(void *ptr);
 
 extern bool global_statistics_enabled;
 

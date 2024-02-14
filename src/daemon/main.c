@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "buildinfo.h"
+#include "daemon/watcher.h"
 #include "static_threads.h"
 
 #include "database/engine/page_test.h"
@@ -299,25 +300,10 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     return (running == 0);
 }
 
-#define delta_shutdown_time(msg)                        \
-    do {                                                \
-        usec_t now_ut = now_monotonic_usec();           \
-        if(prev_msg)                                    \
-            netdata_log_info("NETDATA SHUTDOWN: in %llu ms, %s%s - next: %s", (now_ut - last_ut) / USEC_PER_MS, (timeout)?"(TIMEOUT) ":"", prev_msg, msg); \
-        else                                            \
-            netdata_log_info("NETDATA SHUTDOWN: next: %s", msg);    \
-        last_ut = now_ut;                               \
-        prev_msg = msg;                                 \
-        timeout = false;                                \
-    } while(0)
-
 void web_client_cache_destroy(void);
 
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
-    usec_t started_ut = now_monotonic_usec();
-    usec_t last_ut = started_ut;
-    const char *prev_msg = NULL;
-    bool timeout = false;
+    watcher_shutdown_begin();
 
     nd_log_limits_unlimited();
     netdata_log_info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
@@ -330,104 +316,78 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     statistic = (analytics_statistic_t) {"EXIT", ret?"ERROR":"OK","-"};
     analytics_statistic_send(&statistic);
 
-    delta_shutdown_time("create shutdown file");
-
     char agent_crash_file[FILENAME_MAX + 1];
     char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
     snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
     snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
+    watcher_step_complete(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
 
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {
-        delta_shutdown_time("dbengine exit mode");
         for (size_t tier = 0; tier < storage_tiers; tier++)
             rrdeng_exit_mode(multidb_ctx[tier]);
     }
 #endif
-
-    delta_shutdown_time("close webrtc connections");
+    watcher_step_complete(WATCHER_STEP_ID_DBENGINE_EXIT_MODE);
 
     webrtc_close_all_connections();
+    watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
-    delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
+    service_signal_exit(SERVICE_MAINTENANCE | ABILITY_DATA_QUERIES | ABILITY_WEB_REQUESTS |
+                        ABILITY_STREAMING_CONNECTIONS | SERVICE_ACLK | SERVICE_ACLKSYNC);
+    watcher_step_complete(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
 
-    service_signal_exit(
-            SERVICE_MAINTENANCE
-            | ABILITY_DATA_QUERIES
-            | ABILITY_WEB_REQUESTS
-            | ABILITY_STREAMING_CONNECTIONS
-            | SERVICE_ACLK
-            | SERVICE_ACLKSYNC
-            );
+    service_wait_exit(SERVICE_MAINTENANCE, 3 * USEC_PER_SEC);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
 
-    delta_shutdown_time("stop maintenance thread");
+    service_wait_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD, 3 * USEC_PER_SEC);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
 
-    timeout = !service_wait_exit(
-        SERVICE_MAINTENANCE
-        , 3 * USEC_PER_SEC);
+    service_wait_exit(SERVICE_COLLECTORS | SERVICE_STREAMING, 3 * USEC_PER_SEC);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
 
-    delta_shutdown_time("stop replication, exporters, health and web servers threads");
-
-    timeout = !service_wait_exit(
-            SERVICE_EXPORTERS
-            | SERVICE_HEALTH
-            | SERVICE_WEB_SERVER
-            | SERVICE_HTTPD
-            , 3 * USEC_PER_SEC);
-
-    delta_shutdown_time("stop collectors and streaming threads");
-
-    timeout = !service_wait_exit(
-            SERVICE_COLLECTORS
-            | SERVICE_STREAMING
-            , 3 * USEC_PER_SEC);
-
-    delta_shutdown_time("stop replication threads");
-
-    timeout = !service_wait_exit(
-            SERVICE_REPLICATION // replication has to be stopped after STREAMING, because it cleans up ARAL
-            , 3 * USEC_PER_SEC);
-
-    delta_shutdown_time("prepare metasync shutdown");
+    service_wait_exit(SERVICE_REPLICATION, 3 * USEC_PER_SEC);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
 
     metadata_sync_shutdown_prepare();
-
-    delta_shutdown_time("disable ML detection and training threads");
+    watcher_step_complete(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
 
     ml_stop_threads();
     ml_fini();
+    watcher_step_complete(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
 
-    delta_shutdown_time("stop context thread");
-
-    timeout = !service_wait_exit(
-            SERVICE_CONTEXT
-            , 3 * USEC_PER_SEC);
-
-    delta_shutdown_time("clear web client cache");
+    service_wait_exit(SERVICE_CONTEXT, 3 * USEC_PER_SEC);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_CONTEXT_THREAD);
 
     web_client_cache_destroy();
+    watcher_step_complete(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE);
 
-    delta_shutdown_time("stop aclk threads");
+    service_wait_exit(SERVICE_ACLK, 3 * USEC_PER_SEC);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_THREADS);
 
-    timeout = !service_wait_exit(
-            SERVICE_ACLK
-            , 3 * USEC_PER_SEC);
-
-    delta_shutdown_time("stop all remaining worker threads");
-
-    timeout = !service_wait_exit(~0, 10 * USEC_PER_SEC);
-
-    delta_shutdown_time("cancel main threads");
+    service_wait_exit(~0, 10 * USEC_PER_SEC);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
 
     cancel_main_threads();
+    watcher_step_complete(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
 
-    if(!ret) {
+    if (ret)
+    {
+        watcher_step_complete(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
+        watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
+        watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
+
+        watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
+        watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
+        watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
+    }
+    else
+    {
         // exit cleanly
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            delta_shutdown_time("flush dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
 
@@ -439,21 +399,16 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
             }
         }
 #endif
+        watcher_step_complete(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
 
-        // free the database
-        delta_shutdown_time("stop collection for all hosts");
-
-        // rrdhost_free_all();
         rrd_finalize_collection_for_all_hosts();
-
-        delta_shutdown_time("stop metasync threads");
+        watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
 
         metadata_sync_shutdown();
+        watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            delta_shutdown_time("wait for dbengine collectors to finish");
-
             size_t running = 1;
             size_t count = 10;
             while(running && count) {
@@ -467,52 +422,55 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
                 }
                 count--;
             }
-
-            delta_shutdown_time("wait for dbengine main cache to finish flushing");
+            watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
 
             while (pgc_hot_and_dirty_entries(main_cache)) {
                 pgc_flush_all_hot_and_dirty_pages(main_cache, PGC_SECTION_ALL);
                 sleep_usec(100 * USEC_PER_MS);
             }
+            watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
 
-            delta_shutdown_time("stop dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
-
             rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+            watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
+        } else {
+            // Skip these steps
+            watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
+            watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
+            watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
+#else
+    // Skip these steps
+    watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
+    watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
+    watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
 #endif
     }
 
-    delta_shutdown_time("close SQL context db");
-
     sql_close_context_database();
-
-    delta_shutdown_time("closed SQL main db");
+    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_CONTEXT_DB);
 
     sql_close_database();
+    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_MAIN_DB);
 
     // unlink the pid
     if(pidfile[0]) {
-        delta_shutdown_time("remove pid file");
-
         if(unlink(pidfile) != 0)
             netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
+    watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 
 #ifdef ENABLE_HTTPS
-    delta_shutdown_time("free openssl structures");
     netdata_ssl_cleanup();
 #endif
-
-    delta_shutdown_time("remove incomplete shutdown file");
+    watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
     (void) unlink(agent_incomplete_shutdown_file);
-
-    delta_shutdown_time("exit");
-
-    usec_t ended_ut = now_monotonic_usec();
-    netdata_log_info("NETDATA SHUTDOWN: completed in %llu ms - netdata is now exiting - bye bye...", (ended_ut - started_ut) / USEC_PER_MS);
+    watcher_step_complete(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
+    
+    watcher_shutdown_end();
+    watcher_thread_stop();
 
 #ifdef ENABLE_SENTRY
     if (ret)
@@ -1916,6 +1874,9 @@ int main(int argc, char **argv) {
         load_netdata_conf(NULL, 0, &user);
         load_cloud_conf(0);
     }
+
+    // @stelfrag: Where is the right place to call this?
+    watcher_thread_start();
 
     // ------------------------------------------------------------------------
     // initialize netdata
