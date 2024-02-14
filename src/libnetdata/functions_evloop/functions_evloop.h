@@ -120,7 +120,7 @@ static inline void pluginsd_function_json_error_to_stdout(const char *transactio
     json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
 
     pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
-    fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\",,\"message\":\"%s\"}", code, buffer, buffer);
+    fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\",\"message\":\"%s\"}", code, buffer, buffer);
     pluginsd_function_result_end_to_stdout();
     fflush(stdout);
 }
