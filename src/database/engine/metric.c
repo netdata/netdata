@@ -531,6 +531,11 @@ inline bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *me
     return false;
 }
 
+inline time_t mrg_metric_get_latest_clean_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
+    time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
+    return clean;
+}
+
 inline time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
     time_t hot = __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED);
@@ -641,8 +646,29 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }
 
-    if (likely(!added))
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
+    if (likely(!added)) {
+        uint64_t old_samples = 0;
+
+        if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
+            old_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
+
         mrg_metric_expand_retention(mrg, metric, first_time_s, last_time_s, update_every_s);
+
+        uint64_t new_samples = 0;
+        if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
+            new_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
+
+        __atomic_add_fetch(&ctx->atomic.samples, new_samples - old_samples, __ATOMIC_RELAXED);
+    }
+    else {
+        // Newly added
+        if (update_every_s) {
+            uint64_t samples = (last_time_s - first_time_s) / update_every_s;
+            __atomic_add_fetch(&ctx->atomic.samples, samples, __ATOMIC_RELAXED);
+        }
+        __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
+    }
 
     mrg_metric_release(mrg, metric);
 }

@@ -387,6 +387,8 @@ struct rrdengine_instance {
         unsigned extents_currently_being_flushed;   // non-zero until we commit data to disk (both datafile and journal file)
 
         time_t first_time_s;
+        uint64_t metrics;
+        uint64_t samples;
     } atomic;
 
     struct {

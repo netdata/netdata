@@ -446,6 +446,27 @@ static inline uint64_t storage_engine_disk_space_used(STORAGE_ENGINE_BACKEND seb
     return 0;
 }
 
+uint64_t rrdeng_metrics(STORAGE_INSTANCE *si);
+static inline uint64_t storage_engine_metrics(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
+#ifdef ENABLE_DBENGINE
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_metrics(si);
+#endif
+
+    // TODO - calculate the total host disk space for memory mode save and map
+    return 0;
+}
+
+uint64_t rrdeng_samples(STORAGE_INSTANCE *si);
+static inline uint64_t storage_engine_samples(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
+#ifdef ENABLE_DBENGINE
+    if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_samples(si);
+#endif
+    return 0;
+}
+
+
 time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *si);
 static inline time_t storage_engine_global_first_time_s(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si __maybe_unused) {
 #ifdef ENABLE_DBENGINE

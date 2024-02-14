@@ -223,7 +223,4 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
 bool rrdeng_is_legacy(STORAGE_INSTANCE *si);
 
-uint64_t rrdeng_disk_space_max(STORAGE_INSTANCE *si);
-uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *si);
-
 #endif /* NETDATA_RRDENGINEAPI_H */
