@@ -470,7 +470,7 @@ void analytics_alarms(void)
  */
 void analytics_misc(void)
 {
-    analytics_data.spinlock.locked = false;
+    spinlock_init(&analytics_data.spinlock);
 
 #ifdef ENABLE_ACLK
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
