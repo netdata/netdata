@@ -1,4 +1,3 @@
-
 # Backing up a Netdata Agent
 
 ## Introduction
