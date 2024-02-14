@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- Adjust storage tiers if we fail to create the requested number of tiers [\#16999](https://github.com/netdata/netdata/pull/16999) ([stelfrag](https://github.com/stelfrag))
 - Move diagrams/ under docs/ [\#16998](https://github.com/netdata/netdata/pull/16998) ([vkalintiris](https://github.com/vkalintiris))
+- Include Go plugin sources in main repository. [\#16997](https://github.com/netdata/netdata/pull/16997) ([Ferroin](https://github.com/Ferroin))
 - Small cleanup [\#16996](https://github.com/netdata/netdata/pull/16996) ([vkalintiris](https://github.com/vkalintiris))
 - Remove historical changelog and cppcheck [\#16995](https://github.com/netdata/netdata/pull/16995) ([vkalintiris](https://github.com/vkalintiris))
 - Remove config macros that are always set. [\#16994](https://github.com/netdata/netdata/pull/16994) ([vkalintiris](https://github.com/vkalintiris))
@@ -402,11 +404,6 @@
 - Don't print errors from reading filtered alerts [\#16417](https://github.com/netdata/netdata/pull/16417) ([MrZammler](https://github.com/MrZammler))
 - /api/v1/charts: bring back chart id to `title` [\#16416](https://github.com/netdata/netdata/pull/16416) ([ilyam8](https://github.com/ilyam8))
 - fix: don't count reused connections as new [\#16414](https://github.com/netdata/netdata/pull/16414) ([ilyam8](https://github.com/ilyam8))
-- Add support for installing a specific major version of the agent on install. [\#16413](https://github.com/netdata/netdata/pull/16413) ([Ferroin](https://github.com/Ferroin))
-- Remove queue limit from ACLK sync event loop [\#16411](https://github.com/netdata/netdata/pull/16411) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#16409](https://github.com/netdata/netdata/pull/16409) ([netdatabot](https://github.com/netdatabot))
-- Improve handling around EPEL requirement for RPM packages. [\#16406](https://github.com/netdata/netdata/pull/16406) ([Ferroin](https://github.com/Ferroin))
-- Fix typo in metadata \(eBPF\) [\#16405](https://github.com/netdata/netdata/pull/16405) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
