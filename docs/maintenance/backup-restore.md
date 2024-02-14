@@ -1,64 +1,65 @@
 
-# Introduction
-When preparing to backup Netdata it is worth considering that there are different sorts of data that you may wish to backup independently or all together:
+# Backing up a Netdata Agent
+
+## Introduction
+
+When preparing to backup a Netdata Agent it is worth considering that there are different kinds of data that you may wish to backup independently or all together:
 
 | Data type      | Description | Location |
 | ----------- | ----------- | ----------- |
 | Agent configuration| Files controlling configuration of the Netdata Agent | [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory)
 | Metrics   | Database files | /var/cache/netdata |
-| Identity   | Cloud-claim, API key and some other files | /var/lib/netdata |
-
-> ###Note
-> Only you can decide how to perform your backups. The following examples are provided as a guide only.
-
-
-
-# Backing up Netdata
+| Identity   | Claim token, API key and some other files | /var/lib/netdata |
 
 ## Scenarios
 
-### 1. Backing up to restore data in case of node failure
-In this standard scenario you are backing up your Netdata agent in case of some sort of node failure or data corruption so that the metrics and configuration-state can be recovered. The purpose is not to backup/restore the application itself.
+### Backing up to restore data in case of a node failure
 
-`Step 1` Verify that the directory-paths in the table above contain the information that you expect.<br>
-_The specific paths may vary depending upon installation method, Operating System and whether it is a Docker/Kubernetes deployment._
+In this standard scenario you are backing up your Netdata Agent in case of a node failure or data corruption so that the metrics and the configuration can be recovered. The purpose is not to backup/restore the application itself.
 
-`Step 2` It is recommended that you stop the Netdata agent when backing up the Metrics/database files.
-<br>
-Backing up the Agent configuration and Identity folders is straight-forward as they should not be changing very frequently.
+1. Verify that the directory-paths in the table above contain the information you expect.  
 
-`Step 3`
-Using a backup tool such as **tar** you will likely need to run the backup as _root_ or the _netdata_ user in order to access all the files for backup.
-e.g.
-```
-sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
-```
-Stopping the Netdata agent is mostly required for backing up of the _database files_ and so if you wish to keep the gap in data from the stopping of the Netdata service to an absolute minimum then you could have a backup job or script that uses the following sequence:
-- Backup the Agent configuration Identity directories
-- Stop the Netdata service
-- Backup up up the database files
-- Restart the netdata agent.
+   > **Note**  
+   > The specific paths may vary depending upon installation method, Operating System and whether it is a Docker/Kubernetes deployment.
 
-<br>
+2. It is recommended that you [stop the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) when backing up the Metrics/database files.  
+   Backing up the Agent configuration and Identity folders is straight-forward as they should not be changing very frequently.
 
+3. Using a backup tool such as `tar` you will need to run the backup as _root_ or as the _netdata_ user in order to access all the files in the directories.
 
-# Restoring Netdata
+  ```
+  sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
+  ```
+  
+  Stopping the Netdata agent is mostly required in order to back up the _database files_ of the Netdata Agent. 
+  
+  If you wish to minimize the gap in metrics caused by stopping the Netdata Agent, then you could have a backup job or script that uses the following sequence:
+  
+  - Backup the Agent configuration Identity directories
+  - Stop the Netdata service
+  - Backup up up the database files
+  - Restart the netdata agent.
 
-`Step 1` Ensure that the Netdata agent is installed and in a **stopped state**. <br>
-_If you plan to deploy the agent and restore the backup over the top of it then you might find it helpful to use the "--dont-start-it" switch, e.g._
-```
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --dont-start-it
-```
-_Regardless you must verify that the agent/service is actually stopped_
+### Restoring Netdata
 
-`Step 1.5` If you are going to restore the database files then you should _first_ **ensure that the Metrics directory is empty**:
-```
-sudo rm -Rf /var/cache/netdata
-```
+1. Ensure that the Netdata agent is installed and is [stopped](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md)
 
-`Step 2` Restore from the backup archive
-```
-sudo tar -xvpzf /path/to/netdata_backup.tar.gz -C /
-```
+   If you plan to deploy the Agent and restore a backup on top of it, then you might find it helpful to use the `--dont-start-it` option upon installation.
 
-3. Start the Netdata agent
+   ```
+   wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --dont-start-it
+   ```
+  
+    > **Note**
+    > If you are going to restore the database files then you should first ensure that the Metrics directory is empty.
+    > ```
+    > sudo rm -Rf /var/cache/netdata
+    > ```
+
+2. Restore the backup from the archive
+
+    ```
+    sudo tar -xvpzf /path/to/netdata_backup.tar.gz -C /
+    ```
+
+3. [Start the Netdata agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md)
