@@ -1,26 +1,17 @@
-<!--
-title: "Backing up Netdata"
-description: "Guide on how to backup and restore Netdata."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/maintenance/backup-restore.md"
-sidebar_label: "Notify"
-learn_status: "Published"
-learn_rel_path: "Integrations/Notify"
--->
 
 # Introduction
 When preparing to backup Netdata it is worth considering that there are different sorts of data that you may wish to backup independently or all together:
 
 | Data type      | Description | Location |
 | ----------- | ----------- | ----------- |
-| Agent configuration| Files controlling configuration of the Netdata agent | /etc/netdata/
+| Agent configuration| Files controlling configuration of the Netdata Agent | [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory)
 | Metrics   | Database files | /var/cache/netdata |
 | Identity   | Cloud-claim, API key and some other files | /var/lib/netdata |
 
-<br>
-Note: Only you can decide how to perform your backups. The following examples are provided as a guide only.
+> ###Note
+> Only you can decide how to perform your backups. The following examples are provided as a guide only.
 
 
-<br>
 
 # Backing up Netdata
 
