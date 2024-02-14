@@ -181,11 +181,14 @@ static int dyncfg_intercept_early_error(struct rrd_function_execute *rfe, int rc
 }
 
 static const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id) {
-    const char *colon = strrchr(job_id, ':');
+    char id_copy[strlen(job_id) + 1];
+    memcpy(id_copy, job_id, sizeof(id_copy));
+
+    char *colon = strrchr(id_copy, ':');
     if(!colon) return NULL;
 
-    colon++;
-    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, colon);
+    *colon = '\0';
+    const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id_copy);
     if(!item) return NULL;
 
     DYNCFG *df = dictionary_acquired_item_value(item);
