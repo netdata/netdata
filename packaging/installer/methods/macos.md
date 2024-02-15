@@ -21,7 +21,7 @@ You can install Netdata in one of the three following ways:
 Each of these installation option requires [Homebrew](https://brew.sh/) for handling dependencies. 
 
 > The Netdata Homebrew package is community-created and -maintained.
-> Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](https://github.com/netdata/netdata/blob/master/packaging/PLATFORM_SUPPORT.md).
+> Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/versions-and-platforms.md).
 
 ## Install Netdata with our automatic one-line installation script
 

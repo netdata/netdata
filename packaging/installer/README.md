@@ -215,7 +215,7 @@ There are three potential workarounds for this:
    affect many projects other than just Netdata, and there are unfortunately a number of other services out there
    that do not provide IPv6 connectivity, so taking this route is likely to save you time in the future as well.
 2. If you are using a system that we publish native packages for (see our [platform support
-   policy](https://github.com/netdata/netdata/blob/master/packaging/PLATFORM_SUPPORT.md) for more details),
+   policy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/versions-and-platforms.md) for more details),
    you can manually set up our native package repositories as outlined in our [native package install
    documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md). Our official
    package repositories do provide service over IPv6, so they work without issue on hosts without IPv4 connectivity.
