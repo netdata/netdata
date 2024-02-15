@@ -85,7 +85,7 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
         if(!rrd_function_available(host, string2str(df->function)))
             df->current.status = DYNCFG_STATUS_ORPHAN;
 
-        if((id && strcmp(id, df_dfe.name) != 0) || (template && df->template != template))
+        if((id && strcmp(id, df_dfe.name) != 0) && (template && df->template != template))
             continue;
 
         items[used++] = dictionary_acquired_item_dup(dyncfg_globals.nodes, df_dfe.item);
