@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- dyncfg: fix support for testing new jobs [\#17009](https://github.com/netdata/netdata/pull/17009) ([ktsaou](https://github.com/ktsaou))
+- Abort on non-zero rc. [\#17008](https://github.com/netdata/netdata/pull/17008) ([vkalintiris](https://github.com/vkalintiris))
+- Misc improvements [\#17001](https://github.com/netdata/netdata/pull/17001) ([stelfrag](https://github.com/stelfrag))
 - Adjust storage tiers if we fail to create the requested number of tiers [\#16999](https://github.com/netdata/netdata/pull/16999) ([stelfrag](https://github.com/stelfrag))
 - Move diagrams/ under docs/ [\#16998](https://github.com/netdata/netdata/pull/16998) ([vkalintiris](https://github.com/vkalintiris))
 - Include Go plugin sources in main repository. [\#16997](https://github.com/netdata/netdata/pull/16997) ([Ferroin](https://github.com/Ferroin))
@@ -44,6 +47,7 @@
 - respect NETDATA\_LOG\_LEVEL if set [\#16943](https://github.com/netdata/netdata/pull/16943) ([ilyam8](https://github.com/ilyam8))
 - enable network-viewer aggregated views [\#16940](https://github.com/netdata/netdata/pull/16940) ([ktsaou](https://github.com/ktsaou))
 - fix charts.d.plugin configuration directory names [\#16939](https://github.com/netdata/netdata/pull/16939) ([ilyam8](https://github.com/ilyam8))
+- Assorted cleanup of CI/packaging related code. [\#16938](https://github.com/netdata/netdata/pull/16938) ([Ferroin](https://github.com/Ferroin))
 - Check for agent already running [\#16937](https://github.com/netdata/netdata/pull/16937) ([stelfrag](https://github.com/stelfrag))
 - Remove duplicate check [\#16936](https://github.com/netdata/netdata/pull/16936) ([stelfrag](https://github.com/stelfrag))
 - Drop ESLint CI jobs and config. [\#16935](https://github.com/netdata/netdata/pull/16935) ([Ferroin](https://github.com/Ferroin))
@@ -400,10 +404,6 @@
 - Minor: Remove backtick from doc [\#16423](https://github.com/netdata/netdata/pull/16423) ([MrZammler](https://github.com/MrZammler))
 - Update netdata-functions.md [\#16421](https://github.com/netdata/netdata/pull/16421) ([shyamvalsan](https://github.com/shyamvalsan))
 - disable socket port reuse [\#16420](https://github.com/netdata/netdata/pull/16420) ([ilyam8](https://github.com/ilyam8))
-- fix proc net dev: keep iface speed chart var in Mbits [\#16418](https://github.com/netdata/netdata/pull/16418) ([ilyam8](https://github.com/ilyam8))
-- Don't print errors from reading filtered alerts [\#16417](https://github.com/netdata/netdata/pull/16417) ([MrZammler](https://github.com/MrZammler))
-- /api/v1/charts: bring back chart id to `title` [\#16416](https://github.com/netdata/netdata/pull/16416) ([ilyam8](https://github.com/ilyam8))
-- fix: don't count reused connections as new [\#16414](https://github.com/netdata/netdata/pull/16414) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
