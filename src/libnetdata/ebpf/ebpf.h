@@ -361,7 +361,7 @@ typedef struct ebpf_module {
 
 int ebpf_get_kernel_version();
 int get_redhat_release();
-int has_condition_to_run(int version);
+int has_ebpf_kernel_version(int version);
 char *ebpf_kernel_suffix(int version, int isrh);
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf,
                                            struct bpf_object **obj);

@@ -3059,7 +3059,7 @@ static inline void ebpf_load_thread_config()
  */
 int ebpf_check_conditions()
 {
-    if (!has_condition_to_run(running_on_kernel)) {
+    if (!has_ebpf_kernel_version(running_on_kernel)) {
         netdata_log_error("The current collector cannot run on this kernel.");
         return -1;
     }

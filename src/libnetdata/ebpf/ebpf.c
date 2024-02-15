@@ -244,21 +244,13 @@ static int kernel_is_rejected()
     return 0;
 }
 
-static int has_ebpf_kernel_version(int version)
+int has_ebpf_kernel_version(int version)
 {
     if (kernel_is_rejected())
         return 0;
 
     // Kernel 4.11.0 or RH > 7.5
     return (version >= NETDATA_MINIMUM_EBPF_KERNEL || get_redhat_release() >= NETDATA_MINIMUM_RH_VERSION);
-}
-
-int has_condition_to_run(int version)
-{
-    if (!has_ebpf_kernel_version(version))
-        return 0;
-
-    return 1;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
