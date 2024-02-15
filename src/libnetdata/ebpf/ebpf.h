@@ -3,6 +3,8 @@
 #ifndef NETDATA_EBPF_H
 #define NETDATA_EBPF_H 1
 
+#define NETDATA_EBPF_PLUGIN_NAME "ebpf.plugin"
+
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #ifdef LIBBPF_DEPRECATED
