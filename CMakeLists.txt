@@ -47,12 +47,14 @@ else()
         message(FATAL_ERROR "Wrong version regex match count ${CMAKE_MATCH_COUNT} (should be in 3, 4 or 5)")
 endif()
 
+set(NETDATA_VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}.${FIELD_TWEAK})
+
 #
 # project
 #
 
 project(netdata
-        VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}.${FIELD_TWEAK}
+        VERSION ${NETDATA_VERSION}
         DESCRIPTION "Netdata real-time monitoring"
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
