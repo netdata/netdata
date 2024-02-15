@@ -287,6 +287,7 @@ typedef struct netdata_socket {
         uint32_t retransmit;   //It is never used with UDP
         uint32_t ipv4_connect;
         uint32_t ipv6_connect;
+        uint32_t state; // We do not have charts for it, because we are using network viewer plugin
     } tcp;
 
     struct {
