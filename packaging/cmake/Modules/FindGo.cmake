@@ -24,8 +24,8 @@ if (GO_EXECUTABLE)
        RESULT_VARIABLE RESULT
   )
   if (RESULT EQUAL 0)
-    string(REGEX MATCH "([0-9]+\\.[0-9]+\(\\.[0-9]+\)?)"
-        GO_VERSION_STRING "${GO_VERSION_STRING}")
+    string(REGEX MATCH "go([0-9]+\\.[0-9]+\(\\.[0-9]+\)?)" GO_VERSION_STRING "${GO_VERSION_STRING}")
+    string(REGEX MATCH "([0-9]+\\.[0-9]+\(\\.[0-9]+\)?)" GO_VERSION_STRING "${GO_VERSION_STRING}")
   endif()
 endif()
 
