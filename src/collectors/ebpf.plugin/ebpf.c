@@ -3051,51 +3051,6 @@ static inline void ebpf_load_thread_config()
 }
 
 /**
- * Can the plugin run eBPF code
- *
- * This function checks kernel version and permissions.
- *
- * @param kver  the kernel version
- * @param name  the plugin name.
- *
- * @return It returns 0 on success and -1 otherwise
- */
-int can_plugin_run_ebpf_code(int kver, char *plugin_name)
-{
-    if (!has_ebpf_kernel_version(kver)) {
-        netdata_log_error("The current collector cannot run on this kernel.");
-        return -1;
-    }
-
-    if (!is_ebpf_plugin_running_as_root()) {
-        netdata_log_error(
-            "%s should either run as root (now running with uid %u, euid %u) or have special capabilities.",
-            plugin_name, (unsigned int)getuid(), (unsigned int)geteuid());
-        return -1;
-    }
-
-    return 0;
-}
-
-/**
- * Adjust memory
- *
- * Adjust memory values to load eBPF programs.
- *
- * @return It returns 0 on success and -1 otherwise
- */
-int ebpf_adjust_memory_limit()
-{
-    struct rlimit r = { RLIM_INFINITY, RLIM_INFINITY };
-    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-        netdata_log_error("Setrlimit(RLIMIT_MEMLOCK)");
-        return -1;
-    }
-
-    return 0;
-}
-
-/**
  * Parse arguments given from user.
  *
  * @param argc the number of arguments
@@ -3327,7 +3282,7 @@ static void ebpf_parse_args(int argc, char **argv)
             case EBPF_OPTION_UNITTEST: {
                 // if we cannot run until the end, we will cancel the unittest
                 int exit_code = ECANCELED;
-                if (can_plugin_run_ebpf_code(running_on_kernel, NETDATA_EBPF_PLUGIN_NAME))
+                if (ebpf_can_plugin_load_code(running_on_kernel, NETDATA_EBPF_PLUGIN_NAME))
                     goto unittest;
 
                 if (ebpf_adjust_memory_limit())
@@ -4020,7 +3975,7 @@ int main(int argc, char **argv)
     ebpf_parse_args(argc, argv);
     ebpf_manage_pid(getpid());
 
-    if (can_plugin_run_ebpf_code(running_on_kernel, NETDATA_EBPF_PLUGIN_NAME))
+    if (ebpf_can_plugin_load_code(running_on_kernel, NETDATA_EBPF_PLUGIN_NAME))
         return 2;
 
     if (ebpf_adjust_memory_limit())
