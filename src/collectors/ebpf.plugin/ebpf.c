@@ -3064,7 +3064,7 @@ int ebpf_check_conditions()
         return -1;
     }
 
-    if (!am_i_running_as_root()) {
+    if (!is_ebpf_plugin_running_as_root()) {
         netdata_log_error(
             "ebpf.plugin should either run as root (now running with uid %u, euid %u) or have special capabilities..",
             (unsigned int)getuid(), (unsigned int)geteuid());

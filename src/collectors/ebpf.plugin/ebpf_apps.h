@@ -195,7 +195,7 @@ void clean_apps_groups_target(struct ebpf_target *apps_groups_root_target);
 
 size_t zero_all_targets(struct ebpf_target *root);
 
-int am_i_running_as_root();
+int is_ebpf_plugin_running_as_root();
 
 void cleanup_exited_pids();
 
