@@ -14,8 +14,7 @@ For more information check our [Pricing](https://www.netdata.cloud/pricing/) pag
 
 [Sign-up to Netdata Cloud](https://app.netdata.cloud) and start connecting your Netdata agents. The commands provided once you have signed up, include all the information to install and automatically connect (claim) Netdata agents to your Netdata Cloud space.
 
-<!-- ## On-Prem Version
+## On-Prem Version
 
-How can I get it?
- -->
-
+How can I get it? 
+<!-- There should probably be a link here -->
