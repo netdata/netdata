@@ -24,8 +24,8 @@ if (GO_EXECUTABLE)
        RESULT_VARIABLE RESULT
   )
   if (RESULT EQUAL 0)
-    string(REGEX MATCH "go([0-9]+\\.[0-9]+\(\\.[0-9]+\)?)" GO_VERSION_STRING "${GO_VERSION_STRING}")
-    string(REGEX MATCH "([0-9]+\\.[0-9]+\(\\.[0-9]+\)?)" GO_VERSION_STRING "${GO_VERSION_STRING}")
+    string(REGEX MATCH "go([0-9]+\\.[0-9]+(\\.[0-9]+)?)" GO_VERSION_STRING "${GO_VERSION_STRING}")
+    string(REGEX MATCH "([0-9]+\\.[0-9]+(\\.[0-9]+)?)" GO_VERSION_STRING "${GO_VERSION_STRING}")
   endif()
 endif()
 
@@ -34,5 +34,4 @@ find_package_handle_standard_args(
     Go
     REQUIRED_VARS GO_EXECUTABLE
     VERSION_VAR GO_VERSION_STRING
-    FAIL_MESSAGE "Go toolchain not found"
 )
