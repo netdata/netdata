@@ -166,7 +166,7 @@ endif()
 # handling of extra compiler flags
 #
 
-include(CompilerFlags)
+include(NetdataCompilerFlags)
 
 # Disable hardening for debug builds by default.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -1457,7 +1457,7 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
-include(DetectSystemd)
+include(NetdataDetectSystemd)
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
