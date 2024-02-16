@@ -227,6 +227,28 @@ foreach(RELTYP RELEASE DEBUG RELWITHDEBINFO MINSIZEREL)
 endforeach()
 
 #
+# Handling of LTO/IPO
+#
+
+option(DISABLE_LTO "Disable use of LTO when building. Defaults to being enabled if supported." FALSE)
+
+if(NOT DISABLE_LTO)
+        include(CheckIPOSupported)
+
+        message(CHECK_START "Checking for LTO support")
+        check_ipo_supported(RESULT HAVE_LTO)
+
+        if(HAVE_LTO)
+                message(CHECK_PASS "supported")
+                set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+        else()
+                message(CHECK_FAIL "not supported")
+        endif()
+else()
+        message(STATUS "Not checking for LTO support, as it has been explicitly disabled")
+endif()
+
+#
 # detect OS
 #
 
