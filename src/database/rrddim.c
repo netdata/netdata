@@ -206,11 +206,13 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     }
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(!rd->tiers[tier].smh) continue;
-
-        STORAGE_ENGINE* eng = host->db[tier].eng;
-        eng->api.metric_release(rd->tiers[tier].smh);
-        rd->tiers[tier].smh = NULL;
+        spinlock_lock(&rd->tiers[tier].spinlock);
+        if(rd->tiers[tier].smh) {
+            STORAGE_ENGINE *eng = host->db[tier].eng;
+            eng->api.metric_release(rd->tiers[tier].smh);
+            rd->tiers[tier].smh = NULL;
+        }
+        spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 
     if(rd->db.data) {
