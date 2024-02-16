@@ -56,6 +56,7 @@ project(netdata
         DESCRIPTION "Netdata real-time monitoring"
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/packaging/cmake/Modules")
 
 find_package(PkgConfig REQUIRED)
 
@@ -1522,7 +1523,7 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
-include(packaging/cmake/systemd.cmake)
+include(DetectSystemd)
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
