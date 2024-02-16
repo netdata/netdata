@@ -52,7 +52,7 @@ SCRIPT_SOURCE="$(
     cd "${self%/*}" || exit 1
     echo "$(pwd -P)/${self##*/}"
 )"
-REPO_ROOT="${SCRIPT_SOURCE}/../.."
+REPO_ROOT="$(dirname "${SCRIPT_SOURCE}")/../.."
 
 . "${REPO_ROOT}/packaging/installer/functions.sh"
 
