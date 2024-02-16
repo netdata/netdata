@@ -116,7 +116,10 @@ static void ebpf_fill_function_buffer(BUFFER *wb, netdata_socket_plus_t *values,
     buffer_json_add_array_item_uint64(wb, (uint64_t)values->pid);
 
     // NAME
-    buffer_json_add_array_item_string(wb, (name) ? name : "unknown");
+    if (!values->data.name[0])
+        buffer_json_add_array_item_string(wb, (name) ? name : "unknown");
+    else
+        buffer_json_add_array_item_string(wb, values->data.name);
 
     // Origin
     buffer_json_add_array_item_string(wb, (values->data.external_origin) ? "in" : "out");

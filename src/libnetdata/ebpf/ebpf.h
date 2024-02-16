@@ -3,6 +3,8 @@
 #ifndef NETDATA_EBPF_H
 #define NETDATA_EBPF_H 1
 
+#define NETDATA_EBPF_PLUGIN_NAME "ebpf.plugin"
+
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #ifdef LIBBPF_DEPRECATED
@@ -361,7 +363,6 @@ typedef struct ebpf_module {
 
 int ebpf_get_kernel_version();
 int get_redhat_release();
-int has_condition_to_run(int version);
 char *ebpf_kernel_suffix(int version, int isrh);
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf,
                                            struct bpf_object **obj);
@@ -483,5 +484,8 @@ void ebpf_update_kernel_memory(ebpf_plugin_stats_t *report, ebpf_local_maps_t *m
 int ebpf_statistic_create_aral_chart(char *name, ebpf_module_t *em);
 void ebpf_statistic_obsolete_aral_chart(ebpf_module_t *em, int prio);
 void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em);
+
+int ebpf_can_plugin_load_code(int kver, char *plugin_name);
+int ebpf_adjust_memory_limit();
 
 #endif /* NETDATA_EBPF_H */

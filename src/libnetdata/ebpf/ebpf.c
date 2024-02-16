@@ -244,7 +244,16 @@ static int kernel_is_rejected()
     return 0;
 }
 
-static int has_ebpf_kernel_version(int version)
+/**
+ * Check Kernel Version
+ *
+ * Test kernel version
+ *
+ * @param version current kernel version
+ *
+ * @return It returns 1 when kernel is supported and 0 otherwise
+ */
+int ebpf_check_kernel_version(int version)
 {
     if (kernel_is_rejected())
         return 0;
@@ -253,12 +262,67 @@ static int has_ebpf_kernel_version(int version)
     return (version >= NETDATA_MINIMUM_EBPF_KERNEL || get_redhat_release() >= NETDATA_MINIMUM_RH_VERSION);
 }
 
-int has_condition_to_run(int version)
+/**
+ * Am I running as Root
+ *
+ * Verify the user that is running the collector.
+ *
+ * @return It returns 1 for root and 0 otherwise.
+ */
+int is_ebpf_plugin_running_as_root()
 {
-    if (!has_ebpf_kernel_version(version))
-        return 0;
+    uid_t uid = getuid(), euid = geteuid();
 
-    return 1;
+    if (uid == 0 || euid == 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+/**
+ * Can the plugin run eBPF code
+ *
+ * This function checks kernel version and permissions.
+ *
+ * @param kver  the kernel version
+ * @param name  the plugin name.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int ebpf_can_plugin_load_code(int kver, char *plugin_name)
+{
+    if (!ebpf_check_kernel_version(kver)) {
+        netdata_log_error("The current collector cannot run on this kernel.");
+        return -1;
+    }
+
+    if (!is_ebpf_plugin_running_as_root()) {
+        netdata_log_error(
+            "%s should either run as root (now running with uid %u, euid %u) or have special capabilities.",
+            plugin_name, (unsigned int)getuid(), (unsigned int)geteuid());
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * Adjust memory
+ *
+ * Adjust memory values to load eBPF programs.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int ebpf_adjust_memory_limit()
+{
+    struct rlimit r = { RLIM_INFINITY, RLIM_INFINITY };
+    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+        netdata_log_error("Setrlimit(RLIMIT_MEMLOCK)");
+        return -1;
+    }
+
+    return 0;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
