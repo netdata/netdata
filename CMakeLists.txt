@@ -129,9 +129,11 @@ option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
 
 if(ENABLE_PLUGIN_GO)
-    find_package(Go "1.21" REQUIRED)
+    include(GoTools)
 
-    include(BuildGoComponent)
+    find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
+
+    find_package(Go "${MIN_GO_VERSION}" REQUIRED)
 endif()
 
 if(ENABLE_SENTRY)

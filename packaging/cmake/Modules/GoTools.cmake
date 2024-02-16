@@ -1,4 +1,4 @@
-# Macros to assist in building Go components
+# Macros and functions to assist in working with Go
 #
 # Copyright (c) 2024 Netdata Inc
 #
@@ -44,3 +44,42 @@ macro(add_go_target target output build_src build_dir)
         DEPENDS ${output}
     )
 endmacro()
+
+# find_min_go_version: Determine the minimum Go version based on go.mod files
+#
+# Takes one argument, specifying a source tree to scan for go.mod files.
+#
+# All files found will be checked for a `go` directive, and the
+# MIN_GO_VERSION variable will be set to the highest version
+# number found among these directives.
+#
+# Only works on UNIX-like systems, because it has to process the go.mod
+# files in ways that CMake can't do on it's own.
+function(find_min_go_version src_tree)
+    message(STATUS "Determining minimum required version of Go for this build")
+
+    file(GLOB_RECURSE go_mod_files ${src_tree}/go.mod)
+
+    set(result 1.0)
+
+    foreach(f IN ITEMS ${go_mod_files})
+        message(VERBOSE "Checking Go version specified in ${f}")
+        execute_process(
+            COMMAND grep -E "^go .*$" ${f}
+            COMMAND cut -f 2 -d " "
+            RESULT_VARIABLE version_check_result
+            OUTPUT_VARIABLE go_mod_version
+        )
+
+        if(version_check_result EQUAL 0)
+            string(REGEX MATCH "([0-9]+\\.[0-9]+(\\.[0-9]+)?)" go_mod_version "${go_mod_version}")
+
+            if(go_mod_version VERSION_GREATER result)
+                set(result "${go_mod_version}")
+            endif()
+        endif()
+    endforeach()
+
+    message(STATUS "Minimum required Go version determined to be ${result}")
+    set(MIN_GO_VERSION "${result}" PARENT_SCOPE)
+endfunction()
