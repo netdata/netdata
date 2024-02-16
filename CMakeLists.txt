@@ -129,7 +129,7 @@ option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
 
 if(ENABLE_PLUGIN_GO)
-    find_package(Go "1.21")
+    find_package(Go "1.21" REQUIRED)
 
     include(BuildGoComponent)
 endif()
