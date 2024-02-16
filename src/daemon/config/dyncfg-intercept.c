@@ -371,7 +371,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
             dyncfg_apply_action_on_all_template_jobs(rfe, id, cmd);
 
-            rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_OK, "");
+            rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_OK, "applied");
             make_the_call_to_plugin = false;
         }
         else if (cmd == DYNCFG_CMD_SCHEMA) {
