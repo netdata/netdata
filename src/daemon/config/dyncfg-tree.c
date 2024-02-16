@@ -26,7 +26,7 @@ static void dyncfg_to_json(DYNCFG *df, const char *id, BUFFER *wb) {
             buffer_json_member_add_string(wb, "template", string2str(df->template));
 
         buffer_json_member_add_string(wb, "status", dyncfg_id2status(df->current.status));
-        dyncfg_cmds2json_array(df->cmds, "cmds", wb);
+        dyncfg_cmds2json_array(df->current.status == DYNCFG_STATUS_ORPHAN ? DYNCFG_CMD_REMOVE : df->cmds, "cmds", wb);
         buffer_json_member_add_object(wb, "access");
         {
             http_access2buffer_json_array(wb, "view", df->view_access);
@@ -200,9 +200,39 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
         dyncfg_tree_for_host(host, rfe->result.wb, path, id);
     }
     else {
+        id = action;
+        action = path;
+        path = NULL;
+
+        if(id && *id && dyncfg_cmds2id(action) == DYNCFG_CMD_REMOVE) {
+            const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
+            if(item) {
+                DYNCFG *df = dictionary_acquired_item_value(item);
+
+                if(!rrd_function_available(host, string2str(df->function)))
+                    df->current.status = DYNCFG_STATUS_ORPHAN;
+
+                bool delete = (df->current.status == DYNCFG_STATUS_ORPHAN);
+                dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+
+                if(delete) {
+                    dictionary_del(dyncfg_globals.nodes, id);
+                    dyncfg_file_delete(id);
+                    code = dyncfg_default_response(rfe->result.wb, 200, "");
+                    goto cleanup;
+                }
+            }
+        }
+
         code = HTTP_RESP_NOT_FOUND;
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: unknown config id '%s' in call: '%s'. This can happen if the plugin that registered the dynamic configuration is not running now.", action, rfe->function);
-        rrd_call_function_error(rfe->result.wb, "unknown config id given", code);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "DYNCFG: unknown config id '%s' in call: '%s'. "
+               "This can happen if the plugin that registered the dynamic configuration is not running now.",
+               action, rfe->function);
+
+        rrd_call_function_error(
+            rfe->result.wb,
+            "unknown config id given", code);
     }
 
 cleanup:

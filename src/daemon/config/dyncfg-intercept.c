@@ -225,38 +225,44 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     char *cmd_str = get_word(words, num_words, i++);
 
     if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0)
-        return dyncfg_intercept_early_error(rfe, HTTP_RESP_BAD_REQUEST,
-                                            "dyncfg functions intercept: this is not a dyncfg request");
+        return dyncfg_intercept_early_error(
+            rfe, HTTP_RESP_BAD_REQUEST,
+            "dyncfg functions intercept: this is not a dyncfg request");
 
     cmd = dyncfg_cmds2id(cmd_str);
     if(cmd == DYNCFG_CMD_NONE)
-        return dyncfg_intercept_early_error(rfe, HTTP_RESP_BAD_REQUEST,
-                                            "dyncfg functions intercept: invalid command received");
+        return dyncfg_intercept_early_error(
+            rfe, HTTP_RESP_BAD_REQUEST,
+            "dyncfg functions intercept: invalid command received");
 
     if(cmd == DYNCFG_CMD_ADD) {
         add_name = get_word(words, num_words, i++);
 
         if(!add_name || !*add_name)
-            return dyncfg_intercept_early_error(rfe, HTTP_RESP_BAD_REQUEST,
-                                                "dyncfg functions intercept: this action requires a name");
+            return dyncfg_intercept_early_error(
+                rfe, HTTP_RESP_BAD_REQUEST,
+                "dyncfg functions intercept: this action requires a name");
 
         if(!called_from_dyncfg_echo) {
             char nid[strlen(id) + strlen(add_name) + 2];
             snprintfz(nid, sizeof(nid), "%s:%s", id, add_name);
 
             if (dictionary_get(dyncfg_globals.nodes, nid))
-                return dyncfg_intercept_early_error(rfe, HTTP_RESP_BAD_REQUEST,
-                                                    "dyncfg functions intercept: a configuration with this name already exists");
+                return dyncfg_intercept_early_error(
+                    rfe, HTTP_RESP_BAD_REQUEST,
+                    "dyncfg functions intercept: a configuration with this name already exists");
         }
     }
 
     if((cmd == DYNCFG_CMD_ADD || cmd == DYNCFG_CMD_UPDATE || cmd == DYNCFG_CMD_TEST) && !has_payload)
-        return dyncfg_intercept_early_error(rfe, HTTP_RESP_BAD_REQUEST,
-                                            "dyncfg functions intercept: this action requires a payload");
+        return dyncfg_intercept_early_error(
+            rfe, HTTP_RESP_BAD_REQUEST,
+            "dyncfg functions intercept: this action requires a payload");
 
     if((cmd != DYNCFG_CMD_ADD && cmd != DYNCFG_CMD_UPDATE && cmd != DYNCFG_CMD_TEST) && has_payload)
-        return dyncfg_intercept_early_error(rfe, HTTP_RESP_BAD_REQUEST,
-                                            "dyncfg functions intercept: this action does not require a payload");
+        return dyncfg_intercept_early_error(
+            rfe, HTTP_RESP_BAD_REQUEST,
+            "dyncfg functions intercept: this action does not require a payload");
 
     item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
     if(!item) {
@@ -266,7 +272,9 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         }
 
         if(!item)
-            return dyncfg_intercept_early_error(rfe, HTTP_RESP_NOT_FOUND, "dyncfg functions intercept: id is not found");
+            return dyncfg_intercept_early_error(
+                rfe, HTTP_RESP_NOT_FOUND,
+                "dyncfg functions intercept: id is not found");
     }
 
     DYNCFG *df = dictionary_acquired_item_value(item);
@@ -278,8 +286,9 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         case DYNCFG_CMD_SCHEMA:
             if(!http_access_user_has_enough_access_level_for_endpoint(rfe->user_access, df->view_access)) {
                 make_the_call_to_plugin = false;
-                rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_FORBIDDEN,
-                                             "dyncfg: you don't have enough view permissions to execute this command");
+                rc = dyncfg_default_response(
+                    rfe->result.wb, HTTP_RESP_FORBIDDEN,
+                    "dyncfg: you don't have enough view permissions to execute this command");
             }
             break;
 
@@ -292,15 +301,17 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         case DYNCFG_CMD_RESTART:
             if(!http_access_user_has_enough_access_level_for_endpoint(rfe->user_access, df->edit_access)) {
                 make_the_call_to_plugin = false;
-                rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_FORBIDDEN,
-                                             "dyncfg: you don't have enough edit permissions to execute this command");
+                rc = dyncfg_default_response(
+                    rfe->result.wb, HTTP_RESP_FORBIDDEN,
+                    "dyncfg: you don't have enough edit permissions to execute this command");
             }
             break;
 
         default: {
             make_the_call_to_plugin = false;
-            rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_INTERNAL_SERVER_ERROR,
-                                         "dyncfg: permissions for this command are not set");
+            rc = dyncfg_default_response(
+                rfe->result.wb, HTTP_RESP_INTERNAL_SERVER_ERROR,
+                "dyncfg: permissions for this command are not set");
         }
         break;
     }
@@ -320,8 +331,9 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         else if (cmd == DYNCFG_CMD_ADD) {
             if (df->type != DYNCFG_TYPE_TEMPLATE) {
                 make_the_call_to_plugin = false;
-                rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST,
-                                             "dyncfg functions intercept: add command is only allowed in templates");
+                rc = dyncfg_default_response(
+                    rfe->result.wb, HTTP_RESP_BAD_REQUEST,
+                    "dyncfg functions intercept: add command is only allowed in templates");
 
                 nd_log(NDLS_DAEMON, NDLP_ERR,
                        "DYNCFG: add command can only be applied on templates, not %s: %s",
@@ -331,11 +343,14 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
         else if (
             cmd == DYNCFG_CMD_ENABLE && df->type == DYNCFG_TYPE_JOB &&
             dyncfg_is_user_disabled(string2str(df->template))) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG: cannot enable a job of a disabled template: %s", rfe->function);
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "DYNCFG: cannot enable a job of a disabled template: %s",
+                   rfe->function);
 
             make_the_call_to_plugin = false;
-            rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_BAD_REQUEST,
-                                         "dyncfg functions intercept: this job belongs to disabled template");
+            rc = dyncfg_default_response(
+                rfe->result.wb, HTTP_RESP_BAD_REQUEST,
+                "dyncfg functions intercept: this job belongs to disabled template");
         }
     }
 
@@ -356,7 +371,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
 
             dyncfg_apply_action_on_all_template_jobs(rfe, id, cmd);
 
-            rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_OK, "applied");
+            rc = dyncfg_default_response(rfe->result.wb, HTTP_RESP_OK, "applied to all template job");
             make_the_call_to_plugin = false;
         }
         else if (cmd == DYNCFG_CMD_SCHEMA) {
