@@ -129,7 +129,7 @@ option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
 
 if(ENABLE_PLUGIN_GO)
-    include(GoTools)
+    include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
 
