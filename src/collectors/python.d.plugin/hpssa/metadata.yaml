@@ -42,7 +42,7 @@ modules:
         list:
           - title: 'Enable the hpssa collector'
             description: |
-              The `hpssa` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
+              The `hpssa` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
 
               ```bash
               cd /etc/netdata   # Replace this path with your Netdata config directory, if different

@@ -114,7 +114,7 @@ itself while initiating a streaming connection. Copy that into a separate text f
 > Find out how to [install `uuidgen`](https://command-not-found.com/uuidgen) on your node if you don't already have it.
 
 Next, open `stream.conf` using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files)
-from within the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
+from within the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata
