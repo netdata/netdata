@@ -3,6 +3,8 @@
 # Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+include_guard()
+
 find_library(SYSTEMD_LIBRARY NAMES systemd)
 
 include(CheckFunctionExists)
