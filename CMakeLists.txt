@@ -311,6 +311,67 @@ endif()
 
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
+#
+# handling of extra compiler flags
+#
+
+include(NetdataCompilerFlags)
+
+# Disable hardening for debug builds by default.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" TRUE)
+else()
+        option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" FALSE)
+endif()
+
+set(EXTRA_HARDENING_C_FLAGS "")
+set(EXTRA_HARDENING_CXX_FLAGS "")
+
+set(EXTRA_OPT_C_FLAGS "")
+set(EXTRA_OPT_CXX_FLAGS "")
+
+if(NOT ${DISABLE_HARDENING})
+        add_double_extra_compiler_flag("stack-protector" "-fstack-protector-strong" "-fstack-protector" EXTRA_HARDENING)
+        add_double_extra_compiler_flag("_FORTIFY_SOURCE" "-D_FORTIFY_SOURCE=3" "-D_FORTIFY_SOURCE=2" EXTRA_HARDENING)
+        add_simple_extra_compiler_flag("stack-clash-protection" "-fstack-clash-protection" EXTRA_HARDENING)
+        add_simple_extra_compiler_flag("-fcf-protection" "-fcf-protection=full" EXTRA_HARDENING)
+        add_simple_extra_compiler_flag("branch-protection" "-mbranch-protection=standard" EXTRA_HARDENING)
+endif()
+
+foreach(FLAG function-sections data-sections)
+        add_simple_extra_compiler_flag("${FLAG}" "-f${FLAG}" EXTRA_OPT)
+endforeach()
+
+add_simple_extra_compiler_flag("-Wbuiltin-macro-redefined" "-Wno-builtin-macro-redefined" EXTRA_OPT)
+
+foreach(RELTYP RELEASE DEBUG RELWITHDEBINFO MINSIZEREL)
+        foreach(L C CXX)
+                set(CMAKE_${L}_FLAGS_${RELTYP} "${CMAKE_${L}_FLAGS_${RELTYP}} ${EXTRA_HARDENING_C_FLAGS} ${EXTRA_OPT_C_FLAGS}")
+        endforeach()
+endforeach()
+
+#
+# Handling of LTO/IPO
+#
+
+option(DISABLE_LTO "Disable use of LTO when building. Defaults to being enabled if supported." FALSE)
+
+if(NOT DISABLE_LTO)
+        include(CheckIPOSupported)
+
+        message(CHECK_START "Checking for LTO support")
+        check_ipo_supported(RESULT HAVE_LTO)
+
+        if(HAVE_LTO)
+                message(CHECK_PASS "supported")
+                set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+        else()
+                message(CHECK_FAIL "not supported")
+        endif()
+else()
+        message(STATUS "Not checking for LTO support, as it has been explicitly disabled")
+endif()
+
 if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
         include(NetdataEBPFCORE)
