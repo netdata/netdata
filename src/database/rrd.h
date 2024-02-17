@@ -184,7 +184,7 @@ extern time_t rrdset_free_obsolete_time_s;
 extern int libuv_worker_threads;
 extern bool ieee754_doubles;
 
-#define RRD_ID_LENGTH_MAX 1000
+#define RRD_ID_LENGTH_MAX 1200
 
 typedef long long total_number;
 
