@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix determining repo root in Coverity scan script. [\#17024](https://github.com/netdata/netdata/pull/17024) ([Ferroin](https://github.com/Ferroin))
+- DYNCFG support deleting orphan configurations [\#17023](https://github.com/netdata/netdata/pull/17023) ([ktsaou](https://github.com/ktsaou))
+- Protect metric release in dimension delete callback [\#17020](https://github.com/netdata/netdata/pull/17020) ([stelfrag](https://github.com/stelfrag))
+- eBPF - Network Viewer \(Move code\) [\#17018](https://github.com/netdata/netdata/pull/17018) ([thiagoftsm](https://github.com/thiagoftsm))
 - dyncfg: allow tree for individual IDs [\#17017](https://github.com/netdata/netdata/pull/17017) ([ktsaou](https://github.com/ktsaou))
 - eBPF & NV \(update packages\) [\#17012](https://github.com/netdata/netdata/pull/17012) ([thiagoftsm](https://github.com/thiagoftsm))
 - dyncfg: fix support for testing new jobs [\#17009](https://github.com/netdata/netdata/pull/17009) ([ktsaou](https://github.com/ktsaou))
@@ -293,7 +297,6 @@
 - Assorted kickstart script fixes. [\#16537](https://github.com/netdata/netdata/pull/16537) ([Ferroin](https://github.com/Ferroin))
 - wip documentation about functions table [\#16535](https://github.com/netdata/netdata/pull/16535) ([ktsaou](https://github.com/ktsaou))
 - Remove openSUSE 15.4 from CI [\#16449](https://github.com/netdata/netdata/pull/16449) ([tkatsoulas](https://github.com/tkatsoulas))
-- Remove fedora 37 from CI [\#16422](https://github.com/netdata/netdata/pull/16422) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
@@ -400,10 +403,6 @@
 - Journal sampling [\#16433](https://github.com/netdata/netdata/pull/16433) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#16431](https://github.com/netdata/netdata/pull/16431) ([netdatabot](https://github.com/netdatabot))
 - Regenerate integrations.js [\#16430](https://github.com/netdata/netdata/pull/16430) ([netdatabot](https://github.com/netdatabot))
-- proc\_net\_dev: keep nic\_speed\_max in kilobits [\#16429](https://github.com/netdata/netdata/pull/16429) ([ilyam8](https://github.com/ilyam8))
-- update go.d plugin to v0.57.0 [\#16427](https://github.com/netdata/netdata/pull/16427) ([ilyam8](https://github.com/ilyam8))
-- Adds config info for Telegram cloud notification [\#16424](https://github.com/netdata/netdata/pull/16424) ([juacker](https://github.com/juacker))
-- Minor: Remove backtick from doc [\#16423](https://github.com/netdata/netdata/pull/16423) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
