@@ -44,7 +44,7 @@ In this standard scenario you are backing up your Netdata Agent in case of a nod
 
 1. Ensure that the Netdata agent is installed and is [stopped](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md)
 
-   If you plan to deploy the Agent and restore a backup on top of it, then you might find it helpful to use the `--dont-start-it` option upon installation.
+   If you plan to deploy the Agent and restore a backup on top of it, then you might find it helpful to use the [`--dont-start-it`](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems#other-options) option upon installation.
 
    ```
    wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --dont-start-it
