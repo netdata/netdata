@@ -63,16 +63,17 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src);
 size_t rrdlabels_common_count(RRDLABELS *labels1, RRDLABELS *labels2);
 
 struct pattern_array *pattern_array_allocate();
-void pattern_array_add_label_key_with_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *sp);
-struct pattern_array *pattern_array_populate_with_key_value(struct pattern_array *pa, const char *key, const char *value, char sep);
+struct pattern_array *
+pattern_array_add_key_value(struct pattern_array *pa, const char *key, const char *value, char sep);
 bool pattern_array_label_match(
     struct pattern_array *pa,
     RRDLABELS *labels,
     char eq,
     size_t *searches,
     bool (*callback_function)(RRDLABELS *, void *, char, size_t *));
+struct pattern_array *pattern_array_add_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep);
 struct pattern_array *
-pattern_array_populate_with_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep);
+pattern_array_add_key_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *pattern);
 void pattern_array_free(struct pattern_array *pa);
 
 int rrdlabels_unittest(void);

@@ -167,15 +167,20 @@ void health_init_prototypes(void) {
 // ---------------------------------------------------------------------------------------------------------------------
 
 // If needed, add a prefix key to all possible values in the range
-static inline char *health_config_add_key_to_values(char *value) {
-    BUFFER *wb = buffer_create(HEALTH_CONF_MAX_LINE + 1, NULL);
+static inline struct pattern_array *health_config_add_key_to_values(struct pattern_array *pa, const char *input_key, char *value)
+{
     char key[HEALTH_CONF_MAX_LINE + 1];
     char data[HEALTH_CONF_MAX_LINE + 1];
 
     char *s = value;
     size_t i = 0;
 
-    key[0] = '\0';
+    char pair[HEALTH_CONF_MAX_LINE + 1];
+    if (input_key)
+        strncpyz(key, input_key, HEALTH_CONF_MAX_LINE);
+    else
+        key[0] = '\0';
+
     while(*s) {
         if (*s == '=') {
             //hold the key
@@ -185,9 +190,10 @@ static inline char *health_config_add_key_to_values(char *value) {
         } else if (*s == ' ') {
             data[i]='\0';
             if (data[0]=='!')
-                buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
+                snprintfz(pair, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
             else
-                buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+                snprintfz(pair, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+            pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
             i=0;
         } else {
             data[i++] = *s;
@@ -198,82 +204,49 @@ static inline char *health_config_add_key_to_values(char *value) {
     data[i]='\0';
     if (data[0]) {
         if (data[0]=='!')
-            buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
+            snprintfz(pair, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
         else
-            buffer_snprintf(wb, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+            snprintfz(pair, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
+        pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
     }
 
-    char *final = strdupz(buffer_tostring(wb));
-    buffer_free(wb);
+    return pa;
+}
 
-    return final;
+static struct pattern_array *trim_and_add_key_to_values(struct pattern_array *pa, const char *key, STRING *input)
+{
+    char *tmp = simple_pattern_trim_around_equal(string2str(input));
+    pa = health_config_add_key_to_values(pa, key, tmp);
+    freez(tmp);
+    return pa;
 }
 
 static void health_prototype_activate_match_patterns(struct rrd_alert_match *am) {
-    if(am->os) {
-        simple_pattern_free(am->os_pattern);
 
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->os));
-        am->os_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
+    if(am->os)
+        am->host_labels_pattern = trim_and_add_key_to_values(am->host_labels_pattern, "_os", am->os);
 
-    if(am->host) {
-        simple_pattern_free(am->host_pattern);
+    if(am->host)
+        am->host_labels_pattern = trim_and_add_key_to_values(am->host_labels_pattern, "_hostname", am->host);
 
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->host));
-        am->host_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
+    if(am->host_labels)
+        am->host_labels_pattern = trim_and_add_key_to_values(am->host_labels_pattern, NULL, am->host_labels);
 
     if(am->charts) {
         simple_pattern_free(am->charts_pattern);
-
         char *tmp = simple_pattern_trim_around_equal(string2str(am->charts));
-        am->charts_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
+        am->charts_pattern = simple_pattern_create(tmp, NULL, SIMPLE_PATTERN_EXACT, true);
         freez(tmp);
     }
 
-    if(am->plugin) {
-        simple_pattern_free(am->plugin_pattern);
+    if (am->plugin)
+        am->chart_labels_pattern = trim_and_add_key_to_values(am->chart_labels_pattern, "_collect_plugin", am->plugin);
 
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->plugin));
-        am->plugin_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
+    if (am->module)
+        am->chart_labels_pattern = trim_and_add_key_to_values(am->chart_labels_pattern, "_collect_module", am->module);
 
-    if(am->module) {
-        simple_pattern_free(am->module_pattern);
-
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->module));
-        am->module_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
-
-    if(am->host_labels) {
-        simple_pattern_free(am->host_labels_pattern);
-
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->host_labels));
-        am->host_labels_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
-
-    if(am->chart_labels) {
-        simple_pattern_free(am->chart_labels_pattern);
-
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->chart_labels));
-        char *tmp2 = health_config_add_key_to_values(tmp);
-        am->chart_labels_pattern = simple_pattern_create(
-            tmp2, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp2);
-        freez(tmp);
-    }
+    if (am->chart_labels)
+        am->chart_labels_pattern = trim_and_add_key_to_values(am->chart_labels_pattern, NULL, am->chart_labels);
 }
 
 void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
@@ -387,15 +360,10 @@ static bool prototype_matches_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
         !simple_pattern_matches(health_globals.config.enabled_alerts, string2str(ap->config.name)))
         return false;
 
-    if(ap->match.os_pattern && !simple_pattern_matches_string(ap->match.os_pattern, host->os))
-        return false;
+    struct pattern_array *pa = ap->match.host_labels_pattern;
 
-    if(ap->match.host_pattern && !simple_pattern_matches_string(ap->match.host_pattern, host->hostname))
-        return false;
-
-    if(host->rrdlabels && ap->match.host_labels_pattern &&
-        !rrdlabels_match_simple_pattern_parsed(
-            host->rrdlabels, ap->match.host_labels_pattern, '=', NULL))
+    if (host->rrdlabels && pa &&
+        !pattern_array_label_match(pa, host->rrdlabels, '=', NULL, rrdlabels_match_simple_pattern_parsed))
         return false;
 
     return true;
@@ -418,19 +386,9 @@ static bool prototype_matches_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
         !simple_pattern_matches_string(ap->match.charts_pattern, st->name))
         return false;
 
-    // match the plugin pattern
-    if(ap->match.plugin && ap->match.plugin_pattern &&
-        !simple_pattern_matches_string(ap->match.plugin_pattern, st->plugin_name))
-        return false;
-
-    // match the module pattern
-    if(ap->match.module && ap->match.module_pattern &&
-        !simple_pattern_matches_string(ap->match.module_pattern, st->module_name))
-        return false;
-
-    if (st->rrdlabels && ap->match.chart_labels && ap->match.chart_labels_pattern &&
-        !rrdlabels_match_simple_pattern_parsed(
-            st->rrdlabels, ap->match.chart_labels_pattern, '=', NULL))
+    struct pattern_array *pa = ap->match.chart_labels_pattern;
+    if (st->rrdlabels && pa &&
+        !pattern_array_label_match(pa, st->rrdlabels, '=', NULL, rrdlabels_match_simple_pattern_parsed))
         return false;
 
     return true;

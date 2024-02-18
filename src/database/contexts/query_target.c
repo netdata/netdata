@@ -736,7 +736,7 @@ static inline bool query_instance_matches_labels(
         return false;
 
     if (labels_sp) {
-        struct pattern_array *pa = pattern_array_populate_with_simple_pattern(NULL, labels_sp, ':');
+        struct pattern_array *pa = pattern_array_add_simple_pattern(NULL, labels_sp, ':');
         bool found = pattern_array_label_match(pa, ri->rrdlabels, ':', NULL, rrdlabels_match_simple_pattern_parsed);
         pattern_array_free(pa);
         return found;

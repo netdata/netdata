@@ -1353,7 +1353,7 @@ struct pattern_array *pattern_array_allocate()
     return pa;
 }
 
-void pattern_array_add_label_key_with_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *sp)
+static void pattern_array_add_lblkey_with_sp(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *sp)
 {
     if (!pa || !key || !sp)
         return;
@@ -1411,10 +1411,22 @@ bool pattern_array_label_match(
     return true;
 }
 
-struct pattern_array *pattern_array_populate_with_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep)
+struct pattern_array *pattern_array_add_key_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *pattern)
+{
+    if (unlikely(!pattern || !key))
+        return pa;
+
+    if (!pa)
+        pa = pattern_array_allocate();
+
+    pattern_array_add_lblkey_with_sp(pa, key, pattern);
+    return pa;
+}
+
+struct pattern_array *pattern_array_add_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep)
 {
     if (unlikely(!pattern))
-        return NULL;
+        return pa;
 
     if (!pa)
         pa = pattern_array_allocate();
@@ -1430,26 +1442,25 @@ struct pattern_array *pattern_array_populate_with_simple_pattern(struct pattern_
         strncpyz(key, label_key, RRDLABELS_MAX_NAME_LENGTH);
         *key_sep = sep;
 
-        pattern_array_add_label_key_with_simple_pattern(pa, key, string_to_simple_pattern(label_key));
+        pattern_array_add_lblkey_with_sp(pa, key, string_to_simple_pattern(label_key));
     }
     return pa;
 }
 
-struct pattern_array *pattern_array_populate_with_key_value(struct pattern_array *pa, const char *key, const char *value, char sep)
+struct pattern_array *pattern_array_add_key_value(struct pattern_array *pa, const char *key, const char *value, char sep)
 {
     if (unlikely(!key || !value))
-        return NULL;
+        return pa;
 
     if (!pa)
         pa = pattern_array_allocate();
 
     char label_key[RRDLABELS_MAX_NAME_LENGTH + RRDLABELS_MAX_VALUE_LENGTH + 2];
     snprintfz(label_key, sizeof(label_key) - 1, "%s%c%s", key, sep, value);
-    pattern_array_add_label_key_with_simple_pattern(
+    pattern_array_add_lblkey_with_sp(
         pa, key, simple_pattern_create(label_key, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true));
     return pa;
 }
-
 
 void pattern_array_free(struct pattern_array *pa)
 {
@@ -1692,35 +1703,35 @@ static int rrdlabels_unittest_pattern_check()
     rrdlabels_add(labels, "key4", "value4", RRDLABEL_SRC_CONFIG);
 
     bool match;
-    struct pattern_array *pa = pattern_array_populate_with_key_value(NULL, "_module", "wrong_module", '=');
+    struct pattern_array *pa = pattern_array_add_key_value(NULL, "_module", "wrong_module", '=');
     match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
     // This should not match:  _module in ("wrong_module")
     if (match)
         rc++;
 
-    pattern_array_populate_with_key_value(pa, "_module", "disk_detection", '=');
+    pattern_array_add_key_value(pa, "_module", "disk_detection", '=');
     match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
     // This should match: _module in ("wrong_module","disk_detection")
     if (!match)
         rc++;
 
-    pattern_array_populate_with_key_value(pa, "key1", "wrong_key1_value", '=');
+    pattern_array_add_key_value(pa, "key1", "wrong_key1_value", '=');
     match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
     // This should not match: _module in ("wrong_module","disk_detection") AND key1 in ("wrong_key1_value")
     if (match)
         rc++;
 
-    pattern_array_populate_with_key_value(pa, "key1", "value1", '=');
+    pattern_array_add_key_value(pa, "key1", "value1", '=');
     match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
     // This should match: _module in ("wrong_module","disk_detection") AND key1 in ("wrong_key1_value", "value1")
     if (!match)
         rc++;
 
     SIMPLE_PATTERN *sp = simple_pattern_create("key2=cat*,!d*", SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true);
-    pattern_array_add_label_key_with_simple_pattern(pa, "key2", sp);
+    pattern_array_add_lblkey_with_sp(pa, "key2", sp);
 
     sp = simple_pattern_create("key3=*phant", SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true);
-    pattern_array_add_label_key_with_simple_pattern(pa, "key3", sp);
+    pattern_array_add_lblkey_with_sp(pa, "key3", sp);
 
     match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
     // This should match: _module in ("wrong_module","disk_detection") AND key1 in ("wrong_key1_value", "value1") AND key2 in ("cat* !d*") AND key3 in ("*phant")
