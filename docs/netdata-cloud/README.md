@@ -6,31 +6,31 @@ Technically, Netdata Cloud is a thin control plane that allows the Netdata ecosy
 
 ```mermaid
 flowchart TB
-    NC("`**☁️ Netdata Cloud**
+    NC("<b>☁️ Netdata Cloud</b>
           access from anywhere,
           horizontal scalability,
           role based access,
           custom dashboards,
-          central notifications`")
-    Users[["`**✨ Unified Dashboards**
+          central notifications")
+    Users[["<b>✨ Unified Dashboards</b>
             across the infrastructure,
-            multi-cloud, hybrid-cloud`"]]
-    Notifications["`**🔔 Alert Notifications**
+            multi-cloud, hybrid-cloud"]]
+    Notifications["<b>🔔 Alert Notifications</b>
                     Slack, e-mail, Mobile App,
-                    PagerDuty, and more`"]
+                    PagerDuty, and more"]
     Users <--> NC
     NC -->|deduplicated| Notifications
     subgraph On-Prem Infrastructure
         direction TB
-        Agents("`**🌎 Netdata Agents**
+        Agents("<b>🌎 Netdata Agents</b>
                 Standalone,
                 Children, Parents
-                (possibly overlapping)`")
-        TimeSeries[("`**Time-Series**
+                (possibly overlapping)")
+        TimeSeries[("<b>Time-Series</b>
                     metric samples
-                    database`")]
-        PrivateAgents("`**🔒 Private
-                        Netdata Agents**`")
+                    database")]
+        PrivateAgents("<b>🔒 Private
+                        Netdata Agents</b>")
         Agents <--> TimeSeries
         Agents ---|stream| PrivateAgents
     end

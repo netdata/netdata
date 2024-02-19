@@ -20,32 +20,32 @@ A configuration with 2 observability centralization points, looks like this:
 
 ```mermaid
 flowchart LR
-    WEB[["`One unified
+    WEB[["One unified
         dashboard
-        for all nodes`"]]
-    NC(["`**Netdata Cloud**
+        for all nodes"]]
+    NC(["<b>Netdata Cloud</b>
         decides which agents
-        need to be queried`"])
-    SA1["`Netdata at AWS
-         A1`"]
-    SA2["`Netdata at AWS
-         A2`"]
-    SAN["`Netdata at AWS
-         AN`"]
-    PA["`**Netdata Parent A**
+        need to be queried"])
+    SA1["Netdata at AWS
+         A1"]
+    SA2["Netdata at AWS
+         A2"]
+    SAN["Netdata at AWS
+         AN"]
+    PA["<b>Netdata Parent A</b>
         at AWS
         having all metrics & logs
-        for all Ax nodes`"]
-    SB1["`Netdata On-Prem
-         B1`"]
-    SB2["`Netdata On-Prem
-         B2`"]
-    SBN["`Netdata On-Prem
-         BN`"]
-    PB["`**Netdata Parent B**
+        for all Ax nodes"]
+    SB1["Netdata On-Prem
+         B1"]
+    SB2["Netdata On-Prem
+         B2"]
+    SBN["Netdata On-Prem
+         BN"]
+    PB["<b>Netdata Parent B</b>
         On-Prem
         having all metrics & logs
-        for all Bx nodes`"]
+        for all Bx nodes"]
     WEB -->|query| NC -->|query| PA & PB
     PA ---|stream| SA1 & SA2 & SAN
     PB ---|stream| SB1 & SB2 & SBN 
@@ -57,37 +57,37 @@ For alerts, the dispatch of notifications looks like in the following chart:
 
 ```mermaid
 flowchart LR
-    NC(["`**Netdata Cloud**
+    NC(["<b>Netdata Cloud</b>
         applies silencing
-        & user settings`"])
-    SA1["`Netdata at AWS
-         A1`"]
-    SA2["`Netdata at AWS
-         A2`"]
-    SAN["`Netdata at AWS
-         AN`"]
-    PA["`**Netdata Parent A**
+        & user settings"])
+    SA1["Netdata at AWS
+         A1"]
+    SA2["Netdata at AWS
+         A2"]
+    SAN["Netdata at AWS
+         AN"]
+    PA["<b>Netdata Parent A</b>
         at AWS
         having all metrics & logs
-        for all Ax nodes`"]
-    SB1["`Netdata On-Prem
-         B1`"]
-    SB2["`Netdata On-Prem
-         B2`"]
-    SBN["`Netdata On-Prem
-         BN`"]
-    PB["`**Netdata Parent B**
+        for all Ax nodes"]
+    SB1["Netdata On-Prem
+         B1"]
+    SB2["Netdata On-Prem
+         B2"]
+    SBN["Netdata On-Prem
+         BN"]
+    PB["<b>Netdata Parent B</b>
         On-Prem
         having all metrics & logs
-        for all Bx nodes`"]
-    EMAIL{{"`**e-mail**
-        notifications`"}}
-    MOBILEAPP{{"`**Netdata Mobile App**
-        notifications`"}}
-    SLACK{{"`**Slack**
-        notifications`"}}
-    OTHER{{"`Other
-        notifications`"}}
+        for all Bx nodes"]
+    EMAIL{{"<b>e-mail</b>
+        notifications"}}
+    MOBILEAPP{{"<b>Netdata Mobile App</b>
+        notifications"}}
+    SLACK{{"<b>Slack</b>
+        notifications"}}
+    OTHER{{"Other
+        notifications"}}
     PA & PB -->|alert transitions| NC -->|notification| EMAIL & MOBILEAPP & SLACK & OTHER 
     SA1 & SA2 & SAN ---|stream| PA
     SB1 & SB2 & SBN ---|stream| PB 

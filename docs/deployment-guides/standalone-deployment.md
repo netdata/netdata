@@ -20,18 +20,18 @@ So, each of the Netdata agents has to be accessed individually and independently
 
 ```mermaid
 flowchart LR
-    WEB[["`Multiple
+    WEB[["Multiple
         Independent
-        Dashboards`"]]
-    S1["`Standalone
+        Dashboards"]]
+    S1["Standalone
         Netdata
-         1`"]
-    S2["`Standalone
+         1"]
+    S2["Standalone
         Netdata
-         2`"]
-    SN["`Standalone
+         2"]
+    SN["Standalone
         Netdata
-         N`"]
+         N"]
     WEB -->|URL 1| S1
     WEB -->|URL 2| S2
     WEB -->|URL N| SN
@@ -41,21 +41,21 @@ The same is true for alert notifications. Each of the Netdata agents runs its ow
 
 ```mermaid
 flowchart LR
-    S1["`Standalone
+    S1["Standalone
         Netdata
-         1`"]
-    S2["`Standalone
+         1"]
+    S2["Standalone
         Netdata
-         2`"]
-    SN["`Standalone
+         2"]
+    SN["Standalone
         Netdata
-         N`"]
-    EMAIL{{"`**e-mail**
-        notifications`"}}
-    SLACK{{"`**Slack**
-        notifications`"}}
-    OTHER{{"`Other
-        notifications`"}}
+         N"]
+    EMAIL{{"<b>e-mail</b>
+        notifications"}}
+    SLACK{{"<b>Slack</b>
+        notifications"}}
+    OTHER{{"Other
+        notifications"}}
     S1 & S2 & SN .-> SLACK
     S1 & S2 & SN ---> EMAIL
     S1 & S2 & SN ==> OTHER
@@ -81,21 +81,21 @@ By [connecting all Netdata agents to Netdata Cloud](https://github.com/netdata/n
 
 ```mermaid
 flowchart LR
-    WEB[["`One unified
+    WEB[["One unified
         dashboard
-        for all nodes`"]]
-    NC(["`**Netdata Cloud**
+        for all nodes"]]
+    NC(["<b>Netdata Cloud</b>
         decides which agents
-        need to be queried`"])
-    S1["`Standalone
+        need to be queried"])
+    S1["Standalone
         Netdata
-         1`"]
-    S2["`Standalone
+         1"]
+    S2["Standalone
         Netdata
-         2`"]
-    SN["`Standalone
+         2"]
+    SN["Standalone
         Netdata
-         N`"]
+         N"]
     WEB -->|queries| NC
     NC -->|queries| S1 & S2 & SN
 ```
@@ -104,26 +104,26 @@ Similarly for alerts, Netdata Cloud receives all alert transitions from all agen
 
 ```mermaid
 flowchart LR
-    EMAIL{{"`**e-mail**
-        notifications`"}}
-    MOBILEAPP{{"`**Netdata Mobile App**
-        notifications`"}}
-    SLACK{{"`**Slack**
-        notifications`"}}
-    OTHER{{"`Other
-        notifications`"}}
-    NC(["`**Netdata Cloud**
+    EMAIL{{"<b>e-mail</b>
+        notifications"}}
+    MOBILEAPP{{"<b>Netdata Mobile App</b>
+        notifications"}}
+    SLACK{{"<b>Slack</b>
+        notifications"}}
+    OTHER{{"Other
+        notifications"}}
+    NC(["<b>Netdata Cloud</b>
         applies silencing
-        & user settings`"])
-    S1["`Standalone
+        & user settings"])
+    S1["Standalone
         Netdata
-         1`"]
-    S2["`Standalone
+         1"]
+    S2["Standalone
         Netdata
-         2`"]
-    SN["`Standalone
+         2"]
+    SN["Standalone
         Netdata
-         N`"]
+         N"]
     NC -->|notification| EMAIL & MOBILEAPP & SLACK & OTHER
     S1 & S2 & SN -->|alert transition| NC
 ```
