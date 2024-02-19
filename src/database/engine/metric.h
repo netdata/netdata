@@ -52,7 +52,7 @@ MRG *mrg_create(ssize_t partitions);
 void mrg_destroy(MRG *mrg);
 
 METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric);
-bool mrg_metric_release(MRG *mrg, METRIC *metric);
+void mrg_metric_release(MRG *mrg, METRIC *metric);
 
 METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret);
 METRIC *mrg_metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t section);
