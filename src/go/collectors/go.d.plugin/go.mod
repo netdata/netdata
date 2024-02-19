@@ -42,7 +42,7 @@ require (
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/valyala/fastjson v1.6.4
 	github.com/vmware/govmomi v0.34.2
-	go.mongodb.org/mongo-driver v1.13.1
+	go.mongodb.org/mongo-driver v1.14.0
 	golang.org/x/net v0.21.0
 	golang.org/x/text v0.14.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220504211119-3d4a969bb56b
