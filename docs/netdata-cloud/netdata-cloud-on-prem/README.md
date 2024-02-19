@@ -50,7 +50,7 @@ flowchart TD
     auth -.-> feed
     feed <--> elk
     alerts ----> notifications
-    auth ~~~ spaceroom
+    %% auth ~~~ spaceroom
     emqx <.-> bridges o-..-o pulsar
 ```
 
