@@ -16,5 +16,4 @@ For more information check our [Pricing](https://www.netdata.cloud/pricing/) pag
 
 ## On-Prem Version
 
-How can I get it? 
-<!-- There should probably be a link here -->
+To deploy Netdata Cloud On-premises, take a look at the [related section](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-cloud-on-prem/README.md) on our Documentation.
