@@ -153,7 +153,7 @@ static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric) {
     return refcount;
 }
 
-static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, METRIC *metric) {
+static inline void metric_release(MRG *mrg __maybe_unused, METRIC *metric) {
     spinlock_lock(&metric->refcount_spinlock);
 
     if (metric->refcount <= 0)
@@ -169,6 +169,10 @@ static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, ME
         __atomic_sub_fetch(&mrg->index[partition].stats.entries_referenced, 1, __ATOMIC_RELAXED);
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
+}
+
+static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, METRIC *metric) {
+    metric_release(mrg, metric);
 
     time_t first, last;
     mrg_metric_get_retention(mrg, metric, &first, &last, NULL);
@@ -376,8 +380,8 @@ inline METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
     return metric;
 }
 
-inline bool mrg_metric_release(MRG *mrg, METRIC *metric) {
-    return metric_release_and_can_be_deleted(mrg, metric);
+inline void mrg_metric_release(MRG *mrg, METRIC *metric) {
+    metric_release(mrg, metric);
 }
 
 inline Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
