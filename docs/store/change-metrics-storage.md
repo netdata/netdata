@@ -160,7 +160,7 @@ Once you have decided how to size each tier, open `netdata.conf` with
 and make your changes in the `[db]` subsection. 
 
 Save the file and restart the Agent with `sudo systemctl restart netdata`, or
-the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) 
+the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) 
 for your system, to change the database engine's size.
 
 ## Scaling dedicated parent nodes

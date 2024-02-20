@@ -13,6 +13,20 @@ node_ via individual Netdata Agents. If you want to deploy a new alert across yo
 [infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you must configure each node with the same health configuration
 files.
 
+## Reload health configuration
+
+You do not need to restart the Netdata Agent between changes to health configuration files, such as specific health entities. Instead, you can use `netdatacli` and the `reload-health` option to prevent gaps in metrics collection.
+
+```bash
+sudo netdatacli reload-health
+```
+
+If `netdatacli` doesn't work on your system, send a `SIGUSR2` signal to the daemon, which reloads health configuration without restarting the entire process.
+
+```bash
+killall -USR2 netdata
+```
+
 ## Edit health configuration files
 
 You can configure the Agent's health watchdog service by editing files in two locations:
@@ -183,11 +197,6 @@ In human-readable format:
 
 When you finish writing this new health entity, [reload Netdata's health configuration](#reload-health-configuration) to
 see it live on the local dashboard or Netdata Cloud.
-
-## Reload health configuration
-
-To make any changes to your health configuration live, you must reload Netdata's health monitoring system. To do that
-without restarting all of Netdata, run `netdatacli reload-health` or `killall -USR2 netdata`.
 
 ## Health entity reference
 

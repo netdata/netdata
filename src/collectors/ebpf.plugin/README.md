@@ -899,7 +899,7 @@ node is experiencing high memory usage and there is no obvious culprit to be fou
 
 If with these changes you still suspect eBPF using too much memory, and there is no obvious culprit to be found 
 in the `apps.mem` chart, consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuring-ebpfplugin).
-Next, [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with
+Next, [restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with
 `sudo systemctl restart netdata` to see if system memory usage (see the `system.ram` chart) has dropped significantly.
 
 Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#pid-table-size)

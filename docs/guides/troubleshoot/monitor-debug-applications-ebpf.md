@@ -61,7 +61,7 @@ dev: custom-app
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system, to begin seeing metrics for this particular
+method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to begin seeing metrics for this particular
 group+process. You can also add additional processes to the same group.
 
 You can set up `apps_groups.conf` to more show more precise eBPF metrics for any application or service running on your
@@ -110,7 +110,7 @@ Replace `entry` with `return`:
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
+method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
 
 ## Get familiar with per-application eBPF metrics and charts
 

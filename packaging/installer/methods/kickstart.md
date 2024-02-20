@@ -1,13 +1,3 @@
-<!--
-title: "Install Netdata with kickstart.sh"
-description: "The kickstart.sh script installs Netdata from source, including all dependencies required to connect to Netdata Cloud, with a single command."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kickstart.md"
-sidebar_label: "One line installer (kickstart.sh)"
-learn_status: "Published"
-learn_rel_path: "Installation/Installation methods"
-sidebar_position: 10
--->
-
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
 import { Install, InstallBox } from '@site/src/components/Install/'
 import Tabs from '@theme/Tabs';
@@ -19,28 +9,13 @@ import TabItem from '@theme/TabItem';
 
 `kickstart.sh` is the recommended way of installing Netdata.
 
-This script works on all Linux distributions and macOS environments, by detecting the optimal method of installing Netdata directly to the operating system (it will never install a docker image of Netdata - to run Netdata in a container [check Installing with Docker](https://learn.netdata.cloud/docs/installing/docker)).
-
-If you are installing on macOS, make sure to check the [install documentation for macOS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md) before continuing.
-
-
-## Verify script integrity
-
-To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
-run the following:
-
-```bash
-[ "@KICKSTART_CHECKSUM@" = "$(curl -Ss https://get.netdata.cloud/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
-```
-
-If the script is valid, this command will return `OK, VALID`.
-
+This script works on all Linux distributions and macOS environments, by detecting the optimal method of installing Netdata directly to the operating system.
 
 ## Installation
 
 > :bulb: Tip
 >
-> If you are unsure whether you want nightly or stable releases, read the [installation guide](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#nightly-vs-stable-releases).  
+> If you are unsure whether you want nightly or stable releases, read the [related section](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#nightly-vs-stable-releases) of our Documentation, detailing the pros and cons of each release type.
 
 To install Netdata, run the following as your normal user:
 
@@ -58,10 +33,20 @@ To install Netdata, run the following as your normal user:
 </Tabs>
 
 > :bookmark_tabs: Note
-> 
+>
 > If you plan to also connect the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
 > and `YOUR_ROOM_ID` with the ID of the room you are willing to connect the node to.
 
+## Verify script integrity
+
+To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
+run the following:
+
+```bash
+[ "@KICKSTART_CHECKSUM@" = "$(curl -Ss https://get.netdata.cloud/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+```
+
+If the script is valid, this command will return `OK, VALID`.
 
 ## What does `kickstart.sh` do?
 
@@ -77,6 +62,116 @@ The `kickstart.sh` script does the following after being downloaded and run usin
 - Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated with new nightly
   versions, unless you override that with an [optional parameter](#optional-parameters-to-alter-your-installation).
 - Prints a message whether installation succeeded or failed for QA purposes.
+
+## Start stop or restart the Netdata Agent
+
+You will most often need to _restart_ the Agent to load new or edited configuration files.
+
+> **Note**  
+> Stopping or restarting the Netdata Agent will cause gaps in stored metrics until the `netdata` process initiates collectors and the database engine.
+>
+> You do not need to restart the Netdata Agent between changes to health configuration files, see the relevant section on [reloading health configuration](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#reload-health-configuration).
+
+### Using `systemctl` or `service`
+
+This is the recommended way to start, stop, or restart the Netdata daemon.
+
+- To **start** Netdata, run `sudo systemctl start netdata`.
+- To **stop** Netdata, run `sudo systemctl stop netdata`.
+- To **restart** Netdata, run `sudo systemctl restart netdata`.
+
+If the above commands fail, or you know that you're using a non-systemd system, try using the `service` command:
+
+- Starting: `sudo service netdata start`.
+- Stopping: `sudo service netdata stop`.
+- Restarting: `sudo service netdata restart`.
+
+### Using the `netdata` command
+
+Use the `netdata` command, typically located at `/usr/sbin/netdata`, to start the Netdata daemon:
+
+```bash
+sudo netdata
+```
+
+If you start the daemon this way, close it with `sudo killall netdata`.
+
+### Shutdown using `netdatacli`
+
+The Netdata Agent also comes with a [CLI tool](https://github.com/netdata/netdata/blob/master/src/cli/README.md) capable of performing shutdowns. Start the Agent back up using your preferred method listed above.
+
+```bash
+sudo netdatacli shutdown-agent
+```
+
+## Starting Netdata at boot
+
+In the `system` directory you can find scripts and configurations for the
+various distros.
+
+### systemd
+
+The installer already installs `netdata.service` if it detects a systemd system.
+
+To install `netdata.service` by hand, run:
+
+```sh
+# stop Netdata
+killall netdata
+
+# copy netdata.service to systemd
+cp system/netdata.service /etc/systemd/system/
+
+# let systemd know there is a new service
+systemctl daemon-reload
+
+# enable Netdata at boot
+systemctl enable netdata
+
+# start Netdata
+systemctl start netdata
+```
+
+### init.d
+
+In the system directory you can find `netdata-lsb`. Copy it to the proper place according to your distribution's documentation. For Ubuntu, this can be done via running the following commands as root.
+
+```sh
+# copy the Netdata startup file to /etc/init.d
+cp system/netdata-lsb /etc/init.d/netdata
+
+# make sure it is executable
+chmod +x /etc/init.d/netdata
+
+# enable it
+update-rc.d netdata defaults
+```
+
+### openrc / Gentoo Linux
+
+In the `system` directory you can find `netdata-openrc`. Copy it to the proper
+place according to your distribution documentation.
+
+### CentOS / Red Hat Enterprise Linux
+
+For older versions of RHEL/CentOS that don't have systemd, an init script is included in the system directory. This can be installed by running the following commands as root.
+
+```sh
+# copy the Netdata startup file to /etc/init.d
+cp system/netdata-init-d /etc/init.d/netdata
+
+# make sure it is executable
+chmod +x /etc/init.d/netdata
+
+# enable it
+chkconfig --add netdata
+```
+
+_There have been some recent work on the init script, see the following PR <https://github.com/netdata/netdata/pull/403>_
+
+### Other operating systems
+
+You can start Netdata by running it from `/etc/rc.local` or your system's equivalent.
 
 ## Optional parameters to alter your installation
 
@@ -177,6 +272,7 @@ By default, the agent is sending anonymous telemetry data to help us take identi
   Uninstall an existing installation of Netdata. Fails if there is no existing install.
 
 ### other options
+
 - `--dry-run`
   Show what the installer would do, but don’t actually do any of it.
 - `--dont-start-it`
@@ -204,10 +300,9 @@ should not need to use special values for any of these):
   those to work, or have a different tool to do the same thing on your system, you can specify it here.
 - `DISABLE_TELEMETRY`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.
 
-
 ## Native packages
 
-We publish official DEB/RPM packages for a number of common Linux distributions as part of our releases and nightly
+We publish [official DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md) for a number of common Linux distributions as part of our releases and nightly
 builds. These packages are available for 64-bit x86 systems. Depending on the distribution and release they may
 also be available for 32-bit x86, ARMv7, and AArch64 systems. If a native package is available, it will be used as the
 default installation method. This allows you to handle Netdata updates as part of your usual system update procedure.
@@ -217,7 +312,7 @@ you can do so by adding `--native-only` to the options you pass to the installer
 
 ## Static builds
 
-We publish pre-built static builds of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
+We publish pre-built [static builds](https://github.com/netdata/netdata/blob/master/packaging/makeself/README.md) of Netdata for Linux systems. Currently, these are published for 64-bit x86, ARMv7,
 AArch64, and POWER8+ hardware. These static builds are able to operate in a mostly self-contained manner and only
 require a POSIX compliant shell and a supported init system. These static builds install under `/opt/netdata`. If
 you are on a platform which we provide static builds for but do not provide native packages for, a static build

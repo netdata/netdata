@@ -45,7 +45,7 @@ details see [the requirements](https://github.com/netdata/go.d.plugin/blob/maste
 
 Next, [configure](https://github.com/netdata/go.d.plugin/blob/master/modules/windows/README.md#configuration) the Windows
 collector to point to the URL and port of your exposed endpoint. Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system. You'll start seeing Windows system metrics, such as CPU
+method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system. You'll start seeing Windows system metrics, such as CPU
 utilization, memory, bandwidth per NIC, number of processes, and much more.
 
 For information about collecting metrics from applications _running on Windows systems_, see the [application metrics

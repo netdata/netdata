@@ -164,7 +164,7 @@ modules:
   example: yes
 ```
 
-Then [restart netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for the
+Then [restart netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for the
 change to take effect.
 
 ## Contributing
