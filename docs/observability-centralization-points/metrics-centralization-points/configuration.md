@@ -65,7 +65,7 @@ This example uses self-signed certificates.
 > This section assumes you have read the [Documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md) on how to edit the Netdata configuration files.
 <!-- here we need link to the section that will contain the restarting instructions -->
 
-1. Parent node: generate SSL key and certificate using OpenSSL, then adjust permissions.
+1. Parent node: generate SSL key and certificate using `openssl`, then adjust permissions.
 
     ```bash
     sudo openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout /etc/netdata/ssl/key.pem -out /etc/netdata/ssl/cert.pem
