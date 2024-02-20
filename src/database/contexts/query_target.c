@@ -346,8 +346,10 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
     // cleanup anything we allocated to the retention we will not use
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if (tier_retention[tier].smh)
+        if (tier_retention[tier].smh) {
             tier_retention[tier].eng->api.metric_release(tier_retention[tier].smh);
+            tier_retention[tier].smh = NULL;
+        }
     }
 
     return false;
