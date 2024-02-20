@@ -73,3 +73,25 @@ The query engine of Netdata uses this bit to compute anomaly rates while it exec
 ## What is the Anomaly Rate (AR)?
 
 The Anomaly Rate of a query, is a percentage, representing the number of samples in the query found anomalous, vs the total number of samples participating in the query.
+
+## How it works - a more technical presentation
+
+For each time-series Netdata trains every 3 hours, a `k-means clustering` model, using the last 6 hours of samples collected for it.
+
+Rather than using raw samples of each time-series, the model works on a preprocessed "feature vector" of recent smoothed and differenced values.
+
+This enables the model to detect a wider range of potentially anomalous patterns as opposed to just point anomalies like big spikes or drops.
+
+Some of the types of anomalies Netdata detects are:
+
+1. **Point Anomalies** or **Strange Points**: Single points that represent very big or very small values, not seen before (in some statistical sense).
+2. **Contextual Anomalies** or **Strange Patterns**: Not strange points in their own, but unexpected sequences of points, given the history of the time-series.
+3. **Collective Anomalies** or **Strange Multivariate Patterns**: Neither strange points nor strange patterns, but in global sense something looks off.
+4. **Concept Drifts** or **Strange Trends**: A slow and steady drift to a new state.
+5. **Change Point Detection** or **Strange Step**: A shift occurred and gradually a new normal is established.
+
+For a visual representation, check this infographic:
+
+![](https://user-images.githubusercontent.com/2178292/144414415-275a3477-5b47-43d6-8959-509eb48ebb20.png)
+
+A more detailed explanation can be found on [this (informal) presentation](https://docs.google.com/presentation/d/18zkCvU3nKP-Bw_nQZuXTEa4PIVM6wppH3VUnAauq-RU/edit#slide=id.p).
