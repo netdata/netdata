@@ -56,6 +56,32 @@ Save the file and restart Netdata.
 
 ## Enable TLS/SSL Communication
 
+While encrypting the connection between your parent and child nodes is recommended for security, it's not required to get started.
+
+This example uses self-signed certificates. 
+
+> **Note**  
+> This section assumes you have read the documentation on [how to edit the Netdata configuration files](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md).  
+<!-- here we need link to the section that will contain the restarting instructions -->
+
+1. **Parent node**  
+   To generate an SSL key and certificate using `openssl`, take a look at the related section around [Securing Netdata Agents](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#enable-httpstls-support) in our Documentation.
+
+2. **Child node**  
+   Update `stream.conf` to enable SSL/TLS and allow self-signed certificates. Append ':SSL' to the destination and uncomment 'ssl skip certificate verification'.
+
+    ```conf
+    [stream]
+        enabled = yes
+        destination = 203.0.113.0:SSL
+        ssl skip certificate verification = yes
+        api key = 11111111-2222-3333-4444-555555555555
+    ```
+
+3. Restart the Netdata Agent on both the parent and child nodes, to stream encrypted metrics using TLS/SSL.
+
+
+
 ## Troubleshooting Streaming Connections
 
 You can find any issues related to streaming at Netdata logs.
