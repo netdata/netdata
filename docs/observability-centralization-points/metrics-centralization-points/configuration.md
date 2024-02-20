@@ -72,7 +72,7 @@ This example uses self-signed certificates.
     sudo chown netdata:netdata /etc/netdata/ssl/cert.pem /etc/netdata/ssl/key.pem
     ```
 
-2. Child node: update `stream.conf` to enable SSL/TLS and accommodate self-signed certificates. Append ':SSL' to the destination and uncomment 'ssl skip certificate verification'.
+2. Child node: update `stream.conf` to enable SSL/TLS and allow self-signed certificates. Append ':SSL' to the destination and uncomment 'ssl skip certificate verification'.
 
     ```conf
     [stream]
