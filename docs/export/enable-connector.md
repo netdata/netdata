@@ -24,7 +24,7 @@ Once you understand the process of enabling a connector, you can translate that 
 ## Enable the exporting engine
 
 Use `edit-config` from your
-[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory)
+[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory)
 to open `exporting.conf`:
 
 ```bash
