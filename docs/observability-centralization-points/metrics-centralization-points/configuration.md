@@ -62,7 +62,8 @@ get started.
 This example uses self-signed certificates. 
 
 > **Note**  
-> This section assumes you have read the [Documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md) on how to edit the Netdata configuration files.
+> This section assumes you have read the [Documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md) on how to edit the Netdata configuration files.  
+> Also, make sure you input the proper **install directory** in the commands below, by default we assume your installation directory is `/etc/netdata`.
 <!-- here we need link to the section that will contain the restarting instructions -->
 
 1. Parent node: generate SSL key and certificate using `openssl`, then adjust permissions.
