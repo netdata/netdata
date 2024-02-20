@@ -7,6 +7,7 @@ on:
       - master
     paths: # If any of these files change, we need to regenerate integrations.js.
       - 'src/collectors/**/metadata.yaml'
+      - 'src/go/collectors/**/metadata.yaml'
       - 'src/exporting/**/metadata.yaml'
       - 'src/health/notifications/**/metadata.yaml'
       - 'integrations/templates/**'
@@ -14,7 +15,6 @@ on:
       - 'integrations/deploy.yaml'
       - 'integrations/cloud-notifications/metadata.yaml'
       - 'integrations/gen_integrations.py'
-      - 'packaging/go.d.version'
   workflow_dispatch: null
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref.
   group: integrations-${{ github.ref }}
@@ -31,17 +31,6 @@ jobs:
         with:
           fetch-depth: 1
           submodules: recursive
-      - name: Get Go Ref
-        id: get-go-ref
-        run: echo "go_ref=$(cat packaging/go.d.version)" >> "${GITHUB_ENV}"
-      - name: Checkout Go
-        id: checkout-go
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          path: go.d.plugin
-          repository: netdata/go.d.plugin
-          ref: ${{ env.go_ref }}
       - name: Prepare Dependencies
         id: prep-deps
         run: |

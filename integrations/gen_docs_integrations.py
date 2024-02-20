@@ -5,28 +5,22 @@ import re
 
 # Dictionary responsible for making the symbolic links at the end of the script's run.
 symlink_dict = {}
-am_i_inside_go = "go.d.plugin" in str(Path.cwd())
 
 
 def cleanup():
     """
     clean directories that are either data collection or exporting integrations
     """
-    if am_i_inside_go:
-        for element in Path("modules").glob('**/*/'):
-            if "integrations" in str(element):
-                shutil.rmtree(element)
-    else:
-        for element in Path("src/collectors").glob('**/*/'):
-            # print(element)
-            if "integrations" in str(element):
-                shutil.rmtree(element)
+    paths = {
+        Path('src/collectors'),
+        Path('src/go/collectors'),
+        Path('src/exporting'),
+        Path('integrations/cloud-notifications'),
+    }
 
-        for element in Path("src/exporting").glob('**/*/'):
-            if "integrations" in str(element):
-                shutil.rmtree(element)
-        for element in Path("integrations/cloud-notifications").glob('**/*/'):
-            if "integrations" in str(element) and not "metadata.yaml" in str(element):
+    for p in paths:
+        for element in p.glob('**/*/*'):
+            if "integrations" in element.parts and element.name != "metadata.yaml":
                 shutil.rmtree(element)
 
 
@@ -368,7 +362,7 @@ for integration in integrations:
         path = build_path(meta_yaml)
         write_to_file(path, md, meta_yaml, sidebar_label, community)
 
-    elif not am_i_inside_go:
+    else:
         # kind of specific if clause, so we can avoid running excessive code in the go repo
         if integration['integration_type'] == "exporter":
 

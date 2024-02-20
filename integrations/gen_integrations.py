@@ -14,7 +14,6 @@ from referencing.jsonschema import DRAFT7
 from ruamel.yaml import YAML, YAMLError
 
 AGENT_REPO = 'netdata/netdata'
-GO_REPO = 'netdata/go.d.plugin'
 
 INTEGRATIONS_PATH = Path(__file__).parent
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
@@ -23,7 +22,6 @@ JSON_PATH = INTEGRATIONS_PATH / 'integrations.json'
 CATEGORIES_FILE = INTEGRATIONS_PATH / 'categories.yaml'
 REPO_PATH = INTEGRATIONS_PATH.parent
 SCHEMA_PATH = INTEGRATIONS_PATH / 'schemas'
-GO_REPO_PATH = REPO_PATH / 'go.d.plugin'
 DISTROS_FILE = REPO_PATH / '.github' / 'data' / 'distros.yml'
 METADATA_PATTERN = '*/metadata.yaml'
 
@@ -31,7 +29,7 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
-    (GO_REPO, GO_REPO_PATH / 'modules', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'collectors' / 'go.d.plugin' / 'modules', True),
 ]
 
 DEPLOY_SOURCES = [
@@ -399,10 +397,7 @@ def make_id(meta):
 
 
 def make_edit_link(item):
-    if item['_repo'] == 'netdata/go.d.plugin':
-        item_path = item['_src_path'].relative_to(GO_REPO_PATH)
-    else:
-        item_path = item['_src_path'].relative_to(REPO_PATH)
+    item_path = item['_src_path'].relative_to(REPO_PATH)
 
     return f'https://github.com/{ item["_repo"] }/blob/master/{ item_path }'
 
