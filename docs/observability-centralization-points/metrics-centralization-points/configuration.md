@@ -56,6 +56,47 @@ Save the file and restart Netdata.
 
 ## Enable TLS/SSL Communication
 
+While encrypting the connection between your parent and child nodes is recommended for security, it's not required to
+get started.
+
+This example, uses self-signed certificates. 
+
+> **Note**  
+> This section assumes you have read the [Documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md) on how to edit the Netdata configuration files.
+<!-- here we need link to the section that will contain the restarting instructions -->
+
+On the **parent** node, use OpenSSL to create the key and certificate, then use `chown` to make the new files readable
+by the `netdata` user.
+
+```bash
+sudo openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout /etc/netdata/ssl/key.pem -out /etc/netdata/ssl/cert.pem
+sudo chown netdata:netdata /etc/netdata/ssl/cert.pem /etc/netdata/ssl/key.pem
+```
+
+Next, enforce TLS/SSL on the web server. Open `netdata.conf`, scroll down to the `[web]` section, and look for the `bind
+to` setting. Add `^SSL=force` to turn on TLS/SSL. See the [web serve reference](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#enabling-tls-support) for other TLS/SSL options.
+
+```conf
+[web]
+    bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
+```
+
+Next, connect to the **child** node and open `stream.conf`. Add `:SSL` to the end of the existing `destination` setting
+to connect to the parent using TLS/SSL. Uncomment the `ssl skip certificate verification` line to allow the use of
+self-signed certificates.
+
+```conf
+[stream]
+    enabled = yes
+    destination = 203.0.113.0:SSL
+    ssl skip certificate verification = yes
+    api key = 11111111-2222-3333-4444-555555555555
+```
+
+Restart the Netdata Agent on both the parent and child nodes, to stream encrypted metrics using TLS/SSL.
+<!-- here we need link to installation section that will have restarting for each installation type-->
+
+
 ## Troubleshooting Streaming Connections
 
 You can find any issues related to streaming at Netdata logs.
