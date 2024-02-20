@@ -65,9 +65,7 @@ typedef enum __attribute__ ((__packed__)) storage_priority {
 struct rrddim_tier;
 
 #ifdef ENABLE_DBENGINE
-struct rrdeng_page_descr;
 struct rrdengine_instance;
-struct pg_cache_page_index;
 #endif
 
 // ----------------------------------------------------------------------------
@@ -146,7 +144,6 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type);
 
 #include "contexts/rrdcontext.h"
 
-extern bool unittest_running;
 extern bool dbengine_enabled;
 extern size_t storage_tiers;
 extern bool use_direct_io;
@@ -790,11 +787,7 @@ struct rrdset {
     //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
     struct {
-        char *cache_dir;                                // the directory to store dimensions
-        void *st_on_file;                               // compatibility with V019 RRDSET files
-
         int32_t entries;                                // total number of entries in the data set
-
         int32_t current_entry;                          // the entry that is currently being updated
         // it goes around in a round-robin fashion
     } db;
@@ -1094,8 +1087,6 @@ typedef struct health {
     time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
     STRING *health_default_exec;                   // the full path of the alarms notifications program
     STRING *health_default_recipient;              // the default recipient for all alarms
-    uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
-    uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
     unsigned int health_enabled;                   // 1 when this host has health enabled
     bool use_summary_for_notifications;            // whether or not to use the summary field as a subject for notifications
 } HEALTH;
@@ -1313,7 +1304,6 @@ extern RRDHOST *localhost;
 #define rrdhost_hostname(host) string2str((host)->hostname)
 #define rrdhost_registry_hostname(host) string2str((host)->registry_hostname)
 #define rrdhost_os(host) string2str((host)->os)
-#define rrdhost_tags(host) string2str((host)->tags)
 #define rrdhost_timezone(host) string2str((host)->timezone)
 #define rrdhost_abbrev_timezone(host) string2str((host)->abbrev_timezone)
 #define rrdhost_program_name(host) string2str((host)->program_name)
