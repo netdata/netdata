@@ -4,7 +4,7 @@
 
 Netdata comes with 3 database modes:
 
-1. `dbengine`: the default high-performance multi-tier database of Netdata. Metric samples is cached in memory and saved to disk in multiple tiers, with compression.
+1. `dbengine`: the default high-performance multi-tier database of Netdata. Metric samples are cached in memory and are saved to disk in multiple tiers, with compression.
 2. `ram`: metric samples are stored in ring buffers in memory, with increments of 1024 samples. Metric samples are not committed to disk. Kernel-Same-Page (KSM) can be used to deduplicate Netdata's memory.
 3. `alloc`: metric samples are stored in ring buffers in memory, with flexible increments. Metric samples are not committed to disk.
 
