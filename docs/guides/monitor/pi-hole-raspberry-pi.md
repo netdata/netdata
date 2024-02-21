@@ -81,7 +81,7 @@ service](https://discourse.pi-hole.net/t/how-do-i-configure-my-devices-to-use-pi
 finished setting up Pi-hole at this point.
 
 As far as configuring Netdata to monitor Pi-hole metrics, there's nothing you actually need to do. Netdata's [Pi-hole
-collector](https://github.com/netdata/go.d.plugin/blob/master/modules/pihole/README.md) will autodetect the new service
+collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/pihole/README.md) will autodetect the new service
 running on your Raspberry Pi and immediately start collecting metrics every second.
 
 Restart Netdata with `sudo systemctl restart netdata`, which will then recognize that Pi-hole is running and start a

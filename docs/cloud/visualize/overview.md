@@ -31,7 +31,7 @@ monitor an Apache web server, the **Apache** section still appears and displays 
 One difference between the Netdata Cloud menu and those found in local Agent dashboards is that
 the Overview condenses multiple services, families, or instances into single sections, sub-menus, and associated charts.
 
-For services, let's say you have two concurrent jobs with the [web_log collector](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md), one for Apache and another for Nginx.
+For services, let's say you have two concurrent jobs with the [web_log collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/weblog/README.md), one for Apache and another for Nginx.
 A single-node or local dashboard shows two section, **web_log apache** and **web_log nginx**, whereas the Overview condenses these into a
 single **web_log** section containing composite charts from both jobs.
 
