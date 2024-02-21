@@ -309,7 +309,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
 
     else {
         check_completed_page_consistency(handle);
-
+        mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->pgc_page));
         struct rrdengine_instance *ctx = (struct rrdengine_instance *) mrg_metric_section(main_mrg, handle->metric);
         if (ctx) {
             time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
