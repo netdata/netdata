@@ -11,18 +11,20 @@ def cleanup():
     """
     clean directories that are either data collection or exporting integrations
     """
-    paths = {
-        Path('src/collectors'),
-        Path('src/go/collectors'),
-        Path('src/exporting'),
-        Path('integrations/cloud-notifications'),
-    }
+    for element in Path("src/go/collectors/go.d.plugin/modules").glob('**/*/'):
+        if "integrations" in str(element):
+            shutil.rmtree(element)
+    for element in Path("src/collectors").glob('**/*/'):
+        # print(element)
+        if "integrations" in str(element):
+            shutil.rmtree(element)
 
-    for p in paths:
-        for element in p.glob('**/*/*'):
-            if "integrations" in element.parts and element.name != "metadata.yaml":
-                shutil.rmtree(element)
-
+    for element in Path("src/exporting").glob('**/*/'):
+        if "integrations" in str(element):
+            shutil.rmtree(element)
+    for element in Path("integrations/cloud-notifications").glob('**/*/'):
+        if "integrations" in str(element) and not "metadata.yaml" in str(element):
+            shutil.rmtree(element)
 
 def generate_category_from_name(category_fragment, category_array):
     """
