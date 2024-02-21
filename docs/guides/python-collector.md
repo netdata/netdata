@@ -410,7 +410,7 @@ ORDER = [
 ]
 ```
 
-[Restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see the new humidity
+[Restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with `sudo systemctl restart netdata` to see the new humidity
 chart:
 
 ![A snapshot of the modified chart](https://i.imgur.com/XOeCBmg.png)
@@ -467,7 +467,7 @@ ORDER = [
 ]
 ```
 
-[Restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see the new
+[Restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with `sudo systemctl restart netdata` to see the new
 min/max/average temperature chart with multiple dimensions:
 
 ![A snapshot of the modified chart](https://i.imgur.com/g7E8lnG.png)

@@ -54,7 +54,7 @@ Replace `my_opentsdb_http_instance` with an instance name of your choice, and ch
 address or hostname of your OpenTSDB database.
 
 Restart your Agent with `sudo systemctl restart netdata`, or
-the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system, to begin exporting to your OpenTSDB
+the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to begin exporting to your OpenTSDB
 database. The
 Netdata Agent exports metrics _beginning from the time the process starts_, and because it exports as metrics are
 collected, you should start seeing data in your external database after only a few seconds.
@@ -78,7 +78,7 @@ Replace `my_graphite_instance` with an instance name of your choice, and change 
 address or hostname of your Graphite-supported database.
 
 Restart your Agent with `sudo systemctl restart netdata`, or
-the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system, to begin exporting to your
+the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to begin exporting to your
 Graphite-supported database.
 Because the Agent exports metrics as they're collected, you should start seeing data in your external database after
 only a few seconds.

@@ -60,7 +60,7 @@ static-threaded` setting, and change it to `none`.
     mode = none
 ```
 
-Save and close the editor, then [restart your Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) 
+Save and close the editor, then [restart your Agent](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) 
 using `sudo systemctl
 restart netdata`. If you try to visit the local dashboard to `http://NODE:19999` again, the connection will fail because
 that node no longer serves its local dashboard.

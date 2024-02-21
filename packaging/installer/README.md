@@ -3,23 +3,16 @@ import { InstallRegexLink, InstallBoxRegexLink } from '@site/src/components/Inst
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Install Netdata
+# Netdata Agent Installation
 
-This document will guide you through installing the open-source Netdata monitoring Agent on Linux, Docker, Kubernetes, and many others, often with one command.
+Netdata is very flexible and can be used to monitor all kinds of infrastructure. Read more about possible [Deployment guides](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/README.md) to understand what better suites your needs.
 
-Netdata is very flexible and can be used to monitor all kinds of infrastructure. Read more about possible [Deployment strategies](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/deployment-strategies.md) to understand what better suites your needs.
+## Install through Netdata Cloud
 
-## Get started
+Netdata is a free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from any physical or virtual system (we call them _nodes_). These metrics are organized in an easy-to-use and -navigate interface.
 
-Netdata is a free and open-source (FOSS) monitoring agent that collects thousands of hardware and software metrics from
-any physical or virtual system (we call them _nodes_). These metrics are organized in an easy-to-use and -navigate interface.
-
-Together with [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you can monitor your entire infrastructure in
-real time and troubleshoot problems that threaten the health of your nodes.
-
-Netdata runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices. It
-runs on Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters,
-Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
+Netdata runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
+It runs on Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice platforms (Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with no `sudo` required.
 
 To install Netdata in minutes on your platform:
 
@@ -27,113 +20,27 @@ To install Netdata in minutes on your platform:
 2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform
 3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it
 
-Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts
-in the Overview tab. [Read more about the cloud features](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md).
+Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts in the Overview tab. [Take a look at our Dashboards and Charts](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md) section to read more about Netdata's features.
 
-Where you go from here is based on your use case, immediate needs, and experience with monitoring and troubleshooting,
-but we have some hints on what you might want to do next.
+## Maintaining a Netdata Agent installation
 
-### What's next?
+For actions like starting, stopping, restarting, updating and uninstalling the Netdata Agent take a look at your specific installation platform in the current section of our Documentation.
 
-Explore our [general advanced installation options and troubleshooting](#advanced-installation-options-and-troubleshooting), specific options
-for the [single line installer](#install-on-linux-with-one-line-installer), or [other installation methods](#other-installation-methods).
+## Configuration
 
-#### Configuration
+If you are looking to configure your Netdata Agent installation, refer to the [respective section in our Documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md).
 
-Discover the recommended way to [configure Netdata's settings or behavior](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) using our built-in
-`edit-config` script, then apply that knowledge to mission-critical tweaks, such as [changing how long Netdata stores
-metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
+## Data collection
 
-#### Data collection
+If Netdata didn't autodetect all the hardware, containers, services, or applications running on your node, you should learn more about [how data collectors work](https://github.com/netdata/netdata/blob/master/src/collectors/README.md). If there's a [supported collector](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md) or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
 
-If Netdata didn't autodetect all the hardware, containers, services, or applications running on your node, you should
-learn more about [how data collectors work](https://github.com/netdata/netdata/blob/master/src/collectors/README.md). If there's a [supported
-collector](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md) for metrics you need, [configure the collector](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md)
-or read about its requirements to configure your endpoint to publish metrics in the correct format and endpoint.
+## Alerts & notifications
 
-#### Alerts & notifications
+Netdata comes with hundreds of pre-configured alerts, designed by our monitoring gurus in parallel with our open-source community, but you may want to [edit alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) or [enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
 
-Netdata comes with hundreds of preconfigured alerts, designed by our monitoring gurus in parallel with our open-source
-community, but you may want to [edit alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) or
-[enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
+## Make your deployment production ready
 
-#### Make your deployment production ready
-
-Go through our [deployment strategies](https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/deployment-strategies.md),
-for suggested configuration changes for production deployments.
-
-## Install on Linux with one-line installer
-
-The **recommended** way to install Netdata on a Linux node (physical, virtual, container, IoT) is our one-line
-[kickstart script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md).
-This script automatically installs dependencies and builds Netdata from its source code.
-
-To install, copy the script, paste it into your node's terminal, and hit `Enter` to begin the installation process.
-
- <Tabs>
-  <TabItem value="wget" label=<code>wget</code>>
-
-  <OneLineInstallWget/>
-
-  </TabItem>
-  <TabItem value="curl" label=<code>curl</code>>
-
-  <OneLineInstallCurl/>
-
-  </TabItem>
-</Tabs>
-
-> ### Note
->
-> If you plan to also claim the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space, and `YOUR_ROOM_ID` with the ID of the room you are claiming to.
-> You can leave the room id blank to have your node claimed to the default "All nodes" room.
-
-Jump up to [what's next](#whats-next) to learn how to view your new dashboard and take your next steps in monitoring and
-troubleshooting with Netdata.
-
-## Other installation methods
-
-<InstallRegexLink>
-  <InstallBoxRegexLink
-    to="[](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)"
-    os="Run with Docker"
-    svg="docker" />
-  <InstallBoxRegexLink
-    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md)"
-    os="Deploy on Kubernetes"
-    svg="kubernetes" />
-   <InstallBoxRegexLink
-    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md)"
-    os="Install on macOS"
-    svg="macos" />
-  <InstallBoxRegexLink
-    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)"
-    os="Native DEB/RPM packages"
-    svg="linux" />
-  <InstallBoxRegexLink
-    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)"
-    os="Linux from Git"
-    svg="linux" />
-  <InstallBoxRegexLink
-    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md)"
-    os="Linux from source"
-    svg="linux" />
-  <InstallBoxRegexLink
-    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)"
-    os="Linux for offline nodes"
-    svg="linux" />
-</InstallRegexLink>
-
-- [Native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)
-- [Run with Docker](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)
-- [Deploy on Kubernetes](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md)
-- [Install on macOS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md)
-- [Linux from Git](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)
-- [Linux from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md)
-- [Linux for offline nodes](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)
-
-The full list of all installation methods for various systems is available in [Netdata Learn](https://learn.netdata.cloud),
-under [Installation](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/installation-overview.md).
+Go through our [deployment guides](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/README.md), for suggested configuration changes for production deployments.
 
 ## Advanced installation options and troubleshooting
 

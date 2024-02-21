@@ -2,7 +2,7 @@
 
 The Netdata daemon is practically a synonym for the Netdata Agent, as it controls its 
 entire operation. We support various methods to 
-[start, stop, or restart the daemon](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
+[start, stop, or restart the daemon](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
 
 This document provides some basic information on the command line options, log files, and how to debug and troubleshoot
 
@@ -282,7 +282,7 @@ all programs), edit `netdata.conf` and set:
   process nice level = -1
 ```
 
-then execute this to [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md):
+then execute this to [restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation):
 
 ```sh
 sudo systemctl restart netdata

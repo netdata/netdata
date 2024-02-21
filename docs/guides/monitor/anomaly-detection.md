@@ -53,7 +53,7 @@ Pressing the anomalies icon (next to the information icon in the chart header) w
 
 ## Anomaly Rate Based Alerts
 
-It is possible to use the `anomaly-bit` when defining traditional Alerts within netdata. The `anomaly-bit` is just another `options` parameter that can be passed as part of an [alert line lookup](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md#alert-line-lookup). 
+It is possible to use the `anomaly-bit` when defining traditional Alerts within netdata. The `anomaly-bit` is just another `options` parameter that can be passed as part of an alert line lookup. 
 
 You can see some example ML based alert configurations below:
 

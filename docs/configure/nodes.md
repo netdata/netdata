@@ -98,7 +98,7 @@ method for `edit-config` to write into the config directory. Use your `$EDITOR`,
 > defaulted to `vim` or `nano`. Use `export EDITOR=` to change this temporarily, or edit your shell configuration file
 > to change to permanently.
 
-After you make your changes, you need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl
+After you make your changes, you need to [restart the Agent](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with `sudo systemctl
 restart netdata` or the appropriate method for your system.
 
 Here's an example of editing the node's hostname, which appears in both the local dashboard and in Netdata Cloud.

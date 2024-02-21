@@ -91,7 +91,7 @@ the Netdata service cannot be enabled by default and you must do it manually, us
 > ### Note
 >
 > In some cases a simple restart of the Agent can fix the issue.  
-> Read more about [Starting, Stopping and Restarting the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
+> Read more about [Starting, Stopping and Restarting the Agent](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
 
 #### Troubleshoot connection establishment with Docker
 

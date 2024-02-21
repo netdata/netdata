@@ -53,7 +53,7 @@ comment on settings it does not currently use.
 
 ## Applying changes
 
-After `netdata.conf` has been modified, Netdata needs to be [restarted](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for
+After `netdata.conf` has been modified, Netdata needs to be [restarted](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for
 changes to apply:
 
 ```bash

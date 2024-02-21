@@ -973,7 +973,7 @@ Note that Netdata will report the rate for metrics and counters, even if k6 or a
 sends an _absolute_ number. For example, k6 sends absolute HTTP requests with `http_reqs`, 
 but Netdata visualizes that in `requests/second`.
 
-To enable this StatsD configuration, [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
+To enable this StatsD configuration, [restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
 
 ### Final touches
 
