@@ -63,4 +63,4 @@ In this standard scenario you are backing up your Netdata Agent in case of a nod
     sudo tar -xvpzf /path/to/netdata_backup.tar.gz -C /
     ```
 
-3. [Start the Netdata agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md)
+3. [Start the Netdata agent](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
