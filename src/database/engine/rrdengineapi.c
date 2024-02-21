@@ -312,12 +312,11 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
 
         struct rrdengine_instance *ctx = (struct rrdengine_instance *) mrg_metric_section(main_mrg, handle->metric);
         if (ctx) {
-            time_t old_clean_last_time_s = mrg_metric_get_latest_clean_time_s(main_mrg, handle->metric);
-            time_t last_time_s = pgc_page_end_time_s(handle->pgc_page);
-            bool changed = mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, last_time_s);
+            time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
+            time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
             uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, handle->metric);
-            if (changed && last_time_s > old_clean_last_time_s && update_every_s) {
-                uint64_t add_samples = (last_time_s - old_clean_last_time_s) / update_every_s;
+            if (end_time_s && start_time_s && end_time_s > start_time_s && update_every_s) {
+                uint64_t add_samples = (end_time_s - start_time_s) / update_every_s;
                 __atomic_add_fetch(&ctx->atomic.samples, add_samples, __ATOMIC_RELAXED);
             }
         }
@@ -1179,6 +1178,8 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
 
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
     ctx->atomic.first_time_s = LONG_MAX;
+    ctx->atomic.metrics = 0;
+    ctx->atomic.samples = 0;
 
     if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
         // success - we run this ctx too
