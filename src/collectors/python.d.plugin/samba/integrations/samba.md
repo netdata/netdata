@@ -97,7 +97,7 @@ The `samba` collector is disabled by default. To enable it, use `edit-config` fr
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config python.d.conf
 ```
-Change the value of the `samba` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
+Change the value of the `samba` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
 
 
 #### Permissions and programs
