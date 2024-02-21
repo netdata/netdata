@@ -42,7 +42,7 @@ In this standard scenario you are backing up your Netdata Agent in case of a nod
 
 ### Restoring Netdata
 
-1. Ensure that the Netdata agent is installed and is [stopped](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md)
+1. Ensure that the Netdata agent is installed and is [stopped](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
 
    If you plan to deploy the Agent and restore a backup on top of it, then you might find it helpful to use the [`--dont-start-it`](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems#other-options) option upon installation.
 
