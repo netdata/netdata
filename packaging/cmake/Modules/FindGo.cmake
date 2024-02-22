@@ -15,7 +15,9 @@ if(GO_FOUND)
     return()
 endif()
 
-find_program(GO_EXECUTABLE go PATHS /usr/local/go/bin DOC "Go toolchain")
+# Two passes are needed here so that we prefer a copy in `/usr/local/go/bin` over a system copy.
+find_program(GO_EXECUTABLE go PATHS /usr/local/go/bin DOC "Go toolchain" NO_DEFAULT_PATH)
+find_program(GO_EXECUTABLE go DOC "Go toolchain")
 
 if (GO_EXECUTABLE)
   execute_process(
