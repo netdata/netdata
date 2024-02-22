@@ -14,7 +14,7 @@
 #include <machine/endian.h>
 #endif
 
-#ifdef HAVE_BACKTRACE
+#if !defined(ENABLE_SERNTRY) && defined(HAVE_BACKTRACE)
 #include <execinfo.h>
 #endif
 
@@ -2334,7 +2334,7 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
     char action_result[60+1];
     snprintfz(action_result, 60, "%s:%s", program_name, tag_to_send);
 
-#ifdef HAVE_BACKTRACE
+#if !defined(ENABLE_SERNTRY) && defined(HAVE_BACKTRACE)
     int fd = nd_log.sources[NDLS_DAEMON].fd;
     if(fd == -1)
         fd = STDERR_FILENO;
