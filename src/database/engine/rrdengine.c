@@ -1176,9 +1176,11 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
             bool changed = mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
             if (changed) {
-                uint64_t remove_samples = (uuid_first_t_entry->first_time_s - old_first_time_s) /
-                                          mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
-                __atomic_sub_fetch(&ctx->atomic.samples, remove_samples, __ATOMIC_RELAXED);
+                uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
+                if (update_every_s && old_first_time_s && uuid_first_t_entry->first_time_s > old_first_time_s) {
+                    uint64_t remove_samples = (uuid_first_t_entry->first_time_s - old_first_time_s) / update_every_s;
+                    __atomic_sub_fetch(&ctx->atomic.samples, remove_samples, __ATOMIC_RELAXED);
+                }
             }
             mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         }
