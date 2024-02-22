@@ -312,12 +312,8 @@ while [ -n "${1}" ]; do
       ;;
     "--enable-ml") NETDATA_ENABLE_ML=1 ;;
     "--disable-ml") NETDATA_ENABLE_ML=0 ;;
-    "--enable-lto")
-      # TODO: Needs CMake support
-      ;;
-    "--disable-lto")
-      # TODO: Needs CMake support
-      ;;
+    "--enable-lto") NETDATA_ENABLE_LTO=1 ;;
+    "--disable-lto") NETDATA_ENABLE_LTO=0 ;;
     "--disable-x86-sse")
       # XXX: No longer supported.
       ;;
