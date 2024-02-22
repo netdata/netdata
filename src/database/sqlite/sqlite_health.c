@@ -966,10 +966,6 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.os, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
     rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.host, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
@@ -990,18 +986,6 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
         rc = sqlite3_bind_text(res, ++param, expression_source(ap->config.calculation), -1, SQLITE_STATIC);
     else
         rc = sqlite3_bind_null(res, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.plugin, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.module, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.charts, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 

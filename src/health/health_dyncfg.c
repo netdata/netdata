@@ -17,14 +17,6 @@ static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_ma
     else
         match->on.chart = on;
 
-    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "os", match->os, error);
-    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "host", match->host, error);
-
-    if(match->is_template)
-        JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "instances", match->charts, error);
-
-    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "plugin", match->plugin, error);
-    JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "module", match->module, error);
     JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "host_labels", match->host_labels, error);
     JSONC_PARSE_TXT2PATTERN_OR_ERROR_AND_RETURN(jobj, path, "instance_labels", match->chart_labels, error);
 
@@ -219,11 +211,6 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
             else
                 buffer_json_member_add_string(wb, "on", string2str(ap->match.on.chart));
 
-            buffer_json_member_add_string_or_empty(wb, "os", ap->match.os ? string2str(ap->match.os) : "*");
-            buffer_json_member_add_string_or_empty(wb, "host", ap->match.host ? string2str(ap->match.host) : "*");
-            buffer_json_member_add_string_or_empty(wb, "instances", ap->match.charts ? string2str(ap->match.charts) : "*");
-            buffer_json_member_add_string_or_empty(wb, "plugin", ap->match.charts ? string2str(ap->match.plugin) : "*");
-            buffer_json_member_add_string_or_empty(wb, "module", ap->match.module ? string2str(ap->match.module) : "*");
             buffer_json_member_add_string_or_empty(wb, "host_labels", ap->match.host_labels ? string2str(ap->match.host_labels) : "*");
             buffer_json_member_add_string_or_empty(wb, "instance_labels", ap->match.chart_labels ? string2str(ap->match.chart_labels) : "*");
         }

@@ -210,57 +210,14 @@ static inline char *health_config_add_key_to_values(char *value) {
 }
 
 static void health_prototype_activate_match_patterns(struct rrd_alert_match *am) {
-    if(am->os) {
-        simple_pattern_free(am->os_pattern);
-
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->os));
-        am->os_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
-
-    if(am->host) {
-        simple_pattern_free(am->host_pattern);
-
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->host));
-        am->host_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
-
-    if(am->charts) {
-        simple_pattern_free(am->charts_pattern);
-
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->charts));
-        am->charts_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
-
-    if(am->plugin) {
-        simple_pattern_free(am->plugin_pattern);
-
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->plugin));
-        am->plugin_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
-
-    if(am->module) {
-        simple_pattern_free(am->module_pattern);
-
-        char *tmp = simple_pattern_trim_around_equal(string2str(am->module));
-        am->module_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
-        freez(tmp);
-    }
-
     if(am->host_labels) {
         simple_pattern_free(am->host_labels_pattern);
 
         char *tmp = simple_pattern_trim_around_equal(string2str(am->host_labels));
+        char *tmp2 = health_config_add_key_to_values(tmp);
         am->host_labels_pattern = simple_pattern_create(
-            tmp, NULL, SIMPLE_PATTERN_EXACT, true);
+            tmp2, NULL, SIMPLE_PATTERN_EXACT, true);
+        freez(tmp2);
         freez(tmp);
     }
 
@@ -387,12 +344,6 @@ static bool prototype_matches_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
         !simple_pattern_matches(health_globals.config.enabled_alerts, string2str(ap->config.name)))
         return false;
 
-    if(ap->match.os_pattern && !simple_pattern_matches_string(ap->match.os_pattern, host->os))
-        return false;
-
-    if(ap->match.host_pattern && !simple_pattern_matches_string(ap->match.host_pattern, host->hostname))
-        return false;
-
     if(host->rrdlabels && ap->match.host_labels_pattern &&
         !rrdlabels_match_simple_pattern_parsed(
             host->rrdlabels, ap->match.host_labels_pattern, '=', NULL))
@@ -412,22 +363,6 @@ static bool prototype_matches_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
         ap->match.on.context != st->context)
         return false;
 
-    // match the chart pattern
-    if(ap->match.is_template && ap->match.charts && ap->match.charts_pattern &&
-        !simple_pattern_matches_string(ap->match.charts_pattern, st->id) &&
-        !simple_pattern_matches_string(ap->match.charts_pattern, st->name))
-        return false;
-
-    // match the plugin pattern
-    if(ap->match.plugin && ap->match.plugin_pattern &&
-        !simple_pattern_matches_string(ap->match.plugin_pattern, st->plugin_name))
-        return false;
-
-    // match the module pattern
-    if(ap->match.module && ap->match.module_pattern &&
-        !simple_pattern_matches_string(ap->match.module_pattern, st->module_name))
-        return false;
-
     if (st->rrdlabels && ap->match.chart_labels && ap->match.chart_labels_pattern &&
         !rrdlabels_match_simple_pattern_parsed(
             st->rrdlabels, ap->match.chart_labels_pattern, '=', NULL))
@@ -445,11 +380,6 @@ void health_prototype_copy_match_without_patterns(struct rrd_alert_match *dst, s
     else
         dst->on.chart = string_dup(src->on.chart);
 
-    dst->os = string_dup(src->os);
-    dst->host = string_dup(src->host);
-    dst->charts = string_dup(src->charts);
-    dst->plugin = string_dup(src->plugin);
-    dst->module = string_dup(src->module);
     dst->host_labels = string_dup(src->host_labels);
     dst->chart_labels = string_dup(src->chart_labels);
 }
