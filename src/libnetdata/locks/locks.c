@@ -297,14 +297,15 @@ void spinlock_init(SPINLOCK *spinlock) {
     memset(spinlock, 0, sizeof(SPINLOCK));
 }
 
-void spinlock_lock(SPINLOCK *spinlock) {
+static inline void spinlock_lock_internal(SPINLOCK *spinlock, bool cancelable) {
     static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
 
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t spins = 0;
 #endif
 
-    netdata_thread_disable_cancelability();
+    if (!cancelable)
+        netdata_thread_disable_cancelability();
 
     for(int i = 1;
         __atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) ||
@@ -329,16 +330,19 @@ void spinlock_lock(SPINLOCK *spinlock) {
 #endif
 }
 
-void spinlock_unlock(SPINLOCK *spinlock) {
+static inline void spinlock_unlock_internal(SPINLOCK *spinlock, bool cancelable) {
 #ifdef NETDATA_INTERNAL_CHECKS
     spinlock->locker_pid = 0;
 #endif
     __atomic_clear(&spinlock->locked, __ATOMIC_RELEASE);
-    netdata_thread_enable_cancelability();
+
+    if (!cancelable)
+        netdata_thread_enable_cancelability();
 }
 
-bool spinlock_trylock(SPINLOCK *spinlock) {
-    netdata_thread_disable_cancelability();
+static inline bool spinlock_trylock_internal(SPINLOCK *spinlock, bool cancelable) {
+    if (!cancelable)
+        netdata_thread_disable_cancelability();
 
     if(!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
         !__atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE))
@@ -346,8 +350,39 @@ bool spinlock_trylock(SPINLOCK *spinlock) {
         return true;
 
     // we didn't get the lock
-    netdata_thread_enable_cancelability();
+    if (!cancelable)
+        netdata_thread_enable_cancelability();
     return false;
+}
+
+void spinlock_lock(SPINLOCK *spinlock)
+{
+    spinlock_lock_internal(spinlock, false);
+}
+
+void spinlock_unlock(SPINLOCK *spinlock)
+{
+    spinlock_unlock_internal(spinlock, false);
+}
+
+bool spinlock_trylock(SPINLOCK *spinlock)
+{
+    return spinlock_trylock_internal(spinlock, false);
+}
+
+void spinlock_lock_cancelable(SPINLOCK *spinlock)
+{
+    spinlock_lock_internal(spinlock, true);
+}
+
+void spinlock_unlock_cancelable(SPINLOCK *spinlock)
+{
+    spinlock_unlock_internal(spinlock, true);
+}
+
+bool spinlock_trylock_cancelable(SPINLOCK *spinlock)
+{
+    return spinlock_trylock_internal(spinlock, true);
 }
 
 // ----------------------------------------------------------------------------
