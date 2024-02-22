@@ -2,41 +2,20 @@
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
-      "matchPlugin": {
-        "type": "string",
-        "default": "*",
-        "title": "Plugins",
-        "description": "A simple pattern to match the data collection plugins that are collecting the data this rule is to be applied to. The values it takes are shown as _collect_plugin at the labels filter of the charts on the dashboard."
-      },
-      "matchModule": {
-        "type": "string",
-        "default": "*",
-        "title": "Modules",
-        "description": "A simple pattern to match the data collection plugin modules that are collecting the data this rule is to be applied to. The values it takes are shown as _collect_module at the labels filter of the charts on the dashboard."
-      },
       "matchInstanceLabels": {
         "type": "string",
         "default": "*",
-        "title": "Only for instances with these labels",
-        "description": "A simple pattern to match the instance labels of the instances this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard."
+        "title": "Only for instances with these labels"
       },
       "matchHostLabels": {
         "type": "string",
         "default": "*",
-        "title": "Only for nodes with these host labels",
-        "description": "A simple pattern to match the node labels of the nodes this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard."
+        "title": "Only for nodes with these host labels"
       },
       "matchHostnames": {
         "type": "string",
         "default": "*",
-        "title": "Only for these hostnames",
-        "description": "A simple pattern to match the hostnames of the nodes this rule is to be applied to."
-      },
-      "matchOs": {
-        "type": "string",
-        "default": "*",
-        "title": "Operating Systems",
-        "description": "A simple pattern to match the operating system name of the nodes this rule is to be applied to. The operating system names are available at the global nodes filter, with label key _os_name."
+        "title": "Only for these hostnames"
       },
       "matchInstance": {
         "type": "object",
@@ -49,12 +28,9 @@
             "title": "The instance this rule should be applied to",
             "description": "You can find the instance names on all charts at the instances drop down menu. Do not include the host name in this field."
           },
-          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" },
           "host_labels": { "$ref": "#/definitions/matchHostLabels" },
           "host": { "$ref": "#/definitions/matchHostnames" },
-          "os": { "$ref": "#/definitions/matchOs" },
-          "plugin": { "$ref": "#/definitions/matchPlugin" },
-          "module": { "$ref": "#/definitions/matchModule" }
+          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" }
         },
         "required": [
           "on",
@@ -77,18 +53,14 @@
             "title": "The context of the instances this rule should be applied to",
             "description": "The context is the code-name of each chart on the dashboard, that appears at the chart title bar, between the chart title and its unit of measurement, like: system.cpu, disk.io, etc."
           },
-          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" },
           "host_labels": { "$ref": "#/definitions/matchHostLabels" },
           "host": { "$ref": "#/definitions/matchHostnames" },
+          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" },
           "instances": {
             "type": "string",
             "default": "*",
-            "title": "On on these instances",
-            "description": "A simple pattern to match the instance names of the instances this rule is to be applied to."
-          },
-          "os": { "$ref": "#/definitions/matchOs" },
-          "plugin": { "$ref": "#/definitions/matchPlugin" },
-          "module": { "$ref": "#/definitions/matchModule" }
+            "title": "On on these instances"
+          }
         },
         "required": [
           "on",
@@ -145,18 +117,18 @@
                     "type": "integer",
                     "default": 0,
                     "title": "From",
-                    "description": "The oldest timestamp of the time-series data to be included in the query. Negative values define a duration in seconds in the past (so, -60 means a minute ago)."
+                    "description": "Starting timestamp"
                   },
                   "before": {
                     "type": "integer",
                     "default": 0,
                     "title": "To",
-                    "description": "The newest timestamp of the time-series data to be included in the query. Negative value define a duration in seconds in the past (so, -60 means a minute ago). Zero means now."
+                    "description": "Ending timestamp"
                   },
                   "dimensions": {
                     "type": "string",
                     "title": "Dimensions",
-                    "description": "A simple pattern to match the dimensions that should be included in the query",
+                    "description": "Simple pattern",
                     "default": "*"
                   },
                   "grouping": {
@@ -226,19 +198,19 @@
               },
               "calculation": {
                 "type": "string",
-                "title": "Calculation to Transform the Value",
-                "description": "The database value is available as '$this'. This expression can utilize variables to transform the value of the alert."
+                "title": "Calculation",
+                "description": "An expression to transform the value"
               },
               "units": {
                 "type": "string",
                 "title": "Unit",
-                "description": "The unit of measurement the alert value is expressed with. If unset, the units of the instance the alert is attached to will be used."
+                "description": "of measurement"
               }
             }
           },
           "conditions": {
             "type": "object",
-            "title": "Warning and Critical Conditions",
+            "title": "Conditions to trigger the alert",
             "properties": {
               "warning_condition": {
                 "type": "string",
@@ -275,18 +247,15 @@
             "properties": {
               "execute": {
                 "type": "string",
-                "title": "Command to execute when the alert transitions states",
-                "description": "Leave this empty to get the default alert notification"
+                "title": "Command to execute when the alert transitions states"
               },
               "recipient": {
                 "type": "string",
-                "title": "Recipient(s)",
-                "description": "A space separated list of the recipients of the alert notifications. The special recipient 'silent' prevents this alert from taking any action (i.e. sending notifications)."
+                "title": "Recipient(s)"
               },
               "options": {
                 "type": "array",
                 "title": "Action Options",
-                "description": "Options related to the actions this alert will take.",
                 "uniqueItems": true,
                 "items": {
                   "oneOf": [
@@ -302,23 +271,19 @@
                 "properties": {
                   "up": {
                     "type": "integer",
-                    "title": "Delay when raising",
-                    "description": "Delay the action (notification) that many seconds, when the alert is rising."
+                    "title": "Delay when raising"
                   },
                   "down": {
                     "type": "integer",
-                    "title": "Delay when going Down",
-                    "description": "Delay the action (notification) that many seconds, when the alert is recovering."
+                    "title": "Delay when going Down"
                   },
                   "multiplier": {
                     "type": "number",
-                    "title": "Back-Off",
-                    "description": "Multiply the delay by this number, every time the alert transitions to a new state, while the action (notification) is being delayed."
+                    "title": "Back-Off"
                   },
                   "max": {
                     "type": "integer",
-                    "title": "Max",
-                    "description": "The maximum acceptable delay in seconds, for taking the action (notification)."
+                    "title": "Max"
                   }
                 }
               },
@@ -332,13 +297,11 @@
                   },
                   "warning": {
                     "type": "integer",
-                    "title": "Repeat on Warning",
-                    "description": "The number of seconds to repeat the action while the alert is in warning state"
+                    "title": "Repeat on Warning"
                   },
                   "critical": {
                     "type": "integer",
-                    "title": "Repeat on Critical",
-                    "description": "The number of seconds to repeat the action while the alert is in critical state"
+                    "title": "Repeat on Critical"
                   }
                 }
               }
@@ -366,7 +329,8 @@
             "enabled": {
               "type": "boolean",
               "default": true,
-              "title": "Enabled"
+              "title": "Enabled",
+              "description": "Enable or disable this rule."
             },
             "type": {
               "type": "string",
@@ -376,7 +340,7 @@
               ],
               "default": "template",
               "title": "Type of rule",
-              "description": "Rules can be configured to match a specific instance (like a specific disk), or match all the instances (like all the disks). All rules are always checked against all nodes streamed to this Netdata, so the matching rules include patterns to match both instances and nodes."
+              "description": "Select the type of this rule."
             }
           },
           "required": [ "type", "enabled" ],
@@ -413,29 +377,72 @@
     },
     "rules": {
       "items": {
+        "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
         "enabled": {
+          "ui:classNames": "dyncfg-grid-col-span-1-2",
           "ui:widget": "checkbox"
         },
+        "type": {
+          "ui:classNames": "dyncfg-grid-col-span-3-4",
+          "ui:help": "Rules can be configured to match a specific instance (like a specific disk), or match all the instances (like all the disks). All rules are always checked against all nodes streamed to this Netdata, so the matching rules include patterns to match both instances and nodes."
+        },
         "match": {
-          "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
+          "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
           "on": {
             "ui:classNames": "dyncfg-grid-col-span-1-6"
           },
-          "instance_labels": {
-            "ui:classNames": "dyncfg-grid-col-span-1-2"
-          },
           "host_labels": {
-            "ui:classNames": "dyncfg-grid-col-span-3-2"
+            "ui:help": "A simple pattern to match the node labels of the nodes this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard.",
+            "ui:classNames": "dyncfg-grid-col-span-1-4"
           },
           "host": {
-            "ui:classNames": "dyncfg-grid-col-span-5-2"
+            "ui:classNames": "dyncfg-grid-col-span-5-2",
+            "ui:help": "A simple pattern to match the hostnames of the nodes this rule is to be applied to."
+          },
+          "instance_labels": {
+            "ui:classNames": "dyncfg-grid-col-span-1-4",
+            "ui:help": "A simple pattern to match the instance labels of the instances this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard."
           },
           "instances": {
-            "ui:classNames": "dyncfg-grid-col-span-1-2"
+            "ui:classNames": "dyncfg-grid-col-span-5-2",
+            "ui:help": "A simple pattern to match the instance names of the instances this rule is to be applied to."
           }
         },
         "config": {
-          "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
+          "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
+          "ui:flavour": "tabs",
+          "ui:options": {
+            "tabs": [
+              {
+                "title": "Value",
+                "fields": [
+                  "value"
+                ]
+              },
+              {
+                "title": "Triggers",
+                "fields": [
+                  "conditions"
+                ]
+              },
+              {
+                "title": "Action",
+                "fields": [
+                  "action"
+                ]
+              },
+              {
+                "title": "Description",
+                "fields": [
+                  "summary",
+                  "info",
+                  "type",
+                  "component",
+                  "classification"
+                ]
+              }
+            ]
+          },
           "summary": {
             "ui:classNames": "dyncfg-grid-col-span-1-3"
           },
@@ -455,70 +462,85 @@
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "database_lookup": {
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
+              "ui:Collapsible": true,
+              "ui:InitiallyExpanded": true,
               "after": {
+                "ui:help": "The oldest timestamp of the time-series data to be included in the query. Negative values define a duration in seconds in the past of 'To' (so, -60 means a minute ago from 'To').",
                 "ui:classNames": "dyncfg-grid-col-span-1-1"
               },
               "before": {
+                "ui:help": "The newest timestamp of the time-series data to be included in the query. Negative value define a duration in seconds in the past (so, -60 means a minute ago). Zero means now.",
                 "ui:classNames": "dyncfg-grid-col-span-2-1"
               },
               "dimensions": {
+                "ui:help": "A simple pattern to match the dimensions that should be included in the query",
                 "ui:classNames": "dyncfg-grid-col-span-3-4"
               },
               "grouping": {
-                "ui:classNames": "dyncfg-grid-col-span-1-3"
+                "ui:classNames": "dyncfg-grid-col-span-1-6"
               },
               "options": {
-                "ui:classNames": "dyncfg-grid-col-span-4-3"
+                "ui:classNames": "dyncfg-grid-col-span-1-6"
               }
             },
             "calculation": {
-              "ui:classNames": "dyncfg-grid-col-span-1-5"
+              "ui:help": "The database value is available as '$this'. This expression can utilize variables to transform the value of the alert.",
+              "ui:classNames": "dyncfg-grid-col-span-1-5",
+              "ui:placeholder": "$this * 1"
             },
             "units": {
+              "ui:help": "The unit of measurement the alert value is expressed with. If unset, the units of the instance the alert is attached to will be used.",
               "ui:classNames": "dyncfg-grid-col-span-6-1"
             }
           },
           "conditions": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "warning_condition": {
-              "ui:classNames": "dyncfg-grid-col-span-1-2"
+              "ui:classNames": "dyncfg-grid-col-span-1-3"
             },
             "critical_condition": {
-              "ui:classNames": "dyncfg-grid-col-span-3-2"
+              "ui:classNames": "dyncfg-grid-col-span-4-3"
             },
             "green": {
-              "ui:classNames": "dyncfg-grid-col-span-5-1"
+              "ui:classNames": "dyncfg-grid-col-span-1-3"
             },
             "red": {
-              "ui:classNames": "dyncfg-grid-col-span-6-1"
+              "ui:classNames": "dyncfg-grid-col-span-4-3"
             }
           },
           "action": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "execute": {
-              "ui:classNames": "dyncfg-grid-col-span-1-3"
+              "ui:classNames": "dyncfg-grid-col-span-1-3",
+              "ui:help": "Leave this empty to get the default alert notification"
             },
             "recipient": {
-              "ui:classNames": "dyncfg-grid-col-span-4-1"
+              "ui:classNames": "dyncfg-grid-col-span-4-1",
+              "ui:help": "A space separated list of the recipients of the alert notifications. The special recipient 'silent' prevents this alert from taking any action (i.e. sending notifications)."
             },
             "options": {
-              "ui:classNames": "dyncfg-grid-col-span-5-2"
+              "ui:classNames": "dyncfg-grid-col-span-5-2",
+              "ui:help": "Options related to the actions this alert will take."
             },
             "delay": {
               "ui:Collapsible": true,
               "ui:InitiallyExpanded": false,
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "up": {
-                "ui:classNames": "dyncfg-grid-col-span-1-2"
+                "ui:classNames": "dyncfg-grid-col-span-1-2",
+                "ui:help": "Delay the action (notification) that many seconds, when the alert is rising."
               },
               "down": {
-                "ui:classNames": "dyncfg-grid-col-span-3-2"
+                "ui:classNames": "dyncfg-grid-col-span-3-2",
+                "ui:help": "Delay the action (notification) that many seconds, when the alert is recovering."
               },
               "multiplier": {
-                "ui:classNames": "dyncfg-grid-col-span-5-1"
+                "ui:classNames": "dyncfg-grid-col-span-5-1",
+                "ui:help": "Multiply the delay by this number, every time the alert transitions to a new state, while the action (notification) is being delayed."
               },
               "max": {
-                "ui:classNames": "dyncfg-grid-col-span-6-1"
+                "ui:classNames": "dyncfg-grid-col-span-6-1",
+                "ui:help": "The maximum acceptable delay in seconds, for taking the action (notification)."
               }
             },
             "repeat": {
@@ -529,10 +551,12 @@
                 "ui:classNames": "dyncfg-grid-col-span-1-2"
               },
               "warning": {
-                "ui:classNames": "dyncfg-grid-col-span-3-2"
+                "ui:classNames": "dyncfg-grid-col-span-3-2",
+                "ui:help": "The number of seconds to repeat the action while the alert is in warning state"
               },
               "critical": {
-                "ui:classNames": "dyncfg-grid-col-span-5-2"
+                "ui:classNames": "dyncfg-grid-col-span-5-2",
+                "ui:help": "The number of seconds to repeat the action while the alert is in critical state"
               }
             }
           },
