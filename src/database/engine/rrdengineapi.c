@@ -145,7 +145,10 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, uuid_t *uuid) {
             .latest_update_every_s = 0,
     };
 
-    METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, NULL);
+    bool added;
+    METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+    if (added)
+        __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
     return metric;
 }
 
@@ -307,6 +310,16 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
     else {
         check_completed_page_consistency(handle);
         mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->pgc_page));
+
+        struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+        time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
+        time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
+        uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, handle->metric);
+        if (end_time_s && start_time_s && end_time_s > start_time_s && update_every_s) {
+            uint64_t add_samples = (end_time_s - start_time_s) / update_every_s;
+            __atomic_add_fetch(&ctx->atomic.samples, add_samples, __ATOMIC_RELAXED);
+        }
+
         pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page);
     }
 
@@ -967,6 +980,16 @@ uint64_t rrdeng_disk_space_used(STORAGE_INSTANCE *si) {
     return __atomic_load_n(&ctx->atomic.current_disk_space, __ATOMIC_RELAXED);
 }
 
+uint64_t rrdeng_metrics(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    return __atomic_load_n(&ctx->atomic.metrics, __ATOMIC_RELAXED);
+}
+
+uint64_t rrdeng_samples(STORAGE_INSTANCE *si) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    return __atomic_load_n(&ctx->atomic.samples, __ATOMIC_RELAXED);
+}
+
 time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *si) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
 
@@ -1154,6 +1177,8 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
 
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
     ctx->atomic.first_time_s = LONG_MAX;
+    ctx->atomic.metrics = 0;
+    ctx->atomic.samples = 0;
 
     if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
         // success - we run this ctx too

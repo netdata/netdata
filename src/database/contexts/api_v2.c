@@ -1131,6 +1131,8 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier);
+            buffer_json_member_add_uint64(wb, "metrics", storage_engine_metrics(eng->seb, localhost->db[tier].si));
+            buffer_json_member_add_uint64(wb, "samples", storage_engine_samples(eng->seb, localhost->db[tier].si));
 
             if(used || max) {
                 buffer_json_member_add_uint64(wb, "disk_used", used);

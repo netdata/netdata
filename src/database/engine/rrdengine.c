@@ -1171,7 +1171,17 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     for (size_t index = 0; index < added; ++index) {
         uuid_first_t_entry = &uuid_first_entry_list[index];
         if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
-            mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
+
+            time_t old_first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
+
+            bool changed = mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
+            if (changed) {
+                uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
+                if (update_every_s && old_first_time_s && uuid_first_t_entry->first_time_s > old_first_time_s) {
+                    uint64_t remove_samples = (uuid_first_t_entry->first_time_s - old_first_time_s) / update_every_s;
+                    __atomic_sub_fetch(&ctx->atomic.samples, remove_samples, __ATOMIC_RELAXED);
+                }
+            }
             mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         }
         else {
@@ -1180,6 +1190,14 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             // there is no retention for this metric
             bool has_retention = mrg_metric_zero_disk_retention(main_mrg, uuid_first_t_entry->metric);
             if (!has_retention) {
+                time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
+                time_t last_time_s = mrg_metric_get_latest_time_s(main_mrg, uuid_first_t_entry->metric);
+                time_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
+                if (update_every_s && first_time_s && last_time_s) {
+                    uint64_t remove_samples = (first_time_s - last_time_s) / update_every_s;
+                    __atomic_sub_fetch(&ctx->atomic.samples, remove_samples, __ATOMIC_RELAXED);
+                }
+
                 bool deleted = mrg_metric_release_and_delete(main_mrg, uuid_first_t_entry->metric);
                 if(deleted)
                     deleted_metrics++;
