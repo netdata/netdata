@@ -264,6 +264,7 @@ typedef struct {
     RRDDIM *detector_events_new_anomaly_event_rd;
 
     RRDSET *type_anomaly_rate_rs;
+    SPINLOCK type_anomaly_rate_spinlock;
     std::unordered_map<STRING *, ml_type_anomaly_rate_t> type_anomaly_rate;
 } ml_host_t;
 

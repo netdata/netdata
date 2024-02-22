@@ -288,6 +288,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
             rrdset_flag_set(host->type_anomaly_rate_rs, RRDSET_FLAG_ANOMALY_DETECTION);
         }
 
+        spinlock_lock_cancelable(&host->type_anomaly_rate_spinlock);
         for (auto &entry : host->type_anomaly_rate) {
             ml_type_anomaly_rate_t &type_anomaly_rate = entry.second;
 
@@ -304,6 +305,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
             type_anomaly_rate.anomalous_dimensions = 0;
             type_anomaly_rate.normal_dimensions = 0;
         }
+        spinlock_unlock_cancelable(&host->type_anomaly_rate_spinlock);
 
         rrdset_done(host->type_anomaly_rate_rs);
     }
