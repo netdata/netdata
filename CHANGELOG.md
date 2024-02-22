@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17039](https://github.com/netdata/netdata/pull/17039) ([netdatabot](https://github.com/netdatabot))
 - Improved query target cleanup [\#17038](https://github.com/netdata/netdata/pull/17038) ([stelfrag](https://github.com/stelfrag))
+- Liquify start-stop-restart doc [\#17037](https://github.com/netdata/netdata/pull/17037) ([Ancairon](https://github.com/Ancairon))
 - Code cleanup [\#17036](https://github.com/netdata/netdata/pull/17036) ([stelfrag](https://github.com/stelfrag))
 - Populate the SSL section in Observability and centralization points -… [\#17035](https://github.com/netdata/netdata/pull/17035) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#17034](https://github.com/netdata/netdata/pull/17034) ([netdatabot](https://github.com/netdatabot))
@@ -403,8 +405,6 @@
 - fix: link daemon.log to stderr in docker [\#16447](https://github.com/netdata/netdata/pull/16447) ([ilyam8](https://github.com/ilyam8))
 - Doc change: Curl no longer supports spaces in the URL. [\#16446](https://github.com/netdata/netdata/pull/16446) ([luisj1983](https://github.com/luisj1983))
 - journal estimations [\#16445](https://github.com/netdata/netdata/pull/16445) ([ktsaou](https://github.com/ktsaou))
-- journal startup [\#16443](https://github.com/netdata/netdata/pull/16443) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#16442](https://github.com/netdata/netdata/pull/16442) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
