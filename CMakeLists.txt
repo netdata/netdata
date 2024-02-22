@@ -555,7 +555,7 @@ if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                         set(Protobuf_USE_STATIC_LIBS On)
                 endif()
 
-                find_package(Protobuf)
+                find_package(Protobuf REQUIRED)
         endif()
 
         set(ENABLE_PROTOBUF True)
