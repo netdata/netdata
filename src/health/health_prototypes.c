@@ -209,6 +209,27 @@ static inline char *health_config_add_key_to_values(char *value) {
     return final;
 }
 
+static char *simple_pattern_trim_around_equal(const char *src) {
+    char *store = mallocz(strlen(src) + 1);
+
+    char *dst = store;
+    while (*src) {
+        if (*src == '=') {
+            if (*(dst -1) == ' ')
+                dst--;
+
+            *dst++ = *src++;
+            if (*src == ' ')
+                src++;
+        }
+
+        *dst++ = *src++;
+    }
+    *dst = 0x00;
+
+    return store;
+}
+
 static void health_prototype_activate_match_patterns(struct rrd_alert_match *am) {
     if(am->host_labels) {
         simple_pattern_free(am->host_labels_pattern);
