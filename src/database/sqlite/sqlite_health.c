@@ -966,10 +966,6 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.host, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
     rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.lookup, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
