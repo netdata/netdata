@@ -564,9 +564,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         else if(am->is_template && hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
             PARSE_HEALTH_CONFIG_LINE_STRING(am, on.context);
         }
-        else if(am->is_template && hash == hash_charts && !strcasecmp(key, HEALTH_CHARTS_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(am, chart_labels, "_instance");
-        }
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
             PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(am, host_labels, "_os");
         }
@@ -702,7 +699,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             ac->has_custom_repeat_config = true;
         }
         else {
-            if (strcmp(key, "families") != 0)
+            if (strcmp(key, "families") != 0 && strcmp(key, "charts") != 0)
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm/template '%s' has unknown key '%s'.",
                     line, filename, string2str(ac->name), key);
