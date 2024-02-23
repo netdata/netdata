@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- fix alerts jsonschema prototype for latest dyncfg [\#17047](https://github.com/netdata/netdata/pull/17047) ([ktsaou](https://github.com/ktsaou))
+- Do not use backtrace when sentry is enabled. [\#17043](https://github.com/netdata/netdata/pull/17043) ([vkalintiris](https://github.com/vkalintiris))
+- Keep a count of metrics and samples collected [\#17042](https://github.com/netdata/netdata/pull/17042) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#17039](https://github.com/netdata/netdata/pull/17039) ([netdatabot](https://github.com/netdatabot))
 - Improved query target cleanup [\#17038](https://github.com/netdata/netdata/pull/17038) ([stelfrag](https://github.com/stelfrag))
 - Liquify start-stop-restart doc [\#17037](https://github.com/netdata/netdata/pull/17037) ([Ancairon](https://github.com/Ancairon))
@@ -18,6 +21,7 @@
 - Increase RRD\_ID\_LENGTH\_MAX to 1200 [\#17028](https://github.com/netdata/netdata/pull/17028) ([stelfrag](https://github.com/stelfrag))
 - Fix determining repo root in Coverity scan script. [\#17024](https://github.com/netdata/netdata/pull/17024) ([Ferroin](https://github.com/Ferroin))
 - DYNCFG support deleting orphan configurations [\#17023](https://github.com/netdata/netdata/pull/17023) ([ktsaou](https://github.com/ktsaou))
+- Correctly mark protobuf as required in find\_package. [\#17021](https://github.com/netdata/netdata/pull/17021) ([Ferroin](https://github.com/Ferroin))
 - Protect metric release in dimension delete callback [\#17020](https://github.com/netdata/netdata/pull/17020) ([stelfrag](https://github.com/stelfrag))
 - eBPF - Network Viewer \(Move code\) [\#17018](https://github.com/netdata/netdata/pull/17018) ([thiagoftsm](https://github.com/thiagoftsm))
 - dyncfg: allow tree for individual IDs [\#17017](https://github.com/netdata/netdata/pull/17017) ([ktsaou](https://github.com/ktsaou))
@@ -401,10 +405,6 @@
 - Update non-zero uuid key + child conf. [\#16452](https://github.com/netdata/netdata/pull/16452) ([vkalintiris](https://github.com/vkalintiris))
 - Add missing argument. [\#16451](https://github.com/netdata/netdata/pull/16451) ([vkalintiris](https://github.com/vkalintiris))
 - log flood protection to 1000 log lines / 1 minute [\#16450](https://github.com/netdata/netdata/pull/16450) ([ilyam8](https://github.com/ilyam8))
-- Code cleanup [\#16448](https://github.com/netdata/netdata/pull/16448) ([stelfrag](https://github.com/stelfrag))
-- fix: link daemon.log to stderr in docker [\#16447](https://github.com/netdata/netdata/pull/16447) ([ilyam8](https://github.com/ilyam8))
-- Doc change: Curl no longer supports spaces in the URL. [\#16446](https://github.com/netdata/netdata/pull/16446) ([luisj1983](https://github.com/luisj1983))
-- journal estimations [\#16445](https://github.com/netdata/netdata/pull/16445) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
