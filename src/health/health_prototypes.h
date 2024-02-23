@@ -22,8 +22,8 @@ struct rrd_alert_match {
     STRING *host_labels;                    // the label read from an alarm file
     STRING *chart_labels;                   // the chart label read from an alarm file
 
-    SIMPLE_PATTERN *host_labels_pattern;    // the simple pattern of labels
-    SIMPLE_PATTERN *chart_labels_pattern;   // the simple pattern of chart labels
+    struct pattern_array *host_labels_pattern;
+    struct pattern_array *chart_labels_pattern;
 };
 void rrd_alert_match_cleanup(struct rrd_alert_match *am);
 

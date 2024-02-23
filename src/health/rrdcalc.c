@@ -488,10 +488,10 @@ void rrd_alert_match_cleanup(struct rrd_alert_match *am) {
         string_freez(am->on.chart);
 
     string_freez(am->host_labels);
-    simple_pattern_free(am->host_labels_pattern);
+    pattern_array_free(am->host_labels_pattern);
 
     string_freez(am->chart_labels);
-    simple_pattern_free(am->chart_labels_pattern);
+    pattern_array_free(am->chart_labels_pattern);
 }
 
 void rrd_alert_config_cleanup(struct rrd_alert_config *ac) {
