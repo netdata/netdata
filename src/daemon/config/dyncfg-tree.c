@@ -236,9 +236,9 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
             }
             else if(cmd == DYNCFG_CMD_TEST && df->type == DYNCFG_TYPE_TEMPLATE && df->current.status != DYNCFG_STATUS_ORPHAN) {
                 const char *old_rfe_function = rfe->function;
-                char buf[2048];
-                snprintfz(buf, sizeof(buf), "config %s %s", dictionary_acquired_item_name(item), action);
-                rfe->function = buf;
+                char buf2[2048];
+                snprintfz(buf2, sizeof(buf2), "config %s %s", dictionary_acquired_item_name(item), action);
+                rfe->function = buf2;
                 dictionary_acquired_item_release(dyncfg_globals.nodes, item);
                 item = NULL;
                 code = dyncfg_function_intercept_cb(rfe, data);
