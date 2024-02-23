@@ -355,12 +355,14 @@ endforeach()
 #
 
 if(CMAKE_BUILD_TYPE MATCH Debug)
-        option(ENABLE_LTO "Enble use of LTO when building. Defaults to being enabled if supported for release builds." FALSE)
+        option(DISABLE_LTO "Disable use of LTO when building. Defaults to being enabled if supported for release builds." TRUE)
 else()
-        option(ENABLE_LTO "Enble use of LTO when building. Defaults to being enabled if supported for release builds." TRUE)
+        option(DISABLE_LTO "Disable use of LTO when building. Defaults to being enabled if supported for release builds." FALSE)
 endif()
 
-if(ENABLE_LTO)
+if(DISABLE_LTO)
+        message(STATUS "Not checking for LTO support, as it has been explicitly disabled")
+else()
         include(CheckIPOSupported)
 
         message(CHECK_START "Checking for LTO support")
@@ -372,8 +374,6 @@ if(ENABLE_LTO)
         else()
                 message(CHECK_FAIL "not supported")
         endif()
-else()
-        message(STATUS "Not checking for LTO support, as it has been explicitly disabled")
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
