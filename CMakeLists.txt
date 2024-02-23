@@ -1458,6 +1458,7 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 #
 
 include(NetdataDetectSystemd)
+detect_systemd()
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
