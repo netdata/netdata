@@ -192,7 +192,8 @@ static inline struct pattern_array *health_config_add_key_to_values(struct patte
                 snprintfz(pair, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
             else
                 snprintfz(pair, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
-            pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
+
+            pa = pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
             i=0;
         } else {
             data[i++] = *s;
@@ -205,7 +206,8 @@ static inline struct pattern_array *health_config_add_key_to_values(struct patte
             snprintfz(pair, HEALTH_CONF_MAX_LINE, "!%s=%s ", key, data + 1);
         else
             snprintfz(pair, HEALTH_CONF_MAX_LINE, "%s=%s ", key, data);
-        pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
+
+        pa = pattern_array_add_key_simple_pattern(pa, key, simple_pattern_create(pair, NULL, SIMPLE_PATTERN_EXACT, true));
     }
 
     return pa;
@@ -364,9 +366,8 @@ static bool prototype_matches_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
         !simple_pattern_matches(health_globals.config.enabled_alerts, string2str(ap->config.name)))
         return false;
 
-    if(host->rrdlabels && ap->match.host_labels_pattern &&
-        !rrdlabels_match_simple_pattern_parsed(
-            host->rrdlabels, ap->match.host_labels_pattern, '=', NULL))
+    if (host->rrdlabels && ap->match.host_labels_pattern &&
+        !pattern_array_label_match(ap->match.host_labels_pattern, host->rrdlabels, '=', NULL, rrdlabels_match_simple_pattern_parsed))
         return false;
 
     return true;
@@ -383,9 +384,8 @@ static bool prototype_matches_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
         ap->match.on.context != st->context)
         return false;
 
-    if (st->rrdlabels && ap->match.chart_labels && ap->match.chart_labels_pattern &&
-        !rrdlabels_match_simple_pattern_parsed(
-            st->rrdlabels, ap->match.chart_labels_pattern, '=', NULL))
+    if (st->rrdlabels && ap->match.chart_labels_pattern &&
+        !pattern_array_label_match(ap->match.chart_labels_pattern, st->rrdlabels, '=', NULL, rrdlabels_match_simple_pattern_parsed))
         return false;
 
     return true;

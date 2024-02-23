@@ -1389,7 +1389,7 @@ bool pattern_array_label_match(
     RRDLABELS *labels,
     char eq,
     size_t *searches,
-    bool (*callback_function)(RRDLABELS *, void *, char, size_t *))
+    bool (*callback_function)(RRDLABELS *, SIMPLE_PATTERN *, char, size_t *))
 {
     if (!pa || !labels)
         return true;

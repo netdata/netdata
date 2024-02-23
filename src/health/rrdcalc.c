@@ -289,18 +289,6 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     rc->rrdset = NULL;
 }
 
-static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
-    if (   (rc->chart != st->id)
-        && (rc->chart != st->name))
-        return false;
-
-    if (st->rrdlabels && rc->match.chart_labels_pattern && !rrdlabels_match_simple_pattern_parsed(
-            st->rrdlabels, rc->match.chart_labels_pattern, '=', NULL))
-        return false;
-
-    return true;
-}
-
 // ----------------------------------------------------------------------------
 // RRDCALC rrdhost index management - constructor
 

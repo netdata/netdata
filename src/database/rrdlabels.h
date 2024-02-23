@@ -70,7 +70,7 @@ bool pattern_array_label_match(
     RRDLABELS *labels,
     char eq,
     size_t *searches,
-    bool (*callback_function)(RRDLABELS *, void *, char, size_t *));
+    bool (*callback_function)(RRDLABELS *, SIMPLE_PATTERN *, char, size_t *));
 struct pattern_array *pattern_array_add_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep);
 struct pattern_array *
 pattern_array_add_key_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *pattern);
