@@ -150,7 +150,7 @@ void systemd_journal_dyncfg_init(struct functions_evloop_globals *wg) {
     functions_evloop_dyncfg_add(
         wg,
         "systemd-journal:monitored-directories",
-        "/collectors/logs/systemd-journal",
+        "/logs/systemd-journal",
         DYNCFG_STATUS_RUNNING,
         DYNCFG_TYPE_SINGLE,
         DYNCFG_SOURCE_TYPE_INTERNAL,
