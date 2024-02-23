@@ -204,22 +204,37 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
         action = path;
         path = NULL;
 
-        if(id && *id && dyncfg_cmds2id(action) == DYNCFG_CMD_REMOVE) {
-            const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
-            if(item) {
-                DYNCFG *df = dictionary_acquired_item_value(item);
+        if(id && *id) {
+            DYNCFG_CMDS cmd = dyncfg_cmds2id(action);
+            if(cmd == DYNCFG_CMD_REMOVE) {
+                const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
+                if(item) {
+                    DYNCFG *df = dictionary_acquired_item_value(item);
 
-                if(!rrd_function_available(host, string2str(df->function)))
-                    df->current.status = DYNCFG_STATUS_ORPHAN;
+                    if(!rrd_function_available(host, string2str(df->function)))
+                        df->current.status = DYNCFG_STATUS_ORPHAN;
 
-                bool delete = (df->current.status == DYNCFG_STATUS_ORPHAN);
-                dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+                    bool delete = (df->current.status == DYNCFG_STATUS_ORPHAN);
+                    dictionary_acquired_item_release(dyncfg_globals.nodes, item);
 
-                if(delete) {
-                    dictionary_del(dyncfg_globals.nodes, id);
-                    dyncfg_file_delete(id);
-                    code = dyncfg_default_response(rfe->result.wb, 200, "");
-                    goto cleanup;
+                    if(delete) {
+                        dictionary_del(dyncfg_globals.nodes, id);
+                        dyncfg_file_delete(id);
+                        code = dyncfg_default_response(rfe->result.wb, 200, "");
+                        goto cleanup;
+                    }
+                }
+            }
+            else if(cmd == DYNCFG_CMD_TEST) {
+                const DICTIONARY_ITEM *item = dyncfg_get_template_of_new_job(id);
+                if(item) {
+                    const char *old_rfe_function = rfe->function;
+                    char buf[2048];
+                    snprintfz(buf, sizeof(buf), "config '%s' %s", dictionary_acquired_item_name(item), action);
+                    rfe->function = buf;
+                    code = dyncfg_function_intercept_cb(rfe, data);
+                    rfe->function = old_rfe_function;
+                    return code;
                 }
             }
         }
@@ -228,7 +243,7 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "DYNCFG: unknown config id '%s' in call: '%s'. "
                "This can happen if the plugin that registered the dynamic configuration is not running now.",
-               action, rfe->function);
+               id, rfe->function);
 
         rrd_call_function_error(
             rfe->result.wb,
