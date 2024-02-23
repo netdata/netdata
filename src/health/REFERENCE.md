@@ -242,7 +242,6 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`hosts`](#alert-line-hosts)                        | no              | Which hostnames will run this alert.                                                  |
 | [`plugin`](#alert-line-plugin)                      | no              | Restrict an alert or template to only a certain plugin.                               |
 | [`module`](#alert-line-module)                      | no              | Restrict an alert or template to only a certain module.                               |
-| [`charts`](#alert-line-charts)                      | no              | Restrict an alert or template to only certain charts.                                 |
 | [`lookup`](#alert-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alert-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
 | [`every`](#alert-line-every)                        | no              | The frequency of the alert.                                                           |
@@ -431,19 +430,6 @@ example, you can create an alert that applies only on the `isc_dhcpd` module sta
 ```yaml
 plugin: python.d.plugin
 module: isc_dhcpd
-```
-
-#### Alert line `charts`
-
-The `charts` line filters which chart this alert should apply to. It is only available on entities using the
-[`template`](#alert-line-alarm-or-template) line.
-The value is a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). For
-example, a template that applies to `disk.svctm` (Average Service Time) context, but excludes the disk `sdb` from alerts:
-
-```yaml
-template: disk_svctm_alert
-      on: disk.svctm
-  charts: !*sdb* *
 ```
 
 #### Alert line `lookup`
@@ -896,10 +882,6 @@ context are essentially identical, with the only difference being the family tha
         to the last collected value - as collected and another with suffix `_last_collected_t`
         that resolves to unix timestamp the dimension was last collected (there may be dimensions
         that fail to be collected while others continue normally).
-
-- **family variables**. Families are used to group charts together. For example all `eth0`
-     charts, have `family = eth0`. This index includes all local variables, but if there are
-     overlapping variables, only the first are exposed.
 
 - **host variables**. All the dimensions of all charts, including all alerts, in fullname.
      Fullname is `CHART.VARIABLE`, where `CHART` is either the chart id or the chart name (both
