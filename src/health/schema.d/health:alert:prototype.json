@@ -44,7 +44,7 @@
             "description": "The context is the code-name of each chart on the dashboard, that appears at the chart title bar, between the chart title and its unit of measurement, like: system.cpu, disk.io, etc."
           },
           "host_labels": { "$ref": "#/definitions/matchHostLabels" },
-          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" },
+          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" }
         },
         "required": [
           "on",
