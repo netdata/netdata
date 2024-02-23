@@ -47,6 +47,7 @@ jobs:
             netdata-installer.sh
             .github/workflows/docker.yml
             .github/scripts/docker-test.sh
+            packaging/cmake/
             packaging/docker/
             packaging/installer/
             packaging/runtime-check.sh

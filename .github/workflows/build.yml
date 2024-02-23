@@ -53,6 +53,7 @@ jobs:
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-build.py
             .github/scripts/run-updater-check.sh
+            packaging/cmake/
             packaging/makeself/
             packaging/installer/
             packaging/*.sh
