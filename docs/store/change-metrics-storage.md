@@ -150,7 +150,7 @@ System overhead | 4.4 GiB | Calculated by subtracting all of the above from the 
 
 All the figures above except for the system memory management overhead were retrieved from Netdata itself. 
 The overhead can't be directly calculated, so we subtracted all the other figures from the total Netdata memory usage to get it. 
-This overhead is usually around 50% of the memory actually useable by Netdata, but could range from 20% in small 
+This overhead is usually around 50% of the memory actually usable by Netdata, but could range from 20% in small 
 setups, all the way to 100% in some edge cases. 
 
 ## Configure metric retention

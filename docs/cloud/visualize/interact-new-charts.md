@@ -37,7 +37,7 @@ With a quick glance you have immediate information available at your disposal:
 - [Chart area](#hover-over-the-chart)
 - [Legend with dimensions](#dimensions-bar)
 
-## Fundemental elements
+## Fundamental elements
 
 While Netdata's charts require no configuration and are easy to interact with, they have a lot of underlying complexity. To meaningfully organize charts out of the box based on what's happening in your nodes, Netdata uses the concepts of [dimensions](#dimensions), [contexts](#contexts), and [families](#families).
 
@@ -254,7 +254,7 @@ By default the aggregation applied is _average_ but the user can choose differen
   - you can specify the percentile you want to focus on: 25th, 50th, 75th, 80th, 90th, 95th, 97th, 98th and 99th.  
     <img src="https://user-images.githubusercontent.com/70198089/236410299-de5f3367-f3b0-4beb-a73f-a49007c543d4.png" width="250"/>
 - Trimmed Mean or Trimmed Median
-  - you can choose the percentage of data tha you want to focus on: 1%, 2%, 3%, 5%, 10%, 15%, 20% and 25%.  
+  - you can choose the percentage of data that you want to focus on: 1%, 2%, 3%, 5%, 10%, 15%, 20% and 25%.  
     <img src="https://user-images.githubusercontent.com/70198089/236410858-74b46af9-280a-4ab2-ad26-5a6aa9403aa8.png" width="250"/>
 - Median
 - Standard deviation

@@ -88,7 +88,7 @@ static void test_rbuf_get_linear_insert_range()
     rbuf_bump_head(buff, 3);
     to_write = rbuf_get_linear_insert_range(buff, &ret);
     CHECK_EQ(to_write, buff->head, "write location");
-    CHECK_EQ(ret, 2, "availible to linear write");
+    CHECK_EQ(ret, 2, "available to linear write");
 
     // check behaviour tail > head
     subtest_no++;
@@ -99,7 +99,7 @@ static void test_rbuf_get_linear_insert_range()
     CHECK_EQ(buff->tail, buff->data + 3, "tail_ptr");
     to_write = rbuf_get_linear_insert_range(buff, &ret);
     CHECK_EQ(to_write, buff->head, "write location");
-    CHECK_EQ(ret, 3, "availible to linear write");
+    CHECK_EQ(ret, 3, "available to linear write");
 
 /*    // check behaviour tail and head at last element
     subtest_no++;
@@ -110,7 +110,7 @@ static void test_rbuf_get_linear_insert_range()
     CHECK_EQ(buff->tail, buff->end - 1, "tail_ptr");
     to_write = rbuf_get_linear_insert_range(buff, &ret);
     CHECK_EQ(to_write, buff->head, "write location");
-    CHECK_EQ(ret, 1, "availible to linear write");*/
+    CHECK_EQ(ret, 1, "available to linear write");*/
 
     // check behaviour tail and head at last element
     // after rbuf_bump_tail optimisation that restarts buffer
@@ -123,7 +123,7 @@ static void test_rbuf_get_linear_insert_range()
     CHECK_EQ(buff->tail, buff->data, "tail_ptr");
     to_write = rbuf_get_linear_insert_range(buff, &ret);
     CHECK_EQ(to_write, buff->head, "write location");
-    CHECK_EQ(ret, 5, "availible to linear write");
+    CHECK_EQ(ret, 5, "available to linear write");
 }
 
 #define _CHECK_EQ(x, y, subtest_name, ...) CHECK_EQ_PREFIX(x, y, prefix, subtest_name, ##__VA_ARGS__)
@@ -409,7 +409,7 @@ static void test_rbuf_push()
     CHECK_EQ(buff->head, buff->end - 1, "head_ptr");
     CHECK_EQ(buff->tail, buff->head, "tail_ptr");
     rbuf_bump_tail(buff, 1);
-    //TODO push byte can be usefull optimisation
+    //TODO push byte can be useful optimisation
     ret = rbuf_push(buff, &test_data[9], 1);
     CHECK_EQ(ret, 1, "written 1 byte");
     CHECK_EQ(rbuf_bytes_free(buff), 0, "empty size == 0");
@@ -427,7 +427,7 @@ static void test_rbuf_push()
     CHECK_EQ(buff->tail, buff->head, "tail_ptr");
     rbuf_bump_tail(buff, 3);
     CHECK_EQ(buff->tail, buff->data, "tail_ptr");
-    //TODO push byte can be usefull optimisation
+    //TODO push byte can be useful optimisation
     ret = rbuf_push(buff, &test_data[7], 3);
     CHECK_EQ(ret, 3, "written 3 bytes");
     CHECK_EQ(rbuf_bytes_free(buff), 0, "empty size == 0");
@@ -453,7 +453,7 @@ void test_rbuf_find_bytes()
     int idx;
     char *ptr;
 
-    // make sure needle is wrapped aroung in the buffer
+    // make sure needle is wrapped around in the buffer
     // to test we still can find it
     // target "edle    ne"
     rbuf_bump_head(buff, TEST_RBUF_FIND_BYTES_SIZE / 2);

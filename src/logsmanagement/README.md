@@ -220,14 +220,14 @@ This collector will collect [Apache](https://httpd.apache.org/) and [Nginx](http
 | `unique client IPs - current poll chart` | Enable chart showing unique client IPs in each collection interval. |
 | `unique client IPs - all-time chart` | Enable chart showing unique client IPs since agent startup. It is recommended to set this to `no` as it can have a negative impact on long-term performance. |
 | `http request methods chart` | Enable chart showing HTTP request methods extracted from the collected logs. |
-| `http protocol versions chart` | Enable chart showing HTTP protocol versions exctracted from the collected logs. |
+| `http protocol versions chart` | Enable chart showing HTTP protocol versions extracted from the collected logs. |
 | `bandwidth chart` | Enable chart showing request and response bandwidth extracted from the collected logs. |
 | `timings chart` | Enable chart showing request processing time stats extracted from the collected logs. |
 | `response code families chart` | Enable chart showing response code families (`1xx`, `2xx` etc.) extracted from the collected logs. |
 | `response codes chart` | Enable chart showing response codes extracted from the collected logs. |
 | `response code types chart` | Enable chart showing response code types (`success`, `redirect` etc.) extracted from the collected logs. |
-| `SSL protocols chart` | Enable chart showing SSL protocols (`TLSV1`, `TLSV1.1` etc.) exctracted from the collected logs. |
-| `SSL chipher suites chart` | Enable chart showing SSL chipher suites exctracted from the collected logs. |
+| `SSL protocols chart` | Enable chart showing SSL protocols (`TLSV1`, `TLSV1.1` etc.) extracted from the collected logs. |
+| `SSL chipher suites chart` | Enable chart showing SSL chipher suites extracted from the collected logs. |
 
 <a name="collector-configuration-syslog"/>
 
@@ -267,7 +267,7 @@ This collector will collect logs through a serial interface. See also documentat
 |      :------------:  	| ------------ |
 | `log path` | Absolute path to the device entry, e.g: `/dev/ttyS0`.|
 | `bitrate` | The bitrate for the communication, e.g: 9600, 38400, 115200, etc..|
-| `min bytes` | The minimum bytes the serial interface will wait to receive before it begines to process the log message.|
+| `min bytes` | The minimum bytes the serial interface will wait to receive before it begins to process the log message.|
 | `separator` | An optional separator string to determine the end of a log message.|
 | `format` | Specify the format of the incoming data stream. The only option available is 'json'. Note that Format and Separator cannot be used at the same time.|
 
@@ -321,7 +321,7 @@ Example of configuration for a generic log source collection with custom regex-b
 ```
 [Auth.log]
 	## Example: Log collector that will tail auth.log file and count 
-	## occurences of certain `sudo` commands, using POSIX regular expressions.
+	## occurrences of certain `sudo` commands, using POSIX regular expressions.
 
 	## Required settings
 	enabled = no

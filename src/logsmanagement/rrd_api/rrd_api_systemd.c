@@ -11,7 +11,7 @@ const char *dim_sever_str[SYSLOG_SEVER_ARR_SIZE] = {
     "5:Notice",
     "6:Informational",
     "7:Debug",
-    "uknown"
+    "unknown"
 };
 
 static const char *dim_facil_str[SYSLOG_FACIL_ARR_SIZE] = {
@@ -39,7 +39,7 @@ static const char *dim_facil_str[SYSLOG_FACIL_ARR_SIZE] = {
         "21:local5", 
         "22:local6",
         "23:local7", 
-        "uknown"
+        "unknown"
 };
 
 void systemd_chart_init(struct File_info *p_file_info){
@@ -70,7 +70,7 @@ void systemd_chart_init(struct File_info *p_file_info){
             chart_data->dim_prior[i] = strdupz(dim_id);
             lgs_mng_add_dim(chart_data->dim_prior[i], RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
         }
-        chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1] = "uknown";
+        chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1] = "unknown";
         lgs_mng_add_dim(chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1], 
                         RRD_ALGORITHM_INCREMENTAL_NAME, 1, 1);
 

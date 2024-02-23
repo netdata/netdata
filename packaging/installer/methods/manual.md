@@ -236,7 +236,7 @@ In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
 The Netdata repo consist of the main git tree and it's submodules. Either working on a fork or on the main repo you need to make sure that there
 are no "leftover" artifacts from previous builds and that your submodules are up to date to the **corresponding checkouts**.
 
-> #### Important: Make sure that you have commited any work in progress, before you proceed the with the clean up instruction below
+> #### Important: Make sure that you have committed any work in progress, before you proceed the with the clean up instruction below
 
 
 ```sh

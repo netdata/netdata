@@ -10,7 +10,7 @@
 #include "mqtt_wss_log.h"
 #include "common_public.h"
 
-// All OK call me at your earliest convinience
+// All OK call me at your earliest convenience
 #define MQTT_WSS_OK              0
 /* All OK, poll timeout you requested when calling mqtt_wss_service expired - you might want to know if timeout
  * happened or we got some data or handle same as MQTT_WSS_OK

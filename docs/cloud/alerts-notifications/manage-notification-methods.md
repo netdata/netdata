@@ -65,7 +65,7 @@ Note: If an administrator has disabled a Personal [service level](https://github
    - The list spaces and rooms inside those where you have access to
    - If you're an administrator, Manager or Troubleshooter you'll also see the Rooms from a space you don't have access to on **All Rooms** tab and you can activate notifications for them by joining the room
 1. On this modal you will be able to:
-   1. **Enable/Disable** the notification method for you, this applies accross all spaces and rooms
+   1. **Enable/Disable** the notification method for you, this applies across all spaces and rooms
       - Use the toggle enable or disable the notification method
    1. **Define what notifications you want** to per space/room: All Alerts and unreachable, All Alerts, Critical only or No notifications
    1. **Activate notifications** for a room you aren't a member of

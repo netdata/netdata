@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /** @file  rrd_api_kernel.h
- *  @brief Incudes the structure and function definitions 
+ *  @brief Includes the structure and function definitions 
  *         for the kernel log charts.
  */
 

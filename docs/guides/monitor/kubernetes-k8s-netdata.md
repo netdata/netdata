@@ -39,7 +39,7 @@ To follow this tutorial, you need:
     already.
 -   A working cluster running Kubernetes v1.9 or newer, with a Netdata deployment and connected parent/child nodes. See
     our [Kubernetes deployment process](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md) for details on deployment and
-    conneting to Cloud.
+    connecting to Cloud.
 -   The [`kubectl`](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version
     difference](https://kubernetes.io/docs/tasks/tools/install-kubectl/#before-you-begin) of your cluster, on an
     administrative system.

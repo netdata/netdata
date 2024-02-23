@@ -59,7 +59,7 @@ static void on_walk_cleanup(uv_handle_t* handle, void* data){
 
 /**
  * @brief The main function of the logs management plugin.
- * @details Any static asserts are most likely going to be inluded here. After 
+ * @details Any static asserts are most likely going to be included here. After 
  * any initialisation routines, the default uv_loop_t is executed indefinitely. 
  */
 int main(int argc, char **argv) {

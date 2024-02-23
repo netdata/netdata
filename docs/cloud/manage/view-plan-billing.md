@@ -20,7 +20,7 @@ To see your plan and billing setting you need:
 1. On this page you will be presented with information on your current plan, billing settings, and usage information:
    1. At the top of the page you will see:
       - **Credit** amount which refers to any amount you have available to use on future invoices or subscription changes ([Plan changes and credit balance](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plan-changes-and-credit-balance)) - this is displayed once you have had an active paid subscription with us
-      - **Billing email** the email that was specified to be linked to tha plan subscription. This is where invoices, payment, and subscription-related notifications will be sent.
+      - **Billing email** the email that was specified to be linked to the plan subscription. This is where invoices, payment, and subscription-related notifications will be sent.
       - **Billing options and Invoices** is the link to our billing provider Customer Portal where you will be able to:
          - See the current subscription. There will always be 2 subscriptions active for the two pricing components mentioned on [Netdata Plans documentation page](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plans)
          - Change directly the payment method associated to current subscriptions

@@ -68,7 +68,7 @@ repository are also installed, and will help enable a seamless transition if we 
 
 > ### Note
 >
-> On RHEL and other systems that use the `el` repostiroies, some of the dependencies for Netdata can only be found
+> On RHEL and other systems that use the `el` repositories, some of the dependencies for Netdata can only be found
 > in the EPEL repository, which is not enabled or installed by default on most of these systems. This additional
 > repository _should_ be pulled in automatically by our repository config packages, but if it is not you may need
 > to manually install `epel-release` to be able to successfully install the Netdata packages.
@@ -123,7 +123,7 @@ We do not provide official support for mirroring our repositories,
 but we do have some tips for anyone looking to do so:
 
 - Our `robots.txt` file explicitly disallows indexing, so if you’re using a regular website mirroring tool,
-  you wil need to tell it to ignore `robots.txt` (for example, if using GNU wget, add `-e robots=off` to the
+  you will need to tell it to ignore `robots.txt` (for example, if using GNU wget, add `-e robots=off` to the
   options you pass) to ensure that it actually retrieves everything.
 - Excluding special cases of caching proxies (such as apt-cacher-ng), our repository configuration packages _DO NOT_
   work with custom local mirrors. Thus, you will need to manually configure your systems to use your local mirror.
@@ -137,7 +137,7 @@ but we do have some tips for anyone looking to do so:
 - A full mirror of all of our repositories currently requires up to 100 GB of storage space, though the exact
   amount of space needed fluctuates over time. Because of this, users seeking to mirror our repositories are
   encouraged to mirror only those repositories they actually need instead of mirroring everything.
-- If syncing daily (or less frequently), some time between 05:00 and 08:00 UTC each day is usually the saftest
+- If syncing daily (or less frequently), some time between 05:00 and 08:00 UTC each day is usually the safest
   time to do so, as publishing nightly packages will almost always be done by this point, and publishing of stable
   releases typically happens after that time window.
 - If you intend to use our existing GPG signatures on the repository metadata and packages, you probably also want

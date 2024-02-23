@@ -39,7 +39,7 @@ inspect the state of the container and look at build logs.
 
 ### Detailed explanation
 
-The environments used for building our packages are fully self-contianed Docker images built from [Dockerfiles](https://github.com/netdata/helper-images/tree/master/package-builders)
+The environments used for building our packages are fully self-contained Docker images built from [Dockerfiles](https://github.com/netdata/helper-images/tree/master/package-builders)
 These are published on Docker
 Hub with the image name `netdata/package-builders`, and tagged using the name and version of the distribution
 (with the tag corresponding to the suffix on the associated Dockerfile).

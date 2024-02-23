@@ -26,7 +26,7 @@ else
 fi
 
 # Embed distro info in package name.
-# This is required to make the repo actually standards compliant wthout packageclouds hacks.
+# This is required to make the repo actually standards compliant without packageclouds hacks.
 distid="${DISTNAME}${DISTVERS}"
 for pkg in /usr/src/*.deb; do
   pkgname="$(basename "${pkg}" .deb)"

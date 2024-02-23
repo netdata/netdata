@@ -10,7 +10,7 @@
 # Utility to create self-extracting tar.gz archives.
 # The resulting archive is a file holding the tar.gz archive with
 # a small Shell script stub that uncompresses the archive to a temporary
-# directory and then executes a given script from withing that directory.
+# directory and then executes a given script from within that directory.
 #
 # Makeself home page: https://makeself.io/ - Version history available on GitHub
 #
@@ -18,7 +18,7 @@
 #
 # This software is released under the terms of the GNU GPL version 2 and above
 # Please read the license at http://www.gnu.org/copyleft/gpl.html
-# Self-extracting archives created with this script are explictly NOT released under the term of the GPL
+# Self-extracting archives created with this script are explicitly NOT released under the term of the GPL
 #
 
 MS_VERSION=2.5.0

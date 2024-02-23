@@ -3,7 +3,7 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
-// Key OF HS ARRRAY
+// Key of HS array
 
 struct {
     Pvoid_t JudyHS;
@@ -477,7 +477,7 @@ size_t text_sanitize(unsigned char *dst, const unsigned char *src, size_t dst_si
     unsigned char *end = &d[dst_size - 1];
 
     // copy while converting, but keep only one space
-    // we start wil last_is_space = 1 to skip leading spaces
+    // we start with last_is_space = 1 to skip leading spaces
     int last_is_space = 1;
 
     size_t mblen = 0;

@@ -11,7 +11,7 @@
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
 
-// Forward decleration
+// Forward declaration
 typedef struct log_parser_metrics Log_parser_metrics_t;
 
 
@@ -70,8 +70,8 @@ typedef struct log_parser_config{
 /*                        Web Log parsing and metrics                         */
 /* -------------------------------------------------------------------------- */
 
-#define VHOST_MAX_LEN 255               /**< Max vhost string length, inclding terminating \0 **/
-#define PORT_MAX_LEN 6			        /**< Max port string length, inclding terminating \0 **/
+#define VHOST_MAX_LEN 255               /**< Max vhost string length, including terminating \0 **/
+#define PORT_MAX_LEN 6			        /**< Max port string length, including terminating \0 **/
 #define REQ_SCHEME_MAX_LEN 6			/**< Max request scheme length, including terminating \0 **/
 #define REQ_CLIENT_MAX_LEN 46           /**< https://superuser.com/questions/381022/how-many-characters-can-an-ip-address-be#comment2219013_381029 **/
 #define REQ_METHOD_MAX_LEN 18           /**< Max request method length, including terminating \0 **/
@@ -83,7 +83,7 @@ typedef struct log_parser_config{
 #define REQ_RESP_CODE_MAX_LEN 4         /**< Max size of response code, including terminating \0 **/
 #define REQ_RESP_SIZE_MAX_LEN 11        /**< Max size of request response size, including terminating \0 **/
 #define UPS_RESP_TIME_MAX_LEN 10        /**< Max size of upstream response time, including terminating \0 **/ 
-#define SSL_PROTO_MAX_LEN 8             /**< Max SSL protocol length, inclding terminating \0 **/
+#define SSL_PROTO_MAX_LEN 8             /**< Max SSL protocol length, including terminating \0 **/
 #define SSL_CIPHER_SUITE_MAX_LEN 256    /**< TODO: Check max len for ssl cipher suite string is indeed 256 **/
 
 #define RESP_CODE_ARR_SIZE 501          /**< Size of resp_code array, assuming 500 valid resp codes + 1 for "other" **/
@@ -178,7 +178,7 @@ typedef struct web_log_metrics{
     struct log_parser_metrics_vhosts_array{
         struct log_parser_metrics_vhost{
             char name[VHOST_MAX_LEN];   /**< Name of the vhost **/
-            int count;					/**< Occurences of the vhost **/
+            int count;					/**< Occurrences of the vhost **/
         } *vhosts;
         int size;						/**< Size of vhosts array **/
         int size_max;
@@ -187,7 +187,7 @@ typedef struct web_log_metrics{
         struct log_parser_metrics_port{
             char name[PORT_MAX_LEN];    /**< Number of port in str */
             int port;   				/**< Number of port **/
-            int count;					/**< Occurences of the port **/
+            int count;					/**< Occurrences of the port **/
         } *ports;
         int size;						/**< Size of ports array **/
         int size_max;
@@ -221,7 +221,7 @@ typedef struct web_log_metrics{
     struct log_parser_metrics_resp_code_family{
         int resp_1xx, resp_2xx, resp_3xx, resp_4xx, resp_5xx, other; // TODO: Can there be "other"?
     } resp_code_family; 
-    /**< Array counting occurences of response codes. Each item represents the 
+    /**< Array counting occurrences of response codes. Each item represents the 
      * respective response code by adding 100 to its index, e.g. resp_code[102] 
      * counts how many 202 codes were detected. 501st item represents "other" */  
     unsigned int resp_code[RESP_CODE_ARR_SIZE]; 
@@ -234,7 +234,7 @@ typedef struct web_log_metrics{
     struct log_parser_metrics_ssl_cipher_array{
         struct log_parser_metrics_ssl_cipher{
             char name[SSL_CIPHER_SUITE_MAX_LEN];    /**< SSL cipher suite string **/
-            int count;								/**< Occurences of the SSL cipher **/
+            int count;								/**< Occurrences of the SSL cipher **/
         } *ssl_ciphers;
         int size;									/**< Size of SSL ciphers array **/
     } ssl_cipher_arr;

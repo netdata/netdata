@@ -79,7 +79,7 @@ void https_req_response_free(https_req_response_t *res);
 
 int https_request(https_req_t *request, https_req_response_t *response);
 
-// we expose previously internal parser as this is usefull also from
+// we expose previously internal parser as this is useful also from
 // other parts of the code
 enum http_parse_state {
     HTTP_PARSE_INITIAL = 0,

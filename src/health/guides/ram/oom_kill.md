@@ -25,7 +25,7 @@ Jan 7 07:12:33 mysql-server-01 kernel: Out of Memory: Killed process 3154 (mysql
 
 2. To see the current `oom_score` (the priority in which OOM killer will act upon your processes) run the following script.
 The script prints all running processes (by pid and name) with likelihood to be killed by the OOM killer (second column). 
-The greater the `oom_score` (second column) the more propably to be killed by OOM killer.
+The greater the `oom_score` (second column) the more probably to be killed by OOM killer.
 
 ```
 while read -r pid comm; do  

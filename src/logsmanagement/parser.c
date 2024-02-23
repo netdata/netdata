@@ -1222,7 +1222,7 @@ next_item:
  * @param[in] parser_config Configuration specifying how and what web log 
  * metrics to extract.
  * @param[in] line_parsed Web logs fields extracted from a web log line.
- * @param[out] metrics Web logs metrics exctracted from the \p line_parsed 
+ * @param[out] metrics Web logs metrics extracted from the \p line_parsed 
  * web log fields, using the \p parser_config configuration.
  */
 void extract_web_log_metrics(Log_parser_config_t *parser_config, 
@@ -1478,7 +1478,7 @@ void extract_web_log_metrics(Log_parser_config_t *parser_config,
  * @param[in] line Null-terminated web log line to use in guessing the configuration.
  * @param[in] delimiter Delimiter used to break down \p line in separate fields.
  * @returns Pointer to the web log parser configuration if automatic detection
- * was sucessful, otherwise NULL.
+ * was successful, otherwise NULL.
  */
 Web_log_parser_config_t *auto_detect_web_log_parser_config(char *line, const char delimiter){
     for(int i = 0; csv_auto_format_guess_matrix[i] != NULL; i++){

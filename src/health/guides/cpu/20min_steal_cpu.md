@@ -12,7 +12,7 @@ Generally, if `steal` is high, it could mean one of the following:
 
 - Another VM on the host system is hogging the CPU.
 - System services on the host system are monopolizing the CPU (for example, system updates).
-- The host CPUs are over-committed (you have more virtual CPUs assigned to VMs than the host system has physical CPUs) and too many VMs need CPU time simultanously.
+- The host CPUs are over-committed (you have more virtual CPUs assigned to VMs than the host system has physical CPUs) and too many VMs need CPU time simultaneously.
 - The VM itself has a CPU quota that is too low.
 
 So in the end you can increase the CPU resources of that particular VM, and if the alert persists, move the guest to a different *physical* server.

@@ -35,7 +35,7 @@ AutoReqProv: yes
 %global _have_ml 0
 %endif
 
-# openSUSE requires us to explicity ask for ninja for builds.
+# openSUSE requires us to explicitly ask for ninja for builds.
 # We also need to specify the build directory since they do not.
 %if 0%{?suse_version}
 %global __builder ninja
@@ -871,7 +871,7 @@ Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
 
 %description plugin-slabinfo
- This plugin allows the Netdata Agent to collect perfromance and utilization metrics for the Linux kernel’s SLAB allocator.
+ This plugin allows the Netdata Agent to collect performance and utilization metrics for the Linux kernel’s SLAB allocator.
 
 %pre plugin-slabinfo
 

@@ -197,7 +197,7 @@ USAGE: kickstart.sh [options]
   --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
 
-The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
+The following options are mutually exclusive and specify special operations other than trying to install Netdata normally or update an existing install:
 
   --reinstall                      If there is an existing install, reinstall it instead of trying to update it. If there is no existing install, install netdata normally.
   --reinstall-even-if-unsafe       If there is an existing install, reinstall it instead of trying to update it, even if doing so is known to potentially break things. If there is no existing install, install Netdata normally.
@@ -1556,7 +1556,7 @@ try_package_install() {
   fi
 
   if [ "${ACTION}" = "repositories-only" ]; then
-    progress "Successfully installed repository configuraion package."
+    progress "Successfully installed repository configuration package."
     deferred_warnings
     cleanup
     trap - EXIT
@@ -2076,7 +2076,7 @@ handle_major_version() {
 
   if [ -z "${actual_version}" ]; then
     if [ "${INTERACTIVE}" -eq 0 ]; then
-      fatal "Could not determine the lastest releaase in channel '${RELEASE_CHANNEL}' with major version '${INSTALL_MAJOR_VERSION}'" F0517
+      fatal "Could not determine the latest release in channel '${RELEASE_CHANNEL}' with major version '${INSTALL_MAJOR_VERSION}'" F0517
     else
       if confirm "Unable to determine the correct version to install for major version '${INSTALL_MAJOR_VERSION}'. ${CONTINUE_INSTALL_PROMPT}"; then
         progress "User requested continuing the install with the latest version."

@@ -124,7 +124,7 @@ work this way, as we have unique node identification information under `/var/lib
 
 ### Verify that your IP is not blocked by Netdata Cloud
 
-Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `app.netdata.cloud` due to security concerns, usually because it was spamming Netdata Coud with too many
+Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `app.netdata.cloud` due to security concerns, usually because it was spamming Netdata Cloud with too many
 failed requests (old versions of the agent).
 
 To verify this:

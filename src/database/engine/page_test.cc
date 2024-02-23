@@ -207,7 +207,7 @@ TEST(PGD, MemoryFootprint) {
             footprint = 128 * sizeof(uint32_t);
             break;
         default:
-            fatal("Uknown page type: %uc", pgd_type(pg));
+            fatal("Unknown page type: %uc", pgd_type(pg));
     }
     EXPECT_NEAR(pgd_memory_footprint(pg), footprint, 128);
 
@@ -232,7 +232,7 @@ TEST(PGD, MemoryFootprint) {
             abs_error = footprint / 10;
             break;
         default:
-            fatal("Uknown page type: %uc", pgd_type(pg));
+            fatal("Unknown page type: %uc", pgd_type(pg));
     }
 
     EXPECT_NEAR(pgd_memory_footprint(pg), footprint, abs_error);
@@ -263,7 +263,7 @@ TEST(PGD, DiskFootprint) {
             footprint = 128 * sizeof(uint32_t);
             break;
         default:
-            fatal("Uknown page type: %uc", pgd_type(pg));
+            fatal("Unknown page type: %uc", pgd_type(pg));
     }
     EXPECT_EQ(pgd_disk_footprint(pg), footprint);
 
@@ -286,7 +286,7 @@ TEST(PGD, DiskFootprint) {
             footprint = 2 * (128 * sizeof(uint32_t));
             break;
         default:
-            fatal("Uknown page type: %uc", pgd_type(pg));
+            fatal("Unknown page type: %uc", pgd_type(pg));
     }
     EXPECT_EQ(pgd_disk_footprint(pg), footprint);
 

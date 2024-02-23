@@ -31,7 +31,7 @@ After making changes to the configuration files, perform the following:
 
 -   Test the configuration with `h2o -m test -c /etc/h2o/h2o.conf`
 
--   Restart H2O to apply tha changes with `/etc/init.d/h2o restart` or `service h2o restart`
+-   Restart H2O to apply the changes with `/etc/init.d/h2o restart` or `service h2o restart`
 
 ## Ways to access Netdata via H2O
 

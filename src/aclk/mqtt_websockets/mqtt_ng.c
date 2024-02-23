@@ -1112,7 +1112,7 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
     mqtt_msg_data mqtt_msg = NULL;
 
     BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback );
-    // in case of QOS 0 we can garbage collect immediatelly after sending
+    // in case of QOS 0 we can garbage collect immediately after sending
     uint8_t qos = (publish_flags >> 1) & 0x03;
     if (!qos)
         frag->flags |= BUFFER_FRAG_GARBAGE_COLLECT_ON_SEND;
@@ -2092,7 +2092,7 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 break;
             case MQTT_CPT_PUBLISH:
 #ifdef MQTT_DEBUG_VERBOSE
-                DEBUG("Recevied PUBLISH");
+                DEBUG("Received PUBLISH");
 #endif
                 pub = &client->parser.mqtt_packet.publish;
                 if (pub->qos > 1) {

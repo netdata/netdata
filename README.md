@@ -102,7 +102,7 @@ Dec 11, 2023: [University of Amsterdam published a study](https://twitter.com/IM
 - 🚀 Netdata excels in energy efficiency: **"... Netdata being the most energy-efficient tool ..."**, as the study says.
 - 🚀 Netdata excels in CPU Usage, RAM Usage and Execution Time, and has a similar impact in Network Traffic as Prometheus.
 
-The study did not normalize the results based on the number of metrics collected. Given that Netdata usually collects singificantly more metrics than the other tools, Netdata managed to outperform the other tools, while ingesting a much higher number of metrics. [Read the full study here](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf).
+The study did not normalize the results based on the number of metrics collected. Given that Netdata usually collects significantly more metrics than the other tools, Netdata managed to outperform the other tools, while ingesting a much higher number of metrics. [Read the full study here](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf).
 
 ---
 
@@ -174,12 +174,12 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
 |      **Netdata Cloud<br/>On-Prem**      |                        **Netdata Cloud available for On-Prem installation!**                        | **available** |                 [fill this form](https://www.netdata.cloud/contact-us/?subject=on-prem)                 |
 |          More Customizability           |                           Set default settings for all charts and views!                            |     soon      |                                                 planned                                                 |
 |        Alert Silence Manager R2         |           Improvements to the Alert Silencing Manager with recurring schedules and more!            |     soon      |                                                 planned                                                 |
-|          AWS Integratd billing          |       Run Netdata our your AWS instances and get your billing integrated on your AWS account.       |     soon      |                                                 planned                                                 |
+|          AWS Integrated billing          |       Run Netdata our your AWS instances and get your billing integrated on your AWS account.      |     soon      |                                                 planned                                                 |
 |          State manager monitor          |            Centralized and immediate visibility to the state of your apps and services.             |     soon      |                                                 planned                                                 |
-|                Okta SSO                 |        Faciliate the integration of Netdata into your organzations user management process.         |     soon      |                                                 planned                                                 |
+|                Okta SSO                 |        Facilitate the integration of Netdata into your organizations user management process.       |     soon      |                                                 planned                                                 |
 | Prometheus/OpenMetrics<br/>improvements |               Allow users to configure how metrics should be ingested and presented.                |     soon      |                                                 planned                                                 |
 |                Loki logs                |                     Another Logs integration, bring your Loki logs onto the UI!                     |     soon      |                                               in progress                                               |
-|              Homelab plan               |                    Unlimited Netdata plan targetted for homelabbers or students.                    |     soon      |                                               in progress                                               |
+|              Homelab plan               |                    Unlimited Netdata plan targeted for homelabbers or students.                     |     soon      |                                               in progress                                               |
 |       Easy Custom<br/>Dashboards        |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         |     soon      |                                               in progress                                               |
 |               UCUM Units                |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon      |                                               in progress                                               |
 |            Click to Activate            |                          Configure Alerts and Data Collectors from the UI!                          |     soon      |                                               in progress                                               |
@@ -506,7 +506,7 @@ Using the above, the Netdata Agent on your production system will not use a disk
 
 Netdata is a "ready to use" monitoring solution. Prometheus and Grafana are tools to build your own monitoring solution.
 
-Netdata is also a lot faster, requires singificantly less resources and puts almost no stress on the server it runs. For a performance comparison check [this blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
+Netdata is also a lot faster, requires significantly less resources and puts almost no stress on the server it runs. For a performance comparison check [this blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -523,7 +523,7 @@ So, the biggest difference of Netdata to Prometheus, and Grafana, is that we dec
 
     Maintaining such an index is a challenge: first, because the raw metrics collected do not provide this information, so we have to add it, and second because we need to maintain this index for the lifetime of each metric, which with our current database retention, it is usually more than a year.
 
-    At the same time, Netdata provides better retention than Prometheus due to database tiering, scales easier than Prometheus due to streaming, supports anomaly detection and it has a mertrics scoring engine to find the needle in the haystack when needed.
+    At the same time, Netdata provides better retention than Prometheus due to database tiering, scales easier than Prometheus due to streaming, supports anomaly detection and it has a metrics scoring engine to find the needle in the haystack when needed.
 
   - When compared to Grafana, Netdata is fully automated. Grafana has more customization capabilities than Netdata, but Netdata presents fully functional dashboards by itself and most importantly it gives you the means to understand, analyze, filter, slice and dice the data without the need for you to edit queries or be aware of any peculiarities the underlying metrics may have.
 

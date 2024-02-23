@@ -220,7 +220,7 @@ int test_increment_str_keys() {
     }
 
     if (element_count <= TEST_INCREMENT_STR_KEYS_HASH_SIZE * 2) {
-        // verify we are actually test also iteration trough single bin (when 2 keys have same hash pointing them to same bin)
+        // verify we are actually test also iteration through single bin (when 2 keys have same hash pointing them to same bin)
         PRINT_ERR("For this test to properly test all the hash size needs to be much smaller than all test key count.");
         rc = 1;
         goto test_cleanup;

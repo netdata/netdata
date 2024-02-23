@@ -57,7 +57,7 @@ void circ_buff_search(logs_query_params_t *const p_query_params, struct File_inf
     for(int buff_off = 0; p_file_infos[buff_off]; buff_off++){
         Circ_buff_t *buff = p_file_infos[buff_off]->circ_buff;
         /* TODO: The following 3 operations need to be replaced with a struct
-         * to gurantee atomicity. */
+         * to guarantee atomicity. */
         int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
         int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
         int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);

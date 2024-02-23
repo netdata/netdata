@@ -64,7 +64,7 @@ Here are a few example streaming configurations:
 ![simple-parent-child](https://user-images.githubusercontent.com/43294513/232492152-11886282-29bc-401f-9577-24237e43a501.jpg)
 
 For a predictable number of  non-ephemeral nodes, install a Netdata agent on each node and replicate its data to a 
-Netdata parent, preferrably on a management/admin node outside your production infrastructure.
+Netdata parent, preferably on a management/admin node outside your production infrastructure.
 There are two variations of the basic setup:
 
 - When your nodes have sufficient RAM and disk IO the Netdata agents on each node can run with the default 

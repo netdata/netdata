@@ -15,7 +15,7 @@
 #include "lz4.h"
 #include "parser.h"
 
-#define MAIN_DB                "main.db"        /**< Primary DB with metadata for all the logs managemt collections **/
+#define MAIN_DB                "main.db"        /**< Primary DB with metadata for all the logs management collections **/
 #define MAIN_COLLECTIONS_TABLE "LogCollections" /*< Table name where logs collections metadata is stored in MAIN_DB **/
 #define BLOB_STORE_FILENAME    "logs.bin."      /*< Filename of BLOBs where logs are stored in **/
 #define METADATA_DB_FILENAME   "metadata.db"    /**< Metadata DB for each log collection **/
@@ -868,7 +868,7 @@ int db_init() {
                         rc = uv_fs_unlink(NULL, &unlink_req, blob_delete_path, NULL);
                         uv_fs_req_cleanup(&unlink_req);
                         if (unlikely(rc)) {
-                            // TODO: If there is an erro here, the entry won't be deleted from BLOBS_TABLE. What to do?
+                            // TODO: If there is an error here, the entry won't be deleted from BLOBS_TABLE. What to do?
                             throw_error(p_file_info->chartname, ERR_TYPE_LIBUV, rc, __LINE__, __FILE__, __FUNCTION__);
                             uv_mutex_unlock(p_file_info->db_mut);
                             goto return_error;

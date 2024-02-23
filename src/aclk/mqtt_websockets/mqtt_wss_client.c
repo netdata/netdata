@@ -175,7 +175,7 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
 
     mqtt_wss_client client = mw_calloc(1, sizeof(struct mqtt_wss_client_struct));
     if (!client) {
-        mws_error(log, "OOM alocating mqtt_wss_client");
+        mws_error(log, "OOM allocating mqtt_wss_client");
         goto fail;
     }
 
@@ -596,7 +596,7 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
                             &flag,
                             sizeof(int));
     if (result < 0)
-       mws_error(client->log, "Could not dissable NAGLE");
+       mws_error(client->log, "Could not disable NAGLE");
 
     if (connect(client->sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         mws_error(client->log, "Could not connect to remote endpoint \"%s\", port %d.\n", client->host, client->port);

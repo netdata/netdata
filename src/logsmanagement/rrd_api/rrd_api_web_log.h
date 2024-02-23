@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /** @file  rrd_api_web_log.h
- *  @brief Incudes the structure and function definitions for
+ *  @brief Includes the structure and function definitions for
  *         the web log charts.
  */
 

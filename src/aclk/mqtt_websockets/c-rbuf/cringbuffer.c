@@ -86,8 +86,8 @@ int rbuf_bump_tail(rbuf_t buffer, size_t bytes)
     if(!rbuf_bump_tail_noopt(buffer, bytes))
         return 0;
 
-    // if tail catched up with head
-    // start writing buffer from beggining
+    // if tail caught up with head
+    // start writing buffer from beginning
     // this is not necessary (rbuf must work well without it)
     // but helps to optimize big writes as rbuf_get_linear_insert_range
     // will return bigger continuous region

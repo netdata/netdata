@@ -158,7 +158,7 @@ Then `x 2` is the worst case estimate for the dirty queue. If all collected metr
 
 The memory we saved with the above is used to improve the LRU cache. So, although we reserved 32MiB for the LRU, in bigger setups (Netdata Parents) the LRU grows a lot more, within the limits of the equation.
 
-In practice, the main cache sizes itself with `hot x 1.5` instead of `host x 2`. The reason is that 5% of main cache is reserved for expanding open cache, 5% for expanding extent cache and we need room for the extensive buffers that are allocated in these setups. When the main cache exceeds `hot x 1.5` it enters a mode of critical evictions, and aggresively frees pages from the LRU to maintain a healthy memory footprint within its design limits.
+In practice, the main cache sizes itself with `hot x 1.5` instead of `host x 2`. The reason is that 5% of main cache is reserved for expanding open cache, 5% for expanding extent cache and we need room for the extensive buffers that are allocated in these setups. When the main cache exceeds `hot x 1.5` it enters a mode of critical evictions, and aggressively frees pages from the LRU to maintain a healthy memory footprint within its design limits.
 
 #### Open Cache
 
@@ -166,7 +166,7 @@ Stores metadata about on disk pages. Not the data itself. Only metadata about th
 
 Its primary use is to index information about the open datafile, the one that still accepts new pages. Once that datafile becomes full, all the hot pages of the open cache are indexed in journal v2 files.
 
-The clean queue is an LRU for reducing the journal v2 scans during quering.
+The clean queue is an LRU for reducing the journal v2 scans during querying.
 
 Open cache uses memory ballooning too, like the main cache, based on its own hot pages. Open cache hot size is mainly controlled by the size of the open datafile. This is why on netdata versions with journal files v2, we decreased the maximum datafile size from 1GB to 512MB and we increased the target number of datafiles from 20 to 50.
 

@@ -45,7 +45,7 @@ typedef struct {
 #define c_rhash_iter_t_initialize(p_iter) memset(p_iter, 0, sizeof(c_rhash_iter_t))
 
 /* 
- * goes trough whole hash map and returns every
+ * goes through whole hash map and returns every
  * type uint64 key present/stored
  * 
  * it is not necessary to finish iterating and iterator can be reinitialized

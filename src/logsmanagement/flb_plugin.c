@@ -945,7 +945,7 @@ static int flb_collect_logs_cb(void *record, size_t size, void *data){
                 p_file_info->parser_metrics->systemd->facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
             }
 
-        } else m_assert(0, "shoudn't get here");
+        } else m_assert(0, "shouldn't get here");
 
         char syslog_time_from_flb_time[25]; // 25 just to be on the safe side, but 16 + 1 chars bytes needed only.
         if(unlikely(!syslog_timestamp)){

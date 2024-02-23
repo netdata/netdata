@@ -61,7 +61,7 @@ You can send the notification to multiple recipients by separating the emails wi
 # generic system alerts
 # CPU, disks, network interfaces, entropy, etc
 
-role_recipients_email[sysadmin]="someone@exaple.com someoneelse@example.com"
+role_recipients_email[sysadmin]="someone@example.com someoneelse@example.com"
 ```
 
 Each role may have one or more destinations and one or more notification methods.

@@ -127,7 +127,7 @@ struct journal_v2_header {
     uint32_t metric_offset;
     uint32_t page_count;                // Total count of pages (descriptors @ time)
     uint32_t page_offset;
-    uint32_t extent_trailer_offset;     // CRC for entent list
+    uint32_t extent_trailer_offset;     // CRC for extent list
     uint32_t metric_trailer_offset;     // CRC for metric list
     uint32_t journal_v1_file_size;      // This is the original journal file
     uint32_t journal_v2_file_size;      // This is the total file size

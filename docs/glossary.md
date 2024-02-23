@@ -6,7 +6,7 @@ As such, we want to provide a little Glossary as a reference starting point for 
 
 If you're here looking for the definition of a term you heard elsewhere in our community or products, or if you just want to learn Netdata from the ground up, you've come to the right page.
 
-Use the alphabatized list below to find the answer to your single-term questions, and click the bolded list items to explore more on the topics! We'll be sure to keep constantly updating this list, so if you hear a word that you would like for us to cover, just let us know or submit a request!
+Use the alphabetized list below to find the answer to your single-term questions, and click the bolded list items to explore more on the topics! We'll be sure to keep constantly updating this list, so if you hear a word that you would like for us to cover, just let us know or submit a request!
 
 [A](#a) | [B](#b) | [C](#c) | [D](#d)| [E](#e) | [F](#f) | [G](#g) | [H](#h) | [I](#i) | [J](#j) | [K](#k) | [L](#l) | [M](#m) | [N](#n) | [O](#o) | [P](#p)
 | [Q](#q) | [R](#r) | [S](#s) | [T](#t) | [U](#u) | [V](#v) | [W](#w) | [X](#x) | [Y](#y) | [Z](#z)
@@ -150,7 +150,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Single Node Dashboard**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
 
-<!-- No link for this file in current structure. - **Snapshots** https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md: An image of your dashboard at any given time, whicn can be imiported into any other node running Netdata or used to genereated a PDF file for your records. -->
+<!-- No link for this file in current structure. - **Snapshots** https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md: An image of your dashboard at any given time, which can be imported into any other node running Netdata or used to generated a PDF file for your records. -->
 
 - [**Space**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 

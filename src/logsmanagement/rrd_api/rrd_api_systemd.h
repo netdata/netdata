@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /** @file plugins_logsmanagement_systemd.h
- *  @brief Incudes the structure and function definitions
+ *  @brief Includes the structure and function definitions
  *         for the systemd log charts.
  */
 

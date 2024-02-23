@@ -111,7 +111,7 @@ struct File_info {
     int64_t blob_max_size;                          /**< When the size of a BLOB exceeds this value, the BLOB gets rotated. **/
     int64_t blob_total_size;                        /**< This is the total disk space that all BLOBs occupy (for this log source) **/
     int64_t db_write_duration;                      /**< Holds timing details related to duration of DB write operations **/
-    int64_t db_rotate_duration;                     /**< Holds timing details related to duration of DB rorate operations **/
+    int64_t db_rotate_duration;                     /**< Holds timing details related to duration of DB rotate operations **/
     sqlite3_stmt *stmt_get_log_msg_metadata_asc;    /**< SQLITE3 statement used to retrieve metadata from database during queries in ascending order **/
     sqlite3_stmt *stmt_get_log_msg_metadata_desc;   /**< SQLITE3 statement used to retrieve metadata from database during queries in descending order **/
 

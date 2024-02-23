@@ -423,7 +423,7 @@ static inline size_t get_ws_hdr_size(size_t payload_size)
 int ws_client_send(ws_client *client, enum websocket_opcode frame_type, const char *data, size_t size)
 {
     // TODO maybe? implement fragmenting, it is not necessary though
-    // as both tested MQTT brokers have no reuirement of one MQTT envelope
+    // as both tested MQTT brokers have no requirement of one MQTT envelope
     // be equal to one WebSockets envelope. Therefore there is no need to send
     // one big MQTT message as single fragmented WebSocket envelope
     char hdr[MAX_POSSIBLE_HDR_LEN];
