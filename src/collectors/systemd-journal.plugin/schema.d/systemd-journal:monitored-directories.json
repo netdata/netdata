@@ -4,13 +4,16 @@
     "type": "object",
     "properties": {
       "journalDirectories": {
+        "title": "systemd-journal directories",
+        "description": "The list of directories `systemd-journald` and `systemd-journal-remote` store journal files. Netdata monitors these directories to automatically detect changes.",
         "type": "array",
         "items": {
+          "title": "Absolute Path",
           "type": "string",
-          "pattern": "^/.*$"
+          "pattern": "^/.+$"
         },
         "maxItems": 100,
-	"uniqueItems": true
+	    "uniqueItems": true
       }
     },
     "required": [
@@ -19,6 +22,7 @@
   },
   "uiSchema": {
     "journalDirectories": {
+      "ui:listFlavour": "list",
       "ui:options": {
         "addable": true,
         "orderable": false,

@@ -84,7 +84,7 @@
           },
           "value": {
             "type": "object",
-            "title": "Alert Value Calculation",
+            "title": "",
             "description": "Each alert has a value. This section defines how this value is calculated.",
             "properties": {
               "database_lookup": {
@@ -189,7 +189,7 @@
           },
           "conditions": {
             "type": "object",
-            "title": "Conditions to trigger the alert",
+            "title": "",
             "properties": {
               "warning_condition": {
                 "type": "string",
@@ -221,7 +221,7 @@
           },
           "action": {
             "type": "object",
-            "title": "Alert Action (notification or automation)",
+            "title": "",
             "description": "The action the alert should take when it transitions states",
             "properties": {
               "execute": {
@@ -433,8 +433,8 @@
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "database_lookup": {
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
-              "ui:Collapsible": true,
-              "ui:InitiallyExpanded": true,
+              "ui:collapsible": true,
+              "ui:initiallyExpanded": true,
               "after": {
                 "ui:help": "The oldest timestamp of the time-series data to be included in the query. Negative values define a duration in seconds in the past of 'To' (so, -60 means a minute ago from 'To').",
                 "ui:classNames": "dyncfg-grid-col-span-1-1"
@@ -494,8 +494,8 @@
               "ui:help": "Options related to the actions this alert will take."
             },
             "delay": {
-              "ui:Collapsible": true,
-              "ui:InitiallyExpanded": false,
+              "ui:collapsible": true,
+              "ui:initiallyExpanded": false,
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "up": {
                 "ui:classNames": "dyncfg-grid-col-span-1-2",
@@ -515,8 +515,8 @@
               }
             },
             "repeat": {
-              "ui:Collapsible": true,
-              "ui:InitiallyExpanded": false,
+              "ui:collapsible": true,
+              "ui:initiallyExpanded": false,
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "enabled": {
                 "ui:classNames": "dyncfg-grid-col-span-1-2"
