@@ -274,7 +274,11 @@ cleanup:
 // for which there is no id overloaded.
 
 void dyncfg_host_init(RRDHOST *host) {
+    // IMPORTANT:
+    // This function needs to be async, although it is internal.
+    // The reason is that it can call by itself another function that may or may not be internal (sync).
+
     rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120,
                      1000, "Dynamic configuration", "config", HTTP_ACCESS_ANONYMOUS_DATA,
-                     true, dyncfg_config_execute_cb, host);
+                     false, dyncfg_config_execute_cb, host);
 }
