@@ -76,6 +76,8 @@ const DICTIONARY_ITEM *dyncfg_add_internal(RRDHOST *host, const char *id, const 
 int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data);
 void dyncfg_cleanup(DYNCFG *v);
 
+const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id);
+
 bool dyncfg_is_user_disabled(const char *id);
 
 RRDHOST *dyncfg_rrdhost_by_uuid(UUID *uuid);

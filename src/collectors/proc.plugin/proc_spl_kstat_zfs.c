@@ -272,7 +272,7 @@ int update_zfs_pool_state_chart(const DICTIONARY_ITEM *item, void *pool_p, void 
                     "zfspool",
                     chart_id,
                     NULL,
-                    name,
+                    "state",
                     "zfspool.state",
                     "ZFS pool state",
                     "boolean",

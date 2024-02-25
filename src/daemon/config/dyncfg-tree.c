@@ -204,31 +204,57 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
         action = path;
         path = NULL;
 
-        if(id && *id && dyncfg_cmds2id(action) == DYNCFG_CMD_REMOVE) {
-            const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
-            if(item) {
-                DYNCFG *df = dictionary_acquired_item_value(item);
+        DYNCFG_CMDS cmd = dyncfg_cmds2id(action);
+        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
+        if(!item)
+            item = dyncfg_get_template_of_new_job(id);
 
-                if(!rrd_function_available(host, string2str(df->function)))
-                    df->current.status = DYNCFG_STATUS_ORPHAN;
+        if(item) {
+            DYNCFG *df = dictionary_acquired_item_value(item);
 
+            if(!rrd_function_available(host, string2str(df->function)))
+                df->current.status = DYNCFG_STATUS_ORPHAN;
+
+            if(cmd == DYNCFG_CMD_REMOVE) {
                 bool delete = (df->current.status == DYNCFG_STATUS_ORPHAN);
                 dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+                item = NULL;
 
                 if(delete) {
+                    if(!http_access_user_has_enough_access_level_for_endpoint(rfe->user_access, df->edit_access)) {
+                        code = dyncfg_default_response(
+                            rfe->result.wb, HTTP_RESP_FORBIDDEN,
+                            "dyncfg: you don't have enough edit permissions to execute this command");
+                        goto cleanup;
+                    }
+
                     dictionary_del(dyncfg_globals.nodes, id);
                     dyncfg_file_delete(id);
                     code = dyncfg_default_response(rfe->result.wb, 200, "");
                     goto cleanup;
                 }
             }
+            else if(cmd == DYNCFG_CMD_TEST && df->type == DYNCFG_TYPE_TEMPLATE && df->current.status != DYNCFG_STATUS_ORPHAN) {
+                const char *old_rfe_function = rfe->function;
+                char buf2[2048];
+                snprintfz(buf2, sizeof(buf2), "config %s %s", dictionary_acquired_item_name(item), action);
+                rfe->function = buf2;
+                dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+                item = NULL;
+                code = dyncfg_function_intercept_cb(rfe, data);
+                rfe->function = old_rfe_function;
+                return code;
+            }
+
+            if(item)
+                dictionary_acquired_item_release(dyncfg_globals.nodes, item);
         }
 
         code = HTTP_RESP_NOT_FOUND;
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "DYNCFG: unknown config id '%s' in call: '%s'. "
                "This can happen if the plugin that registered the dynamic configuration is not running now.",
-               action, rfe->function);
+               id, rfe->function);
 
         rrd_call_function_error(
             rfe->result.wb,
@@ -248,7 +274,11 @@ cleanup:
 // for which there is no id overloaded.
 
 void dyncfg_host_init(RRDHOST *host) {
+    // IMPORTANT:
+    // This function needs to be async, although it is internal.
+    // The reason is that it can call by itself another function that may or may not be internal (sync).
+
     rrd_function_add(host, NULL, PLUGINSD_FUNCTION_CONFIG, 120,
                      1000, "Dynamic configuration", "config", HTTP_ACCESS_ANONYMOUS_DATA,
-                     true, dyncfg_config_execute_cb, host);
+                     false, dyncfg_config_execute_cb, host);
 }
