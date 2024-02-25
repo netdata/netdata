@@ -180,7 +180,7 @@ static int dyncfg_intercept_early_error(struct rrd_function_execute *rfe, int rc
     return rc;
 }
 
-static const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id) {
+const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id) {
     char id_copy[strlen(job_id) + 1];
     memcpy(id_copy, job_id, sizeof(id_copy));
 
