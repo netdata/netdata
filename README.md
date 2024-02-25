@@ -41,19 +41,19 @@ It scales nicely from just a single server to thousands of servers, even in comp
   Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
   
 - :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
-  All metrics are collected per second and are on the dashboard immediately after data collection. Netdata is designed to be fast.
+  All metrics are collected per second and are on the dashboard immediately after data collection.
 
 - :face_in_clouds: **Unsupervised Anomaly Detection**<br/>
-  Trains multiple Machine-Learning (ML) models for each metric collected and detects anomalies based on the past behavior of each metric individually.
+  Trains multiple Machine-Learning (ML) models for each metric and uses AI to detect anomalies based on the past behavior of each metric.
 
 - :fire: **Powerful Visualization**<br/>
-  Clear and precise visualization that allows you to quickly understand any dataset, but also to filter, slice and dice the data directly on the dashboard, without the need to learn any query language.
+  Clear and precise visualization allowing you to understand any dataset at first sight, but also to filter, slice and dice the data directly on the dashboard, without the need to learn a query language.
 
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
 
 - 📖 **systemd Journal Logs Explorer**<br/>
-  Provides a `systemd` journal logs explorer, to view, filter and analyze system and applications logs by directly accessing `systemd` journal files on individual hosts and infrastructure-wide logs centralization servers.
+  System and application logs of all servers are available in-real-time, for filtering and analysis, on both individual nodes and infrastructure-wide logs centralization servers.
 
 - :sunglasses: **Low Maintenance**<br/>
   Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
