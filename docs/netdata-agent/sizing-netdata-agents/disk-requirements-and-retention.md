@@ -28,11 +28,11 @@ To configure database mode `ram` or `alloc`, in `netdata.conf`, set the followin
 
 `dbengine` supports up to 5 tiers. By default, 3 tiers are used, like this:
 
-|   Tier   |                                          Resolution                                          | Uncompressed Sample Size |
-|:--------:|:--------------------------------------------------------------------------------------------:|:------------------------:|
-| `tier0`  |            native resolution (metrics collected per-second as stored per-second)             |         4 bytes          |
-| `tier1`  | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |
-| `tier2`  |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |
+|   Tier   |                                          Resolution                                          | Uncompressed Sample Size | Usually On Disk |
+|:--------:|:--------------------------------------------------------------------------------------------:|:------------------------:|:---------------:|
+| `tier0`  |            native resolution (metrics collected per-second as stored per-second)             |         4 bytes          |    0.6 bytes    |
+| `tier1`  | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     6 bytes     |
+| `tier2`  |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |    18 bytes     |
 
 Data are saved to disk compressed, so the actual size on disk varies depending on compression efficiency.
 
@@ -56,40 +56,46 @@ You can find information about the current disk utilization of a Netdata Parent,
 ```json
 {
   // more information about the agent
-  // near the end:
+  // then, near the end:
   "db_size": [
     {
       "tier": 0,
-      "disk_used": 1677528462156,
-      "disk_max": 1677721600000,
-      "disk_percent": 99.9884881,
-      "from": 1706201952,
-      "to": 1707401946,
-      "retention": 1199994,
-      "expected_retention": 1200132,
-      "currently_collected_metrics": 2198777
+      "metrics": 43070,
+      "samples": 88078162001,
+      "disk_used": 41156409552,
+      "disk_max": 41943040000,
+      "disk_percent": 98.1245269,
+      "from": 1705033983,
+      "to": 1708856640,
+      "retention": 3822657,
+      "expected_retention": 3895720,
+      "currently_collected_metrics": 27424
     },
     {
       "tier": 1,
-      "disk_used": 838123468064,
-      "disk_max": 838860800000,
-      "disk_percent": 99.9121032,
-      "from": 1702885800,
-      "to": 1707401946,
-      "retention": 4516146,
-      "expected_retention": 4520119,
-      "currently_collected_metrics": 2198777
+      "metrics": 72987,
+      "samples": 5155155269,
+      "disk_used": 20585157180,
+      "disk_max": 20971520000,
+      "disk_percent": 98.1576785,
+      "from": 1698287340,
+      "to": 1708856640,
+      "retention": 10569300,
+      "expected_retention": 10767675,
+      "currently_collected_metrics": 27424
     },
     {
       "tier": 2,
-      "disk_used": 334329683032,
-      "disk_max": 419430400000,
-      "disk_percent": 79.710408,
-      "from": 1679670000,
-      "to": 1707401946,
-      "retention": 27731946,
-      "expected_retention": 34790871,
-      "currently_collected_metrics": 2198777
+      "metrics": 148234,
+      "samples": 314919121,
+      "disk_used": 5957346684,
+      "disk_max": 10485760000,
+      "disk_percent": 56.8136853,
+      "from": 1667808000,
+      "to": 1708856640,
+      "retention": 41048640,
+      "expected_retention": 72251324,
+      "currently_collected_metrics": 27424
     }
   ]
 }
@@ -98,6 +104,8 @@ You can find information about the current disk utilization of a Netdata Parent,
 In this example:
 
 - `tier` is the database tier.
+- `metrics` is the number of unique time-series in the database.
+- `samples` is the number of samples in the database.
 - `disk_used` is the currently used disk space in bytes.
 - `disk_max` is the configured max disk space in bytes.
 - `disk_percent` is the current disk space utilization for this tier.
@@ -107,21 +115,13 @@ In this example:
 - `expected_retention` is the expected retention in seconds when `disk_percent` will be 100 (divide by 3600 for hours, divide by 86400 for days).
 - `currently_collected_metrics` is the number of unique time-series currently being collected for this tier.
 
-The estimated number of samples on each tier can be calculated as follows:
-
-```
-estimasted number of samples = retention / sample duration * currently_collected_metrics
-```
-
 So, for our example above:
 
-|  Tier   | Sample Duration (seconds) | Estimated Number of Samples | Disk Space Used | Current Retention (days) | Expected Retention (days) | Bytes Per Sample |
-|:-------:|:-------------------------:|:---------------------------:|:---------------:|:------------------------:|:-------------------------:|:----------------:|
-| `tier0` |             1             |    2.64 trillion samples    |    1.56 TiB     |           13.8           |           13.9            |       0.64       |
-| `tier1` |            60             |    165.5 billion samples    |     780 GiB     |           52.2           |           52.3            |       5.01       |
-| `tier2` |           3600            |    16.9 billion samples     |     311 GiB     |          320.9           |           402.7           |      19.73       |
-
-Note: as you can see in this example, the disk footprint per sample of `tier2` is bigger than the uncompressed sample size (19.73 bytes vs 16 bytes). This is due to the fact that samples are organized into pages and pages into extents. When Netdata is restarted frequently, it saves all data prematurely, before filling up entire pages and extents, leading to increased overheads per sample.
+| Tier | # Of Metrics |  # Of Samples | Disk Used | Disk Free | Current Retention | Expected Retention | Sample Size |
+|-----:|-------------:|--------------:|----------:|----------:|------------------:|-------------------:|------------:|
+|    0 |        43.1K |  88.1 billion |    38.4Gi |     1.88% |         44.2 days |          45.0 days |      0.46 B |
+|    1 |        73.0K |   5.2 billion |    19.2Gi |     1.84% |        122.3 days |         124.6 days |      3.99 B |
+|    2 |       148.3K | 315.0 million |     5.6Gi |    43.19% |        475.1 days |         836.2 days |     18.91 B |
 
 To configure retention, in `netdata.conf`, set the following:
 

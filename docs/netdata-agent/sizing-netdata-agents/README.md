@@ -58,7 +58,9 @@ The following are some of the innovations the open-source Netdata agent has, tha
 
 2. **4 bytes per sample uncompressed**
 
-   To achieve optimal memory and disk footprint, Netdata uses a custom 32-bit floating point number we have developed. This floating point number is used to store the samples collected, together with their anomaly bit. The database of Netdata is fixed-step, so it has predefined slots for every sample, allowing Netdata to store timestamps once every several hundreds samples, minimizing both its memory requirements and the disk footprint.
+   To achieve optimal memory and disk footprint, Netdata uses a custom 32-bit floating point number. This floating point number is used to store the samples collected, together with their anomaly bit. The database of Netdata is fixed-step, so it has predefined slots for every sample, allowing Netdata to store timestamps once every several hundreds samples, minimizing both its memory requirements and the disk footprint.
+
+   The final disk footprint of Netdata varies due to compression efficiency. It is usually about 0.6 bytes per sample for the high-resolution tier (per-second), 6 bytes per sample for the mid-resolution tier (per-minute) and 18 bytes per sample for the low-resolution tier (per-hour).
 
 3. **Query priorities**
 
