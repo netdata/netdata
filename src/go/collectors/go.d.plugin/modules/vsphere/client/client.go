@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/netdata/go.d.plugin/pkg/tlscfg"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/performance"

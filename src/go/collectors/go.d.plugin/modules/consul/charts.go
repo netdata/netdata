@@ -7,7 +7,7 @@ import (
 
 	"github.com/blang/semver/v4"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 const (

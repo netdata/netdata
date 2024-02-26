@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	rs "github.com/netdata/go.d.plugin/modules/vsphere/resources"
-	"github.com/netdata/go.d.plugin/pkg/matcher"
+	rs "github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/resources"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 )
 
 type HostMatcher interface {

@@ -3,7 +3,7 @@
 package k8s_kubelet
 
 import (
-	mtx "github.com/netdata/go.d.plugin/pkg/metrics"
+	mtx "github.com/netdata/netdata/go/go.d.plugin/pkg/metrics"
 )
 
 func newMetrics() *metrics {

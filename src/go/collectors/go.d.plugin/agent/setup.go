@@ -7,13 +7,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/agent/discovery"
-	"github.com/netdata/go.d.plugin/agent/discovery/dummy"
-	"github.com/netdata/go.d.plugin/agent/discovery/file"
-	"github.com/netdata/go.d.plugin/agent/hostinfo"
-	"github.com/netdata/go.d.plugin/agent/module"
-	"github.com/netdata/go.d.plugin/agent/vnodes"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/dummy"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/file"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/hostinfo"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/vnodes"
 
 	"gopkg.in/yaml.v2"
 )

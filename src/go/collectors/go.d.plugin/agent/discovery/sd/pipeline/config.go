@@ -5,9 +5,9 @@ package pipeline
 import (
 	"errors"
 	"fmt"
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/hostsocket"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/hostsocket"
 
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/kubernetes"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/kubernetes"
 )
 
 type Config struct {

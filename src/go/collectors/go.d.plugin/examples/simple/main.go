@@ -9,11 +9,11 @@ import (
 	"os"
 	"path"
 
-	"github.com/netdata/go.d.plugin/agent"
-	"github.com/netdata/go.d.plugin/agent/module"
-	"github.com/netdata/go.d.plugin/cli"
-	"github.com/netdata/go.d.plugin/logger"
-	"github.com/netdata/go.d.plugin/pkg/multipath"
+	"github.com/netdata/netdata/go/go.d.plugin/agent"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/cli"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/multipath"
 
 	"github.com/jessevdk/go-flags"
 )

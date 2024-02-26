@@ -5,8 +5,8 @@ package envoy
 import (
 	"errors"
 
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 func (e *Envoy) validateConfig() error {

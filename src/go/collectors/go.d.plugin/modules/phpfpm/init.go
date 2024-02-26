@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 func (p Phpfpm) initClient() (client, error) {

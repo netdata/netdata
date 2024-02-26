@@ -3,7 +3,7 @@
 package tengine
 
 import (
-	"github.com/netdata/go.d.plugin/pkg/stm"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 )
 
 func (t *Tengine) collect() (map[string]int64, error) {

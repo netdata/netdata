@@ -5,7 +5,7 @@ package lighttpd
 import (
 	"fmt"
 
-	"github.com/netdata/go.d.plugin/pkg/stm"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 )
 
 func (l *Lighttpd) collect() (map[string]int64, error) {

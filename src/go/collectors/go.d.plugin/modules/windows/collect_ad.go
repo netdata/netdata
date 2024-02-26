@@ -2,7 +2,7 @@
 
 package windows
 
-import "github.com/netdata/go.d.plugin/pkg/prometheus"
+import "github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 
 // Windows exporter:
 // https://github.com/prometheus-community/windows_exporter/blob/master/docs/collector.ad.md

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"k8s.io/client-go/kubernetes"
 )

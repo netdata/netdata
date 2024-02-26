@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 // TODO: check https://github.com/ProxySQL/proxysql-grafana-prometheus/blob/main/grafana/provisioning/dashboards/ProxySQL-Host-Statistics.json

@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/pkg/logs"
-	"github.com/netdata/go.d.plugin/pkg/matcher"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/logs"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 )
 
 type pattern struct {

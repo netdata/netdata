@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
 func NewManager(path string) *Manager {

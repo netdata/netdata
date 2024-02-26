@@ -2,7 +2,7 @@
 
 package lighttpd
 
-import "github.com/netdata/go.d.plugin/agent/module"
+import "github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 type (
 	// Charts is an alias for module.Charts

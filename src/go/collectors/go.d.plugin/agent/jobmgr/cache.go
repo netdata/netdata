@@ -5,7 +5,7 @@ package jobmgr
 import (
 	"context"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 )
 
 func newRunningJobsCache() *runningJobsCache {

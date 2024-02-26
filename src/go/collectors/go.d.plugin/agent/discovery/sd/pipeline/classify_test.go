@@ -5,7 +5,7 @@ package pipeline
 import (
 	"testing"
 
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

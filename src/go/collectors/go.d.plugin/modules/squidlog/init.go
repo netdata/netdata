@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/pkg/logs"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/logs"
 )
 
 func (s *SquidLog) createLogReader() error {

@@ -2,7 +2,7 @@
 
 package geth
 
-import "github.com/netdata/go.d.plugin/agent/module"
+import "github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 type (
 	Charts = module.Charts

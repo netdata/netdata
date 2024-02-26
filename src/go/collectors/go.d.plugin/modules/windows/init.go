@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 func (w *Windows) validateConfig() error {

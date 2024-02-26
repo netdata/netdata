@@ -4,7 +4,7 @@ package openvpn_status_log
 
 import (
 	"errors"
-	"github.com/netdata/go.d.plugin/pkg/matcher"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 )
 
 func (o OpenVPNStatusLog) validateConfig() error {

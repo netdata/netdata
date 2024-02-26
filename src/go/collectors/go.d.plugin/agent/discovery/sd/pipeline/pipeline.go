@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/hostsocket"
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/kubernetes"
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/model"
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/hostsocket"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/kubernetes"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
 func New(cfg Config) (*Pipeline, error) {

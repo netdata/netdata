@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/module"
-	"github.com/netdata/go.d.plugin/modules/vsphere/match"
-	rs "github.com/netdata/go.d.plugin/modules/vsphere/resources"
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/match"
+	rs "github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/resources"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/vmware/govmomi/performance"
 )

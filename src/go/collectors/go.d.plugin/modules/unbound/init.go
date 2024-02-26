@@ -7,9 +7,9 @@ import (
 	"errors"
 	"net"
 
-	"github.com/netdata/go.d.plugin/modules/unbound/config"
-	"github.com/netdata/go.d.plugin/pkg/socket"
-	"github.com/netdata/go.d.plugin/pkg/tlscfg"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/unbound/config"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/socket"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 )
 
 func (u *Unbound) initConfig() (enabled bool) {

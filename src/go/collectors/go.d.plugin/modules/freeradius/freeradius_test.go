@@ -6,9 +6,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/netdata/go.d.plugin/modules/freeradius/api"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/freeradius/api"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
 )
 

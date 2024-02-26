@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"

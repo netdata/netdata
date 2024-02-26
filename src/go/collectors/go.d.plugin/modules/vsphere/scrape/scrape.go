@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	rs "github.com/netdata/go.d.plugin/modules/vsphere/resources"
+	rs "github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/resources"
 
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 	"github.com/vmware/govmomi/performance"
 	"github.com/vmware/govmomi/vim25/types"
 )

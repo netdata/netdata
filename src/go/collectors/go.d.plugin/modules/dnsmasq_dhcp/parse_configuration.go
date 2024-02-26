@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/pkg/iprange"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/iprange"
 )
 
 func (d *DnsmasqDHCP) parseDnsmasqDHCPConfiguration() ([]iprange.Range, []net.IP) {

@@ -5,7 +5,7 @@ package filestatus
 import (
 	"testing"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 
 	"github.com/stretchr/testify/assert"
 )

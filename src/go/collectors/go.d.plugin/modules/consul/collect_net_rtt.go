@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/netdata/go.d.plugin/pkg/metrics"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/metrics"
 )
 
 const (

@@ -9,7 +9,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 )
 
 func LoadStore(path string) (*Store, error) {

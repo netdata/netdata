@@ -4,7 +4,7 @@ package cassandra
 
 import (
 	"errors"
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 	"strings"
 )
 

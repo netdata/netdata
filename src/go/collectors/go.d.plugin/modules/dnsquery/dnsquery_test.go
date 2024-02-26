@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/module"
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"

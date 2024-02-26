@@ -5,8 +5,8 @@ package file
 import (
 	"testing"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/stretchr/testify/assert"
 )

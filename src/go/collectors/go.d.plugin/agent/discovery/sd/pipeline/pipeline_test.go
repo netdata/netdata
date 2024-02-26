@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
 
 	"github.com/ilyam8/hashstructure"
 	"github.com/stretchr/testify/assert"

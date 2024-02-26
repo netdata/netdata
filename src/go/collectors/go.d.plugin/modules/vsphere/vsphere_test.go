@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/go.d.plugin/modules/vsphere/discover"
-	"github.com/netdata/go.d.plugin/modules/vsphere/match"
-	rs "github.com/netdata/go.d.plugin/modules/vsphere/resources"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/discover"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/match"
+	rs "github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/resources"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmware/govmomi/performance"

@@ -11,16 +11,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/agent"
-	"github.com/netdata/go.d.plugin/agent/executable"
-	"github.com/netdata/go.d.plugin/cli"
-	"github.com/netdata/go.d.plugin/logger"
-	"github.com/netdata/go.d.plugin/pkg/multipath"
+	"github.com/netdata/netdata/go/go.d.plugin/agent"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/executable"
+	"github.com/netdata/netdata/go/go.d.plugin/cli"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/multipath"
 
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/net/http/httpproxy"
 
-	_ "github.com/netdata/go.d.plugin/modules"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules"
 )
 
 var (

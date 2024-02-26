@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/netdata/go.d.plugin/pkg/tlscfg"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

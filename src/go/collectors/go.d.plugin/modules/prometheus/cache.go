@@ -3,7 +3,7 @@
 package prometheus
 
 import (
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 func newCache() *cache {

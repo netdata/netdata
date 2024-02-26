@@ -5,7 +5,7 @@ package windows
 import (
 	"time"
 
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 )
 
 const (

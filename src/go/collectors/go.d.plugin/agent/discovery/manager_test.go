@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/agent/discovery/file"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/file"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
