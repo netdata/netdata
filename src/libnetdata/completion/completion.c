@@ -26,6 +26,41 @@ void completion_wait_for(struct completion *p)
     uv_mutex_unlock(&p->mutex);
 }
 
+bool completion_timedwait_for(struct completion *p, uint64_t timeout)
+{
+    timeout *= NSEC_PER_SEC;
+
+    uint64_t start_time = uv_hrtime();
+    bool result = true;
+
+    uv_mutex_lock(&p->mutex);
+    while (!p->completed) {
+        int rc = uv_cond_timedwait(&p->cond, &p->mutex, timeout);
+
+        if (rc == 0) {
+            result = true;
+            break;
+        } else if (rc == UV_ETIMEDOUT) {
+            result = false;
+            break;
+        }
+
+        /*
+         * handle spurious wakeups
+        */
+
+        uint64_t elapsed = uv_hrtime() - start_time;
+        if (elapsed >= timeout) {
+            result = false;
+            break;
+        }
+        timeout -= elapsed;
+    }
+    uv_mutex_unlock(&p->mutex);
+
+    return result;
+}
+
 void completion_mark_complete(struct completion *p)
 {
     uv_mutex_lock(&p->mutex);
