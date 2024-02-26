@@ -12,6 +12,8 @@
 char *ebpf_user_config_dir = CONFIG_DIR;
 char *ebpf_stock_config_dir = LIBCONFIG_DIR;
 
+ebpf_module_t ebpf_nv_module;
+
 /*
 static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netdata_ebpf_events_t *ptr)
 {
