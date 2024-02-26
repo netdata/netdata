@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/phpfpm/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/phpfpm/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/phpfpm/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/phpfpm/metadata.yaml"
 sidebar_label: "PHP-FPM"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Web Servers and Web Proxies"

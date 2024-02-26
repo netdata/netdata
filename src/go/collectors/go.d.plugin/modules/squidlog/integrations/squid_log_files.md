@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/squidlog/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/squidlog/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/squidlog/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/squidlog/metadata.yaml"
 sidebar_label: "Squid log files"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Web Servers and Web Proxies"

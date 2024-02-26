@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/vernemq/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/vernemq/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/vernemq/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/vernemq/metadata.yaml"
 sidebar_label: "VerneMQ"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Message Brokers"

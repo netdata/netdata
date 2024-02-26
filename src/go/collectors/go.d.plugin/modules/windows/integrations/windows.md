@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/windows/integrations/windows.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/windows/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/windows/integrations/windows.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/windows/metadata.yaml"
 sidebar_label: "Windows"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Windows Systems"

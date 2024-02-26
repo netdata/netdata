@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/pihole/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/pihole/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/pihole/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/pihole/metadata.yaml"
 sidebar_label: "Pi-hole"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/DNS and DHCP Servers"

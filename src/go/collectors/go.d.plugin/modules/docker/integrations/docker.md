@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/docker/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/docker/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/docker/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/docker/metadata.yaml"
 sidebar_label: "Docker"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Containers and VMs"

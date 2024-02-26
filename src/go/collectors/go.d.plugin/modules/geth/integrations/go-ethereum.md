@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/geth/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/geth/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/geth/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/geth/metadata.yaml"
 sidebar_label: "Go-ethereum"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Blockchain Servers"

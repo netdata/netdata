@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/envoy/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/envoy/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/envoy/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/envoy/metadata.yaml"
 sidebar_label: "Envoy"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Web Servers and Web Proxies"
