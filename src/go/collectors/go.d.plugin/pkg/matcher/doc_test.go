@@ -2,7 +2,7 @@
 
 package matcher_test
 
-import "github.com/netdata/go.d.plugin/pkg/matcher"
+import "github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 
 func ExampleNew_string_format() {
 	// create a string matcher, which perform full text match

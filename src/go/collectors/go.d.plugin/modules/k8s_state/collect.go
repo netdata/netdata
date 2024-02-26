@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	corev1 "k8s.io/api/core/v1"
 )

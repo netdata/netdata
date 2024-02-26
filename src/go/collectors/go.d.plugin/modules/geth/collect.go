@@ -3,8 +3,8 @@
 package geth
 
 import (
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
-	"github.com/netdata/go.d.plugin/pkg/stm"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 )
 
 func (g *Geth) collect() (map[string]int64, error) {

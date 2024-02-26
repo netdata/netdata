@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 
 	"gopkg.in/yaml.v2"
 )

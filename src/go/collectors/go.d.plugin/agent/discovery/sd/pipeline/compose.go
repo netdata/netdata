@@ -6,9 +6,9 @@ import (
 	"bytes"
 	"text/template"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/model"
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 
 	"gopkg.in/yaml.v2"
 )

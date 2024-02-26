@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 func (m *Mongo) collectSharding(mx map[string]int64) error {

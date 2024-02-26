@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
 )
 
 type selector interface {

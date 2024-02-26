@@ -5,9 +5,9 @@ package stm_test
 import (
 	"testing"
 
-	"github.com/netdata/go.d.plugin/pkg/stm"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 
-	"github.com/netdata/go.d.plugin/pkg/metrics"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/metrics"
 
 	"github.com/stretchr/testify/assert"
 )

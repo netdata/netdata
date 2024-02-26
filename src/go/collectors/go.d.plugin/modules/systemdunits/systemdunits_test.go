@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/stretchr/testify/assert"

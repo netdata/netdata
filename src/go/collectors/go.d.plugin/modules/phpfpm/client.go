@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	fcgiclient "github.com/tomasen/fcgi_client"
 )

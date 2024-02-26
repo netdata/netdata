@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus/selector"
 
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/textparse"

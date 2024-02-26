@@ -5,7 +5,7 @@ package openvpn_status_log
 import (
 	"fmt"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 var charts = module.Charts{

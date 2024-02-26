@@ -5,8 +5,8 @@ package scaleio
 import (
 	"time"
 
-	"github.com/netdata/go.d.plugin/modules/scaleio/client"
-	"github.com/netdata/go.d.plugin/pkg/stm"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/scaleio/client"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 )
 
 const discoveryEvery = 5

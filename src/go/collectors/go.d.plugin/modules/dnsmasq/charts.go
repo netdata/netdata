@@ -2,7 +2,7 @@
 
 package dnsmasq
 
-import "github.com/netdata/go.d.plugin/agent/module"
+import "github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 var cacheCharts = module.Charts{
 	{

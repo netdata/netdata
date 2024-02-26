@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/model"
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"

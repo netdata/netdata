@@ -5,7 +5,7 @@ package example
 import (
 	"fmt"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 func (e *Example) collect() (map[string]int64, error) {

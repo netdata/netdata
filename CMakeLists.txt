@@ -47,12 +47,14 @@ else()
         message(FATAL_ERROR "Wrong version regex match count ${CMAKE_MATCH_COUNT} (should be in 3, 4 or 5)")
 endif()
 
+set(NETDATA_VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}.${FIELD_TWEAK})
+
 #
 # project
 #
 
 project(netdata
-        VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}.${FIELD_TWEAK}
+        VERSION ${NETDATA_VERSION}
         DESCRIPTION "Netdata real-time monitoring"
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
@@ -98,20 +100,21 @@ option(ENABLE_ML "enable machine learning" True)
 option(ENABLE_H2O "enable h2o" True)
 option(ENABLE_DBENGINE "enable dbengine" True)
 
-option(ENABLE_PLUGIN_DEBUGFS "enable debugfs.plugin" True)
 option(ENABLE_PLUGIN_APPS "enable apps.plugin" True)
+option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network plugin" True)
+option(ENABLE_PLUGIN_CUPS "enable cups.plugin" True)
+option(ENABLE_PLUGIN_DEBUGFS "enable debugfs.plugin" True)
+option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" True)
 option(ENABLE_PLUGIN_FREEIPMI "enable freeipmi.plugin" True)
+option(ENABLE_PLUGIN_GO "enable go.d.plugin" True)
+option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" True)
+option(ENABLE_PLUGIN_LOGS_MANAGEMENT "enable logs-management.plugin" True)
+option(ENABLE_PLUGIN_NETWORK_VIEWER "enable network-viewer" True)
 option(ENABLE_PLUGIN_NFACCT "enable nfacct.plugin" True)
-option(ENABLE_PLUGIN_XENSTAT "enable xenstat.plugin" True)
 option(ENABLE_PLUGIN_PERF "enable perf.plugin" True)
 option(ENABLE_PLUGIN_SLABINFO "enable slabinfo.plugin" True)
-option(ENABLE_PLUGIN_CUPS "enable cups.plugin" True)
-option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network plugin" True)
-option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" True)
-option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" True)
-option(ENABLE_PLUGIN_NETWORK_VIEWER "enable network-viewer" True)
 option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "enable systemd-journal.plugin" True)
-option(ENABLE_PLUGIN_LOGS_MANAGEMENT "enable logs-management.plugin" True)
+option(ENABLE_PLUGIN_XENSTAT "enable xenstat.plugin" True)
 
 option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "enable prometheus remote write exporter" True)
 option(ENABLE_EXPORTER_MONGODB "enable mongodb exporter" True)
@@ -124,6 +127,14 @@ option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
 option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
+
+if(ENABLE_PLUGIN_GO)
+    include(NetdataGoTools)
+
+    find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
+
+    find_package(Go "${MIN_GO_VERSION}" REQUIRED)
+endif()
 
 if(ENABLE_SENTRY)
         include(FetchContent)
@@ -2135,6 +2146,18 @@ install(TARGETS netdatacli
         DESTINATION usr/sbin)
 
 #
+# Build go.d.plugin
+#
+
+if(ENABLE_PLUGIN_GO)
+    add_go_target(go-plugin go.d.plugin src/go/collectors/go.d.plugin cmd/godplugin)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
+            COMPONENT go.d.plugin
+            DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+#
 # Generate config file
 #
 
@@ -2639,6 +2662,23 @@ if (ENABLE_PLUGIN_LOGS_MANAGEMENT)
         install(FILES ${CMAKE_BINARY_DIR}/src/logsmanagement/stock_conf/logsmanagement.d.conf
                 COMPONENT logs_management_plugin
                 DESTINATION usr/lib/netdata/conf.d)
+endif()
+
+#
+# go.d.plugin
+#
+if(ENABLE_PLUGIN_GO)
+    install(FILES src/go/collectors/go.d.plugin/config/go.d.conf
+            COMPONENT go.d.plugin
+            DESTINATION usr/lib/netdata/conf.d)
+    install(DIRECTORY
+            COMPONENT go.d.plugin
+            DESTINATION usr/lib/netdata/conf.d/go.d)
+
+    file(GLOB GO_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/*.conf)
+    install(FILES ${GO_CONF_FILES}
+            COMPONENT go.d.plugin
+            DESTINATION usr/lib/netdata/conf.d/go.d)
 endif()
 
 #

@@ -16,6 +16,7 @@
 GOLANG_MIN_MAJOR_VERSION='1'
 GOLANG_MIN_MINOR_VERSION='21'
 GOLANG_MIN_PATCH_VERSION='0'
+GOLANG_MIN_VERSION="${GOLANG_MIN_MAJOR_VERSION}.${GOLANG_MIN_MINOR_VERSION}.${GOLANG_MIN_PATCH_VERSION}"
 
 GOLANG_TEMP_PATH="${TMPDIR}/go-toolchain"
 
@@ -48,49 +49,84 @@ install_go_toolchain() {
     GOLANG_ARCHIVE_NAME="${GOLANG_TEMP_PATH}/golang.tar.gz"
     GOLANG_CHECKSUM_FILE="${GOLANG_TEMP_PATH}/golang.sha256sums"
 
-    if [ "$(uname -s)" != "Linux" ]; then
-        GOLANG_FAILURE_REASON="We do not support automatic handling of a Go toolchain on this system, you must install one manually."
-        return 1
-    fi
-
-    case "$(uname -m)" in
-        i?86)
-            GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-386.tar.gz"
-            GOLANG_ARCHIVE_CHECKSUM="05d09041b5a1193c14e4b2db3f7fcc649b236c567f5eb93305c537851b72dd95"
+    case "$(uname -s)" in
+        Linux)
+            case "$(uname -m)" in
+                i?86)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-386.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="05d09041b5a1193c14e4b2db3f7fcc649b236c567f5eb93305c537851b72dd95"
+                    ;;
+                x86_64)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-amd64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="3f934f40ac360b9c01f616a9aa1796d227d8b0328bf64cb045c7b8c4ee9caea4"
+                    ;;
+                aarch64)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-arm64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="e2e8aa88e1b5170a0d495d7d9c766af2b2b6c6925a8f8956d834ad6b4cacbd9a"
+                    ;;
+                armv*)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-armv6l.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="6a8eda6cc6a799ff25e74ce0c13fdc1a76c0983a0bb07c789a2a3454bf6ec9b2"
+                    ;;
+                ppc64le)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-ppc64le.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="e872b1e9a3f2f08fd4554615a32ca9123a4ba877ab6d19d36abc3424f86bc07f"
+                    ;;
+                riscv64)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-riscv64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="86a2fe6597af4b37d98bca632f109034b624786a8d9c1504d340661355ed31f7"
+                    ;;
+                s390x)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-s390x.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="92894d0f732d3379bc414ffdd617eaadad47e1d72610e10d69a1156db03fc052"
+                    ;;
+                *)
+                    GOLANG_FAILURE_REASON="Linux $(uname -m) platform is not supported out-of-box by Go, you must install a toolchain for it yourself."
+                    return 1
+                    ;;
+            esac
             ;;
-        x86_64)
-            GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-amd64.tar.gz"
-            GOLANG_ARCHIVE_CHECKSUM="3f934f40ac360b9c01f616a9aa1796d227d8b0328bf64cb045c7b8c4ee9caea4"
-            ;;
-        aarch64)
-            GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-arm64.tar.gz"
-            GOLANG_ARCHIVE_CHECKSUM="e2e8aa88e1b5170a0d495d7d9c766af2b2b6c6925a8f8956d834ad6b4cacbd9a"
-            ;;
-        armv*)
-            GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-armv6l.tar.gz"
-            GOLANG_ARCHIVE_CHECKSUM="6a8eda6cc6a799ff25e74ce0c13fdc1a76c0983a0bb07c789a2a3454bf6ec9b2"
-            ;;
-        ppc64le)
-            GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-ppc64le.tar.gz"
-            GOLANG_ARCHIVE_CHECKSUM="e872b1e9a3f2f08fd4554615a32ca9123a4ba877ab6d19d36abc3424f86bc07f"
-            ;;
-        riscv64)
-            GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-riscv64.tar.gz"
-            GOLANG_ARCHIVE_CHECKSUM="86a2fe6597af4b37d98bca632f109034b624786a8d9c1504d340661355ed31f7"
-            ;;
-        s390x)
-            GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.21.6.linux-s390x.tar.gz"
-            GOLANG_ARCHIVE_CHECKSUM="92894d0f732d3379bc414ffdd617eaadad47e1d72610e10d69a1156db03fc052"
+        FreeBSD)
+            case "$(uname -m)" in
+                386)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-386.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="b8065da37783e8b9e7086365a54d74537e832c92311b61101a66989ab2458d8e"
+                    ;;
+                amd64)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-amd64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="50f421c7f217083ac94aab1e09400cb9c2fea7d337679ec11f1638a11460da30"
+                    ;;
+                arm)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-arm.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="c9c8b305f90903536f4981bad9f029828c2483b3216ca1783777344fbe603f2d"
+                    ;;
+                arm64)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-arm64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="e23385e5c640787fa02cd58f2301ea09e162c4d99f8ca9fa6d52766f428a933d"
+                    ;;
+                riscv64)
+                    GOLANG_ARCHIVE_URL="https://go.dev/dl/go1.22.0.freebsd-riscv64.tar.gz"
+                    GOLANG_ARCHIVE_CHECKSUM="c8f94d1de6024546194d58e7b9370dc7ea06176aad94a675b0062c25c40cb645"
+                    ;;
+                *)
+                    GOLANG_FAILURE_REASON="FreeBSD $(uname -m) platform is not supported out-of-box by Go, you must install a toolchain for it yourself."
+                    return 1
+                    ;;
+            esac
             ;;
         *)
-            GOLANG_FAILURE_REASON="Linux $(uname -m) platform is not supported out-of-box by Go, you must install a toolchain for it yourself."
+            GOLANG_FAILURE_REASON="We do not support automatic handling of a Go toolchain on this system, you must install one manually."
             return 1
             ;;
     esac
 
-    if [ -d '/usr/local/go' ]; then
-        GOLANG_FAILURE_REASON="Refusing to overwrite existing Go toolchain install at /usr/local/go, it needs to be updated manually."
-        return 1
+    if [ -d '/usr/local/go' ]; then 
+        if [ -f '/usr/local/go/.installed-by-netdata' ]; then
+            rm -rf /usr/local/go
+        else
+            GOLANG_FAILURE_REASON="Refusing to overwrite existing Go toolchain install at /usr/local/go, it needs to be updated manually."
+            return 1
+        fi
     fi
 
     mkdir -p "${GOLANG_TEMP_PATH}"
@@ -111,6 +147,8 @@ install_go_toolchain() {
         GOLANG_FAILURE_REASON="Failed to extract Go toolchain."
         return 1
     fi
+
+    touch /usr/local/go/.installed-by-netdata
 
     rm -rf "${GOLANG_TEMP_PATH}"
 }

@@ -5,7 +5,7 @@ package activemq
 import (
 	"encoding/xml"
 	"fmt"
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 	"io"
 	"net/http"
 	"net/url"

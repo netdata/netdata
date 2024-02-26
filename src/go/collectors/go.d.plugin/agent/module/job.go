@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/netdataapi"
-	"github.com/netdata/go.d.plugin/agent/vnodes"
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/netdataapi"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/vnodes"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
 var obsoleteLock = &sync.Mutex{}
@@ -39,7 +39,7 @@ var reSpace = regexp.MustCompile(`\s+`)
 var ndInternalMonitoringDisabled = os.Getenv("NETDATA_INTERNALS_MONITORING") == "NO"
 
 func newRuntimeChart(pluginName string) *Chart {
-	// this is needed to keep the same name as we had before https://github.com/netdata/go.d.plugin/issues/650
+	// this is needed to keep the same name as we had before https://github.com/netdata/netdata/go/go.d.plugin/issues/650
 	ctxName := pluginName
 	if ctxName == "go.d" {
 		ctxName = "go"

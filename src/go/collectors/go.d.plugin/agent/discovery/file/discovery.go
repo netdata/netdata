@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
 var log = logger.New().With(

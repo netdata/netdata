@@ -8,9 +8,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/go.d.plugin/agent/module"
-	"github.com/netdata/go.d.plugin/pkg/tlscfg"
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

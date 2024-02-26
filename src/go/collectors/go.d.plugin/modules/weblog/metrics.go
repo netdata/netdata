@@ -3,7 +3,7 @@
 package weblog
 
 import (
-	"github.com/netdata/go.d.plugin/pkg/metrics"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/metrics"
 )
 
 func newWebLogSummary() metrics.Summary {

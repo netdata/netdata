@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/agent/hostinfo"
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/hostinfo"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/ilyam8/hashstructure"
 )

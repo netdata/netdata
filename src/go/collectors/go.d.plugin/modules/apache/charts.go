@@ -2,7 +2,7 @@
 
 package apache
 
-import "github.com/netdata/go.d.plugin/agent/module"
+import "github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 const (
 	prioRequests = module.Priority + iota

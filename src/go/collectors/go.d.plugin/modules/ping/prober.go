@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 
 	probing "github.com/prometheus-community/pro-bing"
 )

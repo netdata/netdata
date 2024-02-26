@@ -5,9 +5,9 @@ package scaleio
 import (
 	"fmt"
 
-	"github.com/netdata/go.d.plugin/modules/scaleio/client"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/scaleio/client"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 type (

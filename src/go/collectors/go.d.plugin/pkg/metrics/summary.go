@@ -5,7 +5,7 @@ package metrics
 import (
 	"math"
 
-	"github.com/netdata/go.d.plugin/pkg/stm"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 )
 
 type (

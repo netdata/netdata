@@ -4,7 +4,7 @@ package metrics
 
 import (
 	"github.com/axiomhq/hyperloglog"
-	"github.com/netdata/go.d.plugin/pkg/stm"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 )
 
 type (

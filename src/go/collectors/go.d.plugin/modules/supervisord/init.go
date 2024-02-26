@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 func (s Supervisord) verifyConfig() error {

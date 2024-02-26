@@ -5,8 +5,8 @@ package cassandra
 import (
 	"errors"
 
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 func (c *Cassandra) validateConfig() error {

@@ -3,7 +3,7 @@
 package coredns
 
 import (
-	mtx "github.com/netdata/go.d.plugin/pkg/metrics"
+	mtx "github.com/netdata/netdata/go/go.d.plugin/pkg/metrics"
 )
 
 func newMetrics() *metrics {

@@ -132,6 +132,7 @@ scanit() {
 
   progress "Configuring netdata source..."
   USE_SYSTEM_PROTOBUF=1
+  ENABLE_GO=0
   prepare_cmake_options
 
   run cmake ${NETDATA_CMAKE_OPTIONS}

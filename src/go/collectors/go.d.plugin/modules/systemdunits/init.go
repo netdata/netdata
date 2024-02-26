@@ -9,7 +9,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/pkg/matcher"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 )
 
 func (s *SystemdUnits) validateConfig() error {

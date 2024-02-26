@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
 func newNvidiaSMIExec(path string, cfg Config, log *logger.Logger) (*nvidiaSMIExec, error) {

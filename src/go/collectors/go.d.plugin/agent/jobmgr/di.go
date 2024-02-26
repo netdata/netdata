@@ -3,8 +3,8 @@
 package jobmgr
 
 import (
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/agent/vnodes"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/vnodes"
 )
 
 type FileLocker interface {

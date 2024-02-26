@@ -2,7 +2,7 @@
 
 package windows
 
-import "github.com/netdata/go.d.plugin/pkg/prometheus"
+import "github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 
 const (
 	metricTCPConnectionFailure               = "windows_tcp_connection_failures_total"

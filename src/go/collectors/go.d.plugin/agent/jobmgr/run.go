@@ -7,7 +7,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/ticker"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/ticker"
 )
 
 func (m *Manager) runRunningJobsHandling(ctx context.Context) {

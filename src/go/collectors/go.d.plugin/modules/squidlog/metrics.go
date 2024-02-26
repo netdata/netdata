@@ -2,7 +2,7 @@
 
 package squidlog
 
-import "github.com/netdata/go.d.plugin/pkg/metrics"
+import "github.com/netdata/netdata/go/go.d.plugin/pkg/metrics"
 
 func newSummary() metrics.Summary {
 	return &summary{metrics.NewSummary()}

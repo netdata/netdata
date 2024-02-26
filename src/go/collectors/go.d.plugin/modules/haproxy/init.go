@@ -5,9 +5,9 @@ package haproxy
 import (
 	"errors"
 
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
-	"github.com/netdata/go.d.plugin/pkg/prometheus/selector"
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 func (h Haproxy) validateConfig() error {

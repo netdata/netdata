@@ -83,12 +83,13 @@ override_dh_auto_configure:
 		-DENABLE_PLUGIN_DEBUGFS=On \
 		$(EBPF_CONFIG) \
 		-DENABLE_PLUGIN_FREEIPMI=On \
+		-DENABLE_PLUGIN_GO=On \
 		-DENABLE_PLUGIN_LOCAL_LISTENERS=On \
+		-DENABLE_PLUGIN_LOGS_MANAGEMENT=On \
 		-DENABLE_PLUGIN_NFACCT=On \
 		-DENABLE_PLUGIN_PERF=On \
 		-DENABLE_PLUGIN_SLABINFO=On \
 		-DENABLE_PLUGIN_SYSTEMD_JOURNAL=On \
-		-DENABLE_PLUGIN_LOGS_MANAGEMENT=On \
 		$(XENSTAT_CONFIG) \
 		-DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On \
 		-DENABLE_EXPORTER_MONGODB=On \
@@ -210,6 +211,17 @@ override_dh_install:
 		$(TOP)-plugin-xenstat/usr/libexec/netdata/plugins.d/xenstat.plugin; \
 	fi
 
+	# Install go to it's own package directory
+	#
+	mkdir -p $(TOP)-plugin-go/usr/libexec/netdata/plugins.d
+	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/go.d.plugin \
+	$(TOP)-plugin-go/usr/libexec/netdata/plugins.d/go.d.plugin
+	mkdir -p $(TOP)-plugin-go/usr/lib/netdata/conf.d
+	mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/go.d.conf \
+	$(TOP)-plugin-go/usr/lib/netdata/conf.d/go.d.conf
+	mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/go.d \
+	$(TOP)-plugin-go/usr/lib/netdata/conf.d/go.d
+
 	# Set the rest of the software in the main package
 	#
 	cp -rp $(TEMPTOP)/usr $(TOP)
@@ -230,13 +242,6 @@ override_dh_install:
 		packaging/bundle-ebpf.sh . ${TOP}-ebpf-code-legacy/usr/libexec/netdata/plugins.d/ force; \
 	fi
 
-	# Install go to it's own package directory
-	#
-	mkdir -p $(TOP)-plugin-go/usr/lib/netdata/conf.d
-	mkdir -p $(TOP)-plugin-go/usr/libexec/netdata/plugins.d
-	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) \
-	$(TOP)-plugin-go/usr/lib/netdata \
-	$(TOP)-plugin-go/usr/libexec/netdata
 
 override_dh_installdocs:
 	dh_installdocs

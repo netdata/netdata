@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/netdata/go.d.plugin/pkg/matcher"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"

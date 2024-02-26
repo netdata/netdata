@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/go.d.plugin/pkg/prometheus/selector"
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

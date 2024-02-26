@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 // https://github.com/Qihoo360/pika/blob/master/src/pika_admin.cc

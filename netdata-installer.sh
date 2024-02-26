@@ -102,10 +102,6 @@ print_deferred_errors() {
   fi
 }
 
-download_go() {
-  download_file "${1}" "${2}" "go.d plugin" "go"
-}
-
 # make sure we save all commands we run
 # Variable is used by code in the packaging/installer/functions.sh
 # shellcheck disable=SC2034
@@ -205,7 +201,6 @@ USAGE: ${PROGRAM} [options]
                              This results in less frequent updates.
   --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
-  --disable-go               Disable installation of go.d.plugin.
   --disable-ebpf             Disable eBPF Kernel plugin. Default: enabled.
   --disable-cloud            Disable all Netdata Cloud functionality.
   --require-cloud            Fail the install if it can't build Netdata Cloud support.
@@ -214,6 +209,9 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-freeipmi  Explicitly disable the FreeIPMI plugin.
   --disable-https            Explicitly disable TLS support.
   --disable-dbengine         Explicitly disable DB engine support.
+  --enable-plugin-go         Enable the Go plugin. Default: Enabled when possible.
+  --disable-plugin-go        Disable the Go plugin.
+  --disable-go               Equivalent to --disable-go-plugin
   --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
   --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available.
@@ -254,6 +252,7 @@ LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
 ENABLE_EBPF=1
+ENABLE_GO=1
 ENABLE_H2O=1
 ENABLE_CLOUD=1
 ENABLE_LOGS_MANAGEMENT=1
@@ -284,6 +283,9 @@ while [ -n "${1}" ]; do
       ENABLE_CLOUD=0
       ;;
     "--disable-dbengine") ENABLE_DBENGINE=0 ;;
+    "--enable-plugin-go") ENABLE_GO=1 ;;
+    "--disable-plugin-go") ENABLE_GO=0 ;;
+    "--disable-go") ENABLE_GO=0 ;;
     "--enable-plugin-nfacct") ENABLE_NFACCT=1 ;;
     "--disable-plugin-nfacct") ENABLE_NFACCT=0 ;;
     "--enable-plugin-xenstat") ENABLE_XENSTAT=1 ;;
@@ -321,7 +323,6 @@ while [ -n "${1}" ]; do
       # XXX: No longer supported.
       ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
-    "--disable-go") NETDATA_DISABLE_GO=1 ;;
     "--enable-ebpf")
       ENABLE_EBPF=1
       NETDATA_DISABLE_EBPF=0
@@ -1040,6 +1041,18 @@ bundle_fluentbit() {
 bundle_fluentbit
 
 # -----------------------------------------------------------------------------
+# If we’re installing the Go plugin, ensure a working Go toolchain is installed.
+if [ "${ENABLE_GO}" -eq 1 ]; then
+  progress "Checking for a usable Go toolchain and attempting to install one to /usr/local/go if needed."
+  . "${NETDATA_SOURCE_DIR}/packaging/check-for-go-toolchain.sh"
+
+  if ! ensure_go_toolchain; then
+    warning "Go ${GOLANG_MIN_VERSION} needed to build Go plugin, but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}"
+    ENABLE_GO=0
+  fi
+fi
+
+# -----------------------------------------------------------------------------
 # If we have the dashboard switching logic, make sure we're on the classic
 # dashboard during the install (updates don't work correctly otherwise).
 if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-switch-dashboard.sh" ]; then
@@ -1429,6 +1442,22 @@ if [ "$(id -u)" -eq 0 ]; then
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ndsudo"
   fi
 
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+    capabilities=1
+    if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
+      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+      if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"; then
+        capabilities=0
+      fi
+    fi
+
+    if [ $capabilities -eq 0 ]; then
+      # fix go.d.plugin to be setuid to root
+      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+    fi
+  fi
+
 else
   # non-privileged user installation
   run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_LOG_DIR}"
@@ -1438,167 +1467,6 @@ else
 fi
 
 [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-
-# -----------------------------------------------------------------------------
-
-# govercomp compares go.d.plugin versions. Exit codes:
-# 0 - version1 == version2
-# 1 - version1 > version2
-# 2 - version2 > version1
-# 3 - error
-
-# shellcheck disable=SC2086
-govercomp() {
-  # version in file:
-  # - v0.14.0
-  #
-  # 'go.d.plugin -v' output variants:
-  # - go.d.plugin, version: unknown
-  # - go.d.plugin, version: v0.14.1
-  # - go.d.plugin, version: v0.14.1-dirty
-  # - go.d.plugin, version: v0.14.1-1-g4c5f98c
-  # - go.d.plugin, version: v0.14.1-1-g4c5f98c-dirty
-
-  # we need to compare only MAJOR.MINOR.PATCH part
-  ver1=$(echo "$1" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
-  ver2=$(echo "$2" | grep -E -o "[0-9]+\.[0-9]+\.[0-9]+")
-
-  if [ ${#ver1} -eq 0 ] || [ ${#ver2} -eq 0 ]; then
-    return 3
-  fi
-
-  num1=$(echo $ver1 | grep -o -E '\.' | wc -l)
-  num2=$(echo $ver2 | grep -o -E '\.' | wc -l)
-
-  if [ ${num1} -ne ${num2} ]; then
-          return 3
-  fi
-
-  for i in $(seq 1 $((num1+1))); do
-          x=$(echo $ver1 | cut -d'.' -f$i)
-          y=$(echo $ver2 | cut -d'.' -f$i)
-    if [ "${x}" -gt "${y}" ]; then
-      return 1
-    elif [ "${y}" -gt "${x}" ]; then
-      return 2
-    fi
-  done
-
-  return 0
-}
-
-should_install_go() {
-  if [ -n "${NETDATA_DISABLE_GO+x}" ]; then
-    return 1
-  fi
-
-  version_in_file="$(cat packaging/go.d.version 2> /dev/null)"
-  binary_version=$("${NETDATA_PREFIX}"/usr/libexec/netdata/plugins.d/go.d.plugin -v 2> /dev/null)
-
-  govercomp "$version_in_file" "$binary_version"
-  case $? in
-    0) return 1 ;; # =
-    2) return 1 ;; # <
-    *) return 0 ;; # >, error
-  esac
-}
-
-install_go() {
-  if ! should_install_go; then
-    return 0
-  fi
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Installing go.d.plugin."
-
-  # When updating this value, ensure correct checksums in packaging/go.d.checksums
-  GO_PACKAGE_VERSION="$(cat packaging/go.d.version)"
-  ARCH_MAP='
-    i386::386
-    i686::386
-    x86_64::amd64
-    aarch64::arm64
-    armv64::arm64
-    armv6l::arm
-    armv7l::arm
-    armv5tel::arm
-  '
-
-  progress "Install go.d.plugin"
-  ARCH=$(uname -m)
-  OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-
-  for index in ${ARCH_MAP}; do
-    KEY="${index%%::*}"
-    VALUE="${index##*::}"
-    if [ "$KEY" = "$ARCH" ]; then
-      ARCH="${VALUE}"
-      break
-    fi
-  done
-  tmp="$(mktemp -d -t netdata-go-XXXXXX)"
-  GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
-
-  if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" ]; then
-    download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
-  else
-    progress "Using provided go.d tarball ${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}"
-    run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" "${tmp}/${GO_PACKAGE_BASENAME}"
-  fi
-
-  if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}" ]; then
-    download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
-  else
-    progress "Using provided config file for go.d ${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}"
-    run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}" "${tmp}/config.tar.gz"
-  fi
-
-  if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
-    run_failed "go.d plugin download failed, go.d plugin will not be available"
-    echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
-    echo >&2
-    [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-    return 0
-  fi
-
-  grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2> /dev/null
-  grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2> /dev/null
-
-  # Checksum validation
-  if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
-
-    echo >&2 "go.d plugin checksum validation failure."
-    echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
-    echo >&2
-
-    run_failed "go.d.plugin package files checksum validation failed. go.d.plugin will not be available."
-    [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-    return 0
-  fi
-
-  # Install new files
-  run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d"
-  run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d.conf"
-  run tar --no-same-owner -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
-  run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
-
-  run tar --no-same-owner -xf "${tmp}/${GO_PACKAGE_BASENAME}"
-  run mv "${GO_PACKAGE_BASENAME%.tar.gz}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-  if [ "$(id -u)" -eq 0 ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-  fi
-  run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-  rm -rf "${tmp}"
-
-  [ -n "${GITHUB_ACTIONS}" ] && echo "::endgroup::"
-}
-
-install_go
-
-if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin" ]; then
-  if command -v setcap 1>/dev/null 2>&1; then
-    run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
-  fi
-fi
 
 should_install_ebpf() {
   if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 )
 
 func (c *Consul) collectMetricsPrometheus(mx map[string]int64) error {

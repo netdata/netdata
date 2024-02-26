@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //  Session: https://vmware.github.io/vsphere-automation-sdk-rest/vsphere/index.html#SVC_com.vmware.cis.session

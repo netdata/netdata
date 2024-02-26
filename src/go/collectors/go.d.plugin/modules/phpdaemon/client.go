@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/netdata/go.d.plugin/pkg/web"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 type decodeFunc func(dst interface{}, reader io.Reader) error

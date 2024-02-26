@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/blang/semver/v4"
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
-	"github.com/netdata/go.d.plugin/pkg/stm"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 )
 
 const (

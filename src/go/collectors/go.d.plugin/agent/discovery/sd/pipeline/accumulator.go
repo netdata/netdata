@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/model"
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
 func newAccumulator() *accumulator {

@@ -2,7 +2,7 @@
 
 package phpdaemon
 
-import "github.com/netdata/go.d.plugin/pkg/stm"
+import "github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 
 func (p *PHPDaemon) collect() (map[string]int64, error) {
 	s, err := p.client.queryFullStatus()

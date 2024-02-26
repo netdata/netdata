@@ -5,9 +5,9 @@ package vsphere
 import (
 	"errors"
 
-	"github.com/netdata/go.d.plugin/modules/vsphere/client"
-	"github.com/netdata/go.d.plugin/modules/vsphere/discover"
-	"github.com/netdata/go.d.plugin/modules/vsphere/scrape"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/client"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/discover"
+	"github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/scrape"
 )
 
 func (vs *VSphere) validateConfig() error {

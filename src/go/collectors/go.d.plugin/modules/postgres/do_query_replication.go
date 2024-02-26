@@ -36,7 +36,7 @@ func (p *Postgres) doQueryReplStandbyAppWALDelta() error {
 			app = value
 			p.getReplAppMetrics(app).updated = true
 		default:
-			// TODO: delta calculation was changed in https://github.com/netdata/go.d.plugin/pull/1039
+			// TODO: delta calculation was changed in https://github.com/netdata/netdata/go/go.d.plugin/pull/1039
 			// - 'replay_delta' (probably other deltas too?) can be negative
 			// - Also, WAL delta != WAL lag after that PR
 			v := parseInt(value)

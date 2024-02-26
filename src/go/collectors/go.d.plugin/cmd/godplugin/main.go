@@ -11,15 +11,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/netdata/go.d.plugin/agent"
-	"github.com/netdata/go.d.plugin/cli"
-	"github.com/netdata/go.d.plugin/logger"
-	"github.com/netdata/go.d.plugin/pkg/multipath"
+	"github.com/netdata/netdata/go/go.d.plugin/agent"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/executable"
+	"github.com/netdata/netdata/go/go.d.plugin/cli"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/multipath"
 
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/net/http/httpproxy"
 
-	_ "github.com/netdata/go.d.plugin/modules"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules"
 )
 
 var (
@@ -45,6 +46,12 @@ func confDir(opts *cli.Option) multipath.MultiPath {
 			stockDir,
 		)
 	}
+	if executable.Directory != "" {
+		return multipath.New(
+			filepath.Join(executable.Directory, "/../../../../etc/netdata"),
+			filepath.Join(executable.Directory, "/../../../../usr/lib/netdata/conf.d"),
+		)
+	}
 	return multipath.New(
 		filepath.Join(cd, "/../../../../etc/netdata"),
 		filepath.Join(cd, "/../../../../usr/lib/netdata/conf.d"),
@@ -63,6 +70,12 @@ func modulesConfDir(opts *cli.Option) (mpath multipath.MultiPath) {
 			mpath = append(mpath, filepath.Join(stockDir, name))
 		}
 		return multipath.New(mpath...)
+	}
+	if executable.Directory != "" {
+		return multipath.New(
+			filepath.Join(executable.Directory, "/../../../../etc/netdata", name),
+			filepath.Join(executable.Directory, "/../../../../usr/lib/netdata/conf.d", name),
+		)
 	}
 	return multipath.New(
 		filepath.Join(cd, "/../../../../etc/netdata", name),

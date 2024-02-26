@@ -5,7 +5,7 @@ package postgres
 import (
 	"errors"
 
-	"github.com/netdata/go.d.plugin/pkg/matcher"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 )
 
 func (p *Postgres) validateConfig() error {

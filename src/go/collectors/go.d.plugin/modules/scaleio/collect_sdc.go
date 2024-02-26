@@ -2,7 +2,7 @@
 
 package scaleio
 
-import "github.com/netdata/go.d.plugin/modules/scaleio/client"
+import "github.com/netdata/netdata/go/go.d.plugin/modules/scaleio/client"
 
 func (s ScaleIO) collectSdc(ss map[string]client.SdcStatistics) map[string]sdcMetrics {
 	ms := make(map[string]sdcMetrics, len(ss))

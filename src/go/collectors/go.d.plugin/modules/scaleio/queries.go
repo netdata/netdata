@@ -2,7 +2,7 @@
 
 package scaleio
 
-import "github.com/netdata/go.d.plugin/modules/scaleio/client"
+import "github.com/netdata/netdata/go/go.d.plugin/modules/scaleio/client"
 
 /*
 Starting from version 3 of ScaleIO/VxFlex API numOfScsiInitiators property is removed from the system selectedStatisticsQuery.

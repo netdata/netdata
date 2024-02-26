@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/go.d.plugin/pkg/tlscfg"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"

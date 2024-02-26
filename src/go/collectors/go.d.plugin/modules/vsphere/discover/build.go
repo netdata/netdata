@@ -5,7 +5,7 @@ package discover
 import (
 	"time"
 
-	rs "github.com/netdata/go.d.plugin/modules/vsphere/resources"
+	rs "github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/resources"
 
 	"github.com/vmware/govmomi/vim25/mo"
 )

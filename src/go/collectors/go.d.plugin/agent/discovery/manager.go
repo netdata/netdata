@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/go.d.plugin/agent/confgroup"
-	"github.com/netdata/go.d.plugin/agent/discovery/dummy"
-	"github.com/netdata/go.d.plugin/agent/discovery/file"
-	"github.com/netdata/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/dummy"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/file"
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
 func NewManager(cfg Config) (*Manager, error) {

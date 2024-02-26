@@ -2,7 +2,7 @@
 
 package postgres
 
-import "github.com/netdata/go.d.plugin/pkg/metrics"
+import "github.com/netdata/netdata/go/go.d.plugin/pkg/metrics"
 
 type pgMetrics struct {
 	srvMetrics

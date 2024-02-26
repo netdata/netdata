@@ -5,11 +5,11 @@ package k8s_kubelet
 import (
 	"math"
 
-	mtx "github.com/netdata/go.d.plugin/pkg/metrics"
-	"github.com/netdata/go.d.plugin/pkg/prometheus"
-	"github.com/netdata/go.d.plugin/pkg/stm"
+	mtx "github.com/netdata/netdata/go/go.d.plugin/pkg/metrics"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 
-	"github.com/netdata/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 func (k *Kubelet) collect() (map[string]int64, error) {

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/go.d.plugin/pkg/socket"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/socket"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -5,7 +5,7 @@ package sd
 import (
 	"testing"
 
-	"github.com/netdata/go.d.plugin/agent/discovery/sd/pipeline"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/pipeline"
 
 	"gopkg.in/yaml.v2"
 )
