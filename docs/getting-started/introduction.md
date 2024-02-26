@@ -120,7 +120,7 @@ Here are a few ways to enrich your existing monitoring and troubleshooting stack
 ### Collect metrics from Prometheus endpoints
 
 Netdata automatically detects 600 popular endpoints and collects per-second metrics from them via the [generic
-Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md). This even
+Prometheus collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/README.md). This even
 includes support for Windows 10 via [`windows_exporter`](https://github.com/prometheus-community/windows_exporter).
 
 This collector is installed and enabled on all Agent installations by default, so you don't need to waste time

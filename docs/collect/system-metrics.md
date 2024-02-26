@@ -38,12 +38,12 @@ can find all system collectors in our [supported collectors list](https://github
 ## Collect Windows system metrics
 
 Netdata is also capable of monitoring Windows systems. The [Windows
-collector](https://github.com/netdata/go.d.plugin/blob/master/modules/windows/README.md) integrates with
+collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/windows/README.md) integrates with
 [windows_exporter](https://github.com/prometheus-community/windows_exporter), a small Go-based binary that you can run
 on Windows systems. The Windows collector then gathers metrics from an endpoint created by windows_exporter, for more
-details see [the requirements](https://github.com/netdata/go.d.plugin/blob/master/modules/windows/README.md#requirements).
+details see [the requirements](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/windows/README.md#requirements).
 
-Next, [configure](https://github.com/netdata/go.d.plugin/blob/master/modules/windows/README.md#configuration) the Windows
+Next, [configure](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/windows/README.md#configuration) the Windows
 collector to point to the URL and port of your exposed endpoint. Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
 method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system. You'll start seeing Windows system metrics, such as CPU
 utilization, memory, bandwidth per NIC, number of processes, and much more.

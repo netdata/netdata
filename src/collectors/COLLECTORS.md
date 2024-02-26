@@ -23,7 +23,7 @@ accompanying configuration file.
 If you don't see the app/service you'd like to monitor in this list:
 
 - If your application has a Prometheus endpoint, Netdata can monitor it! Look at our
-  [generic Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md).
+  [generic Prometheus collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/README.md).
 
 - If your application is instrumented to expose [StatsD](https://blog.netdata.cloud/introduction-to-statsd/) metrics,
   see our [generic StatsD collector](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/README.md).
@@ -38,7 +38,7 @@ If you don't see the app/service you'd like to monitor in this list:
   a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
 
 - If you have basic software development skills, you can add your own plugin
-  in [Go](https://github.com/netdata/go.d.plugin/blob/master/README.md#how-to-develop-a-collector)
+  in [Go](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/README.md#how-to-develop-a-collector)
   or [Python](https://github.com/netdata/netdata/blob/master/docs/guides/python-collector.md)
 
 ## Available Data Collection Integrations

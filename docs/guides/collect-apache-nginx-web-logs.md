@@ -8,7 +8,7 @@ You can use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage,
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
 200ms, using ~30% of a single core.
 
-The [web_log](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md) collector is currently compatible
+The [web_log](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/weblog/README.md) collector is currently compatible
 with [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
 
 This guide will walk you through using the new Go-based web log collector to turn the logs these web servers
@@ -91,7 +91,7 @@ The web log collector is capable of parsing custom Nginx and Apache log formats 
 leave that topic for a separate guide.
 
 We do have [extensive
-documentation](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#custom-log-format) on how
+documentation](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/weblog/README.md#custom-log-format) on how
 to build custom parsing for Nginx and Apache logs.
 
 ## Tweak web log collector alerts

@@ -36,8 +36,8 @@ The steps are:
     - [suggested module layout](#module-layout).
     - [helper packages](#helper-packages).
 - Add the configuration to [`config/go.d/example2.conf`](https://github.com/netdata/go.d.plugin/tree/master/config/go.d).
-- Add the module to [`config/go.d.conf`](https://github.com/netdata/go.d.plugin/blob/master/config/go.d.conf).
-- Import the module in [`modules/init.go`](https://github.com/netdata/go.d.plugin/blob/master/modules/init.go).
+- Add the module to [`config/go.d.conf`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d.conf).
+- Import the module in [`modules/init.go`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/init.go).
 - Update the [`available modules list`](https://github.com/netdata/go.d.plugin#available-modules).
 - To build it, run `make` from the plugin root dir. This will create a new `go.d.plugin` binary that includes your newly
   developed collector. It will be placed into the `bin` directory (e.g `go.d.plugin/bin`)
@@ -119,7 +119,7 @@ func (e *Example) Check() bool {
 :exclamation: Netdata module produces [`charts`](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#chart), not
 raw metrics.
 
-Use [`agent/module`](https://github.com/netdata/go.d.plugin/blob/master/agent/module/charts.go) package to create them,
+Use [`agent/module`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/agent/module/charts.go) package to create them,
 it contains charts and dimensions structs.
 
 - `Charts` returns the [charts](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#chart) (`*module.Charts`).
@@ -196,7 +196,7 @@ Suggested minimal layout:
 
 ### File `module_name.go`
 
-> :exclamation: See the example [`example.go`](https://github.com/netdata/go.d.plugin/blob/master/modules/example/example.go).
+> :exclamation: See the example [`example.go`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/example/example.go).
 
 Don't overload this file with the implementation details.
 
@@ -208,13 +208,13 @@ Usually it contains only:
 
 ### File `charts.go`
 
-> :exclamation: See the example: [`charts.go`](https://github.com/netdata/go.d.plugin/blob/master/modules/example/charts.go).
+> :exclamation: See the example: [`charts.go`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/example/charts.go).
 
 Put charts, charts templates and charts constructor functions in this file.
 
 ### File `init.go`
 
-> :exclamation: See the example: [`init.go`](https://github.com/netdata/go.d.plugin/blob/master/modules/example/init.go).
+> :exclamation: See the example: [`init.go`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/example/init.go).
 
 All the module initialization details should go in this file.
 
@@ -240,7 +240,7 @@ func (e *Example) initSomeValue() error {
 
 ### File `collect.go`
 
-> :exclamation: See the example: [`collect.go`](https://github.com/netdata/go.d.plugin/blob/master/modules/example/collect.go).
+> :exclamation: See the example: [`collect.go`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/example/collect.go).
 
 This file is the entry point for the metrics collection.
 
@@ -262,7 +262,7 @@ func (e *Example) collect() (map[string]int64, error) {
 
 ### File `module_name_test.go`
 
-> :exclamation: See the example: [`example_test.go`](https://github.com/netdata/go.d.plugin/blob/master/modules/example/example_test.go).
+> :exclamation: See the example: [`example_test.go`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/example/example_test.go).
 
 > if you have no experience in testing we recommend starting with [testing package documentation](https://golang.org/pkg/testing/).
 

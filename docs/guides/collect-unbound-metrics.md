@@ -110,7 +110,7 @@ method](https://github.com/netdata/netdata/blob/master/packaging/installer/READM
 
 Collecting metrics from remote Unbound servers requires manual configuration. There are too many possibilities to cover
 all remote connections here, but the [default `unbound.conf`
-file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/unbound.conf) contains a few useful examples:
+file](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d/unbound.conf) contains a few useful examples:
 
 ```yaml
 jobs:
@@ -132,7 +132,7 @@ jobs:
 ```
 
 To see all the available options, see the default [unbound.conf
-file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/unbound.conf).
+file](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d/unbound.conf).
 
 ## What's next?
 

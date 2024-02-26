@@ -37,7 +37,7 @@ This collector supports collecting metrics from multiple instances of this integ
 #### Auto-Detection
 
 By default, it detects instances running on the local host by trying to connect to known ports that are [allocated to exporters](https://github.com/prometheus/prometheus/wiki/Default-port-allocations).
-The full list of endpoints is available in the collector's [configuration file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/prometheus.conf).
+The full list of endpoints is available in the collector's [configuration file](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d/prometheus.conf).
 
 
 #### Limits
@@ -134,7 +134,7 @@ The following options can be defined globally: update_every, autodetection_retry
 This option allows you to filter out unwanted time series. Only metrics matching the selector will be collected.
 
 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-- Pattern syntax: [selector](https://github.com/netdata/go.d.plugin/blob/master/pkg/prometheus/selector/README.md).
+- Pattern syntax: [selector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/pkg/prometheus/selector/README.md).
 - Option syntax:
 
 ```yaml

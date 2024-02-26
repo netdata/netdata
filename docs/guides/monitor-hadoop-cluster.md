@@ -27,8 +27,8 @@ alternative, like the guide available from
 
 For more specifics on the collection modules used in this guide, read the respective pages in our documentation:
 
--   [HDFS](https://github.com/netdata/go.d.plugin/blob/master/modules/hdfs/README.md)
--   [Zookeeper](https://github.com/netdata/go.d.plugin/blob/master/modules/zookeeper/README.md)
+-   [HDFS](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/hdfs/README.md)
+-   [Zookeeper](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/zookeeper/README.md)
 
 ## Set up your HDFS and Zookeeper installations
 

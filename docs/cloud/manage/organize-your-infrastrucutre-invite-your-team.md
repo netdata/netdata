@@ -106,7 +106,7 @@ We recommend a few strategies for organizing your War Rooms.
 
 - **Incident response**  
   You can also create new War Rooms as one of the first steps in your incident response process.
-   For example, you have a user-facing web app that relies on Apache Pulsar for a message queue, and one of your nodes using the [Pulsar collector](https://github.com/netdata/go.d.plugin/blob/master/modules/pulsar/README.md) begins reporting a suspiciously low messages rate.
+   For example, you have a user-facing web app that relies on Apache Pulsar for a message queue, and one of your nodes using the [Pulsar collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/pulsar/README.md) begins reporting a suspiciously low messages rate.
    You can create a War Room called `$year-$month-$day-pulsar-rate`, add all your Pulsar nodes in addition to nodes they connect to, and begin diagnosing the root cause in a War Room optimized for getting to resolution as fast as possible.
 
 ### Add War Rooms

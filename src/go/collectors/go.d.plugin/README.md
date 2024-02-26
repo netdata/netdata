@@ -109,7 +109,7 @@ see the appropriate collector readme.
 | [rabbitmq](https://github.com/netdata/go.d.plugin/tree/master/modules/rabbitmq)                     |           RabbitMQ            |
 | [redis](https://github.com/netdata/go.d.plugin/tree/master/modules/redis)                           |             Redis             |
 | [scaleio](https://github.com/netdata/go.d.plugin/tree/master/modules/scaleio)                       |       Dell EMC ScaleIO        |
-| [SNMP](https://github.com/netdata/go.d.plugin/blob/master/modules/snmp)                             |             SNMP              |
+| [SNMP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/snmp)                             |             SNMP              |
 | [solr](https://github.com/netdata/go.d.plugin/tree/master/modules/solr)                             |             Solr              |
 | [squidlog](https://github.com/netdata/go.d.plugin/tree/master/modules/squidlog)                     |             Squid             |
 | [springboot2](https://github.com/netdata/go.d.plugin/tree/master/modules/springboot2)               |         Spring Boot2          |
@@ -142,7 +142,7 @@ sudo ./edit-config go.d.conf
 
 Configurations are written in [YAML](http://yaml.org/).
 
-- [plugin configuration](https://github.com/netdata/go.d.plugin/blob/master/config/go.d.conf)
+- [plugin configuration](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d.conf)
 - [specific module configuration](https://github.com/netdata/go.d.plugin/tree/master/config/go.d)
 
 ### Enable a collector
@@ -175,7 +175,7 @@ contact us in our forums.
 
 ### How to develop a collector
 
-Read [how to write a Netdata collector in Go](https://github.com/netdata/go.d.plugin/blob/master/docs/how-to-write-a-module.md).
+Read [how to write a Netdata collector in Go](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/docs/how-to-write-a-module.md).
 
 ## Troubleshooting
 

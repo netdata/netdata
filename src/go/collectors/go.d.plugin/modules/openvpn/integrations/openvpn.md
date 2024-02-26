@@ -99,7 +99,7 @@ There are no alerts configured by default for this integration.
 
 #### Enable in go.d.conf.
 
-This collector is disabled by default. You need to explicitly enable it in [go.d.conf](https://github.com/netdata/go.d.plugin/blob/master/config/go.d.conf).
+This collector is disabled by default. You need to explicitly enable it in [go.d.conf](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d.conf).
 
 From the documentation for the OpenVPN Management Interface:
 > Currently, the OpenVPN daemon can at most support a single management client any one time.
