@@ -121,7 +121,7 @@ install_go_toolchain() {
     esac
 
     if [ -d '/usr/local/go' ]; then 
-        if [ ! -f '/usr/local/go/.installed-by-netdata' ]; then
+        if [ -f '/usr/local/go/.installed-by-netdata' ]; then
             rm -rf /usr/local/go
         else
             GOLANG_FAILURE_REASON="Refusing to overwrite existing Go toolchain install at /usr/local/go, it needs to be updated manually."
