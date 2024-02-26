@@ -174,6 +174,19 @@ typedef enum {
     MODE_ENTRY       // This attaches kprobe when the function is called
 } netdata_run_mode_t;
 
+enum ebpf_socket_functions {
+    NETDATA_FCNT_INET_CSK_ACCEPT,
+    NETDATA_FCNT_TCP_RETRANSMIT,
+    NETDATA_FCNT_CLEANUP_RBUF,
+    NETDATA_FCNT_TCP_CLOSE,
+    NETDATA_FCNT_UDP_RECEVMSG,
+    NETDATA_FCNT_TCP_SENDMSG,
+    NETDATA_FCNT_UDP_SENDMSG,
+    NETDATA_FCNT_TCP_V4_CONNECT,
+    NETDATA_FCNT_TCP_V6_CONNECT,
+    NETDATA_FCNT_TCP_SET_STATE
+};
+
 #define ND_EBPF_DEFAULT_PID_SIZE 32768U
 
 enum netdata_ebpf_map_type {
@@ -370,6 +383,7 @@ int get_redhat_release();
 char *ebpf_kernel_suffix(int version, int isrh);
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf,
                                            struct bpf_object **obj);
+void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links);
 
 void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
 int ebpf_load_config(struct config *config, char *filename);
