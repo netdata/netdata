@@ -814,28 +814,6 @@ static void ebpf_exit()
 }
 
 /**
- * Unload loegacy code
- *
- * @param objects       objects loaded from eBPF programs
- * @param probe_links   links from loader
- */
-void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
-{
-    if (!probe_links || !objects)
-        return;
-
-    struct bpf_program *prog;
-    size_t j = 0 ;
-    bpf_object__for_each_program(prog, objects) {
-        bpf_link__destroy(probe_links[j]);
-        j++;
-    }
-    freez(probe_links);
-    if (objects)
-        bpf_object__close(objects);
-}
-
-/**
  * Unload Unique maps
  *
  * This function unload all BPF maps from threads using one unique BPF object.
