@@ -29,4 +29,4 @@
 #define be64toh(x) OSSwapBigToHostInt64(x)
 #define le64toh(x) OSSwapLittleToHostInt64(x)
 
-#endif  /* LIBNETDATA_ENDIAN_H */
+#endif  /* LIBNETDATA_BYTE_ORDER_H */
