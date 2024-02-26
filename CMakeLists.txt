@@ -1528,7 +1528,7 @@ include(packaging/cmake/systemd.cmake)
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
-target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
 
 # pthread (FIXME: use find_package for this)
 
