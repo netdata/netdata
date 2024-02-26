@@ -12,6 +12,8 @@
 char *ebpf_user_config_dir = CONFIG_DIR;
 char *ebpf_stock_config_dir = LIBCONFIG_DIR;
 
+ebpf_module_t ebpf_nv_module;
+
 /*
 static int clean_kprobe_event(FILE *out, char *filename, char *father_pid, netdata_ebpf_events_t *ptr)
 {
@@ -617,6 +619,31 @@ void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report,
 
         ebpf_update_kernel_memory(report, map, action);
     }
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Unload loegacy code
+ *
+ * @param objects       objects loaded from eBPF programs
+ * @param probe_links   links from loader
+ */
+void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
+{
+    if (!probe_links || !objects)
+        return;
+
+    struct bpf_program *prog;
+    size_t j = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[j]);
+        j++;
+    }
+
+    freez(probe_links);
+    if (objects)
+        bpf_object__close(objects);
 }
 
 //----------------------------------------------------------------------------------------------------------------------
