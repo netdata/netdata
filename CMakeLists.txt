@@ -598,7 +598,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/os.c
         src/libnetdata/os.h
         src/libnetdata/simple_hashtable.h
-        src/libnetdata/endian.h
+        src/libnetdata/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h
         src/libnetdata/popen/popen.c
@@ -1464,7 +1464,7 @@ detect_systemd()
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
-target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
 
 # pthread (FIXME: use find_package for this)
 
@@ -1591,9 +1591,6 @@ target_link_libraries(libnetdata PUBLIC ${CRYPTO_LDFLAGS})
 target_include_directories(libnetdata BEFORE PUBLIC ${OPENSSL_INCLUDE_DIRS})
 target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
-
-# h2o
-target_link_libraries(libnetdata PUBLIC "$<$<BOOL:${ENABLE_H2O}>:h2o>")
 
 # mnl
 pkg_check_modules(MNL libmnl)
@@ -2056,6 +2053,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
+        "$<$<BOOL:${ENABLE_H2O}>:h2o>"
 )
 
 #

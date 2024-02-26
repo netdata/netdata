@@ -1,5 +1,5 @@
-#ifndef LIBNETDATA_ENDIAN_H
-#define LIBNETDATA_ENDIAN_H
+#ifndef LIBNETDATA_BYTE_ORDER_H
+#define LIBNETDATA_BYTE_ORDER_H
 
 /** compatibility header for endian.h
  * This is a simple compatibility shim to convert
@@ -29,4 +29,4 @@
 #define be64toh(x) OSSwapBigToHostInt64(x)
 #define le64toh(x) OSSwapLittleToHostInt64(x)
 
-#endif  /* LIBNETDATA_ENDIAN_H */
+#endif  /* LIBNETDATA_BYTE_ORDER_H */
