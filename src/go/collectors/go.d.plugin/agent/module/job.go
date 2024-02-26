@@ -164,7 +164,7 @@ type Job struct {
 }
 
 // NetdataChartIDMaxLength is the chart ID max length. See RRD_ID_LENGTH_MAX in the netdata source code.
-const NetdataChartIDMaxLength = 1000
+const NetdataChartIDMaxLength = 1200
 
 // FullName returns job full name.
 func (j Job) FullName() string {
