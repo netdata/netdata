@@ -10,14 +10,14 @@ import (
 )
 
 func newNTPClient(c Config) (ntpConn, error) {
-	conn, err := net.DialTimeout("udp", c.Address, c.Timeout.Duration)
+	conn, err := net.DialTimeout("udp", c.Address, c.Timeout.Duration())
 	if err != nil {
 		return nil, err
 	}
 
 	client := &ntpClient{
 		conn:    conn,
-		timeout: c.Timeout.Duration,
+		timeout: c.Timeout.Duration(),
 		client:  &control.NTPClient{Connection: conn},
 	}
 

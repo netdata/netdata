@@ -3,6 +3,7 @@
 package dnsdist
 
 import (
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,22 +17,27 @@ import (
 )
 
 var (
-	v151JSONStat, _ = os.ReadFile("testdata/v1.5.1/jsonstat.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer151JSONStat, _ = os.ReadFile("testdata/v1.5.1/jsonstat.json")
 )
 
-func Test_testDataIsCorrectlyReadAndValid(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"v151JSONStat": v151JSONStat,
+		"dataConfigJSON":     dataConfigJSON,
+		"dataConfigYAML":     dataConfigYAML,
+		"dataVer151JSONStat": dataVer151JSONStat,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*DNSdist)(nil), New())
+func TestDNSdist_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &DNSdist{}, dataConfigJSON, dataConfigYAML)
 }
 
-func Test_Init(t *testing.T) {
+func TestDNSdist_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -68,25 +74,25 @@ func Test_Init(t *testing.T) {
 			ns.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, ns.Init())
+				assert.Error(t, ns.Init())
 			} else {
-				assert.True(t, ns.Init())
+				assert.NoError(t, ns.Init())
 			}
 		})
 	}
 }
 
-func Test_Charts(t *testing.T) {
+func TestDNSdist_Charts(t *testing.T) {
 	dist := New()
-	require.True(t, dist.Init())
+	require.NoError(t, dist.Init())
 	assert.NotNil(t, dist.Charts())
 }
 
-func Test_Cleanup(t *testing.T) {
+func TestDNSdist_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func Test_Check(t *testing.T) {
+func TestDNSdist_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepare  func() (dist *DNSdist, cleanup func())
 		wantFail bool
@@ -113,18 +119,18 @@ func Test_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dist, cleanup := test.prepare()
 			defer cleanup()
-			require.True(t, dist.Init())
+			require.NoError(t, dist.Init())
 
 			if test.wantFail {
-				assert.False(t, dist.Check())
+				assert.Error(t, dist.Check())
 			} else {
-				assert.True(t, dist.Check())
+				assert.NoError(t, dist.Check())
 			}
 		})
 	}
 }
 
-func Test_Collect(t *testing.T) {
+func TestDNSdist_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepare       func() (dist *DNSdist, cleanup func())
 		wantCollected map[string]int64
@@ -181,7 +187,7 @@ func Test_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dist, cleanup := test.prepare()
 			defer cleanup()
-			require.True(t, dist.Init())
+			require.NoError(t, dist.Init())
 
 			collected := dist.Collect()
 
@@ -251,7 +257,7 @@ func preparePowerDNSDistEndpoint() *httptest.Server {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.String() {
 			case "/jsonstat?command=stats":
-				_, _ = w.Write(v151JSONStat)
+				_, _ = w.Write(dataVer151JSONStat)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

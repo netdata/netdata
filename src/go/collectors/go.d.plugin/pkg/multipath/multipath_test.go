@@ -45,7 +45,7 @@ func TestMultiPath_FindFiles(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"testdata/data2/test-empty.conf", "testdata/data2/test.conf"}, files)
 
-	files, err = m.FindFiles("")
+	files, err = m.FindFiles()
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"testdata/data2/test-empty.conf", "testdata/data2/test.conf"}, files)
 

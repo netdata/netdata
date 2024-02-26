@@ -7,14 +7,14 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 )
 
-func (o OpenVPNStatusLog) validateConfig() error {
+func (o *OpenVPNStatusLog) validateConfig() error {
 	if o.LogPath == "" {
 		return errors.New("empty 'log_path'")
 	}
 	return nil
 }
 
-func (o OpenVPNStatusLog) initPerUserStatsMatcher() (matcher.Matcher, error) {
+func (o *OpenVPNStatusLog) initPerUserStatsMatcher() (matcher.Matcher, error) {
 	if o.PerUserStats.Empty() {
 		return nil, nil
 	}

@@ -1,37 +1,53 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/portcheck job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "minLength": 1
-    },
-    "host": {
-      "type": "string",
-      "minLength": 1
-    },
-    "ports": {
-      "type": "array",
-      "items": {
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Portcheck collector configuration.",
+    "description": "Collector for monitoring TCP service availability and response time.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
         "type": "integer",
-        "minimum": 1
+        "minimum": 1,
+        "default": 5
       },
-      "minItems": 1
+      "host": {
+        "title": "Network host",
+        "description": "The IP address or domain name of the network host.",
+        "type": "string"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for establishing a connection, including domain name resolution, in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 2
+      },
+      "ports": {
+        "title": "Ports",
+        "description": "A list of ports to monitor for TCP service availability and response time.",
+        "type": "array",
+        "items": {
+          "title": "Port",
+          "type": "integer",
+          "minimum": 1
+        },
+        "minItems": 1,
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "host",
+      "ports"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
     },
     "timeout": {
-      "type": [
-        "string",
-        "integer"
-      ],
-      "minLength": 1,
-      "minimum": 1,
-      "description": "The timeout duration, in seconds. Must be at least 1."
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     }
-  },
-  "required": [
-    "name",
-    "host",
-    "ports"
-  ]
+  }
 }

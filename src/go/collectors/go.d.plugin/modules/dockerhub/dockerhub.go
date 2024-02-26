@@ -4,18 +4,11 @@ package dockerhub
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
-)
-
-const (
-	defaultURL         = "https://hub.docker.com/v2/repositories"
-	defaultHTTPTimeout = time.Second * 2
-
-	defaultUpdateEvery = 5
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -25,80 +18,79 @@ func init() {
 	module.Register("dockerhub", module.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: module.Defaults{
-			UpdateEvery: defaultUpdateEvery,
+			UpdateEvery: 5,
 		},
 		Create: func() module.Module { return New() },
 	})
 }
 
-// New creates DockerHub with default values.
 func New() *DockerHub {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: defaultURL,
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: defaultHTTPTimeout},
+	return &DockerHub{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "https://hub.docker.com/v2/repositories",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second * 2),
+				},
 			},
 		},
 	}
-	return &DockerHub{
-		Config: config,
-	}
 }
 
-// Config is the DockerHub module configuration.
 type Config struct {
-	web.HTTP     `yaml:",inline"`
-	Repositories []string
+	web.HTTP     `yaml:",inline" json:""`
+	UpdateEvery  int      `yaml:"update_every" json:"update_every"`
+	Repositories []string `yaml:"repositories" json:"repositories"`
 }
 
-// DockerHub DockerHub module.
 type DockerHub struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
 	client *apiClient
 }
 
-// Cleanup makes cleanup.
-func (DockerHub) Cleanup() {}
+func (dh *DockerHub) Configuration() any {
+	return dh.Config
+}
 
-// Init makes initialization.
-func (dh *DockerHub) Init() bool {
-	if dh.URL == "" {
-		dh.Error("URL not set")
-		return false
+func (dh *DockerHub) Init() error {
+	if err := dh.validateConfig(); err != nil {
+		dh.Errorf("config validation: %v", err)
+		return err
 	}
 
-	if len(dh.Repositories) == 0 {
-		dh.Error("repositories parameter is not set")
-		return false
-	}
-
-	client, err := web.NewHTTPClient(dh.Client)
+	client, err := dh.initApiClient()
 	if err != nil {
-		dh.Errorf("error on creating http client : %v", err)
-		return false
+		dh.Error(err)
+		return err
 	}
-	dh.client = newAPIClient(client, dh.Request)
+	dh.client = client
 
-	return true
+	return nil
 }
 
-// Check makes check.
-func (dh DockerHub) Check() bool {
-	return len(dh.Collect()) > 0
+func (dh *DockerHub) Check() error {
+	mx, err := dh.collect()
+	if err != nil {
+		dh.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
-// Charts creates Charts.
-func (dh DockerHub) Charts() *Charts {
+func (dh *DockerHub) Charts() *Charts {
 	cs := charts.Copy()
 	addReposToCharts(dh.Repositories, cs)
 	return cs
 }
 
-// Collect collects metrics.
 func (dh *DockerHub) Collect() map[string]int64 {
 	mx, err := dh.collect()
 
@@ -108,4 +100,10 @@ func (dh *DockerHub) Collect() map[string]int64 {
 	}
 
 	return mx
+}
+
+func (dh *DockerHub) Cleanup() {
+	if dh.client != nil && dh.client.httpClient != nil {
+		dh.client.httpClient.CloseIdleConnections()
+	}
 }

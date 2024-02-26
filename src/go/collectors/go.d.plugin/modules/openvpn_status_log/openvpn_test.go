@@ -3,13 +3,15 @@
 package openvpn_status_log
 
 import (
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 )
 
 const (
@@ -24,7 +26,22 @@ const (
 	pathStatusVersion3NoClients = "testdata/v2.5.1/version3-no-clients.txt"
 )
 
-func TestNew(t *testing.T) {
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestOpenVPNStatusLog_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &OpenVPNStatusLog{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestOpenVPNStatusLog_Init(t *testing.T) {
@@ -49,9 +66,9 @@ func TestOpenVPNStatusLog_Init(t *testing.T) {
 			ovpn.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, ovpn.Init())
+				assert.Error(t, ovpn.Init())
 			} else {
-				assert.True(t, ovpn.Init())
+				assert.NoError(t, ovpn.Init())
 			}
 		})
 	}
@@ -76,12 +93,12 @@ func TestOpenVPNStatusLog_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ovpn := test.prepare()
 
-			require.True(t, ovpn.Init())
+			require.NoError(t, ovpn.Init())
 
 			if test.wantFail {
-				assert.False(t, ovpn.Check())
+				assert.Error(t, ovpn.Check())
 			} else {
-				assert.True(t, ovpn.Check())
+				assert.NoError(t, ovpn.Check())
 			}
 		})
 	}
@@ -114,7 +131,7 @@ func TestOpenVPNStatusLog_Charts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ovpn := test.prepare()
 
-			require.True(t, ovpn.Init())
+			require.NoError(t, ovpn.Init())
 			_ = ovpn.Check()
 			_ = ovpn.Collect()
 
@@ -240,7 +257,7 @@ func TestOpenVPNStatusLog_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ovpn := test.prepare()
 
-			require.True(t, ovpn.Init())
+			require.NoError(t, ovpn.Init())
 			_ = ovpn.Check()
 
 			collected := ovpn.Collect()

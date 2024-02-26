@@ -132,7 +132,7 @@ func (p *Postgres) openPrimaryConnection() (*sql.DB, error) {
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
@@ -162,7 +162,7 @@ func (p *Postgres) openSecondaryConnection(dbname string) (*sql.DB, string, erro
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {

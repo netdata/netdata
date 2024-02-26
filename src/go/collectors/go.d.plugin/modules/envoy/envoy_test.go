@@ -3,6 +3,7 @@
 package envoy
 
 import (
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,17 +16,26 @@ import (
 )
 
 var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
 	dataEnvoyConsulDataplane, _ = os.ReadFile("testdata/consul-dataplane.txt")
 	dataEnvoy, _                = os.ReadFile("testdata/envoy.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
+		"dataConfigJSON":           dataConfigJSON,
+		"dataConfigYAML":           dataConfigYAML,
 		"dataEnvoyConsulDataplane": dataEnvoyConsulDataplane,
 		"dataEnvoy":                dataEnvoy,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
+}
+
+func TestEnvoy_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Envoy{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestEnvoy_Init(t *testing.T) {
@@ -53,9 +63,9 @@ func TestEnvoy_Init(t *testing.T) {
 			envoy.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, envoy.Init())
+				assert.Error(t, envoy.Init())
 			} else {
-				assert.True(t, envoy.Init())
+				assert.NoError(t, envoy.Init())
 			}
 		})
 	}
@@ -66,7 +76,7 @@ func TestEnvoy_Cleanup(t *testing.T) {
 	envoy := New()
 	assert.NotPanics(t, envoy.Cleanup)
 
-	require.True(t, envoy.Init())
+	require.NoError(t, envoy.Init())
 	assert.NotPanics(t, envoy.Cleanup)
 }
 
@@ -76,7 +86,7 @@ func TestEnvoy_Charts(t *testing.T) {
 
 	require.Empty(t, *envoy.Charts())
 
-	require.True(t, envoy.Init())
+	require.NoError(t, envoy.Init())
 	_ = envoy.Collect()
 	require.NotEmpty(t, *envoy.Charts())
 }
@@ -109,12 +119,12 @@ func TestEnvoy_Check(t *testing.T) {
 			envoy, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, envoy.Init())
+			require.NoError(t, envoy.Init())
 
 			if test.wantFail {
-				assert.False(t, envoy.Check())
+				assert.Error(t, envoy.Check())
 			} else {
-				assert.True(t, envoy.Check())
+				assert.NoError(t, envoy.Check())
 			}
 		})
 	}
@@ -489,7 +499,7 @@ func TestEnvoy_Collect(t *testing.T) {
 			envoy, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, envoy.Init())
+			require.NoError(t, envoy.Init())
 
 			mx := envoy.Collect()
 

@@ -53,7 +53,7 @@ modules:
           list:
             - name: update_every
               description: Data collection frequency.
-              default_value: 5
+              default_value: 1
               required: false
             - name: autodetection_retry
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
@@ -63,10 +63,6 @@ modules:
               description: Data Source Name. See [DSN syntax](https://github.com/go-sql-driver/mysql#dsn-data-source-name).
               default_value: stats:stats@tcp(127.0.0.1:6032)/
               required: true
-            - name: my.cnf
-              description: Specifies my.cnf file to read connection parameters from under the [client] section.
-              default_value: ""
-              required: false
             - name: timeout
               description: Query timeout in seconds.
               default_value: 1

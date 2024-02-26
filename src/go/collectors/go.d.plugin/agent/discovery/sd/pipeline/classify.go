@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"text/template"
 
@@ -80,33 +81,35 @@ func newClassifyRules(cfg []ClassifyRuleConfig) ([]*classifyRule, error) {
 
 	fmap := newFuncMap()
 
-	for _, ruleCfg := range cfg {
+	for i, ruleCfg := range cfg {
+		i++
 		rule := classifyRule{name: ruleCfg.Name}
 
 		sr, err := parseSelector(ruleCfg.Selector)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("rule '%d': %v", i, err)
 		}
 		rule.sr = sr
 
 		tags, err := model.ParseTags(ruleCfg.Tags)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("rule '%d': %v", i, err)
 		}
 		rule.tags = tags
 
-		for _, matchCfg := range ruleCfg.Match {
+		for j, matchCfg := range ruleCfg.Match {
+			j++
 			var match classifyRuleMatch
 
 			tags, err := model.ParseTags(matchCfg.Tags)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("rule '%d/%d': %v", i, j, err)
 			}
 			match.tags = tags
 
 			tmpl, err := parseTemplate(matchCfg.Expr, fmap)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("rule '%d/%d': %v", i, j, err)
 			}
 			match.expr = tmpl
 

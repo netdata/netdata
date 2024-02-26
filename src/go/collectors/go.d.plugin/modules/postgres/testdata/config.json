@@ -1,0 +1,14 @@
+{
+  "update_every": 123,
+  "dsn": "ok",
+  "timeout": 123.123,
+  "collect_databases_matching": "ok",
+  "transaction_time_histogram": [
+    123.123
+  ],
+  "query_time_histogram": [
+    123.123
+  ],
+  "max_db_tables": 123,
+  "max_db_indexes": 123
+}

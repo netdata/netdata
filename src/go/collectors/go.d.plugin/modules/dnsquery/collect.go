@@ -14,7 +14,7 @@ import (
 
 func (d *DNSQuery) collect() (map[string]int64, error) {
 	if d.dnsClient == nil {
-		d.dnsClient = d.newDNSClient(d.Network, d.Timeout.Duration)
+		d.dnsClient = d.newDNSClient(d.Network, d.Timeout.Duration())
 	}
 
 	mx := make(map[string]int64)

@@ -8,14 +8,14 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
-func (fc Filecheck) validateConfig() error {
+func (fc *Filecheck) validateConfig() error {
 	if len(fc.Files.Include) == 0 && len(fc.Dirs.Include) == 0 {
 		return errors.New("both 'files->include' and 'dirs->include' are empty")
 	}
 	return nil
 }
 
-func (fc Filecheck) initCharts() (*module.Charts, error) {
+func (fc *Filecheck) initCharts() (*module.Charts, error) {
 	charts := &module.Charts{}
 
 	if len(fc.Files.Include) > 0 {

@@ -4,6 +4,7 @@ package nginxvts
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"time"
 
@@ -32,7 +33,7 @@ func New() *NginxVTS {
 					URL: "http://localhost/status/format/json",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 		},
@@ -40,15 +41,21 @@ func New() *NginxVTS {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type NginxVTS struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
 
 	httpClient *http.Client
-	charts     *module.Charts
+}
+
+func (vts *NginxVTS) Configuration() any {
+	return vts.Config
 }
 
 func (vts *NginxVTS) Cleanup() {
@@ -58,11 +65,11 @@ func (vts *NginxVTS) Cleanup() {
 	vts.httpClient.CloseIdleConnections()
 }
 
-func (vts *NginxVTS) Init() bool {
+func (vts *NginxVTS) Init() error {
 	err := vts.validateConfig()
 	if err != nil {
 		vts.Errorf("check configuration: %v", err)
-		return false
+		return err
 	}
 
 	httpClient, err := vts.initHTTPClient()
@@ -74,15 +81,23 @@ func (vts *NginxVTS) Init() bool {
 	charts, err := vts.initCharts()
 	if err != nil {
 		vts.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	vts.charts = charts
 
-	return true
+	return nil
 }
 
-func (vts *NginxVTS) Check() bool {
-	return len(vts.Collect()) > 0
+func (vts *NginxVTS) Check() error {
+	mx, err := vts.collect()
+	if err != nil {
+		vts.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (vts *NginxVTS) Charts() *module.Charts {

@@ -5,16 +5,17 @@ package mysql
 import (
 	"database/sql"
 	_ "embed"
+	"errors"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
+
 	"github.com/blang/semver/v4"
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -31,7 +32,7 @@ func New() *MySQL {
 	return &MySQL{
 		Config: Config{
 			DSN:     "root@tcp(localhost:3306)/",
-			Timeout: web.Duration{Duration: time.Second},
+			Timeout: web.Duration(time.Second),
 		},
 
 		charts:                         baseCharts.Copy(),
@@ -52,24 +53,17 @@ func New() *MySQL {
 }
 
 type Config struct {
-	DSN         string       `yaml:"dsn"`
-	MyCNF       string       `yaml:"my.cnf"`
-	UpdateEvery int          `yaml:"update_every"`
-	Timeout     web.Duration `yaml:"timeout"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	DSN         string       `yaml:"dsn" json:"dsn"`
+	MyCNF       string       `yaml:"my.cnf" json:"my.cnf"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type MySQL struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
-	db        *sql.DB
-	safeDSN   string
-	version   *semver.Version
-	isMariaDB bool
-	isPercona bool
-
-	charts *module.Charts
-
+	charts                         *module.Charts
 	addInnoDBOSLogOnce             *sync.Once
 	addBinlogOnce                  *sync.Once
 	addMyISAMOnce                  *sync.Once
@@ -77,6 +71,13 @@ type MySQL struct {
 	addGaleraOnce                  *sync.Once
 	addQCacheOnce                  *sync.Once
 	addTableOpenCacheOverflowsOnce *sync.Once
+
+	db *sql.DB
+
+	safeDSN   string
+	version   *semver.Version
+	isMariaDB bool
+	isPercona bool
 
 	doSlaveStatus      bool
 	collectedReplConns map[string]bool
@@ -92,36 +93,49 @@ type MySQL struct {
 	varPerformanceSchema     string
 }
 
-func (m *MySQL) Init() bool {
+func (m *MySQL) Configuration() any {
+	return m.Config
+}
+
+func (m *MySQL) Init() error {
 	if m.MyCNF != "" {
 		dsn, err := dsnFromFile(m.MyCNF)
 		if err != nil {
 			m.Error(err)
-			return false
+			return err
 		}
 		m.DSN = dsn
 	}
 
 	if m.DSN == "" {
-		m.Error("DSN not set")
-		return false
+		m.Error("dsn not set")
+		return errors.New("dsn not set")
 	}
 
 	cfg, err := mysql.ParseDSN(m.DSN)
 	if err != nil {
 		m.Errorf("error on parsing DSN: %v", err)
-		return false
+		return err
 	}
 
 	cfg.Passwd = strings.Repeat("*", len(cfg.Passwd))
 	m.safeDSN = cfg.FormatDSN()
 
 	m.Debugf("using DSN [%s]", m.DSN)
-	return true
+
+	return nil
 }
 
-func (m *MySQL) Check() bool {
-	return len(m.Collect()) > 0
+func (m *MySQL) Check() error {
+	mx, err := m.collect()
+	if err != nil {
+		m.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (m *MySQL) Charts() *module.Charts {

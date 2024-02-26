@@ -4,23 +4,13 @@ package snmp
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/gosnmp/gosnmp"
-)
-
-const (
-	defaultUpdateEvery = 10
-	defaultHostname    = "127.0.0.1"
-	defaultCommunity   = "public"
-	defaultVersion     = gosnmp.Version2c
-	defaultPort        = 161
-	defaultRetries     = 1
-	defaultTimeout     = defaultUpdateEvery
-	defaultMaxOIDs     = 60
 )
 
 //go:embed "config_schema.json"
@@ -36,6 +26,17 @@ func init() {
 	})
 }
 
+const (
+	defaultUpdateEvery = 10
+	defaultHostname    = "127.0.0.1"
+	defaultCommunity   = "public"
+	defaultVersion     = gosnmp.Version2c
+	defaultPort        = 161
+	defaultRetries     = 1
+	defaultTimeout     = defaultUpdateEvery
+	defaultMaxOIDs     = 60
+)
+
 func New() *SNMP {
 	return &SNMP{
 		Config: Config{
@@ -48,73 +49,87 @@ func New() *SNMP {
 				Version: defaultVersion.String(),
 				MaxOIDs: defaultMaxOIDs,
 			},
+			User: User{
+				Name:          "",
+				SecurityLevel: "authPriv",
+				AuthProto:     "sha512",
+				AuthKey:       "",
+				PrivProto:     "aes192c",
+				PrivKey:       "",
+			},
 		},
 	}
 }
 
 type (
 	Config struct {
-		UpdateEvery int           `yaml:"update_every"`
-		Hostname    string        `yaml:"hostname"`
-		Community   string        `yaml:"community"`
-		User        User          `yaml:"user"`
-		Options     Options       `yaml:"options"`
-		ChartsInput []ChartConfig `yaml:"charts"`
+		UpdateEvery int           `yaml:"update_every" json:"update_every"`
+		Hostname    string        `yaml:"hostname" json:"hostname"`
+		Community   string        `yaml:"community" json:"community"`
+		User        User          `yaml:"user" json:"user"`
+		Options     Options       `yaml:"options" json:"options"`
+		ChartsInput []ChartConfig `yaml:"charts" json:"charts"`
 	}
 	User struct {
-		Name          string `yaml:"name"`
-		SecurityLevel string `yaml:"level"`
-		AuthProto     string `yaml:"auth_proto"`
-		AuthKey       string `yaml:"auth_key"`
-		PrivProto     string `yaml:"priv_proto"`
-		PrivKey       string `yaml:"priv_key"`
+		Name          string `yaml:"name" json:"name"`
+		SecurityLevel string `yaml:"level" json:"level"`
+		AuthProto     string `yaml:"auth_proto" json:"auth_proto"`
+		AuthKey       string `yaml:"auth_key" json:"auth_key"`
+		PrivProto     string `yaml:"priv_proto" json:"priv_proto"`
+		PrivKey       string `yaml:"priv_key" json:"priv_key"`
 	}
 	Options struct {
-		Port    int    `yaml:"port"`
-		Retries int    `yaml:"retries"`
-		Timeout int    `yaml:"timeout"`
-		Version string `yaml:"version"`
-		MaxOIDs int    `yaml:"max_request_size"`
+		Port    int    `yaml:"port" json:"port"`
+		Retries int    `yaml:"retries" json:"retries"`
+		Timeout int    `yaml:"timeout" json:"timeout"`
+		Version string `yaml:"version" json:"version"`
+		MaxOIDs int    `yaml:"max_request_size" json:"max_request_size"`
 	}
 	ChartConfig struct {
-		ID         string            `yaml:"id"`
-		Title      string            `yaml:"title"`
-		Units      string            `yaml:"units"`
-		Family     string            `yaml:"family"`
-		Type       string            `yaml:"type"`
-		Priority   int               `yaml:"priority"`
-		IndexRange []int             `yaml:"multiply_range"`
-		Dimensions []DimensionConfig `yaml:"dimensions"`
+		ID         string            `yaml:"id" json:"id"`
+		Title      string            `yaml:"title" json:"title"`
+		Units      string            `yaml:"units" json:"units"`
+		Family     string            `yaml:"family" json:"family"`
+		Type       string            `yaml:"type" json:"type"`
+		Priority   int               `yaml:"priority" json:"priority"`
+		IndexRange []int             `yaml:"multiply_range" json:"multiply_range"`
+		Dimensions []DimensionConfig `yaml:"dimensions" json:"dimensions"`
 	}
 	DimensionConfig struct {
-		OID        string `yaml:"oid"`
-		Name       string `yaml:"name"`
-		Algorithm  string `yaml:"algorithm"`
-		Multiplier int    `yaml:"multiplier"`
-		Divisor    int    `yaml:"divisor"`
+		OID        string `yaml:"oid" json:"oid"`
+		Name       string `yaml:"name" json:"name"`
+		Algorithm  string `yaml:"algorithm" json:"algorithm"`
+		Multiplier int    `yaml:"multiplier" json:"multiplier"`
+		Divisor    int    `yaml:"divisor" json:"divisor"`
 	}
 )
 
 type SNMP struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
-	charts     *module.Charts
+	charts *module.Charts
+
 	snmpClient gosnmp.Handler
-	oids       []string
+
+	oids []string
 }
 
-func (s *SNMP) Init() bool {
+func (s *SNMP) Configuration() any {
+	return s.Config
+}
+
+func (s *SNMP) Init() error {
 	err := s.validateConfig()
 	if err != nil {
 		s.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	snmpClient, err := s.initSNMPClient()
 	if err != nil {
 		s.Errorf("SNMP client initialization: %v", err)
-		return false
+		return err
 	}
 
 	s.Info(snmpClientConnInfo(snmpClient))
@@ -122,24 +137,32 @@ func (s *SNMP) Init() bool {
 	err = snmpClient.Connect()
 	if err != nil {
 		s.Errorf("SNMP client connect: %v", err)
-		return false
+		return err
 	}
 	s.snmpClient = snmpClient
 
 	charts, err := newCharts(s.ChartsInput)
 	if err != nil {
 		s.Errorf("Population of charts failed: %v", err)
-		return false
+		return err
 	}
 	s.charts = charts
 
 	s.oids = s.initOIDs()
 
-	return true
+	return nil
 }
 
-func (s *SNMP) Check() bool {
-	return len(s.Collect()) > 0
+func (s *SNMP) Check() error {
+	mx, err := s.collect()
+	if err != nil {
+		s.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (s *SNMP) Charts() *module.Charts {

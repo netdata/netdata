@@ -4,6 +4,7 @@ package x509check
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
@@ -30,7 +31,7 @@ func init() {
 func New() *X509Check {
 	return &X509Check{
 		Config: Config{
-			Timeout:           web.Duration{Duration: time.Second * 2},
+			Timeout:           web.Duration(time.Second * 2),
 			DaysUntilWarn:     14,
 			DaysUntilCritical: 7,
 		},
@@ -38,41 +39,56 @@ func New() *X509Check {
 }
 
 type Config struct {
-	Source            string
-	Timeout           web.Duration
-	tlscfg.TLSConfig  `yaml:",inline"`
-	DaysUntilWarn     int64 `yaml:"days_until_expiration_warning"`
-	DaysUntilCritical int64 `yaml:"days_until_expiration_critical"`
-	CheckRevocation   bool  `yaml:"check_revocation_status"`
+	tlscfg.TLSConfig  `yaml:",inline" json:""`
+	UpdateEvery       int          `yaml:"update_every" json:"update_every"`
+	Source            string       `yaml:"source" json:"source"`
+	Timeout           web.Duration `yaml:"timeout" json:"timeout"`
+	DaysUntilWarn     int64        `yaml:"days_until_expiration_warning" json:"days_until_expiration_warning"`
+	DaysUntilCritical int64        `yaml:"days_until_expiration_critical" json:"days_until_expiration_critical"`
+	CheckRevocation   bool         `yaml:"check_revocation_status" json:"check_revocation_status"`
 }
 
 type X509Check struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
 	charts *module.Charts
-	prov   provider
+
+	prov provider
 }
 
-func (x *X509Check) Init() bool {
+func (x *X509Check) Configuration() any {
+	return x.Config
+}
+
+func (x *X509Check) Init() error {
 	if err := x.validateConfig(); err != nil {
 		x.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	prov, err := x.initProvider()
 	if err != nil {
 		x.Errorf("certificate provider init: %v", err)
-		return false
+		return err
 	}
 	x.prov = prov
 
 	x.charts = x.initCharts()
 
-	return true
+	return nil
 }
 
-func (x *X509Check) Check() bool {
-	return len(x.Collect()) > 0
+func (x *X509Check) Check() error {
+	mx, err := x.collect()
+	if err != nil {
+		x.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (x *X509Check) Charts() *module.Charts {

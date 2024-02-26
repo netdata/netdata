@@ -29,6 +29,7 @@ func (p *Prometheus) collect() (map[string]int64, error) {
 		return nil, nil
 	}
 
+	// TODO: shouldn't modify the value from Config
 	if p.ExpectedPrefix != "" {
 		if !hasPrefix(mfs, p.ExpectedPrefix) {
 			return nil, fmt.Errorf("'%s' metrics have no expected prefix (%s)", p.URL, p.ExpectedPrefix)
@@ -36,6 +37,7 @@ func (p *Prometheus) collect() (map[string]int64, error) {
 		p.ExpectedPrefix = ""
 	}
 
+	// TODO: shouldn't modify the value from Config
 	if p.MaxTS > 0 {
 		if n := calcMetrics(mfs); n > p.MaxTS {
 			return nil, fmt.Errorf("'%s' num of time series (%d) > limit (%d)", p.URL, n, p.MaxTS)

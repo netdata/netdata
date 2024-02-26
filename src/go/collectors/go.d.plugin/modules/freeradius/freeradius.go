@@ -7,10 +7,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/modules/freeradius/api"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -24,72 +23,70 @@ func init() {
 }
 
 func New() *FreeRADIUS {
-	cfg := Config{
-		Address: "127.0.0.1",
-		Port:    18121,
-		Secret:  "adminsecret",
-		Timeout: web.Duration{Duration: time.Second},
-	}
 	return &FreeRADIUS{
-		Config: cfg,
+		Config: Config{
+			Address: "127.0.0.1",
+			Port:    18121,
+			Secret:  "adminsecret",
+			Timeout: web.Duration(time.Second),
+		},
 	}
+}
+
+type Config struct {
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	Address     string       `yaml:"address" json:"address"`
+	Port        int          `yaml:"port" json:"port"`
+	Secret      string       `yaml:"secret" json:"secret"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type (
+	FreeRADIUS struct {
+		module.Base
+		Config `yaml:",inline" json:""`
+
+		client
+	}
 	client interface {
 		Status() (*api.Status, error)
 	}
-	Config struct {
-		Address string
-		Port    int
-		Secret  string
-		Timeout web.Duration
-	}
-	FreeRADIUS struct {
-		module.Base
-		Config `yaml:",inline"`
-		client
-	}
 )
 
-func (f FreeRADIUS) validateConfig() error {
-	if f.Address == "" {
-		return errors.New("address not set")
-	}
-	if f.Port == 0 {
-		return errors.New("port not set")
-	}
-	if f.Secret == "" {
-		return errors.New("secret not set")
-	}
-	return nil
+func (f *FreeRADIUS) Configuration() any {
+	return f.Config
 }
 
-func (f *FreeRADIUS) initClient() {
+func (f *FreeRADIUS) Init() error {
+	if err := f.validateConfig(); err != nil {
+		f.Errorf("config validation: %v", err)
+		return err
+	}
+
 	f.client = api.New(api.Config{
 		Address: f.Address,
 		Port:    f.Port,
 		Secret:  f.Secret,
-		Timeout: f.Timeout.Duration,
+		Timeout: f.Timeout.Duration(),
 	})
+
+	return nil
 }
 
-func (f *FreeRADIUS) Init() bool {
-	err := f.validateConfig()
+func (f *FreeRADIUS) Check() error {
+	mx, err := f.collect()
 	if err != nil {
-		f.Errorf("error on validating config: %v", err)
-		return false
+		f.Error(err)
+		return err
 	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
 
-	f.initClient()
-	return true
+	}
+	return nil
 }
 
-func (f FreeRADIUS) Check() bool {
-	return len(f.Collect()) > 0
-}
-
-func (FreeRADIUS) Charts() *Charts {
+func (f *FreeRADIUS) Charts() *Charts {
 	return charts.Copy()
 }
 
@@ -105,4 +102,4 @@ func (f *FreeRADIUS) Collect() map[string]int64 {
 	return mx
 }
 
-func (FreeRADIUS) Cleanup() {}
+func (f *FreeRADIUS) Cleanup() {}

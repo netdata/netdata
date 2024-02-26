@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"bytes"
+	"fmt"
 	"text/template"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
@@ -61,7 +62,8 @@ func (c *configComposer) compose(tgt model.Target) []confgroup.Config {
 			c.buf.Reset()
 
 			if err := conf.tmpl.Execute(&c.buf, tgt); err != nil {
-				c.Warningf("failed to execute rule[%d]->config[%d]->template on target '%s'", i+1, j+1, tgt.TUID())
+				c.Warningf("failed to execute rule[%d]->config[%d]->template on target '%s': %v",
+					i+1, j+1, tgt.TUID(), err)
 				continue
 			}
 			if c.buf.Len() == 0 {
@@ -80,7 +82,7 @@ func (c *configComposer) compose(tgt model.Target) []confgroup.Config {
 	}
 
 	if len(configs) > 0 {
-		c.Infof("created %d config(s) for target '%s'", len(configs), tgt.TUID())
+		c.Debugf("created %d config(s) for target '%s'", len(configs), tgt.TUID())
 	}
 	return configs
 }
@@ -90,27 +92,29 @@ func newComposeRules(cfg []ComposeRuleConfig) ([]*composeRule, error) {
 
 	fmap := newFuncMap()
 
-	for _, ruleCfg := range cfg {
+	for i, ruleCfg := range cfg {
+		i++
 		rule := composeRule{name: ruleCfg.Name}
 
 		sr, err := parseSelector(ruleCfg.Selector)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("rule '%d': %v", i, err)
 		}
 		rule.sr = sr
 
-		for _, confCfg := range ruleCfg.Config {
+		for j, confCfg := range ruleCfg.Config {
+			j++
 			var conf composeRuleConf
 
 			sr, err := parseSelector(confCfg.Selector)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("rule '%d/%d': %v", i, j, err)
 			}
 			conf.sr = sr
 
 			tmpl, err := parseTemplate(confCfg.Template, fmap)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("rule '%d/%d': %v", i, j, err)
 			}
 			conf.tmpl = tmpl
 

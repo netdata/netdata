@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
-func (a Apache) verifyConfig() error {
+func (a *Apache) validateConfig() error {
 	if a.URL == "" {
 		return errors.New("url not set")
 	}
@@ -20,6 +20,6 @@ func (a Apache) verifyConfig() error {
 	return nil
 }
 
-func (a Apache) initHTTPClient() (*http.Client, error) {
+func (a *Apache) initHTTPClient() (*http.Client, error) {
 	return web.NewHTTPClient(a.Client)
 }

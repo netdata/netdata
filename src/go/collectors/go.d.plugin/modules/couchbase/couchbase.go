@@ -4,6 +4,7 @@ package couchbase
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"time"
 
@@ -32,7 +33,7 @@ func New() *Couchbase {
 					URL: "http://127.0.0.1:8091",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second * 5},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 		},
@@ -40,53 +41,60 @@ func New() *Couchbase {
 	}
 }
 
-type (
-	Config struct {
-		web.HTTP `yaml:",inline"`
-	}
-	Couchbase struct {
-		module.Base
-		Config `yaml:",inline"`
-
-		httpClient       *http.Client
-		charts           *module.Charts
-		collectedBuckets map[string]bool
-	}
-)
-
-func (cb *Couchbase) Cleanup() {
-	if cb.httpClient == nil {
-		return
-	}
-	cb.httpClient.CloseIdleConnections()
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
-func (cb *Couchbase) Init() bool {
+type Couchbase struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	httpClient *http.Client
+	charts     *module.Charts
+
+	collectedBuckets map[string]bool
+}
+
+func (cb *Couchbase) Configuration() any {
+	return cb.Config
+}
+
+func (cb *Couchbase) Init() error {
 	err := cb.validateConfig()
 	if err != nil {
 		cb.Errorf("check configuration: %v", err)
-		return false
+		return err
 	}
 
 	httpClient, err := cb.initHTTPClient()
 	if err != nil {
 		cb.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	cb.httpClient = httpClient
 
 	charts, err := cb.initCharts()
 	if err != nil {
 		cb.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
-
 	cb.charts = charts
-	return true
+
+	return nil
 }
 
-func (cb *Couchbase) Check() bool {
-	return len(cb.Collect()) > 0
+func (cb *Couchbase) Check() error {
+	mx, err := cb.collect()
+	if err != nil {
+		cb.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (cb *Couchbase) Charts() *Charts {
@@ -103,4 +111,11 @@ func (cb *Couchbase) Collect() map[string]int64 {
 		return nil
 	}
 	return mx
+}
+
+func (cb *Couchbase) Cleanup() {
+	if cb.httpClient == nil {
+		return
+	}
+	cb.httpClient.CloseIdleConnections()
 }

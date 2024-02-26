@@ -3,11 +3,10 @@
 package matcher
 
 import (
+	"errors"
 	"path/filepath"
 	"regexp"
 	"unicode/utf8"
-
-	"errors"
 )
 
 // globMatcher implements Matcher, it uses filepath.MatchString to match.

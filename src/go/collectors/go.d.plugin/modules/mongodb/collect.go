@@ -5,7 +5,7 @@ package mongo
 import "fmt"
 
 func (m *Mongo) collect() (map[string]int64, error) {
-	if err := m.conn.initClient(m.URI, m.Timeout); err != nil {
+	if err := m.conn.initClient(m.URI, m.Timeout.Duration()); err != nil {
 		return nil, fmt.Errorf("init mongo conn: %v", err)
 	}
 

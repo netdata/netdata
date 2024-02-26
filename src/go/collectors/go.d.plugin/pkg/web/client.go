@@ -21,18 +21,18 @@ var ErrRedirectAttempted = errors.New("redirect")
 type Client struct {
 	// Timeout specifies a time limit for requests made by this Client.
 	// Default (zero value) is no timeout. Must be set before http.Client creation.
-	Timeout Duration `yaml:"timeout"`
+	Timeout Duration `yaml:"timeout" json:"timeout"`
 
 	// NotFollowRedirect specifies the policy for handling redirects.
 	// Default (zero value) is std http package default policy (stop after 10 consecutive requests).
-	NotFollowRedirect bool `yaml:"not_follow_redirects"`
+	NotFollowRedirect bool `yaml:"not_follow_redirects" json:"not_follow_redirects"`
 
 	// ProxyURL specifies the URL of the proxy to use. An empty string means use the environment variables
 	// HTTP_PROXY, HTTPS_PROXY and NO_PROXY (or the lowercase versions thereof) to get the URL.
-	ProxyURL string `yaml:"proxy_url"`
+	ProxyURL string `yaml:"proxy_url" json:"proxy_url"`
 
 	// TLSConfig specifies the TLS configuration.
-	tlscfg.TLSConfig `yaml:",inline"`
+	tlscfg.TLSConfig `yaml:",inline" json:",inline"`
 }
 
 // NewHTTPClient returns a new *http.Client given a Client configuration and an error if any.
@@ -48,17 +48,17 @@ func NewHTTPClient(cfg Client) (*http.Client, error) {
 		}
 	}
 
-	d := &net.Dialer{Timeout: cfg.Timeout.Duration}
+	d := &net.Dialer{Timeout: cfg.Timeout.Duration()}
 
 	transport := &http.Transport{
 		Proxy:               proxyFunc(cfg.ProxyURL),
 		TLSClientConfig:     tlsConfig,
 		DialContext:         d.DialContext,
-		TLSHandshakeTimeout: cfg.Timeout.Duration,
+		TLSHandshakeTimeout: cfg.Timeout.Duration(),
 	}
 
 	return &http.Client{
-		Timeout:       cfg.Timeout.Duration,
+		Timeout:       cfg.Timeout.Duration(),
 		Transport:     transport,
 		CheckRedirect: redirectFunc(cfg.NotFollowRedirect),
 	}, nil

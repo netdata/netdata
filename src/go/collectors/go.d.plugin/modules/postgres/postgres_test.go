@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -20,91 +21,82 @@ import (
 )
 
 var (
-	dataV140004ServerVersionNum, _ = os.ReadFile("testdata/v14.4/server_version_num.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataV140004IsSuperUserFalse, _       = os.ReadFile("testdata/v14.4/is_super_user-false.txt")
-	dataV140004IsSuperUserTrue, _        = os.ReadFile("testdata/v14.4/is_super_user-true.txt")
-	dataV140004PGIsInRecoveryTrue, _     = os.ReadFile("testdata/v14.4/pg_is_in_recovery-true.txt")
-	dataV140004SettingsMaxConnections, _ = os.ReadFile("testdata/v14.4/settings_max_connections.txt")
-	dataV140004SettingsMaxLocksHeld, _   = os.ReadFile("testdata/v14.4/settings_max_locks_held.txt")
-
-	dataV140004ServerCurrentConnections, _ = os.ReadFile("testdata/v14.4/server_current_connections.txt")
-	dataV140004ServerConnectionsState, _   = os.ReadFile("testdata/v14.4/server_connections_state.txt")
-	dataV140004Checkpoints, _              = os.ReadFile("testdata/v14.4/checkpoints.txt")
-	dataV140004ServerUptime, _             = os.ReadFile("testdata/v14.4/uptime.txt")
-	dataV140004TXIDWraparound, _           = os.ReadFile("testdata/v14.4/txid_wraparound.txt")
-	dataV140004WALWrites, _                = os.ReadFile("testdata/v14.4/wal_writes.txt")
-	dataV140004WALFiles, _                 = os.ReadFile("testdata/v14.4/wal_files.txt")
-	dataV140004WALArchiveFiles, _          = os.ReadFile("testdata/v14.4/wal_archive_files.txt")
-	dataV140004CatalogRelations, _         = os.ReadFile("testdata/v14.4/catalog_relations.txt")
-	dataV140004AutovacuumWorkers, _        = os.ReadFile("testdata/v14.4/autovacuum_workers.txt")
-	dataV140004XactQueryRunningTime, _     = os.ReadFile("testdata/v14.4/xact_query_running_time.txt")
-
-	dataV140004ReplStandbyAppDelta, _ = os.ReadFile("testdata/v14.4/replication_standby_app_wal_delta.txt")
-	dataV140004ReplStandbyAppLag, _   = os.ReadFile("testdata/v14.4/replication_standby_app_wal_lag.txt")
-
-	dataV140004ReplSlotFiles, _ = os.ReadFile("testdata/v14.4/replication_slot_files.txt")
-
-	dataV140004DatabaseStats, _     = os.ReadFile("testdata/v14.4/database_stats.txt")
-	dataV140004DatabaseSize, _      = os.ReadFile("testdata/v14.4/database_size.txt")
-	dataV140004DatabaseConflicts, _ = os.ReadFile("testdata/v14.4/database_conflicts.txt")
-	dataV140004DatabaseLocks, _     = os.ReadFile("testdata/v14.4/database_locks.txt")
-
-	dataV140004QueryableDatabaseList, _ = os.ReadFile("testdata/v14.4/queryable_database_list.txt")
-
-	dataV140004StatUserTablesDBPostgres, _   = os.ReadFile("testdata/v14.4/stat_user_tables_db_postgres.txt")
-	dataV140004StatIOUserTablesDBPostgres, _ = os.ReadFile("testdata/v14.4/statio_user_tables_db_postgres.txt")
-
-	dataV140004StatUserIndexesDBPostgres, _ = os.ReadFile("testdata/v14.4/stat_user_indexes_db_postgres.txt")
-
-	dataV140004Bloat, _        = os.ReadFile("testdata/v14.4/bloat_tables.txt")
-	dataV140004ColumnsStats, _ = os.ReadFile("testdata/v14.4/table_columns_stats.txt")
+	dataVer140004ServerVersionNum, _           = os.ReadFile("testdata/v14.4/server_version_num.txt")
+	dataVer140004IsSuperUserFalse, _           = os.ReadFile("testdata/v14.4/is_super_user-false.txt")
+	dataVer140004IsSuperUserTrue, _            = os.ReadFile("testdata/v14.4/is_super_user-true.txt")
+	dataVer140004PGIsInRecoveryTrue, _         = os.ReadFile("testdata/v14.4/pg_is_in_recovery-true.txt")
+	dataVer140004SettingsMaxConnections, _     = os.ReadFile("testdata/v14.4/settings_max_connections.txt")
+	dataVer140004SettingsMaxLocksHeld, _       = os.ReadFile("testdata/v14.4/settings_max_locks_held.txt")
+	dataVer140004ServerCurrentConnections, _   = os.ReadFile("testdata/v14.4/server_current_connections.txt")
+	dataVer140004ServerConnectionsState, _     = os.ReadFile("testdata/v14.4/server_connections_state.txt")
+	dataVer140004Checkpoints, _                = os.ReadFile("testdata/v14.4/checkpoints.txt")
+	dataVer140004ServerUptime, _               = os.ReadFile("testdata/v14.4/uptime.txt")
+	dataVer140004TXIDWraparound, _             = os.ReadFile("testdata/v14.4/txid_wraparound.txt")
+	dataVer140004WALWrites, _                  = os.ReadFile("testdata/v14.4/wal_writes.txt")
+	dataVer140004WALFiles, _                   = os.ReadFile("testdata/v14.4/wal_files.txt")
+	dataVer140004WALArchiveFiles, _            = os.ReadFile("testdata/v14.4/wal_archive_files.txt")
+	dataVer140004CatalogRelations, _           = os.ReadFile("testdata/v14.4/catalog_relations.txt")
+	dataVer140004AutovacuumWorkers, _          = os.ReadFile("testdata/v14.4/autovacuum_workers.txt")
+	dataVer140004XactQueryRunningTime, _       = os.ReadFile("testdata/v14.4/xact_query_running_time.txt")
+	dataVer140004ReplStandbyAppDelta, _        = os.ReadFile("testdata/v14.4/replication_standby_app_wal_delta.txt")
+	dataVer140004ReplStandbyAppLag, _          = os.ReadFile("testdata/v14.4/replication_standby_app_wal_lag.txt")
+	dataVer140004ReplSlotFiles, _              = os.ReadFile("testdata/v14.4/replication_slot_files.txt")
+	dataVer140004DatabaseStats, _              = os.ReadFile("testdata/v14.4/database_stats.txt")
+	dataVer140004DatabaseSize, _               = os.ReadFile("testdata/v14.4/database_size.txt")
+	dataVer140004DatabaseConflicts, _          = os.ReadFile("testdata/v14.4/database_conflicts.txt")
+	dataVer140004DatabaseLocks, _              = os.ReadFile("testdata/v14.4/database_locks.txt")
+	dataVer140004QueryableDatabaseList, _      = os.ReadFile("testdata/v14.4/queryable_database_list.txt")
+	dataVer140004StatUserTablesDBPostgres, _   = os.ReadFile("testdata/v14.4/stat_user_tables_db_postgres.txt")
+	dataVer140004StatIOUserTablesDBPostgres, _ = os.ReadFile("testdata/v14.4/statio_user_tables_db_postgres.txt")
+	dataVer140004StatUserIndexesDBPostgres, _  = os.ReadFile("testdata/v14.4/stat_user_indexes_db_postgres.txt")
+	dataVer140004Bloat, _                      = os.ReadFile("testdata/v14.4/bloat_tables.txt")
+	dataVer140004ColumnsStats, _               = os.ReadFile("testdata/v14.4/table_columns_stats.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataV140004ServerVersionNum": dataV140004ServerVersionNum,
-
-		"dataV140004IsSuperUserFalse":       dataV140004IsSuperUserFalse,
-		"dataV140004IsSuperUserTrue":        dataV140004IsSuperUserTrue,
-		"dataV140004PGIsInRecoveryTrue":     dataV140004PGIsInRecoveryTrue,
-		"dataV140004SettingsMaxConnections": dataV140004SettingsMaxConnections,
-		"dataV140004SettingsMaxLocksHeld":   dataV140004SettingsMaxLocksHeld,
-
-		"dataV140004ServerCurrentConnections": dataV140004ServerCurrentConnections,
-		"dataV140004ServerConnectionsState":   dataV140004ServerConnectionsState,
-		"dataV140004Checkpoints":              dataV140004Checkpoints,
-		"dataV140004ServerUptime":             dataV140004ServerUptime,
-		"dataV140004TXIDWraparound":           dataV140004TXIDWraparound,
-		"dataV140004WALWrites":                dataV140004WALWrites,
-		"dataV140004WALFiles":                 dataV140004WALFiles,
-		"dataV140004WALArchiveFiles":          dataV140004WALArchiveFiles,
-		"dataV140004CatalogRelations":         dataV140004CatalogRelations,
-		"dataV140004AutovacuumWorkers":        dataV140004AutovacuumWorkers,
-		"dataV140004XactQueryRunningTime":     dataV140004XactQueryRunningTime,
-
-		"dataV14004ReplStandbyAppDelta": dataV140004ReplStandbyAppDelta,
-		"dataV14004ReplStandbyAppLag":   dataV140004ReplStandbyAppLag,
-
-		"dataV140004ReplSlotFiles": dataV140004ReplSlotFiles,
-
-		"dataV140004DatabaseStats":     dataV140004DatabaseStats,
-		"dataV140004DatabaseSize":      dataV140004DatabaseSize,
-		"dataV140004DatabaseConflicts": dataV140004DatabaseConflicts,
-		"dataV140004DatabaseLocks":     dataV140004DatabaseLocks,
-
-		"dataV140004QueryableDatabaseList": dataV140004QueryableDatabaseList,
-
-		"dataV140004StatUserTablesDBPostgres":   dataV140004StatUserTablesDBPostgres,
-		"dataV140004StatIOUserTablesDBPostgres": dataV140004StatIOUserTablesDBPostgres,
-
-		"dataV140004StatUserIndexesDBPostgres": dataV140004StatUserIndexesDBPostgres,
-
-		"dataV140004Bloat":        dataV140004Bloat,
-		"dataV140004ColumnsStats": dataV140004ColumnsStats,
+		"dataConfigJSON":                          dataConfigJSON,
+		"dataConfigYAML":                          dataConfigYAML,
+		"dataVer140004ServerVersionNum":           dataVer140004ServerVersionNum,
+		"dataVer140004IsSuperUserFalse":           dataVer140004IsSuperUserFalse,
+		"dataVer140004IsSuperUserTrue":            dataVer140004IsSuperUserTrue,
+		"dataVer140004PGIsInRecoveryTrue":         dataVer140004PGIsInRecoveryTrue,
+		"dataVer140004SettingsMaxConnections":     dataVer140004SettingsMaxConnections,
+		"dataVer140004SettingsMaxLocksHeld":       dataVer140004SettingsMaxLocksHeld,
+		"dataVer140004ServerCurrentConnections":   dataVer140004ServerCurrentConnections,
+		"dataVer140004ServerConnectionsState":     dataVer140004ServerConnectionsState,
+		"dataVer140004Checkpoints":                dataVer140004Checkpoints,
+		"dataVer140004ServerUptime":               dataVer140004ServerUptime,
+		"dataVer140004TXIDWraparound":             dataVer140004TXIDWraparound,
+		"dataVer140004WALWrites":                  dataVer140004WALWrites,
+		"dataVer140004WALFiles":                   dataVer140004WALFiles,
+		"dataVer140004WALArchiveFiles":            dataVer140004WALArchiveFiles,
+		"dataVer140004CatalogRelations":           dataVer140004CatalogRelations,
+		"dataVer140004AutovacuumWorkers":          dataVer140004AutovacuumWorkers,
+		"dataVer140004XactQueryRunningTime":       dataVer140004XactQueryRunningTime,
+		"dataV14004ReplStandbyAppDelta":           dataVer140004ReplStandbyAppDelta,
+		"dataV14004ReplStandbyAppLag":             dataVer140004ReplStandbyAppLag,
+		"dataVer140004ReplSlotFiles":              dataVer140004ReplSlotFiles,
+		"dataVer140004DatabaseStats":              dataVer140004DatabaseStats,
+		"dataVer140004DatabaseSize":               dataVer140004DatabaseSize,
+		"dataVer140004DatabaseConflicts":          dataVer140004DatabaseConflicts,
+		"dataVer140004DatabaseLocks":              dataVer140004DatabaseLocks,
+		"dataVer140004QueryableDatabaseList":      dataVer140004QueryableDatabaseList,
+		"dataVer140004StatUserTablesDBPostgres":   dataVer140004StatUserTablesDBPostgres,
+		"dataVer140004StatIOUserTablesDBPostgres": dataVer140004StatIOUserTablesDBPostgres,
+		"dataVer140004StatUserIndexesDBPostgres":  dataVer140004StatUserIndexesDBPostgres,
+		"dataVer140004Bloat":                      dataVer140004Bloat,
+		"dataVer140004ColumnsStats":               dataVer140004ColumnsStats,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
+}
+
+func TestPostgres_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Postgres{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestPostgres_Init(t *testing.T) {
@@ -128,9 +120,9 @@ func TestPostgres_Init(t *testing.T) {
 			pg.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, pg.Init())
+				assert.Error(t, pg.Init())
 			} else {
-				assert.True(t, pg.Init())
+				assert.NoError(t, pg.Init())
 			}
 		})
 	}
@@ -154,54 +146,54 @@ func TestPostgres_Check(t *testing.T) {
 			prepareMock: func(t *testing.T, pg *Postgres, m sqlmock.Sqlmock) {
 				pg.dbSr = matcher.TRUE()
 
-				mockExpect(t, m, queryServerVersion(), dataV140004ServerVersionNum)
-				mockExpect(t, m, queryIsSuperUser(), dataV140004IsSuperUserTrue)
-				mockExpect(t, m, queryPGIsInRecovery(), dataV140004PGIsInRecoveryTrue)
+				mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
+				mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+				mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
-				mockExpect(t, m, querySettingsMaxConnections(), dataV140004SettingsMaxConnections)
-				mockExpect(t, m, querySettingsMaxLocksHeld(), dataV140004SettingsMaxLocksHeld)
+				mockExpect(t, m, querySettingsMaxConnections(), dataVer140004SettingsMaxConnections)
+				mockExpect(t, m, querySettingsMaxLocksHeld(), dataVer140004SettingsMaxLocksHeld)
 
-				mockExpect(t, m, queryServerCurrentConnectionsUsed(), dataV140004ServerCurrentConnections)
-				mockExpect(t, m, queryServerConnectionsState(), dataV140004ServerConnectionsState)
-				mockExpect(t, m, queryCheckpoints(), dataV140004Checkpoints)
-				mockExpect(t, m, queryServerUptime(), dataV140004ServerUptime)
-				mockExpect(t, m, queryTXIDWraparound(), dataV140004TXIDWraparound)
-				mockExpect(t, m, queryWALWrites(140004), dataV140004WALWrites)
-				mockExpect(t, m, queryCatalogRelations(), dataV140004CatalogRelations)
-				mockExpect(t, m, queryAutovacuumWorkers(), dataV140004AutovacuumWorkers)
-				mockExpect(t, m, queryXactQueryRunningTime(), dataV140004XactQueryRunningTime)
+				mockExpect(t, m, queryServerCurrentConnectionsUsed(), dataVer140004ServerCurrentConnections)
+				mockExpect(t, m, queryServerConnectionsState(), dataVer140004ServerConnectionsState)
+				mockExpect(t, m, queryCheckpoints(), dataVer140004Checkpoints)
+				mockExpect(t, m, queryServerUptime(), dataVer140004ServerUptime)
+				mockExpect(t, m, queryTXIDWraparound(), dataVer140004TXIDWraparound)
+				mockExpect(t, m, queryWALWrites(140004), dataVer140004WALWrites)
+				mockExpect(t, m, queryCatalogRelations(), dataVer140004CatalogRelations)
+				mockExpect(t, m, queryAutovacuumWorkers(), dataVer140004AutovacuumWorkers)
+				mockExpect(t, m, queryXactQueryRunningTime(), dataVer140004XactQueryRunningTime)
 
-				mockExpect(t, m, queryWALFiles(140004), dataV140004WALFiles)
-				mockExpect(t, m, queryWALArchiveFiles(140004), dataV140004WALArchiveFiles)
+				mockExpect(t, m, queryWALFiles(140004), dataVer140004WALFiles)
+				mockExpect(t, m, queryWALArchiveFiles(140004), dataVer140004WALArchiveFiles)
 
-				mockExpect(t, m, queryReplicationStandbyAppDelta(140004), dataV140004ReplStandbyAppDelta)
-				mockExpect(t, m, queryReplicationStandbyAppLag(), dataV140004ReplStandbyAppLag)
-				mockExpect(t, m, queryReplicationSlotFiles(140004), dataV140004ReplSlotFiles)
+				mockExpect(t, m, queryReplicationStandbyAppDelta(140004), dataVer140004ReplStandbyAppDelta)
+				mockExpect(t, m, queryReplicationStandbyAppLag(), dataVer140004ReplStandbyAppLag)
+				mockExpect(t, m, queryReplicationSlotFiles(140004), dataVer140004ReplSlotFiles)
 
-				mockExpect(t, m, queryDatabaseStats(), dataV140004DatabaseStats)
-				mockExpect(t, m, queryDatabaseSize(140004), dataV140004DatabaseSize)
-				mockExpect(t, m, queryDatabaseConflicts(), dataV140004DatabaseConflicts)
-				mockExpect(t, m, queryDatabaseLocks(), dataV140004DatabaseLocks)
+				mockExpect(t, m, queryDatabaseStats(), dataVer140004DatabaseStats)
+				mockExpect(t, m, queryDatabaseSize(140004), dataVer140004DatabaseSize)
+				mockExpect(t, m, queryDatabaseConflicts(), dataVer140004DatabaseConflicts)
+				mockExpect(t, m, queryDatabaseLocks(), dataVer140004DatabaseLocks)
 
-				mockExpect(t, m, queryQueryableDatabaseList(), dataV140004QueryableDatabaseList)
-				mockExpect(t, m, queryStatUserTables(), dataV140004StatUserTablesDBPostgres)
-				mockExpect(t, m, queryStatIOUserTables(), dataV140004StatIOUserTablesDBPostgres)
-				mockExpect(t, m, queryStatUserIndexes(), dataV140004StatUserIndexesDBPostgres)
-				mockExpect(t, m, queryBloat(), dataV140004Bloat)
-				mockExpect(t, m, queryColumnsStats(), dataV140004ColumnsStats)
+				mockExpect(t, m, queryQueryableDatabaseList(), dataVer140004QueryableDatabaseList)
+				mockExpect(t, m, queryStatUserTables(), dataVer140004StatUserTablesDBPostgres)
+				mockExpect(t, m, queryStatIOUserTables(), dataVer140004StatIOUserTablesDBPostgres)
+				mockExpect(t, m, queryStatUserIndexes(), dataVer140004StatUserIndexesDBPostgres)
+				mockExpect(t, m, queryBloat(), dataVer140004Bloat)
+				mockExpect(t, m, queryColumnsStats(), dataVer140004ColumnsStats)
 			},
 		},
 		"Fail when the second query unsuccessful (v14.4)": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, pg *Postgres, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryServerVersion(), dataV140004ServerVersionNum)
-				mockExpect(t, m, queryIsSuperUser(), dataV140004IsSuperUserTrue)
-				mockExpect(t, m, queryPGIsInRecovery(), dataV140004PGIsInRecoveryTrue)
+				mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
+				mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+				mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
-				mockExpect(t, m, querySettingsMaxConnections(), dataV140004ServerVersionNum)
-				mockExpect(t, m, querySettingsMaxLocksHeld(), dataV140004SettingsMaxLocksHeld)
+				mockExpect(t, m, querySettingsMaxConnections(), dataVer140004ServerVersionNum)
+				mockExpect(t, m, querySettingsMaxLocksHeld(), dataVer140004SettingsMaxLocksHeld)
 
-				mockExpect(t, m, queryServerCurrentConnectionsUsed(), dataV140004ServerCurrentConnections)
+				mockExpect(t, m, queryServerCurrentConnectionsUsed(), dataVer140004ServerCurrentConnections)
 				mockExpectErr(m, queryServerConnectionsState())
 			},
 		},
@@ -214,9 +206,9 @@ func TestPostgres_Check(t *testing.T) {
 		"Fail when querying settings max connection returns an error": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, pg *Postgres, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryServerVersion(), dataV140004ServerVersionNum)
-				mockExpect(t, m, queryIsSuperUser(), dataV140004IsSuperUserTrue)
-				mockExpect(t, m, queryPGIsInRecovery(), dataV140004PGIsInRecoveryTrue)
+				mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
+				mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+				mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 				mockExpectErr(m, querySettingsMaxConnections())
 			},
@@ -233,14 +225,14 @@ func TestPostgres_Check(t *testing.T) {
 			pg.db = db
 			defer func() { _ = db.Close() }()
 
-			require.True(t, pg.Init())
+			require.NoError(t, pg.Init())
 
 			test.prepareMock(t, pg, mock)
 
 			if test.wantFail {
-				assert.False(t, pg.Check())
+				assert.Error(t, pg.Check())
 			} else {
-				assert.True(t, pg.Check())
+				assert.NoError(t, pg.Check())
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -257,41 +249,41 @@ func TestPostgres_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, pg *Postgres, m sqlmock.Sqlmock) {
 					pg.dbSr = matcher.TRUE()
-					mockExpect(t, m, queryServerVersion(), dataV140004ServerVersionNum)
-					mockExpect(t, m, queryIsSuperUser(), dataV140004IsSuperUserTrue)
-					mockExpect(t, m, queryPGIsInRecovery(), dataV140004PGIsInRecoveryTrue)
+					mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
+					mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+					mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
-					mockExpect(t, m, querySettingsMaxConnections(), dataV140004SettingsMaxConnections)
-					mockExpect(t, m, querySettingsMaxLocksHeld(), dataV140004SettingsMaxLocksHeld)
+					mockExpect(t, m, querySettingsMaxConnections(), dataVer140004SettingsMaxConnections)
+					mockExpect(t, m, querySettingsMaxLocksHeld(), dataVer140004SettingsMaxLocksHeld)
 
-					mockExpect(t, m, queryServerCurrentConnectionsUsed(), dataV140004ServerCurrentConnections)
-					mockExpect(t, m, queryServerConnectionsState(), dataV140004ServerConnectionsState)
-					mockExpect(t, m, queryCheckpoints(), dataV140004Checkpoints)
-					mockExpect(t, m, queryServerUptime(), dataV140004ServerUptime)
-					mockExpect(t, m, queryTXIDWraparound(), dataV140004TXIDWraparound)
-					mockExpect(t, m, queryWALWrites(140004), dataV140004WALWrites)
-					mockExpect(t, m, queryCatalogRelations(), dataV140004CatalogRelations)
-					mockExpect(t, m, queryAutovacuumWorkers(), dataV140004AutovacuumWorkers)
-					mockExpect(t, m, queryXactQueryRunningTime(), dataV140004XactQueryRunningTime)
+					mockExpect(t, m, queryServerCurrentConnectionsUsed(), dataVer140004ServerCurrentConnections)
+					mockExpect(t, m, queryServerConnectionsState(), dataVer140004ServerConnectionsState)
+					mockExpect(t, m, queryCheckpoints(), dataVer140004Checkpoints)
+					mockExpect(t, m, queryServerUptime(), dataVer140004ServerUptime)
+					mockExpect(t, m, queryTXIDWraparound(), dataVer140004TXIDWraparound)
+					mockExpect(t, m, queryWALWrites(140004), dataVer140004WALWrites)
+					mockExpect(t, m, queryCatalogRelations(), dataVer140004CatalogRelations)
+					mockExpect(t, m, queryAutovacuumWorkers(), dataVer140004AutovacuumWorkers)
+					mockExpect(t, m, queryXactQueryRunningTime(), dataVer140004XactQueryRunningTime)
 
-					mockExpect(t, m, queryWALFiles(140004), dataV140004WALFiles)
-					mockExpect(t, m, queryWALArchiveFiles(140004), dataV140004WALArchiveFiles)
+					mockExpect(t, m, queryWALFiles(140004), dataVer140004WALFiles)
+					mockExpect(t, m, queryWALArchiveFiles(140004), dataVer140004WALArchiveFiles)
 
-					mockExpect(t, m, queryReplicationStandbyAppDelta(140004), dataV140004ReplStandbyAppDelta)
-					mockExpect(t, m, queryReplicationStandbyAppLag(), dataV140004ReplStandbyAppLag)
-					mockExpect(t, m, queryReplicationSlotFiles(140004), dataV140004ReplSlotFiles)
+					mockExpect(t, m, queryReplicationStandbyAppDelta(140004), dataVer140004ReplStandbyAppDelta)
+					mockExpect(t, m, queryReplicationStandbyAppLag(), dataVer140004ReplStandbyAppLag)
+					mockExpect(t, m, queryReplicationSlotFiles(140004), dataVer140004ReplSlotFiles)
 
-					mockExpect(t, m, queryDatabaseStats(), dataV140004DatabaseStats)
-					mockExpect(t, m, queryDatabaseSize(140004), dataV140004DatabaseSize)
-					mockExpect(t, m, queryDatabaseConflicts(), dataV140004DatabaseConflicts)
-					mockExpect(t, m, queryDatabaseLocks(), dataV140004DatabaseLocks)
+					mockExpect(t, m, queryDatabaseStats(), dataVer140004DatabaseStats)
+					mockExpect(t, m, queryDatabaseSize(140004), dataVer140004DatabaseSize)
+					mockExpect(t, m, queryDatabaseConflicts(), dataVer140004DatabaseConflicts)
+					mockExpect(t, m, queryDatabaseLocks(), dataVer140004DatabaseLocks)
 
-					mockExpect(t, m, queryQueryableDatabaseList(), dataV140004QueryableDatabaseList)
-					mockExpect(t, m, queryStatUserTables(), dataV140004StatUserTablesDBPostgres)
-					mockExpect(t, m, queryStatIOUserTables(), dataV140004StatIOUserTablesDBPostgres)
-					mockExpect(t, m, queryStatUserIndexes(), dataV140004StatUserIndexesDBPostgres)
-					mockExpect(t, m, queryBloat(), dataV140004Bloat)
-					mockExpect(t, m, queryColumnsStats(), dataV140004ColumnsStats)
+					mockExpect(t, m, queryQueryableDatabaseList(), dataVer140004QueryableDatabaseList)
+					mockExpect(t, m, queryStatUserTables(), dataVer140004StatUserTablesDBPostgres)
+					mockExpect(t, m, queryStatIOUserTables(), dataVer140004StatIOUserTablesDBPostgres)
+					mockExpect(t, m, queryStatUserIndexes(), dataVer140004StatUserIndexesDBPostgres)
+					mockExpect(t, m, queryBloat(), dataVer140004Bloat)
+					mockExpect(t, m, queryColumnsStats(), dataVer140004ColumnsStats)
 				},
 				check: func(t *testing.T, pg *Postgres) {
 					mx := pg.Collect()
@@ -625,9 +617,9 @@ func TestPostgres_Collect(t *testing.T) {
 		"Fail when querying settings max connections returns an error": {
 			{
 				prepareMock: func(t *testing.T, pg *Postgres, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryServerVersion(), dataV140004ServerVersionNum)
-					mockExpect(t, m, queryIsSuperUser(), dataV140004IsSuperUserTrue)
-					mockExpect(t, m, queryPGIsInRecovery(), dataV140004PGIsInRecoveryTrue)
+					mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
+					mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+					mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
 					mockExpectErr(m, querySettingsMaxConnections())
 				},
@@ -641,12 +633,12 @@ func TestPostgres_Collect(t *testing.T) {
 		"Fail when querying the server connections returns an error": {
 			{
 				prepareMock: func(t *testing.T, pg *Postgres, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryServerVersion(), dataV140004ServerVersionNum)
-					mockExpect(t, m, queryIsSuperUser(), dataV140004IsSuperUserTrue)
-					mockExpect(t, m, queryPGIsInRecovery(), dataV140004PGIsInRecoveryTrue)
+					mockExpect(t, m, queryServerVersion(), dataVer140004ServerVersionNum)
+					mockExpect(t, m, queryIsSuperUser(), dataVer140004IsSuperUserTrue)
+					mockExpect(t, m, queryPGIsInRecovery(), dataVer140004PGIsInRecoveryTrue)
 
-					mockExpect(t, m, querySettingsMaxConnections(), dataV140004SettingsMaxConnections)
-					mockExpect(t, m, querySettingsMaxLocksHeld(), dataV140004SettingsMaxLocksHeld)
+					mockExpect(t, m, querySettingsMaxConnections(), dataVer140004SettingsMaxConnections)
+					mockExpect(t, m, querySettingsMaxLocksHeld(), dataVer140004SettingsMaxLocksHeld)
 
 					mockExpectErr(m, queryServerCurrentConnectionsUsed())
 				},
@@ -669,7 +661,7 @@ func TestPostgres_Collect(t *testing.T) {
 			pg.db = db
 			defer func() { _ = db.Close() }()
 
-			require.True(t, pg.Init())
+			require.NoError(t, pg.Init())
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {

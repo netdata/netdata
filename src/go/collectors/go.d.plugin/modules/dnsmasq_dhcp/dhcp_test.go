@@ -3,10 +3,18 @@
 package dnsmasq_dhcp
 
 import (
+	"os"
 	"testing"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 )
 
 const (
@@ -15,10 +23,17 @@ const (
 	testConfDir    = "testdata/dnsmasq.d"
 )
 
-func TestNew(t *testing.T) {
-	job := New()
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
 
-	assert.IsType(t, (*DnsmasqDHCP)(nil), job)
+func TestDnsmasqDHCP_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &DnsmasqDHCP{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestDnsmasqDHCP_Init(t *testing.T) {
@@ -27,14 +42,14 @@ func TestDnsmasqDHCP_Init(t *testing.T) {
 	job.ConfPath = testConfPath
 	job.ConfDir = testConfDir
 
-	assert.True(t, job.Init())
+	assert.NoError(t, job.Init())
 }
 
 func TestDnsmasqDHCP_InitEmptyLeasesPath(t *testing.T) {
 	job := New()
 	job.LeasesPath = ""
 
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestDnsmasqDHCP_InitInvalidLeasesPath(t *testing.T) {
@@ -42,7 +57,7 @@ func TestDnsmasqDHCP_InitInvalidLeasesPath(t *testing.T) {
 	job.LeasesPath = testLeasesPath
 	job.LeasesPath += "!"
 
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestDnsmasqDHCP_InitZeroDHCPRanges(t *testing.T) {
@@ -51,7 +66,7 @@ func TestDnsmasqDHCP_InitZeroDHCPRanges(t *testing.T) {
 	job.ConfPath = "testdata/dnsmasq3.conf"
 	job.ConfDir = ""
 
-	assert.True(t, job.Init())
+	assert.NoError(t, job.Init())
 }
 
 func TestDnsmasqDHCP_Check(t *testing.T) {
@@ -60,8 +75,8 @@ func TestDnsmasqDHCP_Check(t *testing.T) {
 	job.ConfPath = testConfPath
 	job.ConfDir = testConfDir
 
-	require.True(t, job.Init())
-	assert.True(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.NoError(t, job.Check())
 }
 
 func TestDnsmasqDHCP_Charts(t *testing.T) {
@@ -70,7 +85,7 @@ func TestDnsmasqDHCP_Charts(t *testing.T) {
 	job.ConfPath = testConfPath
 	job.ConfDir = testConfDir
 
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
 	assert.NotNil(t, job.Charts())
 }
@@ -85,8 +100,8 @@ func TestDnsmasqDHCP_Collect(t *testing.T) {
 	job.ConfPath = testConfPath
 	job.ConfDir = testConfDir
 
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	expected := map[string]int64{
 		"dhcp_range_1230::1-1230::64_allocated_leases":              7,
@@ -126,8 +141,8 @@ func TestDnsmasqDHCP_CollectFailedToOpenLeasesPath(t *testing.T) {
 	job.ConfPath = testConfPath
 	job.ConfDir = testConfDir
 
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	job.LeasesPath = ""
 	assert.Nil(t, job.Collect())

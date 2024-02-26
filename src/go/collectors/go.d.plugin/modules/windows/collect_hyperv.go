@@ -12,17 +12,6 @@ const (
 	metricHypervHealthCritical = "windows_hyperv_health_critical"
 	metricHypervHealthOK       = "windows_hyperv_health_ok"
 
-	metricHypervHypervisorLogicalProcessors = "windows_hyperv_hypervisor_logical_processors"
-	metricHypervHypervisorVirtualProcessors = "windows_hyperv_hypervisor_virtual_processors"
-
-	metricHypervHostCPUGuestRunTime            = "windows_hyperv_host_cpu_guest_run_time"
-	metricHypervHostCPUHypervisorRunTime       = "windows_hyperv_host_cpu_hypervisor_run_time"
-	metricHypervHostCPURemoteRunTime           = "windows_hyperv_host_cpu_remote_run_time"
-	metricHypervHostCPUTotalRunTime            = "windows_hyperv_host_cpu_total_run_time"
-	metricHypervHostLPGuestRunTimePercent      = "windows_hyperv_host_lp_guest_run_time_percent"
-	metricHypervHostLPHypervisorRunTimePercent = "windows_hyperv_host_lp_hypervisor_run_time_percent"
-	metricHypervHostLPTotalRunTimePercent      = "windows_hyperv_host_lp_total_run_time_percent"
-
 	metricHypervRootPartition4KGPAPages                    = "windows_hyperv_root_partition_4K_gpa_pages"
 	metricHypervRootPartition2MGPAPages                    = "windows_hyperv_root_partition_2M_gpa_pages"
 	metricHypervRootPartition1GGPAPages                    = "windows_hyperv_root_partition_1G_gpa_pages"

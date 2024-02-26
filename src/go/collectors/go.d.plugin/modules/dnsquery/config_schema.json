@@ -1,48 +1,114 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/dns_query job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
-    },
-    "domains": {
-      "type": "array",
-      "items": {
-        "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "DNS query collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 5
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for DNS queries, in seconds.",
+        "type": "number",
+        "default": 2
+      },
+      "network": {
+        "title": "Protocol",
+        "description": "Network protocol for DNS queries.",
+        "type": "string",
+        "enum": [
+          "udp",
+          "tcp",
+          "tcp-tls"
+        ],
+        "default": "udp"
+      },
+      "port": {
+        "title": "Port",
+        "description": "Port number for DNS servers.",
+        "type": "integer",
+        "default": 53
+      },
+      "record_types": {
+        "title": "Record types",
+        "description": "Types of DNS records to query for each server.",
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "A",
+            "AAAA",
+            "ANY",
+            "CNAME",
+            "MX",
+            "NS",
+            "PTR",
+            "SOA",
+            "SPF",
+            "SRV",
+            "TXT"
+          ],
+          "default": "A"
+        },
+        "default": [
+          "A"
+        ],
+        "uniqueItems": true
+      },
+      "servers": {
+        "title": "Servers",
+        "description": "List of DNS servers to query.",
+        "type": "array",
+        "items": {
+          "title": "DNS server",
+          "description": "IP address or hostname of the DNS server.",
+          "type": "string"
+        },
+        "default": [
+          "8.8.8.8"
+        ],
+        "uniqueItems": true,
+        "minItems": 1
+      },
+      "domains": {
+        "title": "Domains",
+        "description": "List of domains or subdomains to query. A random domain will be selected from this list at each iteration.",
+        "type": "array",
+        "items": {
+          "title": "Domain",
+          "type": "string"
+        },
+        "default": [
+          "google.com",
+          "github.com"
+        ],
+        "uniqueItems": true,
+        "minItems": 1
       }
     },
-    "servers": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "network": {
-      "type": "string"
-    },
-    "record_type": {
-      "type": "string"
-    },
-    "record_types": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "port": {
-      "type": "integer"
+    "required": [
+      "domains",
+      "servers",
+      "network"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
     },
     "timeout": {
-      "type": [
-        "string",
-        "integer"
-      ]
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "network": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
     }
-  },
-  "required": [
-    "name",
-    "domains",
-    "servers"
-  ]
+  }
 }

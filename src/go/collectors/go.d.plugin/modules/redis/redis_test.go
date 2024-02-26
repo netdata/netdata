@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 
 	"github.com/go-redis/redis/v8"
@@ -17,21 +18,26 @@ import (
 )
 
 var (
-	pikaInfoAll, _ = os.ReadFile("testdata/pika/info_all.txt")
-	v609InfoAll, _ = os.ReadFile("testdata/v6.0.9/info_all.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataPikaInfoAll, _   = os.ReadFile("testdata/pika/info_all.txt")
+	dataVer609InfoAll, _ = os.ReadFile("testdata/v6.0.9/info_all.txt")
 )
 
-func Test_Testdata(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"pikaInfoAll": pikaInfoAll,
-		"v609InfoAll": v609InfoAll,
+		"dataConfigJSON":    dataConfigJSON,
+		"dataConfigYAML":    dataConfigYAML,
+		"dataPikaInfoAll":   dataPikaInfoAll,
+		"dataVer609InfoAll": dataVer609InfoAll,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*Redis)(nil), New())
+func TestRedis_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Redis{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestRedis_Init(t *testing.T) {
@@ -65,9 +71,9 @@ func TestRedis_Init(t *testing.T) {
 			rdb.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, rdb.Init())
+				assert.Error(t, rdb.Init())
 			} else {
-				assert.True(t, rdb.Init())
+				assert.NoError(t, rdb.Init())
 			}
 		})
 	}
@@ -96,9 +102,9 @@ func TestRedis_Check(t *testing.T) {
 			rdb := test.prepare(t)
 
 			if test.wantFail {
-				assert.False(t, rdb.Check())
+				assert.Error(t, rdb.Check())
 			} else {
-				assert.True(t, rdb.Check())
+				assert.NoError(t, rdb.Check())
 			}
 		})
 	}
@@ -106,7 +112,7 @@ func TestRedis_Check(t *testing.T) {
 
 func TestRedis_Charts(t *testing.T) {
 	rdb := New()
-	require.True(t, rdb.Init())
+	require.NoError(t, rdb.Init())
 
 	assert.NotNil(t, rdb.Charts())
 }
@@ -115,7 +121,7 @@ func TestRedis_Cleanup(t *testing.T) {
 	rdb := New()
 	assert.NotPanics(t, rdb.Cleanup)
 
-	require.True(t, rdb.Init())
+	require.NoError(t, rdb.Init())
 	m := &mockRedisClient{}
 	rdb.rdb = m
 
@@ -308,16 +314,16 @@ func TestRedis_Collect(t *testing.T) {
 
 func prepareRedisV609(t *testing.T) *Redis {
 	rdb := New()
-	require.True(t, rdb.Init())
+	require.NoError(t, rdb.Init())
 	rdb.rdb = &mockRedisClient{
-		result: v609InfoAll,
+		result: dataVer609InfoAll,
 	}
 	return rdb
 }
 
 func prepareRedisErrorOnInfo(t *testing.T) *Redis {
 	rdb := New()
-	require.True(t, rdb.Init())
+	require.NoError(t, rdb.Init())
 	rdb.rdb = &mockRedisClient{
 		errOnInfo: true,
 	}
@@ -326,9 +332,9 @@ func prepareRedisErrorOnInfo(t *testing.T) *Redis {
 
 func prepareRedisWithPikaMetrics(t *testing.T) *Redis {
 	rdb := New()
-	require.True(t, rdb.Init())
+	require.NoError(t, rdb.Init())
 	rdb.rdb = &mockRedisClient{
-		result: pikaInfoAll,
+		result: dataPikaInfoAll,
 	}
 	return rdb
 }

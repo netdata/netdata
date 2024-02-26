@@ -63,10 +63,10 @@ func TestTargetClassificator_classify(t *testing.T) {
 			var cfg []ClassifyRuleConfig
 
 			err := yaml.Unmarshal([]byte(config), &cfg)
-			require.NoErrorf(t, err, "yaml unmarshalling of config")
+			require.NoError(t, err, "yaml unmarshalling of config")
 
 			clr, err := newTargetClassificator(cfg)
-			require.NoErrorf(t, err, "targetClassificator creation")
+			require.NoError(t, err, "targetClassificator creation")
 
 			assert.Equal(t, test.wantTags, clr.classify(test.target))
 		})

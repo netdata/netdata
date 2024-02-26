@@ -1,23 +1,43 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/dnsmasq_dhcp job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Dnsmasq DHCP collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "leases_path": {
+        "title": "Leases file",
+        "description": "File path to the Dnsmasq DHCP server's lease database.",
+        "type": "string",
+        "default": "/var/lib/misc/dnsmasq.leases"
+      },
+      "conf_path": {
+        "title": "Config file",
+        "description": "File path for the Dnsmasq configuration. Used to find all configured DHCP ranges.",
+        "type": "string",
+        "default": "/etc/dnsmasq.conf"
+      },
+      "conf_dir": {
+        "title": "Config directory",
+        "description": "Directory path for Dnsmasq configurations. The syntax follows the same format as the [--conf-dir](https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html) option.",
+        "type": "string",
+        "default": "/etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new"
+      }
     },
-    "leases_path": {
-      "type": "string"
-    },
-    "conf_path": {
-      "type": "string"
-    },
-    "conf_dir": {
-      "type": "string"
-    }
+    "required": [
+      "leases_path",
+      "conf_path"
+    ]
   },
-  "required": [
-    "name",
-    "leases_path"
-  ]
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    }
+  }
 }

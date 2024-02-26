@@ -15,7 +15,7 @@ type ipPool struct {
 	addresses iprange.Pool
 }
 
-func (d DHCPd) validateConfig() error {
+func (d *DHCPd) validateConfig() error {
 	if d.Config.LeasesPath == "" {
 		return errors.New("'lease_path' parameter not set")
 	}
@@ -33,7 +33,7 @@ func (d DHCPd) validateConfig() error {
 	return nil
 }
 
-func (d DHCPd) initPools() ([]ipPool, error) {
+func (d *DHCPd) initPools() ([]ipPool, error) {
 	var pools []ipPool
 	for i, cfg := range d.Pools {
 		rs, err := iprange.ParseRanges(cfg.Networks)
@@ -50,7 +50,7 @@ func (d DHCPd) initPools() ([]ipPool, error) {
 	return pools, nil
 }
 
-func (d DHCPd) initCharts(pools []ipPool) (*module.Charts, error) {
+func (d *DHCPd) initCharts(pools []ipPool) (*module.Charts, error) {
 	charts := &module.Charts{}
 
 	if err := charts.Add(activeLeasesTotalChart.Copy()); err != nil {

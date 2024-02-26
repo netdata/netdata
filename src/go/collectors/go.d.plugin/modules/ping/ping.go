@@ -4,6 +4,7 @@ package ping
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -32,7 +33,7 @@ func New() *Ping {
 			Network:     "ip",
 			Privileged:  true,
 			SendPackets: 5,
-			Interval:    web.Duration{Duration: time.Millisecond * 100},
+			Interval:    web.Duration(time.Millisecond * 100),
 		},
 
 		charts:    &module.Charts{},
@@ -42,51 +43,63 @@ func New() *Ping {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every"`
-	Hosts       []string     `yaml:"hosts"`
-	Network     string       `yaml:"network"`
-	Privileged  bool         `yaml:"privileged"`
-	SendPackets int          `yaml:"packets"`
-	Interval    web.Duration `yaml:"interval"`
-	Interface   string       `yaml:"interface"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	Hosts       []string     `yaml:"hosts" json:"hosts"`
+	Network     string       `yaml:"network" json:"network"`
+	Privileged  bool         `yaml:"privileged" json:"privileged"`
+	SendPackets int          `yaml:"packets" json:"packets"`
+	Interval    web.Duration `yaml:"interval" json:"interval"`
+	Interface   string       `yaml:"interface" json:"interface"`
 }
 
 type (
 	Ping struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
-		hosts map[string]bool
-
-		newProber func(pingProberConfig, *logger.Logger) prober
 		prober    prober
+		newProber func(pingProberConfig, *logger.Logger) prober
+
+		hosts map[string]bool
 	}
 	prober interface {
 		ping(host string) (*probing.Statistics, error)
 	}
 )
 
-func (p *Ping) Init() bool {
+func (p *Ping) Configuration() any {
+	return p.Config
+}
+
+func (p *Ping) Init() error {
 	err := p.validateConfig()
 	if err != nil {
 		p.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	pr, err := p.initProber()
 	if err != nil {
 		p.Errorf("init prober: %v", err)
-		return false
+		return err
 	}
 	p.prober = pr
 
-	return true
+	return nil
 }
 
-func (p *Ping) Check() bool {
-	return len(p.Collect()) > 0
+func (p *Ping) Check() error {
+	mx, err := p.collect()
+	if err != nil {
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (p *Ping) Charts() *module.Charts {

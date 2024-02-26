@@ -1,0 +1,7 @@
+update_every: 123
+log_path: "ok"
+per_user_stats:
+  includes:
+    - "ok"
+  excludes:
+    - "ok"

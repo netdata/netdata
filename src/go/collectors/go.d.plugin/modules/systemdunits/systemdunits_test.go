@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -19,8 +20,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestSystemdUnits_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &SystemdUnits{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestSystemdUnits_Init(t *testing.T) {
@@ -48,9 +63,9 @@ func TestSystemdUnits_Init(t *testing.T) {
 			systemd.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, systemd.Init())
+				assert.Error(t, systemd.Init())
 			} else {
-				assert.True(t, systemd.Init())
+				assert.NoError(t, systemd.Init())
 			}
 		})
 	}
@@ -115,12 +130,12 @@ func TestSystemdUnits_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			systemd := test.prepare()
-			require.True(t, systemd.Init())
+			require.NoError(t, systemd.Init())
 
 			if test.wantFail {
-				assert.False(t, systemd.Check())
+				assert.Error(t, systemd.Check())
 			} else {
-				assert.True(t, systemd.Check())
+				assert.NoError(t, systemd.Check())
 			}
 		})
 	}
@@ -128,7 +143,7 @@ func TestSystemdUnits_Check(t *testing.T) {
 
 func TestSystemdUnits_Charts(t *testing.T) {
 	systemd := New()
-	require.True(t, systemd.Init())
+	require.NoError(t, systemd.Init())
 	assert.NotNil(t, systemd.Charts())
 }
 
@@ -138,7 +153,7 @@ func TestSystemdUnits_Cleanup(t *testing.T) {
 	client := prepareOKClient(230)
 	systemd.client = client
 
-	require.True(t, systemd.Init())
+	require.NoError(t, systemd.Init())
 	require.NotNil(t, systemd.Collect())
 	conn := systemd.conn
 	systemd.Cleanup()
@@ -681,7 +696,7 @@ func TestSystemdUnits_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			systemd := test.prepare()
-			require.True(t, systemd.Init())
+			require.NoError(t, systemd.Init())
 
 			var collected map[string]int64
 
@@ -702,7 +717,7 @@ func TestSystemdUnits_connectionReuse(t *testing.T) {
 	systemd.Include = []string{"*"}
 	client := prepareOKClient(230)
 	systemd.client = client
-	require.True(t, systemd.Init())
+	require.NoError(t, systemd.Init())
 
 	var collected map[string]int64
 	for i := 0; i < 10; i++ {

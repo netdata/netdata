@@ -4,12 +4,12 @@ package scaleio
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/modules/scaleio/client"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -22,40 +22,39 @@ func init() {
 	})
 }
 
-// New creates ScaleIO with default values.
 func New() *ScaleIO {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: "https://127.0.0.1",
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: time.Second},
+	return &ScaleIO{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "https://127.0.0.1",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second),
+				},
 			},
 		},
-	}
-	return &ScaleIO{
-		Config:  config,
 		charts:  systemCharts.Copy(),
 		charted: make(map[string]bool),
 	}
 }
 
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
+}
+
 type (
-	// Config is the ScaleIO module configuration.
-	Config struct {
-		web.HTTP `yaml:",inline"`
-	}
-	// ScaleIO ScaleIO module.
 	ScaleIO struct {
 		module.Base
-		Config `yaml:",inline"`
-		client *client.Client
+		Config `yaml:",inline" json:""`
+
 		charts *module.Charts
 
-		discovered instances
-		charted    map[string]bool
+		client *client.Client
 
+		discovered      instances
+		charted         map[string]bool
 		lastDiscoveryOK bool
 		runs            int
 	}
@@ -65,40 +64,49 @@ type (
 	}
 )
 
-// Init makes initialization.
-func (s *ScaleIO) Init() bool {
+func (s *ScaleIO) Configuration() any {
+	return s.Config
+}
+
+func (s *ScaleIO) Init() error {
 	if s.Username == "" || s.Password == "" {
 		s.Error("username and password aren't set")
-		return false
+		return errors.New("username and password aren't set")
 	}
 
 	c, err := client.New(s.Client, s.Request)
 	if err != nil {
 		s.Errorf("error on creating ScaleIO client: %v", err)
-		return false
+		return err
 	}
 	s.client = c
 
 	s.Debugf("using URL %s", s.URL)
-	s.Debugf("using timeout: %s", s.Timeout.Duration)
-	return true
+	s.Debugf("using timeout: %s", s.Timeout)
+
+	return nil
 }
 
-// Check makes check.
-func (s *ScaleIO) Check() bool {
+func (s *ScaleIO) Check() error {
 	if err := s.client.Login(); err != nil {
 		s.Error(err)
-		return false
+		return err
 	}
-	return len(s.Collect()) > 0
+	mx, err := s.collect()
+	if err != nil {
+		s.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
-// Charts returns Charts.
 func (s *ScaleIO) Charts() *module.Charts {
 	return s.charts
 }
 
-// Collect collects metrics.
 func (s *ScaleIO) Collect() map[string]int64 {
 	mx, err := s.collect()
 	if err != nil {
@@ -112,7 +120,6 @@ func (s *ScaleIO) Collect() map[string]int64 {
 	return mx
 }
 
-// Cleanup makes cleanup.
 func (s *ScaleIO) Cleanup() {
 	if s.client == nil {
 		return

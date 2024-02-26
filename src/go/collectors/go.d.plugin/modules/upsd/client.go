@@ -29,9 +29,9 @@ type upsUnit struct {
 
 func newUpsdConn(conf Config) upsdConn {
 	return &upsdClient{conn: socket.New(socket.Config{
-		ConnectTimeout: conf.Timeout.Duration,
-		ReadTimeout:    conf.Timeout.Duration,
-		WriteTimeout:   conf.Timeout.Duration,
+		ConnectTimeout: conf.Timeout.Duration(),
+		ReadTimeout:    conf.Timeout.Duration(),
+		WriteTimeout:   conf.Timeout.Duration(),
 		Address:        conf.Address,
 	})}
 }

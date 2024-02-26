@@ -9,29 +9,38 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testStatusData, _       = os.ReadFile("testdata/status.txt")
-	testApacheStatusData, _ = os.ReadFile("testdata/apache-status.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataStatusMetrics, _       = os.ReadFile("testdata/status.txt")
+	dataApacheStatusMetrics, _ = os.ReadFile("testdata/apache-status.txt")
 )
 
-func TestLighttpd_Cleanup(t *testing.T) { New().Cleanup() }
-
-func TestNew(t *testing.T) {
-	job := New()
-
-	assert.Implements(t, (*module.Module)(nil), job)
-	assert.Equal(t, defaultURL, job.URL)
-	assert.Equal(t, defaultHTTPTimeout, job.Timeout.Duration)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
+
+func TestLighttpd_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Lighttpd{}, dataConfigJSON, dataConfigYAML)
+}
+
+func TestLighttpd_Cleanup(t *testing.T) { New().Cleanup() }
 
 func TestLighttpd_Init(t *testing.T) {
 	job := New()
 
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 	assert.NotNil(t, job.apiClient)
 }
 
@@ -39,29 +48,29 @@ func TestLighttpd_InitNG(t *testing.T) {
 	job := New()
 
 	job.URL = ""
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestLighttpd_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusData)
+				_, _ = w.Write(dataStatusMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/server-status?auto"
-	require.True(t, job.Init())
-	assert.True(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.NoError(t, job.Check())
 }
 
 func TestLighttpd_CheckNG(t *testing.T) {
 	job := New()
 
 	job.URL = "http://127.0.0.1:38001/server-status?auto"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestLighttpd_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
@@ -70,14 +79,14 @@ func TestLighttpd_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusData)
+				_, _ = w.Write(dataStatusMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/server-status?auto"
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	expected := map[string]int64{
 		"scoreboard_waiting":        125,
@@ -113,22 +122,22 @@ func TestLighttpd_InvalidData(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/server-status?auto"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestLighttpd_ApacheData(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testApacheStatusData)
+				_, _ = w.Write(dataApacheStatusMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/server-status?auto"
-	require.True(t, job.Init())
-	require.False(t, job.Check())
+	require.NoError(t, job.Init())
+	require.Error(t, job.Check())
 }
 
 func TestLighttpd_404(t *testing.T) {
@@ -141,6 +150,6 @@ func TestLighttpd_404(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/server-status?auto"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }

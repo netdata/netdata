@@ -7,10 +7,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -24,74 +23,70 @@ func init() {
 }
 
 func New() *VerneMQ {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: "http://127.0.0.1:8888/metrics",
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: time.Second},
+	return &VerneMQ{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "http://127.0.0.1:8888/metrics",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second),
+				},
 			},
 		},
-	}
-
-	return &VerneMQ{
-		Config: config,
 		charts: charts.Copy(),
-		cache:  make(cache),
+		cache:  make(map[string]bool),
 	}
+}
+
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type (
-	Config struct {
-		web.HTTP `yaml:",inline"`
-	}
-
 	VerneMQ struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
-		prom   prometheus.Prometheus
 		charts *Charts
-		cache  cache
-	}
 
-	cache map[string]bool
+		prom prometheus.Prometheus
+
+		cache map[string]bool
+	}
 )
 
-func (c cache) hasP(v string) bool { ok := c[v]; c[v] = true; return ok }
-
-func (v VerneMQ) validateConfig() error {
-	if v.URL == "" {
-		return errors.New("URL is not set")
-	}
-	return nil
+func (v *VerneMQ) Configuration() any {
+	return v.Config
 }
 
-func (v *VerneMQ) initClient() error {
-	client, err := web.NewHTTPClient(v.Client)
-	if err != nil {
+func (v *VerneMQ) Init() error {
+	if err := v.validateConfig(); err != nil {
+		v.Errorf("error on validating config: %v", err)
 		return err
 	}
 
-	v.prom = prometheus.New(client, v.Request)
+	prom, err := v.initPrometheusClient()
+	if err != nil {
+		v.Error(err)
+		return err
+	}
+	v.prom = prom
+
 	return nil
 }
 
-func (v *VerneMQ) Init() bool {
-	if err := v.validateConfig(); err != nil {
-		v.Errorf("error on validating config: %v", err)
-		return false
+func (v *VerneMQ) Check() error {
+	mx, err := v.collect()
+	if err != nil {
+		v.Error(err)
+		return err
 	}
-	if err := v.initClient(); err != nil {
-		v.Errorf("error on initializing client: %v", err)
-		return false
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
 	}
-	return true
-}
-
-func (v *VerneMQ) Check() bool {
-	return len(v.Collect()) > 0
+	return nil
 }
 
 func (v *VerneMQ) Charts() *Charts {
@@ -110,4 +105,8 @@ func (v *VerneMQ) Collect() map[string]int64 {
 	return mx
 }
 
-func (VerneMQ) Cleanup() {}
+func (v *VerneMQ) Cleanup() {
+	if v.prom != nil && v.prom.HTTPClient() != nil {
+		v.prom.HTTPClient().CloseIdleConnections()
+	}
+}

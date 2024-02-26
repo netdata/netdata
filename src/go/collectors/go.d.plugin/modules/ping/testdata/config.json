@@ -1,0 +1,11 @@
+{
+  "update_every": 123,
+  "hosts": [
+    "ok"
+  ],
+  "network": "ok",
+  "privileged": true,
+  "packets": 123,
+  "interval": 123.123,
+  "interface": "ok"
+}

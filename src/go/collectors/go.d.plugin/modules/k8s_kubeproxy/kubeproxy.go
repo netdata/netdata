@@ -4,17 +4,12 @@ package k8s_kubeproxy
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
-)
-
-const (
-	defaultURL         = "http://127.0.0.1:10249/metrics"
-	defaultHTTPTimeout = time.Second * 2
 )
 
 //go:embed "config_schema.json"
@@ -31,70 +26,72 @@ func init() {
 	})
 }
 
-// New creates KubeProxy with default values.
 func New() *KubeProxy {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: defaultURL,
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: defaultHTTPTimeout},
+	return &KubeProxy{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "http://127.0.0.1:10249/metrics",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second),
+				},
 			},
 		},
-	}
-	return &KubeProxy{
-		Config: config,
 		charts: charts.Copy(),
 	}
 }
 
-// Config is the KubeProxy module configuration.
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
-// KubeProxy is KubeProxy module.
 type KubeProxy struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
-	prom   prometheus.Prometheus
 	charts *Charts
+
+	prom prometheus.Prometheus
 }
 
-// Cleanup makes cleanup.
-func (KubeProxy) Cleanup() {}
+func (kp *KubeProxy) Configuration() any {
+	return kp.Config
+}
 
-// Init makes initialization.
-func (kp *KubeProxy) Init() bool {
-	if kp.URL == "" {
-		kp.Error("URL not set")
-		return false
+func (kp *KubeProxy) Init() error {
+	if err := kp.validateConfig(); err != nil {
+		kp.Errorf("config validation: %v", err)
+		return err
 	}
 
-	client, err := web.NewHTTPClient(kp.Client)
+	prom, err := kp.initPrometheusClient()
 	if err != nil {
-		kp.Errorf("error on creating http client : %v", err)
-		return false
+		kp.Error(err)
+		return err
 	}
+	kp.prom = prom
 
-	kp.prom = prometheus.New(client, kp.Request)
-
-	return true
+	return nil
 }
 
-// Check makes check.
-func (kp *KubeProxy) Check() bool {
-	return len(kp.Collect()) > 0
+func (kp *KubeProxy) Check() error {
+	mx, err := kp.collect()
+	if err != nil {
+		kp.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
-// Charts creates Charts.
-func (kp KubeProxy) Charts() *Charts {
+func (kp *KubeProxy) Charts() *Charts {
 	return kp.charts
 }
 
-// Collect collects metrics.
 func (kp *KubeProxy) Collect() map[string]int64 {
 	mx, err := kp.collect()
 
@@ -104,4 +101,10 @@ func (kp *KubeProxy) Collect() map[string]int64 {
 	}
 
 	return mx
+}
+
+func (kp *KubeProxy) Cleanup() {
+	if kp.prom != nil && kp.prom.HTTPClient() != nil {
+		kp.prom.HTTPClient().CloseIdleConnections()
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/stretchr/testify/assert"
@@ -21,11 +22,31 @@ const (
 )
 
 var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
 	dataEmptyResp                     = []byte("[]")
 	dataSummaryRawResp, _             = os.ReadFile("testdata/summaryRaw.json")
 	dataGetQueryTypesResp, _          = os.ReadFile("testdata/getQueryTypes.json")
 	dataGetForwardDestinationsResp, _ = os.ReadFile("testdata/getForwardDestinations.json")
 )
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":                 dataConfigJSON,
+		"dataConfigYAML":                 dataConfigYAML,
+		"dataEmptyResp":                  dataEmptyResp,
+		"dataSummaryRawResp":             dataSummaryRawResp,
+		"dataGetQueryTypesResp":          dataGetQueryTypesResp,
+		"dataGetForwardDestinationsResp": dataGetForwardDestinationsResp,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestPihole_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Pihole{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestPihole_Init(t *testing.T) {
 	tests := map[string]struct {
@@ -52,9 +73,9 @@ func TestPihole_Init(t *testing.T) {
 			p.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, p.Init())
+				assert.Error(t, p.Init())
 			} else {
-				assert.True(t, p.Init())
+				assert.NoError(t, p.Init())
 			}
 		})
 	}
@@ -85,9 +106,9 @@ func TestPihole_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, p.Check())
+				assert.Error(t, p.Check())
 			} else {
-				assert.True(t, p.Check())
+				assert.NoError(t, p.Check())
 			}
 		})
 	}
@@ -164,7 +185,7 @@ func caseSuccessWithWebPassword(t *testing.T) (*Pihole, func()) {
 	p.SetupVarsPath = pathSetupVarsOK
 	p.URL = srv.URL
 
-	require.True(t, p.Init())
+	require.NoError(t, p.Init())
 
 	return p, srv.Close
 }
@@ -175,7 +196,7 @@ func caseFailNoWebPassword(t *testing.T) (*Pihole, func()) {
 	p.SetupVarsPath = pathSetupVarsWrong
 	p.URL = srv.URL
 
-	require.True(t, p.Init())
+	require.NoError(t, p.Init())
 
 	return p, srv.Close
 }
@@ -186,7 +207,7 @@ func caseFailUnsupportedVersion(t *testing.T) (*Pihole, func()) {
 	p.SetupVarsPath = pathSetupVarsOK
 	p.URL = srv.URL
 
-	require.True(t, p.Init())
+	require.NoError(t, p.Init())
 
 	return p, srv.Close
 }
@@ -197,8 +218,6 @@ type mockPiholeServer struct {
 	errOnSummary       bool
 	errOnQueryTypes    bool
 	errOnGetForwardDst bool
-	errOnTopClients    bool
-	errOnTopItems      bool
 }
 
 func (m mockPiholeServer) newPiholeHTTPServer() *httptest.Server {

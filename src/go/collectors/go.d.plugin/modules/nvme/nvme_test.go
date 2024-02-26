@@ -9,11 +9,16 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
 	dataNVMeListJSON, _           = os.ReadFile("testdata/nvme-list.json")
 	dataNVMeListEmptyJSON, _      = os.ReadFile("testdata/nvme-list-empty.json")
 	dataNVMeSmartLogJSON, _       = os.ReadFile("testdata/nvme-smart-log.json")
@@ -23,13 +28,19 @@ var (
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
+		"dataConfigJSON":             dataConfigJSON,
+		"dataConfigYAML":             dataConfigYAML,
 		"dataNVMeListJSON":           dataNVMeListJSON,
 		"dataNVMeListEmptyJSON":      dataNVMeListEmptyJSON,
 		"dataNVMeSmartLogStringJSON": dataNVMeSmartLogStringJSON,
 		"dataNVMeSmartLogFloatJSON":  dataNVMeSmartLogFloatJSON,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
+}
+
+func TestNVMe_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &NVMe{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNVMe_Init(t *testing.T) {
@@ -58,9 +69,9 @@ func TestNVMe_Init(t *testing.T) {
 			test.prepare(nv)
 
 			if test.wantFail {
-				assert.False(t, nv.Init())
+				assert.Error(t, nv.Init())
 			} else {
-				assert.True(t, nv.Init())
+				assert.NoError(t, nv.Init())
 			}
 		})
 	}
@@ -104,9 +115,9 @@ func TestNVMe_Check(t *testing.T) {
 			test.prepare(n)
 
 			if test.wantFail {
-				assert.False(t, n.Check())
+				assert.Error(t, n.Check())
 			} else {
-				assert.True(t, n.Check())
+				assert.NoError(t, n.Check())
 			}
 		})
 	}

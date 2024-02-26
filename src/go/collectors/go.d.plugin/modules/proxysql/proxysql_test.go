@@ -12,33 +12,44 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	dataV2010Version, _                    = os.ReadFile("testdata/v2.0.10/version.txt")
-	dataV2010StatsMySQLGlobal, _           = os.ReadFile("testdata/v2.0.10/stats_mysql_global.txt")
-	dataV2010StatsMemoryMetrics, _         = os.ReadFile("testdata/v2.0.10/stats_memory_metrics.txt")
-	dataV2010StatsMySQLCommandsCounters, _ = os.ReadFile("testdata/v2.0.10/stats_mysql_commands_counters.txt")
-	dataV2010StatsMySQLUsers, _            = os.ReadFile("testdata/v2.0.10/stats_mysql_users.txt")
-	dataV2010StatsMySQLConnectionPool, _   = os.ReadFile("testdata/v2.0.10/stats_mysql_connection_pool .txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer2010Version, _                    = os.ReadFile("testdata/v2.0.10/version.txt")
+	dataVer2010StatsMySQLGlobal, _           = os.ReadFile("testdata/v2.0.10/stats_mysql_global.txt")
+	dataVer2010StatsMemoryMetrics, _         = os.ReadFile("testdata/v2.0.10/stats_memory_metrics.txt")
+	dataVer2010StatsMySQLCommandsCounters, _ = os.ReadFile("testdata/v2.0.10/stats_mysql_commands_counters.txt")
+	dataVer2010StatsMySQLUsers, _            = os.ReadFile("testdata/v2.0.10/stats_mysql_users.txt")
+	dataVer2010StatsMySQLConnectionPool, _   = os.ReadFile("testdata/v2.0.10/stats_mysql_connection_pool .txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataV2010Version":                    dataV2010Version,
-		"dataV2010StatsMySQLGlobal":           dataV2010StatsMySQLGlobal,
-		"dataV2010StatsMemoryMetrics":         dataV2010StatsMemoryMetrics,
-		"dataV2010StatsMySQLCommandsCounters": dataV2010StatsMySQLCommandsCounters,
-		"dataV2010StatsMySQLUsers":            dataV2010StatsMySQLUsers,
-		"dataV2010StatsMySQLConnectionPool":   dataV2010StatsMySQLConnectionPool,
+		"dataConfigJSON":                        dataConfigJSON,
+		"dataConfigYAML":                        dataConfigYAML,
+		"dataVer2010Version":                    dataVer2010Version,
+		"dataVer2010StatsMySQLGlobal":           dataVer2010StatsMySQLGlobal,
+		"dataVer2010StatsMemoryMetrics":         dataVer2010StatsMemoryMetrics,
+		"dataVer2010StatsMySQLCommandsCounters": dataVer2010StatsMySQLCommandsCounters,
+		"dataVer2010StatsMySQLUsers":            dataVer2010StatsMySQLUsers,
+		"dataVer2010StatsMySQLConnectionPool":   dataVer2010StatsMySQLConnectionPool,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 		_, err := prepareMockRows(data)
-		require.NoErrorf(t, err, name)
+		require.NoError(t, err, name)
 	}
+}
+
+func TestProxySQL_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &ProxySQL{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestProxySQL_Init(t *testing.T) {
@@ -62,9 +73,9 @@ func TestProxySQL_Init(t *testing.T) {
 			proxySQL.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, proxySQL.Init())
+				assert.Error(t, proxySQL.Init())
 			} else {
-				assert.True(t, proxySQL.Init())
+				assert.NoError(t, proxySQL.Init())
 			}
 		})
 	}
@@ -111,45 +122,45 @@ func TestProxySQL_Check(t *testing.T) {
 		"success on all queries": {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryVersion, dataV2010Version)
-				mockExpect(t, m, queryStatsMySQLGlobal, dataV2010StatsMySQLGlobal)
-				mockExpect(t, m, queryStatsMySQLMemoryMetrics, dataV2010StatsMemoryMetrics)
-				mockExpect(t, m, queryStatsMySQLCommandsCounters, dataV2010StatsMySQLCommandsCounters)
-				mockExpect(t, m, queryStatsMySQLUsers, dataV2010StatsMySQLUsers)
-				mockExpect(t, m, queryStatsMySQLConnectionPool, dataV2010StatsMySQLConnectionPool)
+				mockExpect(t, m, queryVersion, dataVer2010Version)
+				mockExpect(t, m, queryStatsMySQLGlobal, dataVer2010StatsMySQLGlobal)
+				mockExpect(t, m, queryStatsMySQLMemoryMetrics, dataVer2010StatsMemoryMetrics)
+				mockExpect(t, m, queryStatsMySQLCommandsCounters, dataVer2010StatsMySQLCommandsCounters)
+				mockExpect(t, m, queryStatsMySQLUsers, dataVer2010StatsMySQLUsers)
+				mockExpect(t, m, queryStatsMySQLConnectionPool, dataVer2010StatsMySQLConnectionPool)
 			},
 		},
 		"fails when error on querying global stats": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryVersion, dataV2010Version)
+				mockExpect(t, m, queryVersion, dataVer2010Version)
 				mockExpectErr(m, queryStatsMySQLGlobal)
 			},
 		},
 		"fails when error on querying memory metrics": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryVersion, dataV2010Version)
-				mockExpect(t, m, queryStatsMySQLGlobal, dataV2010StatsMySQLGlobal)
+				mockExpect(t, m, queryVersion, dataVer2010Version)
+				mockExpect(t, m, queryStatsMySQLGlobal, dataVer2010StatsMySQLGlobal)
 				mockExpectErr(m, queryStatsMySQLMemoryMetrics)
 			},
 		},
 		"fails when error on querying mysql command counters": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryVersion, dataV2010Version)
-				mockExpect(t, m, queryStatsMySQLGlobal, dataV2010StatsMySQLGlobal)
-				mockExpect(t, m, queryStatsMySQLMemoryMetrics, dataV2010StatsMemoryMetrics)
+				mockExpect(t, m, queryVersion, dataVer2010Version)
+				mockExpect(t, m, queryStatsMySQLGlobal, dataVer2010StatsMySQLGlobal)
+				mockExpect(t, m, queryStatsMySQLMemoryMetrics, dataVer2010StatsMemoryMetrics)
 				mockExpectErr(m, queryStatsMySQLCommandsCounters)
 			},
 		},
 		"fails when error on querying mysql users": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryVersion, dataV2010Version)
-				mockExpect(t, m, queryStatsMySQLGlobal, dataV2010StatsMySQLGlobal)
-				mockExpect(t, m, queryStatsMySQLMemoryMetrics, dataV2010StatsMemoryMetrics)
-				mockExpect(t, m, queryStatsMySQLCommandsCounters, dataV2010StatsMySQLCommandsCounters)
+				mockExpect(t, m, queryVersion, dataVer2010Version)
+				mockExpect(t, m, queryStatsMySQLGlobal, dataVer2010StatsMySQLGlobal)
+				mockExpect(t, m, queryStatsMySQLMemoryMetrics, dataVer2010StatsMemoryMetrics)
+				mockExpect(t, m, queryStatsMySQLCommandsCounters, dataVer2010StatsMySQLCommandsCounters)
 				mockExpectErr(m, queryStatsMySQLUsers)
 			},
 		},
@@ -165,14 +176,14 @@ func TestProxySQL_Check(t *testing.T) {
 			proxySQL.db = db
 			defer func() { _ = db.Close() }()
 
-			require.True(t, proxySQL.Init())
+			require.NoError(t, proxySQL.Init())
 
 			test.prepareMock(t, mock)
 
 			if test.wantFail {
-				assert.False(t, proxySQL.Check())
+				assert.Error(t, proxySQL.Check())
 			} else {
-				assert.True(t, proxySQL.Check())
+				assert.NoError(t, proxySQL.Check())
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -189,12 +200,12 @@ func TestProxySQL_Collect(t *testing.T) {
 		"success on all queries (v2.0.10)": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryVersion, dataV2010Version)
-					mockExpect(t, m, queryStatsMySQLGlobal, dataV2010StatsMySQLGlobal)
-					mockExpect(t, m, queryStatsMySQLMemoryMetrics, dataV2010StatsMemoryMetrics)
-					mockExpect(t, m, queryStatsMySQLCommandsCounters, dataV2010StatsMySQLCommandsCounters)
-					mockExpect(t, m, queryStatsMySQLUsers, dataV2010StatsMySQLUsers)
-					mockExpect(t, m, queryStatsMySQLConnectionPool, dataV2010StatsMySQLConnectionPool)
+					mockExpect(t, m, queryVersion, dataVer2010Version)
+					mockExpect(t, m, queryStatsMySQLGlobal, dataVer2010StatsMySQLGlobal)
+					mockExpect(t, m, queryStatsMySQLMemoryMetrics, dataVer2010StatsMemoryMetrics)
+					mockExpect(t, m, queryStatsMySQLCommandsCounters, dataVer2010StatsMySQLCommandsCounters)
+					mockExpect(t, m, queryStatsMySQLUsers, dataVer2010StatsMySQLUsers)
+					mockExpect(t, m, queryStatsMySQLConnectionPool, dataVer2010StatsMySQLConnectionPool)
 				},
 				check: func(t *testing.T, my *ProxySQL) {
 					mx := my.Collect()
@@ -1152,7 +1163,7 @@ func TestProxySQL_Collect(t *testing.T) {
 			my.db = db
 			defer func() { _ = db.Close() }()
 
-			require.True(t, my.Init())
+			require.NoError(t, my.Init())
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {

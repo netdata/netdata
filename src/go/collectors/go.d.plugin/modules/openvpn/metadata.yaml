@@ -72,6 +72,10 @@ modules:
               description: Server address in IP:PORT format.
               default_value: 127.0.0.1:7505
               required: true
+            - name: timeout
+              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              default_value: 1
+              required: false
             - name: per_user_stats
               description: User selector. Determines which user metrics will be collected.
               default_value: ""
@@ -92,18 +96,6 @@ modules:
                       - pattern3
                       - pattern4
                   ```
-            - name: connect_timeout
-              description: Connection timeout in seconds. The timeout includes name resolution, if required.
-              default_value: 2
-              required: false
-            - name: read_timeout
-              description: Read timeout in seconds. Sets deadline for read calls.
-              default_value: 2
-              required: false
-            - name: write_timeout
-              description: Write timeout in seconds. Sets deadline for write calls.
-              default_value: 2
-              required: false
         examples:
           folding:
             title: Config

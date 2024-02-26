@@ -3,32 +3,46 @@ package vsphere
 
 import (
 	"crypto/tls"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/discover"
 	"github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/match"
 	rs "github.com/netdata/netdata/go/go.d.plugin/modules/vsphere/resources"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmware/govmomi/performance"
 	"github.com/vmware/govmomi/simulator"
 )
 
-func TestNew(t *testing.T) {
-	job := New()
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
 
-	assert.Implements(t, (*module.Module)(nil), job)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestVSphere_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &VSphere{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestVSphere_Init(t *testing.T) {
 	vSphere, _, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	assert.True(t, vSphere.Init())
+	assert.NoError(t, vSphere.Init())
 	assert.NotNil(t, vSphere.discoverer)
 	assert.NotNil(t, vSphere.scraper)
 	assert.NotNil(t, vSphere.resources)
@@ -41,7 +55,7 @@ func TestVSphere_Init_ReturnsFalseIfURLNotSet(t *testing.T) {
 	defer teardown()
 	vSphere.URL = ""
 
-	assert.False(t, vSphere.Init())
+	assert.Error(t, vSphere.Init())
 }
 
 func TestVSphere_Init_ReturnsFalseIfUsernameNotSet(t *testing.T) {
@@ -49,7 +63,7 @@ func TestVSphere_Init_ReturnsFalseIfUsernameNotSet(t *testing.T) {
 	defer teardown()
 	vSphere.Username = ""
 
-	assert.False(t, vSphere.Init())
+	assert.Error(t, vSphere.Init())
 }
 
 func TestVSphere_Init_ReturnsFalseIfPasswordNotSet(t *testing.T) {
@@ -57,7 +71,7 @@ func TestVSphere_Init_ReturnsFalseIfPasswordNotSet(t *testing.T) {
 	defer teardown()
 	vSphere.Password = ""
 
-	assert.False(t, vSphere.Init())
+	assert.Error(t, vSphere.Init())
 }
 
 func TestVSphere_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
@@ -65,7 +79,7 @@ func TestVSphere_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
 	defer teardown()
 	vSphere.Client.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.False(t, vSphere.Init())
+	assert.Error(t, vSphere.Init())
 }
 
 func TestVSphere_Init_ReturnsFalseIfConnectionRefused(t *testing.T) {
@@ -73,7 +87,7 @@ func TestVSphere_Init_ReturnsFalseIfConnectionRefused(t *testing.T) {
 	defer teardown()
 	vSphere.URL = "http://127.0.0.1:32001"
 
-	assert.False(t, vSphere.Init())
+	assert.Error(t, vSphere.Init())
 }
 
 func TestVSphere_Init_ReturnsFalseIfInvalidHostVMIncludeFormat(t *testing.T) {
@@ -81,16 +95,16 @@ func TestVSphere_Init_ReturnsFalseIfInvalidHostVMIncludeFormat(t *testing.T) {
 	defer teardown()
 
 	vSphere.HostsInclude = match.HostIncludes{"invalid"}
-	assert.False(t, vSphere.Init())
+	assert.Error(t, vSphere.Init())
 
 	vSphere.HostsInclude = vSphere.HostsInclude[:0]
 
 	vSphere.VMsInclude = match.VMIncludes{"invalid"}
-	assert.False(t, vSphere.Init())
+	assert.Error(t, vSphere.Init())
 }
 
 func TestVSphere_Check(t *testing.T) {
-	assert.NotNil(t, New().Check())
+	assert.NoError(t, New().Check())
 }
 
 func TestVSphere_Charts(t *testing.T) {
@@ -101,7 +115,7 @@ func TestVSphere_Cleanup(t *testing.T) {
 	vSphere, _, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	require.True(t, vSphere.Init())
+	require.NoError(t, vSphere.Init())
 
 	vSphere.Cleanup()
 	time.Sleep(time.Second)
@@ -117,7 +131,7 @@ func TestVSphere_Collect(t *testing.T) {
 	vSphere, model, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	require.True(t, vSphere.Init())
+	require.NoError(t, vSphere.Init())
 
 	vSphere.scraper = mockScraper{vSphere.scraper}
 
@@ -332,8 +346,8 @@ func TestVSphere_Collect_RemoveHostsVMsInRuntime(t *testing.T) {
 	vSphere, _, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	require.True(t, vSphere.Init())
-	require.True(t, vSphere.Check())
+	require.NoError(t, vSphere.Init())
+	require.NoError(t, vSphere.Check())
 
 	okHostID := "host-50"
 	okVMID := "vm-64"
@@ -387,9 +401,9 @@ func TestVSphere_Collect_Run(t *testing.T) {
 	vSphere, model, teardown := prepareVSphereSim(t)
 	defer teardown()
 
-	vSphere.DiscoveryInterval.Duration = time.Second * 2
-	require.True(t, vSphere.Init())
-	require.True(t, vSphere.Check())
+	vSphere.DiscoveryInterval = web.Duration(time.Second * 2)
+	require.NoError(t, vSphere.Init())
+	require.NoError(t, vSphere.Check())
 
 	runs := 20
 	for i := 0; i < runs; i++ {

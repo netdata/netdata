@@ -44,3 +44,8 @@ func (r Registry) Register(name string, creator Creator) {
 	}
 	r[name] = creator
 }
+
+func (r Registry) Lookup(name string) (Creator, bool) {
+	v, ok := r[name]
+	return v, ok
+}

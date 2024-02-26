@@ -3,93 +3,79 @@
 package pipeline
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_globAny(t *testing.T) {
+func Test_funcMatchAny(t *testing.T) {
 	tests := map[string]struct {
+		typ       string
 		patterns  []string
 		value     string
 		wantMatch bool
 	}{
-		"one param, matches": {
+		"dstar: one param, matches": {
 			wantMatch: true,
+			typ:       "dstar",
 			patterns:  []string{"*"},
 			value:     "value",
 		},
-		"one param, matches with *": {
+		"dstar: one param, matches with *": {
 			wantMatch: true,
+			typ:       "dstar",
 			patterns:  []string{"**/value"},
 			value:     "/one/two/three/value",
 		},
-		"one param, not matches": {
+		"dstar: one param, not matches": {
 			wantMatch: false,
+			typ:       "dstar",
 			patterns:  []string{"Value"},
 			value:     "value",
 		},
-		"several params, last one matches": {
+		"dstar: several params, last one matches": {
 			wantMatch: true,
+			typ:       "dstar",
 			patterns:  []string{"not", "matches", "*"},
 			value:     "value",
 		},
-		"several params, no matches": {
+		"dstar: several params, no matches": {
 			wantMatch: false,
+			typ:       "dstar",
 			patterns:  []string{"not", "matches", "really"},
 			value:     "value",
 		},
-	}
-
-	for name, test := range tests {
-		name := fmt.Sprintf("name: %s, patterns: '%v', value: '%s'", name, test.patterns, test.value)
-		ok := globAny(test.value, test.patterns[0], test.patterns[1:]...)
-
-		if test.wantMatch {
-			assert.Truef(t, ok, name)
-		} else {
-			assert.Falsef(t, ok, name)
-		}
-	}
-}
-
-func Test_regexpAny(t *testing.T) {
-	tests := map[string]struct {
-		patterns  []string
-		value     string
-		wantMatch bool
-	}{
-		"one param, matches": {
+		"re: one param, matches": {
 			wantMatch: true,
+			typ:       "re",
 			patterns:  []string{"^value$"},
 			value:     "value",
 		},
-		"one param, not matches": {
+		"re: one param, not matches": {
 			wantMatch: false,
+			typ:       "re",
 			patterns:  []string{"^Value$"},
 			value:     "value",
 		},
-		"several params, last one matches": {
+		"re: several params, last one matches": {
 			wantMatch: true,
+			typ:       "re",
 			patterns:  []string{"not", "matches", "va[lue]{3}"},
 			value:     "value",
 		},
-		"several params, no matches": {
+		"re: several params, no matches": {
 			wantMatch: false,
+			typ:       "re",
 			patterns:  []string{"not", "matches", "val[^l]ue"},
 			value:     "value",
 		},
 	}
 
 	for name, test := range tests {
-		name := fmt.Sprintf("name: %s, patterns: '%v', value: '%s'", name, test.patterns, test.value)
-		ok := regexpAny(test.value, test.patterns[0], test.patterns[1:]...)
+		t.Run(name, func(t *testing.T) {
+			ok := funcMatchAny(test.typ, test.value, test.patterns[0], test.patterns[1:]...)
 
-		if test.wantMatch {
-			assert.Truef(t, ok, name)
-		} else {
-			assert.Falsef(t, ok, name)
-		}
+			assert.Equal(t, test.wantMatch, ok)
+		})
 	}
 }

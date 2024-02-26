@@ -3,6 +3,7 @@
 package elasticsearch
 
 import (
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,25 +17,34 @@ import (
 )
 
 var (
-	v842NodesLocalStats, _ = os.ReadFile("testdata/v8.4.2/nodes_local_stats.json")
-	v842NodesStats, _      = os.ReadFile("testdata/v8.4.2/nodes_stats.json")
-	v842ClusterHealth, _   = os.ReadFile("testdata/v8.4.2/cluster_health.json")
-	v842ClusterStats, _    = os.ReadFile("testdata/v8.4.2/cluster_stats.json")
-	v842CatIndicesStats, _ = os.ReadFile("testdata/v8.4.2/cat_indices_stats.json")
-	v842Info, _            = os.ReadFile("testdata/v8.4.2/info.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer842NodesLocalStats, _ = os.ReadFile("testdata/v8.4.2/nodes_local_stats.json")
+	dataVer842NodesStats, _      = os.ReadFile("testdata/v8.4.2/nodes_stats.json")
+	dataVer842ClusterHealth, _   = os.ReadFile("testdata/v8.4.2/cluster_health.json")
+	dataVer842ClusterStats, _    = os.ReadFile("testdata/v8.4.2/cluster_stats.json")
+	dataVer842CatIndicesStats, _ = os.ReadFile("testdata/v8.4.2/cat_indices_stats.json")
+	dataVer842Info, _            = os.ReadFile("testdata/v8.4.2/info.json")
 )
 
-func Test_testDataIsCorrectlyReadAndValid(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"v842NodesLocalStats": v842NodesLocalStats,
-		"v842NodesStats":      v842NodesStats,
-		"v842ClusterHealth":   v842ClusterHealth,
-		"v842ClusterStats":    v842ClusterStats,
-		"v842CatIndicesStats": v842CatIndicesStats,
-		"v842Info":            v842Info,
+		"dataConfigJSON":            dataConfigJSON,
+		"dataConfigYAML":            dataConfigYAML,
+		"dataVer842NodesLocalStats": dataVer842NodesLocalStats,
+		"dataVer842NodesStats":      dataVer842NodesStats,
+		"dataVer842ClusterHealth":   dataVer842ClusterHealth,
+		"dataVer842ClusterStats":    dataVer842ClusterStats,
+		"dataVer842CatIndicesStats": dataVer842CatIndicesStats,
+		"dataVer842Info":            dataVer842Info,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
+}
+
+func TestElasticsearch_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Elasticsearch{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestElasticsearch_Init(t *testing.T) {
@@ -103,9 +113,9 @@ func TestElasticsearch_Init(t *testing.T) {
 			es.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, es.Init())
+				assert.Error(t, es.Init())
 			} else {
-				assert.True(t, es.Init())
+				assert.NoError(t, es.Init())
 			}
 		})
 	}
@@ -128,9 +138,9 @@ func TestElasticsearch_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, es.Check())
+				assert.Error(t, es.Check())
 			} else {
-				assert.True(t, es.Check())
+				assert.NoError(t, es.Check())
 			}
 		})
 	}
@@ -666,7 +676,7 @@ func prepareElasticsearch(t *testing.T, createES func() *Elasticsearch) (es *Ela
 
 	es = createES()
 	es.URL = srv.URL
-	require.True(t, es.Init())
+	require.NoError(t, es.Init())
 
 	return es, srv.Close
 }
@@ -683,7 +693,7 @@ func prepareElasticsearchInvalidData(t *testing.T) (*Elasticsearch, func()) {
 		}))
 	es := New()
 	es.URL = srv.URL
-	require.True(t, es.Init())
+	require.NoError(t, es.Init())
 
 	return es, srv.Close
 }
@@ -696,7 +706,7 @@ func prepareElasticsearch404(t *testing.T) (*Elasticsearch, func()) {
 		}))
 	es := New()
 	es.URL = srv.URL
-	require.True(t, es.Init())
+	require.NoError(t, es.Init())
 
 	return es, srv.Close
 }
@@ -705,7 +715,7 @@ func prepareElasticsearchConnectionRefused(t *testing.T) (*Elasticsearch, func()
 	t.Helper()
 	es := New()
 	es.URL = "http://127.0.0.1:38001"
-	require.True(t, es.Init())
+	require.NoError(t, es.Init())
 
 	return es, func() {}
 }
@@ -715,17 +725,17 @@ func prepareElasticsearchEndpoint() *httptest.Server {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case urlPathNodesStats:
-				_, _ = w.Write(v842NodesStats)
+				_, _ = w.Write(dataVer842NodesStats)
 			case urlPathLocalNodeStats:
-				_, _ = w.Write(v842NodesLocalStats)
+				_, _ = w.Write(dataVer842NodesLocalStats)
 			case urlPathClusterHealth:
-				_, _ = w.Write(v842ClusterHealth)
+				_, _ = w.Write(dataVer842ClusterHealth)
 			case urlPathClusterStats:
-				_, _ = w.Write(v842ClusterStats)
+				_, _ = w.Write(dataVer842ClusterStats)
 			case urlPathIndicesStats:
-				_, _ = w.Write(v842CatIndicesStats)
+				_, _ = w.Write(dataVer842CatIndicesStats)
 			case "/":
-				_, _ = w.Write(v842Info)
+				_, _ = w.Write(dataVer842Info)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

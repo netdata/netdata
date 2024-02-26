@@ -3,6 +3,7 @@
 package logstash
 
 import (
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,16 +16,25 @@ import (
 )
 
 var (
-	nodeStataData, _ = os.ReadFile("testdata/stats.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataNodeStatsMetrics, _ = os.ReadFile("testdata/stats.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"nodeStataData": nodeStataData,
+		"dataConfigJSON":       dataConfigJSON,
+		"dataConfigYAML":       dataConfigYAML,
+		"dataNodeStatsMetrics": dataNodeStatsMetrics,
 	} {
 		require.NotNilf(t, data, name)
 
 	}
+}
+
+func TestLogstash_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Logstash{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestLogstash_Init(t *testing.T) {
@@ -52,9 +62,9 @@ func TestLogstash_Init(t *testing.T) {
 			ls.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, ls.Init())
+				assert.Error(t, ls.Init())
 			} else {
-				assert.True(t, ls.Init())
+				assert.NoError(t, ls.Init())
 			}
 		})
 	}
@@ -97,9 +107,9 @@ func TestLogstash_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, ls.Check())
+				assert.Error(t, ls.Check())
 			} else {
-				assert.True(t, ls.Check())
+				assert.NoError(t, ls.Check())
 			}
 		})
 	}
@@ -195,14 +205,14 @@ func caseValidResponse(t *testing.T) (*Logstash, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case urlPathNodeStatsAPI:
-				_, _ = w.Write(nodeStataData)
+				_, _ = w.Write(dataNodeStatsMetrics)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
 	ls := New()
 	ls.URL = srv.URL
-	require.True(t, ls.Init())
+	require.NoError(t, ls.Init())
 
 	return ls, srv.Close
 }
@@ -215,7 +225,7 @@ func caseInvalidDataResponse(t *testing.T) (*Logstash, func()) {
 		}))
 	ls := New()
 	ls.URL = srv.URL
-	require.True(t, ls.Init())
+	require.NoError(t, ls.Init())
 
 	return ls, srv.Close
 }
@@ -224,7 +234,7 @@ func caseConnectionRefused(t *testing.T) (*Logstash, func()) {
 	t.Helper()
 	ls := New()
 	ls.URL = "http://127.0.0.1:65001"
-	require.True(t, ls.Init())
+	require.NoError(t, ls.Init())
 
 	return ls, func() {}
 }
@@ -237,7 +247,7 @@ func case404(t *testing.T) (*Logstash, func()) {
 		}))
 	ls := New()
 	ls.URL = srv.URL
-	require.True(t, ls.Init())
+	require.NoError(t, ls.Init())
 
 	return ls, srv.Close
 }

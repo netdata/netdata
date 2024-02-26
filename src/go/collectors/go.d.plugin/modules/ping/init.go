@@ -31,7 +31,7 @@ func (p *Ping) initProber() (prober, error) {
 		privileged: p.Privileged,
 		packets:    p.SendPackets,
 		iface:      p.Interface,
-		interval:   p.Interval.Duration,
+		interval:   p.Interval.Duration(),
 		deadline:   deadline,
 	}
 

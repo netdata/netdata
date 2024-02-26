@@ -8,36 +8,59 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testNoLoad169, _       = os.ReadFile("testdata/version169/no_load.txt")
-	testSomeLoad169, _     = os.ReadFile("testdata/version169/some_load.txt")
-	testNoLoad170, _       = os.ReadFile("testdata/version170/no_load.txt")
-	testSomeLoad170, _     = os.ReadFile("testdata/version170/some_load.txt")
-	testNoLoadNoVersion, _ = os.ReadFile("testdata/no_version/no_load.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer169NoLoad, _   = os.ReadFile("testdata/version169/no_load.txt")
+	dataVer169SomeLoad, _ = os.ReadFile("testdata/version169/some_load.txt")
+
+	dataVer170NoLoad, _   = os.ReadFile("testdata/version170/no_load.txt")
+	dataVer170SomeLoad, _ = os.ReadFile("testdata/version170/some_load.txt")
+
+	dataNoLoadNoVersion, _ = os.ReadFile("testdata/no_version/no_load.txt")
 )
 
-func TestNew(t *testing.T) {
-	job := New()
-
-	assert.IsType(t, (*CoreDNS)(nil), job)
-	assert.Equal(t, defaultURL, job.URL)
-	assert.Equal(t, defaultHTTPTimeout, job.Timeout.Duration)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":      dataConfigJSON,
+		"dataConfigYAML":      dataConfigYAML,
+		"dataVer169NoLoad":    dataVer169NoLoad,
+		"dataVer169SomeLoad":  dataVer169SomeLoad,
+		"dataVer170NoLoad":    dataVer170NoLoad,
+		"dataVer170SomeLoad":  dataVer170SomeLoad,
+		"dataNoLoadNoVersion": dataNoLoadNoVersion,
+	} {
+		require.NotNilf(t, data, name)
+	}
 }
 
-func TestCoreDNS_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
+func TestCoreDNS_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &CoreDNS{}, dataConfigJSON, dataConfigYAML)
+}
 
-func TestCoreDNS_Cleanup(t *testing.T) { New().Cleanup() }
+func TestCoreDNS_Charts(t *testing.T) {
+	assert.NotNil(t, New().Charts())
+}
 
-func TestCoreDNS_Init(t *testing.T) { assert.True(t, New().Init()) }
+func TestCoreDNS_Cleanup(t *testing.T) {
+	New().Cleanup()
+}
+
+func TestCoreDNS_Init(t *testing.T) {
+	assert.NoError(t, New().Init())
+}
 
 func TestCoreDNS_InitNG(t *testing.T) {
 	job := New()
 	job.URL = ""
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestCoreDNS_Check(t *testing.T) {
@@ -45,8 +68,8 @@ func TestCoreDNS_Check(t *testing.T) {
 		name string
 		data []byte
 	}{
-		{"version 1.6.9", testNoLoad169},
-		{"version 1.7.0", testNoLoad170},
+		{"version 1.6.9", dataVer169NoLoad},
+		{"version 1.7.0", dataVer170NoLoad},
 	}
 	for _, testNoLoad := range tests {
 		t.Run(testNoLoad.name, func(t *testing.T) {
@@ -60,8 +83,8 @@ func TestCoreDNS_Check(t *testing.T) {
 
 			job := New()
 			job.URL = ts.URL + "/metrics"
-			require.True(t, job.Init())
-			assert.True(t, job.Check())
+			require.NoError(t, job.Init())
+			assert.NoError(t, job.Check())
 		})
 	}
 }
@@ -69,8 +92,8 @@ func TestCoreDNS_Check(t *testing.T) {
 func TestCoreDNS_CheckNG(t *testing.T) {
 	job := New()
 	job.URL = "http://127.0.0.1:38001/metrics"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestCoreDNS_Collect(t *testing.T) {
@@ -78,8 +101,8 @@ func TestCoreDNS_Collect(t *testing.T) {
 		name string
 		data []byte
 	}{
-		{"version 1.6.9", testSomeLoad169},
-		{"version 1.7.0", testSomeLoad170},
+		{"version 1.6.9", dataVer169SomeLoad},
+		{"version 1.7.0", dataVer170SomeLoad},
 	}
 	for _, testSomeLoad := range tests {
 		t.Run(testSomeLoad.name, func(t *testing.T) {
@@ -95,8 +118,8 @@ func TestCoreDNS_Collect(t *testing.T) {
 			job.URL = ts.URL + "/metrics"
 			job.PerServerStats.Includes = []string{"glob:*"}
 			job.PerZoneStats.Includes = []string{"glob:*"}
-			require.True(t, job.Init())
-			require.True(t, job.Check())
+			require.NoError(t, job.Init())
+			require.NoError(t, job.Check())
 
 			expected := map[string]int64{
 				"coredns.io._request_per_ip_family_v4":     19,
@@ -428,8 +451,8 @@ func TestCoreDNS_CollectNoLoad(t *testing.T) {
 		name string
 		data []byte
 	}{
-		{"version 1.6.9", testNoLoad169},
-		{"version 1.7.0", testNoLoad170},
+		{"version 1.6.9", dataVer169NoLoad},
+		{"version 1.7.0", dataVer170NoLoad},
 	}
 	for _, testNoLoad := range tests {
 		t.Run(testNoLoad.name, func(t *testing.T) {
@@ -444,8 +467,8 @@ func TestCoreDNS_CollectNoLoad(t *testing.T) {
 			job.URL = ts.URL + "/metrics"
 			job.PerServerStats.Includes = []string{"glob:*"}
 			job.PerZoneStats.Includes = []string{"glob:*"}
-			require.True(t, job.Init())
-			require.True(t, job.Check())
+			require.NoError(t, job.Init())
+			require.NoError(t, job.Check())
 
 			expected := map[string]int64{
 				"no_matching_zone_dropped_total": 0,
@@ -513,8 +536,8 @@ func TestCoreDNS_InvalidData(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestCoreDNS_404(t *testing.T) {
@@ -527,15 +550,15 @@ func TestCoreDNS_404(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestCoreDNS_CollectNoVersion(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testNoLoadNoVersion)
+				_, _ = w.Write(dataNoLoadNoVersion)
 			}))
 	defer ts.Close()
 
@@ -543,8 +566,8 @@ func TestCoreDNS_CollectNoVersion(t *testing.T) {
 	job.URL = ts.URL + "/metrics"
 	job.PerServerStats.Includes = []string{"glob:*"}
 	job.PerZoneStats.Includes = []string{"glob:*"}
-	require.True(t, job.Init())
-	require.False(t, job.Check())
+	require.NoError(t, job.Init())
+	require.Error(t, job.Check())
 
 	assert.Nil(t, job.Collect())
 }

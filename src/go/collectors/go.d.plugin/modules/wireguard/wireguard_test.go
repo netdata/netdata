@@ -5,6 +5,7 @@ package wireguard
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -16,8 +17,26 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		assert.NotNil(t, data, name)
+	}
+}
+
+func TestWireGuard_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &WireGuard{}, dataConfigJSON, dataConfigYAML)
+}
+
 func TestWireGuard_Init(t *testing.T) {
-	assert.True(t, New().Init())
+	assert.NoError(t, New().Init())
 }
 
 func TestWireGuard_Charts(t *testing.T) {
@@ -36,15 +55,15 @@ func TestWireGuard_Cleanup(t *testing.T) {
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(w *WireGuard) { w.Init() },
+			prepare:   func(w *WireGuard) { _ = w.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(w *WireGuard) { w.Init(); w.Check() },
+			prepare:   func(w *WireGuard) { _ = w.Init(); _ = w.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(w *WireGuard) { w.Init(); w.Collect() },
+			prepare:   func(w *WireGuard) { _ = w.Init(); _ = w.Collect() },
 		},
 	}
 
@@ -114,13 +133,13 @@ func TestWireGuard_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			w := New()
-			require.True(t, w.Init())
+			require.NoError(t, w.Init())
 			test.prepare(w)
 
 			if test.wantFail {
-				assert.False(t, w.Check())
+				assert.Error(t, w.Check())
 			} else {
-				assert.True(t, w.Check())
+				assert.NoError(t, w.Check())
 			}
 		})
 	}
@@ -411,7 +430,7 @@ func TestWireGuard_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			w := New()
-			require.True(t, w.Init())
+			require.NoError(t, w.Init())
 			m := &mockClient{}
 			w.client = m
 

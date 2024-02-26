@@ -4,6 +4,7 @@ package module
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -84,6 +85,10 @@ const (
 
 func NewJob(cfg JobConfig) *Job {
 	var buf bytes.Buffer
+
+	if cfg.UpdateEvery == 0 {
+		cfg.UpdateEvery = 1
+	}
 
 	j := &Job{
 		AutoDetectEvery: cfg.AutoDetectEvery,
@@ -167,40 +172,44 @@ type Job struct {
 const NetdataChartIDMaxLength = 1200
 
 // FullName returns job full name.
-func (j Job) FullName() string {
+func (j *Job) FullName() string {
 	return j.fullName
 }
 
 // ModuleName returns job module name.
-func (j Job) ModuleName() string {
+func (j *Job) ModuleName() string {
 	return j.moduleName
 }
 
 // Name returns job name.
-func (j Job) Name() string {
+func (j *Job) Name() string {
 	return j.name
 }
 
 // Panicked returns 'panicked' flag value.
-func (j Job) Panicked() bool {
+func (j *Job) Panicked() bool {
 	return j.panicked
 }
 
 // AutoDetectionEvery returns value of AutoDetectEvery.
-func (j Job) AutoDetectionEvery() int {
+func (j *Job) AutoDetectionEvery() int {
 	return j.AutoDetectEvery
 }
 
 // RetryAutoDetection returns whether it is needed to retry autodetection.
-func (j Job) RetryAutoDetection() bool {
+func (j *Job) RetryAutoDetection() bool {
 	return j.AutoDetectEvery > 0 && (j.AutoDetectTries == infTries || j.AutoDetectTries > 0)
 }
 
+func (j *Job) Configuration() any {
+	return j.module.Configuration()
+}
+
 // AutoDetection invokes init, check and postCheck. It handles panic.
-func (j *Job) AutoDetection() (ok bool) {
+func (j *Job) AutoDetection() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			ok = false
+			err = fmt.Errorf("panic %v", err)
 			j.panicked = true
 			j.disableAutoDetection()
 
@@ -209,7 +218,7 @@ func (j *Job) AutoDetection() (ok bool) {
 				j.Errorf("STACK: %s", debug.Stack())
 			}
 		}
-		if !ok {
+		if err != nil {
 			j.module.Cleanup()
 		}
 	}()
@@ -218,29 +227,29 @@ func (j *Job) AutoDetection() (ok bool) {
 		j.Mute()
 	}
 
-	if ok = j.init(); !ok {
+	if err = j.init(); err != nil {
 		j.Error("init failed")
 		j.Unmute()
 		j.disableAutoDetection()
-		return
+		return err
 	}
 
-	if ok = j.check(); !ok {
+	if err = j.check(); err != nil {
 		j.Error("check failed")
 		j.Unmute()
-		return
+		return err
 	}
 
 	j.Unmute()
-
 	j.Info("check success")
-	if ok = j.postCheck(); !ok {
+
+	if err = j.postCheck(); err != nil {
 		j.Error("postCheck failed")
 		j.disableAutoDetection()
-		return
+		return err
 	}
 
-	return true
+	return nil
 }
 
 // Tick Tick.
@@ -316,34 +325,40 @@ func (j *Job) Cleanup() {
 	}
 }
 
-func (j *Job) init() bool {
+func (j *Job) init() error {
 	if j.initialized {
-		return true
+		return nil
 	}
 
-	j.initialized = j.module.Init()
-
-	return j.initialized
-}
-
-func (j *Job) check() bool {
-	ok := j.module.Check()
-	if !ok && j.AutoDetectTries != infTries {
-		j.AutoDetectTries--
+	if err := j.module.Init(); err != nil {
+		return err
 	}
-	return ok
+
+	j.initialized = true
+
+	return nil
 }
 
-func (j *Job) postCheck() bool {
+func (j *Job) check() error {
+	if err := j.module.Check(); err != nil {
+		if j.AutoDetectTries != infTries {
+			j.AutoDetectTries--
+		}
+		return err
+	}
+	return nil
+}
+
+func (j *Job) postCheck() error {
 	if j.charts = j.module.Charts(); j.charts == nil {
 		j.Error("nil charts")
-		return false
+		return errors.New("nil charts")
 	}
 	if err := checkCharts(*j.charts...); err != nil {
 		j.Errorf("charts check: %v", err)
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
 func (j *Job) runOnce() {
@@ -562,7 +577,7 @@ func (j *Job) updateChart(chart *Chart, collected map[string]int64, sinceLastRun
 	return chart.updated
 }
 
-func (j Job) penalty() int {
+func (j *Job) penalty() int {
 	v := j.retries / penaltyStep * penaltyStep * j.updateEvery / 2
 	if v > maxPenalty {
 		return maxPenalty

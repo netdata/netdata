@@ -218,7 +218,7 @@ func prepareWebLog() *WebLog {
 	return &WebLog{
 		Config: Config{
 			GroupRespCodes: false,
-			Parser:         cfg,
+			ParserConfig:   cfg,
 		},
 	}
 }

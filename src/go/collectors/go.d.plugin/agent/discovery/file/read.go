@@ -4,8 +4,10 @@ package file
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
@@ -71,19 +73,26 @@ func (r *Reader) groups() (groups []*confgroup.Group) {
 				r.Warningf("parse '%s': %v", path, err)
 				continue
 			}
+
 			if group == nil {
 				group = &confgroup.Group{Source: path}
+			} else {
+				for _, cfg := range group.Configs {
+					cfg.SetProvider("file reader")
+					cfg.SetSourceType(configSourceType(path))
+					cfg.SetSource(fmt.Sprintf("discoverer=file_reader,file=%s", path))
+				}
 			}
 			groups = append(groups, group)
 		}
 	}
 
-	for _, group := range groups {
-		for _, cfg := range group.Configs {
-			cfg.SetSource(group.Source)
-			cfg.SetProvider(r.Name())
-		}
-	}
-
 	return groups
+}
+
+func configSourceType(path string) string {
+	if strings.Contains(path, "/etc/netdata") {
+		return "user"
+	}
+	return "stock"
 }

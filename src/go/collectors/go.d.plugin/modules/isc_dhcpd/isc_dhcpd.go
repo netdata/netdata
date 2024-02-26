@@ -4,6 +4,7 @@ package isc_dhcpd
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -22,27 +23,6 @@ func init() {
 	})
 }
 
-type (
-	Config struct {
-		LeasesPath string       `yaml:"leases_path"`
-		Pools      []PoolConfig `yaml:"pools"`
-	}
-	PoolConfig struct {
-		Name     string `yaml:"name"`
-		Networks string `yaml:"networks"`
-	}
-)
-
-type DHCPd struct {
-	module.Base
-	Config `yaml:",inline"`
-
-	charts        *module.Charts
-	pools         []ipPool
-	leasesModTime time.Time
-	collected     map[string]int64
-}
-
 func New() *DHCPd {
 	return &DHCPd{
 		Config: Config{
@@ -53,36 +33,70 @@ func New() *DHCPd {
 	}
 }
 
-func (DHCPd) Cleanup() {}
+type (
+	Config struct {
+		UpdateEvery int          `yaml:"update_every" json:"update_every"`
+		LeasesPath  string       `yaml:"leases_path" json:"leases_path"`
+		Pools       []PoolConfig `yaml:"pools" json:"pools"`
+	}
+	PoolConfig struct {
+		Name     string `yaml:"name" json:"name"`
+		Networks string `yaml:"networks" json:"networks"`
+	}
+)
 
-func (d *DHCPd) Init() bool {
+type DHCPd struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
+
+	pools         []ipPool
+	leasesModTime time.Time
+	collected     map[string]int64
+}
+
+func (d *DHCPd) Configuration() any {
+	return d.Config
+}
+
+func (d *DHCPd) Init() error {
 	err := d.validateConfig()
 	if err != nil {
 		d.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	pools, err := d.initPools()
 	if err != nil {
 		d.Errorf("ip pools init: %v", err)
-		return false
+		return err
 	}
 	d.pools = pools
 
 	charts, err := d.initCharts(pools)
 	if err != nil {
 		d.Errorf("charts init: %v", err)
-		return false
+		return err
 	}
 	d.charts = charts
 
 	d.Debugf("monitoring leases file: %v", d.Config.LeasesPath)
 	d.Debugf("monitoring ip pools: %v", d.Config.Pools)
-	return true
+
+	return nil
 }
 
-func (d *DHCPd) Check() bool {
-	return len(d.Collect()) > 0
+func (d *DHCPd) Check() error {
+	mx, err := d.collect()
+	if err != nil {
+		d.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (d *DHCPd) Charts() *module.Charts {
@@ -101,3 +115,5 @@ func (d *DHCPd) Collect() map[string]int64 {
 
 	return mx
 }
+
+func (d *DHCPd) Cleanup() {}

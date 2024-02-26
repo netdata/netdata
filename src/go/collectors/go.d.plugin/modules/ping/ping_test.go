@@ -4,15 +4,35 @@ package ping
 
 import (
 	"errors"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
 
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestPing_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Ping{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestPing_Init(t *testing.T) {
 	tests := map[string]struct {
@@ -39,9 +59,9 @@ func TestPing_Init(t *testing.T) {
 			ping.UpdateEvery = 1
 
 			if test.wantFail {
-				assert.False(t, ping.Init())
+				assert.Error(t, ping.Init())
 			} else {
-				assert.True(t, ping.Init())
+				assert.NoError(t, ping.Init())
 			}
 		})
 	}
@@ -75,9 +95,9 @@ func TestPing_Check(t *testing.T) {
 			ping := test.prepare(t)
 
 			if test.wantFail {
-				assert.False(t, ping.Check())
+				assert.Error(t, ping.Check())
 			} else {
-				assert.True(t, ping.Check())
+				assert.NoError(t, ping.Check())
 			}
 		})
 	}
@@ -145,7 +165,7 @@ func casePingSuccess(t *testing.T) *Ping {
 	ping.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
 		return &mockProber{}
 	}
-	require.True(t, ping.Init())
+	require.NoError(t, ping.Init())
 	return ping
 }
 
@@ -156,7 +176,7 @@ func casePingError(t *testing.T) *Ping {
 	ping.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
 		return &mockProber{errOnPing: true}
 	}
-	require.True(t, ping.Init())
+	require.NoError(t, ping.Init())
 	return ping
 }
 

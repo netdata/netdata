@@ -1,0 +1,6 @@
+{
+  "update_every": 123,
+  "leases_path": "ok",
+  "conf_path": "ok",
+  "conf_dir": "ok"
+}

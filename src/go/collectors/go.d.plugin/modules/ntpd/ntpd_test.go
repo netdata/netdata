@@ -5,11 +5,32 @@ package ntpd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestNTPd_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &NTPd{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestNTPd_Init(t *testing.T) {
 	tests := map[string]struct {
@@ -33,9 +54,9 @@ func TestNTPd_Init(t *testing.T) {
 			n.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, n.Init())
+				assert.Error(t, n.Init())
 			} else {
-				assert.True(t, n.Init())
+				assert.NoError(t, n.Init())
 			}
 		})
 	}
@@ -56,15 +77,15 @@ func TestNTPd_Cleanup(t *testing.T) {
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(n *NTPd) { n.Init() },
+			prepare:   func(n *NTPd) { _ = n.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(n *NTPd) { n.Init(); n.Check() },
+			prepare:   func(n *NTPd) { _ = n.Init(); _ = n.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(n *NTPd) { n.Init(); n.Collect() },
+			prepare:   func(n *NTPd) { _ = n.Init(); n.Collect() },
 		},
 	}
 
@@ -116,12 +137,12 @@ func TestNTPd_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			n := test.prepare()
 
-			require.True(t, n.Init())
+			require.NoError(t, n.Init())
 
 			if test.wantFail {
-				assert.False(t, n.Check())
+				assert.Error(t, n.Check())
 			} else {
-				assert.True(t, n.Check())
+				assert.NoError(t, n.Check())
 			}
 		})
 	}
@@ -237,7 +258,7 @@ func TestNTPd_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			n := test.prepare()
 
-			require.True(t, n.Init())
+			require.NoError(t, n.Init())
 			_ = n.Check()
 
 			mx := n.Collect()

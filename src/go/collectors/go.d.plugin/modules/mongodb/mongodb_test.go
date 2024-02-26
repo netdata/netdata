@@ -9,28 +9,38 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 )
 
 var (
-	dataV6MongodServerStatus, _ = os.ReadFile("testdata/v6.0.3/mongod-serverStatus.json")
-	dataV6MongosServerStatus, _ = os.ReadFile("testdata/v6.0.3/mongos-serverStatus.json")
-	dataV6DbStats, _            = os.ReadFile("testdata/v6.0.3/dbStats.json")
-	dataV6ReplSetGetStatus, _   = os.ReadFile("testdata/v6.0.3/replSetGetStatus.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer6MongodServerStatus, _ = os.ReadFile("testdata/v6.0.3/mongod-serverStatus.json")
+	dataVer6MongosServerStatus, _ = os.ReadFile("testdata/v6.0.3/mongos-serverStatus.json")
+	dataVer6DbStats, _            = os.ReadFile("testdata/v6.0.3/dbStats.json")
+	dataVer6ReplSetGetStatus, _   = os.ReadFile("testdata/v6.0.3/replSetGetStatus.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataV6MongodServerStatus": dataV6MongodServerStatus,
-		"dataV6MongosServerStatus": dataV6MongosServerStatus,
-		"dataV6DbStats":            dataV6DbStats,
-		"dataV6ReplSetGetStatus":   dataV6ReplSetGetStatus,
+		"dataConfigJSON":             dataConfigJSON,
+		"dataConfigYAML":             dataConfigYAML,
+		"dataVer6MongodServerStatus": dataVer6MongodServerStatus,
+		"dataVer6MongosServerStatus": dataVer6MongosServerStatus,
+		"dataVer6DbStats":            dataVer6DbStats,
+		"dataVer6ReplSetGetStatus":   dataVer6ReplSetGetStatus,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
+}
+
+func TestMongo_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Mongo{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestMongo_Init(t *testing.T) {
@@ -65,9 +75,9 @@ func TestMongo_Init(t *testing.T) {
 			mongo.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, mongo.Init())
+				assert.Error(t, mongo.Init())
 			} else {
-				assert.True(t, mongo.Init())
+				assert.NoError(t, mongo.Init())
 			}
 		})
 	}
@@ -139,12 +149,12 @@ func TestMongo_Check(t *testing.T) {
 			defer mongo.Cleanup()
 			mongo.conn = test.prepare()
 
-			require.True(t, mongo.Init())
+			require.NoError(t, mongo.Init())
 
 			if test.wantFail {
-				assert.False(t, mongo.Check())
+				assert.Error(t, mongo.Check())
 			} else {
-				assert.True(t, mongo.Check())
+				assert.NoError(t, mongo.Check())
 			}
 		})
 	}
@@ -590,7 +600,7 @@ func TestMongo_Collect(t *testing.T) {
 			defer mongo.Cleanup()
 			mongo.conn = test.prepare()
 
-			require.True(t, mongo.Init())
+			require.NoError(t, mongo.Init())
 
 			mx := mongo.Collect()
 
@@ -641,9 +651,9 @@ func (m *mockMongoClient) serverStatus() (*documentServerStatus, error) {
 		return nil, errors.New("mock.serverStatus() error")
 	}
 
-	data := dataV6MongodServerStatus
+	data := dataVer6MongodServerStatus
 	if m.mongos {
-		data = dataV6MongosServerStatus
+		data = dataVer6MongosServerStatus
 	}
 
 	var s documentServerStatus
@@ -673,7 +683,7 @@ func (m *mockMongoClient) dbStats(_ string) (*documentDBStats, error) {
 	}
 
 	var s documentDBStats
-	if err := json.Unmarshal(dataV6DbStats, &s); err != nil {
+	if err := json.Unmarshal(dataVer6DbStats, &s); err != nil {
 		return nil, err
 	}
 
@@ -703,7 +713,7 @@ func (m *mockMongoClient) replSetGetStatus() (*documentReplSetStatus, error) {
 	}
 
 	var s documentReplSetStatus
-	if err := json.Unmarshal(dataV6ReplSetGetStatus, &s); err != nil {
+	if err := json.Unmarshal(dataVer6ReplSetGetStatus, &s); err != nil {
 		return nil, err
 	}
 

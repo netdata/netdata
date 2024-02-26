@@ -15,9 +15,9 @@ import (
 
 type (
 	LTSVConfig struct {
-		FieldDelimiter string            `yaml:"field_delimiter"`
-		ValueDelimiter string            `yaml:"value_delimiter"`
-		Mapping        map[string]string `yaml:"mapping"`
+		FieldDelimiter string            `yaml:"field_delimiter" json:"field_delimiter"`
+		ValueDelimiter string            `yaml:"value_delimiter" json:"value_delimiter"`
+		Mapping        map[string]string `yaml:"mapping" json:"mapping"`
 	}
 
 	LTSVParser struct {

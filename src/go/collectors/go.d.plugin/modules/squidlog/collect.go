@@ -14,7 +14,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
-func (s SquidLog) logPanicStackIfAny() {
+func (s *SquidLog) logPanicStackIfAny() {
 	err := recover()
 	if err == nil {
 		return

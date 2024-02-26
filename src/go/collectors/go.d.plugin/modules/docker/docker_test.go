@@ -5,12 +5,33 @@ package docker
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestDocker_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Docker{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestDocker_Init(t *testing.T) {
 	tests := map[string]struct {
@@ -35,9 +56,9 @@ func TestDocker_Init(t *testing.T) {
 			d.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, d.Init())
+				assert.Error(t, d.Init())
 			} else {
-				assert.True(t, d.Init())
+				assert.NoError(t, d.Init())
 			}
 		})
 	}
@@ -58,15 +79,15 @@ func TestDocker_Cleanup(t *testing.T) {
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(d *Docker) { d.Init() },
+			prepare:   func(d *Docker) { _ = d.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(d *Docker) { d.Init(); d.Check() },
+			prepare:   func(d *Docker) { _ = d.Init(); _ = d.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(d *Docker) { d.Init(); d.Collect() },
+			prepare:   func(d *Docker) { _ = d.Init(); d.Collect() },
 		},
 	}
 
@@ -136,12 +157,12 @@ func TestDocker_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := test.prepare()
 
-			require.True(t, d.Init())
+			require.NoError(t, d.Init())
 
 			if test.wantFail {
-				assert.False(t, d.Check())
+				assert.Error(t, d.Check())
 			} else {
-				assert.True(t, d.Check())
+				assert.NoError(t, d.Check())
 			}
 		})
 	}
@@ -666,7 +687,7 @@ func TestDocker_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := test.prepare()
 
-			require.True(t, d.Init())
+			require.NoError(t, d.Init())
 
 			mx := d.Collect()
 

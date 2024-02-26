@@ -4,6 +4,7 @@ package wireguard
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -32,9 +33,14 @@ func New() *WireGuard {
 	}
 }
 
+type Config struct {
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
+}
+
 type (
 	WireGuard struct {
 		module.Base
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
@@ -43,9 +49,8 @@ type (
 
 		cleanupLastTime time.Time
 		cleanupEvery    time.Duration
-
-		devices map[string]bool
-		peers   map[string]bool
+		devices         map[string]bool
+		peers           map[string]bool
 	}
 	wgClient interface {
 		Devices() ([]*wgtypes.Device, error)
@@ -53,12 +58,24 @@ type (
 	}
 )
 
-func (w *WireGuard) Init() bool {
-	return true
+func (w *WireGuard) Configuration() any {
+	return w.Config
 }
 
-func (w *WireGuard) Check() bool {
-	return len(w.Collect()) > 0
+func (w *WireGuard) Init() error {
+	return nil
+}
+
+func (w *WireGuard) Check() error {
+	mx, err := w.collect()
+	if err != nil {
+		w.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (w *WireGuard) Charts() *module.Charts {

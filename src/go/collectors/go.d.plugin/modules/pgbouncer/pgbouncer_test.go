@@ -12,31 +12,42 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	dataV170Version, _    = os.ReadFile("testdata/v1.7.0/version.txt")
-	dataV1170Version, _   = os.ReadFile("testdata/v1.17.0/version.txt")
-	dataV1170Config, _    = os.ReadFile("testdata/v1.17.0/config.txt")
-	dataV1170Databases, _ = os.ReadFile("testdata/v1.17.0/databases.txt")
-	dataV1170Pools, _     = os.ReadFile("testdata/v1.17.0/pools.txt")
-	dataV1170Stats, _     = os.ReadFile("testdata/v1.17.0/stats.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer170Version, _    = os.ReadFile("testdata/v1.7.0/version.txt")
+	dataVer1170Version, _   = os.ReadFile("testdata/v1.17.0/version.txt")
+	dataVer1170Config, _    = os.ReadFile("testdata/v1.17.0/config.txt")
+	dataVer1170Databases, _ = os.ReadFile("testdata/v1.17.0/databases.txt")
+	dataVer1170Pools, _     = os.ReadFile("testdata/v1.17.0/pools.txt")
+	dataVer1170Stats, _     = os.ReadFile("testdata/v1.17.0/stats.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataV170Version":    dataV170Version,
-		"dataV1170Version":   dataV1170Version,
-		"dataV1170Config":    dataV1170Config,
-		"dataV1170Databases": dataV1170Databases,
-		"dataV1170Pools":     dataV1170Pools,
-		"dataV1170Stats":     dataV1170Stats,
+		"dataConfigJSON":       dataConfigJSON,
+		"dataConfigYAML":       dataConfigYAML,
+		"dataVer170Version":    dataVer170Version,
+		"dataVer1170Version":   dataVer1170Version,
+		"dataVer1170Config":    dataVer1170Config,
+		"dataVer1170Databases": dataVer1170Databases,
+		"dataVer1170Pools":     dataVer1170Pools,
+		"dataVer1170Stats":     dataVer1170Stats,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
+}
+
+func TestPgBouncer_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &PgBouncer{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestPgBouncer_Init(t *testing.T) {
@@ -60,9 +71,9 @@ func TestPgBouncer_Init(t *testing.T) {
 			p.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, p.Init())
+				assert.Error(t, p.Init())
 			} else {
-				assert.True(t, p.Init())
+				assert.NoError(t, p.Init())
 			}
 		})
 	}
@@ -80,11 +91,11 @@ func TestPgBouncer_Check(t *testing.T) {
 		"Success when all queries are successful (v1.17.0)": {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataV1170Version)
-				mockExpect(t, m, queryShowConfig, dataV1170Config)
-				mockExpect(t, m, queryShowDatabases, dataV1170Databases)
-				mockExpect(t, m, queryShowStats, dataV1170Stats)
-				mockExpect(t, m, queryShowPools, dataV1170Pools)
+				mockExpect(t, m, queryShowVersion, dataVer1170Version)
+				mockExpect(t, m, queryShowConfig, dataVer1170Config)
+				mockExpect(t, m, queryShowDatabases, dataVer1170Databases)
+				mockExpect(t, m, queryShowStats, dataVer1170Stats)
+				mockExpect(t, m, queryShowPools, dataVer1170Pools)
 			},
 		},
 		"Fail when querying version returns an error": {
@@ -96,13 +107,13 @@ func TestPgBouncer_Check(t *testing.T) {
 		"Fail when querying version returns unsupported version": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataV170Version)
+				mockExpect(t, m, queryShowVersion, dataVer170Version)
 			},
 		},
 		"Fail when querying config returns an error": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataV1170Version)
+				mockExpect(t, m, queryShowVersion, dataVer1170Version)
 				mockExpectErr(m, queryShowConfig)
 			},
 		},
@@ -118,14 +129,14 @@ func TestPgBouncer_Check(t *testing.T) {
 			p.db = db
 			defer func() { _ = db.Close() }()
 
-			require.True(t, p.Init())
+			require.NoError(t, p.Init())
 
 			test.prepareMock(t, mock)
 
 			if test.wantFail {
-				assert.False(t, p.Check())
+				assert.Error(t, p.Check())
 			} else {
-				assert.True(t, p.Check())
+				assert.NoError(t, p.Check())
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -141,11 +152,11 @@ func TestPgBouncer_Collect(t *testing.T) {
 		"Success on all queries (v1.17.0)": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataV1170Version)
-					mockExpect(t, m, queryShowConfig, dataV1170Config)
-					mockExpect(t, m, queryShowDatabases, dataV1170Databases)
-					mockExpect(t, m, queryShowStats, dataV1170Stats)
-					mockExpect(t, m, queryShowPools, dataV1170Pools)
+					mockExpect(t, m, queryShowVersion, dataVer1170Version)
+					mockExpect(t, m, queryShowConfig, dataVer1170Config)
+					mockExpect(t, m, queryShowDatabases, dataVer1170Databases)
+					mockExpect(t, m, queryShowStats, dataVer1170Stats)
+					mockExpect(t, m, queryShowPools, dataVer1170Pools)
 				},
 				check: func(t *testing.T, p *PgBouncer) {
 					mx := p.Collect()
@@ -249,7 +260,7 @@ func TestPgBouncer_Collect(t *testing.T) {
 		"Fail when querying version returns unsupported version": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataV170Version)
+					mockExpect(t, m, queryShowVersion, dataVer170Version)
 				},
 				check: func(t *testing.T, p *PgBouncer) {
 					mx := p.Collect()
@@ -261,7 +272,7 @@ func TestPgBouncer_Collect(t *testing.T) {
 		"Fail when querying config returns an error": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataV1170Version)
+					mockExpect(t, m, queryShowVersion, dataVer1170Version)
 					mockExpectErr(m, queryShowConfig)
 				},
 				check: func(t *testing.T, p *PgBouncer) {
@@ -283,7 +294,7 @@ func TestPgBouncer_Collect(t *testing.T) {
 			p.db = db
 			defer func() { _ = db.Close() }()
 
-			require.True(t, p.Init())
+			require.NoError(t, p.Init())
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {

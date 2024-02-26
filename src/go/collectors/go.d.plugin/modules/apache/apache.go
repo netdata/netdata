@@ -4,6 +4,7 @@ package apache
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -30,7 +31,7 @@ func New() *Apache {
 					URL: "http://127.0.0.1/server-status?auto",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second * 2},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 		},
@@ -40,40 +41,55 @@ func New() *Apache {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type Apache struct {
 	module.Base
-
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
 	httpClient *http.Client
-	once       *sync.Once
+
+	once *sync.Once
 }
 
-func (a *Apache) Init() bool {
-	if err := a.verifyConfig(); err != nil {
+func (a *Apache) Configuration() any {
+	return a.Config
+}
+
+func (a *Apache) Init() error {
+	if err := a.validateConfig(); err != nil {
 		a.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	httpClient, err := a.initHTTPClient()
 	if err != nil {
 		a.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	a.httpClient = httpClient
 
 	a.Debugf("using URL %s", a.URL)
-	a.Debugf("using timeout: %s", a.Timeout.Duration)
-	return true
+	a.Debugf("using timeout: %s", a.Timeout)
+
+	return nil
 }
 
-func (a *Apache) Check() bool {
-	return len(a.Collect()) > 0
+func (a *Apache) Check() error {
+	mx, err := a.collect()
+	if err != nil {
+		a.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (a *Apache) Charts() *module.Charts {

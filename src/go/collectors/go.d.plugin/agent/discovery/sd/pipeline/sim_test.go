@@ -46,11 +46,11 @@ func (sim discoverySim) run(t *testing.T) {
 
 	pl := &Pipeline{
 		Logger:      logger.New(),
-		accum:       accum,
 		discoverers: sim.discoverers,
+		accum:       accum,
 		clr:         mockClr,
 		cmr:         mockCmr,
-		items:       make(map[string]map[uint64][]confgroup.Config),
+		configs:     make(map[string]map[uint64][]confgroup.Config),
 	}
 
 	pl.accum.Logger = pl.Logger

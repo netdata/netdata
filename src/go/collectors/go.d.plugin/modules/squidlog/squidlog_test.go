@@ -16,11 +16,24 @@ import (
 )
 
 var (
-	nativeFormatAccessLog, _ = os.ReadFile("testdata/access.log")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataNativeFormatAccessLog, _ = os.ReadFile("testdata/access.log")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, nativeFormatAccessLog)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":            dataConfigJSON,
+		"dataConfigYAML":            dataConfigYAML,
+		"dataNativeFormatAccessLog": dataNativeFormatAccessLog,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestSquidLog_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &SquidLog{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
@@ -30,7 +43,7 @@ func TestNew(t *testing.T) {
 func TestSquidLog_Init(t *testing.T) {
 	squidlog := New()
 
-	assert.True(t, squidlog.Init())
+	assert.NoError(t, squidlog.Init())
 }
 
 func TestSquidLog_Check(t *testing.T) {
@@ -40,28 +53,28 @@ func TestSquidLog_Check_ErrorOnCreatingLogReaderNoLogFile(t *testing.T) {
 	squid := New()
 	defer squid.Cleanup()
 	squid.Path = "testdata/not_exists.log"
-	require.True(t, squid.Init())
+	require.NoError(t, squid.Init())
 
-	assert.False(t, squid.Check())
+	assert.Error(t, squid.Check())
 }
 
 func TestSquid_Check_ErrorOnCreatingParserUnknownFormat(t *testing.T) {
 	squid := New()
 	defer squid.Cleanup()
 	squid.Path = "testdata/unknown.log"
-	require.True(t, squid.Init())
+	require.NoError(t, squid.Init())
 
-	assert.False(t, squid.Check())
+	assert.Error(t, squid.Check())
 }
 
 func TestSquid_Check_ErrorOnCreatingParserZeroKnownFields(t *testing.T) {
 	squid := New()
 	defer squid.Cleanup()
 	squid.Path = "testdata/access.log"
-	squid.Parser.CSV.Format = "$one $two"
-	require.True(t, squid.Init())
+	squid.ParserConfig.CSV.Format = "$one $two"
+	require.NoError(t, squid.Init())
 
-	assert.False(t, squid.Check())
+	assert.Error(t, squid.Check())
 }
 
 func TestSquidLog_Charts(t *testing.T) {
@@ -280,11 +293,11 @@ func prepareSquidCollect(t *testing.T) *SquidLog {
 	t.Helper()
 	squid := New()
 	squid.Path = "testdata/access.log"
-	require.True(t, squid.Init())
-	require.True(t, squid.Check())
+	require.NoError(t, squid.Init())
+	require.NoError(t, squid.Check())
 	defer squid.Cleanup()
 
-	p, err := logs.NewCSVParser(squid.Parser.CSV, bytes.NewReader(nativeFormatAccessLog))
+	p, err := logs.NewCSVParser(squid.ParserConfig.CSV, bytes.NewReader(dataNativeFormatAccessLog))
 	require.NoError(t, err)
 	squid.parser = p
 	return squid

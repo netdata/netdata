@@ -9,28 +9,38 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 var (
-	testOverviewStats, _ = os.ReadFile("testdata/v3.11.5/api-overview.json")
-	testNodeStats, _     = os.ReadFile("testdata/v3.11.5/api-nodes-node.json")
-	testVhostsStats, _   = os.ReadFile("testdata/v3.11.5/api-vhosts.json")
-	testQueuesStats, _   = os.ReadFile("testdata/v3.11.5/api-queues.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataOverviewStats, _ = os.ReadFile("testdata/v3.11.5/api-overview.json")
+	dataNodeStats, _     = os.ReadFile("testdata/v3.11.5/api-nodes-node.json")
+	dataVhostsStats, _   = os.ReadFile("testdata/v3.11.5/api-vhosts.json")
+	dataQueuesStats, _   = os.ReadFile("testdata/v3.11.5/api-queues.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"testOverviewStats": testOverviewStats,
-		"testNodeStats":     testNodeStats,
-		"testVhostsStats":   testVhostsStats,
-		"testQueuesStats":   testQueuesStats,
+		"dataConfigJSON":    dataConfigJSON,
+		"dataConfigYAML":    dataConfigYAML,
+		"dataOverviewStats": dataOverviewStats,
+		"dataNodeStats":     dataNodeStats,
+		"dataVhostsStats":   dataVhostsStats,
+		"dataQueuesStats":   dataQueuesStats,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
+}
+
+func TestRabbitMQ_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &RabbitMQ{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestRabbitMQ_Init(t *testing.T) {
@@ -58,9 +68,9 @@ func TestRabbitMQ_Init(t *testing.T) {
 			rabbit.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, rabbit.Init())
+				assert.Error(t, rabbit.Init())
 			} else {
-				assert.True(t, rabbit.Init())
+				assert.NoError(t, rabbit.Init())
 			}
 		})
 	}
@@ -74,7 +84,7 @@ func TestRabbitMQ_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 
 	rabbit := New()
-	require.True(t, rabbit.Init())
+	require.NoError(t, rabbit.Init())
 
 	assert.NotPanics(t, rabbit.Cleanup)
 }
@@ -94,12 +104,12 @@ func TestRabbitMQ_Check(t *testing.T) {
 			rabbit, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, rabbit.Init())
+			require.NoError(t, rabbit.Init())
 
 			if test.wantFail {
-				assert.False(t, rabbit.Check())
+				assert.Error(t, rabbit.Check())
 			} else {
-				assert.True(t, rabbit.Check())
+				assert.NoError(t, rabbit.Check())
 			}
 		})
 	}
@@ -285,7 +295,7 @@ func TestRabbitMQ_Collect(t *testing.T) {
 			rabbit, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, rabbit.Init())
+			require.NoError(t, rabbit.Init())
 
 			mx := rabbit.Collect()
 
@@ -332,13 +342,13 @@ func prepareRabbitMQEndpoint() *httptest.Server {
 			func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case urlPathAPIOverview:
-					_, _ = w.Write(testOverviewStats)
+					_, _ = w.Write(dataOverviewStats)
 				case filepath.Join(urlPathAPINodes, "rabbit@localhost"):
-					_, _ = w.Write(testNodeStats)
+					_, _ = w.Write(dataNodeStats)
 				case urlPathAPIVhosts:
-					_, _ = w.Write(testVhostsStats)
+					_, _ = w.Write(dataVhostsStats)
 				case urlPathAPIQueues:
-					_, _ = w.Write(testQueuesStats)
+					_, _ = w.Write(dataQueuesStats)
 				default:
 					w.WriteHeader(404)
 				}

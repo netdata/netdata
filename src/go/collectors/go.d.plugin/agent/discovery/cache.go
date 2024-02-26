@@ -6,7 +6,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 )
 
-type cache map[string]*confgroup.Group
+type cache map[string]*confgroup.Group // [Source]
 
 func newCache() *cache {
 	return &cache{}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,9 @@ import (
 )
 
 var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
 	dataSimpleStatusMPMEvent, _     = os.ReadFile("testdata/simple-status-mpm-event.txt")
 	dataExtendedStatusMPMEvent, _   = os.ReadFile("testdata/extended-status-mpm-event.txt")
 	dataExtendedStatusMPMPrefork, _ = os.ReadFile("testdata/extended-status-mpm-prefork.txt")
@@ -23,14 +27,20 @@ var (
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
+		"dataConfigJSON":               dataConfigJSON,
+		"dataConfigYAML":               dataConfigYAML,
 		"dataSimpleStatusMPMEvent":     dataSimpleStatusMPMEvent,
 		"dataExtendedStatusMPMEvent":   dataExtendedStatusMPMEvent,
 		"dataExtendedStatusMPMPrefork": dataExtendedStatusMPMPrefork,
 		"dataLighttpdStatus":           dataLighttpdStatus,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 
 	}
+}
+
+func TestApache_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Apache{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestApache_Init(t *testing.T) {
@@ -66,9 +76,9 @@ func TestApache_Init(t *testing.T) {
 			apache.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, apache.Init())
+				assert.Error(t, apache.Init())
 			} else {
-				assert.True(t, apache.Init())
+				assert.NoError(t, apache.Init())
 			}
 		})
 	}
@@ -115,9 +125,9 @@ func TestApache_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, apache.Check())
+				assert.Error(t, apache.Check())
 			} else {
-				assert.True(t, apache.Check())
+				assert.NoError(t, apache.Check())
 			}
 		})
 	}
@@ -255,7 +265,7 @@ func caseMPMEventSimpleStatus(t *testing.T) (*Apache, func()) {
 		}))
 	apache := New()
 	apache.URL = srv.URL + "/server-status?auto"
-	require.True(t, apache.Init())
+	require.NoError(t, apache.Init())
 
 	return apache, srv.Close
 }
@@ -268,7 +278,7 @@ func caseMPMEventExtendedStatus(t *testing.T) (*Apache, func()) {
 		}))
 	apache := New()
 	apache.URL = srv.URL + "/server-status?auto"
-	require.True(t, apache.Init())
+	require.NoError(t, apache.Init())
 
 	return apache, srv.Close
 }
@@ -281,7 +291,7 @@ func caseMPMPreforkExtendedStatus(t *testing.T) (*Apache, func()) {
 		}))
 	apache := New()
 	apache.URL = srv.URL + "/server-status?auto"
-	require.True(t, apache.Init())
+	require.NoError(t, apache.Init())
 
 	return apache, srv.Close
 }
@@ -294,7 +304,7 @@ func caseLighttpdResponse(t *testing.T) (*Apache, func()) {
 		}))
 	apache := New()
 	apache.URL = srv.URL + "/server-status?auto"
-	require.True(t, apache.Init())
+	require.NoError(t, apache.Init())
 
 	return apache, srv.Close
 }
@@ -307,7 +317,7 @@ func caseInvalidDataResponse(t *testing.T) (*Apache, func()) {
 		}))
 	apache := New()
 	apache.URL = srv.URL + "/server-status?auto"
-	require.True(t, apache.Init())
+	require.NoError(t, apache.Init())
 
 	return apache, srv.Close
 }
@@ -316,7 +326,7 @@ func caseConnectionRefused(t *testing.T) (*Apache, func()) {
 	t.Helper()
 	apache := New()
 	apache.URL = "http://127.0.0.1:65001/server-status?auto"
-	require.True(t, apache.Init())
+	require.NoError(t, apache.Init())
 
 	return apache, func() {}
 }
@@ -329,7 +339,7 @@ func case404(t *testing.T) (*Apache, func()) {
 		}))
 	apache := New()
 	apache.URL = srv.URL + "/server-status?auto"
-	require.True(t, apache.Init())
+	require.NoError(t, apache.Init())
 
 	return apache, srv.Close
 }

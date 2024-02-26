@@ -5,6 +5,7 @@ package pgbouncer
 import (
 	"database/sql"
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -27,7 +28,7 @@ func init() {
 func New() *PgBouncer {
 	return &PgBouncer{
 		Config: Config{
-			Timeout: web.Duration{Duration: time.Second},
+			Timeout: web.Duration(time.Second),
 			DSN:     "postgres://postgres:postgres@127.0.0.1:6432/pgbouncer",
 		},
 		charts:               globalCharts.Copy(),
@@ -39,19 +40,20 @@ func New() *PgBouncer {
 }
 
 type Config struct {
-	DSN     string       `yaml:"dsn"`
-	Timeout web.Duration `yaml:"timeout"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	DSN         string       `yaml:"dsn" json:"dsn"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type PgBouncer struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
-	db      *sql.DB
-	version *semver.Version
+	db *sql.DB
 
+	version              *semver.Version
 	recheckSettingsTime  time.Time
 	recheckSettingsEvery time.Duration
 	maxClientConn        int64
@@ -59,18 +61,30 @@ type PgBouncer struct {
 	metrics *metrics
 }
 
-func (p *PgBouncer) Init() bool {
+func (p *PgBouncer) Configuration() any {
+	return p.Config
+}
+
+func (p *PgBouncer) Init() error {
 	err := p.validateConfig()
 	if err != nil {
 		p.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
-	return true
+	return nil
 }
 
-func (p *PgBouncer) Check() bool {
-	return len(p.Collect()) > 0
+func (p *PgBouncer) Check() error {
+	mx, err := p.collect()
+	if err != nil {
+		p.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (p *PgBouncer) Charts() *module.Charts {

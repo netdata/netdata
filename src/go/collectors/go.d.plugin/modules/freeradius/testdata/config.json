@@ -1,0 +1,7 @@
+{
+  "update_every": 123,
+  "address": "ok",
+  "port": 123,
+  "secret": "ok",
+  "timeout": 123.123
+}

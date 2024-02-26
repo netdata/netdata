@@ -1,36 +1,59 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/isc_dhcpd job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
-    },
-    "leases_path": {
-      "type": "string"
-    },
-    "pools": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ISC DHCP collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "leases_path": {
+        "title": "Leases file",
+        "description": "File path to the ISC DHCP server's lease database.",
+        "type": "string",
+        "default": "/var/lib/dhcp/dhcpd.leases"
+      },
+      "pools": {
+        "title": "IP pools",
+        "description": "A list of IP pools to monitor.",
+        "type": "array",
+        "items": {
+          "title": "IP pool",
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "description": "A descriptive name for the IP pool.",
+              "type": "string"
+            },
+            "networks": {
+              "title": "Networks",
+              "description": "A space-separated list of [IP ranges](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/iprange#supported-formats).",
+              "type": "string"
+            }
           },
-          "networks": {
-            "type": "string"
-          }
+          "required": [
+            "name",
+            "networks"
+          ]
         },
-        "required": [
-          "name",
-          "networks"
-        ]
+        "minItems": 1,
+        "uniqueItems": true,
+        "additionalItems": false
       }
-    }
+    },
+    "required": [
+      "leases_path",
+      "pools"
+    ]
   },
-  "required": [
-    "name",
-    "leases_path",
-    "pools"
-  ]
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    }
+  }
 }

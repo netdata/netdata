@@ -26,7 +26,7 @@ func init() {
 func New() *Filecheck {
 	return &Filecheck{
 		Config: Config{
-			DiscoveryEvery: web.Duration{Duration: time.Second * 30},
+			DiscoveryEvery: web.Duration(time.Second * 30),
 			Files:          filesConfig{},
 			Dirs: dirsConfig{
 				CollectDirSize: true,
@@ -39,24 +39,27 @@ func New() *Filecheck {
 
 type (
 	Config struct {
-		DiscoveryEvery web.Duration `yaml:"discovery_every"`
-		Files          filesConfig  `yaml:"files"`
-		Dirs           dirsConfig   `yaml:"dirs"`
+		UpdateEvery    int          `yaml:"update_every" json:"update_every"`
+		DiscoveryEvery web.Duration `yaml:"discovery_every" json:"discovery_every"`
+		Files          filesConfig  `yaml:"files" json:"files"`
+		Dirs           dirsConfig   `yaml:"dirs" json:"dirs"`
 	}
 	filesConfig struct {
-		Include []string `yaml:"include"`
-		Exclude []string `yaml:"exclude"`
+		Include []string `yaml:"include" json:"include"`
+		Exclude []string `yaml:"exclude" json:"exclude"`
 	}
 	dirsConfig struct {
-		Include        []string `yaml:"include"`
-		Exclude        []string `yaml:"exclude"`
-		CollectDirSize bool     `yaml:"collect_dir_size"`
+		Include        []string `yaml:"include" json:"include"`
+		Exclude        []string `yaml:"exclude" json:"exclude"`
+		CollectDirSize bool     `yaml:"collect_dir_size" json:"collect_dir_size"`
 	}
 )
 
 type Filecheck struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
 
 	lastDiscoveryFiles time.Time
 	curFiles           []string
@@ -65,34 +68,34 @@ type Filecheck struct {
 	lastDiscoveryDirs time.Time
 	curDirs           []string
 	collectedDirs     map[string]bool
-
-	charts *module.Charts
 }
 
-func (Filecheck) Cleanup() {
+func (fc *Filecheck) Configuration() any {
+	return fc.Config
 }
 
-func (fc *Filecheck) Init() bool {
+func (fc *Filecheck) Init() error {
 	err := fc.validateConfig()
 	if err != nil {
 		fc.Errorf("error on validating config: %v", err)
-		return false
+		return err
 	}
 
 	charts, err := fc.initCharts()
 	if err != nil {
 		fc.Errorf("error on charts initialization: %v", err)
-		return false
+		return err
 	}
 	fc.charts = charts
 
 	fc.Debugf("monitored files: %v", fc.Files.Include)
 	fc.Debugf("monitored dirs: %v", fc.Dirs.Include)
-	return true
+
+	return nil
 }
 
-func (fc Filecheck) Check() bool {
-	return true
+func (fc *Filecheck) Check() error {
+	return nil
 }
 
 func (fc *Filecheck) Charts() *module.Charts {
@@ -109,4 +112,7 @@ func (fc *Filecheck) Collect() map[string]int64 {
 		return nil
 	}
 	return ms
+}
+
+func (fc *Filecheck) Cleanup() {
 }

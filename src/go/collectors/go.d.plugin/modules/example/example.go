@@ -16,10 +16,9 @@ func init() {
 	module.Register("example", module.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: module.Defaults{
-			UpdateEvery:        module.UpdateEvery,
-			AutoDetectionRetry: module.AutoDetectionRetry,
-			Priority:           module.Priority,
-			Disabled:           true,
+			UpdateEvery: module.UpdateEvery,
+			Priority:    module.Priority,
+			Disabled:    true,
 		},
 		Create: func() module.Module { return New() },
 	})
@@ -45,15 +44,16 @@ func New() *Example {
 
 type (
 	Config struct {
-		Charts       ConfigCharts `yaml:"charts"`
-		HiddenCharts ConfigCharts `yaml:"hidden_charts"`
+		UpdateEvery  int          `yaml:"update_every" json:"update_every"`
+		Charts       ConfigCharts `yaml:"charts" json:"charts"`
+		HiddenCharts ConfigCharts `yaml:"hidden_charts" json:"hidden_charts"`
 	}
 	ConfigCharts struct {
-		Type     string `yaml:"type"`
-		Num      int    `yaml:"num"`
-		Contexts int    `yaml:"contexts"`
-		Dims     int    `yaml:"dimensions"`
-		Labels   int    `yaml:"labels"`
+		Type     string `yaml:"type" json:"type"`
+		Num      int    `yaml:"num" json:"num"`
+		Contexts int    `yaml:"contexts" json:"contexts"`
+		Dims     int    `yaml:"dimensions" json:"dimensions"`
+		Labels   int    `yaml:"labels" json:"labels"`
 	}
 )
 
@@ -66,24 +66,28 @@ type Example struct {
 	collectedDims map[string]bool
 }
 
-func (e *Example) Init() bool {
+func (e *Example) Configuration() any {
+	return e.Config
+}
+
+func (e *Example) Init() error {
 	err := e.validateConfig()
 	if err != nil {
 		e.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	charts, err := e.initCharts()
 	if err != nil {
 		e.Errorf("charts init: %v", err)
-		return false
+		return err
 	}
 	e.charts = charts
-	return true
+	return nil
 }
 
-func (e *Example) Check() bool {
-	return len(e.Collect()) > 0
+func (e *Example) Check() error {
+	return nil
 }
 
 func (e *Example) Charts() *module.Charts {

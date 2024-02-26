@@ -1,0 +1,25 @@
+{
+  "update_every": 123,
+  "webadmin": "ok",
+  "max_queues": 123,
+  "max_topics": 123,
+  "queues_filter": "ok",
+  "topics_filter": "ok",
+  "url": "ok",
+  "body": "ok",
+  "method": "ok",
+  "headers": {
+    "ok": "ok"
+  },
+  "username": "ok",
+  "password": "ok",
+  "proxy_url": "ok",
+  "proxy_username": "ok",
+  "proxy_password": "ok",
+  "timeout": 123.123,
+  "not_follow_redirects": true,
+  "tls_ca": "ok",
+  "tls_cert": "ok",
+  "tls_key": "ok",
+  "tls_skip_verify": true
+}

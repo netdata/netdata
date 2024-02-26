@@ -5,16 +5,33 @@ package dnsmasq
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*Dnsmasq)(nil), New())
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestDnsmasq_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Dnsmasq{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestDnsmasq_Init(t *testing.T) {
@@ -54,9 +71,9 @@ func TestDnsmasq_Init(t *testing.T) {
 			ns.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, ns.Init())
+				assert.Error(t, ns.Init())
 			} else {
-				assert.True(t, ns.Init())
+				assert.NoError(t, ns.Init())
 			}
 		})
 	}
@@ -83,12 +100,12 @@ func TestDnsmasq_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			dnsmasq := test.prepare()
-			require.True(t, dnsmasq.Init())
+			require.NoError(t, dnsmasq.Init())
 
 			if test.wantFail {
-				assert.False(t, dnsmasq.Check())
+				assert.Error(t, dnsmasq.Check())
 			} else {
-				assert.True(t, dnsmasq.Check())
+				assert.NoError(t, dnsmasq.Check())
 			}
 		})
 	}
@@ -96,7 +113,7 @@ func TestDnsmasq_Check(t *testing.T) {
 
 func TestDnsmasq_Charts(t *testing.T) {
 	dnsmasq := New()
-	require.True(t, dnsmasq.Init())
+	require.NoError(t, dnsmasq.Init())
 	assert.NotNil(t, dnsmasq.Charts())
 }
 
@@ -133,7 +150,7 @@ func TestDnsmasq_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			dnsmasq := test.prepare()
-			require.True(t, dnsmasq.Init())
+			require.NoError(t, dnsmasq.Init())
 
 			collected := dnsmasq.Collect()
 

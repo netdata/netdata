@@ -4,6 +4,7 @@ package file
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -150,6 +151,11 @@ func (w *Watcher) refresh(ctx context.Context, in chan<- []*confgroup.Group) {
 		} else if group == nil {
 			groups = append(groups, &confgroup.Group{Source: file})
 		} else {
+			for _, cfg := range group.Configs {
+				cfg.SetProvider("file watcher")
+				cfg.SetSourceType(configSourceType(file))
+				cfg.SetSource(fmt.Sprintf("discoverer=file_watcher,file=%s", file))
+			}
 			groups = append(groups, group)
 		}
 	}
@@ -162,14 +168,8 @@ func (w *Watcher) refresh(ctx context.Context, in chan<- []*confgroup.Group) {
 		groups = append(groups, &confgroup.Group{Source: name})
 	}
 
-	for _, group := range groups {
-		for _, cfg := range group.Configs {
-			cfg.SetSource(group.Source)
-			cfg.SetProvider("file watcher")
-		}
-	}
-
 	send(ctx, in, groups)
+
 	w.watchDirs()
 }
 
@@ -202,7 +202,6 @@ func (w *Watcher) stop() {
 		}
 	}()
 
-	// in fact never returns an error
 	_ = w.watcher.Close()
 }
 

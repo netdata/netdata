@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/file"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/hostinfo"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/vnodes"
@@ -144,6 +145,7 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 	}
 
 	a.Infof("dummy/read/watch paths: %d/%d/%d", len(dummyPaths), len(readPaths), len(a.ModulesSDConfPath))
+
 	return discovery.Config{
 		Registry: reg,
 		File: file.Config{
@@ -152,6 +154,9 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 		},
 		Dummy: dummy.Config{
 			Names: dummyPaths,
+		},
+		SD: sd.Config{
+			ConfDir: a.ModulesConfSDDir,
 		},
 	}
 }
@@ -174,7 +179,7 @@ func (a *Agent) setupVnodeRegistry() *vnodes.Vnodes {
 	return reg
 }
 
-func loadYAML(conf interface{}, path string) error {
+func loadYAML(conf any, path string) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err

@@ -14,10 +14,12 @@ func (z *Zookeeper) collect() (map[string]int64, error) {
 
 func (z *Zookeeper) collectMntr() (map[string]int64, error) {
 	const command = "mntr"
+
 	lines, err := z.fetch("mntr")
 	if err != nil {
 		return nil, err
 	}
+
 	switch len(lines) {
 	case 0:
 		return nil, fmt.Errorf("'%s' command returned empty response", command)
@@ -27,6 +29,7 @@ func (z *Zookeeper) collectMntr() (map[string]int64, error) {
 	}
 
 	mx := make(map[string]int64)
+
 	for _, line := range lines {
 		parts := strings.Fields(line)
 		if len(parts) != 2 || !strings.HasPrefix(parts[0], "zk_") {
@@ -56,6 +59,7 @@ func (z *Zookeeper) collectMntr() (map[string]int64, error) {
 	if len(mx) == 0 {
 		return nil, fmt.Errorf("'%s' command: failed to parse response", command)
 	}
+
 	return mx, nil
 }
 

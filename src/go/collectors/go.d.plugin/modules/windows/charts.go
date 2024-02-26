@@ -4549,9 +4549,6 @@ func (w *Windows) addProcessToCharts(procID string) {
 			continue
 		}
 
-		if dim == nil {
-			continue
-		}
 		if err := chart.AddDim(dim); err != nil {
 			w.Warning(err)
 			continue

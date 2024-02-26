@@ -4,14 +4,31 @@ package supervisord
 
 import (
 	"errors"
+	"os"
 	"testing"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*Supervisord)(nil), New())
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestSupervisord_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Supervisord{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestSupervisord_Init(t *testing.T) {
@@ -38,9 +55,9 @@ func TestSupervisord_Init(t *testing.T) {
 			supvr.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, supvr.Init())
+				assert.Error(t, supvr.Init())
 			} else {
-				assert.True(t, supvr.Init())
+				assert.NoError(t, supvr.Init())
 			}
 		})
 	}
@@ -69,9 +86,9 @@ func TestSupervisord_Check(t *testing.T) {
 			defer supvr.Cleanup()
 
 			if test.wantFail {
-				assert.False(t, supvr.Check())
+				assert.Error(t, supvr.Check())
 			} else {
-				assert.True(t, supvr.Check())
+				assert.NoError(t, supvr.Check())
 			}
 		})
 	}
@@ -79,7 +96,7 @@ func TestSupervisord_Check(t *testing.T) {
 
 func TestSupervisord_Charts(t *testing.T) {
 	supvr := New()
-	require.True(t, supvr.Init())
+	require.NoError(t, supvr.Init())
 
 	assert.NotNil(t, supvr.Charts())
 }
@@ -88,7 +105,7 @@ func TestSupervisord_Cleanup(t *testing.T) {
 	supvr := New()
 	assert.NotPanics(t, supvr.Cleanup)
 
-	require.True(t, supvr.Init())
+	require.NoError(t, supvr.Init())
 	m := &mockSupervisorClient{}
 	supvr.client = m
 
@@ -188,21 +205,21 @@ func ensureCollectedProcessesAddedToCharts(t *testing.T, supvr *Supervisord) {
 
 func prepareSupervisordSuccessOnGetAllProcessInfo(t *testing.T) *Supervisord {
 	supvr := New()
-	require.True(t, supvr.Init())
+	require.NoError(t, supvr.Init())
 	supvr.client = &mockSupervisorClient{}
 	return supvr
 }
 
 func prepareSupervisordZeroProcessesOnGetAllProcessInfo(t *testing.T) *Supervisord {
 	supvr := New()
-	require.True(t, supvr.Init())
+	require.NoError(t, supvr.Init())
 	supvr.client = &mockSupervisorClient{returnZeroProcesses: true}
 	return supvr
 }
 
 func prepareSupervisordErrorOnGetAllProcessInfo(t *testing.T) *Supervisord {
 	supvr := New()
-	require.True(t, supvr.Init())
+	require.NoError(t, supvr.Init())
 	supvr.client = &mockSupervisorClient{errOnGetAllProcessInfo: true}
 	return supvr
 }

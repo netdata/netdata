@@ -3,6 +3,7 @@
 package file
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
@@ -27,73 +28,89 @@ func TestNewReader(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		t.Run(name, func(t *testing.T) { assert.NotNil(t, NewReader(test.reg, test.paths)) })
+		t.Run(name, func(t *testing.T) {
+			assert.NotNil(t, NewReader(test.reg, test.paths))
+		})
 	}
 }
 
 func TestReader_Run(t *testing.T) {
-	tmp := newTmpDir(t, "reader-run-*")
-	defer tmp.cleanup()
+	tests := map[string]struct {
+		createSim func(tmp *tmpDir) discoverySim
+	}{
+		"read multiple files": {
+			createSim: func(tmp *tmpDir) discoverySim {
+				module1 := tmp.join("module1.conf")
+				module2 := tmp.join("module2.conf")
+				module3 := tmp.join("module3.conf")
 
-	module1 := tmp.join("module1.conf")
-	module2 := tmp.join("module2.conf")
-	module3 := tmp.join("module3.conf")
+				tmp.writeYAML(module1, staticConfig{
+					Jobs: []confgroup.Config{{"name": "name"}},
+				})
+				tmp.writeYAML(module2, staticConfig{
+					Jobs: []confgroup.Config{{"name": "name"}},
+				})
+				tmp.writeString(module3, "# a comment")
 
-	tmp.writeYAML(module1, staticConfig{
-		Jobs: []confgroup.Config{{"name": "name"}},
-	})
-	tmp.writeYAML(module2, staticConfig{
-		Jobs: []confgroup.Config{{"name": "name"}},
-	})
-	tmp.writeString(module3, "# a comment")
+				reg := confgroup.Registry{
+					"module1": {},
+					"module2": {},
+					"module3": {},
+				}
+				discovery := prepareDiscovery(t, Config{
+					Registry: reg,
+					Read:     []string{module1, module2, module3},
+				})
+				expected := []*confgroup.Group{
+					{
+						Source: module1,
+						Configs: []confgroup.Config{
+							{
+								"name":                "name",
+								"module":              "module1",
+								"update_every":        module.UpdateEvery,
+								"autodetection_retry": module.AutoDetectionRetry,
+								"priority":            module.Priority,
+								"__provider__":        "file reader",
+								"__source_type__":     confgroup.TypeStock,
+								"__source__":          fmt.Sprintf("discoverer=file_reader,file=%s", module1),
+							},
+						},
+					},
+					{
+						Source: module2,
+						Configs: []confgroup.Config{
+							{
+								"name":                "name",
+								"module":              "module2",
+								"update_every":        module.UpdateEvery,
+								"autodetection_retry": module.AutoDetectionRetry,
+								"priority":            module.Priority,
+								"__provider__":        "file reader",
+								"__source_type__":     confgroup.TypeStock,
+								"__source__":          fmt.Sprintf("discoverer=file_reader,file=%s", module2),
+							},
+						},
+					},
+					{
+						Source: module3,
+					},
+				}
 
-	reg := confgroup.Registry{
-		"module1": {},
-		"module2": {},
-		"module3": {},
-	}
-	discovery := prepareDiscovery(t, Config{
-		Registry: reg,
-		Read:     []string{module1, module2, module3},
-	})
-	expected := []*confgroup.Group{
-		{
-			Source: module1,
-			Configs: []confgroup.Config{
-				{
-					"name":                "name",
-					"module":              "module1",
-					"update_every":        module.UpdateEvery,
-					"autodetection_retry": module.AutoDetectionRetry,
-					"priority":            module.Priority,
-					"__source__":          module1,
-					"__provider__":        "file reader",
-				},
+				return discoverySim{
+					discovery:      discovery,
+					expectedGroups: expected,
+				}
 			},
 		},
-		{
-			Source: module2,
-			Configs: []confgroup.Config{
-				{
-					"name":                "name",
-					"module":              "module2",
-					"update_every":        module.UpdateEvery,
-					"autodetection_retry": module.AutoDetectionRetry,
-					"priority":            module.Priority,
-					"__source__":          module2,
-					"__provider__":        "file reader",
-				},
-			},
-		},
-		{
-			Source: module3,
-		},
 	}
 
-	sim := discoverySim{
-		discovery:      discovery,
-		expectedGroups: expected,
-	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tmp := newTmpDir(t, "reader-run-*")
+			defer tmp.cleanup()
 
-	sim.run(t)
+			test.createSim(tmp).run(t)
+		})
+	}
 }

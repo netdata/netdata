@@ -1,54 +1,103 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "title": "go.d/x509check job configuration schema.",
-  "properties": {
-    "name": {
-      "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "X509Check collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "source": {
+        "title": "Certificate source",
+        "description": "The source of the certificate. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file.",
+        "type": "string"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "The timeout in seconds for the certificate retrieval.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      },
+      "check_revocation_status": {
+        "title": "Revocation status check",
+        "description": "Whether to check the revocation status of the certificate.",
+        "type": "boolean"
+      },
+      "days_until_expiration_warning": {
+        "title": "Days until warning",
+        "description": "Number of days before the alarm status is set to warning.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 14
+      },
+      "days_until_expiration_critical": {
+        "title": "Days until critical",
+        "description": "Number of days before the alarm status is set to critical.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 7
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "If set, TLS certificate verification will be skipped.",
+        "type": "boolean"
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "The path to the CA certificate file for TLS verification.",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "The path to the client certificate file for TLS authentication.",
+        "type": "string"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "The path to the client key file for TLS authentication.",
+        "type": "string"
+      }
     },
-    "source": {
-      "type": "string"
+    "required": [
+      "source"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
     },
     "timeout": {
-      "type": [
-        "string",
-        "integer"
-      ]
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },
-    "tlscfg": {
-      "type": "object",
-      "properties": {
-        "tls_ca": {
-          "type": "string"
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "source",
+            "timeout",
+            "check_revocation_status",
+            "days_until_expiration_warning",
+            "days_until_expiration_critical"
+          ]
         },
-        "tls_cert": {
-          "type": "string"
-        },
-        "tls_key": {
-          "type": "string"
-        },
-        "tls_skip_verify": {
-          "type": "boolean"
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
         }
-      },
-      "required": [
-        "tls_ca",
-        "tls_cert",
-        "tls_key"
       ]
-    },
-    "days_until_expiration_warning": {
-      "type": "integer"
-    },
-    "days_until_expiration_critical": {
-      "type": "integer"
-    },
-    "check_revocation_status": {
-      "type": "boolean"
     }
-  },
-  "required": [
-    "name",
-    "source"
-  ]
+  }
 }

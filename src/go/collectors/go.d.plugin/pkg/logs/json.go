@@ -12,7 +12,7 @@ import (
 )
 
 type JSONConfig struct {
-	Mapping map[string]string `yaml:"mapping"`
+	Mapping map[string]string `yaml:"mapping" json:"mapping"`
 }
 
 type JSONParser struct {

@@ -5,6 +5,7 @@ package redis
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"sync"
 	"time"
 
@@ -31,7 +32,7 @@ func New() *Redis {
 	return &Redis{
 		Config: Config{
 			Address:     "redis://@localhost:6379",
-			Timeout:     web.Duration{Duration: time.Second},
+			Timeout:     web.Duration(time.Second),
 			PingSamples: 5,
 		},
 
@@ -44,31 +45,29 @@ func New() *Redis {
 }
 
 type Config struct {
-	Address          string       `yaml:"address"`
-	Password         string       `yaml:"password"`
-	Username         string       `yaml:"username"`
-	Timeout          web.Duration `yaml:"timeout"`
-	PingSamples      int          `yaml:"ping_samples"`
-	tlscfg.TLSConfig `yaml:",inline"`
+	tlscfg.TLSConfig `yaml:",inline" json:""`
+	UpdateEvery      int          `yaml:"update_every" json:"update_every"`
+	Address          string       `yaml:"address" json:"address"`
+	Timeout          web.Duration `yaml:"timeout" json:"timeout"`
+	Username         string       `yaml:"username" json:"username"`
+	Password         string       `yaml:"password" json:"password"`
+	PingSamples      int          `yaml:"ping_samples" json:"ping_samples"`
 }
 
 type (
 	Redis struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
-		charts *module.Charts
-
-		rdb redisClient
-
-		server  string
-		version *semver.Version
-
+		charts                 *module.Charts
 		addAOFChartsOnce       *sync.Once
 		addReplSlaveChartsOnce *sync.Once
 
-		pingSummary metrics.Summary
+		rdb redisClient
 
+		server            string
+		version           *semver.Version
+		pingSummary       metrics.Summary
 		collectedCommands map[string]bool
 		collectedDbs      map[string]bool
 	}
@@ -79,32 +78,44 @@ type (
 	}
 )
 
-func (r *Redis) Init() bool {
+func (r *Redis) Configuration() any {
+	return r.Config
+}
+
+func (r *Redis) Init() error {
 	err := r.validateConfig()
 	if err != nil {
 		r.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	rdb, err := r.initRedisClient()
 	if err != nil {
 		r.Errorf("init redis client: %v", err)
-		return false
+		return err
 	}
 	r.rdb = rdb
 
 	charts, err := r.initCharts()
 	if err != nil {
 		r.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	r.charts = charts
 
-	return true
+	return nil
 }
 
-func (r *Redis) Check() bool {
-	return len(r.Collect()) > 0
+func (r *Redis) Check() error {
+	mx, err := r.collect()
+	if err != nil {
+		r.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (r *Redis) Charts() *module.Charts {

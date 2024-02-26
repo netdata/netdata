@@ -3,16 +3,13 @@
 package zookeeper
 
 import (
-	"crypto/tls"
 	_ "embed"
-	"fmt"
+	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/socket"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -25,80 +22,71 @@ func init() {
 	})
 }
 
-// Config is the Zookeeper module configuration.
-type Config struct {
-	Address          string
-	Timeout          web.Duration `yaml:"timeout"`
-	UseTLS           bool         `yaml:"use_tls"`
-	tlscfg.TLSConfig `yaml:",inline"`
-}
-
-// New creates Zookeeper with default values.
 func New() *Zookeeper {
-	config := Config{
-		Address: "127.0.0.1:2181",
-		Timeout: web.Duration{Duration: time.Second},
-		UseTLS:  false,
+	return &Zookeeper{
+		Config: Config{
+			Address: "127.0.0.1:2181",
+			Timeout: web.Duration(time.Second),
+			UseTLS:  false,
+		}}
+}
+
+type Config struct {
+	tlscfg.TLSConfig `yaml:",inline" json:""`
+	UpdateEvery      int          `yaml:"update_every" json:"update_every"`
+	Address          string       `yaml:"address" json:"address"`
+	Timeout          web.Duration `yaml:"timeout" json:"timeout"`
+	UseTLS           bool         `yaml:"use_tls" json:"use_tls"`
+}
+
+type (
+	Zookeeper struct {
+		module.Base
+		Config `yaml:",inline" json:""`
+
+		fetcher
 	}
-	return &Zookeeper{Config: config}
+	fetcher interface {
+		fetch(command string) ([]string, error)
+	}
+)
+
+func (z *Zookeeper) Configuration() any {
+	return z.Config
 }
 
-type fetcher interface {
-	fetch(command string) ([]string, error)
-}
-
-// Zookeeper Zookeeper module.
-type Zookeeper struct {
-	module.Base
-	fetcher
-	Config `yaml:",inline"`
-}
-
-// Cleanup makes cleanup.
-func (Zookeeper) Cleanup() {}
-
-func (z *Zookeeper) createZookeeperFetcher() (err error) {
-	var tlsConf *tls.Config
-	if z.UseTLS {
-		tlsConf, err = tlscfg.NewTLSConfig(z.TLSConfig)
-		if err != nil {
-			return fmt.Errorf("error on creating tls config : %v", err)
-		}
+func (z *Zookeeper) Init() error {
+	if err := z.verifyConfig(); err != nil {
+		z.Error(err)
+		return err
 	}
 
-	sock := socket.New(socket.Config{
-		Address:        z.Address,
-		ConnectTimeout: z.Timeout.Duration,
-		ReadTimeout:    z.Timeout.Duration,
-		WriteTimeout:   z.Timeout.Duration,
-		TLSConf:        tlsConf,
-	})
-	z.fetcher = &zookeeperFetcher{Client: sock}
+	f, err := z.initZookeeperFetcher()
+	if err != nil {
+		z.Error(err)
+		return err
+	}
+	z.fetcher = f
+
 	return nil
 }
 
-// Init makes initialization.
-func (z *Zookeeper) Init() bool {
-	err := z.createZookeeperFetcher()
+func (z *Zookeeper) Check() error {
+	mx, err := z.collect()
 	if err != nil {
 		z.Error(err)
-		return false
+		return err
 	}
-
-	return true
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
-// Check makes check.
-func (z *Zookeeper) Check() bool {
-	return len(z.Collect()) > 0
-}
-
-// Charts creates Charts.
-func (Zookeeper) Charts() *Charts {
+func (z *Zookeeper) Charts() *Charts {
 	return charts.Copy()
 }
 
-// Collect collects metrics.
 func (z *Zookeeper) Collect() map[string]int64 {
 	mx, err := z.collect()
 	if err != nil {
@@ -110,3 +98,5 @@ func (z *Zookeeper) Collect() map[string]int64 {
 	}
 	return mx
 }
+
+func (z *Zookeeper) Cleanup() {}

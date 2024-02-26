@@ -4,7 +4,7 @@ package scaleio
 
 import "github.com/netdata/netdata/go/go.d.plugin/modules/scaleio/client"
 
-func (s ScaleIO) collectStoragePool(ss map[string]client.StoragePoolStatistics) map[string]storagePoolMetrics {
+func (s *ScaleIO) collectStoragePool(ss map[string]client.StoragePoolStatistics) map[string]storagePoolMetrics {
 	ms := make(map[string]storagePoolMetrics, len(ss))
 
 	for id, stats := range ss {

@@ -17,27 +17,32 @@ import (
 )
 
 var (
-	v311Root, _        = os.ReadFile("testdata/v3.1.1/root.json")
-	v311ActiveTasks, _ = os.ReadFile("testdata/v3.1.1/active_tasks.json")
-	v311NodeStats, _   = os.ReadFile("testdata/v3.1.1/node_stats.json")
-	v311NodeSystem, _  = os.ReadFile("testdata/v3.1.1/node_system.json")
-	v311DbsInfo, _     = os.ReadFile("testdata/v3.1.1/dbs_info.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer311Root, _        = os.ReadFile("testdata/v3.1.1/root.json")
+	dataVer311ActiveTasks, _ = os.ReadFile("testdata/v3.1.1/active_tasks.json")
+	dataVer311NodeStats, _   = os.ReadFile("testdata/v3.1.1/node_stats.json")
+	dataVer311NodeSystem, _  = os.ReadFile("testdata/v3.1.1/node_system.json")
+	dataVer311DbsInfo, _     = os.ReadFile("testdata/v3.1.1/dbs_info.json")
 )
 
-func Test_testDataIsCorrectlyReadAndValid(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"v311Root":        v311Root,
-		"v311ActiveTasks": v311ActiveTasks,
-		"v311NodeStats":   v311NodeStats,
-		"v311NodeSystem":  v311NodeSystem,
-		"v311DbsInfo":     v311DbsInfo,
+		"dataConfigJSON":        dataConfigJSON,
+		"dataConfigYAML":        dataConfigYAML,
+		"dataVer311Root":        dataVer311Root,
+		"dataVer311ActiveTasks": dataVer311ActiveTasks,
+		"dataVer311NodeStats":   dataVer311NodeStats,
+		"dataVer311NodeSystem":  dataVer311NodeSystem,
+		"dataVer311DbsInfo":     dataVer311DbsInfo,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func TestCouchDB_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &CouchDB{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCouchDB_Init(t *testing.T) {
@@ -79,9 +84,9 @@ func TestCouchDB_Init(t *testing.T) {
 			es.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, es.Init())
+				assert.Error(t, es.Init())
 			} else {
-				assert.True(t, es.Init())
+				assert.NoError(t, es.Init())
 				assert.Equal(t, test.wantNumOfCharts, len(*es.Charts()))
 			}
 		})
@@ -105,9 +110,9 @@ func TestCouchDB_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, cdb.Check())
+				assert.Error(t, cdb.Check())
 			} else {
-				assert.True(t, cdb.Check())
+				assert.NoError(t, cdb.Check())
 			}
 		})
 	}
@@ -387,7 +392,7 @@ func prepareCouchDB(t *testing.T, createCDB func() *CouchDB) (cdb *CouchDB, clea
 	srv := prepareCouchDBEndpoint()
 	cdb.URL = srv.URL
 
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 
 	return cdb, srv.Close
 }
@@ -404,7 +409,7 @@ func prepareCouchDBInvalidData(t *testing.T) (*CouchDB, func()) {
 		}))
 	cdb := New()
 	cdb.URL = srv.URL
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 
 	return cdb, srv.Close
 }
@@ -417,7 +422,7 @@ func prepareCouchDB404(t *testing.T) (*CouchDB, func()) {
 		}))
 	cdb := New()
 	cdb.URL = srv.URL
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 
 	return cdb, srv.Close
 }
@@ -426,7 +431,7 @@ func prepareCouchDBConnectionRefused(t *testing.T) (*CouchDB, func()) {
 	t.Helper()
 	cdb := New()
 	cdb.URL = "http://127.0.0.1:38001"
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 
 	return cdb, func() {}
 }
@@ -436,15 +441,15 @@ func prepareCouchDBEndpoint() *httptest.Server {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case "/_node/_local/_stats":
-				_, _ = w.Write(v311NodeStats)
+				_, _ = w.Write(dataVer311NodeStats)
 			case "/_node/_local/_system":
-				_, _ = w.Write(v311NodeSystem)
+				_, _ = w.Write(dataVer311NodeSystem)
 			case urlPathActiveTasks:
-				_, _ = w.Write(v311ActiveTasks)
+				_, _ = w.Write(dataVer311ActiveTasks)
 			case "/_dbs_info":
-				_, _ = w.Write(v311DbsInfo)
+				_, _ = w.Write(dataVer311DbsInfo)
 			case "/":
-				_, _ = w.Write(v311Root)
+				_, _ = w.Write(dataVer311Root)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

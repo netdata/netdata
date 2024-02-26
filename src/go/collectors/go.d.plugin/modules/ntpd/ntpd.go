@@ -4,6 +4,8 @@ package ntpd
 
 import (
 	_ "embed"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -25,7 +27,7 @@ func New() *NTPd {
 	return &NTPd{
 		Config: Config{
 			Address:      "127.0.0.1:123",
-			Timeout:      web.Duration{Duration: time.Second * 3},
+			Timeout:      web.Duration(time.Second),
 			CollectPeers: false,
 		},
 		charts:         systemCharts.Copy(),
@@ -36,20 +38,21 @@ func New() *NTPd {
 }
 
 type Config struct {
-	Address      string       `yaml:"address"`
-	Timeout      web.Duration `yaml:"timeout"`
-	CollectPeers bool         `yaml:"collect_peers"`
+	UpdateEvery  int          `yaml:"update_every" json:"update_every"`
+	Address      string       `yaml:"address" json:"address"`
+	Timeout      web.Duration `yaml:"timeout" json:"timeout"`
+	CollectPeers bool         `yaml:"collect_peers" json:"collect_peers"`
 }
 
 type (
 	NTPd struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
-		newClient func(c Config) (ntpConn, error)
 		client    ntpConn
+		newClient func(c Config) (ntpConn, error)
 
 		findPeersTime    time.Time
 		findPeersEvery   time.Duration
@@ -65,26 +68,38 @@ type (
 	}
 )
 
-func (n *NTPd) Init() bool {
+func (n *NTPd) Configuration() any {
+	return n.Config
+}
+
+func (n *NTPd) Init() error {
 	if n.Address == "" {
 		n.Error("config validation: 'address' can not be empty")
-		return false
+		return errors.New("address not set")
 	}
 
 	txt := "0.0.0.0 127.0.0.0/8"
 	r, err := iprange.ParseRanges(txt)
 	if err != nil {
-		n.Errorf("error on parse ip range '%s': %v", txt, err)
-		return false
+		n.Errorf("error on parsing ip range '%s': %v", txt, err)
+		return fmt.Errorf("error on parsing ip range '%s': %v", txt, err)
 	}
 
 	n.peerIPAddrFilter = r
 
-	return true
+	return nil
 }
 
-func (n *NTPd) Check() bool {
-	return len(n.Collect()) > 0
+func (n *NTPd) Check() error {
+	mx, err := n.collect()
+	if err != nil {
+		n.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (n *NTPd) Charts() *module.Charts {

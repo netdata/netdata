@@ -39,7 +39,7 @@ type mongoClient struct {
 }
 
 func (c *mongoClient) serverStatus() (*documentServerStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*c.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
 	cmd := bson.D{
@@ -83,14 +83,14 @@ func (c *mongoClient) serverStatus() (*documentServerStatus, error) {
 }
 
 func (c *mongoClient) listDatabaseNames() ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*c.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
 	return c.client.ListDatabaseNames(ctx, bson.M{})
 }
 
 func (c *mongoClient) dbStats(name string) (*documentDBStats, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*c.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
 	cmd := bson.M{"dbStats": 1}
@@ -130,7 +130,7 @@ func (c *mongoClient) isMongos() bool {
 }
 
 func (c *mongoClient) replSetGetStatus() (*documentReplSetStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*c.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
 	var status *documentReplSetStatus
@@ -201,7 +201,7 @@ func (c *mongoClient) shardCollectAggregation(collection string, aggr []bson.D) 
 }
 
 func (c *mongoClient) shardChunks() (map[string]int64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*c.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
 	col := c.client.Database("config").Collection("chunks")
@@ -242,19 +242,15 @@ func (c *mongoClient) initClient(uri string, timeout time.Duration) error {
 
 	c.timeout = timeout
 
-	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	ctxConn, cancelConn := context.WithTimeout(context.Background(), c.timeout)
+	defer cancelConn()
+
+	client, err := mongo.Connect(ctxConn, options.Client().ApplyURI(uri))
 	if err != nil {
 		return err
 	}
 
-	ctxConn, cancelConn := context.WithTimeout(context.Background(), c.timeout*time.Second)
-	defer cancelConn()
-
-	if err := client.Connect(ctxConn); err != nil {
-		return err
-	}
-
-	ctxPing, cancelPing := context.WithTimeout(context.Background(), c.timeout*time.Second)
+	ctxPing, cancelPing := context.WithTimeout(context.Background(), c.timeout)
 	defer cancelPing()
 
 	if err := client.Ping(ctxPing, nil); err != nil {
@@ -271,7 +267,7 @@ func (c *mongoClient) close() error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
 	if err := c.client.Disconnect(ctx); err != nil {
@@ -284,7 +280,7 @@ func (c *mongoClient) close() error {
 }
 
 func (c *mongoClient) dbAggregate(collection string, aggr []bson.D) ([]documentAggrResults, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*c.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
 	cursor, err := c.client.Database("config").Collection(collection).Aggregate(ctx, aggr)

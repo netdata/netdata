@@ -1,44 +1,106 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/unbound job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Unbound collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "address": {
+        "title": "Address",
+        "description": "The IP address and port where the Unbound server listens for connections.",
+        "type": "string",
+        "default": "127.0.0.1:8953"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "The timeout duration, in seconds, for connection, read, write, and SSL handshake operations.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      },
+      "conf_path": {
+        "title": "Path to unbound.conf",
+        "description": "The absolute path to the Unbound configuration file. Providing this path enables the tool to make adjustments based on the 'remote-control' section.",
+        "type": "string",
+        "default": "/etc/unbound/unbound.conf"
+      },
+      "cumulative_stats": {
+        "title": "Cumulative stats",
+        "description": "Specifies whether statistics collection mode is enabled. Should match the 'statistics-cumulative' parameter in unbound.conf.",
+        "type": "boolean",
+        "default": false
+      },
+      "use_tls": {
+        "title": "Use TLS",
+        "description": "Indicates whether TLS should be used for secure communication.",
+        "type": "boolean",
+        "default": true
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "If set, TLS certificate verification will be skipped.",
+        "type": "boolean",
+        "default": true
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "The path to the CA certificate file for TLS verification.",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "The path to the client certificate file for TLS authentication.",
+        "type": "string",
+        "default": "/etc/unbound/unbound_control.pem"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "The path to the client key file for TLS authentication.",
+        "type": "string",
+        "default": "/etc/unbound/unbound_control.key"
+      }
     },
-    "address": {
-      "type": "string"
+    "required": [
+      "address"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
     },
     "timeout": {
-      "type": [
-        "string",
-        "integer"
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "address",
+            "timeout",
+            "conf_path",
+            "cumulative_stats"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "use_tls",
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        }
       ]
-    },
-    "conf_path": {
-      "type": "string"
-    },
-    "cumulative_stats": {
-      "type": "boolean"
-    },
-    "use_tls": {
-      "type": "boolean"
-    },
-    "tls_ca": {
-      "type": "string"
-    },
-    "tls_cert": {
-      "type": "string"
-    },
-    "tls_key": {
-      "type": "string"
-    },
-    "tls_skip_verify": {
-      "type": "boolean"
     }
-  },
-  "required": [
-    "name",
-    "address"
-  ]
+  }
 }

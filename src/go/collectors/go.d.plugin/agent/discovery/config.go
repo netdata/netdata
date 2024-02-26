@@ -8,12 +8,14 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/file"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd"
 )
 
 type Config struct {
 	Registry confgroup.Registry
 	File     file.Config
 	Dummy    dummy.Config
+	SD       sd.Config
 }
 
 func validateConfig(cfg Config) error {

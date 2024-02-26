@@ -8,25 +8,34 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/modules/scaleio/client"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	selectedStatisticsData, _ = os.ReadFile("testdata/selected_statistics.json")
-	instancesData, _          = os.ReadFile("testdata/instances.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataSelectedStatistics, _ = os.ReadFile("testdata/selected_statistics.json")
+	dataInstances, _          = os.ReadFile("testdata/instances.json")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, selectedStatisticsData)
-	assert.NotNil(t, instancesData)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":         dataConfigJSON,
+		"dataConfigYAML":         dataConfigYAML,
+		"dataSelectedStatistics": dataSelectedStatistics,
+		"dataInstances":          dataInstances,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func TestScaleIO_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &ScaleIO{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestScaleIO_Init(t *testing.T) {
@@ -34,10 +43,10 @@ func TestScaleIO_Init(t *testing.T) {
 	scaleIO.Username = "username"
 	scaleIO.Password = "password"
 
-	assert.True(t, scaleIO.Init())
+	assert.NoError(t, scaleIO.Init())
 }
 func TestScaleIO_Init_UsernameAndPasswordNotSet(t *testing.T) {
-	assert.False(t, New().Init())
+	assert.Error(t, New().Init())
 }
 
 func TestScaleIO_Init_ErrorOnCreatingClientWrongTLSCA(t *testing.T) {
@@ -46,24 +55,24 @@ func TestScaleIO_Init_ErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 	job.Password = "password"
 	job.Client.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestScaleIO_Check(t *testing.T) {
 	srv, _, scaleIO := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.True(t, scaleIO.Init())
+	require.NoError(t, scaleIO.Init())
 
-	assert.True(t, scaleIO.Check())
+	assert.NoError(t, scaleIO.Check())
 }
 
 func TestScaleIO_Check_ErrorOnLogin(t *testing.T) {
 	srv, mock, scaleIO := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.True(t, scaleIO.Init())
+	require.NoError(t, scaleIO.Init())
 	mock.Password = "new password"
 
-	assert.False(t, scaleIO.Check())
+	assert.Error(t, scaleIO.Check())
 }
 
 func TestScaleIO_Charts(t *testing.T) {
@@ -73,8 +82,8 @@ func TestScaleIO_Charts(t *testing.T) {
 func TestScaleIO_Cleanup(t *testing.T) {
 	srv, _, scaleIO := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.True(t, scaleIO.Init())
-	require.True(t, scaleIO.Check())
+	require.NoError(t, scaleIO.Init())
+	require.NoError(t, scaleIO.Check())
 
 	scaleIO.Cleanup()
 	assert.False(t, scaleIO.client.LoggedIn())
@@ -83,8 +92,8 @@ func TestScaleIO_Cleanup(t *testing.T) {
 func TestScaleIO_Collect(t *testing.T) {
 	srv, _, scaleIO := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.True(t, scaleIO.Init())
-	require.True(t, scaleIO.Check())
+	require.NoError(t, scaleIO.Init())
+	require.NoError(t, scaleIO.Check())
 
 	expected := map[string]int64{
 		"sdc_6076fd0f00000000_bandwidth_read":                                    0,
@@ -297,8 +306,8 @@ func TestScaleIO_Collect(t *testing.T) {
 func TestScaleIO_Collect_ConnectionRefused(t *testing.T) {
 	srv, _, scaleIO := prepareSrvMockScaleIO(t)
 	defer srv.Close()
-	require.True(t, scaleIO.Init())
-	require.True(t, scaleIO.Check())
+	require.NoError(t, scaleIO.Init())
+	require.NoError(t, scaleIO.Check())
 	scaleIO.client.Request.URL = "http://127.0.0.1:38001"
 
 	assert.Nil(t, scaleIO.Collect())
@@ -349,11 +358,11 @@ func prepareSrvMockScaleIO(t *testing.T) (*httptest.Server, *client.MockScaleIOA
 		token    = "token"
 	)
 	var stats client.SelectedStatistics
-	err := json.Unmarshal(selectedStatisticsData, &stats)
+	err := json.Unmarshal(dataSelectedStatistics, &stats)
 	require.NoError(t, err)
 
 	var ins client.Instances
-	err = json.Unmarshal(instancesData, &ins)
+	err = json.Unmarshal(dataInstances, &ins)
 	require.NoError(t, err)
 
 	mock := client.MockScaleIOAPIServer{

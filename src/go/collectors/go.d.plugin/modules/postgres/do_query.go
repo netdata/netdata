@@ -8,14 +8,14 @@ import (
 )
 
 func (p *Postgres) doQueryRow(query string, v any) error {
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
 	defer cancel()
 
 	return p.db.QueryRowContext(ctx, query).Scan(v)
 }
 
 func (p *Postgres) doDBQueryRow(db *sql.DB, query string, v any) error {
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
 	defer cancel()
 
 	return db.QueryRowContext(ctx, query).Scan(v)
@@ -26,7 +26,7 @@ func (p *Postgres) doQuery(query string, assign func(column, value string, rowEn
 }
 
 func (p *Postgres) doDBQuery(db *sql.DB, query string, assign func(column, value string, rowEnd bool)) error {
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
 	defer cancel()
 
 	rows, err := db.QueryContext(ctx, query)

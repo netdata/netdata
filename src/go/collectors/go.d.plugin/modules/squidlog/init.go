@@ -34,7 +34,7 @@ func (s *SquidLog) createParser() error {
 	lastLine = bytes.TrimRight(lastLine, "\n")
 	s.Debugf("last line: '%s'", string(lastLine))
 
-	s.parser, err = logs.NewParser(s.Parser, s.file)
+	s.parser, err = logs.NewParser(s.ParserConfig, s.file)
 	if err != nil {
 		return fmt.Errorf("create parser: %v", err)
 	}

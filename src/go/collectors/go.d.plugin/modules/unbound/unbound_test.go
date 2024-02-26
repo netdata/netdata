@@ -11,51 +11,53 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/socket"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	commonStatsData, _          = os.ReadFile("testdata/stats/common.txt")
-	extStatsData, _             = os.ReadFile("testdata/stats/extended.txt")
-	lifeCycleCumulativeData1, _ = os.ReadFile("testdata/stats/lifecycle/cumulative/extended1.txt")
-	lifeCycleCumulativeData2, _ = os.ReadFile("testdata/stats/lifecycle/cumulative/extended2.txt")
-	lifeCycleCumulativeData3, _ = os.ReadFile("testdata/stats/lifecycle/cumulative/extended3.txt")
-	lifeCycleResetData1, _      = os.ReadFile("testdata/stats/lifecycle/reset/extended1.txt")
-	lifeCycleResetData2, _      = os.ReadFile("testdata/stats/lifecycle/reset/extended2.txt")
-	lifeCycleResetData3, _      = os.ReadFile("testdata/stats/lifecycle/reset/extended3.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataCommonStats, _          = os.ReadFile("testdata/stats/common.txt")
+	dataExtendedStats, _        = os.ReadFile("testdata/stats/extended.txt")
+	dataLifeCycleCumulative1, _ = os.ReadFile("testdata/stats/lifecycle/cumulative/extended1.txt")
+	dataLifeCycleCumulative2, _ = os.ReadFile("testdata/stats/lifecycle/cumulative/extended2.txt")
+	dataLifeCycleCumulative3, _ = os.ReadFile("testdata/stats/lifecycle/cumulative/extended3.txt")
+	dataLifeCycleReset1, _      = os.ReadFile("testdata/stats/lifecycle/reset/extended1.txt")
+	dataLifeCycleReset2, _      = os.ReadFile("testdata/stats/lifecycle/reset/extended2.txt")
+	dataLifeCycleReset3, _      = os.ReadFile("testdata/stats/lifecycle/reset/extended3.txt")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, commonStatsData)
-	assert.NotNil(t, extStatsData)
-	assert.NotNil(t, lifeCycleCumulativeData1)
-	assert.NotNil(t, lifeCycleCumulativeData2)
-	assert.NotNil(t, lifeCycleCumulativeData3)
-	assert.NotNil(t, lifeCycleResetData1)
-	assert.NotNil(t, lifeCycleResetData2)
-	assert.NotNil(t, lifeCycleResetData3)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":           dataConfigJSON,
+		"dataConfigYAML":           dataConfigYAML,
+		"dataCommonStats":          dataCommonStats,
+		"dataExtendedStats":        dataExtendedStats,
+		"dataLifeCycleCumulative1": dataLifeCycleCumulative1,
+		"dataLifeCycleCumulative2": dataLifeCycleCumulative2,
+		"dataLifeCycleCumulative3": dataLifeCycleCumulative3,
+		"dataLifeCycleReset1":      dataLifeCycleReset1,
+		"dataLifeCycleReset2":      dataLifeCycleReset2,
+		"dataLifeCycleReset3":      dataLifeCycleReset3,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func nonTLSUnbound() *Unbound {
-	unbound := New()
-	unbound.ConfPath = ""
-	unbound.UseTLS = false
-	return unbound
-}
-
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func TestUnbound_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Unbound{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestUnbound_Init(t *testing.T) {
-	unbound := nonTLSUnbound()
+	unbound := prepareNonTLSUnbound()
 
-	assert.True(t, unbound.Init())
+	assert.NoError(t, unbound.Init())
 }
 
 func TestUnbound_Init_SetEverythingFromUnboundConf(t *testing.T) {
@@ -74,45 +76,45 @@ func TestUnbound_Init_SetEverythingFromUnboundConf(t *testing.T) {
 		},
 	}
 
-	assert.True(t, unbound.Init())
+	assert.NoError(t, unbound.Init())
 	assert.Equal(t, expectedConfig, unbound.Config)
 }
 
 func TestUnbound_Init_DisabledInUnboundConf(t *testing.T) {
-	unbound := nonTLSUnbound()
+	unbound := prepareNonTLSUnbound()
 	unbound.ConfPath = "testdata/unbound_disabled.conf"
 
-	assert.False(t, unbound.Init())
+	assert.Error(t, unbound.Init())
 }
 
 func TestUnbound_Init_HandleEmptyConfig(t *testing.T) {
-	unbound := nonTLSUnbound()
+	unbound := prepareNonTLSUnbound()
 	unbound.ConfPath = "testdata/unbound_empty.conf"
 
-	assert.True(t, unbound.Init())
+	assert.NoError(t, unbound.Init())
 }
 
 func TestUnbound_Init_HandleNonExistentConfig(t *testing.T) {
-	unbound := nonTLSUnbound()
+	unbound := prepareNonTLSUnbound()
 	unbound.ConfPath = "testdata/unbound_non_existent.conf"
 
-	assert.True(t, unbound.Init())
+	assert.NoError(t, unbound.Init())
 }
 
 func TestUnbound_Check(t *testing.T) {
-	unbound := nonTLSUnbound()
-	require.True(t, unbound.Init())
-	unbound.client = mockUnboundClient{data: commonStatsData, err: false}
+	unbound := prepareNonTLSUnbound()
+	require.NoError(t, unbound.Init())
+	unbound.client = mockUnboundClient{data: dataCommonStats, err: false}
 
-	assert.True(t, unbound.Check())
+	assert.NoError(t, unbound.Check())
 }
 
 func TestUnbound_Check_ErrorDuringScrapingUnbound(t *testing.T) {
-	unbound := nonTLSUnbound()
-	require.True(t, unbound.Init())
+	unbound := prepareNonTLSUnbound()
+	require.NoError(t, unbound.Init())
 	unbound.client = mockUnboundClient{err: true}
 
-	assert.False(t, unbound.Check())
+	assert.Error(t, unbound.Check())
 }
 
 func TestUnbound_Cleanup(t *testing.T) {
@@ -120,16 +122,16 @@ func TestUnbound_Cleanup(t *testing.T) {
 }
 
 func TestUnbound_Charts(t *testing.T) {
-	unbound := nonTLSUnbound()
-	require.True(t, unbound.Init())
+	unbound := prepareNonTLSUnbound()
+	require.NoError(t, unbound.Init())
 
 	assert.NotNil(t, unbound.Charts())
 }
 
 func TestUnbound_Collect(t *testing.T) {
-	unbound := nonTLSUnbound()
-	require.True(t, unbound.Init())
-	unbound.client = mockUnboundClient{data: commonStatsData, err: false}
+	unbound := prepareNonTLSUnbound()
+	require.NoError(t, unbound.Init())
+	unbound.client = mockUnboundClient{data: dataCommonStats, err: false}
 
 	collected := unbound.Collect()
 	assert.Equal(t, expectedCommon, collected)
@@ -137,9 +139,9 @@ func TestUnbound_Collect(t *testing.T) {
 }
 
 func TestUnbound_Collect_ExtendedStats(t *testing.T) {
-	unbound := nonTLSUnbound()
-	require.True(t, unbound.Init())
-	unbound.client = mockUnboundClient{data: extStatsData, err: false}
+	unbound := prepareNonTLSUnbound()
+	require.NoError(t, unbound.Init())
+	unbound.client = mockUnboundClient{data: dataExtendedStats, err: false}
 
 	collected := unbound.Collect()
 	assert.Equal(t, expectedExtended, collected)
@@ -151,14 +153,14 @@ func TestUnbound_Collect_LifeCycleCumulativeExtendedStats(t *testing.T) {
 		input    []byte
 		expected map[string]int64
 	}{
-		{input: lifeCycleCumulativeData1, expected: expectedCumulative1},
-		{input: lifeCycleCumulativeData2, expected: expectedCumulative2},
-		{input: lifeCycleCumulativeData3, expected: expectedCumulative3},
+		{input: dataLifeCycleCumulative1, expected: expectedCumulative1},
+		{input: dataLifeCycleCumulative2, expected: expectedCumulative2},
+		{input: dataLifeCycleCumulative3, expected: expectedCumulative3},
 	}
 
-	unbound := nonTLSUnbound()
+	unbound := prepareNonTLSUnbound()
 	unbound.Cumulative = true
-	require.True(t, unbound.Init())
+	require.NoError(t, unbound.Init())
 	ubClient := &mockUnboundClient{err: false}
 	unbound.client = ubClient
 
@@ -179,14 +181,14 @@ func TestUnbound_Collect_LifeCycleResetExtendedStats(t *testing.T) {
 		input    []byte
 		expected map[string]int64
 	}{
-		{input: lifeCycleResetData1, expected: expectedReset1},
-		{input: lifeCycleResetData2, expected: expectedReset2},
-		{input: lifeCycleResetData3, expected: expectedReset3},
+		{input: dataLifeCycleReset1, expected: expectedReset1},
+		{input: dataLifeCycleReset2, expected: expectedReset2},
+		{input: dataLifeCycleReset3, expected: expectedReset3},
 	}
 
-	unbound := nonTLSUnbound()
+	unbound := prepareNonTLSUnbound()
 	unbound.Cumulative = false
-	require.True(t, unbound.Init())
+	require.NoError(t, unbound.Init())
 	ubClient := &mockUnboundClient{err: false}
 	unbound.client = ubClient
 
@@ -203,36 +205,44 @@ func TestUnbound_Collect_LifeCycleResetExtendedStats(t *testing.T) {
 }
 
 func TestUnbound_Collect_EmptyResponse(t *testing.T) {
-	unbound := nonTLSUnbound()
-	require.True(t, unbound.Init())
+	unbound := prepareNonTLSUnbound()
+	require.NoError(t, unbound.Init())
 	unbound.client = mockUnboundClient{data: []byte{}, err: false}
 
 	assert.Nil(t, unbound.Collect())
 }
 
 func TestUnbound_Collect_ErrorResponse(t *testing.T) {
-	unbound := nonTLSUnbound()
-	require.True(t, unbound.Init())
+	unbound := prepareNonTLSUnbound()
+	require.NoError(t, unbound.Init())
 	unbound.client = mockUnboundClient{data: []byte("error unknown command 'unknown'"), err: false}
 
 	assert.Nil(t, unbound.Collect())
 }
 
 func TestUnbound_Collect_ErrorOnSend(t *testing.T) {
-	unbound := nonTLSUnbound()
-	require.True(t, unbound.Init())
+	unbound := prepareNonTLSUnbound()
+	require.NoError(t, unbound.Init())
 	unbound.client = mockUnboundClient{err: true}
 
 	assert.Nil(t, unbound.Collect())
 }
 
 func TestUnbound_Collect_ErrorOnParseBadSyntax(t *testing.T) {
-	unbound := nonTLSUnbound()
-	require.True(t, unbound.Init())
+	unbound := prepareNonTLSUnbound()
+	require.NoError(t, unbound.Init())
 	data := strings.Repeat("zk_avg_latency	0\nzk_min_latency	0\nzk_mix_latency	0\n", 10)
 	unbound.client = mockUnboundClient{data: []byte(data), err: false}
 
 	assert.Nil(t, unbound.Collect())
+}
+
+func prepareNonTLSUnbound() *Unbound {
+	unbound := New()
+	unbound.ConfPath = ""
+	unbound.UseTLS = false
+
+	return unbound
 }
 
 type mockUnboundClient struct {

@@ -14,7 +14,7 @@ import (
 
 func (fc *Filecheck) collectFiles(ms map[string]int64) {
 	curTime := time.Now()
-	if time.Since(fc.lastDiscoveryFiles) >= fc.DiscoveryEvery.Duration {
+	if time.Since(fc.lastDiscoveryFiles) >= fc.DiscoveryEvery.Duration() {
 		fc.lastDiscoveryFiles = curTime
 		fc.curFiles = fc.discoveryFiles()
 		fc.updateFilesCharts(fc.curFiles)
@@ -47,7 +47,7 @@ func (fc *Filecheck) collectFile(ms map[string]int64, path string, curTime time.
 	ms[fileDimID(path, "mtime_ago")] = int64(curTime.Sub(info.ModTime()).Seconds())
 }
 
-func (fc Filecheck) discoveryFiles() (files []string) {
+func (fc *Filecheck) discoveryFiles() (files []string) {
 	for _, path := range fc.Files.Include {
 		if hasMeta(path) {
 			continue

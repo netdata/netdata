@@ -5,13 +5,34 @@ package chrony
 import (
 	"errors"
 	"net"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/facebook/time/ntp/chrony"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		assert.NotNil(t, data, name)
+	}
+}
+
+func TestChrony_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Chrony{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestChrony_Init(t *testing.T) {
 	tests := map[string]struct {
@@ -35,9 +56,9 @@ func TestChrony_Init(t *testing.T) {
 			c.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, c.Init())
+				assert.Error(t, c.Init())
 			} else {
-				assert.True(t, c.Init())
+				assert.NoError(t, c.Init())
 			}
 		})
 	}
@@ -53,7 +74,7 @@ func TestChrony_Check(t *testing.T) {
 			prepare:  func() *Chrony { return prepareChronyWithMock(&mockClient{}) },
 		},
 		"tracking: success, activity: fail": {
-			wantFail: false,
+			wantFail: true,
 			prepare:  func() *Chrony { return prepareChronyWithMock(&mockClient{errOnActivity: true}) },
 		},
 		"tracking: fail, activity: success": {
@@ -74,12 +95,12 @@ func TestChrony_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := test.prepare()
 
-			require.True(t, c.Init())
+			require.NoError(t, c.Init())
 
 			if test.wantFail {
-				assert.False(t, c.Check())
+				assert.Error(t, c.Check())
 			} else {
-				assert.True(t, c.Check())
+				assert.NoError(t, c.Check())
 			}
 		})
 	}
@@ -100,15 +121,15 @@ func TestChrony_Cleanup(t *testing.T) {
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(c *Chrony) { c.Init() },
+			prepare:   func(c *Chrony) { _ = c.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(c *Chrony) { c.Init(); c.Check() },
+			prepare:   func(c *Chrony) { _ = c.Init(); _ = c.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(c *Chrony) { c.Init(); c.Collect() },
+			prepare:   func(c *Chrony) { _ = c.Init(); _ = c.Collect() },
 		},
 	}
 
@@ -197,7 +218,7 @@ func TestChrony_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := test.prepare()
 
-			require.True(t, c.Init())
+			require.NoError(t, c.Init())
 			_ = c.Check()
 
 			collected := c.Collect()
@@ -224,7 +245,7 @@ type mockClient struct {
 	closeCalled   bool
 }
 
-func (m mockClient) Tracking() (*chrony.ReplyTracking, error) {
+func (m *mockClient) Tracking() (*chrony.ReplyTracking, error) {
 	if m.errOnTracking {
 		return nil, errors.New("mockClient.Tracking call error")
 	}
@@ -249,7 +270,7 @@ func (m mockClient) Tracking() (*chrony.ReplyTracking, error) {
 	return &reply, nil
 }
 
-func (m mockClient) Activity() (*chrony.ReplyActivity, error) {
+func (m *mockClient) Activity() (*chrony.ReplyActivity, error) {
 	if m.errOnActivity {
 		return nil, errors.New("mockClient.Activity call error")
 	}

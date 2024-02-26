@@ -1,1 +1,0 @@
-integrations/java_spring-boot_2_applications.md

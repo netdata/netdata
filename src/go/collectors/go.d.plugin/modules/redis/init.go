@@ -42,9 +42,9 @@ func (r *Redis) initRedisClient() (*redis.Client, error) {
 
 	opts.PoolSize = 1
 	opts.TLSConfig = tlsConfig
-	opts.DialTimeout = r.Timeout.Duration
-	opts.ReadTimeout = r.Timeout.Duration
-	opts.WriteTimeout = r.Timeout.Duration
+	opts.DialTimeout = r.Timeout.Duration()
+	opts.ReadTimeout = r.Timeout.Duration()
+	opts.WriteTimeout = r.Timeout.Duration()
 
 	return redis.NewClient(opts), nil
 }

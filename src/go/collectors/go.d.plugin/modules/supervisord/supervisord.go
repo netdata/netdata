@@ -4,6 +4,7 @@ package supervisord
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -25,7 +26,7 @@ func New() *Supervisord {
 		Config: Config{
 			URL: "http://127.0.0.1:9001/RPC2",
 			Client: web.Client{
-				Timeout: web.Duration{Duration: time.Second},
+				Timeout: web.Duration(time.Second),
 			},
 		},
 
@@ -35,17 +36,19 @@ func New() *Supervisord {
 }
 
 type Config struct {
-	URL        string `yaml:"url"`
-	web.Client `yaml:",inline"`
+	web.Client  `yaml:",inline" json:""`
+	UpdateEvery int    `yaml:"update_every" json:"update_every"`
+	URL         string `yaml:"url" json:"url"`
 }
 
 type (
 	Supervisord struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
+
+		charts *module.Charts
 
 		client supervisorClient
-		charts *module.Charts
 
 		cache map[string]map[string]bool // map[group][procName]collected
 	}
@@ -55,25 +58,37 @@ type (
 	}
 )
 
-func (s *Supervisord) Init() bool {
+func (s *Supervisord) Configuration() any {
+	return s.Config
+}
+
+func (s *Supervisord) Init() error {
 	err := s.verifyConfig()
 	if err != nil {
 		s.Errorf("verify config: %v", err)
-		return false
+		return err
 	}
 
 	client, err := s.initSupervisorClient()
 	if err != nil {
 		s.Errorf("init supervisord client: %v", err)
-		return false
+		return err
 	}
 	s.client = client
 
-	return true
+	return nil
 }
 
-func (s *Supervisord) Check() bool {
-	return len(s.Collect()) > 0
+func (s *Supervisord) Check() error {
+	mx, err := s.collect()
+	if err != nil {
+		s.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (s *Supervisord) Charts() *module.Charts {

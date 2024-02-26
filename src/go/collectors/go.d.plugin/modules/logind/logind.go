@@ -7,6 +7,7 @@ package logind
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -29,34 +30,48 @@ func init() {
 func New() *Logind {
 	return &Logind{
 		Config: Config{
-			Timeout: web.Duration{Duration: time.Second * 2},
+			Timeout: web.Duration(time.Second),
 		},
 		newLogindConn: func(cfg Config) (logindConnection, error) {
-			return newLogindConnection(cfg.Timeout.Duration)
+			return newLogindConnection(cfg.Timeout.Duration())
 		},
 		charts: charts.Copy(),
 	}
 }
 
 type Config struct {
-	Timeout web.Duration `yaml:"timeout"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type Logind struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
-	newLogindConn func(config Config) (logindConnection, error)
+	charts *module.Charts
+
 	conn          logindConnection
-	charts        *module.Charts
+	newLogindConn func(config Config) (logindConnection, error)
 }
 
-func (l *Logind) Init() bool {
-	return true
+func (l *Logind) Configuration() any {
+	return l.Config
 }
 
-func (l *Logind) Check() bool {
-	return len(l.Collect()) > 0
+func (l *Logind) Init() error {
+	return nil
+}
+
+func (l *Logind) Check() error {
+	mx, err := l.collect()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (l *Logind) Charts() *module.Charts {

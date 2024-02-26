@@ -46,7 +46,8 @@ func (c *Consul) collectAutopilotHealth(mx map[string]int64) error {
 			mx["autopilot_server_healthy_no"] = boolToInt(!srv.Healthy)
 			mx["autopilot_server_voter_yes"] = boolToInt(srv.Voter)
 			mx["autopilot_server_voter_no"] = boolToInt(!srv.Voter)
-			mx["autopilot_server_stable_time"] = int64(time.Now().Sub(srv.StableSince).Seconds())
+			mx["autopilot_server_stable_time"] = int64(time.Since(srv.StableSince).Seconds())
+			mx["autopilot_server_stable_time"] = int64(time.Since(srv.StableSince).Seconds())
 			if !srv.Leader {
 				if v, err := time.ParseDuration(srv.LastContact); err == nil {
 					mx["autopilot_server_lastContact_leader"] = v.Milliseconds()

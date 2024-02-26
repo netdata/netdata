@@ -5,6 +5,8 @@ package k8s_state
 import (
 	"context"
 	_ "embed"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -37,41 +39,48 @@ func New() *KubeState {
 	}
 }
 
+type Config struct {
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
+}
+
 type (
+	KubeState struct {
+		module.Base
+		Config `yaml:",inline" json:""`
+
+		charts *module.Charts
+
+		client        kubernetes.Interface
+		newKubeClient func() (kubernetes.Interface, error)
+
+		startTime       time.Time
+		initDelay       time.Duration
+		once            *sync.Once
+		wg              *sync.WaitGroup
+		discoverer      discoverer
+		ctx             context.Context
+		ctxCancel       context.CancelFunc
+		kubeClusterID   string
+		kubeClusterName string
+
+		state *kubeState
+	}
 	discoverer interface {
 		run(ctx context.Context, in chan<- resource)
 		ready() bool
 		stopped() bool
 	}
-
-	KubeState struct {
-		module.Base
-
-		newKubeClient func() (kubernetes.Interface, error)
-
-		startTime time.Time
-		initDelay time.Duration
-
-		charts *module.Charts
-
-		client     kubernetes.Interface
-		once       *sync.Once
-		wg         *sync.WaitGroup
-		discoverer discoverer
-		ctx        context.Context
-		ctxCancel  context.CancelFunc
-		state      *kubeState
-
-		kubeClusterID   string
-		kubeClusterName string
-	}
 )
 
-func (ks *KubeState) Init() bool {
+func (ks *KubeState) Configuration() any {
+	return ks.Config
+}
+
+func (ks *KubeState) Init() error {
 	client, err := ks.initClient()
 	if err != nil {
 		ks.Errorf("client initialization: %v", err)
-		return false
+		return err
 	}
 	ks.client = client
 
@@ -79,23 +88,25 @@ func (ks *KubeState) Init() bool {
 
 	ks.discoverer = ks.initDiscoverer(ks.client)
 
-	return true
+	return nil
 }
 
-func (ks *KubeState) Check() bool {
+func (ks *KubeState) Check() error {
 	if ks.client == nil || ks.discoverer == nil {
 		ks.Error("not initialized job")
-		return false
+		return errors.New("not initialized")
 	}
 
 	ver, err := ks.client.Discovery().ServerVersion()
 	if err != nil {
-		ks.Errorf("failed to connect to the Kubernetes API server: %v", err)
-		return false
+		err := fmt.Errorf("failed to connect to K8s API server: %v", err)
+		ks.Error(err)
+		return err
 	}
 
 	ks.Infof("successfully connected to the Kubernetes API server '%s'", ver)
-	return true
+
+	return nil
 }
 
 func (ks *KubeState) Charts() *module.Charts {
@@ -123,7 +134,7 @@ func (ks *KubeState) Cleanup() {
 	c := make(chan struct{})
 	go func() { defer close(c); ks.wg.Wait() }()
 
-	t := time.NewTimer(time.Second * 3)
+	t := time.NewTimer(time.Second * 5)
 	defer t.Stop()
 
 	select {

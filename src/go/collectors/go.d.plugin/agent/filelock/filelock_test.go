@@ -74,13 +74,16 @@ func TestLocker_Unlock(t *testing.T) {
 			ok, err := reg.Lock("name")
 			require.True(t, ok)
 			require.NoError(t, err)
+			reg.Unlock("name")
 
-			assert.NoError(t, reg.Unlock("name"))
+			assert.False(t, reg.isLocked("name"))
 		},
 		"unregister not registered lock": func(t *testing.T, dir string) {
 			reg := New(dir)
 
-			assert.NoError(t, reg.Unlock("name"))
+			reg.Unlock("name")
+
+			assert.False(t, reg.isLocked("name"))
 		},
 	}
 

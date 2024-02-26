@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 
 	"github.com/go-redis/redis/v8"
@@ -16,21 +17,26 @@ import (
 )
 
 var (
-	redisInfoAll, _ = os.ReadFile("testdata/redis/info_all.txt")
-	v340InfoAll, _  = os.ReadFile("testdata/v3.4.0/info_all.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataRedisInfoAll, _  = os.ReadFile("testdata/redis/info_all.txt")
+	dataVer340InfoAll, _ = os.ReadFile("testdata/v3.4.0/info_all.txt")
 )
 
-func Test_Testdata(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"redisInfoAll": redisInfoAll,
-		"v340InfoAll":  v340InfoAll,
+		"dataConfigJSON":    dataConfigJSON,
+		"dataConfigYAML":    dataConfigYAML,
+		"dataRedisInfoAll":  dataRedisInfoAll,
+		"dataVer340InfoAll": dataVer340InfoAll,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*Pika)(nil), New())
+func TestPika_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Pika{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestPika_Init(t *testing.T) {
@@ -64,9 +70,9 @@ func TestPika_Init(t *testing.T) {
 			pika.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, pika.Init())
+				assert.Error(t, pika.Init())
 			} else {
-				assert.True(t, pika.Init())
+				assert.NoError(t, pika.Init())
 			}
 		})
 	}
@@ -95,9 +101,9 @@ func TestPika_Check(t *testing.T) {
 			pika := test.prepare(t)
 
 			if test.wantFail {
-				assert.False(t, pika.Check())
+				assert.Error(t, pika.Check())
 			} else {
-				assert.True(t, pika.Check())
+				assert.NoError(t, pika.Check())
 			}
 		})
 	}
@@ -105,7 +111,7 @@ func TestPika_Check(t *testing.T) {
 
 func TestPika_Charts(t *testing.T) {
 	pika := New()
-	require.True(t, pika.Init())
+	require.NoError(t, pika.Init())
 
 	assert.NotNil(t, pika.Charts())
 }
@@ -114,7 +120,7 @@ func TestPika_Cleanup(t *testing.T) {
 	pika := New()
 	assert.NotPanics(t, pika.Cleanup)
 
-	require.True(t, pika.Init())
+	require.NoError(t, pika.Init())
 	m := &mockRedisClient{}
 	pika.pdb = m
 
@@ -195,16 +201,16 @@ func TestPika_Collect(t *testing.T) {
 
 func preparePikaV340(t *testing.T) *Pika {
 	pika := New()
-	require.True(t, pika.Init())
+	require.NoError(t, pika.Init())
 	pika.pdb = &mockRedisClient{
-		result: v340InfoAll,
+		result: dataVer340InfoAll,
 	}
 	return pika
 }
 
 func preparePikaErrorOnInfo(t *testing.T) *Pika {
 	pika := New()
-	require.True(t, pika.Init())
+	require.NoError(t, pika.Init())
 	pika.pdb = &mockRedisClient{
 		errOnInfo: true,
 	}
@@ -213,9 +219,9 @@ func preparePikaErrorOnInfo(t *testing.T) *Pika {
 
 func preparePikaWithRedisMetrics(t *testing.T) *Pika {
 	pika := New()
-	require.True(t, pika.Init())
+	require.NoError(t, pika.Init())
 	pika.pdb = &mockRedisClient{
-		result: redisInfoAll,
+		result: dataRedisInfoAll,
 	}
 	return pika
 }

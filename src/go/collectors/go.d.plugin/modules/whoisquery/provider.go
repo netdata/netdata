@@ -23,7 +23,7 @@ type fromNet struct {
 func newProvider(config Config) (provider, error) {
 	domain := config.Source
 	client := whois.NewClient()
-	client.SetTimeout(config.Timeout.Duration)
+	client.SetTimeout(config.Timeout.Duration())
 
 	return &fromNet{
 		domainAddress: domain,

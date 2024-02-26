@@ -12,17 +12,17 @@ import (
 func TestMockModule_Init(t *testing.T) {
 	m := &MockModule{}
 
-	assert.True(t, m.Init())
-	m.InitFunc = func() bool { return false }
-	assert.False(t, m.Init())
+	assert.NoError(t, m.Init())
+	m.InitFunc = func() error { return nil }
+	assert.NoError(t, m.Init())
 }
 
 func TestMockModule_Check(t *testing.T) {
 	m := &MockModule{}
 
-	assert.True(t, m.Check())
-	m.CheckFunc = func() bool { return false }
-	assert.False(t, m.Check())
+	assert.NoError(t, m.Check())
+	m.CheckFunc = func() error { return nil }
+	assert.NoError(t, m.Check())
 }
 
 func TestMockModule_Charts(t *testing.T) {

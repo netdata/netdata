@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/stretchr/testify/assert"
@@ -15,15 +16,24 @@ import (
 )
 
 var (
-	dataMetrics, _ = os.ReadFile("testdata/metrics.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataExpectedMetrics, _ = os.ReadFile("testdata/metrics.txt")
 )
 
-func Test_TestData(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataMetrics": dataMetrics,
+		"dataConfigJSON":      dataConfigJSON,
+		"dataConfigYAML":      dataConfigYAML,
+		"dataExpectedMetrics": dataExpectedMetrics,
 	} {
-		assert.NotNilf(t, data, name)
+		assert.NotNil(t, data, name)
 	}
+}
+
+func TestCassandra_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Cassandra{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
@@ -55,9 +65,9 @@ func TestCassandra_Init(t *testing.T) {
 			c.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, c.Init())
+				assert.Error(t, c.Init())
 			} else {
-				assert.True(t, c.Init())
+				assert.NoError(t, c.Init())
 			}
 		})
 	}
@@ -90,12 +100,12 @@ func TestCassandra_Check(t *testing.T) {
 			c, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, c.Init())
+			require.NoError(t, c.Init())
 
 			if test.wantFail {
-				assert.False(t, c.Check())
+				assert.Error(t, c.Check())
 			} else {
-				assert.True(t, c.Check())
+				assert.NoError(t, c.Check())
 			}
 		})
 	}
@@ -239,7 +249,7 @@ func TestCassandra_Collect(t *testing.T) {
 			c, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, c.Init())
+			require.NoError(t, c.Init())
 
 			mx := c.Collect()
 
@@ -251,7 +261,7 @@ func TestCassandra_Collect(t *testing.T) {
 func prepareCassandra() (c *Cassandra, cleanup func()) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(dataMetrics)
+			_, _ = w.Write(dataExpectedMetrics)
 		}))
 
 	c = New()

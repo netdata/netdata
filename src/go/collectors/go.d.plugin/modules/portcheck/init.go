@@ -4,9 +4,20 @@ package portcheck
 
 import (
 	"errors"
+	"net"
+	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
+
+type dialFunc func(network, address string, timeout time.Duration) (net.Conn, error)
+
+type port struct {
+	number  int
+	state   checkState
+	inState int
+	latency int
+}
 
 func (pc *PortCheck) validateConfig() error {
 	if pc.Host == "" {
@@ -28,4 +39,11 @@ func (pc *PortCheck) initCharts() (*module.Charts, error) {
 	}
 
 	return &charts, nil
+}
+
+func (pc *PortCheck) initPorts() (ports []*port) {
+	for _, p := range pc.Ports {
+		ports = append(ports, &port{number: p})
+	}
+	return ports
 }

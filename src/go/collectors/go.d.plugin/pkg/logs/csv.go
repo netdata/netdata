@@ -14,11 +14,11 @@ import (
 
 type (
 	CSVConfig struct {
-		FieldsPerRecord  int                              `yaml:"fields_per_record"`
-		Delimiter        string                           `yaml:"delimiter"`
-		TrimLeadingSpace bool                             `yaml:"trim_leading_space"`
-		Format           string                           `yaml:"format"`
-		CheckField       func(string) (string, int, bool) `yaml:"-"`
+		FieldsPerRecord  int                              `yaml:"fields_per_record" json:"fields_per_record"`
+		Delimiter        string                           `yaml:"delimiter" json:"delimiter"`
+		TrimLeadingSpace bool                             `yaml:"trim_leading_space" json:"trim_leading_space"`
+		Format           string                           `yaml:"format" json:"format"`
+		CheckField       func(string) (string, int, bool) `yaml:"-" json:"-"`
 	}
 
 	CSVParser struct {

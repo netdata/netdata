@@ -4,6 +4,7 @@ package rabbitmq
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"time"
 
@@ -31,7 +32,7 @@ func New() *RabbitMQ {
 					Password: "guest",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 			CollectQueues: false,
@@ -43,50 +44,62 @@ func New() *RabbitMQ {
 }
 
 type Config struct {
-	web.HTTP      `yaml:",inline"`
-	CollectQueues bool `yaml:"collect_queues_metrics"`
+	web.HTTP      `yaml:",inline" json:""`
+	UpdateEvery   int  `yaml:"update_every" json:"update_every"`
+	CollectQueues bool `yaml:"collect_queues_metrics" json:"collect_queues_metrics"`
 }
 
 type (
 	RabbitMQ struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
 		httpClient *http.Client
 
 		nodeName string
-
-		vhosts map[string]bool
-		queues map[string]queueCache
+		vhosts   map[string]bool
+		queues   map[string]queueCache
 	}
 	queueCache struct {
 		name, vhost string
 	}
 )
 
-func (r *RabbitMQ) Init() bool {
+func (r *RabbitMQ) Configuration() any {
+	return r.Config
+}
+
+func (r *RabbitMQ) Init() error {
 	if r.URL == "" {
 		r.Error("'url' can not be empty")
-		return false
+		return errors.New("url not set")
 	}
 
 	client, err := web.NewHTTPClient(r.Client)
 	if err != nil {
 		r.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	r.httpClient = client
 
 	r.Debugf("using URL %s", r.URL)
-	r.Debugf("using timeout: %s", r.Timeout.Duration)
+	r.Debugf("using timeout: %s", r.Timeout)
 
-	return true
+	return nil
 }
 
-func (r *RabbitMQ) Check() bool {
-	return len(r.Collect()) > 0
+func (r *RabbitMQ) Check() error {
+	mx, err := r.collect()
+	if err != nil {
+		r.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (r *RabbitMQ) Charts() *module.Charts {

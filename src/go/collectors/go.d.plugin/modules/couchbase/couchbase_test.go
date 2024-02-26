@@ -16,19 +16,24 @@ import (
 )
 
 var (
-	v660BucketsBasicStats, _ = os.ReadFile("testdata/6.6.0/buckets_basic_stats.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer660BucketsBasicStats, _ = os.ReadFile("testdata/6.6.0/buckets_basic_stats.json")
 )
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":              dataConfigJSON,
+		"dataConfigYAML":              dataConfigYAML,
+		"dataVer660BucketsBasicStats": dataVer660BucketsBasicStats,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func Test_testDataIsCorrectlyReadAndValid(t *testing.T) {
-	for name, data := range map[string][]byte{
-		"v660BucketsBasicStats": v660BucketsBasicStats,
-	} {
-		require.NotNilf(t, data, name)
-	}
+func TestCouchbase_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Couchbase{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestCouchbase_Init(t *testing.T) {
@@ -67,9 +72,9 @@ func TestCouchbase_Init(t *testing.T) {
 			cb.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, cb.Init())
+				assert.Error(t, cb.Init())
 			} else {
-				assert.True(t, cb.Init())
+				assert.NoError(t, cb.Init())
 			}
 		})
 	}
@@ -103,9 +108,9 @@ func TestCouchbase_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, cb.Check())
+				assert.Error(t, cb.Check())
 			} else {
-				assert.True(t, cb.Check())
+				assert.NoError(t, cb.Check())
 			}
 		})
 	}
@@ -173,12 +178,12 @@ func prepareCouchbaseV660(t *testing.T) (cb *Couchbase, cleanup func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(v660BucketsBasicStats)
+			_, _ = w.Write(dataVer660BucketsBasicStats)
 		}))
 
 	cb = New()
 	cb.URL = srv.URL
-	require.True(t, cb.Init())
+	require.NoError(t, cb.Init())
 
 	return cb, srv.Close
 }
@@ -191,7 +196,7 @@ func prepareCouchbaseInvalidData(t *testing.T) (*Couchbase, func()) {
 		}))
 	cb := New()
 	cb.URL = srv.URL
-	require.True(t, cb.Init())
+	require.NoError(t, cb.Init())
 
 	return cb, srv.Close
 }
@@ -204,7 +209,7 @@ func prepareCouchbase404(t *testing.T) (*Couchbase, func()) {
 		}))
 	cb := New()
 	cb.URL = srv.URL
-	require.True(t, cb.Init())
+	require.NoError(t, cb.Init())
 
 	return cb, srv.Close
 }
@@ -213,7 +218,7 @@ func prepareCouchbaseConnectionRefused(t *testing.T) (*Couchbase, func()) {
 	t.Helper()
 	cb := New()
 	cb.URL = "http://127.0.0.1:38001"
-	require.True(t, cb.Init())
+	require.NoError(t, cb.Init())
 
 	return cb, func() {}
 }

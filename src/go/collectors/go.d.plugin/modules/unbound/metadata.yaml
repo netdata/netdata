@@ -94,7 +94,7 @@ modules:
               required: false
             - name: cumulative_stats
               description: Statistics collection mode. Should have the same value as the `statistics-cumulative` parameter in the unbound configuration file.
-              default_value: /etc/unbound/unbound.conf
+              default_value: false
               required: false
             - name: use_tls
               description: Whether to use TLS or not.

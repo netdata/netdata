@@ -9,32 +9,36 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	testURL = "http://127.0.0.1:38001"
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataFullStatusMetrics, _ = os.ReadFile("testdata/fullstatus.json")
 )
 
-var testFullStatusData, _ = os.ReadFile("testdata/fullstatus.json")
-
-func Test_testData(t *testing.T) {
-	assert.NotEmpty(t, testFullStatusData)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":        dataConfigJSON,
+		"dataConfigYAML":        dataConfigYAML,
+		"dataFullStatusMetrics": dataFullStatusMetrics,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	job := New()
-
-	assert.Implements(t, (*module.Module)(nil), job)
-	assert.Equal(t, defaultURL, job.URL)
-	assert.Equal(t, defaultHTTPTimeout, job.Timeout.Duration)
+func TestPHPDaemon_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &PHPDaemon{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestPHPDaemon_Init(t *testing.T) {
 	job := New()
 
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 	assert.NotNil(t, job.client)
 }
 
@@ -42,21 +46,21 @@ func TestPHPDaemon_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testFullStatusData)
+				_, _ = w.Write(dataFullStatusMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
-	assert.True(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.NoError(t, job.Check())
 }
 
 func TestPHPDaemon_CheckNG(t *testing.T) {
 	job := New()
-	job.URL = testURL
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	job.URL = "http://127.0.0.1:38001"
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestPHPDaemon_Charts(t *testing.T) {
@@ -68,13 +72,13 @@ func TestPHPDaemon_Charts(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testFullStatusData)
+				_, _ = w.Write(dataFullStatusMetrics)
 			}))
 	defer ts.Close()
 
 	job.URL = ts.URL
-	require.True(t, job.Init())
-	assert.True(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.NoError(t, job.Check())
 	assert.True(t, job.charts.Has(uptimeChart.ID))
 }
 
@@ -86,14 +90,14 @@ func TestPHPDaemon_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testFullStatusData)
+				_, _ = w.Write(dataFullStatusMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
-	assert.True(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.NoError(t, job.Check())
 
 	expected := map[string]int64{
 		"alive":       350,
@@ -121,8 +125,8 @@ func TestPHPDaemon_InvalidData(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestPHPDaemon_404(t *testing.T) {
@@ -135,6 +139,6 @@ func TestPHPDaemon_404(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }

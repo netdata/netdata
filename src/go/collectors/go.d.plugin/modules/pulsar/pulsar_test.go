@@ -9,31 +9,40 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	metricsNonPulsar, _         = os.ReadFile("testdata/non-pulsar.txt")
-	metricsStdV250Namespaces, _ = os.ReadFile("testdata/standalone-v2.5.0-namespaces.txt")
-	metricsStdV250Topics, _     = os.ReadFile("testdata/standalone-v2.5.0-topics.txt")
-	metricsStdV250Topics2, _    = os.ReadFile("testdata/standalone-v2.5.0-topics-2.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataNonPulsarMetrics, _ = os.ReadFile("testdata/non-pulsar.txt")
+	dataVer250Namespaces, _ = os.ReadFile("testdata/standalone-v2.5.0-namespaces.txt")
+	dataVer250Topics, _     = os.ReadFile("testdata/standalone-v2.5.0-topics.txt")
+	dataVer250Topics2, _    = os.ReadFile("testdata/standalone-v2.5.0-topics-2.txt")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, metricsNonPulsar)
-	assert.NotNil(t, metricsStdV250Namespaces)
-	assert.NotNil(t, metricsStdV250Topics)
-	assert.NotNil(t, metricsStdV250Topics2)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":       dataConfigJSON,
+		"dataConfigYAML":       dataConfigYAML,
+		"dataNonPulsarMetrics": dataNonPulsarMetrics,
+		"dataVer250Namespaces": dataVer250Namespaces,
+		"dataVer250Topics":     dataVer250Topics,
+		"dataVer250Topics2":    dataVer250Topics2,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func TestPulsar_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Pulsar{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestPulsar_Init(t *testing.T) {
@@ -49,8 +58,8 @@ func TestPulsar_Init(t *testing.T) {
 		},
 		"bad syntax topic filer": {
 			config: Config{
-				HTTP:       web.HTTP{Request: web.Request{URL: "http://127.0.0.1:8080/metrics"}},
-				TopicFiler: matcher.SimpleExpr{Includes: []string{"+"}}},
+				HTTP:        web.HTTP{Request: web.Request{URL: "http://127.0.0.1:8080/metrics"}},
+				TopicFilter: matcher.SimpleExpr{Includes: []string{"+"}}},
 			wantFail: true,
 		},
 		"empty URL": {
@@ -71,9 +80,9 @@ func TestPulsar_Init(t *testing.T) {
 			pulsar.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, pulsar.Init())
+				assert.Error(t, pulsar.Init())
 			} else {
-				assert.True(t, pulsar.Init())
+				assert.NoError(t, pulsar.Init())
 			}
 		})
 	}
@@ -102,9 +111,9 @@ func TestPulsar_Check(t *testing.T) {
 			defer srv.Close()
 
 			if test.wantFail {
-				assert.False(t, pulsar.Check())
+				assert.Error(t, pulsar.Check())
 			} else {
-				assert.True(t, pulsar.Check())
+				assert.NoError(t, pulsar.Check())
 			}
 		})
 	}
@@ -220,12 +229,12 @@ func prepareClientServerStdV250Namespaces(t *testing.T) (*Pulsar, *httptest.Serv
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(metricsStdV250Namespaces)
+			_, _ = w.Write(dataVer250Namespaces)
 		}))
 
 	pulsar := New()
 	pulsar.URL = srv.URL
-	require.True(t, pulsar.Init())
+	require.NoError(t, pulsar.Init())
 
 	return pulsar, srv
 }
@@ -234,12 +243,12 @@ func prepareClientServerStdV250Topics(t *testing.T) (*Pulsar, *httptest.Server) 
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(metricsStdV250Topics)
+			_, _ = w.Write(dataVer250Topics)
 		}))
 
 	pulsar := New()
 	pulsar.URL = srv.URL
-	require.True(t, pulsar.Init())
+	require.NoError(t, pulsar.Init())
 
 	return pulsar, srv
 }
@@ -258,16 +267,16 @@ func prepareClientServersDynamicStdV250Topics(t *testing.T) (*Pulsar, *httptest.
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			if i%2 == 0 {
-				_, _ = w.Write(metricsStdV250Topics)
+				_, _ = w.Write(dataVer250Topics)
 			} else {
-				_, _ = w.Write(metricsStdV250Topics2)
+				_, _ = w.Write(dataVer250Topics2)
 			}
 			i++
 		}))
 
 	pulsar := New()
 	pulsar.URL = srv.URL
-	require.True(t, pulsar.Init())
+	require.NoError(t, pulsar.Init())
 
 	return pulsar, srv
 }
@@ -276,12 +285,12 @@ func prepareClientServerNonPulsar(t *testing.T) (*Pulsar, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(metricsNonPulsar)
+			_, _ = w.Write(dataNonPulsarMetrics)
 		}))
 
 	pulsar := New()
 	pulsar.URL = srv.URL
-	require.True(t, pulsar.Init())
+	require.NoError(t, pulsar.Init())
 
 	return pulsar, srv
 }
@@ -295,7 +304,7 @@ func prepareClientServerInvalidData(t *testing.T) (*Pulsar, *httptest.Server) {
 
 	pulsar := New()
 	pulsar.URL = srv.URL
-	require.True(t, pulsar.Init())
+	require.NoError(t, pulsar.Init())
 
 	return pulsar, srv
 }
@@ -309,7 +318,7 @@ func prepareClientServer404(t *testing.T) (*Pulsar, *httptest.Server) {
 
 	pulsar := New()
 	pulsar.URL = srv.URL
-	require.True(t, pulsar.Init())
+	require.NoError(t, pulsar.Init())
 
 	return pulsar, srv
 }
@@ -320,7 +329,7 @@ func prepareClientServerConnectionRefused(t *testing.T) (*Pulsar, *httptest.Serv
 
 	pulsar := New()
 	pulsar.URL = "http://127.0.0.1:38001/metrics"
-	require.True(t, pulsar.Init())
+	require.NoError(t, pulsar.Init())
 
 	return pulsar, srv
 }

@@ -4,7 +4,6 @@ package windows
 
 import (
 	"errors"
-	"net/http"
 
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
@@ -17,10 +16,10 @@ func (w *Windows) validateConfig() error {
 	return nil
 }
 
-func (w *Windows) initHTTPClient() (*http.Client, error) {
-	return web.NewHTTPClient(w.Client)
-}
-
-func (w *Windows) initPrometheusClient(client *http.Client) (prometheus.Prometheus, error) {
+func (w *Windows) initPrometheusClient() (prometheus.Prometheus, error) {
+	client, err := web.NewHTTPClient(w.Client)
+	if err != nil {
+		return nil, err
+	}
 	return prometheus.New(client, w.Request), nil
 }

@@ -14,7 +14,7 @@ func (vs *VSphere) goDiscovery() {
 			vs.Errorf("error on discovering : %v", err)
 		}
 	}
-	vs.discoveryTask = newTask(job, vs.DiscoveryInterval.Duration)
+	vs.discoveryTask = newTask(job, vs.DiscoveryInterval.Duration())
 }
 
 func (vs *VSphere) discoverOnce() error {

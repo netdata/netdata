@@ -4,13 +4,12 @@ package k8s_kubelet
 
 import (
 	_ "embed"
-	"os"
+	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -27,78 +26,83 @@ func init() {
 	})
 }
 
-// New creates Kubelet with default values.
 func New() *Kubelet {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL:     "http://127.0.0.1:10255/metrics",
-				Headers: make(map[string]string),
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: time.Second},
-			},
-		},
-		TokenPath: "/var/run/secrets/kubernetes.io/serviceaccount/token",
-	}
-
 	return &Kubelet{
-		Config:             config,
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL:     "http://127.0.0.1:10255/metrics",
+					Headers: make(map[string]string),
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second),
+				},
+			},
+			TokenPath: "/var/run/secrets/kubernetes.io/serviceaccount/token",
+		},
+
 		charts:             charts.Copy(),
 		collectedVMPlugins: make(map[string]bool),
 	}
 }
 
-type (
-	Config struct {
-		web.HTTP  `yaml:",inline"`
-		TokenPath string `yaml:"token_path"`
-	}
-
-	Kubelet struct {
-		module.Base
-		Config `yaml:",inline"`
-
-		prom   prometheus.Prometheus
-		charts *Charts
-		// volume_manager_total_volumes
-		collectedVMPlugins map[string]bool
-	}
-)
-
-// Cleanup makes cleanup.
-func (Kubelet) Cleanup() {}
-
-// Init makes initialization.
-func (k *Kubelet) Init() bool {
-	b, err := os.ReadFile(k.TokenPath)
-	if err != nil {
-		k.Warningf("error on reading service account token from '%s': %v", k.TokenPath, err)
-	} else {
-		k.Request.Headers["Authorization"] = "Bearer " + string(b)
-	}
-
-	client, err := web.NewHTTPClient(k.Client)
-	if err != nil {
-		k.Errorf("error on creating http client: %v", err)
-		return false
-	}
-
-	k.prom = prometheus.New(client, k.Request)
-	return true
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int    `yaml:"update_every" json:"update_every"`
+	TokenPath   string `yaml:"token_path" json:"token_path"`
 }
 
-// Check makes check.
-func (k *Kubelet) Check() bool {
-	return len(k.Collect()) > 0
+type Kubelet struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	charts *Charts
+
+	prom prometheus.Prometheus
+
+	collectedVMPlugins map[string]bool // volume_manager_total_volumes
 }
 
-// Charts creates Charts.
-func (k Kubelet) Charts() *Charts {
+func (k *Kubelet) Configuration() any {
+	return k.Config
+}
+
+func (k *Kubelet) Init() error {
+	if err := k.validateConfig(); err != nil {
+		k.Errorf("config validation: %v", err)
+		return err
+	}
+
+	prom, err := k.initPrometheusClient()
+	if err != nil {
+		k.Error(err)
+		return err
+	}
+	k.prom = prom
+
+	if tok := k.initAuthToken(); tok != "" {
+		k.Request.Headers["Authorization"] = "Bearer " + tok
+	}
+
+	return nil
+}
+
+func (k *Kubelet) Check() error {
+	mx, err := k.collect()
+	if err != nil {
+		k.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
+}
+
+func (k *Kubelet) Charts() *Charts {
 	return k.charts
 }
 
-// Collect collects mx.
 func (k *Kubelet) Collect() map[string]int64 {
 	mx, err := k.collect()
 
@@ -108,4 +112,10 @@ func (k *Kubelet) Collect() map[string]int64 {
 	}
 
 	return mx
+}
+
+func (k *Kubelet) Cleanup() {
+	if k.prom != nil && k.prom.HTTPClient() != nil {
+		k.prom.HTTPClient().CloseIdleConnections()
+	}
 }

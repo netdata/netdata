@@ -1,0 +1,21 @@
+{
+  "update_every": 123,
+  "discovery_every": 123.123,
+  "files": {
+    "include": [
+      "ok"
+    ],
+    "exclude": [
+      "ok"
+    ]
+  },
+  "dirs": {
+    "include": [
+      "ok"
+    ],
+    "exclude": [
+      "ok"
+    ],
+    "collect_dir_size": true
+  }
+}
