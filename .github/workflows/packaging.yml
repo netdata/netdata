@@ -59,6 +59,7 @@ jobs:
             .github/workflows/packaging.yml
             .github/scripts/gen-matrix-packaging.py
             .github/scripts/pkg-test.sh
+            packaging/cmake/
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
