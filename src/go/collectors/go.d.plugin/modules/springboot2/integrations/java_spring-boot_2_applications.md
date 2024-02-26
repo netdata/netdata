@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/springboot2/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/springboot2/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/springboot2/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/springboot2/metadata.yaml"
 sidebar_label: "Java Spring-boot 2 applications"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/APM"

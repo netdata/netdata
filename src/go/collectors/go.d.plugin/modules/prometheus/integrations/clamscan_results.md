@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/prometheus/integrations/clamscan_results.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/prometheus/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/clamscan_results.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/prometheus/metadata.yaml"
 sidebar_label: "Clamscan results"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Security Systems"

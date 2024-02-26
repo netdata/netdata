@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/mongodb/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/mongodb/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/mongodb/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/mongodb/metadata.yaml"
 sidebar_label: "MongoDB"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Databases"

@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/pulsar/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/pulsar/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/pulsar/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/pulsar/metadata.yaml"
 sidebar_label: "Apache Pulsar"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Message Brokers"

@@ -1,6 +1,6 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/modules/couchdb/README.md"
-meta_yaml: "https://github.com/netdata/go.d.plugin/edit/master/modules/couchdb/metadata.yaml"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/couchdb/README.md"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/couchdb/metadata.yaml"
 sidebar_label: "CouchDB"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Databases"
