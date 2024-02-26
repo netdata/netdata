@@ -1090,20 +1090,24 @@ ml_host_detect_once(ml_host_t *host)
             host->mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
             host->mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
 
-            STRING *key = rs->parts.type;
-            auto &um = host->type_anomaly_rate;
-            auto it = um.find(key);
-            if (it == um.end()) {
-                um[key] = ml_type_anomaly_rate_t {
-                    .rd = NULL,
-                    .normal_dimensions = 0,
-                    .anomalous_dimensions = 0
-                };
-                it = um.find(key);
-            }
+            if (spinlock_trylock_cancelable(&host->type_anomaly_rate_spinlock))
+            {
+                STRING *key = rs->parts.type;
+                auto &um = host->type_anomaly_rate;
+                auto it = um.find(key);
+                if (it == um.end()) {
+                    um[key] = ml_type_anomaly_rate_t {
+                        .rd = NULL,
+                        .normal_dimensions = 0,
+                        .anomalous_dimensions = 0
+                    };
+                    it = um.find(key);
+                }
 
-            it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
-            it->second.normal_dimensions += chart_mls.num_normal_dimensions;
+                it->second.anomalous_dimensions += chart_mls.num_anomalous_dimensions;
+                it->second.normal_dimensions += chart_mls.num_normal_dimensions;
+                spinlock_unlock_cancelable(&host->type_anomaly_rate_spinlock);
+            }
         }
         rrdset_foreach_done(rsp);
 
@@ -1310,6 +1314,7 @@ void ml_host_new(RRDHOST *rh)
     host->training_queue = Cfg.training_threads[times_called++ % Cfg.num_training_threads].training_queue;
 
     netdata_mutex_init(&host->mutex);
+    spinlock_init(&host->type_anomaly_rate_spinlock);
 
     host->ml_running = true;
     rh->ml_host = (rrd_ml_host_t *) host;
