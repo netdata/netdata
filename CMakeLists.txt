@@ -1656,9 +1656,6 @@ target_include_directories(libnetdata BEFORE PUBLIC ${OPENSSL_INCLUDE_DIRS})
 target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
 
-# h2o
-target_link_libraries(libnetdata PUBLIC "$<$<BOOL:${ENABLE_H2O}>:h2o>")
-
 # mnl
 pkg_check_modules(MNL libmnl)
 if(MNL_FOUND)
@@ -2120,6 +2117,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
+        "$<$<BOOL:${ENABLE_H2O}>:h2o>"
 )
 
 #
