@@ -16,7 +16,6 @@ version = parse('1.0.0')
 modules = []
 
 for modfile in GO_SRC.glob('**/go.mod'):
-    modules.append(str(modfile.parent))
     moddata = modfile.read_text()
 
     for line in moddata.splitlines():
@@ -24,8 +23,17 @@ for modfile in GO_SRC.glob('**/go.mod'):
             version = max(version, parse(line.split()[1]))
             break
 
-with GITHUB_OUTPUT.open('a') as f:
-    f.write(f'version={ str(version) }\n')
+    for main in modfile.parent.glob('**/main.go'):
+        mainpath = main.relative_to(modfile.parent).parent
+
+        if 'examples' in mainpath.parts:
+            continue
+
+        modules.append({
+            'module': str(modfile.parent),
+            'version': str(version),
+            'build_target': f'github.com/netdata/netdata/go/{ modfile.parts[-2] }/{ str(mainpath) }/',
+        })
 
 with GITHUB_OUTPUT.open('a') as f:
-    f.write(f'matrix={ json.dumps({"module": modules}) }\n')
+    f.write(f'matrix={ json.dumps({"include": modules}) }\n')
