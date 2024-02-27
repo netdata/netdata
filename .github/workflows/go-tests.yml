@@ -104,7 +104,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           go fmt ./... | tee modified-files
-          [ "$(wc -l modified-files | cut -f 1 -d ' ')" -ne 0 ] && exit 1
+          [ "$(wc -l modified-files | cut -f 1 -d ' ')" -eq 0 ] || exit 1
         working-directory: ${{ matrix.module }}
       - name: Go vet
         if: needs.file-check.outputs.run == 'true'
