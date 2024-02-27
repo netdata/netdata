@@ -1404,6 +1404,7 @@ static inline void network_viewer_load_ebpf()
     if (network_viewer_load_ebpf_to_kernel(&ebpf_nv_module, kver))
         network_viewer_unload_ebpf();
 }
+#endif
 
 // ----------------------------------------------------------------------------------------------------------------
 // main
