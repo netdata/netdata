@@ -302,6 +302,9 @@ are divided in the following sections:
 
 #### `[network connections]`
 
+The Netdata is integrating eBPF sockets collection with the [`networkviewer.plugin`](https://github.com/netdata/netdata/blob/master/src/collectors/network-viewer.plugin/network-connections-chart.html).
+While this is happening, we are disabling this option to avoid overload on the host.
+
 You can configure the information shown with function `ebpf_socket` using the settings in this section.
 
 ```conf
