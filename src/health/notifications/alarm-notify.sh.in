@@ -248,31 +248,32 @@ docurl() {
 # Used in a couple of places to write more compact code.
 
 method_names="
-email
-pushover
-pushbullet
-telegram
-slack
 alerta
-flock
-discord
-hipchat
-twilio
-messagebird
-pd
-fleep
-syslog
-custom
-msteams
-kavenegar
-prowl
-irc
 awssns
-rocketchat
-sms
+custom
+discord
 dynatrace
+email
+fleep
+flock
+gotify
+hipchat
+irc
+kavenegar
 matrix
+messagebird
+msteams
 ntfy
+pd
+prowl
+pushbullet
+pushover
+rocketchat
+slack
+sms
+syslog
+telegram
+twilio
 "
 
 # -----------------------------------------------------------------------------
