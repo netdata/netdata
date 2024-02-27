@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "daemon/common.h"
 #include "watcher.h"
 
 watcher_step_t *watcher_steps;
@@ -30,23 +29,38 @@ void *watcher_main(void *arg)
     completion_wait_for(&shutdown_begin_completion);
     usec_t shutdown_start_time = now_monotonic_usec();
 
-    // TODO:
-    //   - add a version of completion_wait_for with timeout
-    //   - check the step's duration and abort when the timeout has expired.
+    netdata_log_error("Shutdown process started");
+
+    unsigned timeout = 60;
+
     for (int step_id = 0; step_id != WATCHER_STEP_ID_MAX; step_id++) {
         usec_t step_start_time = now_monotonic_usec();
+
+#ifdef ENABLE_SENTRY
+        // Wait with a timeout
+        bool ok = completion_timedwait_for(&watcher_steps[step_id].p, timeout);
+#else
+        // Wait indefinitely
+        bool ok = true;
         completion_wait_for(&watcher_steps[step_id].p);
-        usec_t step_end_time = now_monotonic_usec();
+#endif
 
-        usec_t step_duration = step_end_time - step_start_time;
-        netdata_log_info("shutdown step: [%d/%d] - '%s' finished in %llu milliseconds",
-                         step_id + 1,
-                         WATCHER_STEP_ID_MAX,
-                         watcher_steps[step_id].msg,
-                         step_duration / USEC_PER_MS);
+        usec_t step_duration = now_monotonic_usec() - step_start_time;
+
+        if (ok) {
+            netdata_log_info("shutdown step: [%d/%d] - '%s' finished in %llu milliseconds",
+                             step_id + 1, WATCHER_STEP_ID_MAX,
+                             watcher_steps[step_id].msg, step_duration / USEC_PER_MS);
+        } else {
+            // Do not call fatal() because it will try to execute the exit
+            // sequence twice.
+            netdata_log_error("shutdown step: [%d/%d] - '%s' took more than %u seconds (ie. %llu milliseconds)",
+                  step_id + 1, WATCHER_STEP_ID_MAX, watcher_steps[step_id].msg,
+                  timeout, step_duration / USEC_PER_MS);
+
+            abort();
+        }
     }
-
-    netdata_log_error("Shutdown process started");
 
     completion_wait_for(&shutdown_end_completion);
     usec_t shutdown_end_time = now_monotonic_usec();

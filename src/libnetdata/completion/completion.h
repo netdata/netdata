@@ -18,6 +18,10 @@ void completion_destroy(struct completion *p);
 
 void completion_wait_for(struct completion *p);
 
+// Wait for at most `timeout` seconds. Return true on success, false on
+// error or timeout.
+bool completion_timedwait_for(struct completion *p, uint64_t timeout);
+
 void completion_mark_complete(struct completion *p);
 
 unsigned completion_wait_for_a_job(struct completion *p, unsigned completed_jobs);
