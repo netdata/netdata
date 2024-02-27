@@ -1060,11 +1060,11 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
         network_viewer_load_ebpf();
-#endif
 
         if (ebpf_nv_module.maps[0].map_fd > 0)
             nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGIN: the plugin will use eBPF %s to monitor sockets.",
                    (nv_targets[0].mode == EBPF_LOAD_TRAMPOLINE) ? "trampoline" : "kprobe");
+#endif
 
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
