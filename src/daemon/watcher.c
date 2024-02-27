@@ -31,12 +31,20 @@ void *watcher_main(void *arg)
 
     netdata_log_error("Shutdown process started");
 
-    // Abort if any individual shutdown step takes more than 60 seconds.
     unsigned timeout = 60;
 
     for (int step_id = 0; step_id != WATCHER_STEP_ID_MAX; step_id++) {
         usec_t step_start_time = now_monotonic_usec();
+
+#ifdef ENABLE_SENTRY
+        // Wait with a timeout
         bool ok = completion_timedwait_for(&watcher_steps[step_id].p, timeout);
+#else
+        // Wait indefinitely
+        bool ok = true;
+        completion_wait_for(&watcher_steps[step_id].p);
+#endif
+
         usec_t step_duration = now_monotonic_usec() - step_start_time;
 
         if (ok) {
