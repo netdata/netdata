@@ -125,8 +125,8 @@ jobs:
       - name: Go fmt
         if: needs.file-check.outputs.run == 'true'
         run: |
-          go fmt ./...
-          [ $(git status --porcelain=1 | wc -l) -ne 0 ] && exit 1
+          go fmt ./... | tee modified-files
+          [ $(wc -l modified-files) -ne 0 ] && exit 1
         working-directory: ${{ matrix.module }}
 
   go-test:
