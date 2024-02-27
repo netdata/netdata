@@ -497,7 +497,7 @@ extern char *netdata_configured_host_prefix;
 #include "string/string.h"
 #include "dictionary/dictionary.h"
 #include "dictionary/thread-cache.h"
-#if defined(HAVE_LIBBPF) && !defined(__cplusplus)
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 #include "ebpf/ebpf.h"
 #endif
 #include "eval/eval.h"

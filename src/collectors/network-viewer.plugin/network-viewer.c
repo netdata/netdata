@@ -4,7 +4,7 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
-#include "libnetdata/ebpf/ebpf.h"
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 static ebpf_local_maps_t nv_maps[] = {{.name = "tbl_nv_socket",
                                        .internal_input = 65536,
                                        .user_input = 65536, .type = NETDATA_EBPF_MAP_RESIZABLE,
@@ -47,6 +47,8 @@ struct btf *common_btf = NULL;
 #else
 void *common_btf = NULL;
 #endif
+
+#endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 
 #define ENABLE_DETAILED_VIEW
 
@@ -778,6 +780,7 @@ close_and_send:
     netdata_mutex_unlock(&stdout_mutex);
 }
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 // ----------------------------------------------------------------------------------------------------------------
 // eBPF
 
@@ -1037,6 +1040,7 @@ static inline void network_viewer_load_ebpf()
     if (network_viewer_load_ebpf_to_kernel(&ebpf_nv_module, kver))
         network_viewer_unload_ebpf();
 }
+#endif
 
 // ----------------------------------------------------------------------------------------------------------------
 // main
@@ -1054,7 +1058,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ----------------------------------------------------------------------------------------------------------------
 
     if(argc == 2 && strcmp(argv[1], "debug") == 0) {
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
         network_viewer_load_ebpf();
+#endif
 
         if (ebpf_nv_module.maps[0].map_fd > 0)
             nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGIN: the plugin will use eBPF %s to monitor sockets.",
@@ -1070,11 +1076,15 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         network_viewer_function("123", buf2, &stop_monotonic_ut, &cancelled,
                                 NULL, HTTP_ACCESS_ALL, NULL, NULL);
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
         network_viewer_unload_ebpf();
+#endif
         exit(1);
     }
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     network_viewer_load_ebpf();
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
 
@@ -1113,7 +1123,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         }
     }
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     network_viewer_unload_ebpf();
+#endif
 
     return 0;
 }
