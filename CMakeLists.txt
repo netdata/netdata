@@ -354,7 +354,7 @@ endforeach()
 # Handling of LTO/IPO
 #
 
-if(CMAKE_BUILD_TYPE MATCH Debug)
+if(CMAKE_BUILD_TYPE STREQUAL Debug)
         option(DISABLE_LTO "Disable use of LTO when building. Defaults to being enabled if supported for release builds." TRUE)
 else()
         option(DISABLE_LTO "Disable use of LTO when building. Defaults to being enabled if supported for release builds." FALSE)
