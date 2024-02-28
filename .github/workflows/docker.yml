@@ -64,7 +64,7 @@ jobs:
       - name: List all changed files in pattern
         continue-on-error: true
         env:
-          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
+          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_modified_files }}
         run: |
           for file in ${ALL_CHANGED_FILES}; do
             echo "$file was changed"
