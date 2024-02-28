@@ -34,6 +34,7 @@ jobs:
         uses: tj-actions/changed-files@v42
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          base_sha: ${{ github.event.pull_request.base.sha }}
           files: |
             **/*.c
             **/*.cc
