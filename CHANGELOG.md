@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- add missing "gotify" to list of notification methods in alarm-notify.sh [\#17069](https://github.com/netdata/netdata/pull/17069) ([ilyam8](https://github.com/ilyam8))
+- Add CI checks for Go code. [\#17066](https://github.com/netdata/netdata/pull/17066) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17063](https://github.com/netdata/netdata/pull/17063) ([netdatabot](https://github.com/netdatabot))
+- go.d.plugin: set max chart id length to 1200 [\#17062](https://github.com/netdata/netdata/pull/17062) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17061](https://github.com/netdata/netdata/pull/17061) ([netdatabot](https://github.com/netdatabot))
+- Abort the agent if a single shutdown step takes more than 60 seconds. [\#17060](https://github.com/netdata/netdata/pull/17060) ([vkalintiris](https://github.com/vkalintiris))
 - Fix typo [\#17059](https://github.com/netdata/netdata/pull/17059) ([vkalintiris](https://github.com/vkalintiris))
 - updated sizing netdata [\#17057](https://github.com/netdata/netdata/pull/17057) ([ktsaou](https://github.com/ktsaou))
 - fix zpool state chart family [\#17054](https://github.com/netdata/netdata/pull/17054) ([ilyam8](https://github.com/ilyam8))
@@ -402,9 +406,6 @@
 - journals management improvements [\#16475](https://github.com/netdata/netdata/pull/16475) ([ktsaou](https://github.com/ktsaou))
 - SEO changes for Collector names [\#16473](https://github.com/netdata/netdata/pull/16473) ([sashwathn](https://github.com/sashwathn))
 - Check context post processing queue before sending status to cloud [\#16472](https://github.com/netdata/netdata/pull/16472) ([stelfrag](https://github.com/stelfrag))
-- fix charts.d plugin loading configuration [\#16471](https://github.com/netdata/netdata/pull/16471) ([ilyam8](https://github.com/ilyam8))
-- Fix error limit to respect the log every [\#16469](https://github.com/netdata/netdata/pull/16469) ([stelfrag](https://github.com/stelfrag))
-- Journal better estimations and watcher [\#16467](https://github.com/netdata/netdata/pull/16467) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
