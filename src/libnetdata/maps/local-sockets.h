@@ -1283,6 +1283,10 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
 
 static inline void local_sockets_process(LS_STATE *ls) {
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    local_sockets_ebpf_selector(ls);
+#endif
+
 #ifdef HAVE_LIBMNL
     local_sockets_netlink_init(ls);
 #endif
