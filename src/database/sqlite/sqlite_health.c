@@ -897,12 +897,12 @@ void sql_health_alarm_log_load(RRDHOST *host)
  */
 #define SQL_STORE_ALERT_CONFIG_HASH                                                                                     \
     "insert or replace into alert_hash (hash_id, date_updated, alarm, template, "                                       \
-    "on_key, class, component, type, os, hosts, lookup, every, units, calc, plugin, module, "                           \
-    "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, "                         \
+    "on_key, class, component, type, lookup, every, units, calc, "                                                      \
+    "green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, "                                 \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, "                              \
     "p_db_lookup_before, p_update_every, source, chart_labels, summary) values (@hash_id,UNIXEPOCH(),@alarm,@template," \
-    "@on_key,@class,@component,@type,@os,@hosts,@lookup,@every,@units,@calc,@plugin,@module,"                           \
-    "@charts,@green,@red,@warn,@crit,@exec,@to_key,@info,@delay,@options,@repeat,@host_labels,"                         \
+    "@on_key,@class,@component,@type,@lookup,@every,@units,@calc,"                                                      \
+    "@green,@red,@warn,@crit,@exec,@to_key,@info,@delay,@options,@repeat,@host_labels,"                                 \
     "@p_db_lookup_dimensions,@p_db_lookup_method,@p_db_lookup_options,@p_db_lookup_after,"                              \
     "@p_db_lookup_before,@p_update_every,@source,@chart_labels,@summary)"
 
