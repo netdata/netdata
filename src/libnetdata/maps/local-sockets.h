@@ -209,6 +209,11 @@ typedef struct local_socket {
 
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) PRINTFLIKE(2, 3);
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+enum ebpf_nv_tables_list {
+    NETWORK_VIEWER_EBPF_NV_SOCKET,
+    NETWORK_VIEWER_EBPF_NV_CONTROL
+};
+
 typedef struct ebpf_nv_idx {
     union ipv46 saddr;
     uint16_t sport;
@@ -239,7 +244,7 @@ typedef struct ebpf_nv_data {
 
 static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
     // We loaded with success eBPF codes
-    if (ebpf_nv_module.maps && ebpf_nv_module.maps[0].map_fd != -1)
+    if (ebpf_nv_module.maps && ebpf_nv_module.maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
         ls->use_ebpf = true;
 }
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
