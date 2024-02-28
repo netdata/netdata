@@ -204,6 +204,38 @@ typedef struct local_socket {
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) PRINTFLIKE(2, 3);
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+typedef struct ebpf_nv_idx {
+    union ipv46 saddr;
+    uint16_t sport;
+    union ipv46 daddr;
+    uint16_t dport;
+} ebpf_nv_idx_t;
+
+typedef struct ebpf_nv_data {
+    int state;
+
+    uint32_t pid;
+    uint32_t uid;
+    uint64_t ts;
+
+    uint8_t timer;
+    uint8_t retransmits;
+    uint32_t expires;
+    uint32_t rqueue;
+    uint32_t wqueue;
+
+    char name[TASK_COMM_LEN];
+
+    uint32_t direction;
+
+    uint16_t family;
+    uint16_t protocol;
+} ebpf_nv_data_t;
+#endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+
+// --------------------------------------------------------------------------------------------------------------------
+
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
     if(++ls->stats.errors_encountered == ls->config.max_errors) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: max number of logs reached. Not logging anymore");
