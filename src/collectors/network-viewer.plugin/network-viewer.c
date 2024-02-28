@@ -1339,9 +1339,9 @@ static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver
                 const char *name = bpf_map__name(map);
                 int fd = bpf_map__fd(map);
                 if (!strcmp(name, nv_maps[0].name))
-                    nv_maps[0].map_fd = fd;
+                    em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd = fd;
                 else
-                    nv_maps[1].map_fd = fd;
+                    em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd = fd;
             }
         }
     }
@@ -1351,8 +1351,8 @@ static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver
         networkviewer_bpf_obj = networkviewer_bpf__open();
         ret = (!networkviewer_bpf_obj) ? -1 : ebpf_networkviewer_load_and_attach(networkviewer_bpf_obj, em);
         if (!ret) {
-            em->maps[0].map_fd =  bpf_map__fd(networkviewer_bpf_obj->maps.tbl_nv_socket);
-            em->maps[1].map_fd =  bpf_map__fd(networkviewer_bpf_obj->maps.nv_ctrl);
+            em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd =  bpf_map__fd(networkviewer_bpf_obj->maps.tbl_nv_socket);
+            em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd =  bpf_map__fd(networkviewer_bpf_obj->maps.nv_ctrl);
         }
     }
 #endif

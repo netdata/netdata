@@ -245,7 +245,7 @@ typedef struct ebpf_nv_data {
 
 static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
     // We loaded with success eBPF codes
-    if (ebpf_nv_module.maps && ebpf_nv_module.maps[0].map_fd != -1)
+    if (ebpf_nv_module.maps && ebpf_nv_module.maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
         ls->use_ebpf = true;
 }
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
