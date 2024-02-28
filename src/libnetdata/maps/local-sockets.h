@@ -104,6 +104,10 @@ typedef struct local_socket_state {
     uint16_t tmp_protocol;
 #endif
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    bool use_ebpf;
+#endif
+
     ARAL *local_socket_aral;
     ARAL *pid_socket_aral;
 
@@ -232,6 +236,12 @@ typedef struct ebpf_nv_data {
     uint16_t family;
     uint16_t protocol;
 } ebpf_nv_data_t;
+
+static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
+    // We loaded with success eBPF codes
+    if (ebpf_nv_module.maps && ebpf_nv_module.maps[0].map_fd != -1)
+        ls->use_ebpf = true;
+}
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -669,6 +679,10 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
 #ifdef HAVE_LIBMNL
 
 static inline void local_sockets_netlink_init(LS_STATE *ls) {
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    if (ls->use_ebpf)
+        return;
+#endif
     ls->use_nl = true;
     ls->nl = mnl_socket_open(NETLINK_INET_DIAG);
     if (!ls->nl) {
@@ -1126,6 +1140,10 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
             local_sockets_log(ls, "failed to switch network namespace at child process");
             exit(EXIT_FAILURE);
         }
+
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+        local_sockets_ebpf_selector(ls);
+#endif
 
 #ifdef HAVE_LIBMNL
         local_sockets_netlink_cleanup(ls);
