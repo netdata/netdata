@@ -1016,7 +1016,7 @@ fi
 %caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
 %changelog
-* Tue Feb 06 2024 Austin hemmelgarn <austin@netdata.cloud>
+* Tue Feb 06 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-25
 - Add package for network-viewer plugin
 * Thu Oct 26 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-24
 - Add package for logs-management plugin
