@@ -54,10 +54,11 @@ fi
 # Run the build script inside the container
 if [ -t 1 ]; then
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -a stdin -a stdout -a stderr -i -t -v "$(pwd)":/netdata:rw \
-    --platform "${platform}" "${DOCKER_IMAGE_NAME}" \
-    /bin/sh /netdata/packaging/makeself/build.sh "${@}"
+    --platform "${platform}" ${EXTRA_INSTALLER_FLAGS:+-e EXTRA_INSTALLER_FLAGS="${EXTRA_INSTALLER_FLAGS}"} \
+    "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 else
   run ${docker} run --rm -e BUILDARCH="${BUILDARCH}" -v "$(pwd)":/netdata:rw \
-    -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" --platform "${platform}" "${DOCKER_IMAGE_NAME}" \
-    /bin/sh /netdata/packaging/makeself/build.sh "${@}"
+    -e GITHUB_ACTIONS="${GITHUB_ACTIONS}" --platform "${platform}" \
+    ${EXTRA_INSTALLER_FLAGS:+-e EXTRA_INSTALLER_FLAGS="${EXTRA_INSTALLER_FLAGS}"} \
+    "${DOCKER_IMAGE_NAME}" /bin/sh /netdata/packaging/makeself/build.sh "${@}"
 fi
