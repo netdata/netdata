@@ -38,7 +38,7 @@ run ./netdata-installer.sh \
   --one-time-build \
   --disable-logsmanagement \
   --enable-lto \
-  ${EXTRA_INSTALLER_FLAGS}
+  ${EXTRA_INSTALL_FLAGS}
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Finishing netdata install" || true
