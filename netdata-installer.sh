@@ -211,7 +211,7 @@ USAGE: ${PROGRAM} [options]
   --disable-dbengine         Explicitly disable DB engine support.
   --enable-plugin-go         Enable the Go plugin. Default: Enabled when possible.
   --disable-plugin-go        Disable the Go plugin.
-  --disable-go               Equivalent to --disable-go-plugin
+  --disable-go               Disable all Go components.
   --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
   --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available.
