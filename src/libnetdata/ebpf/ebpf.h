@@ -506,6 +506,4 @@ void ebpf_send_data_aral_chart(ARAL *memory, ebpf_module_t *em);
 int ebpf_can_plugin_load_code(int kver, char *plugin_name);
 int ebpf_adjust_memory_limit();
 
-extern ebpf_module_t ebpf_nv_module;
-
 #endif /* NETDATA_EBPF_H */

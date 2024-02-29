@@ -5,6 +5,8 @@
 #include "libnetdata/required_dummies.h"
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+ebpf_module_t ebpf_nv_module;
+
 static ebpf_local_maps_t nv_maps[] = {{.name = "tbl_nv_socket",
                                        .internal_input = 65536,
                                        .user_input = 65536, .type = NETDATA_EBPF_MAP_RESIZABLE,
@@ -378,6 +380,9 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                 .max_errors = 10,
             },
             .stats = { 0 },
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+            .ebpf_module = &ebpf_nv_module,
+#endif
             .sockets_hashtable = { 0 },
             .local_ips_hashtable = { 0 },
             .listening_ports_hashtable = { 0 },

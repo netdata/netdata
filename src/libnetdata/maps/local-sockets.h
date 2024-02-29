@@ -106,6 +106,7 @@ typedef struct local_socket_state {
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     bool use_ebpf;
+    ebpf_module_t *ebpf_module;
 #endif
 
     ARAL *local_socket_aral;
@@ -244,7 +245,7 @@ typedef struct ebpf_nv_data {
 
 static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
     // We loaded with success eBPF codes
-    if (ebpf_nv_module.maps && ebpf_nv_module.maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
+    if (ls->ebpf_module->maps && ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
         ls->use_ebpf = true;
 }
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
