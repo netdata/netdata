@@ -42,7 +42,7 @@ RELEASE_INFO_URL="https://repo.netdata.cloud/releases"
 REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
 REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
-TROUBLESHOOTING_GUIDE_URL="https://learn.netdata.cloud/docs/installing/installation-troubleshoot-actions"
+TROUBLESHOOTING_GUIDE_URL="https://learn.netdata.cloud/docs/netdata-agent/installation/linux/kickstart-troubleshooting-FAQ"
 # ======================================================================
 # Defaults for environment variables
 
