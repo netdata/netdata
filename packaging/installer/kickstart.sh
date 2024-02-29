@@ -426,23 +426,23 @@ cleanup() {
 
 deferred_warnings() {
   if [ -n "${NETDATA_WARNINGS}" ]; then
-    
     printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
     # shellcheck disable=SC2059
     printf >&2 "${NETDATA_WARNINGS}"
     printf >&2 "\n"
-    printf >&2 "%s\n" "You can consult the guide to common installation problems in our documentation ${TROUBLESHOOTING_GUIDE_URL}"
+    printf >&2 "%s\n" "You can consult the guide to common installation problems in our docs: ${TROUBLESHOOTING_GUIDE_URL}"
     printf >&2 "\n\n"
   fi
 }
 
 fatal() {
-  troubleshoot_guide_url="https://learn.netdata.cloud/docs/installing/installation-troubleshoot-actions"
   deferred_warnings
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
   printf >&2 "%s\n" "For community support, you can connect with us on:"
   support_list
-  printf >&2 "%s\n" "Or you can consult the guide to common installation problems in our documentation ${TROUBLESHOOTING_GUIDE_URL}"
+  if [ -n "${NETDATA_WARNINGS}" ]; then
+    printf >&2 "%s\n" "Or you can consult the guide to common installation problems in our docs: ${TROUBLESHOOTING_GUIDE_URL}"
+  fi
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
   cleanup
   trap - EXIT
