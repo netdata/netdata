@@ -44,6 +44,7 @@
 - Add watcher thread to report shutdown steps. [\#17010](https://github.com/netdata/netdata/pull/17010) ([vkalintiris](https://github.com/vkalintiris))
 - dyncfg: fix support for testing new jobs [\#17009](https://github.com/netdata/netdata/pull/17009) ([ktsaou](https://github.com/ktsaou))
 - Abort on non-zero rc. [\#17008](https://github.com/netdata/netdata/pull/17008) ([vkalintiris](https://github.com/vkalintiris))
+- Netdata Agent: Backup restore documentation [\#17006](https://github.com/netdata/netdata/pull/17006) ([luisj1983](https://github.com/luisj1983))
 - Integrate Go plugin with build system. [\#17005](https://github.com/netdata/netdata/pull/17005) ([Ferroin](https://github.com/Ferroin))
 - Bump the version of the installed Go toolchain to 1.22.0. [\#17004](https://github.com/netdata/netdata/pull/17004) ([Ferroin](https://github.com/Ferroin))
 - Misc improvements [\#17001](https://github.com/netdata/netdata/pull/17001) ([stelfrag](https://github.com/stelfrag))
@@ -403,9 +404,6 @@
 - Disable netdata monitoring section by default [\#16480](https://github.com/netdata/netdata/pull/16480) ([MrZammler](https://github.com/MrZammler))
 - Log2journal yaml configuration support [\#16479](https://github.com/netdata/netdata/pull/16479) ([ktsaou](https://github.com/ktsaou))
 - log alarm notifications to health.log [\#16476](https://github.com/netdata/netdata/pull/16476) ([ktsaou](https://github.com/ktsaou))
-- journals management improvements [\#16475](https://github.com/netdata/netdata/pull/16475) ([ktsaou](https://github.com/ktsaou))
-- SEO changes for Collector names [\#16473](https://github.com/netdata/netdata/pull/16473) ([sashwathn](https://github.com/sashwathn))
-- Check context post processing queue before sending status to cloud [\#16472](https://github.com/netdata/netdata/pull/16472) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
