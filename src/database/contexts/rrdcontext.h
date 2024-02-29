@@ -461,14 +461,9 @@ struct sql_alert_config_data {
         const char *on_template;
         const char *on_key;
 
-        const char *os;
-        const char *hosts;
         const char *families;
-        const char *plugin;
-        const char *module;
         const char *host_labels;
         const char *chart_labels;
-        const char *charts;
     } selectors;
 
     const char *info;
