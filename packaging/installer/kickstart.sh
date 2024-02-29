@@ -440,7 +440,7 @@ fatal() {
   printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
   printf >&2 "%s\n" "For community support, you can connect with us on:"
   support_list
-  if [ -n "${NETDATA_WARNINGS}" ]; then
+  if [ -z "${NETDATA_WARNINGS}" ]; then
     printf >&2 "%s\n" "Or you can consult the guide to common installation problems in our docs: ${TROUBLESHOOTING_GUIDE_URL}"
   fi
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
