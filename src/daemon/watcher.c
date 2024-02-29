@@ -20,47 +20,76 @@ void watcher_step_complete(watcher_step_id_t step_id) {
     completion_mark_complete(&watcher_steps[step_id].p);
 }
 
+static void watcher_wait_for_step(const watcher_step_id_t step_id)
+{
+    unsigned timeout = 90;
+
+    usec_t step_start_time = now_monotonic_usec();
+
+#ifdef ENABLE_SENTRY
+    // Wait with a timeout
+    bool ok = completion_timedwait_for(&watcher_steps[step_id].p, timeout);
+#else
+    // Wait indefinitely
+    bool ok = true;
+    completion_wait_for(&watcher_steps[step_id].p);
+#endif
+
+    usec_t step_duration = now_monotonic_usec() - step_start_time;
+
+    if (ok) {
+        netdata_log_info("shutdown step: [%d/%d] - '%s' finished in %llu milliseconds",
+                         step_id + 1, WATCHER_STEP_ID_MAX,
+                         watcher_steps[step_id].msg, step_duration / USEC_PER_MS);
+    } else {
+        // Do not call fatal() because it will try to execute the exit
+        // sequence twice.
+        netdata_log_error("shutdown step: [%d/%d] - '%s' took more than %u seconds (ie. %llu milliseconds)",
+              step_id + 1, WATCHER_STEP_ID_MAX, watcher_steps[step_id].msg,
+              timeout, step_duration / USEC_PER_MS);
+
+        abort();
+    }
+}
+
 void *watcher_main(void *arg)
 {
     UNUSED(arg);
 
     netdata_log_debug(D_SYSTEM, "Watcher thread started");
 
+    // wait until the agent starts the shutdown process
     completion_wait_for(&shutdown_begin_completion);
-    usec_t shutdown_start_time = now_monotonic_usec();
-
     netdata_log_error("Shutdown process started");
 
-    unsigned timeout = 60;
+    usec_t shutdown_start_time = now_monotonic_usec();
 
-    for (int step_id = 0; step_id != WATCHER_STEP_ID_MAX; step_id++) {
-        usec_t step_start_time = now_monotonic_usec();
-
-#ifdef ENABLE_SENTRY
-        // Wait with a timeout
-        bool ok = completion_timedwait_for(&watcher_steps[step_id].p, timeout);
-#else
-        // Wait indefinitely
-        bool ok = true;
-        completion_wait_for(&watcher_steps[step_id].p);
-#endif
-
-        usec_t step_duration = now_monotonic_usec() - step_start_time;
-
-        if (ok) {
-            netdata_log_info("shutdown step: [%d/%d] - '%s' finished in %llu milliseconds",
-                             step_id + 1, WATCHER_STEP_ID_MAX,
-                             watcher_steps[step_id].msg, step_duration / USEC_PER_MS);
-        } else {
-            // Do not call fatal() because it will try to execute the exit
-            // sequence twice.
-            netdata_log_error("shutdown step: [%d/%d] - '%s' took more than %u seconds (ie. %llu milliseconds)",
-                  step_id + 1, WATCHER_STEP_ID_MAX, watcher_steps[step_id].msg,
-                  timeout, step_duration / USEC_PER_MS);
-
-            abort();
-        }
-    }
+    watcher_wait_for_step(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
+    watcher_wait_for_step(WATCHER_STEP_ID_DBENGINE_EXIT_MODE);
+    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
+    watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_MAINTENANCE_NEW_QUERIES_NEW_WEB_REQUESTS_NEW_STREAMING_CONNECTIONS_AND_ACLK);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_MAINTENANCE_THREAD);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_EXPORTERS_HEALTH_AND_WEB_SERVERS_THREADS);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_REPLICATION_THREADS);
+    watcher_wait_for_step(WATCHER_STEP_ID_PREPARE_METASYNC_SHUTDOWN);
+    watcher_wait_for_step(WATCHER_STEP_ID_DISABLE_ML_DETECTION_AND_TRAINING_THREADS);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_CONTEXT_THREAD);
+    watcher_wait_for_step(WATCHER_STEP_ID_CLEAR_WEB_CLIENT_CACHE);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_ACLK_THREADS);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
+    watcher_wait_for_step(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
+    watcher_wait_for_step(WATCHER_STEP_ID_FLUSH_DBENGINE_TIERS);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_COLLECTION_FOR_ALL_HOSTS);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
+    watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
+    watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
+    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_CONTEXT_DB);
+    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_MAIN_DB);
+    watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE);
+    watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
+    watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
 
     completion_wait_for(&shutdown_end_completion);
     usec_t shutdown_end_time = now_monotonic_usec();
