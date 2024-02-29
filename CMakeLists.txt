@@ -55,7 +55,6 @@ set(NETDATA_VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}.${FIELD_TWEAK})
 
 project(netdata
         VERSION ${NETDATA_VERSION}
-        DESCRIPTION "Netdata real-time monitoring"
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/packaging/cmake/Modules")
@@ -1844,7 +1843,17 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
             COMPONENT logs_management_plugin
             DESTINATION usr/lib/netdata/conf.d)
 
-    install(DIRECTORY DESTINATION etc/netdata/logsmanagement.d)
+    install(DIRECTORY
+            COMPONENT logs_management_plugin
+            DESTINATION etc/netdata/logsmanagement.d)
+
+    configure_file(src/logsmanagement/stock_conf/logsmanagement.d.conf.in
+                   src/logsmanagement/stock_conf/logsmanagement.d.conf
+                   @ONLY)
+
+    install(FILES ${CMAKE_BINARY_DIR}/src/logsmanagement/stock_conf/logsmanagement.d.conf
+            COMPONENT logs_management_plugin
+            DESTINATION usr/lib/netdata/conf.d)
 endif()
 
 if(ENABLE_PLUGIN_CUPS)
@@ -2158,7 +2167,7 @@ add_executable(netdatacli ${NETDATACLI_FILES})
 target_link_libraries(netdatacli libnetdata)
 
 install(TARGETS netdatacli
-        COMPONENT netdatacli
+        COMPONENT netdata
         DESTINATION usr/sbin)
 
 #
@@ -2210,26 +2219,26 @@ configure_file(packaging/cmake/config.cmake.h.in config.h)
 # install
 #
 
-install(TARGETS netdata DESTINATION usr/sbin)
+install(TARGETS netdata COMPONENT netdata DESTINATION usr/sbin)
 
-install(DIRECTORY DESTINATION var/cache/netdata)
-install(DIRECTORY DESTINATION var/log/netdata)
-install(DIRECTORY DESTINATION var/lib/netdata/registry)
-install(DIRECTORY DESTINATION var/lib/netdata/cloud.d)
-install(DIRECTORY DESTINATION var/run)
-install(DIRECTORY DESTINATION etc/netdata)
-install(DIRECTORY DESTINATION etc/netdata/charts.d)
-install(DIRECTORY DESTINATION etc/netdata/custom-plugins.d)
-install(DIRECTORY DESTINATION etc/netdata/ebpf.d)
-install(DIRECTORY DESTINATION etc/netdata/go.d)
-install(DIRECTORY DESTINATION etc/netdata/health.d)
-install(DIRECTORY DESTINATION etc/netdata/python.d)
-install(DIRECTORY DESTINATION etc/netdata/ssl)
-install(DIRECTORY DESTINATION etc/netdata/statsd.d)
-install(DIRECTORY DESTINATION usr/lib/netdata/conf.d)
-install(DIRECTORY DESTINATION usr/lib/netdata/conf.d/schema.d)
-install(DIRECTORY DESTINATION usr/libexec/netdata/plugins.d)
-install(DIRECTORY DESTINATION ${WEB_DEST})
+install(DIRECTORY COMPONENT netdata DESTINATION var/cache/netdata)
+install(DIRECTORY COMPONENT netdata DESTINATION var/log/netdata)
+install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/registry)
+install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/cloud.d)
+install(DIRECTORY COMPONENT netdata DESTINATION var/run)
+install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata)
+install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/charts.d)
+install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/custom-plugins.d)
+install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/ebpf.d)
+install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/go.d)
+install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/health.d)
+install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/python.d)
+install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/ssl)
+install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/statsd.d)
+install(DIRECTORY COMPONENT netdata DESTINATION usr/lib/netdata/conf.d)
+install(DIRECTORY COMPONENT netdata DESTINATION usr/lib/netdata/conf.d/schema.d)
+install(DIRECTORY COMPONENT netdata DESTINATION usr/libexec/netdata/plugins.d)
+install(DIRECTORY COMPONENT netdata DESTINATION ${WEB_DEST})
 
 set(libsysdir_POST "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/system")
 set(pkglibexecdir_POST "${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata")
@@ -2258,6 +2267,7 @@ endif()
 configure_file(src/claim/netdata-claim.sh.in src/claim/netdata-claim.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/claim/netdata-claim.sh
+        COMPONENT netdata
         DESTINATION usr/sbin)
 
 #
@@ -2275,6 +2285,7 @@ configure_file(src/collectors/cgroups.plugin/cgroup-name.sh.in
                src/collectors/cgroups.plugin/cgroup-name.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-name.sh
+        # COMPONENT cgroup_network_plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
@@ -2284,6 +2295,7 @@ install(FILES
         src/collectors/statsd.plugin/asterisk.conf
         src/collectors/statsd.plugin/example.conf
         src/collectors/statsd.plugin/k6.conf
+        # COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/statsd.d)
 
 #
@@ -2291,6 +2303,7 @@ install(FILES
 #
 install(FILES
         src/exporting/exporting.conf
+        # COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d)
 
 #
@@ -2298,6 +2311,7 @@ install(FILES
 #
 install(FILES
         src/collectors/ioping.plugin/ioping.conf
+        COMPONENT ioping_plugin
         DESTINATION usr/lib/netdata/conf.d)
 
 #
@@ -2305,6 +2319,7 @@ install(FILES
 #
 install(FILES
         src/streaming/stream.conf
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d)
 
 #
@@ -2313,6 +2328,7 @@ install(FILES
 install(FILES
         src/web/api/netdata-swagger.json
         src/web/api/netdata-swagger.yaml
+        COMPONENT netdata
         DESTINATION ${WEB_DEST})
 
 #
@@ -2322,81 +2338,98 @@ install(FILES
 configure_file(system/install-service.sh.in system/install-service.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/system/install-service.sh
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata)
 
 configure_file(system/cron/netdata-updater-daily.in system/cron/netdata-updater-daily @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/cron/netdata-updater-daily
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/cron)
 
 configure_file(system/launchd/netdata.plist.in system/launchd/netdata.plist @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/launchd/netdata.plist
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/launchd)
 
 configure_file(system/freebsd/rc.d/netdata.in system/freebsd/rc.d/netdata @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/system/freebsd/rc.d/netdata
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/freebsd/rc.d)
 
 configure_file(system/initd/init.d/netdata.in system/initd/init.d/netdata @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/system/initd/init.d/netdata
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/initd/init.d)
 
 configure_file(system/logrotate/netdata.in system/logrotate/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/logrotate/netdata
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/logrotate)
 
 configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/system/lsb/init.d/netdata
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/lsb/init.d)
 
 configure_file(system/openrc/conf.d/netdata.in system/openrc/conf.d/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/openrc/conf.d/netdata
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/openrc/conf.d)
 
 configure_file(system/openrc/init.d/netdata.in system/openrc/init.d/netdata @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/system/openrc/init.d/netdata
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/openrc/init.d)
 
 configure_file(system/runit/run.in system/runit/run @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/system/runit/run
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/runit)
 
 configure_file(system/systemd/netdata.service.in system/systemd/netdata.service @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
 configure_file(system/systemd/netdata-updater.service.in system/systemd/netdata-updater.service @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
 install(FILES
         system/systemd/netdata-updater.timer
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 install(FILES
         system/systemd/50-netdata.preset
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
 install(FILES
         system/vnodes/vnodes.conf
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/vnodes)
 
 install(FILES
         system/.install-type
+        COMPONENT netdata
         DESTINATION etc/netdata)
 install(FILES
         system/netdata-updater.conf
@@ -2404,6 +2437,7 @@ install(FILES
 
 install(PROGRAMS
         system/edit-config
+        COMPONENT netdata
         DESTINATION etc/netdata)
 
 #
@@ -2412,15 +2446,18 @@ install(PROGRAMS
 configure_file(src/daemon/anonymous-statistics.sh.in src/daemon/anonymous-statistics.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/daemon/anonymous-statistics.sh
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 configure_file(src/daemon/get-kubernetes-labels.sh.in src/daemon/get-kubernetes-labels.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/daemon/get-kubernetes-labels.sh
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(PROGRAMS
         src/daemon/system-info.sh
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
@@ -2430,21 +2467,25 @@ install(PROGRAMS
 file(GLOB_RECURSE HEALTH_CONF_FILES "src/health/health.d/*.conf")
 install(FILES
         ${HEALTH_CONF_FILES}
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/health.d)
 
 configure_file(src/health/notifications/alarm-notify.sh.in src/health/notifications/alarm-notify.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/health/notifications/alarm-notify.sh
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(PROGRAMS
         src/health/notifications/alarm-email.sh
         src/health/notifications/alarm-test.sh
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES
         src/health/notifications/health_alarm_notify.conf
         src/health/notifications/health_email_recipients.conf
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d)
 #
 # test/ files
@@ -2473,11 +2514,13 @@ install(FILES
 configure_file(src/collectors/charts.d.plugin/charts.d.plugin.in src/collectors/charts.d.plugin/charts.d.plugin @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
+        COMPONENT chartsd_plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES
         src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
         src/collectors/charts.d.plugin/loopsleepms.sh.inc
+        COMPONENT chartsd_plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES
@@ -2491,6 +2534,7 @@ install(FILES
 configure_file(src/collectors/tc.plugin/tc-qos-helper.sh.in src/collectors/tc.plugin/tc-qos-helper.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/tc.plugin/tc-qos-helper.sh
+        COMPONENT tc_plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 # scripts
@@ -2502,6 +2546,7 @@ install(FILES
         src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
         src/collectors/charts.d.plugin/opensips/opensips.chart.sh
         src/collectors/charts.d.plugin/sensors/sensors.chart.sh
+        COMPONENT chartsd_plugin
         DESTINATION usr/libexec/netdata/charts.d)
 
 # confs
@@ -2513,11 +2558,13 @@ install(FILES
         src/collectors/charts.d.plugin/libreswan/libreswan.conf
         src/collectors/charts.d.plugin/opensips/opensips.conf
         src/collectors/charts.d.plugin/sensors/sensors.conf
+        COMPONENT chartsd_plugin
         DESTINATION usr/lib/netdata/conf.d/charts.d)
 
 install(FILES
         src/collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
         src/health/schema.d/health:alert:prototype.json
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/schema.d)
 
 #
@@ -2556,12 +2603,15 @@ endif()
 
 configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
+        COMPONENT chartsd_plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(DIRECTORY src/collectors/python.d.plugin/python_modules
+        COMPONENT chartsd_plugin
         DESTINATION usr/libexec/netdata/python.d)
 
 install(FILES src/collectors/python.d.plugin/python.d.conf
+        COMPONENT chartsd_plugin
         DESTINATION usr/lib/netdata/conf.d)
 
 # conf files
@@ -2613,6 +2663,7 @@ install(FILES
         src/collectors/python.d.plugin/varnish/varnish.conf
         src/collectors/python.d.plugin/w1sensor/w1sensor.conf
         src/collectors/python.d.plugin/zscores/zscores.conf
+        COMPONENT chartsd_plugin
         DESTINATION usr/lib/netdata/conf.d/python.d)
 
 # scripts
@@ -2664,36 +2715,29 @@ install(FILES
         src/collectors/python.d.plugin/varnish/varnish.chart.py
         src/collectors/python.d.plugin/w1sensor/w1sensor.chart.py
         src/collectors/python.d.plugin/zscores/zscores.chart.py
+        COMPONENT chartsd_plugin
         DESTINATION usr/libexec/netdata/python.d)
 
 # FIXME: don't install this unconditionally
 configure_file(src/collectors/ioping.plugin/ioping.plugin.in src/collectors/ioping.plugin/ioping.plugin @ONLY)
-install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin DESTINATION usr/libexec/netdata/plugins.d)
-
-#
-# logs management
-#
-if (ENABLE_PLUGIN_LOGS_MANAGEMENT)
-        configure_file(src/logsmanagement/stock_conf/logsmanagement.d.conf.in src/logsmanagement/stock_conf/logsmanagement.d.conf @ONLY)
-        install(FILES ${CMAKE_BINARY_DIR}/src/logsmanagement/stock_conf/logsmanagement.d.conf
-                COMPONENT logs_management_plugin
-                DESTINATION usr/lib/netdata/conf.d)
-endif()
+install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
+        COMPONENT ioping_plugin
+        DESTINATION usr/libexec/netdata/plugins.d)
 
 #
 # go.d.plugin
 #
 if(ENABLE_PLUGIN_GO)
     install(FILES src/go/collectors/go.d.plugin/config/go.d.conf
-            COMPONENT go.d.plugin
+            COMPONENT god_plugin
             DESTINATION usr/lib/netdata/conf.d)
 
     install(DIRECTORY
-            COMPONENT go.d.plugin
+            COMPONENT god_plugin
             DESTINATION usr/lib/netdata/conf.d/go.d)
     file(GLOB GO_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/*.conf)
     install(FILES ${GO_CONF_FILES}
-            COMPONENT go.d.plugin
+            COMPONENT god_plugin
             DESTINATION usr/lib/netdata/conf.d/go.d)
 
     install(DIRECTORY
@@ -2727,6 +2771,7 @@ configure_file(${CMAKE_BINARY_DIR}/dashboard.js.in
 
 install(FILES
         ${CMAKE_BINARY_DIR}/dashboard.js
+        COMPONENT netdata
         DESTINATION ${WEB_DEST})
 
 install(FILES
@@ -2740,26 +2785,34 @@ install(FILES
         src/web/gui/registry-hello.html
         src/web/gui/switch.html
         src/web/gui/ilove.html
+        COMPONENT netdata
         DESTINATION ${WEB_DEST})
 
 install(FILES
         src/web/gui/old/index.html
+        COMPONENT netdata
         DESTINATION ${WEB_DEST}/old)
 
 install(FILES
         src/web/gui/static/img/netdata-logomark.svg
+        COMPONENT netdata
         DESTINATION ${WEB_DEST}/static/img)
 
 install(FILES
         src/web/gui/css/morris-0.5.1.css
         src/web/gui/css/c3-0.4.18.min.css
+        COMPONENT netdata
         DESTINATION ${WEB_DEST}/css)
 
 install(FILES
         src/web/gui/.well-known/dnt/cookies
+        COMPONENT netdata
         DESTINATION ${WEB_DEST}/.well-known/dnt)
 
 # v0 dashboard
 install(FILES
         src/web/gui/v0/index.html
+        COMPONENT netdata
         DESTINATION ${WEB_DEST}/v0)
+
+include(Packaging)
