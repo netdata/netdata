@@ -381,6 +381,7 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             },
             .stats = { 0 },
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+            .use_ebpf = false,
             .ebpf_module = &ebpf_nv_module,
 #endif
             .sockets_hashtable = { 0 },
