@@ -404,7 +404,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             hash_host = 0,
             hash_plugin = 0,
             hash_module = 0,
-            hash_charts = 0,
             hash_calc = 0,
             hash_green = 0,
             hash_red = 0,
@@ -436,7 +435,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         hash_host = simple_uhash(HEALTH_HOST_KEY);
         hash_plugin = simple_uhash(HEALTH_PLUGIN_KEY);
         hash_module = simple_uhash(HEALTH_MODULE_KEY);
-        hash_charts = simple_uhash(HEALTH_CHARTS_KEY);
         hash_calc = simple_uhash(HEALTH_CALC_KEY);
         hash_lookup = simple_uhash(HEALTH_LOOKUP_KEY);
         hash_green = simple_uhash(HEALTH_GREEN_KEY);
