@@ -774,16 +774,33 @@ static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
         ls->use_ebpf = true;
 }
 
+static inline bool local_sockets_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t *data) {
+    if (data->protocol == IPPROTO_TCP && (ls->config.tcp4 || ls->config.tcp6))
+        return  true;
+    else if (data->protocol == IPPROTO_UDP && (ls->config.udp4 || ls->config.udp6))
+        return  true;
+
+    return false;
+}
+
 static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
     ebpf_nv_idx_t key =  { };
     ebpf_nv_idx_t next_key = { };
     ebpf_nv_data_t stored = {};
     int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
+    size_t counter = 0;
     while (!bpf_map_get_next_key(fd, &key, &next_key)) {
         if (bpf_map_lookup_elem(fd, &key, &stored)) {
             goto end_socket_read_loop;
         }
 
+        if (!local_sockets_ebpf_use_protocol(ls, &stored)) {
+            // Socket not allowed, let us remove it
+            bpf_map_delete_elem(fd, &key);
+            goto end_socket_read_loop;
+        }
+
+        counter++;
         LOCAL_SOCKET n = {
             .inode = stored.ts,
             .direction = SOCKET_DIRECTION_NONE,
@@ -822,7 +839,8 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
         // cleanup avoiding garbage from previous socket
         memset(&stored, 0, sizeof(stored));
     }
-    return true;
+
+    return (!counter) ? false : true;
 }
 
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
@@ -830,10 +848,6 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
 #ifdef HAVE_LIBMNL
 
 static inline void local_sockets_netlink_init(LS_STATE *ls) {
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    if (ls->use_ebpf)
-        return;
-#endif
     ls->use_nl = true;
     ls->nl = mnl_socket_open(NETLINK_INET_DIAG);
     if (!ls->nl) {
