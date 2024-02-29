@@ -211,9 +211,11 @@ Suggests: %{name}-plugin-freeipmi = %{version}
 Suggests: %{name}-plugin-cups = %{version}
 %endif
 Recommends: %{name}-plugin-systemd-journal = %{version}
+Recommends: %{name}-plugin-network-viewer = %{version}
 Recommends: %{name}-plugin-logs-management = %{version}
 %else
 Requires: %{name}-plugin-systemd-journal = %{version}
+Requires: %{name}-plugin-network-viewer = %{version}
 %endif
 
 
@@ -629,6 +631,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libdir}/%{name}/conf.d/logsmanagement.d.conf
 %exclude %{_libdir}/%{name}/conf.d/logsmanagement.d
 
+# Network viewer belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
+
 # CUPS belongs to a different sub package
 %if %{_have_cups}
 %exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
@@ -990,7 +995,34 @@ fi
 # CAP_DAC_READ_SEARCH and CAP_SYSLOG needed for data collection.
 %caps(cap_dac_read_search,cap_syslog=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
 
+%package plugin-network-viewer
+Summary: The network viewer plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Conflicts: %{name} < %{version}
+%if 0%{?centos_ver} != 7
+Recommends: %{name}-plugin-ebpf = %{version}
+%else
+Requires: %{name}-plugin-ebpf = %{version}
+%endif
+
+%description plugin-network-viewer
+ This plugin allows the Netdata Agent to provide network connection
+ mapping functionality for use in netdata Cloud.
+
+%pre plugin-network-viewer
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
+%files plugin-network-viewer
+%defattr(0750,root,netdata,0750)
+# CAP_SYS_ADMIN, CAP_SYS_PTRACE and CAP_DAC_READ_SEARCH needed for data collection.
+%caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
+
 %changelog
+* Tue Feb 06 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-25
+- Add package for network-viewer plugin
 * Thu Oct 26 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-24
 - Add package for logs-management plugin
 * Tue Sep 19 2023 Austin hemmelgarn <austin@netdata.cloud> 0.0.0-24

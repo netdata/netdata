@@ -58,7 +58,8 @@ Conflicts: netdata-core,
 Suggests: netdata-plugin-cups (= ${source:Version}),
           netdata-plugin-freeipmi (= ${source:Version})
 Recommends: netdata-plugin-systemd-journal (= ${source:Version}),
-            netdata-plugin-logs-management (= ${source:Version})
+            netdata-plugin-logs-management (= ${source:Version}),
+            netdata-plugin-network-viewer (= ${source:Version})
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
  and presents a web site to view and analyze them. The presentation
@@ -223,3 +224,14 @@ Conflicts: netdata (<< ${source:Version})
 Description: The logs-management plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect logs from the system
  and parse them to extract metrics.
+
+Package: netdata-plugin-network-viewer
+Architecture: any
+Depends: ${shlibs:Depends},
+         netdata (= ${source:Version})
+Pre-Depends: libcap2-bin, adduser
+Recommends: netdata-plugin-ebpf (= ${source:Version} )
+Conflicts: netdata (<< ${source:Version})
+Description: The network viewer plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to provide network connection
+ mapping functionality for use in netdata Cloud.

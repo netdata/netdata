@@ -124,7 +124,7 @@ override_dh_install:
 	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/freeipmi.plugin \
 	$(TOP)-plugin-freeipmi/usr/libexec/netdata/plugins.d/freeipmi.plugin
 
-	# Add free IPMI plugin install rules
+	# Add NFACCT plugin install rules
 	#
 	mkdir -p $(TOP)-plugin-nfacct/usr/libexec/netdata/plugins.d
 	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/nfacct.plugin \
@@ -222,6 +222,11 @@ override_dh_install:
 	mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/go.d \
 	$(TOP)-plugin-go/usr/lib/netdata/conf.d/go.d
 
+	# Add network-viewer plugin install rules
+	mkdir -p $(TOP)-plugin-network-viewer/usr/libexec/netdata/plugins.d/
+	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/network-viewer.plugin \
+	$(TOP)-plugin-network-viewer/usr/libexec/netdata/plugins.d/network-viewer.plugin
+
 	# Set the rest of the software in the main package
 	#
 	cp -rp $(TEMPTOP)/usr $(TOP)
@@ -294,7 +299,7 @@ override_dh_fixperms:
 	chmod 4750 $(TOP)/usr/libexec/netdata/plugins.d/local-listeners
 
 	# network-viewer
-	chmod 4750 $(TOP)/usr/libexec/netdata/plugins.d/network-viewer.plugin
+	chmod 4750 $(TOP)-plugin-network-viewer/usr/libexec/netdata/plugins.d/network-viewer.plugin
 
 	# systemd-journal
 	chmod 4750 $(TOP)-plugin-systemd-journal/usr/libexec/netdata/plugins.d/systemd-journal.plugin
