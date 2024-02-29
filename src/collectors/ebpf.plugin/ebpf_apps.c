@@ -1066,11 +1066,11 @@ void ebpf_process_sum_values_for_pids(ebpf_process_stat_t *process, struct ebpf_
         ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
         if (local_pid) {
             ebpf_process_stat_t *in = &local_pid->process;
-            process->task_err = in->task_err;
-            process->release_call = in->release_call;
-            process->exit_call = in->exit_call;
-            process->create_thread = in->create_thread;
-            process->create_process = in->create_process;
+            process->task_err += in->task_err;
+            process->release_call += in->release_call;
+            process->exit_call += in->exit_call;
+            process->create_thread += in->create_thread;
+            process->create_process += in->create_process;
         }
 
         root = root->next;
