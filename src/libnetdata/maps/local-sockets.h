@@ -950,10 +950,6 @@ static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *
 #ifdef HAVE_LIBMNL
 
 static inline void local_sockets_netlink_init(LS_STATE *ls) {
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    if (ls->use_ebpf)
-        return;
-#endif
     ls->use_nl = true;
     ls->nl = mnl_socket_open(NETLINK_INET_DIAG);
     if (!ls->nl) {
