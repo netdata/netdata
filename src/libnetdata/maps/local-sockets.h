@@ -833,8 +833,9 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
         }
 
         strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
+        local_sockets_add_socket(ls, &n);
 
-        end_socket_read_loop:
+end_socket_read_loop:
         key = next_key;
         // cleanup avoiding garbage from previous socket
         memset(&stored, 0, sizeof(stored));
@@ -1199,7 +1200,7 @@ static inline void local_sockets_read_sockets_from_proc(LS_STATE *ls) {
         /* Keeping commented while the rest of the algorithm is inserted to compare with other collections
         if (ls->use_ebpf)
             return;
-        */
+            */
     }
 #endif
 
