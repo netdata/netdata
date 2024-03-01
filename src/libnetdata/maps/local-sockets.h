@@ -1301,7 +1301,7 @@ static inline void local_sockets_read_sockets_from_proc(LS_STATE *ls) {
         /* Keeping commented while the rest of the algorithm is inserted to compare with other collections
         if (ls->use_ebpf)
             return;
-        */
+            */
     }
 #endif
 
