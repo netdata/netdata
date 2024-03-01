@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Make watcher thread wait for explicit steps. [\#17079](https://github.com/netdata/netdata/pull/17079) ([vkalintiris](https://github.com/vkalintiris))
 - add missing "gotify" to list of notification methods in alarm-notify.sh [\#17069](https://github.com/netdata/netdata/pull/17069) ([ilyam8](https://github.com/ilyam8))
 - Add CI checks for Go code. [\#17066](https://github.com/netdata/netdata/pull/17066) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17063](https://github.com/netdata/netdata/pull/17063) ([netdatabot](https://github.com/netdatabot))
@@ -58,6 +59,7 @@
 - Move web/ under src/ [\#16992](https://github.com/netdata/netdata/pull/16992) ([vkalintiris](https://github.com/vkalintiris))
 - Add spinlock to protect metric release [\#16989](https://github.com/netdata/netdata/pull/16989) ([stelfrag](https://github.com/stelfrag))
 - updated message ids for systemd and dbus [\#16987](https://github.com/netdata/netdata/pull/16987) ([ktsaou](https://github.com/ktsaou))
+- Cache key wasn't taking account changes in the version of bundled software [\#16985](https://github.com/netdata/netdata/pull/16985) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update input skip patterns [\#16984](https://github.com/netdata/netdata/pull/16984) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update input paths for tj-actions/changed-files [\#16982](https://github.com/netdata/netdata/pull/16982) ([tkatsoulas](https://github.com/tkatsoulas))
 - Update synology.md [\#16980](https://github.com/netdata/netdata/pull/16980) ([pschaer](https://github.com/pschaer))
@@ -80,6 +82,7 @@
 - fix linking of a markdown file [\#16952](https://github.com/netdata/netdata/pull/16952) ([tkatsoulas](https://github.com/tkatsoulas))
 - Do not declare struct meant for internal usage [\#16951](https://github.com/netdata/netdata/pull/16951) ([vkalintiris](https://github.com/vkalintiris))
 - fix wrong sizeof [\#16950](https://github.com/netdata/netdata/pull/16950) ([ktsaou](https://github.com/ktsaou))
+- Split network viewer plugin to it’s own package. [\#16949](https://github.com/netdata/netdata/pull/16949) ([Ferroin](https://github.com/Ferroin))
 - update bundled UI to v6.85.0 [\#16948](https://github.com/netdata/netdata/pull/16948) ([ilyam8](https://github.com/ilyam8))
 - Update codeowners and cleanup .gitignore [\#16946](https://github.com/netdata/netdata/pull/16946) ([vkalintiris](https://github.com/vkalintiris))
 - Remove cleanup\_destroyed\_dictionaries call during shutdown [\#16944](https://github.com/netdata/netdata/pull/16944) ([stelfrag](https://github.com/stelfrag))
@@ -401,9 +404,6 @@
 - Fix incorrect DEB package build dep. [\#16483](https://github.com/netdata/netdata/pull/16483) ([Ferroin](https://github.com/Ferroin))
 - Bump new version to cov-analysis tool [\#16482](https://github.com/netdata/netdata/pull/16482) ([tkatsoulas](https://github.com/tkatsoulas))
 - log2journal moved to collectors [\#16481](https://github.com/netdata/netdata/pull/16481) ([ktsaou](https://github.com/ktsaou))
-- Disable netdata monitoring section by default [\#16480](https://github.com/netdata/netdata/pull/16480) ([MrZammler](https://github.com/MrZammler))
-- Log2journal yaml configuration support [\#16479](https://github.com/netdata/netdata/pull/16479) ([ktsaou](https://github.com/ktsaou))
-- log alarm notifications to health.log [\#16476](https://github.com/netdata/netdata/pull/16476) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
