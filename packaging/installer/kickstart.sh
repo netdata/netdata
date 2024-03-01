@@ -1667,7 +1667,7 @@ try_static_install() {
     netdata_agent="${NETDATA_STATIC_ARCHIVE_OLD_NAME}"
     export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_OLD_URL}"
   else
-    warning "There is no static build available for ${SYSARCH} CPUs. This usually means we simply do not currently provide static builds for ${SYSARCH} CPUs."
+    warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs. This usually means there is some networking issue preventing access to https://github.com/ from this system."
     return 2
   fi
 
