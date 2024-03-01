@@ -199,16 +199,6 @@ typedef struct netdata_passive_connection_idx {
     uint16_t port;
 } netdata_passive_connection_idx_t;
 
-/**
- * Union used to store ip addresses
- */
-union netdata_ip_t {
-    uint8_t  addr8[16];
-    uint16_t addr16[8];
-    uint32_t addr32[4];
-    uint64_t addr64[2];
-};
-
 typedef struct ebpf_network_viewer_ip_list {
     char *value;            // IP value
     uint32_t hash;          // IP hash
