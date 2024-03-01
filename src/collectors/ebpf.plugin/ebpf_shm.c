@@ -54,6 +54,17 @@ netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TR
 int shm_disable_priority;
 #endif
 
+struct netdata_static_thread ebpf_read_shm = {
+    .name = "EBPF_READ_SHM",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
+
 #ifdef LIBBPF_MAJOR_VERSION
 /*****************************************************************
  *
@@ -155,7 +166,7 @@ static int ebpf_shm_attach_probe(struct shm_bpf *obj)
 
     obj->links.netdata_shmget_probe = bpf_program__attach_kprobe(obj->progs.netdata_shmget_probe,
                                                                  false, syscall);
-    int ret = (int)libbpf_get_error(obj->links.netdata_shmget_probe);
+    long ret = libbpf_get_error(obj->links.netdata_shmget_probe);
     if (ret)
         return -1;
 
@@ -163,7 +174,7 @@ static int ebpf_shm_attach_probe(struct shm_bpf *obj)
                             shm_targets[NETDATA_KEY_SHMAT_CALL].name, running_on_kernel);
     obj->links.netdata_shmat_probe = bpf_program__attach_kprobe(obj->progs.netdata_shmat_probe,
                                                                 false, syscall);
-    ret = (int)libbpf_get_error(obj->links.netdata_shmat_probe);
+    ret = libbpf_get_error(obj->links.netdata_shmat_probe);
     if (ret)
         return -1;
 
@@ -171,7 +182,7 @@ static int ebpf_shm_attach_probe(struct shm_bpf *obj)
                             shm_targets[NETDATA_KEY_SHMDT_CALL].name, running_on_kernel);
     obj->links.netdata_shmdt_probe = bpf_program__attach_kprobe(obj->progs.netdata_shmdt_probe,
                                                                 false, syscall);
-    ret = (int)libbpf_get_error(obj->links.netdata_shmdt_probe);
+    ret = libbpf_get_error(obj->links.netdata_shmdt_probe);
     if (ret)
         return -1;
 
@@ -179,7 +190,7 @@ static int ebpf_shm_attach_probe(struct shm_bpf *obj)
                             shm_targets[NETDATA_KEY_SHMCTL_CALL].name, running_on_kernel);
     obj->links.netdata_shmctl_probe = bpf_program__attach_kprobe(obj->progs.netdata_shmctl_probe,
                                                                  false, syscall);
-    ret = (int)libbpf_get_error(obj->links.netdata_shmctl_probe);
+    ret = libbpf_get_error(obj->links.netdata_shmctl_probe);
     if (ret)
         return -1;
 
@@ -354,6 +365,7 @@ void ebpf_obsolete_shm_apps_charts(struct ebpf_module *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SHM_IDX))))
             continue;
@@ -404,6 +416,7 @@ void ebpf_obsolete_shm_apps_charts(struct ebpf_module *em)
 
         w->charts_created &= ~(1<<EBPF_MODULE_SHM_IDX);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -438,6 +451,9 @@ static void ebpf_shm_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
+    if (ebpf_read_shm.thread)
+        netdata_thread_cancel(*ebpf_read_shm.thread);
+
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
         if (em->cgroup_charts) {
@@ -450,11 +466,6 @@ static void ebpf_shm_exit(void *ptr)
         }
 
         ebpf_obsolete_shm_global(em);
-
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_shm_pid)
-            ebpf_statistic_obsolete_aral_chart(em, shm_disable_priority);
-#endif
 
         fflush(stdout);
         pthread_mutex_unlock(&lock);
@@ -507,38 +518,16 @@ static void shm_apps_accumulator(netdata_publish_shm_t *out, int maps_per_core)
 }
 
 /**
- * Fill PID
- *
- * Fill PID structures
- *
- * @param current_pid pid that we are collecting data
- * @param out         values read from hash tables;
- */
-static void shm_fill_pid(uint32_t current_pid, netdata_publish_shm_t *publish)
-{
-    netdata_publish_shm_t *curr = shm_pid[current_pid];
-    if (!curr) {
-        curr = ebpf_shm_stat_get( );
-        shm_pid[current_pid] = curr;
-    }
-
-    memcpy(curr, publish, sizeof(netdata_publish_shm_t));
-}
-
-/**
  * Update cgroup
  *
  * Update cgroup data based in
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_shm_cgroup(int maps_per_core)
+static void ebpf_update_shm_cgroup()
 {
     netdata_publish_shm_t *cv = shm_vector;
-    int fd = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_shm_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
 
     ebpf_cgroup_target_t *ect;
 
@@ -550,20 +539,11 @@ static void ebpf_update_shm_cgroup(int maps_per_core)
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             netdata_publish_shm_t *out = &pids->shm;
-            if (likely(shm_pid) && shm_pid[pid]) {
-                netdata_publish_shm_t *in = shm_pid[pid];
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            if (local_pid) {
+                netdata_publish_shm_t *in = &local_pid->shm;
 
                 memcpy(out, in, sizeof(netdata_publish_shm_t));
-            } else {
-                if (!bpf_map_lookup_elem(fd, &pid, cv)) {
-                    shm_apps_accumulator(cv, maps_per_core);
-
-                    memcpy(out, cv, sizeof(netdata_publish_shm_t));
-
-                    // now that we've consumed the value, zero it out in the map.
-                    memset(cv, 0, length);
-                    bpf_map_update_elem(fd, &pid, cv, BPF_EXIST);
-                }
             }
         }
     }
@@ -577,33 +557,42 @@ static void ebpf_update_shm_cgroup(int maps_per_core)
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void read_shm_apps_table(int maps_per_core)
+static void ebpf_read_shm_apps_table(int maps_per_core, int max_period)
 {
     netdata_publish_shm_t *cv = shm_vector;
-    uint32_t key;
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = shm_maps[NETDATA_PID_SHM_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_shm_t);
     if (maps_per_core)
         length *= ebpf_nprocs;
 
-    while (pids) {
-        key = pids->pid;
-
+    uint32_t key = 0, next_key = 0;
+    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
         if (bpf_map_lookup_elem(fd, &key, cv)) {
-            pids = pids->next;
-            continue;
+            goto end_shm_loop;
         }
 
         shm_apps_accumulator(cv, maps_per_core);
 
-        shm_fill_pid(key, cv);
+        ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(key, 0);
+        if (!local_pid)
+            goto end_shm_loop;
 
+
+        netdata_publish_shm_t *publish = &local_pid->shm;
+        if (!publish->ct || publish->ct != cv->ct) {
+            memcpy(publish, &cv[0], sizeof(netdata_publish_shm_t));
+            local_pid->not_updated = 0;
+        } else if (++local_pid->not_updated >= max_period){
+            bpf_map_delete_elem(fd, &key);
+            local_pid->not_updated = 0;
+        }
+
+end_shm_loop:
         // now that we've consumed the value, zero it out in the map.
         memset(cv, 0, length);
         bpf_map_update_elem(fd, &key, cv, BPF_EXIST);
 
-        pids = pids->next;
+        key = next_key;
     }
 }
 
@@ -662,10 +651,12 @@ static void ebpf_shm_read_global_table(netdata_idx_t *stats, int maps_per_core)
  */
 static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_target *root)
 {
+    memset(shm, 0, sizeof(netdata_publish_shm_t));
     while (root) {
         int32_t pid = root->pid;
-        netdata_publish_shm_t *w = shm_pid[pid];
-        if (w) {
+        ebpf_pid_stat_t *pid_stat = ebpf_get_pid_entry(pid, 0);
+        if (pid_stat) {
+            netdata_publish_shm_t *w = &pid_stat->shm;
             shm->get += w->get;
             shm->at += w->at;
             shm->dt += w->dt;
@@ -689,11 +680,10 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_tar
 void ebpf_shm_send_apps_data(struct ebpf_target *root)
 {
     struct ebpf_target *w;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SHM_IDX))))
             continue;
-
-        ebpf_shm_sum_pids(&w->shm, w->root_pid);
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_shmget_call");
         write_chart_dimension("calls", (long long) w->shm.get);
@@ -711,6 +701,7 @@ void ebpf_shm_send_apps_data(struct ebpf_target *root)
         write_chart_dimension("calls", (long long) w->shm.ctl);
         ebpf_write_end_chart();
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -1001,6 +992,72 @@ void ebpf_shm_send_cgroup_data(int update_every)
 }
 
 /**
+ * Resume apps data
+ */
+void ebpf_shm_resume_apps_data() {
+    struct ebpf_target *w;
+    for (w = apps_groups_root_target; w; w = w->next) {
+        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SHM_IDX))))
+            continue;
+
+        ebpf_shm_sum_pids(&w->shm, w->root_pid);
+    }
+}
+
+/**
+ * DCstat thread
+ *
+ * Thread used to generate dcstat charts.
+ *
+ * @param ptr a pointer to `struct ebpf_module`
+ *
+ * @return It always return NULL
+ */
+void *ebpf_read_shm_thread(void *ptr)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    int maps_per_core = em->maps_per_core;
+    int update_every = em->update_every;
+
+    int counter = update_every - 1;
+
+    uint32_t lifetime = em->lifetime;
+    uint32_t running_time = 0;
+    usec_t period = update_every * USEC_PER_SEC;
+    int max_period = update_every * EBPF_CLEANUP_FACTOR;
+    while (!ebpf_plugin_exit && running_time < lifetime) {
+        (void)heartbeat_next(&hb, period);
+        if (ebpf_plugin_exit || ++counter != update_every)
+            continue;
+
+        netdata_thread_disable_cancelability();
+
+        pthread_mutex_lock(&collect_data_mutex);
+        ebpf_read_shm_apps_table(maps_per_core, max_period);
+        ebpf_shm_resume_apps_data();
+        pthread_mutex_unlock(&collect_data_mutex);
+
+        counter = 0;
+
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (running_time && !em->running_time)
+            running_time = update_every;
+        else
+            running_time += update_every;
+
+        em->running_time = running_time;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        netdata_thread_enable_cancelability();
+    }
+
+    return NULL;
+}
+
+/**
 * Main loop for this collector.
 */
 static void shm_collector(ebpf_module_t *em)
@@ -1023,16 +1080,11 @@ static void shm_collector(ebpf_module_t *em)
         counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_shm_read_global_table(stats, maps_per_core);
-        pthread_mutex_lock(&collect_data_mutex);
-        if (apps) {
-            read_shm_apps_table(maps_per_core);
-        }
+        pthread_mutex_lock(&lock);
 
         if (cgroups) {
-            ebpf_update_shm_cgroup(maps_per_core);
+            ebpf_update_shm_cgroup();
         }
-
-        pthread_mutex_lock(&lock);
 
         shm_send_global();
 
@@ -1040,17 +1092,11 @@ static void shm_collector(ebpf_module_t *em)
             ebpf_shm_send_apps_data(apps_groups_root_target);
         }
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_shm_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_shm_pid, em);
-#endif
-
         if (cgroups) {
             ebpf_shm_send_cgroup_data(update_every);
         }
 
         pthread_mutex_unlock(&lock);
-        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
@@ -1159,12 +1205,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_shm_allocate_global_vectors(int apps)
 {
-    if (apps) {
-        ebpf_shm_aral_init();
-        shm_pid = callocz((size_t)pid_max, sizeof(netdata_publish_shm_t *));
-        shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_t));
-    }
-
+    shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_t));
     shm_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
     memset(shm_hash_values, 0, sizeof(shm_hash_values));
@@ -1283,12 +1324,14 @@ void *ebpf_shm_thread(void *ptr)
     ebpf_create_shm_charts(em->update_every);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_shm_pid)
-        shm_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_SHM_ARAL_NAME, em);
-#endif
-
     pthread_mutex_unlock(&lock);
+
+    ebpf_read_shm.thread = mallocz(sizeof(netdata_thread_t));
+    netdata_thread_create(ebpf_read_shm.thread,
+                          ebpf_read_shm.name,
+                          NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_read_shm_thread,
+                          em);
 
     shm_collector(em);
 

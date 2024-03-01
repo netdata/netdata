@@ -107,10 +107,6 @@ struct netdata_static_thread ebpf_read_socket = {
 
 ARAL *aral_socket_table = NULL;
 
-#ifdef NETDATA_DEV_MODE
-int socket_disable_priority;
-#endif
-
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Disable Probe
@@ -650,6 +646,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
     int order = 20130;
     struct ebpf_target *w;
     int update_every = em->update_every;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
             continue;
@@ -757,6 +754,7 @@ void ebpf_socket_obsolete_apps_charts(struct ebpf_module *em)
 
         w->charts_created &= ~(1<<EBPF_MODULE_SOCKET_IDX);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -904,10 +902,6 @@ static void ebpf_socket_exit(void *ptr)
 
         ebpf_socket_obsolete_global_charts(em);
 
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_socket_pid)
-            ebpf_statistic_obsolete_aral_chart(em, socket_disable_priority);
-#endif
         pthread_mutex_unlock(&lock);
     }
 
@@ -1031,83 +1025,57 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
 
 /**
  * Send data to Netdata calling auxiliary functions.
- *
- * @param em   the structure with thread information
- * @param root the target list.
  */
-void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
+void ebpf_socket_send_apps_data()
 {
-    UNUSED(em);
-
     struct ebpf_target *w;
-    // This algorithm is improved in https://github.com/netdata/netdata/pull/16030
-    collected_number values[9];
-
-    for (w = root; w; w = w->next) {
+    pthread_mutex_lock(&collect_data_mutex);
+    for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
             continue;
 
-        struct ebpf_pid_on_target *move = w->root_pid;
-        // Simplify algorithm, but others will appear only in https://github.com/netdata/netdata/pull/16030
-        memset(values, 0, sizeof(values));
-        while (move) {
-            int32_t pid = move->pid;
-            ebpf_socket_publish_apps_t *ws = socket_bandwidth_curr[pid];
-            if (ws) {
-                values[0] += (collected_number) ws->call_tcp_v4_connection;
-                values[1] += (collected_number) ws->call_tcp_v6_connection;
-                values[2] += (collected_number) ws->bytes_sent;
-                values[3] += (collected_number) ws->bytes_received;
-                values[4] += (collected_number) ws->call_tcp_sent;
-                values[5] += (collected_number) ws->call_tcp_received;
-                values[6] += (collected_number) ws->retransmit;
-                values[7] += (collected_number) ws->call_udp_sent;
-                values[8] += (collected_number) ws->call_udp_received;
-            }
-
-            move = move->next;
-        }
-
+        ebpf_socket_publish_apps_t *values = &w->socket;
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_v4_connection");
-        write_chart_dimension("connections", values[0]);
+        write_chart_dimension("connections", (collected_number) values->call_tcp_v4_connection);
         ebpf_write_end_chart();
 
         if (tcp_v6_connect_address.type == 'T') {
             ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_call_tcp_v6_connection");
-            write_chart_dimension("calls", values[1]);
+            write_chart_dimension("calls", (collected_number) values->call_tcp_v6_connection);
             ebpf_write_end_chart();
         }
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_sent");
         // We multiply by 0.008, because we read bytes, but we display bits
-        write_chart_dimension("bandwidth", ((values[2])*8)/1000);
+        write_chart_dimension("bandwidth", (collected_number) ((values->bytes_sent)*8)/1000);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_sock_bytes_received");
         // We multiply by 0.008, because we read bytes, but we display bits
-        write_chart_dimension("bandwidth", ((values[3])*8)/1000);
+        write_chart_dimension("bandwidth", (collected_number) ((values->bytes_received)*8)/1000);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_sendmsg");
-        write_chart_dimension("calls", values[4]);
+        write_chart_dimension("calls", (collected_number) values->call_tcp_sent);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_cleanup_rbuf");
-        write_chart_dimension("calls", values[5]);
+        write_chart_dimension("calls", (collected_number) values->call_tcp_received);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_tcp_retransmit");
-        write_chart_dimension("calls", values[6]);
+        write_chart_dimension("calls", (collected_number) values->retransmit);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_udp_sendmsg");
-        write_chart_dimension("calls", values[7]);
+        write_chart_dimension("calls", (collected_number) values->call_udp_sent);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_call_udp_recvmsg");
-        write_chart_dimension("calls", values[8]);
+        write_chart_dimension("calls", (collected_number) values->call_udp_received);
         ebpf_write_end_chart();
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /*****************************************************************
@@ -1809,6 +1777,41 @@ end_socket_loop:
     }
     netdata_thread_enable_cancelability();
 }
+/**
+ * Resume apps data
+ */
+void ebpf_socket_resume_apps_data()
+{
+    struct ebpf_target *w;
+
+    for (w = apps_groups_root_target; w; w = w->next) {
+        if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_SOCKET_IDX))))
+            continue;
+
+        struct ebpf_pid_on_target *move = w->root_pid;
+
+        ebpf_socket_publish_apps_t *values = &w->socket;
+        memset(&w->socket, 0, sizeof(ebpf_socket_publish_apps_t));
+        while (move) {
+            int32_t pid = move->pid;
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            if (local_pid) {
+                ebpf_socket_publish_apps_t *ws = &local_pid->socket;
+                values->call_tcp_v4_connection = ws->call_tcp_v4_connection;
+                values->call_tcp_v6_connection = ws->call_tcp_v6_connection;
+                values->bytes_sent = ws->bytes_sent;
+                values->bytes_received = ws->bytes_received;
+                values->call_tcp_sent = ws->call_tcp_sent;
+                values->call_tcp_received = ws->call_tcp_received;
+                values->retransmit = ws->retransmit;
+                values->call_udp_sent = ws->call_udp_sent;
+                values->call_udp_received = ws->call_udp_received;
+            }
+
+            move = move->next;
+        }
+    }
+}
 
 /**
  * Socket thread
@@ -1839,7 +1842,10 @@ void *ebpf_read_socket_thread(void *ptr)
         if (ebpf_plugin_exit || ++counter != update_every)
             continue;
 
+        pthread_mutex_lock(&collect_data_mutex);
         ebpf_update_array_vectors(em);
+        ebpf_socket_resume_apps_data();
+        pthread_mutex_unlock(&collect_data_mutex);
 
         counter = 0;
     }
@@ -1992,23 +1998,23 @@ static void ebpf_socket_read_hash_global_tables(netdata_idx_t *stats, int maps_p
  */
 void ebpf_socket_fill_publish_apps(uint32_t current_pid, netdata_socket_t *ns)
 {
-    ebpf_socket_publish_apps_t *curr = socket_bandwidth_curr[current_pid];
-    if (!curr) {
-        curr = ebpf_socket_stat_get();
-        socket_bandwidth_curr[current_pid] = curr;
-    }
+    ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(current_pid, 0);
+    if (!local_pid)
+        return;
 
-    curr->bytes_sent += ns->tcp.tcp_bytes_sent;
-    curr->bytes_received += ns->tcp.tcp_bytes_received;
-    curr->call_tcp_sent += ns->tcp.call_tcp_sent;
-    curr->call_tcp_received += ns->tcp.call_tcp_received;
-    curr->retransmit += ns->tcp.retransmit;
-    curr->call_close += ns->tcp.close;
-    curr->call_tcp_v4_connection += ns->tcp.ipv4_connect;
-    curr->call_tcp_v6_connection += ns->tcp.ipv6_connect;
+    ebpf_socket_publish_apps_t *curr = &local_pid->socket;
 
-    curr->call_udp_sent += ns->udp.call_udp_sent;
-    curr->call_udp_received += ns->udp.call_udp_received;
+    curr->bytes_sent = ns->tcp.tcp_bytes_sent;
+    curr->bytes_received = ns->tcp.tcp_bytes_received;
+    curr->call_tcp_sent = ns->tcp.call_tcp_sent;
+    curr->call_tcp_received = ns->tcp.call_tcp_received;
+    curr->retransmit = ns->tcp.retransmit;
+    curr->call_close = ns->tcp.close;
+    curr->call_tcp_v4_connection = ns->tcp.ipv4_connect;
+    curr->call_tcp_v6_connection = ns->tcp.ipv6_connect;
+
+    curr->call_udp_sent = ns->udp.call_udp_sent;
+    curr->call_udp_received = ns->udp.call_udp_received;
 }
 
 /**
@@ -2026,8 +2032,9 @@ static void ebpf_update_socket_cgroup()
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             ebpf_socket_publish_apps_t *publish = &ect->publish_socket;
-            if (likely(socket_bandwidth_curr) && socket_bandwidth_curr[pid]) {
-                ebpf_socket_publish_apps_t *in = socket_bandwidth_curr[pid];
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            if (local_pid) {
+                ebpf_socket_publish_apps_t *in = &local_pid->socket;
 
                 publish->bytes_sent = in->bytes_sent;
                 publish->bytes_received = in->bytes_received;
@@ -2602,7 +2609,6 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_read_hash_global_tables(stats, maps_per_core);
         }
 
-        pthread_mutex_lock(&collect_data_mutex);
         if (cgroups)
             ebpf_update_socket_cgroup();
 
@@ -2611,12 +2617,7 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_send_data(em);
 
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
-            ebpf_socket_send_apps_data(em, apps_groups_root_target);
-
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_socket_pid)
-            ebpf_send_data_aral_chart(ebpf_aral_socket_pid, em);
-#endif
+            ebpf_socket_send_apps_data();
 
         if (cgroups)
             ebpf_socket_send_cgroup_data(update_every);
@@ -2624,7 +2625,6 @@ static void socket_collector(ebpf_module_t *em)
         fflush(stdout);
 
         pthread_mutex_unlock(&lock);
-        pthread_mutex_unlock(&collect_data_mutex);
 
         pthread_mutex_lock(&ebpf_exit_cleanup);
         if (running_time && !em->running_time)
@@ -2654,9 +2654,6 @@ static void ebpf_socket_initialize_global_vectors()
     memset(socket_aggregated_data, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_syscall_stat_t));
     memset(socket_publish_aggregated, 0 ,NETDATA_MAX_SOCKET_VECTOR * sizeof(netdata_publish_syscall_t));
     socket_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
-
-    ebpf_socket_aral_init();
-    socket_bandwidth_curr = callocz((size_t)pid_max, sizeof(ebpf_socket_publish_apps_t *));
 
     aral_socket_table = ebpf_allocate_pid_aral(NETDATA_EBPF_SOCKET_ARAL_TABLE_NAME,
                                                sizeof(netdata_socket_plus_t));
@@ -2877,11 +2874,6 @@ void *ebpf_socket_thread(void *ptr)
 
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_socket_pid)
-        socket_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_SOCKET_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 

@@ -4032,6 +4032,7 @@ int main(int argc, char **argv)
     heartbeat_t hb;
     heartbeat_init(&hb);
     int update_apps_every = (int) EBPF_CFG_UPDATE_APPS_EVERY_DEFAULT;
+    int max_period = update_apps_every * EBPF_CLEANUP_FACTOR;
     int update_apps_list = update_apps_every - 1;
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
@@ -4047,19 +4048,17 @@ int main(int argc, char **argv)
             fflush(stdout);
         }
 
-        pthread_mutex_lock(&ebpf_exit_cleanup);
-        pthread_mutex_lock(&collect_data_mutex);
         if (++update_apps_list == update_apps_every) {
             update_apps_list = 0;
-            cleanup_exited_pids();
+            pthread_mutex_lock(&lock);
+            pthread_mutex_lock(&collect_data_mutex);
+            ebpf_cleanup_exited_pids(max_period);
             collect_data_for_all_processes(process_pid_fd, process_maps_per_core);
 
-            pthread_mutex_lock(&lock);
             ebpf_create_apps_charts(apps_groups_root_target);
+            pthread_mutex_unlock(&collect_data_mutex);
             pthread_mutex_unlock(&lock);
         }
-        pthread_mutex_unlock(&collect_data_mutex);
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
     ebpf_stop_threads(0);

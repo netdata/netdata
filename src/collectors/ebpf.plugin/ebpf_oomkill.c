@@ -101,6 +101,7 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;
+    pthread_mutex_lock(&collect_data_mutex);
     for (w = apps_groups_root_target; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_OOMKILL_IDX))))
             continue;
@@ -118,6 +119,7 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
 
         w->charts_created &= ~(1<<EBPF_MODULE_OOMKILL_IDX);
     }
+    pthread_mutex_unlock(&collect_data_mutex);
 }
 
 /**
@@ -443,14 +445,10 @@ static void oomkill_collector(ebpf_module_t *em)
         counter = 0;
 
         uint32_t count = oomkill_read_data(keys);
-        if (!count) {
-            running_time = ebpf_update_oomkill_period(running_time, em);
-        }
 
         stats[NETDATA_CONTROLLER_PID_TABLE_ADD] += (uint64_t) count;
         stats[NETDATA_CONTROLLER_PID_TABLE_DEL] += (uint64_t) count;
 
-        pthread_mutex_lock(&collect_data_mutex);
         pthread_mutex_lock(&lock);
         if (cgroups && count) {
             ebpf_update_oomkill_cgroup(keys, count);
@@ -459,10 +457,11 @@ static void oomkill_collector(ebpf_module_t *em)
         }
 
         if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
+            pthread_mutex_lock(&collect_data_mutex);
             oomkill_write_data(keys, count);
+            pthread_mutex_unlock(&collect_data_mutex);
         }
         pthread_mutex_unlock(&lock);
-        pthread_mutex_unlock(&collect_data_mutex);
 
         running_time = ebpf_update_oomkill_period(running_time, em);
     }

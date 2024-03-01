@@ -65,10 +65,6 @@ struct config process_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-#ifdef NETDATA_DEV_MODE
-int process_disable_priority;
-#endif
-
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -147,53 +143,6 @@ static void ebpf_process_send_data(ebpf_module_t *em)
 }
 
 /**
- * Sum values for pid
- *
- * @param root the structure with all available PIDs
- * @param offset the address that we are reading
- *
- * @return it returns the sum of all PIDs
- */
-long long ebpf_process_sum_values_for_pids(struct ebpf_pid_on_target *root, size_t offset)
-{
-    long long ret = 0;
-    while (root) {
-        int32_t pid = root->pid;
-        ebpf_process_stat_t *w = global_process_stats[pid];
-        if (w) {
-            uint32_t *value = (uint32_t *)((char *)w + offset);
-            ret += *value;
-        }
-
-        root = root->next;
-    }
-
-    return ret;
-}
-
-/**
- * Remove process pid
- *
- * Remove from PID task table when task_release was called.
- */
-void ebpf_process_remove_pids()
-{
-    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
-    int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
-    while (pids) {
-        uint32_t pid = pids->pid;
-        ebpf_process_stat_t *w = global_process_stats[pid];
-        if (w) {
-            ebpf_process_stat_release(w);
-            global_process_stats[pid] = NULL;
-            bpf_map_delete_elem(pid_fd, &pid);
-        }
-
-        pids = pids->next;
-    }
-}
-
-/**
  * Send data to Netdata calling auxiliary functions.
  *
  * @param root the target list.
@@ -201,46 +150,33 @@ void ebpf_process_remove_pids()
 void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
 {
     struct ebpf_target *w;
-    // This algorithm is improved in https://github.com/netdata/netdata/pull/16030
-    collected_number values[5];
 
     for (w = root; w; w = w->next) {
         if (unlikely(!(w->charts_created & (1<<EBPF_MODULE_PROCESS_IDX))))
             continue;
 
-        values[0] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t, create_process));
-        values[1] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t, create_thread));
-        values[2] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
-                                                                           exit_call));
-        values[3] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
-                                                                           release_call));
-        values[4] = ebpf_process_sum_values_for_pids(w->root_pid, offsetof(ebpf_process_stat_t,
-                                                                           task_err));
-
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_process_start");
-        write_chart_dimension("calls", values[0]);
+        write_chart_dimension("calls", w->process.create_process);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_thread_start");
-        write_chart_dimension("calls", values[1]);
+        write_chart_dimension("calls", w->process.create_thread);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_task_exit");
-        write_chart_dimension("calls", values[2]);
+        write_chart_dimension("calls", w->process.exit_call);
         ebpf_write_end_chart();
 
         ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_task_released");
-        write_chart_dimension("calls", values[3]);
+        write_chart_dimension("calls", w->process.release_call);
         ebpf_write_end_chart();
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_begin_chart(NETDATA_APP_FAMILY, w->clean_name, "_ebpf_task_error");
-            write_chart_dimension("calls", values[4]);
+            write_chart_dimension("calls", w->process.task_err);
             ebpf_write_end_chart();
         }
     }
-
-    ebpf_process_remove_pids();
 }
 
 /*****************************************************************
@@ -287,34 +223,20 @@ static void ebpf_read_process_hash_global_tables(netdata_idx_t *stats, int maps_
  *
  * @param maps_per_core do I need to read all cores?
  */
-static void ebpf_update_process_cgroup(int maps_per_core)
+static void ebpf_update_process_cgroup()
 {
     ebpf_cgroup_target_t *ect ;
-    int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
-
-    size_t length =  sizeof(ebpf_process_stat_t);
-    if (maps_per_core)
-        length *= ebpf_nprocs;
     pthread_mutex_lock(&mutex_cgroup_shm);
     for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
         struct pid_on_target2 *pids;
         for (pids = ect->pids; pids; pids = pids->next) {
             int pid = pids->pid;
             ebpf_process_stat_t *out = &pids->ps;
-            if (global_process_stats[pid]) {
-                ebpf_process_stat_t *in = global_process_stats[pid];
+            ebpf_pid_stat_t *local_pid = ebpf_get_pid_entry(pid, 0);
+            if (local_pid) {
+                ebpf_process_stat_t *in = &local_pid->process;
 
                 memcpy(out, in, sizeof(ebpf_process_stat_t));
-            } else {
-                if (bpf_map_lookup_elem(pid_fd, &pid, process_stat_vector)) {
-                    memset(out, 0, sizeof(ebpf_process_stat_t));
-                }
-
-                ebpf_process_apps_accumulator(process_stat_vector, maps_per_core);
-
-                memcpy(out, process_stat_vector, sizeof(ebpf_process_stat_t));
-
-                memset(process_stat_vector, 0, length);
             }
         }
     }
@@ -439,7 +361,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
@@ -454,7 +376,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
@@ -469,7 +391,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
         ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
                              w->clean_name,
@@ -484,7 +406,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
         ebpf_create_chart_labels("app_group", w->name, 1);
         ebpf_commit_label();
-        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+        fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
         if (em->mode < MODE_ENTRY) {
             ebpf_write_chart_cmd(NETDATA_APP_FAMILY,
@@ -500,7 +422,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  NETDATA_EBPF_MODULE_NAME_PROCESS);
             ebpf_create_chart_labels("app_group", w->name, 1);
             ebpf_commit_label();
-            fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
+            fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
         }
         w->charts_created |= 1<<EBPF_MODULE_PROCESS_IDX;
     }
@@ -784,11 +706,6 @@ static void ebpf_process_exit(void *ptr)
         }
 
         ebpf_obsolete_process_global(em);
-
-#ifdef NETDATA_DEV_MODE
-        if (ebpf_aral_process_stat)
-            ebpf_statistic_obsolete_aral_chart(em, process_disable_priority);
-#endif
 
         fflush(stdout);
         pthread_mutex_unlock(&lock);
@@ -1181,7 +1098,7 @@ static void process_collector(ebpf_module_t *em)
 
             if (ebpf_all_pids_count > 0) {
                 if (cgroups && shm_ebpf_cgroup.header) {
-                    ebpf_update_process_cgroup(maps_per_core);
+                    ebpf_update_process_cgroup();
                 }
             }
 
@@ -1194,11 +1111,6 @@ static void process_collector(ebpf_module_t *em)
             if (apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
                 ebpf_process_send_apps_data(apps_groups_root_target, em);
             }
-
-#ifdef NETDATA_DEV_MODE
-            if (ebpf_aral_process_stat)
-                ebpf_send_data_aral_chart(ebpf_aral_process_stat, em);
-#endif
 
             if (cgroups && shm_ebpf_cgroup.header) {
                 ebpf_process_send_cgroup_data(em);
@@ -1240,8 +1152,6 @@ static void ebpf_process_allocate_global_vectors(size_t length)
     memset(process_publish_aggregated, 0, length * sizeof(netdata_publish_syscall_t));
     process_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
     process_stat_vector = callocz(ebpf_nprocs, sizeof(ebpf_process_stat_t));
-
-    global_process_stats = callocz((size_t)pid_max, sizeof(ebpf_process_stat_t *));
 }
 
 static void change_syscalls()
@@ -1350,11 +1260,6 @@ void *ebpf_process_thread(void *ptr)
 
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
-
-#ifdef NETDATA_DEV_MODE
-    if (ebpf_aral_process_stat)
-        process_disable_priority = ebpf_statistic_create_aral_chart(NETDATA_EBPF_PROC_ARAL_NAME, em);
-#endif
 
     pthread_mutex_unlock(&lock);
 
