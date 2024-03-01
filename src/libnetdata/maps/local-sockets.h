@@ -876,12 +876,12 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_loa
         };
 
         if (stored.family == AF_INET) {
-            memcpy(&n.local.ip.ipv4, &key.saddr.ipv4, sizeof(n.local.ip.ipv4));
-            memcpy(&n.remote.ip.ipv4, &key.daddr.ipv4, sizeof(n.remote.ip.ipv4));
+            memcpy(&n.local.ip.ipv4, &key.saddr.addr64[0], sizeof(n.local.ip.ipv4));
+            memcpy(&n.remote.ip.ipv4, &key.daddr.addr64[0], sizeof(n.remote.ip.ipv4));
         }
         else if (stored.family == AF_INET6) {
-            memcpy(&n.local.ip.ipv6, &key.saddr.ipv6, sizeof(n.local.ip.ipv6));
-            memcpy(&n.remote.ip.ipv6, &key.daddr.ipv6, sizeof(n.remote.ip.ipv6));
+            memcpy(&n.local.ip.ipv6, &key.saddr.addr8, sizeof(n.local.ip.ipv6));
+            memcpy(&n.remote.ip.ipv6, &key.daddr.addr8, sizeof(n.remote.ip.ipv6));
         }
 
         strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
