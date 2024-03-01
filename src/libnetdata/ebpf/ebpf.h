@@ -174,6 +174,16 @@ typedef enum {
     MODE_ENTRY       // This attaches kprobe when the function is called
 } netdata_run_mode_t;
 
+/**
+ * Union used to store ip addresses
+ */
+union netdata_ip_t {
+    uint8_t  addr8[16];
+    uint16_t addr16[8];
+    uint32_t addr32[4];
+    uint64_t addr64[2];
+};
+
 enum ebpf_socket_functions {
     NETDATA_FCNT_INET_CSK_ACCEPT,
     NETDATA_FCNT_TCP_RETRANSMIT,
