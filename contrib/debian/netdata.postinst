@@ -28,7 +28,7 @@ case "$1" in
 
     grep /usr/libexec/netdata /var/lib/dpkg/info/netdata.list | xargs -n 30 chown root:netdata
 
-    for f in ndsudo cgroup-network local-listeners ioping network-viewer.plugin; do
+    for f in ndsudo cgroup-network local-listeners ioping; do
         chmod 4750 "/usr/libexec/netdata/plugins.d/${f}" || true
     done
 
