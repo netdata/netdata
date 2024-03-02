@@ -1000,10 +1000,12 @@ Summary: The network viewer plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if 0%{?_have_ebpf}
 %if 0%{?centos_ver} != 7
 Recommends: %{name}-plugin-ebpf = %{version}
 %else
 Requires: %{name}-plugin-ebpf = %{version}
+%endif
 %endif
 
 %description plugin-network-viewer
