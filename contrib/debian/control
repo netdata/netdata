@@ -230,7 +230,7 @@ Architecture: any
 Depends: ${shlibs:Depends},
          netdata (= ${source:Version})
 Pre-Depends: libcap2-bin, adduser
-Recommends: netdata-plugin-ebpf (= ${source:Version} )
+Recommends: netdata-plugin-ebpf (= ${source:Version}) [amd64]
 Conflicts: netdata (<< ${source:Version})
 Description: The network viewer plugin for the Netdata Agent
  This plugin allows the Netdata Agent to provide network connection
