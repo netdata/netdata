@@ -789,6 +789,7 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
     ebpf_nv_data_t stored = {};
     int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
     size_t counter = 0;
+    char filename[FILENAME_MAX + 1];
     while (!bpf_map_get_next_key(fd, &key, &next_key)) {
         if (bpf_map_lookup_elem(fd, &key, &stored)) {
             goto end_socket_read_loop;
@@ -834,6 +835,33 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
 
         strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
         local_sockets_add_socket(ls, &n);
+
+        uint64_t net_ns_inode = 0;
+        SIMPLE_HASHTABLE_SLOT_PID_SOCKET *sl = simple_hashtable_get_slot_PID_SOCKET(&ls->pid_sockets_hashtable,
+                                                                                    n.inode,
+                                                                                    &n.inode,
+                                                                                    true);
+        struct pid_socket *ps = SIMPLE_HASHTABLE_SLOT_DATA(sl);
+        if(!ps)
+            ps = aral_callocz(ls->pid_socket_aral);
+
+        if(!net_ns_inode && ls->config.namespaces) {
+            snprintfz(filename, sizeof(filename), "%s/proc/%u/ns/net", ls->config.host_prefix, stored.pid);
+            if(local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
+                SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable,
+                                                                                       net_ns_inode,
+                                                                                       (uint64_t *)net_ns_inode,
+                                                                                       true);
+                simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
+            }
+        }
+
+        ps->inode = stored.ts;
+        ps->pid = stored.pid;
+        ps->uid = stored.uid;
+        ps->net_ns_inode = net_ns_inode;
+
+        simple_hashtable_set_slot_PID_SOCKET(&ls->pid_sockets_hashtable, sl, stored.ts, ps);
 
 end_socket_read_loop:
         key = next_key;
