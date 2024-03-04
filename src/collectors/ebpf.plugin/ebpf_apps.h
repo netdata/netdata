@@ -241,6 +241,7 @@ extern ARAL *ebpf_aral_shm_pid;
 void ebpf_shm_aral_init();
 netdata_publish_shm_t *ebpf_shm_stat_get(void);
 void ebpf_shm_release(netdata_publish_shm_t *stat);
+void ebpf_cleanup_exited_pids(int max);
 
 // ARAL Section end
 

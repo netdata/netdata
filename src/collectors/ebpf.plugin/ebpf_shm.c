@@ -1205,6 +1205,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_shm_allocate_global_vectors(int apps)
 {
+    UNUSED(apps);
     shm_vector = callocz((size_t)ebpf_nprocs, sizeof(netdata_publish_shm_t));
     shm_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
