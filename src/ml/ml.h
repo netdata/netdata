@@ -46,6 +46,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted);
 
 bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm);
 bool ml_host_running(RRDHOST *rh);
+uint64_t sqlite_get_ml_space(void);
 
 #ifdef __cplusplus
 };

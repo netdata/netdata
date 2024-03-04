@@ -404,6 +404,12 @@ int sql_context_cache_stats(int op)
     return count;
 }
 
+
+uint64_t sqlite_get_context_space(void)
+{
+    return sqlite_get_db_space(db_context_meta);
+}
+
 //
 // TESTING FUNCTIONS
 //

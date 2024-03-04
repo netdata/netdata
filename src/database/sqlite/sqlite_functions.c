@@ -276,6 +276,45 @@ void sql_drop_table(const char *table)
     }
 }
 
+static int get_pragma_value(sqlite3 *database, const char *sql)
+{
+    sqlite3_stmt *res = NULL;
+    int rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
+    if (unlikely(rc != SQLITE_OK))
+        return -1;
+
+    int result = -1;
+    rc = sqlite3_step_monitored(res);
+    if (likely(rc == SQLITE_ROW))
+        result = sqlite3_column_int(res, 0);
+
+    rc = sqlite3_finalize(res);
+    (void) rc;
+
+    return result;
+}
+
+int get_free_page_count(sqlite3 *database)
+{
+    return get_pragma_value(database, "PRAGMA freelist_count");
+}
+
+int get_database_page_count(sqlite3 *database)
+{
+    return get_pragma_value(database, "PRAGMA page_count");
+}
+
+uint64_t sqlite_get_db_space(sqlite3 *db)
+{
+    if (!db)
+        return 0;
+
+    int page_size = get_pragma_value(db, "PRAGMA page_size");
+    int page_count = get_pragma_value(db, "PRAGMA page_count");
+
+    return page_size * page_count;
+}
+
 /*
  * Close the sqlite database
  */
@@ -285,6 +324,9 @@ void sql_close_database(sqlite3 *database, const char *database_name)
     int rc;
     if (unlikely(!database))
         return;
+
+    (void) db_execute(database, "PRAGMA analysis_limit=10000");
+    (void) db_execute(database, "PRAGMA optimize");
 
     netdata_log_info("%s: Closing sqlite database", database_name);
 

@@ -50,6 +50,7 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
 void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id);
 RRDLABELS *sql_load_host_labels(uuid_t *host_id);
 
+uint64_t sqlite_get_meta_space(void);
 int sql_init_meta_database(db_check_action_type_t rebuild, int memory);
 void sql_close_meta_database(void);
 

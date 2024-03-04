@@ -780,30 +780,6 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     return 0;
 }
 
-/*
- * Close the sqlite database
- */
-
-void sql_close_meta_database(void)
-{
-    int rc;
-    if (unlikely(!db_meta))
-        return;
-
-    netdata_log_info("Closing SQLite database");
-
-//    add_stmt_to_list(NULL);
-
-    (void) db_execute(db_meta, "PRAGMA analysis_limit=10000");
-    (void) db_execute(db_meta, "PRAGMA optimize");
-
-    rc = sqlite3_close_v2(db_meta);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
-    db_meta = NULL;
-}
-
-
 // Metadata functions
 
 struct query_build {
@@ -1361,35 +1337,6 @@ static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused, sqlite3_st
 #else
     return false;
 #endif
-}
-
-int get_pragma_value(sqlite3 *database, const char *sql)
-{
-    sqlite3_stmt *res = NULL;
-    int rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK))
-        return -1;
-
-    int result = -1;
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW))
-        result = sqlite3_column_int(res, 0);
-
-    rc = sqlite3_finalize(res);
-    (void) rc;
-
-    return result;
-}
-
-
-int get_free_page_count(sqlite3 *database)
-{
-    return get_pragma_value(database, "PRAGMA freelist_count");
-}
-
-int get_database_page_count(sqlite3 *database)
-{
-    return get_pragma_value(database, "PRAGMA page_count");
 }
 
 static bool run_cleanup_loop(

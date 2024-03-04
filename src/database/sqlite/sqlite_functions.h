@@ -34,6 +34,11 @@ char *get_database_extented_error(sqlite3 *database, int i, const char *descript
 void sql_drop_table(const char *table);
 void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv);
 
+uint64_t sqlite_get_db_space(sqlite3 *db);
+
+int get_free_page_count(sqlite3 *database);
+int get_database_page_count(sqlite3 *database);
+
 int sqlite_library_init(void);
 void sqlite_library_shutdown(void);
 
