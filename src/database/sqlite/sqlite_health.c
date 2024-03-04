@@ -106,7 +106,7 @@ failed:
     "@non_clear_duration,@flags,@exec_run_timestamp,@delay_up_to_timestamp, @info,@exec_code,@new_status,@old_status,"       \
     "@delay,@new_value,@old_value,@last_repeat,@transition_id,@global_id,@summary)"
 
-static int sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
+static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
 {
     sqlite3_stmt *res = NULL;
     int rc;
@@ -115,7 +115,7 @@ static int sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log
     if (unlikely(rc != SQLITE_OK)) {
         error_report(
             "HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG_DETAIL", rrdhost_hostname(host));
-        return 1;
+        return;
     }
 
     rc = sqlite3_bind_int64(res, 1, (sqlite3_int64)health_log_id);
