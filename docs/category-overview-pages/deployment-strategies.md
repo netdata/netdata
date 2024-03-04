@@ -237,7 +237,7 @@ On both Netdata Parent and all Child Agents, edit `stream.conf` with `/etc/netda
 
 We strongly recommend the following configuration changes for production deployments:
 
-1. Understand Netdata's [security and privacy design](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md) and 
+1. Understand Netdata's [security and privacy design](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md) and 
    [secure your nodes](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/secure-nodes.md)
    
    To safeguard your infrastructure and comply with your organization's security policies.

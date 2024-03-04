@@ -24,7 +24,7 @@ you. This is why **we don't store any metric data in Netdata Cloud**.
 
 All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. The data passes through our systems, but it isn't stored.
 
-However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_. Read more about our [security and privacy design](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md).
+However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_. Read more about our [security and privacy design](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
 
 ## Enable and configure the ACLK
 
