@@ -280,7 +280,7 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 {
     sqlite3_stmt *res = NULL;
     int rc;
-    uint64_t health_log_id = 0;
+    uint64_t health_log_id;
 
     if (unlikely(!db_meta)) {
         if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
