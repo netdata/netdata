@@ -80,7 +80,7 @@ protect them from the internet by making their UI accessible only via an nginx p
 for the parent and even each child, if necessary. 
 
 Both children and the parent are connected to the cloud, to enable infrastructure observability, 
-[without transferring the collected data](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md). 
+[without transferring the collected data](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md). 
 Requests for data are always serverd by a connected Netdata agent. When both a child and a parent are connected, 
 the cloud will always select the parent to query the user requested data.
 

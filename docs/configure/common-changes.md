@@ -131,7 +131,7 @@ click on the link to your preferred notification method to find documentation fo
 While the Netdata Agent is both [open and secure by design](https://www.netdata.cloud/blog/netdata-agent-dashboard/), we
 recommend every user take some action to administer and secure their nodes.
 
-Learn more about the available options in the [security design documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md).
+Learn more about the available options in the [security design documentation](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
 
 ## Reduce resource usage
 
