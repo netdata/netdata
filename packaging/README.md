@@ -1,0 +1,1 @@
+../docs/netdata-agent/versions-and-platforms.md
