@@ -22,8 +22,8 @@ directory.
 
 The Netdata Agent's [local dashboard](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md), accessible
 at `http://NODE:19999` is highly configurable. If
-you use Netdata Cloud
-for [infrastructure monitoring](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you
+you use [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md)
+for infrastructure monitoring, you
 will see many of these
 changes reflected in those visualizations due to the way Netdata Cloud proxies metric data and metadata to your browser.
 

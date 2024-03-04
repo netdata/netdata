@@ -94,7 +94,7 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
    ```
 
 2. Click **Install** on the Software Update popup window that appears. 
-3. Use the same terminal session to install some of Netdata's prerequisites using Homebrew. If you don't want to use [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you can omit `cmake`.
+3. Use the same terminal session to install some of Netdata's prerequisites using Homebrew. If you don't want to use [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md), you can omit `cmake`.
 
    ```bash
    brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake

@@ -36,7 +36,7 @@ By clicking on the name of an entry of the table you can access that alert's det
 
 ![image](https://user-images.githubusercontent.com/70198089/226339928-bae60140-0293-42cf-9713-ac4901708aba.png)
 
-At the bottom of the panel you can click the green button "View dedicated alert page" to open a [dynamic tab](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md#dynamic-tabs) containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
+At the bottom of the panel you can click the green button "View dedicated alert page" to open a dynamic tab containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
 
 ![image](https://user-images.githubusercontent.com/70198089/226339794-61896c35-0b93-4ac9-92aa-07116fe63784.png)
 

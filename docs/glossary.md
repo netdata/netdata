@@ -33,7 +33,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Child**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md#streaming-basics): A node, running Netdata, that streams metric data to one or more parent.
 
-- [**Cloud** or **Netdata Cloud**](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
+- [**Cloud** or **Netdata Cloud**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
 - [**Collector**](https://github.com/netdata/netdata/blob/master/src/collectors/README.md#collector-architecture-and-terminology): A catch-all term for any Netdata process that gathers metrics from an endpoint.
 
@@ -112,7 +112,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Netdata Agent** or **Agent**](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
 
-- [**Netdata Cloud** or **Cloud**](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
+- [**Netdata Cloud** or **Cloud**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
 - [**Netdata Functions** or **Functions**](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
