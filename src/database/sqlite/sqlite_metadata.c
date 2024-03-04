@@ -25,10 +25,6 @@ const char *database_config[] = {
 
     "CREATE TABLE IF NOT EXISTS metadata_migration(filename text, file_size, date_created int)",
 
-    "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id)",
-
-    "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id)",
-
     "CREATE TABLE IF NOT EXISTS chart_label(chart_id blob, source_type int, label_key text, "
     "label_value text, date_created int, PRIMARY KEY (chart_id, label_key))",
 
@@ -54,14 +50,15 @@ const char *database_config[] = {
     "config_hash_id blob, name text, chart text, family text, recipient text, units text, exec text, "
     "chart_context text, last_transition_id blob, chart_name text, UNIQUE (host_id, alarm_id))",
 
-    "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id)",
-
     "CREATE TABLE IF NOT EXISTS health_log_detail (health_log_id int, unique_id int, alarm_id int, alarm_event_id int, "
     "updated_by_id int, updates_id int, when_key int, duration int, non_clear_duration int, "
     "flags int, exec_run_timestamp int, delay_up_to_timestamp int, "
     "info text, exec_code int, new_status real, old_status real, delay int, "
     "new_value double, old_value double, last_repeat int, transition_id blob, global_id int, summary text)",
 
+    "CREATE INDEX IF NOT EXISTS ind_d2 on dimension (chart_id)",
+    "CREATE INDEX IF NOT EXISTS ind_c3 on chart (host_id)",
+    "CREATE INDEX IF NOT EXISTS health_log_ind_1 ON health_log (host_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_2 ON health_log_detail (global_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_3 ON health_log_detail (transition_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_9 ON health_log_detail (unique_id DESC, health_log_id)",
@@ -417,7 +414,7 @@ struct node_instance_list *get_node_list(void)
     }
 
     int row = 0;
-    char host_guid[37];
+    char host_guid[UUID_STR_LEN];
     while (sqlite3_step_monitored(res) == SQLITE_ROW)
         row++;
 
@@ -618,7 +615,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
         if (rc == SQLITE_OK)
             netdata_log_info("Recover complete");
         else
-            netdata_log_info("Recover encountered an error but the database may be usable");
+            netdata_log_error("Recover encountered an error but the database may be usable");
 
         rc = sqlite3_recover_finish(recover);
 
@@ -631,6 +628,8 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
                 netdata_log_info("     to %s", sqlite_database);
             }
         }
+        else
+            netdata_log_error("Recover failed to free resources");
     }
     else
         (void) sqlite3_close(database);
@@ -704,7 +703,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         }
     }
     else
-        strcpy(sqlite_database, ":memory:");
+        strncpyz(sqlite_database, ":memory:", sizeof(sqlite_database) - 1);
 
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
