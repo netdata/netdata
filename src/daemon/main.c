@@ -451,7 +451,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     sql_close_context_database();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_CONTEXT_DB);
 
-    sql_close_database();
+    sql_close_meta_database();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_MAIN_DB);
 
     // unlink the pid
@@ -1500,17 +1500,17 @@ int main(int argc, char **argv) {
 #endif
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
-                            sql_init_database(DB_CHECK_RECOVER, 0);
+                            sql_init_meta_database(DB_CHECK_RECOVER, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-compact") == 0) {
-                            sql_init_database(DB_CHECK_RECLAIM_SPACE, 0);
+                            sql_init_meta_database(DB_CHECK_RECLAIM_SPACE, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-analyze") == 0) {
-                            sql_init_database(DB_CHECK_ANALYZE, 0);
+                            sql_init_meta_database(DB_CHECK_ANALYZE, 0);
                             return 0;
                         }
 
