@@ -309,8 +309,8 @@ uint64_t sqlite_get_db_space(sqlite3 *db)
     if (!db)
         return 0;
 
-    int page_size = get_pragma_value(db, "PRAGMA page_size");
-    int page_count = get_pragma_value(db, "PRAGMA page_count");
+    uint64_t page_size = (uint64_t) get_pragma_value(db, "PRAGMA page_size");
+    uint64_t page_count = (uint64_t) get_pragma_value(db, "PRAGMA page_count");
 
     return page_size * page_count;
 }
