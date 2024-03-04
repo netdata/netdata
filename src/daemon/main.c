@@ -448,11 +448,10 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 #endif
     }
 
-    sql_close_context_database();
-    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_CONTEXT_DB);
+    sqlite_close_databases();
+    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
+    sqlite_library_shutdown();
 
-    sql_close_meta_database();
-    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_MAIN_DB);
 
     // unlink the pid
     if(pidfile[0]) {

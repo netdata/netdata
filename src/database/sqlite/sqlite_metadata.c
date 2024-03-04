@@ -777,8 +777,6 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
 
     netdata_log_info("SQLite database initialization completed");
 
-    initialize_thread_key_pool();
-
     return 0;
 }
 

@@ -29,9 +29,14 @@ int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_b
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement);
 int execute_insert(sqlite3_stmt *res);
 int db_execute(sqlite3 *database, const char *cmd);
-void initialize_thread_key_pool(void);
 char *get_database_extented_error(sqlite3 *database, int i, const char *description);
 
 void sql_drop_table(const char *table);
 void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv);
+
+int sqlite_library_init(void);
+void sqlite_library_shutdown(void);
+
+void sql_close_database(sqlite3 *database, const char *database_name);
+void sqlite_close_databases(void);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

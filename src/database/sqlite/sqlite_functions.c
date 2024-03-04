@@ -156,7 +156,7 @@ static void release_statement(void *statement)
         error_report("Failed to finalize statement, rc = %d", rc);
 }
 
-void initialize_thread_key_pool(void)
+static void initialize_thread_key_pool(void)
 {
     for (int i = 0; i < MAX_PREPARED_STATEMENTS; i++)
         (void)pthread_key_create(&key_pool[i], release_statement);
@@ -274,4 +274,58 @@ void sql_drop_table(const char *table)
     if (rc != SQLITE_OK) {
         error_report("DES SQLite error during drop table operation for %s, rc = %d", table, rc);
     }
+}
+
+/*
+ * Close the sqlite database
+ */
+
+void sql_close_database(sqlite3 *database, const char *database_name)
+{
+    int rc;
+    if (unlikely(!database))
+        return;
+
+    netdata_log_info("%s: Closing sqlite database", database_name);
+
+#ifdef NETDATA_DEV_MODE
+    int t_count_used,t_count_hit,t_count_miss,t_count_full, dummy;
+    (void) sqlite3_db_status(database, SQLITE_DBSTATUS_LOOKASIDE_USED, &dummy, &t_count_used, 0);
+    (void) sqlite3_db_status(database, SQLITE_DBSTATUS_LOOKASIDE_HIT, &dummy,&t_count_hit, 0);
+    (void) sqlite3_db_status(database, SQLITE_DBSTATUS_LOOKASIDE_MISS_SIZE, &dummy,&t_count_miss, 0);
+    (void) sqlite3_db_status(database, SQLITE_DBSTATUS_LOOKASIDE_MISS_FULL, &dummy,&t_count_full, 0);
+
+    netdata_log_info("%s: Database lookaside allocation statistics: Used slots %d, Hit %d, Misses due to small slot size %d, Misses due to slots full %d", database_name,
+                     t_count_used,t_count_hit, t_count_miss, t_count_full);
+
+    (void) sqlite3_db_release_memory(database);
+#endif
+
+    rc = sqlite3_close_v2(database);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("%s: Error while closing the sqlite database: rc %d, error \"%s\"", database_name, rc, sqlite3_errstr(rc));
+}
+
+extern sqlite3 *db_context_meta;
+
+void sqlite_close_databases(void)
+{
+    add_stmt_to_list(NULL);
+
+    sql_close_database(db_context_meta, "CONTEXT");
+    sql_close_database(db_meta, "METADATA");
+}
+
+int sqlite_library_init(void)
+{
+    initialize_thread_key_pool();
+
+    int rc = sqlite3_initialize();
+
+    return (SQLITE_OK != rc);
+}
+
+void sqlite_library_shutdown(void)
+{
+    (void) sqlite3_shutdown();
 }
