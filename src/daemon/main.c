@@ -1400,6 +1400,8 @@ int unittest_prepare_rrd(char **user) {
 }
 
 int main(int argc, char **argv) {
+    uv_setup_args(argc, argv);
+
     // initialize the system clocks
     clocks_init();
     netdata_start_time = now_realtime_sec();

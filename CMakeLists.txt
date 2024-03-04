@@ -125,6 +125,7 @@ option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
 
 option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
+option(ENABLE_LIBBACKTRACE "enable libbacktrace" False)
 option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
 
@@ -134,6 +135,23 @@ if(ENABLE_PLUGIN_GO)
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
 
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
+endif()
+
+if(ENABLE_LIBBACKTRACE)
+        include(ExternalProject)
+
+        ExternalProject_Add(libbacktrace
+            GIT_REPOSITORY https://github.com/ianlancetaylor/libbacktrace.git
+            GIT_TAG master
+            CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+            BUILD_COMMAND make
+            BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libbacktrace.a
+            UPDATE_DISCONNECTED True
+            INSTALL_COMMAND make install)
+
+        ExternalProject_Get_Property(libbacktrace INSTALL_DIR)
+        set(LIBBACKTRACE_INCLUDE_DIR ${INSTALL_DIR}/include)
+        set(LIBBACKTRACE_LIBRARY ${INSTALL_DIR}/lib/libbacktrace.a)
 endif()
 
 if(ENABLE_SENTRY)
@@ -668,6 +686,12 @@ if(ENABLE_PLUGIN_EBPF)
             src/libnetdata/ebpf/ebpf.c
             src/libnetdata/ebpf/ebpf.h
     )
+endif()
+
+if(ENABLE_LIBBACKTRACE)
+    list(APPEND LIBNETDATA_FILES
+         src/libnetdata/bt/bt.cc
+         src/libnetdata/bt/bt.h)
 endif()
 
 set(LIBH2O_FILES
@@ -1504,6 +1528,12 @@ if(ENABLE_PLUGIN_EBPF)
         target_include_directories(libnetdata BEFORE PUBLIC ${ELF_INCLUDE_DIRS})
         target_compile_options(libnetdata PUBLIC ${ELF_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${ELF_LIBRARIES})
+endif()
+
+if(ENABLE_LIBBACKTRACE)
+        add_dependencies(libnetdata libbacktrace)
+        target_include_directories(libnetdata PRIVATE ${LIBBACKTRACE_INCLUDE_DIR})
+        target_link_libraries(libnetdata PRIVATE ${LIBBACKTRACE_LIBRARY})
 endif()
 
 # judy

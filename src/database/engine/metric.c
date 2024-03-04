@@ -134,6 +134,10 @@ static inline time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, 
 }
 
 static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric) {
+#ifdef ENABLE_LIBBACKTRACE
+    bt_collect(&metric->uuid);
+#endif
+
     spinlock_lock(&metric->refcount_spinlock);
 
     if (metric->refcount >= 0)
@@ -154,10 +158,18 @@ static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 static inline void metric_release(MRG *mrg __maybe_unused, METRIC *metric) {
+#ifdef ENABLE_LIBBACKTRACE
+    bt_collect(&metric->uuid);
+#endif
+
     spinlock_lock(&metric->refcount_spinlock);
 
-    if (metric->refcount <= 0)
+    if (metric->refcount <= 0) {
+        #ifdef ENABLE_LIBBACKTRACE
+            bt_dump(&metric->uuid);
+        #endif
         fatal("METRIC: refcount is %d (zero or negative) during release", metric->refcount);
+    }
 
     metric->refcount -= 1;
     REFCOUNT refcount = metric->refcount;
