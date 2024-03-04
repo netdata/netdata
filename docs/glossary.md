@@ -53,8 +53,6 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Dimension**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#dimensions): A dimension is a value that gets shown on a chart.
 
-- [**Distributed Architecture**](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md): The data architecture mindset with which Netdata was built, where all data are collected and stored on the edge, whenever it's possible, creating countless benefits.
-
 ## E
 
 - [**External Plugins**](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md): These gather metrics from external processes, such as a webserver or database, and run as independent processes that communicate with the Netdata daemon via pipes.
