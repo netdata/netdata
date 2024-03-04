@@ -741,9 +741,9 @@ enum ebpf_nv_tables_list {
 };
 
 typedef struct ebpf_nv_idx {
-    union netdata_ip_t saddr;
+    union ipv46 saddr;
     uint16_t sport;
-    union netdata_ip_t daddr;
+    union ipv46 daddr;
     uint16_t dport;
 } ebpf_nv_idx_t;
 
@@ -756,13 +756,14 @@ typedef struct ebpf_nv_data {
 
     uint8_t timer;
     uint8_t retransmits;
+    uint16_t closed;
     uint32_t expires;
     uint32_t rqueue;
     uint32_t wqueue;
 
     char name[TASK_COMM_LEN];
 
-    uint32_t direction;
+    SOCKET_DIRECTION direction;
 
     uint16_t family;
     uint16_t protocol;
@@ -804,7 +805,7 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
         counter++;
         LOCAL_SOCKET n = {
             .inode = stored.ts,
-            .direction = SOCKET_DIRECTION_NONE,
+            .direction = stored.direction,
             .state = stored.state,
             .local = {
                 .family = stored.family,
@@ -825,12 +826,12 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
                 };
 
         if (stored.family == AF_INET) {
-            memcpy(&n.local.ip.ipv4, &key.saddr.addr64[0], sizeof(n.local.ip.ipv4));
-            memcpy(&n.remote.ip.ipv4, &key.daddr.addr64[0], sizeof(n.remote.ip.ipv4));
+            memcpy(&n.local.ip.ipv4, &key.saddr.ipv4, sizeof(n.local.ip.ipv4));
+            memcpy(&n.remote.ip.ipv4, &key.daddr.ipv4, sizeof(n.remote.ip.ipv4));
         }
         else if (stored.family == AF_INET6) {
-            memcpy(&n.local.ip.ipv6, &key.saddr.addr8, sizeof(n.local.ip.ipv6));
-            memcpy(&n.remote.ip.ipv6, &key.daddr.addr8, sizeof(n.remote.ip.ipv6));
+            memcpy(&n.local.ip.ipv6, &key.saddr.ipv6, sizeof(n.local.ip.ipv6));
+            memcpy(&n.remote.ip.ipv6, &key.daddr.ipv6, sizeof(n.remote.ip.ipv6));
         }
 
         strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
