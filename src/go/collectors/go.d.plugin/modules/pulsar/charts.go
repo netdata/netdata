@@ -269,6 +269,7 @@ var namespaceCharts = Charts{
 }
 
 func toNamespaceChart(chart Chart) Chart {
+	chart = *chart.Copy()
 	if chart.ID == sumBrokerComponentsChart.ID {
 		_ = chart.RemoveDim("pulsar_namespaces_count")
 	}
