@@ -26,7 +26,7 @@
 
 static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
     if (unlikely(!db_meta)) {
@@ -35,10 +35,12 @@ static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
         return;
     }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_UPDATE_HEALTH_LOG, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("HEALTH [%s]: Failed to prepare statement for SQL_UPDATE_HEALTH_LOG", rrdhost_hostname(host));
-        return;
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_UPDATE_HEALTH_LOG, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("HEALTH [%s]: Failed to prepare statement for SQL_UPDATE_HEALTH_LOG", rrdhost_hostname(host));
+            return;
+        }
     }
 
     rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) ae->updated_by_id);
@@ -89,8 +91,8 @@ static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("HEALTH [%s]: Failed to finalize the prepared statement for updating health log.", rrdhost_hostname(host));
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+        error_report("HEALTH [%s]: Failed to reset statement for updating health log.", rrdhost_hostname(host));
 }
 
 /* Health related SQL queries
@@ -108,14 +110,16 @@ failed:
 
 static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report(
-            "HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG_DETAIL", rrdhost_hostname(host));
-        return;
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report(
+                "HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG_DETAIL", rrdhost_hostname(host));
+            return;
+        }
     }
 
     rc = sqlite3_bind_int64(res, 1, (sqlite3_int64)health_log_id);
@@ -264,8 +268,8 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
             "HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG_DETAIL, rc = %d", rrdhost_hostname(host), rc);
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("HEALTH [%s]: Failed to finalize the prepared statement for inserting to health log detail", rrdhost_hostname(host));
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+        error_report("HEALTH [%s]: Failed to reset statement for inserting to health log detail", rrdhost_hostname(host));
 }
 
 #define SQL_INSERT_HEALTH_LOG                                                                                          \
@@ -278,7 +282,7 @@ failed:
 
 static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    sqlite3_stmt *res = NULL;
+    static __thread sqlite3_stmt *res = NULL;
     int rc;
     uint64_t health_log_id;
 
@@ -288,10 +292,12 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
         return;
     }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_INSERT_HEALTH_LOG, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
-        return;
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_INSERT_HEALTH_LOG, &res);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
+            return;
+        }
     }
 
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
@@ -369,8 +375,8 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
         error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("HEALTH [%s]: Failed to finalize the prepared statement for inserting to health log.", rrdhost_hostname(host));
+    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
+        error_report("HEALTH [%s]: Failed to reset statement for inserting to health log", rrdhost_hostname(host));
 }
 
 void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
