@@ -871,17 +871,17 @@ context are essentially identical, with the only difference being the family tha
   - `$update_every` is the update frequency of the chart
   - `$green` and `$red` the threshold defined in alerts (these are per chart - the charts inherits them from the first alert that defined them)
 
-        Chart dimensions define their last calculated (i.e. interpolated) value, exactly as
-        shown on the charts, but also a variable with their name and suffix `_raw` that resolves
-        to the last collected value - as collected and another with suffix `_last_collected_t`
-        that resolves to unix timestamp the dimension was last collected (there may be dimensions
-        that fail to be collected while others continue normally).
+      > Chart dimensions define their last calculated (i.e. interpolated) value, exactly as
+      shown on the charts, but also a variable with their name and suffix `_raw` that resolves
+      to the last collected value - as collected and another with suffix `_last_collected_t`
+      that resolves to unix timestamp the dimension was last collected (there may be dimensions
+      that fail to be collected while others continue normally).
 
 - **host variables**. All the dimensions of all charts, including all alerts, in fullname.
      Fullname is `CHART.VARIABLE`, where `CHART` is either the chart id or the chart name (both
      are supported).
 
-- **special variables\*** are:
+- **special variables** are:
 
   - `$this`, which is resolved to the value of the current alert.
 
