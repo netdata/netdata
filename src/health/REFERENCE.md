@@ -253,7 +253,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`repeat`](#alert-line-repeat)                      | no              | The interval for sending notifications when an alert is in WARNING or CRITICAL mode.  |
 | [`options`](#alert-line-options)                    | no              | Add an option to not clear alerts.                                                    |
 | [`host labels`](#alert-line-host-labels)            | no              | Restrict an alert or template to a list of matching labels present on a host.         |
-| [`chart labels`](#alert-line-chart-labels)          | no              | Restrict an alert or template to a list of matching labels present on a chart.         |
+| [`chart labels`](#alert-line-chart-labels)          | no              | Restrict an alert or template to a list of matching labels present on a chart.        |
 | [`summary`](#alert-line-summary)                    | no              | A brief description of the alert.                                                     |
 | [`info`](#alert-line-info)                          | no              | A longer text field that provides more information of this alert                      |
 
@@ -1128,7 +1128,7 @@ template: ml_5min_node
     info: rolling 5min anomaly rate for all ML enabled dims
 ```
 
-The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://github.com/netdata/netdata/blob/master/src/ml/README.md#node-anomaly-rate) over the last 5 minues.
+The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detection.anomaly_rate` ML chart to calculate the average [node level anomaly rate](https://github.com/netdata/netdata/blob/master/src/ml/README.md#node-anomaly-rate) over the last 5 minutes.
 
 ## Troubleshooting
 
