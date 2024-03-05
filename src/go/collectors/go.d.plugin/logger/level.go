@@ -7,6 +7,17 @@ import (
 	"strings"
 )
 
+const levelNotice = slog.Level(2)
+
+var (
+	customLevels = map[slog.Leveler]string{
+		levelNotice: "NOTICE",
+	}
+	customLevelsTerm = map[slog.Leveler]string{
+		levelNotice: "\u001B[34m" + "NTC" + "\u001B[0m",
+	}
+)
+
 var Level = &level{lvl: &slog.LevelVar{}}
 
 type level struct {
@@ -27,6 +38,8 @@ func (l *level) SetByName(level string) {
 		l.lvl.Set(slog.LevelError)
 	case "warn", "warning":
 		l.lvl.Set(slog.LevelWarn)
+	case "notice":
+		l.lvl.Set(levelNotice)
 	case "info":
 		l.lvl.Set(slog.LevelInfo)
 	case "debug":

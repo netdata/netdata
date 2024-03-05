@@ -38,10 +38,12 @@ type Logger struct {
 
 func (l *Logger) Error(a ...any)                   { l.log(slog.LevelError, fmt.Sprint(a...)) }
 func (l *Logger) Warning(a ...any)                 { l.log(slog.LevelWarn, fmt.Sprint(a...)) }
+func (l *Logger) Notice(a ...any)                  { l.log(levelNotice, fmt.Sprint(a...)) }
 func (l *Logger) Info(a ...any)                    { l.log(slog.LevelInfo, fmt.Sprint(a...)) }
 func (l *Logger) Debug(a ...any)                   { l.log(slog.LevelDebug, fmt.Sprint(a...)) }
 func (l *Logger) Errorf(format string, a ...any)   { l.log(slog.LevelError, fmt.Sprintf(format, a...)) }
 func (l *Logger) Warningf(format string, a ...any) { l.log(slog.LevelWarn, fmt.Sprintf(format, a...)) }
+func (l *Logger) Noticef(format string, a ...any)  { l.log(levelNotice, fmt.Sprintf(format, a...)) }
 func (l *Logger) Infof(format string, a ...any)    { l.log(slog.LevelInfo, fmt.Sprintf(format, a...)) }
 func (l *Logger) Debugf(format string, a ...any)   { l.log(slog.LevelDebug, fmt.Sprintf(format, a...)) }
 func (l *Logger) Mute()                            { l.mute(true) }
