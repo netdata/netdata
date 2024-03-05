@@ -71,6 +71,7 @@ enum {
     IDX_HEALTH_ENABLED,
     IDX_LAST_CONNECTED,
     IDX_IS_EPHEMERAL,
+    IDX_IS_REGISTERED,
 };
 
 static int create_host_callback(void *data, int argc, char **argv, char **column)
@@ -87,21 +88,27 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
     time_t age = now_realtime_sec() - last_connected;
     int is_ephemeral = 0;
+    int is_registered = 0;
 
     if (argv[IDX_IS_EPHEMERAL])
         is_ephemeral = str2i(argv[IDX_IS_EPHEMERAL]);
+
+    if (argv[IDX_IS_REGISTERED])
+        is_registered = str2i(argv[IDX_IS_REGISTERED]);
 
     char guid[UUID_STR_LEN];
     uuid_unparse_lower(*(uuid_t *)argv[IDX_HOST_ID], guid);
 
     if (is_ephemeral && age > rrdhost_free_ephemeral_time_s) {
         netdata_log_info(
-            "Skipping ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
+            "%s ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
+            is_registered ? "Loading registered" : "Skipping unregistered",
             (const char *)argv[IDX_HOSTNAME],
             guid,
             age,
             rrdhost_free_ephemeral_time_s);
-        return 0;
+        if (!is_registered)
+            return 0;
     }
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
@@ -555,11 +562,12 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
 
 #define SQL_FETCH_ALL_HOSTS                                                                                            \
     "SELECT host_id, hostname, registry_hostname, update_every, os, "                                                  \
-    "timezone, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "                                   \
+    "timezone, hops, memory_mode, abbrev_timezone, utc_offset, program_name, "                                         \
     "program_version, entries, health_enabled, last_connected, "                                                       \
     "(SELECT CASE WHEN hl.label_value = 'true' THEN 1 ELSE 0 END FROM "                                                \
-    "host_label hl WHERE hl.host_id = h.host_id AND hl.label_key = '_is_ephemeral')  "                                 \
-    "FROM host h WHERE hops > 0"
+    "host_label hl WHERE hl.host_id = h.host_id AND hl.label_key = '_is_ephemeral'),  "                                \
+    "(SELECT CASE WHEN ni.node_id is NULL THEN 0 ELSE 1 END FROM "                                                     \
+    "node_instance ni WHERE ni.host_id = h.host_id) FROM host h WHERE hops > 0"
 
 #define SQL_FETCH_ALL_INSTANCES                                                                                        \
     "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni "                                                     \
