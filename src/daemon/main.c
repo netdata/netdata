@@ -2053,6 +2053,8 @@ int main(int argc, char **argv) {
                 exit(1);
             }
         }
+        if (sqlite_library_init())
+            fatal("Failed to initialize sqlite library");
 
         // --------------------------------------------------------------------
         // Initialize ML configuration
