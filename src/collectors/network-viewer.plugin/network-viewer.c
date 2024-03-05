@@ -798,6 +798,7 @@ static inline void ebpf_networkviewer_disable_probes(struct networkviewer_bpf *o
     bpf_program__set_autoload(obj->progs.netdata_nv_tcp_v6_connect_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_tcp_retransmit_skb_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_tcp_cleanup_rbuf_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_close_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_udp_recvmsg_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_tcp_sendmsg_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_udp_sendmsg_kprobe, false);
@@ -811,6 +812,7 @@ static inline void ebpf_networkviewer_disable_trampoline(struct networkviewer_bp
     bpf_program__set_autoload(obj->progs.netdata_nv_tcp_v6_connect_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_tcp_retransmit_skb_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_tcp_cleanup_rbuf_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_close_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_udp_recvmsg_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_tcp_sendmsg_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_nv_udp_sendmsg_fentry, false);
@@ -833,6 +835,9 @@ static void ebpf_networkviewer_set_trampoline_target(struct networkviewer_bpf *o
 
     bpf_program__set_attach_target(obj->progs.netdata_nv_tcp_cleanup_rbuf_fentry, 0,
                                    targets[NETDATA_FCNT_CLEANUP_RBUF].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_tcp_close_fentry, 0,
+                                   targets[NETDATA_FCNT_TCP_CLOSE].name);
 
     bpf_program__set_attach_target(obj->progs.netdata_nv_udp_recvmsg_fentry, 0,
                                    targets[NETDATA_FCNT_UDP_RECEVMSG].name);
@@ -880,6 +885,13 @@ static int ebpf_networkviewer_attach_probes(struct networkviewer_bpf *obj, netda
                                                                                false,
                                                                                targets[NETDATA_FCNT_CLEANUP_RBUF].name);
     ret = libbpf_get_error(obj->links.netdata_nv_tcp_cleanup_rbuf_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_tcp_close_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_close_kprobe,
+                                                                        false,
+                                                                        targets[NETDATA_FCNT_TCP_CLOSE].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_tcp_close_kprobe);
     if (ret)
         return -1;
 
