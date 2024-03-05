@@ -1515,6 +1515,8 @@ int main(int argc, char **argv) {
 
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
+                            if (sqlite_library_init())
+                                return 1;
 
                             if (pluginsd_parser_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
@@ -1538,6 +1540,7 @@ int main(int argc, char **argv) {
                             if (ctx_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
+                            sqlite_library_shutdown();
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
