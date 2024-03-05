@@ -86,6 +86,9 @@ jobs:
     outputs:
       tags: ${{ steps.tag.outputs.tags }}
     steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
       - name: Generate Tags
         id: tag
         run: |
