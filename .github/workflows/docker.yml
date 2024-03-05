@@ -146,6 +146,7 @@ jobs:
       - name: Docker Hub Login
         id: docker-hub-login
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        continue-on-error: true
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
@@ -153,6 +154,7 @@ jobs:
 #      - name: GitHub Container Registry Login
 #        id: ghcr-login
 #        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+#        continue-on-error: true
 #        uses: docker/login-action@v3
 #        with:
 #          registry: ghcr.io
@@ -161,6 +163,7 @@ jobs:
       - name: Quay.io Login
         id: quay-login
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        continue-on-error: true
         uses: docker/login-action@v3
         with:
           registry: quay.io
@@ -173,12 +176,27 @@ jobs:
         with:
           platforms: ${{ matrix.platform }}
           tags: ${{ needs.gen-tags.outputs.tags }}
+          load: true
           build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
-          outputs: ${{ steps.gen-config.outputs.output-config }}
       - name: Test Image
         id: test
         if: needs.file-check.outputs.run == 'true' && matrix.platform == 'linux/amd64'
         run: .github/scripts/docker-test.sh
+      - name: Push to Docker Hub
+        id: push-docker-hub
+        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && steps.docker-hub-login.outcome == 'success'
+        continue-on-error: true
+        run: docker image push 'netdata/netdata@${{ steps.build.outputs.digest }}'
+#      - name: Push to GitHub Container Registry
+#        id: push-ghcr
+#        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && steps.docker-hub-login.outcome == 'success'
+#        continue-on-error: true
+#        run: docker image push 'netdata/netdata@${{ steps.build.outputs.digest }}'
+      - name: Push to Quay.io
+        id: push-quay
+        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && steps.docker-hub-login.outcome == 'success'
+        continue-on-error: true
+        run: docker image push 'quay.io/netdata/netdata@${{ steps.build.outputs.digest }}'
       - name: Export Digest
         id: export-digest
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
@@ -214,6 +232,8 @@ jobs:
               Login to Quay: ${{ steps.quay-login.outcome }}
               Build image: ${{ steps.build.outcome }}
               Test image: ${{ steps.test.outcome }}
+              Push to Docker Hub: ${{ steps.push-docker-hub.outcome }}
+              Push to Quay: ${{ steps.push-quay.outcome }}
               Export digest: ${{ steps.export-digest.outcome }}
               Upload digest: ${{ steps.upload-digest.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
