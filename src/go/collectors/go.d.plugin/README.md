@@ -1,7 +1,7 @@
 <!--
 title: go.d.plugin
 description: "go.d.plugin is an external plugin for Netdata, responsible for running individual data collectors written in Go."
-custom_edit_url: https://github.com/netdata/go.d.plugin/edit/master/README.md
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/README.md"
 sidebar_label: "go.d.plugin"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -40,8 +40,8 @@ the [official installation method](https://github.com/netdata/netdata/blob/maste
 No further action required. If you have used a different installation method and need to set the capabilities manually,
 see the appropriate collector readme.
 
-| Capability          |                                       Required by                                        |
-|:--------------------|:----------------------------------------------------------------------------------------:|
+| Capability          |                                                    Required by                                                     |
+|:--------------------|:------------------------------------------------------------------------------------------------------------------:|
 | CAP_NET_RAW         |      [Ping](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/ping#readme)      |
 | CAP_NET_ADMIN       | [Wireguard](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/wireguard#readme) |
 | CAP_DAC_READ_SEARCH | [Filecheck](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/filecheck#readme) |

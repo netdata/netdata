@@ -1,6 +1,6 @@
 <!--
 title: "tlscfg"
-custom_edit_url: "https://github.com/netdata/go.d.plugin/edit/master/pkg/tlscfg/README.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/pkg/tlscfg/README.md"
 sidebar_label: "tlscfg"
 learn_status: "Published"
 learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
@@ -27,7 +27,7 @@ Just make `TLSConfig` part of your module configuration.
 ```go
 package example
 
-import "github.com/netdata/go.d.plugin/pkg/tlscfg"
+import "github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 
 type Config struct {
 	tlscfg.TLSConfig `yaml:",inline"`
