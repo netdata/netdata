@@ -14,12 +14,18 @@ func newTextHandler() slog.Handler {
 	return slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: Level.lvl,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey && isJournal {
-				return slog.Attr{}
-			}
-			if a.Key == slog.LevelKey {
-				v := a.Value.Any().(slog.Level)
-				a.Value = slog.StringValue(strings.ToLower(v.String()))
+			switch a.Key {
+			case slog.TimeKey:
+				if isJournal {
+					return slog.Attr{}
+				}
+			case slog.LevelKey:
+				lvl := a.Value.Any().(slog.Level)
+				s, ok := customLevels[lvl]
+				if !ok {
+					s = lvl.String()
+				}
+				return slog.String(a.Key, strings.ToLower(s))
 			}
 			return a
 		},
@@ -31,11 +37,18 @@ func newTerminalHandler() slog.Handler {
 		AddSource: true,
 		Level:     Level.lvl,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey {
+			switch a.Key {
+			case slog.TimeKey:
 				return slog.Attr{}
-			}
-			if a.Key == slog.SourceKey && !Level.Enabled(slog.LevelDebug) {
-				return slog.Attr{}
+			case slog.SourceKey:
+				if !Level.Enabled(slog.LevelDebug) {
+					return slog.Attr{}
+				}
+			case slog.LevelKey:
+				lvl := a.Value.Any().(slog.Level)
+				if s, ok := customLevelsTerm[lvl]; ok {
+					return slog.String(a.Key, s)
+				}
 			}
 			return a
 		},
