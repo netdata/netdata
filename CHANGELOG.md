@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Fix ebpf compilation warnings [\#17100](https://github.com/netdata/netdata/pull/17100) ([stelfrag](https://github.com/stelfrag))
+- Remove distributed-data-architecture.md and omit mentions to it [\#17097](https://github.com/netdata/netdata/pull/17097) ([Ancairon](https://github.com/Ancairon))
+- Remove deployment-strategies [\#17096](https://github.com/netdata/netdata/pull/17096) ([Ancairon](https://github.com/Ancairon))
+- delete docs/netdata-security.md and replace links to proper points [\#17094](https://github.com/netdata/netdata/pull/17094) ([Ancairon](https://github.com/Ancairon))
+- fix go.d.plugin/pulsar tests [\#17093](https://github.com/netdata/netdata/pull/17093) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/stretchr/testify from 1.8.4 to 1.9.0 in /src/go/collectors/go.d.plugin [\#17092](https://github.com/netdata/netdata/pull/17092) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Fix cups plugin group owner [\#17087](https://github.com/netdata/netdata/pull/17087) ([tkatsoulas](https://github.com/tkatsoulas))
 - deb packages fix on ioping perms [\#17086](https://github.com/netdata/netdata/pull/17086) ([tkatsoulas](https://github.com/tkatsoulas))
 - Amend the logic of ebpf-plugin package suggestion for network-viewer plugin [\#17085](https://github.com/netdata/netdata/pull/17085) ([tkatsoulas](https://github.com/tkatsoulas))
 - rename network plugin post and pre install actions [\#17084](https://github.com/netdata/netdata/pull/17084) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -394,16 +401,6 @@
 - Fix CID 410152 Dereference after null check [\#16502](https://github.com/netdata/netdata/pull/16502) ([stelfrag](https://github.com/stelfrag))
 - proc\_net\_dev: don't create runtime device config by default [\#16501](https://github.com/netdata/netdata/pull/16501) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#16500](https://github.com/netdata/netdata/pull/16500) ([netdatabot](https://github.com/netdatabot))
-- remove discourse badge from readme [\#16499](https://github.com/netdata/netdata/pull/16499) ([ilyam8](https://github.com/ilyam8))
-- add curl example to create\_netdata\_conf\(\) [\#16498](https://github.com/netdata/netdata/pull/16498) ([ilyam8](https://github.com/ilyam8))
-- add /var/log mount to docker [\#16496](https://github.com/netdata/netdata/pull/16496) ([ilyam8](https://github.com/ilyam8))
-- Fix occasional shutdown deadlock [\#16495](https://github.com/netdata/netdata/pull/16495) ([stelfrag](https://github.com/stelfrag))
-- Log2journal improvements part2 [\#16494](https://github.com/netdata/netdata/pull/16494) ([ktsaou](https://github.com/ktsaou))
-- proc\_net\_dev: remove device config section [\#16492](https://github.com/netdata/netdata/pull/16492) ([ilyam8](https://github.com/ilyam8))
-- Spelling fixes to documentation [\#16490](https://github.com/netdata/netdata/pull/16490) ([M4itee](https://github.com/M4itee))
-- Fix builds on macOS due to missing endianness functions [\#16489](https://github.com/netdata/netdata/pull/16489) ([vkalintiris](https://github.com/vkalintiris))
-- log2journal: added missing yaml elements [\#16488](https://github.com/netdata/netdata/pull/16488) ([ktsaou](https://github.com/ktsaou))
-- When unregistering an ephemeral host, delete its chart labels [\#16486](https://github.com/netdata/netdata/pull/16486) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
