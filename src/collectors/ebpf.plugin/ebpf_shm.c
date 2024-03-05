@@ -902,7 +902,7 @@ static void ebpf_create_systemd_shm_charts(int update_every)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely(!w->systemd || (w->systemd && w->flags & NETDATA_EBPF_SERVICES_HAS_SHM_CHART)))
+        if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_SHM_CHART))
             continue;
 
         data_shmat.id = data_shmctl.id = data_shmdt.id = data_shmget.id = w->name;

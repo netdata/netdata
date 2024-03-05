@@ -1102,7 +1102,7 @@ static void ebpf_create_systemd_dc_charts(int update_every)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely(!w->systemd || (w->systemd && w->flags & NETDATA_EBPF_SERVICES_HAS_DC_CHART)))
+        if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_DC_CHART))
             continue;
 
         data_dc_hit_ratio.id = data_dc_not_cache.id = data_dc_not_found.id = data_dc_references.id = w->name;
