@@ -673,6 +673,13 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
     if (rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST))
         rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, "true", RRDLABEL_SRC_CONFIG);
+
+    if(!rrdlabels_exist(host->rrdlabels, "_os"))
+        rrdlabels_add(host->rrdlabels, "_os", string2str(host->os), RRDLABEL_SRC_AUTO);
+
+    if(!rrdlabels_exist(host->rrdlabels, "_hostname"))
+        rrdlabels_add(host->rrdlabels, "_hostname", string2str(host->hostname), RRDLABEL_SRC_AUTO);
+
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
     rrdlabels_destroy(parser->user.new_host_labels);

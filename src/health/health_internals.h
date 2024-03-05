@@ -22,7 +22,6 @@
 #define HEALTH_OS_KEY "os"
 #define HEALTH_PLUGIN_KEY "plugin"
 #define HEALTH_MODULE_KEY "module"
-#define HEALTH_CHARTS_KEY "charts"
 #define HEALTH_LOOKUP_KEY "lookup"
 #define HEALTH_CALC_KEY "calc"
 #define HEALTH_EVERY_KEY "every"
@@ -42,7 +41,6 @@
 #define HEALTH_OPTIONS_KEY "options"
 #define HEALTH_REPEAT_KEY "repeat"
 #define HEALTH_HOST_LABEL_KEY "host labels"
-#define HEALTH_FOREACH_KEY "foreach"
 #define HEALTH_CHART_LABEL_KEY "chart labels"
 
 void alert_action_options_to_buffer_json_array(BUFFER *wb, const char *key, ALERT_ACTION_OPTIONS options);

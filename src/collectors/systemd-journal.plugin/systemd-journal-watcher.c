@@ -300,7 +300,7 @@ void journal_watcher_restart(void) {
 
 void *journal_watcher_main(void *arg __maybe_unused) {
     while(1) {
-        size_t journal_watcher_session_id = journal_watcher_wanted_session_id;
+        size_t journal_watcher_session_id = __atomic_load_n(&journal_watcher_wanted_session_id, __ATOMIC_RELAXED);
 
         Watcher watcher = {
                 .watchList = mallocz(INITIAL_WATCHES * sizeof(WatchEntry)),

@@ -340,7 +340,7 @@ static inline void strip_quotes(char *s) {
     }
 }
 
-#define PARSE_HEALTH_CONFIG_DUPLICATE_STRING_MSG(ax, member) do {                                   \
+#define PARSE_HEALTH_CONFIG_LOG_DUPLICATE_STRING_MSG(ax, member) do {                               \
     if(strcmp(string2str(ax->member), value) != 0)                                                  \
         netdata_log_error(                                                                          \
             "Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, "     \
@@ -351,25 +351,47 @@ static inline void strip_quotes(char *s) {
 
 #define PARSE_HEALTH_CONFIG_LINE_STRING(ax, member) do {                                            \
     if(ax->member) {                                                                                \
-        PARSE_HEALTH_CONFIG_DUPLICATE_STRING_MSG(ax, member);                                       \
+        PARSE_HEALTH_CONFIG_LOG_DUPLICATE_STRING_MSG(ax, member);                                   \
         string_freez(ax->member);                                                                   \
     }                                                                                               \
     ax->member = string_strdupz(value);                                                             \
 } while(0)
 
-#define PARSE_HEALTH_CONFIG_LINE_PATTERN(ax, member) do {                                           \
-    if(ax->member) {                                                                                \
-        PARSE_HEALTH_CONFIG_DUPLICATE_STRING_MSG(ax, member);                                       \
-        string_freez(ax->member);                                                                   \
-    }                                                                                               \
-    if(value && strcmp(value, "*") == 0)                                                            \
+#define PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(ax, member, label) do {                             \
+    const char *_label = label;                                                                     \
+    if(_label && !*_label)                                                                          \
+        _label = NULL;                                                                              \
+                                                                                                    \
+    if(value && (!*value || strcmp(value, "*") == 0))                                               \
         value = NULL;                                                                               \
     else if(value && (strcmp(value, "!* *") == 0 || strcmp(value, "!*") == 0)) {                    \
         value = NULL;                                                                               \
         ap->match.enabled = false;                                                                  \
     }                                                                                               \
-    ax->member = string_strdupz(value);                                                             \
+                                                                                                    \
+    if(value && !_label && !strchr(value, '=')) {                                                   \
+        netdata_log_error(                                                                          \
+            "Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' "            \
+            "with value '%s' that does not match label=pattern. Ignoring it.",                      \
+            line, filename, string2str(ac->name), key, value);                                      \
+        value = NULL;                                                                               \
+    }                                                                                               \
+                                                                                                    \
+    if(value) {                                                                                     \
+        typeof(ax->member) _old = ax->member;                                                       \
+        char _buf[strlen(value) + string_strlen(_old) + (_label ? strlen(_label) : 0) + 3];         \
+        snprintfz(_buf, sizeof(_buf), "%s%s%s%s%s",                                                 \
+                      _label ? _label : "",                                                         \
+                      _label ? "=" : "",                                                            \
+                      value,                                                                        \
+                      _old ? " " : "",                                                              \
+                      _old ? string2str(_old) : "");                                                \
+        string_freez(_old);                                                                         \
+        ax->member = string_strdupz(_buf);                                                          \
+    }                                                                                               \
 } while(0)
+
+
 
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
     netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
@@ -382,7 +404,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             hash_host = 0,
             hash_plugin = 0,
             hash_module = 0,
-            hash_charts = 0,
             hash_calc = 0,
             hash_green = 0,
             hash_red = 0,
@@ -414,7 +435,6 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         hash_host = simple_uhash(HEALTH_HOST_KEY);
         hash_plugin = simple_uhash(HEALTH_PLUGIN_KEY);
         hash_module = simple_uhash(HEALTH_MODULE_KEY);
-        hash_charts = simple_uhash(HEALTH_CHARTS_KEY);
         hash_calc = simple_uhash(HEALTH_CALC_KEY);
         hash_lookup = simple_uhash(HEALTH_LOOKUP_KEY);
         hash_green = simple_uhash(HEALTH_GREEN_KEY);
@@ -542,26 +562,23 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         else if(am->is_template && hash == hash_on && !strcasecmp(key, HEALTH_ON_KEY)) {
             PARSE_HEALTH_CONFIG_LINE_STRING(am, on.context);
         }
-        else if(am->is_template && hash == hash_charts && !strcasecmp(key, HEALTH_CHARTS_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, charts);
-        }
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, os);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(am, host_labels, "_os");
         }
         else if(hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, host);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(am, host_labels, "_hostname");
         }
         else if(hash == hash_host_label && !strcasecmp(key, HEALTH_HOST_LABEL_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, host_labels);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(am, host_labels, NULL);
         }
         else if(hash == hash_plugin && !strcasecmp(key, HEALTH_PLUGIN_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, plugin);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(am, chart_labels, "_collect_plugin");
         }
         else if(hash == hash_module && !strcasecmp(key, HEALTH_MODULE_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, module);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(am, chart_labels, "_collect_module");
         }
         else if(hash == hash_chart_label && !strcasecmp(key, HEALTH_CHART_LABEL_KEY)) {
-            PARSE_HEALTH_CONFIG_LINE_PATTERN(am, chart_labels);
+            PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND(am, chart_labels, NULL);
         }
         else if(hash == hash_class && !strcasecmp(key, HEALTH_CLASS_KEY)) {
             strip_quotes(value);
@@ -680,7 +697,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             ac->has_custom_repeat_config = true;
         }
         else {
-            if (strcmp(key, "families") != 0)
+            if (strcmp(key, "families") != 0 && strcmp(key, "charts") != 0)
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm/template '%s' has unknown key '%s'.",
                     line, filename, string2str(ac->name), key);

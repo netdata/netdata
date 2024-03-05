@@ -329,13 +329,6 @@ struct query_timings {
     usec_t finished_ut;
 };
 
-struct label_pattern_list {
-    BUFFER **buffer_list;
-    STRING **key;
-    SIMPLE_PATTERN **labels_pattern;
-    size_t size;
-};
-
 #define query_view_update_every(qt) ((qt)->window.group * (qt)->window.query_granularity)
 
 typedef struct query_target {
@@ -386,7 +379,6 @@ typedef struct query_target {
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
         SIMPLE_PATTERN *labels_pattern;
-        struct label_pattern_list *label_pattern_list;
         SIMPLE_PATTERN *alerts_pattern;
         SIMPLE_PATTERN *chart_label_key_pattern;
     } instances;
@@ -469,14 +461,9 @@ struct sql_alert_config_data {
         const char *on_template;
         const char *on_key;
 
-        const char *os;
-        const char *hosts;
         const char *families;
-        const char *plugin;
-        const char *module;
         const char *host_labels;
         const char *chart_labels;
-        const char *charts;
     } selectors;
 
     const char *info;

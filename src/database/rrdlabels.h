@@ -5,6 +5,16 @@
 
 #include "rrd.h"
 
+struct pattern_array_item {
+    Word_t size;
+    Pvoid_t JudyL;
+};
+
+struct pattern_array {
+    Word_t key_count;
+    Pvoid_t JudyL;
+};
+
 typedef enum __attribute__ ((__packed__)) rrdlabel_source {
     RRDLABEL_SRC_AUTO       = (1 << 0), // set when Netdata found the label by some automation
     RRDLABEL_SRC_CONFIG     = (1 << 1), // set when the user configured the label
@@ -51,6 +61,20 @@ void rrdlabels_to_buffer_json_members(RRDLABELS *labels, BUFFER *wb);
 void rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src);
 void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src);
 size_t rrdlabels_common_count(RRDLABELS *labels1, RRDLABELS *labels2);
+
+struct pattern_array *pattern_array_allocate();
+struct pattern_array *
+pattern_array_add_key_value(struct pattern_array *pa, const char *key, const char *value, char sep);
+bool pattern_array_label_match(
+    struct pattern_array *pa,
+    RRDLABELS *labels,
+    char eq,
+    size_t *searches,
+    bool (*callback_function)(RRDLABELS *, SIMPLE_PATTERN *, char, size_t *));
+struct pattern_array *pattern_array_add_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep);
+struct pattern_array *
+pattern_array_add_key_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *pattern);
+void pattern_array_free(struct pattern_array *pa);
 
 int rrdlabels_unittest(void);
 

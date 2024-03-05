@@ -289,24 +289,6 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     rc->rrdset = NULL;
 }
 
-static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
-    if (   (rc->chart != st->id)
-        && (rc->chart != st->name))
-        return false;
-
-    if (rc->match.module_pattern && !simple_pattern_matches_string(rc->match.module_pattern, st->module_name))
-        return false;
-
-    if (rc->match.plugin_pattern && !simple_pattern_matches_string(rc->match.plugin_pattern, st->module_name))
-        return false;
-
-    if (st->rrdlabels && rc->match.chart_labels_pattern && !rrdlabels_match_simple_pattern_parsed(
-            st->rrdlabels, rc->match.chart_labels_pattern, '=', NULL))
-        return false;
-
-    return true;
-}
-
 // ----------------------------------------------------------------------------
 // RRDCALC rrdhost index management - constructor
 
@@ -493,26 +475,11 @@ void rrd_alert_match_cleanup(struct rrd_alert_match *am) {
     else
         string_freez(am->on.chart);
 
-    string_freez(am->os);
-    simple_pattern_free(am->os_pattern);
-
-    string_freez(am->host);
-    simple_pattern_free(am->host_pattern);
-
-    string_freez(am->plugin);
-    simple_pattern_free(am->plugin_pattern);
-
-    string_freez(am->module);
-    simple_pattern_free(am->module_pattern);
-
-    string_freez(am->charts);
-    simple_pattern_free(am->charts_pattern);
-
     string_freez(am->host_labels);
-    simple_pattern_free(am->host_labels_pattern);
+    pattern_array_free(am->host_labels_pattern);
 
     string_freez(am->chart_labels);
-    simple_pattern_free(am->chart_labels_pattern);
+    pattern_array_free(am->chart_labels_pattern);
 }
 
 void rrd_alert_config_cleanup(struct rrd_alert_config *ac) {

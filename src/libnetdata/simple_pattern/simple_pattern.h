@@ -5,7 +5,6 @@
 
 #include "../libnetdata.h"
 
-
 typedef enum __attribute__ ((__packed__)) {
     SIMPLE_PATTERN_EXACT,
     SIMPLE_PATTERN_PREFIX,
@@ -19,7 +18,8 @@ typedef enum __attribute__ ((__packed__)) {
     SP_MATCHED_POSITIVE,
 } SIMPLE_PATTERN_RESULT;
 
-typedef void SIMPLE_PATTERN;
+struct simple_pattern;
+typedef struct simple_pattern SIMPLE_PATTERN;
 
 // create a simple_pattern from the string given
 // default_mode is used in cases where EXACT matches, without an asterisk,
@@ -46,9 +46,6 @@ void simple_pattern_free(SIMPLE_PATTERN *list);
 void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p) ;
 int simple_pattern_is_potential_name(SIMPLE_PATTERN *p) ;
 char *simple_pattern_iterate(SIMPLE_PATTERN **p);
-
-// Auxiliary function to create a pattern
-char *simple_pattern_trim_around_equal(const char *src);
 
 #define SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS ",|\t\r\n\f\v"
 

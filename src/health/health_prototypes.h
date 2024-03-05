@@ -19,21 +19,11 @@ struct rrd_alert_match {
         STRING *context;
     } on;
 
-    STRING *os;
-    STRING *host;
-    STRING *charts;                         // the charts that should be linked to (for templates)
-    STRING *plugin;                         // the plugin name that should be linked to
-    STRING *module;                         // the module name that should be linked to
     STRING *host_labels;                    // the label read from an alarm file
     STRING *chart_labels;                   // the chart label read from an alarm file
 
-    SIMPLE_PATTERN *os_pattern;
-    SIMPLE_PATTERN *host_pattern;
-    SIMPLE_PATTERN *charts_pattern;         // the simple pattern of charts
-    SIMPLE_PATTERN *plugin_pattern;         // the simple pattern of plugin
-    SIMPLE_PATTERN *module_pattern;         // the simple pattern of module
-    SIMPLE_PATTERN *host_labels_pattern;    // the simple pattern of labels
-    SIMPLE_PATTERN *chart_labels_pattern;   // the simple pattern of chart labels
+    struct pattern_array *host_labels_pattern;
+    struct pattern_array *chart_labels_pattern;
 };
 void rrd_alert_match_cleanup(struct rrd_alert_match *am);
 

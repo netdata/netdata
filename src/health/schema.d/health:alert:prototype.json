@@ -12,11 +12,6 @@
         "default": "*",
         "title": "Only for nodes with these host labels"
       },
-      "matchHostnames": {
-        "type": "string",
-        "default": "*",
-        "title": "Only for these hostnames"
-      },
       "matchInstance": {
         "type": "object",
         "title": "Apply this rule to a single instance",
@@ -29,15 +24,10 @@
             "description": "You can find the instance names on all charts at the instances drop down menu. Do not include the host name in this field."
           },
           "host_labels": { "$ref": "#/definitions/matchHostLabels" },
-          "host": { "$ref": "#/definitions/matchHostnames" },
           "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" }
         },
         "required": [
           "on",
-          "os",
-          "host",
-          "plugin",
-          "module",
           "host_labels",
           "instance_labels"
         ]
@@ -54,22 +44,11 @@
             "description": "The context is the code-name of each chart on the dashboard, that appears at the chart title bar, between the chart title and its unit of measurement, like: system.cpu, disk.io, etc."
           },
           "host_labels": { "$ref": "#/definitions/matchHostLabels" },
-          "host": { "$ref": "#/definitions/matchHostnames" },
-          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" },
-          "instances": {
-            "type": "string",
-            "default": "*",
-            "title": "On on these instances"
-          }
+          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" }
         },
         "required": [
           "on",
-          "os",
-          "host",
-          "plugin",
-          "module",
           "host_labels",
-          "instances",
           "instance_labels"
         ]
       },
@@ -105,7 +84,7 @@
           },
           "value": {
             "type": "object",
-            "title": "Alert Value Calculation",
+            "title": "",
             "description": "Each alert has a value. This section defines how this value is calculated.",
             "properties": {
               "database_lookup": {
@@ -210,7 +189,7 @@
           },
           "conditions": {
             "type": "object",
-            "title": "Conditions to trigger the alert",
+            "title": "",
             "properties": {
               "warning_condition": {
                 "type": "string",
@@ -242,7 +221,7 @@
           },
           "action": {
             "type": "object",
-            "title": "Alert Action (notification or automation)",
+            "title": "",
             "description": "The action the alert should take when it transitions states",
             "properties": {
               "execute": {
@@ -393,19 +372,11 @@
           },
           "host_labels": {
             "ui:help": "A simple pattern to match the node labels of the nodes this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard.",
-            "ui:classNames": "dyncfg-grid-col-span-1-4"
-          },
-          "host": {
-            "ui:classNames": "dyncfg-grid-col-span-5-2",
-            "ui:help": "A simple pattern to match the hostnames of the nodes this rule is to be applied to."
+            "ui:classNames": "dyncfg-grid-col-span-1-3"
           },
           "instance_labels": {
-            "ui:classNames": "dyncfg-grid-col-span-1-4",
+            "ui:classNames": "dyncfg-grid-col-span-4-3",
             "ui:help": "A simple pattern to match the instance labels of the instances this rule is to be applied to. A space separated list of label=value pairs is accepted. Asterisks can be placed anywhere, including the label key. The label keys and their values are available at the labels filter of the charts on the dashboard."
-          },
-          "instances": {
-            "ui:classNames": "dyncfg-grid-col-span-5-2",
-            "ui:help": "A simple pattern to match the instance names of the instances this rule is to be applied to."
           }
         },
         "config": {
@@ -462,8 +433,8 @@
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "database_lookup": {
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
-              "ui:Collapsible": true,
-              "ui:InitiallyExpanded": true,
+              "ui:collapsible": true,
+              "ui:initiallyExpanded": true,
               "after": {
                 "ui:help": "The oldest timestamp of the time-series data to be included in the query. Negative values define a duration in seconds in the past of 'To' (so, -60 means a minute ago from 'To').",
                 "ui:classNames": "dyncfg-grid-col-span-1-1"
@@ -523,8 +494,8 @@
               "ui:help": "Options related to the actions this alert will take."
             },
             "delay": {
-              "ui:Collapsible": true,
-              "ui:InitiallyExpanded": false,
+              "ui:collapsible": true,
+              "ui:initiallyExpanded": false,
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "up": {
                 "ui:classNames": "dyncfg-grid-col-span-1-2",
@@ -544,8 +515,8 @@
               }
             },
             "repeat": {
-              "ui:Collapsible": true,
-              "ui:InitiallyExpanded": false,
+              "ui:collapsible": true,
+              "ui:initiallyExpanded": false,
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "enabled": {
                 "ui:classNames": "dyncfg-grid-col-span-1-2"

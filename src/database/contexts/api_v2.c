@@ -1319,14 +1319,9 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
             buffer_json_member_add_string(wb, "type", is_template ? "template" : "alarm");
             buffer_json_member_add_string(wb, "on", is_template ? t->selectors.on_template : t->selectors.on_key);
 
-            buffer_json_member_add_string(wb, "os", t->selectors.os);
-            buffer_json_member_add_string(wb, "hosts", t->selectors.hosts);
             buffer_json_member_add_string(wb, "families", t->selectors.families);
-            buffer_json_member_add_string(wb, "plugin", t->selectors.plugin);
-            buffer_json_member_add_string(wb, "module", t->selectors.module);
             buffer_json_member_add_string(wb, "host_labels", t->selectors.host_labels);
             buffer_json_member_add_string(wb, "chart_labels", t->selectors.chart_labels);
-            buffer_json_member_add_string(wb, "charts", t->selectors.charts);
         }
         buffer_json_object_close(wb); // selectors
 

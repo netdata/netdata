@@ -897,12 +897,12 @@ void sql_health_alarm_log_load(RRDHOST *host)
  */
 #define SQL_STORE_ALERT_CONFIG_HASH                                                                                     \
     "insert or replace into alert_hash (hash_id, date_updated, alarm, template, "                                       \
-    "on_key, class, component, type, os, hosts, lookup, every, units, calc, plugin, module, "                           \
-    "charts, green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, "                         \
+    "on_key, class, component, type, lookup, every, units, calc, "                                                      \
+    "green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, "                                 \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, "                              \
     "p_db_lookup_before, p_update_every, source, chart_labels, summary) values (@hash_id,UNIXEPOCH(),@alarm,@template," \
-    "@on_key,@class,@component,@type,@os,@hosts,@lookup,@every,@units,@calc,@plugin,@module,"                           \
-    "@charts,@green,@red,@warn,@crit,@exec,@to_key,@info,@delay,@options,@repeat,@host_labels,"                         \
+    "@on_key,@class,@component,@type,@lookup,@every,@units,@calc,"                                                      \
+    "@green,@red,@warn,@crit,@exec,@to_key,@info,@delay,@options,@repeat,@host_labels,"                                 \
     "@p_db_lookup_dimensions,@p_db_lookup_method,@p_db_lookup_options,@p_db_lookup_after,"                              \
     "@p_db_lookup_before,@p_update_every,@source,@chart_labels,@summary)"
 
@@ -966,14 +966,6 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.os, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.host, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
     rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.lookup, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
@@ -990,18 +982,6 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
         rc = sqlite3_bind_text(res, ++param, expression_source(ap->config.calculation), -1, SQLITE_STATIC);
     else
         rc = sqlite3_bind_null(res, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.plugin, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.module, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.charts, ++param);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1855,8 +1835,8 @@ done_only_drop:
 #define SQL_POPULATE_TEMP_CONFIG_TARGET_TABLE "INSERT INTO c_%p (hash_id) VALUES (@hash_id)"
 
 #define SQL_SEARCH_CONFIG_LIST                                                                                         \
-    "SELECT ah.hash_id, alarm, template, on_key, class, component, type, os, hosts, lookup, every, "                   \
-    " units, calc, families, plugin, module, charts, green, red, warn, crit, "                                         \
+    "SELECT ah.hash_id, alarm, template, on_key, class, component, type, lookup, every, "                              \
+    " units, calc, families, green, red, warn, crit, "                                                                 \
     " exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, "           \
     " p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every, source, chart_labels, summary "      \
     " FROM alert_hash ah, c_%p t where ah.hash_id = t.hash_id"
@@ -1938,16 +1918,11 @@ int sql_get_alert_configuration(
         acd.classification = (const char *) sqlite3_column_text(res, param++);
         acd.component = (const char *) sqlite3_column_text(res, param++);
         acd.type = (const char *) sqlite3_column_text(res, param++);
-        acd.selectors.os = (const char *) sqlite3_column_text(res, param++);
-        acd.selectors.hosts = (const char *) sqlite3_column_text(res, param++);
         acd.value.db.lookup = (const char *) sqlite3_column_text(res, param++);
         acd.value.every = (const char *) sqlite3_column_text(res, param++);
         acd.value.units = (const char *) sqlite3_column_text(res, param++);
         acd.value.calc = (const char *) sqlite3_column_text(res, param++);
         acd.selectors.families = (const char *) sqlite3_column_text(res, param++);
-        acd.selectors.plugin = (const char *) sqlite3_column_text(res, param++);
-        acd.selectors.module = (const char *) sqlite3_column_text(res, param++);
-        acd.selectors.charts = (const char *) sqlite3_column_text(res, param++);
         acd.status.green = (const char *) sqlite3_column_text(res, param++);
         acd.status.red = (const char *) sqlite3_column_text(res, param++);
         acd.status.warn = (const char *) sqlite3_column_text(res, param++);
