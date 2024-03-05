@@ -104,7 +104,7 @@ modules:
                 Metrics of databases matching the selector will be collected.
 
                 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-                - Pattern syntax: [matcher](https://github.com/netdata/go.d.plugin/tree/master/pkg/matcher#supported-format).
+                - Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#supported-format).
                 - Syntax:
 
                   ```yaml
