@@ -24,18 +24,18 @@ sidebar_position: 20
 ## Write and test a simple collector
 
 > :exclamation: You can skip most of these steps if you first experiment directy with the existing 
-> [example module](https://github.com/netdata/go.d.plugin/tree/master/modules/example), which will 
+> [example module](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/example), which will 
 > give you an idea of  how things work.
 
 Let's assume you want to write a collector named `example2`.
 
 The steps are:
 
-- Add the source code to [`modules/example2/`](https://github.com/netdata/go.d.plugin/tree/master/modules).
+- Add the source code to [`modules/example2/`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules).
     - [module interface](#module-interface).
     - [suggested module layout](#module-layout).
     - [helper packages](#helper-packages).
-- Add the configuration to [`config/go.d/example2.conf`](https://github.com/netdata/go.d.plugin/tree/master/config/go.d).
+- Add the configuration to [`config/go.d/example2.conf`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/config/go.d).
 - Add the module to [`config/go.d.conf`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/config/go.d.conf).
 - Import the module in [`modules/init.go`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/init.go).
 - Update the [`available modules list`](https://github.com/netdata/go.d.plugin#available-modules).
@@ -285,5 +285,5 @@ be [`testdata`](https://golang.org/cmd/go/#hdr-Package_lists_and_patterns).
 
 ## Helper packages
 
-There are [some helper packages](https://github.com/netdata/go.d.plugin/tree/master/pkg) for writing a module.
+There are [some helper packages](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg) for writing a module.
 
