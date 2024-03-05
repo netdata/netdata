@@ -1,4 +1,13 @@
 ---
+# Handle building docker images both for CI checks and for eleases.
+#
+# The case of releaases is unfortunately rather complicated, as Docker
+# tooling does not have great support for handling of multiarch images
+# published to multiple registries. As a result, we have to build the
+# images, export the cache, and then _rebuild_ the images using the exported
+# cache but with different output parameters for buildx. We also need to
+# do the second build step as a separate job for each registry so that a
+# failure to publish one place won’t break publishing elsewhere.
 name: Docker
 on:
   push:
@@ -23,14 +32,19 @@ jobs:
     outputs:
       run: ${{ steps.check-run.outputs.run }}
     steps:
+      - name: Skip File Check
+        if: github.event_name == 'workflow_dispatch'
+        run: echo 'run=true' >> "${GITHUB_OUTPUT}"
       - name: Checkout
         id: checkout
+        if: github.event_name != 'workflow_dispatch'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Check files
         id: check-files
+        if: github.event_name != 'workflow_dispatch'
         uses: tj-actions/changed-files@v42
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
@@ -65,6 +79,7 @@ jobs:
             **/*.md
       - name: List all changed files in pattern
         continue-on-error: true
+        if: github.event_name != 'workflow_dispatch'
         env:
           ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
         run: |
@@ -73,6 +88,7 @@ jobs:
           done
       - name: Check Run
         id: check-run
+        if: github.event_name != 'workflow_dispatch'
         run: |
           if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
@@ -80,9 +96,102 @@ jobs:
             echo 'run=false' >> "${GITHUB_OUTPUT}"
           fi
 
+  build-images:
+    name: Build Docker Images
+    needs:
+      - file-check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/i386
+          - linux/arm/v7
+          - linux/arm64
+          - linux/ppc64le
+      # Fail fast on releases, but run everything to completion on other triggers.
+      fail-fast: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Generate Artifact Name
+        id: artifact-name
+        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
+      - name: Mark image as official
+        id: env
+        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
+      - name: Setup QEMU
+        id: qemu
+        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64' && needs.file-check.outputs.run == 'true'
+        uses: docker/setup-qemu-action@v3
+      - name: Setup Buildx
+        id: prepare
+        if: needs.file-check.outputs.run == 'true'
+        uses: docker/setup-buildx-action@v3
+      - name: Build Image
+        id: build
+        if: needs.file-check.outputs.run == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          platforms: ${{ matrix.platform }}
+          tags: netdata/netdata:test
+          load: true
+          cache-to: type=local,dest=/tmp/build-cache,mode=max
+          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+      - name: Test Image
+        id: test
+        if: needs.file-check.outputs.run == 'true' && matrix.platform == 'linux/amd64'
+        run: .github/scripts/docker-test.sh
+      - name: Upload Cache
+        id: upload-cache
+        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cache-${{ steps.artifact-name.outputs.platform }}
+          path: /tmp/build-cache/*
+          retention-days: 1
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Docker build failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Building or testing Docker image for ${{ matrix.platform }} failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Determine artifact name: ${{ steps.artifact-name.outcome }}
+              Setup environment: ${{ steps.env.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup buildx: ${{ steps.prepare.outcome }}
+              Build image: ${{ steps.build.outcome }}
+              Test image: ${{ steps.test.outcome }}
+              Upload build cache: ${{ steps.upload-cache.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
+
   gen-tags:
     name: Generate Docker Tags
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     outputs:
       tags: ${{ steps.tag.outputs.tags }}
     steps:
@@ -98,12 +207,12 @@ jobs:
             echo "tags=$(.github/scripts/gen-docker-tags.py ${{ github.event_name }} '')" >> "${GITHUB_OUTPUT}"
           fi
 
-  build-images:
-    name: Build Docker Images
+  build-images-docker-hub:
+    name: Push Images to Docker Hub
+    if: github.event_name == 'workflow_dispatch'
     needs:
-      - file-check
+      - build-images
       - gen-tags
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         platform:
@@ -112,104 +221,62 @@ jobs:
           - linux/arm/v7
           - linux/arm64
           - linux/ppc64le
-      # Fail fast on releases so that we minimize the number of ‘dead’
-      # images we push, but run everything to completion on other triggers.
-      fail-fast: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Skip Check
-        id: skip
-        if: needs.file-check.outputs.run != 'true'
-        run: echo "SKIPPED"
       - name: Checkout
         id: checkout
-        if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
+      - name: Generate Artifact Name
+        id: artifact-name
+        run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
+      - name: Download Cache
+        id: fetch-cache
+        uses: actions/download-artifact@v4
+        with:
+          name: cache-${{ steps.artifact-name.outputs.platform }}
+          path: /tmp/build-cache
       - name: Mark image as official
         id: env
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        if: github.repository == 'netdata/netdata'
         run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
-      - name: Generate Build Output Config
-        id: gen-config
-        if: needs.file-check.outputs.run == 'true'
-        run: echo "output-config=$(.github/scripts/gen-docker-build-output.py ${{ github.event_name }})" >> "${GITHUB_OUTPUT}"
       - name: Setup QEMU
         id: qemu
-        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64' && needs.file-check.outputs.run == 'true'
+        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64'
         uses: docker/setup-qemu-action@v3
       - name: Setup Buildx
         id: prepare
-        if: needs.file-check.outputs.run == 'true'
         uses: docker/setup-buildx-action@v3
-      - name: Docker Hub Login
-        id: docker-hub-login
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-        continue-on-error: true
+      - name: Registry Login
+        id: login
+        if: github.repository == 'netdata/netdata'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
-#      - name: GitHub Container Registry Login
-#        id: ghcr-login
-#        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-#        continue-on-error: true
-#        uses: docker/login-action@v3
-#        with:
-#          registry: ghcr.io
-#          username: ${{ github.repository_owner }}
-#          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Quay.io Login
-        id: quay-login
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-        continue-on-error: true
-        uses: docker/login-action@v3
-        with:
-          registry: quay.io
-          username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
-          password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Build Image
         id: build
-        if: needs.file-check.outputs.run == 'true'
         uses: docker/build-push-action@v5
         with:
           platforms: ${{ matrix.platform }}
-          tags: ${{ needs.gen-tags.outputs.tags }}
-          load: true
+          cache-from: type=local,src=/tmp/build-cache
           build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
-      - name: Test Image
-        id: test
-        if: needs.file-check.outputs.run == 'true' && matrix.platform == 'linux/amd64'
-        run: .github/scripts/docker-test.sh
-      - name: Push to Docker Hub
-        id: push-docker-hub
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && steps.docker-hub-login.outcome == 'success'
-        continue-on-error: true
-        run: docker image push 'netdata/netdata@${{ steps.build.outputs.digest }}'
-#      - name: Push to GitHub Container Registry
-#        id: push-ghcr
-#        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && steps.docker-hub-login.outcome == 'success'
-#        continue-on-error: true
-#        run: docker image push 'netdata/netdata@${{ steps.build.outputs.digest }}'
-      - name: Push to Quay.io
-        id: push-quay
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch' && steps.docker-hub-login.outcome == 'success'
-        continue-on-error: true
-        run: docker image push 'quay.io/netdata/netdata@${{ steps.build.outputs.digest }}'
+          outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
         id: export-digest
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        if: github.repository == 'netdata/netdata'
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
       - name: Upload digest
         id: upload-digest
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
+        if: github.repository == 'netdata/netdata'
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ env.PLATFORM_PAIR }}
+          name: docker-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -219,37 +286,32 @@ jobs:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Docker build failed:'
+          SLACK_TITLE: 'Docker Hub upload failed:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: Building or testing Docker image for ${{ matrix.platform }} failed.
+              ${{ github.repository }}: Creating or uploading Docker image for ${{ matrix.platform }} on Docker Hub failed.
               Checkout: ${{ steps.checkout.outcome }}
+              Determine artifact name: ${{ steps.artifact-name.outcome }}
+              Fetch build cache: ${{ steps.fetch-cache.outcome }}
               Setup environment: ${{ steps.env.outcome }}
-              Generate Build Output Config: ${{ steps.gen-config.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
-              Login to DockerHub: ${{ steps.docker-hub-login.outcome }}
-              Login to Quay: ${{ steps.quay-login.outcome }}
+              Login to registry: ${{ steps.login.outcome }}
               Build image: ${{ steps.build.outcome }}
-              Test image: ${{ steps.test.outcome }}
-              Push to Docker Hub: ${{ steps.push-docker-hub.outcome }}
-              Push to Quay: ${{ steps.push-quay.outcome }}
               Export digest: ${{ steps.export-digest.outcome }}
               Upload digest: ${{ steps.upload-digest.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
             failure()
-            && github.event_name != 'pull_request'
             && github.repository == 'netdata/netdata'
-            && needs.file-check.outputs.run == 'true'
           }}
 
-  publish:
-    name: Consolidate and tag images
+  publish-docker-hub:
+    name: Consolidate and tag images for DockerHub
     if: github.event_name == 'workflow_dispatch'
     needs:
-      - build-images
+      - build-images-docker-hub
       - gen-tags
     runs-on: ubuntu-latest
     steps:
@@ -258,69 +320,188 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
-          pattern: digests-*
+          pattern: docker-digests-*
           merge-multiple: true
       - name: Setup Buildx
         id: prepare
         uses: docker/setup-buildx-action@v3
-      - name: Docker Hub Login
-        id: docker-hub-login
+      - name: Registry Login
+        id: login
         if: github.repository == 'netdata/netdata'
-        continue-on-error: true
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
-      - name: GitHub Container Registry Login
-        id: ghcr-login
+      - name: Create and Push Manifest
+        id: manifest
         if: github.repository == 'netdata/netdata'
-        continue-on-error: true
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Quay.io Login
-        id: quay-login
-        if: github.repository == 'netdata/netdata'
-        continue-on-error: true
-        uses: docker/login-action@v3
-        with:
-          registry: quay.io
-          username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
-          password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
-      - name: Create and Push Manifest for Docker Hub
-        id: docker-hub-push
-        if: github.repository == 'netdata/netdata' && steps.docker-hub-login.outcome == 'success'
-        continue-on-error: true
         run: docker buildx imagetool create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' ${{ needs.gen-tags.outputs.tags }})
-#      - name: Create and Push Manifest for GitHub Container Registry
-#        id: ghcr-push
-#        if: github.repository == 'netdata/netdata' && steps.ghcr-login.outcome == 'success'
-#        continue-on-error: true
-#        run: docker buildx imagetool create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' ${{ needs.gen-tags.outputs.tags }})
-      - name: Create and Push Manifest for Quay.io
-        id: quay-push
-        if: github.repository == 'netdata/netdata' && steps.quay-login.outcome == 'success'
-        continue-on-error: true
-        run: docker buildx imagetool create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' ${{ needs.gen-tags.outputs.tags }})
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Publishing Docker images failed:'
+          SLACK_TITLE: 'Publishing Docker images to Docker Hub failed:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: Publishing Docker images failed.
+              ${{ github.repository }}: Publishing Docker images to Docker Hub failed.
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
-              Login to DockerHub: ${{ steps.docker-hub-login.outcome }}
-              Login to GHCR: ${{ steps.ghcr-login.outcome }}
-              Login to Quay: ${{ steps.quay-login.outcome }}
-              Publish DockerHub: ${{ steps.docker-hub-push.outcome }}
-              Publish Quay: ${{ steps.quay-push.outcome }}
+              Login to registry: ${{ steps.login.outcome }}
+              Create and push manifest: ${{ steps.manifest.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.repository == 'netdata/netdata'
+          }}
+
+  build-images-quay:
+    name: Push Images to Quay.io
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - build-images
+      - gen-tags
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/i386
+          - linux/arm/v7
+          - linux/arm64
+          - linux/ppc64le
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Generate Artifact Name
+        id: artifact-name
+        run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
+      - name: Download Cache
+        id: fetch-cache
+        uses: actions/download-artifact@v4
+        with:
+          name: cache-${{ steps.artifact-name.outputs.platform }}
+          path: /tmp/build-cache
+      - name: Mark image as official
+        id: env
+        if: github.repository == 'netdata/netdata'
+        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
+      - name: Setup QEMU
+        id: qemu
+        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64'
+        uses: docker/setup-qemu-action@v3
+      - name: Setup Buildx
+        id: prepare
+        uses: docker/setup-buildx-action@v3
+      - name: Registry Login
+        id: login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
+          password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
+      - name: Build Image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          platforms: ${{ matrix.platform }}
+          cache-from: type=local,src=/tmp/build-cache
+          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+          outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
+      - name: Export Digest
+        id: export-digest
+        if: github.repository == 'netdata/netdata'
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      - name: Upload digest
+        id: upload-digest
+        if: github.repository == 'netdata/netdata'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quay-digests-${{ steps.artifact-name.outputs.platform }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Quay.io upload failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Creating or uploading Docker image for ${{ matrix.platform }} on Quay.io failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Determine artifact name: ${{ steps.artifact-name.outcome }}
+              Fetch build cache: ${{ steps.fetch-cache.outcome }}
+              Setup environment: ${{ steps.env.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup buildx: ${{ steps.prepare.outcome }}
+              Login to registry: ${{ steps.login.outcome }}
+              Build image: ${{ steps.build.outcome }}
+              Export digest: ${{ steps.export-digest.outcome }}
+              Upload digest: ${{ steps.upload-digest.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.repository == 'netdata/netdata'
+          }}
+
+  publish-quay:
+    name: Consolidate and tag images for Quay.io
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - build-images-quay
+      - gen-tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        id: fetch-digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: quay-digests-*
+          merge-multiple: true
+      - name: Setup Buildx
+        id: prepare
+        uses: docker/setup-buildx-action@v3
+      - name: Registry Login
+        id: login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
+          password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
+      - name: Create and Push Manifest
+        id: manifest
+        if: github.repository == 'netdata/netdata'
+        run: docker buildx imagetool create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' ${{ needs.gen-tags.outputs.tags }})
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Publishing Docker images on Quay.io failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Publishing Docker images on Quay.io failed.
+              Download digests: ${{ steps.fetch-digests.outcome }}
+              Setup buildx: ${{ steps.prepare.outcome }}
+              Login to registry: ${{ steps.login.outcome }}
+              Create and push manifest: ${{ steps.manifest.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
