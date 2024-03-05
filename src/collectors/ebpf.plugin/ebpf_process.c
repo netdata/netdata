@@ -986,10 +986,8 @@ static void ebpf_create_systemd_process_charts(ebpf_module_t *em)
         task_closed.update_every = task_error.update_every = em->update_every;
 
     for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely((!w->systemd)) ||
-            unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART)))) {
+        if (unlikely(!w->systemd || (w->systemd && w->flags & NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART)))
             continue;
-        }
 
         data_process.id = data_thread.id = task_exit.id = task_closed.id = task_error.id = w->name;
         ebpf_create_charts_on_systemd(&data_process);

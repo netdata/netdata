@@ -1177,8 +1177,7 @@ static void ebpf_create_systemd_cachestat_charts(int update_every)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely((!w->systemd)) ||
-            unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_CACHESTAT_CHART))))
+        if (unlikely(!w->systemd || (w->systemd && w->flags & NETDATA_EBPF_SERVICES_HAS_CACHESTAT_CHART)))
             continue;
 
         data_hit_ratio.id = data_dirty.id = data_hit.id = data_miss.id = w->name;

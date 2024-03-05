@@ -1081,8 +1081,7 @@ static void ebpf_create_systemd_fd_charts(ebpf_module_t *em)
     ebpf_cgroup_target_t *w;
     netdata_run_mode_t mode = em->mode;
     for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely((!w->systemd)) ||
-            unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_FD_CHART))))
+        if (unlikely(!w->systemd || (w->systemd && w->flags & NETDATA_EBPF_SERVICES_HAS_FD_CHART)))
             continue;
 
         data_open.id = data_open_error.id = data_close.id = data_close_error.id = w->name;

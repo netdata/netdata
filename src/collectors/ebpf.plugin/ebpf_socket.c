@@ -2470,10 +2470,8 @@ static void ebpf_create_systemd_socket_charts(int update_every)
 
     ebpf_cgroup_target_t *w;
     for (w = ebpf_cgroup_pids; w ; w = w->next) {
-        if (unlikely((!w->systemd)) ||
-            unlikely((w->systemd && (w->flags & NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART)))) {
+        if (unlikely(!w->systemd || (w->systemd && w->flags & NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART)))
             continue;
-        }
 
         data_tcp_v4.id = data_tcp_v6.id = data_bandwith_recv.id =
         data_bandwith_sent.id = data_tcp_cleanup.id = data_tcp_sendmsg.id =
