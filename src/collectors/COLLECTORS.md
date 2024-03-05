@@ -63,8 +63,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [JMX](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/jmx.md)
 
-- [Java Spring-boot 2 applications](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/springboot2/integrations/java_spring-boot_2_applications.md)
-
 - [NRPE daemon](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/nrpe_daemon.md)
 
 - [Sentry](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/sentry.md)
@@ -110,8 +108,6 @@ If you don't see the app/service you'd like to monitor in this list:
 - [Crypto exchanges](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/crypto_exchanges.md)
 
 - [Cryptowatch](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/cryptowatch.md)
-
-- [Energi Core Wallet](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/energid/integrations/energi_core_wallet.md)
 
 - [Go-ethereum](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/geth/integrations/go-ethereum.md)
 
@@ -952,8 +948,6 @@ If you don't see the app/service you'd like to monitor in this list:
 - [Meilisearch](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/meilisearch.md)
 
 - [OpenSearch](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/elasticsearch/integrations/opensearch.md)
-
-- [Solr](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/solr/integrations/solr.md)
 
 - [Sphinx](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/sphinx.md)
 

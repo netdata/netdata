@@ -110,7 +110,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:----|:-----------|:-------|:--------:|
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | url | Server URL. | http://127.0.0.1:24220 | yes |
-| timeout | HTTP request timeout. | 2 | no |
+| timeout | HTTP request timeout. | 1 | no |
 | username | Username for basic HTTP authentication. |  | no |
 | password | Password for basic HTTP authentication. |  | no |
 | proxy_url | Proxy URL. |  | no |

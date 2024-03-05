@@ -112,7 +112,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| files | List of files to monitor. |  | yes |
+| files | Files matching the selector will be monitored. |  | yes |
 | dirs | List of directories to monitor. |  | yes |
 | discovery_every | Files and directories discovery interval. | 60 | no |
 
