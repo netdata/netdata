@@ -71,24 +71,6 @@ int sql_init_context_database(int memory)
     return 0;
 }
 
-/*
- * Close the sqlite database
- */
-
-void sql_close_context_database(void)
-{
-    int rc;
-    if (unlikely(!db_context_meta))
-        return;
-
-    netdata_log_info("Closing context SQLite database");
-
-    rc = sqlite3_close_v2(db_context_meta);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Error %d while closing the context SQLite database, %s", rc, sqlite3_errstr(rc));
-    db_context_meta = NULL;
-}
-
 //
 // Fetching data
 //
@@ -422,6 +404,12 @@ int sql_context_cache_stats(int op)
     return count;
 }
 
+
+uint64_t sqlite_get_context_space(void)
+{
+    return sqlite_get_db_space(db_context_meta);
+}
+
 //
 // TESTING FUNCTIONS
 //
@@ -456,7 +444,8 @@ int ctx_unittest(void)
     uuid_t host_uuid;
     uuid_generate(host_uuid);
 
-    initialize_thread_key_pool();
+    if (sqlite_library_init())
+        return 1;
 
     int rc = sql_init_context_database(1);
 
@@ -532,7 +521,8 @@ int ctx_unittest(void)
     ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
     netdata_log_info("List context end after delete");
 
-    sql_close_context_database();
+    sql_close_database(db_context_meta, "CONTEXT");
+    sqlite_library_shutdown();
 
     return 0;
 }

@@ -448,11 +448,10 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 #endif
     }
 
-    sql_close_context_database();
-    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_CONTEXT_DB);
+    sqlite_close_databases();
+    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
+    sqlite_library_shutdown();
 
-    sql_close_database();
-    watcher_step_complete(WATCHER_STEP_ID_CLOSE_SQL_MAIN_DB);
 
     // unlink the pid
     if(pidfile[0]) {
@@ -1500,22 +1499,24 @@ int main(int argc, char **argv) {
 #endif
 
                         if(strcmp(optarg, "sqlite-meta-recover") == 0) {
-                            sql_init_database(DB_CHECK_RECOVER, 0);
+                            sql_init_meta_database(DB_CHECK_RECOVER, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-compact") == 0) {
-                            sql_init_database(DB_CHECK_RECLAIM_SPACE, 0);
+                            sql_init_meta_database(DB_CHECK_RECLAIM_SPACE, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "sqlite-analyze") == 0) {
-                            sql_init_database(DB_CHECK_ANALYZE, 0);
+                            sql_init_meta_database(DB_CHECK_ANALYZE, 0);
                             return 0;
                         }
 
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
+                            if (sqlite_library_init())
+                                return 1;
 
                             if (pluginsd_parser_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
@@ -1539,6 +1540,7 @@ int main(int argc, char **argv) {
                             if (ctx_unittest()) return 1;
                             if (uuid_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
+                            sqlite_library_shutdown();
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
@@ -2054,6 +2056,8 @@ int main(int argc, char **argv) {
                 exit(1);
             }
         }
+        if (sqlite_library_init())
+            fatal("Failed to initialize sqlite library");
 
         // --------------------------------------------------------------------
         // Initialize ML configuration

@@ -1809,13 +1809,16 @@ void ml_init()
     }
 }
 
+uint64_t sqlite_get_ml_space(void)
+{
+    return sqlite_get_db_space(db);
+}
+
 void ml_fini() {
     if (!Cfg.enable_anomaly_detection || !db)
         return;
 
-    int rc = sqlite3_close_v2(db);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Error %d while closing the SQLite database, %s", rc, sqlite3_errstr(rc));
+    sql_close_database(db, "ML");
     db = NULL;
 }
 

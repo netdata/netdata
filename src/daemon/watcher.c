@@ -85,8 +85,7 @@ void *watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
     watcher_wait_for_step(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_MAIN_CACHE_TO_FINISH_FLUSHING);
     watcher_wait_for_step(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
-    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_CONTEXT_DB);
-    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_MAIN_DB);
+    watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE);
     watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_INCOMPLETE_SHUTDOWN_FILE);
@@ -146,10 +145,8 @@ void watcher_thread_start() {
         "wait for dbengine main cache to finish flushing";
     watcher_steps[WATCHER_STEP_ID_STOP_DBENGINE_TIERS].msg =
         "stop dbengine tiers";
-    watcher_steps[WATCHER_STEP_ID_CLOSE_SQL_CONTEXT_DB].msg =
-        "close SQL context db";
-    watcher_steps[WATCHER_STEP_ID_CLOSE_SQL_MAIN_DB].msg =
-        "close SQL main db";
+    watcher_steps[WATCHER_STEP_ID_CLOSE_SQL_DATABASES].msg =
+        "close SQL databases";
     watcher_steps[WATCHER_STEP_ID_REMOVE_PID_FILE].msg =
         "remove pid file";
     watcher_steps[WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES].msg =

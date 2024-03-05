@@ -2546,7 +2546,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
 
     fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
 
-    (void) sql_init_database(DB_CHECK_NONE, 1);
+    (void)sql_init_meta_database(DB_CHECK_NONE, 1);
     host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
     if (NULL == host)
         return;
