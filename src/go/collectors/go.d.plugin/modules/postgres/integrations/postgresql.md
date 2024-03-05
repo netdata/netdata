@@ -267,7 +267,7 @@ GRANT pg_monitor TO netdata;
 ```
 
 After creating the new user, restart the Netdata agent with `sudo systemctl restart netdata`, or
-the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your
+the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your
 system.
 
 
@@ -299,7 +299,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | dsn | Postgres server DSN (Data Source Name). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING). | postgres://postgres:postgres@127.0.0.1:5432/postgres | yes |
 | timeout | Query timeout in seconds. | 2 | no |
-| collect_databases_matching | Databases selector. Determines which database metrics will be collected. Syntax is [simple patterns](https://github.com/netdata/go.d.plugin/tree/master/pkg/matcher#simple-patterns-matcher). |  | no |
+| collect_databases_matching | Databases selector. Determines which database metrics will be collected. Syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#simple-patterns-matcher). |  | no |
 | max_db_tables | Maximum number of tables in the database. Table metrics will not be collected for databases that have more tables than max_db_tables. 0 means no limit. | 50 | no |
 | max_db_indexes | Maximum number of indexes in the database. Index metrics will not be collected for databases that have more indexes than max_db_indexes. 0 means no limit. | 250 | no |
 

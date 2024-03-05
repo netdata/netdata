@@ -217,7 +217,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | collect_cluster_health | Controls whether to collect cluster health metrics. | true | no |
 | collect_cluster_stats | Controls whether to collect cluster stats metrics. | true | no |
 | collect_indices_stats | Controls whether to collect indices metrics. | false | no |
-| timeout | HTTP request timeout. | 5 | no |
+| timeout | HTTP request timeout. | 2 | no |
 | username | Username for basic HTTP authentication. |  | no |
 | password | Password for basic HTTP authentication. |  | no |
 | proxy_url | Proxy URL. |  | no |

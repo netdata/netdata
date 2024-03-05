@@ -134,10 +134,8 @@ The following options can be defined globally: update_every, autodetection_retry
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | address | Server address in IP:PORT format. | 127.0.0.1:7505 | yes |
+| timeout | Connection, read, and write timeout duration in seconds. The timeout includes name resolution. | 1 | no |
 | per_user_stats | User selector. Determines which user metrics will be collected. |  | no |
-| connect_timeout | Connection timeout in seconds. The timeout includes name resolution, if required. | 2 | no |
-| read_timeout | Read timeout in seconds. Sets deadline for read calls. | 2 | no |
-| write_timeout | Write timeout in seconds. Sets deadline for write calls. | 2 | no |
 
 </details>
 

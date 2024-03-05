@@ -113,7 +113,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 List of IP pools to monitor.
 
-- IP range syntax: see [supported formats](https://github.com/netdata/go.d.plugin/tree/master/pkg/iprange#supported-formats).
+- IP range syntax: see [supported formats](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/iprange#supported-formats).
 - Syntax:
 
 ```yaml

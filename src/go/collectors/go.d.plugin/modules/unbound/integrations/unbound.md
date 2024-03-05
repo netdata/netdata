@@ -180,7 +180,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | address | Server address in IP:PORT format. | 127.0.0.1:8953 | yes |
 | timeout | Connection/read/write/ssl handshake timeout. | 1 | no |
 | conf_path | Absolute path to the unbound configuration file. | /etc/unbound/unbound.conf | no |
-| cumulative_stats | Statistics collection mode. Should have the same value as the `statistics-cumulative` parameter in the unbound configuration file. | /etc/unbound/unbound.conf | no |
+| cumulative_stats | Statistics collection mode. Should have the same value as the `statistics-cumulative` parameter in the unbound configuration file. | no | no |
 | use_tls | Whether to use TLS or not. | yes | no |
 | tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | yes | no |
 | tls_ca | Certificate authority that client use when verifying server certificates. |  | no |
