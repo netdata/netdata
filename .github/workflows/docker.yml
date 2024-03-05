@@ -239,7 +239,6 @@ jobs:
           merge-multiple: true
       - name: Setup Buildx
         id: prepare
-        if: needs.file-check.outputs.run == 'true'
         uses: docker/setup-buildx-action@v3
       - name: Docker Hub Login
         id: docker-hub-login
