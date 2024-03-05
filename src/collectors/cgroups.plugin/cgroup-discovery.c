@@ -1090,7 +1090,7 @@ static void netdata_cgroup_ebpf_initialize_shm()
     shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
 }
 
-static void cgruoup_cleanup_ebpf_integration()
+static void cgroup_cleanup_ebpf_integration()
 {
     if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
         sem_close(shm_mutex_cgroup_ebpf);
@@ -1326,7 +1326,7 @@ void cgroup_discovery_worker(void *ptr)
         discovery_find_all_cgroups();
     }
     collector_info("discovery thread stopped");
-    cgruoup_cleanup_ebpf_integration();
+    cgroup_cleanup_ebpf_integration();
     worker_unregister();
     service_exits();
     __atomic_store_n(&discovery_thread.exited,1,__ATOMIC_RELAXED);
