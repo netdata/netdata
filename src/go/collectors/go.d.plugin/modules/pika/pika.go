@@ -48,7 +48,7 @@ type Config struct {
 type (
 	Pika struct {
 		module.Base
-		Config `yaml:""`
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
