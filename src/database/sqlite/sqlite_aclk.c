@@ -99,23 +99,16 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     char guid[UUID_STR_LEN];
     uuid_unparse_lower(*(uuid_t *)argv[IDX_HOST_ID], guid);
 
-    if (is_ephemeral) {
-        if (age > rrdhost_free_ephemeral_time_s && !is_registered) {
-            netdata_log_info(
-                "Skipping ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
-                (const char *)argv[IDX_HOSTNAME],
-                guid,
-                age,
-                rrdhost_free_ephemeral_time_s);
+    if (is_ephemeral && age > rrdhost_free_ephemeral_time_s) {
+        netdata_log_info(
+            "%s ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
+            is_registered ? "Loading registered" : "Skipping unregistered",
+            (const char *)argv[IDX_HOSTNAME],
+            guid,
+            age,
+            rrdhost_free_ephemeral_time_s);
+        if (!is_registered)
             return 0;
-        }
-        else
-            netdata_log_info(
-                "Loading ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds) but it is registered",
-                (const char *)argv[IDX_HOSTNAME],
-                guid,
-                age,
-                rrdhost_free_ephemeral_time_s);
     }
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
