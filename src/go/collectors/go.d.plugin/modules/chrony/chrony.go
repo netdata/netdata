@@ -4,6 +4,7 @@ package chrony
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/facebook/time/ntp/chrony"
@@ -25,7 +26,7 @@ func New() *Chrony {
 	return &Chrony{
 		Config: Config{
 			Address: "127.0.0.1:323",
-			Timeout: web.Duration{Duration: time.Second},
+			Timeout: web.Duration(time.Second),
 		},
 		charts:    charts.Copy(),
 		newClient: newChronyClient,
@@ -33,19 +34,20 @@ func New() *Chrony {
 }
 
 type Config struct {
-	Address string       `yaml:"address"`
-	Timeout web.Duration `yaml:"timeout"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	Address     string       `yaml:"address" json:"address"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type (
 	Chrony struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
-		newClient func(c Config) (chronyClient, error)
 		client    chronyClient
+		newClient func(c Config) (chronyClient, error)
 	}
 	chronyClient interface {
 		Tracking() (*chrony.ReplyTracking, error)
@@ -54,17 +56,30 @@ type (
 	}
 )
 
-func (c *Chrony) Init() bool {
-	if err := c.validateConfig(); err != nil {
-		c.Errorf("config validation: %v", err)
-		return false
-	}
-
-	return true
+func (c *Chrony) Configuration() any {
+	return c.Config
 }
 
-func (c *Chrony) Check() bool {
-	return len(c.Collect()) > 0
+func (c *Chrony) Init() error {
+	if err := c.validateConfig(); err != nil {
+		c.Errorf("config validation: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (c *Chrony) Check() error {
+	mx, err := c.collect()
+	if err != nil {
+		c.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (c *Chrony) Charts() *module.Charts {

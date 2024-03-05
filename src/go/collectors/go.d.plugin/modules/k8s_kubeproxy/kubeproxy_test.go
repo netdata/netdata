@@ -8,65 +8,84 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var testMetrics, _ = os.ReadFile("testdata/metrics.txt")
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-func TestNew(t *testing.T) {
-	job := New()
+	dataMetrics, _ = os.ReadFile("testdata/metrics.txt")
+)
 
-	assert.IsType(t, (*KubeProxy)(nil), job)
-	assert.Equal(t, defaultURL, job.URL)
-	assert.Equal(t, defaultHTTPTimeout, job.Timeout.Duration)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+		"dataMetrics":    dataMetrics,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestKubeProxy_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
+func TestKubeProxy_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &KubeProxy{}, dataConfigJSON, dataConfigYAML)
+}
 
-func TestKubeProxy_Cleanup(t *testing.T) { New().Cleanup() }
+func TestKubeProxy_Charts(t *testing.T) {
+	assert.NotNil(t, New().Charts())
+}
 
-func TestKubeProxy_Init(t *testing.T) { assert.True(t, New().Init()) }
+func TestKubeProxy_Cleanup(t *testing.T) {
+	New().Cleanup()
+}
+
+func TestKubeProxy_Init(t *testing.T) {
+	assert.NoError(t, New().Init())
+}
 
 func TestKubeProxy_InitNG(t *testing.T) {
 	job := New()
 	job.URL = ""
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestKubeProxy_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testMetrics)
+				_, _ = w.Write(dataMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	assert.True(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.NoError(t, job.Check())
 }
 
 func TestKubeProxy_CheckNG(t *testing.T) {
 	job := New()
 	job.URL = "http://127.0.0.1:38001/metrics"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestKubeProxy_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testMetrics)
+				_, _ = w.Write(dataMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	expected := map[string]int64{
 		"sync_proxy_rules_count":           2669,
@@ -108,8 +127,8 @@ func TestKubeProxy_InvalidData(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestKubeProxy_404(t *testing.T) {
@@ -122,6 +141,6 @@ func TestKubeProxy_404(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }

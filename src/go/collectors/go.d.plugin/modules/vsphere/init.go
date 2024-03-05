@@ -30,7 +30,7 @@ func (vs *VSphere) initClient() (*client.Client, error) {
 		URL:       vs.URL,
 		User:      vs.Username,
 		Password:  vs.Password,
-		Timeout:   vs.Timeout.Duration,
+		Timeout:   vs.Timeout.Duration(),
 		TLSConfig: vs.Client.TLSConfig,
 	}
 	return client.New(config)

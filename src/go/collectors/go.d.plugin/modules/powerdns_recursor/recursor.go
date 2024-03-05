@@ -4,6 +4,7 @@ package powerdns_recursor
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"time"
 
@@ -29,7 +30,7 @@ func New() *Recursor {
 					URL: "http://127.0.0.1:8081",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 		},
@@ -37,43 +38,57 @@ func New() *Recursor {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type Recursor struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
 
 	httpClient *http.Client
-	charts     *module.Charts
 }
 
-func (r *Recursor) Init() bool {
+func (r *Recursor) Configuration() any {
+	return r.Config
+}
+
+func (r *Recursor) Init() error {
 	err := r.validateConfig()
 	if err != nil {
 		r.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	client, err := r.initHTTPClient()
 	if err != nil {
 		r.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	r.httpClient = client
 
 	cs, err := r.initCharts()
 	if err != nil {
 		r.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	r.charts = cs
 
-	return true
+	return nil
 }
 
-func (r *Recursor) Check() bool {
-	return len(r.Collect()) > 0
+func (r *Recursor) Check() error {
+	mx, err := r.collect()
+	if err != nil {
+		r.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (r *Recursor) Charts() *module.Charts {

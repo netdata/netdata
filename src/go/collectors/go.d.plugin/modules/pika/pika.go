@@ -5,6 +5,7 @@ package pika
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -29,7 +30,7 @@ func New() *Pika {
 	return &Pika{
 		Config: Config{
 			Address: "redis://@localhost:9221",
-			Timeout: web.Duration{Duration: time.Second},
+			Timeout: web.Duration(time.Second),
 		},
 
 		collectedCommands: make(map[string]bool),
@@ -38,25 +39,25 @@ func New() *Pika {
 }
 
 type Config struct {
-	Address          string       `yaml:"address"`
-	Timeout          web.Duration `yaml:"timeout"`
-	tlscfg.TLSConfig `yaml:",inline"`
+	tlscfg.TLSConfig `yaml:",inline" json:""`
+	UpdateEvery      int          `yaml:"update_every" json:"update_every"`
+	Address          string       `yaml:"address" json:"address"`
+	Timeout          web.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type (
 	Pika struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:""`
+
+		charts *module.Charts
 
 		pdb redisClient
 
-		server  string
-		version *semver.Version
-
+		server            string
+		version           *semver.Version
 		collectedCommands map[string]bool
 		collectedDbs      map[string]bool
-
-		charts *module.Charts
 	}
 	redisClient interface {
 		Info(ctx context.Context, section ...string) *redis.StringCmd
@@ -64,32 +65,44 @@ type (
 	}
 )
 
-func (p *Pika) Init() bool {
+func (p *Pika) Configuration() any {
+	return p.Config
+}
+
+func (p *Pika) Init() error {
 	err := p.validateConfig()
 	if err != nil {
 		p.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	pdb, err := p.initRedisClient()
 	if err != nil {
 		p.Errorf("init redis client: %v", err)
-		return false
+		return err
 	}
 	p.pdb = pdb
 
 	charts, err := p.initCharts()
 	if err != nil {
 		p.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	p.charts = charts
 
-	return true
+	return nil
 }
 
-func (p *Pika) Check() bool {
-	return len(p.Collect()) > 0
+func (p *Pika) Check() error {
+	mx, err := p.collect()
+	if err != nil {
+		p.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (p *Pika) Charts() *module.Charts {

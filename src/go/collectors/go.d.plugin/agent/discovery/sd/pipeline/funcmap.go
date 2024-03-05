@@ -4,7 +4,10 @@ package pipeline
 
 import (
 	"regexp"
+	"strconv"
 	"text/template"
+
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/bmatcuk/doublestar/v4"
@@ -12,11 +15,18 @@ import (
 
 func newFuncMap() template.FuncMap {
 	custom := map[string]interface{}{
-		"glob": globAny,
-		"re":   regexpAny,
+		"match": funcMatchAny,
+		"glob": func(value, pattern string, patterns ...string) bool {
+			return funcMatchAny("glob", value, pattern, patterns...)
+		},
+		"promPort": func(port string) string {
+			v, _ := strconv.Atoi(port)
+			return prometheusPortAllocations[v]
+		},
 	}
 
 	fm := sprig.HermeticTxtFuncMap()
+
 	for name, fn := range custom {
 		fm[name] = fn
 	}
@@ -24,30 +34,30 @@ func newFuncMap() template.FuncMap {
 	return fm
 }
 
-func globAny(value, pattern string, rest ...string) bool {
-	switch len(rest) {
+func funcMatchAny(typ, value, pattern string, patterns ...string) bool {
+	switch len(patterns) {
 	case 0:
-		return globOnce(value, pattern)
+		return funcMatch(typ, value, pattern)
 	default:
-		return globOnce(value, pattern) || globAny(value, rest[0], rest[1:]...)
+		return funcMatch(typ, value, pattern) || funcMatchAny(typ, value, patterns[0], patterns[1:]...)
 	}
 }
 
-func regexpAny(value, pattern string, rest ...string) bool {
-	switch len(rest) {
-	case 0:
-		return regexpOnce(value, pattern)
+func funcMatch(typ string, value, pattern string) bool {
+	switch typ {
+	case "glob", "":
+		m, err := matcher.NewGlobMatcher(pattern)
+		return err == nil && m.MatchString(value)
+	case "sp":
+		m, err := matcher.NewSimplePatternsMatcher(pattern)
+		return err == nil && m.MatchString(value)
+	case "re":
+		ok, err := regexp.MatchString(pattern, value)
+		return err == nil && ok
+	case "dstar":
+		ok, err := doublestar.Match(pattern, value)
+		return err == nil && ok
 	default:
-		return regexpOnce(value, pattern) || regexpAny(value, rest[0], rest[1:]...)
+		return false
 	}
-}
-
-func globOnce(value, pattern string) bool {
-	ok, err := doublestar.Match(pattern, value)
-	return err == nil && ok
-}
-
-func regexpOnce(value, pattern string) bool {
-	ok, err := regexp.MatchString(pattern, value)
-	return err == nil && ok
 }

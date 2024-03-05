@@ -24,11 +24,11 @@ func (cb *Couchbase) initCharts() (*Charts, error) {
 	return bucketCharts.Copy(), nil
 }
 
-func (cb Couchbase) initHTTPClient() (*http.Client, error) {
+func (cb *Couchbase) initHTTPClient() (*http.Client, error) {
 	return web.NewHTTPClient(cb.Client)
 }
 
-func (cb Couchbase) validateConfig() error {
+func (cb *Couchbase) validateConfig() error {
 	if cb.URL == "" {
 		return errors.New("URL not set")
 	}

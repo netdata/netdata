@@ -7,13 +7,34 @@ package logind
 
 import (
 	"errors"
+	"os"
 	"testing"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/coreos/go-systemd/v22/login1"
 	"github.com/godbus/dbus/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestLogind_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Logind{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestLogind_Init(t *testing.T) {
 	tests := map[string]struct {
@@ -32,9 +53,9 @@ func TestLogind_Init(t *testing.T) {
 			l.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, l.Init())
+				assert.Error(t, l.Init())
 			} else {
-				assert.True(t, l.Init())
+				assert.NoError(t, l.Init())
 			}
 		})
 	}
@@ -55,15 +76,15 @@ func TestLogind_Cleanup(t *testing.T) {
 		},
 		"after Init": {
 			wantClose: false,
-			prepare:   func(l *Logind) { l.Init() },
+			prepare:   func(l *Logind) { _ = l.Init() },
 		},
 		"after Check": {
 			wantClose: true,
-			prepare:   func(l *Logind) { l.Init(); l.Check() },
+			prepare:   func(l *Logind) { _ = l.Init(); _ = l.Check() },
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(l *Logind) { l.Init(); l.Collect() },
+			prepare:   func(l *Logind) { _ = l.Init(); l.Collect() },
 		},
 	}
 
@@ -119,13 +140,13 @@ func TestLogind_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			l := New()
-			require.True(t, l.Init())
+			require.NoError(t, l.Init())
 			l.conn = test.prepare()
 
 			if test.wantFail {
-				assert.False(t, l.Check())
+				assert.Error(t, l.Check())
 			} else {
-				assert.True(t, l.Check())
+				assert.NoError(t, l.Check())
 			}
 		})
 	}
@@ -193,7 +214,7 @@ func TestLogind_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			l := New()
-			require.True(t, l.Init())
+			require.NoError(t, l.Init())
 			l.conn = test.prepare()
 
 			mx := l.Collect()

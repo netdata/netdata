@@ -1,31 +1,56 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/freeradius job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "FreeRADIUS collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "address": {
+        "title": "Address",
+        "description": "Server address.",
+        "type": "string",
+        "default": "127.0.0.1"
+      },
+      "port": {
+        "title": "Port",
+        "description": "Server port.",
+        "type": "integer",
+        "default": 18121
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for establishing a connection and communication (reading and writing) in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      },
+      "secret": {
+        "title": "Secret",
+        "description": "Shared secret key.",
+        "type": "string"
+      }
     },
-    "address": {
-      "type": "string"
-    },
-    "port": {
-      "type": "integer"
-    },
-    "secret": {
-      "type": "string"
+    "required": [
+      "address",
+      "port",
+      "secret"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
     },
     "timeout": {
-      "type": [
-        "string",
-        "integer"
-      ]
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "secret": {
+      "ui:widget": "password"
     }
-  },
-  "required": [
-    "name",
-    "address",
-    "port",
-    "secret"
-  ]
+  }
 }

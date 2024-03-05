@@ -1,0 +1,19 @@
+update_every: 123
+path: "ok"
+exclude_path: "ok"
+log_type: "ok"
+csv_config:
+  fields_per_record: 123
+  delimiter: "ok"
+  trim_leading_space: yes
+  format: "ok"
+ltsv_config:
+  field_delimiter: "ok"
+  value_delimiter: "ok"
+  mapping:
+    ok: "ok"
+regexp_config:
+  pattern: "ok"
+json_config:
+  mapping:
+    ok: "ok"

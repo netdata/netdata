@@ -4,11 +4,11 @@ package vcsa
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -29,7 +29,7 @@ func New() *VCSA {
 		Config: Config{
 			HTTP: web.HTTP{
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second * 5},
+					Timeout: web.Duration(time.Second * 5),
 				},
 			},
 		},
@@ -38,17 +38,18 @@ func New() *VCSA {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type (
 	VCSA struct {
 		module.Base
-		Config `yaml:",inline"`
-
-		client healthClient
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
+
+		client healthClient
 	}
 
 	healthClient interface {
@@ -66,33 +67,47 @@ type (
 	}
 )
 
-func (vc *VCSA) Init() bool {
+func (vc *VCSA) Configuration() any {
+	return vc.Config
+}
+
+func (vc *VCSA) Init() error {
 	if err := vc.validateConfig(); err != nil {
 		vc.Error(err)
-		return false
+		return err
 	}
 
 	c, err := vc.initHealthClient()
 	if err != nil {
 		vc.Errorf("error on creating health client : %vc", err)
-		return false
+		return err
 	}
 	vc.client = c
 
 	vc.Debugf("using URL %s", vc.URL)
-	vc.Debugf("using timeout: %s", vc.Timeout.Duration)
+	vc.Debugf("using timeout: %s", vc.Timeout)
 
-	return true
+	return nil
 }
 
-func (vc *VCSA) Check() bool {
+func (vc *VCSA) Check() error {
 	err := vc.client.Login()
 	if err != nil {
 		vc.Error(err)
-		return false
+		return err
 	}
 
-	return len(vc.Collect()) > 0
+	mx, err := vc.collect()
+	if err != nil {
+		vc.Error(err)
+		return err
+	}
+
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+
+	return nil
 }
 
 func (vc *VCSA) Charts() *module.Charts {

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
 
@@ -37,7 +36,6 @@ type (
 		*logger.Logger
 
 		confDir string
-		mux     *sync.Mutex
 		vnodes  map[string]*VirtualNode
 	}
 	VirtualNode struct {

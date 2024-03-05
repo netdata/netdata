@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
-func (r Recursor) validateConfig() error {
+func (r *Recursor) validateConfig() error {
 	if r.URL == "" {
 		return errors.New("URL not set")
 	}
@@ -20,10 +20,10 @@ func (r Recursor) validateConfig() error {
 	return nil
 }
 
-func (r Recursor) initHTTPClient() (*http.Client, error) {
+func (r *Recursor) initHTTPClient() (*http.Client, error) {
 	return web.NewHTTPClient(r.Client)
 }
 
-func (r Recursor) initCharts() (*module.Charts, error) {
+func (r *Recursor) initCharts() (*module.Charts, error) {
 	return charts.Copy(), nil
 }

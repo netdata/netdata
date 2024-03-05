@@ -13,7 +13,7 @@ import (
 func TestServiceDiscovery_Run(t *testing.T) {
 	tests := map[string]discoverySim{
 		"add pipeline": {
-			configs: []ConfigFile{
+			configs: []confFile{
 				prepareConfigFile("source", "name"),
 			},
 			wantPipelines: []*mockPipeline{
@@ -21,7 +21,7 @@ func TestServiceDiscovery_Run(t *testing.T) {
 			},
 		},
 		"remove pipeline": {
-			configs: []ConfigFile{
+			configs: []confFile{
 				prepareConfigFile("source", "name"),
 				prepareEmptyConfigFile("source"),
 			},
@@ -30,17 +30,19 @@ func TestServiceDiscovery_Run(t *testing.T) {
 			},
 		},
 		"re-add pipeline multiple times": {
-			configs: []ConfigFile{
+			configs: []confFile{
 				prepareConfigFile("source", "name"),
 				prepareConfigFile("source", "name"),
 				prepareConfigFile("source", "name"),
 			},
 			wantPipelines: []*mockPipeline{
+				{name: "name", started: true, stopped: true},
+				{name: "name", started: true, stopped: true},
 				{name: "name", started: true, stopped: false},
 			},
 		},
 		"restart pipeline": {
-			configs: []ConfigFile{
+			configs: []confFile{
 				prepareConfigFile("source", "name1"),
 				prepareConfigFile("source", "name2"),
 			},
@@ -50,13 +52,13 @@ func TestServiceDiscovery_Run(t *testing.T) {
 			},
 		},
 		"invalid pipeline config": {
-			configs: []ConfigFile{
+			configs: []confFile{
 				prepareConfigFile("source", "invalid"),
 			},
 			wantPipelines: nil,
 		},
 		"invalid config for running pipeline": {
-			configs: []ConfigFile{
+			configs: []confFile{
 				prepareConfigFile("source", "name"),
 				prepareConfigFile("source", "invalid"),
 			},
@@ -73,17 +75,17 @@ func TestServiceDiscovery_Run(t *testing.T) {
 	}
 }
 
-func prepareConfigFile(source, name string) ConfigFile {
+func prepareConfigFile(source, name string) confFile {
 	bs, _ := yaml.Marshal(pipeline.Config{Name: name})
 
-	return ConfigFile{
-		Source: source,
-		Data:   bs,
+	return confFile{
+		source:  source,
+		content: bs,
 	}
 }
 
-func prepareEmptyConfigFile(source string) ConfigFile {
-	return ConfigFile{
-		Source: source,
+func prepareEmptyConfigFile(source string) confFile {
+	return confFile{
+		source: source,
 	}
 }

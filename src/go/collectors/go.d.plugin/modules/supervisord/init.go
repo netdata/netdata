@@ -10,14 +10,14 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
-func (s Supervisord) verifyConfig() error {
+func (s *Supervisord) verifyConfig() error {
 	if s.URL == "" {
 		return errors.New("'url' not set")
 	}
 	return nil
 }
 
-func (s Supervisord) initSupervisorClient() (supervisorClient, error) {
+func (s *Supervisord) initSupervisorClient() (supervisorClient, error) {
 	u, err := url.Parse(s.URL)
 	if err != nil {
 		return nil, fmt.Errorf("parse 'url': %v (%s)", err, s.URL)

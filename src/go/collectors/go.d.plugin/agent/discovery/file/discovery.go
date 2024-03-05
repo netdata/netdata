@@ -14,7 +14,8 @@ import (
 )
 
 var log = logger.New().With(
-	slog.String("component", "discovery file"),
+	slog.String("component", "discovery"),
+	slog.String("discoverer", "file"),
 )
 
 func NewDiscovery(cfg Config) (*Discovery, error) {

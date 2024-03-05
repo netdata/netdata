@@ -1,101 +1,194 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/squid_log job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
-    },
-    "parser": {
-      "type": "object",
-      "properties": {
-        "log_type": {
-          "type": "string"
-        },
-        "csv_config": {
-          "type": "object",
-          "properties": {
-            "fields_per_record": {
-              "type": "integer"
-            },
-            "delimiter": {
-              "type": "string"
-            },
-            "trim_leading_space": {
-              "type": "boolean"
-            },
-            "format": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "fields_per_record",
-            "delimiter",
-            "trim_leading_space",
-            "format"
-          ]
-        },
-        "ltsv_config": {
-          "type": "object",
-          "properties": {
-            "field_delimiter": {
-              "type": "string"
-            },
-            "value_delimiter": {
-              "type": "string"
-            },
-            "mapping": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            }
-          },
-          "required": [
-            "field_delimiter",
-            "value_delimiter",
-            "mapping"
-          ]
-        },
-        "regexp_config": {
-          "type": "object",
-          "properties": {
-            "pattern": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "pattern"
-          ]
-        },
-        "json_config": {
-          "type": "object",
-          "properties": {
-            "mapping": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            }
-          },
-          "required": [
-            "mapping"
-          ]
-        }
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
       },
-      "required": [
-        "log_type"
-      ]
+      "path": {
+        "title": "Log file",
+        "description": "The file path to the Squid server log file.",
+        "type": "string",
+        "default": "/var/log/squid/access.log"
+      },
+      "exclude_path": {
+        "title": "Exclude path",
+        "description": "Pattern to exclude log files.",
+        "type": "string",
+        "default": "*.gz"
+      },
+      "log_type": {
+        "title": "Log parser",
+        "description": "Type of parser to use for parsing the Squid server log file.",
+        "type": "string",
+        "enum": [
+          "csv",
+          "regexp",
+          "json",
+          "ltsv"
+        ],
+        "default": "csv"
+      }
     },
-    "path": {
-      "type": "string"
-    },
-    "exclude_path": {
-      "type": "string"
+    "required": [
+      "path",
+      "log_type"
+    ],
+    "dependencies": {
+      "log_type": {
+        "oneOf": [
+          {
+            "properties": {
+              "log_type": {
+                "const": "csv"
+              },
+              "csv_config": {
+                "title": "CSV parser configuration",
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "title": "Format",
+                    "description": "Log format.",
+                    "type": "string",
+                    "default": "$remote_addr - - [$time_local] \"$request\" $status $body_bytes_sent"
+                  },
+                  "delimiter": {
+                    "title": "Delimiter",
+                    "description": "Delimiter used to separate fields in the log file. Default: space (' ').",
+                    "type": "string",
+                    "default": " "
+                  }
+                },
+                "required": [
+                  "format",
+                  "delimiter"
+                ]
+              }
+            },
+            "required": [
+              "csv_config"
+            ]
+          },
+          {
+            "properties": {
+              "log_type": {
+                "const": "regexp"
+              },
+              "regexp_config": {
+                "title": "Regular expression parser configuration",
+                "type": "object",
+                "properties": {
+                  "pattern": {
+                    "title": "Pattern with named groups",
+                    "description": "Regular expression pattern with named groups. Use named groups for known fields.",
+                    "type": "string",
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "pattern"
+                ]
+              }
+            },
+            "required": [
+              "regexp_config"
+            ]
+          },
+          {
+            "properties": {
+              "log_type": {
+                "const": "json"
+              },
+              "json_config": {
+                "title": "JSON parser configuration",
+                "type": "object",
+                "properties": {
+                  "mapping": {
+                    "title": "Field mapping",
+                    "description": "Dictionary mapping fields in logs to known fields.",
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "properties": {
+              "log_type": {
+                "const": "ltsv"
+              },
+              "ltsv_config": {
+                "title": "LTSV parser configuration",
+                "type": "object",
+                "properties": {
+                  "field_delimiter": {
+                    "title": "Field delimiter",
+                    "description": "Delimiter used to separate fields in LTSV logs. Default: tab ('\\t').",
+                    "type": "string",
+                    "default": "\t"
+                  },
+                  "value_delimiter": {
+                    "title": "Value delimiter",
+                    "description": "Delimiter used to separate label-value pairs in LTSV logs.",
+                    "type": "string",
+                    "default": ":"
+                  },
+                  "mapping": {
+                    "title": "Field mapping",
+                    "description": "Dictionary mapping fields in logs to known fields.",
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
     }
   },
-  "required": [
-    "name",
-    "path"
-  ]
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "log_type": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "path",
+            "exclude_path"
+          ]
+        },
+        {
+          "title": "Parser",
+          "fields": [
+            "log_type",
+            "csv_config",
+            "ltsv_config",
+            "regexp_config",
+            "json_config"
+          ]
+        }
+      ]
+    }
+  }
 }

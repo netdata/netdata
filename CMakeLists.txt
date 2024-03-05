@@ -2671,14 +2671,22 @@ if(ENABLE_PLUGIN_GO)
     install(FILES src/go/collectors/go.d.plugin/config/go.d.conf
             COMPONENT go.d.plugin
             DESTINATION usr/lib/netdata/conf.d)
+
     install(DIRECTORY
             COMPONENT go.d.plugin
             DESTINATION usr/lib/netdata/conf.d/go.d)
-
     file(GLOB GO_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/*.conf)
     install(FILES ${GO_CONF_FILES}
             COMPONENT go.d.plugin
             DESTINATION usr/lib/netdata/conf.d/go.d)
+
+    install(DIRECTORY
+            COMPONENT go.d.plugin
+            DESTINATION usr/lib/netdata/conf.d/go.d/sd)
+    file(GLOB GO_SD_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/sd/*.conf)
+    install(FILES ${GO_SD_CONF_FILES}
+            COMPONENT go.d.plugin
+            DESTINATION usr/lib/netdata/conf.d/go.d/sd)
 endif()
 
 #

@@ -4,7 +4,7 @@ package windows
 
 import (
 	_ "embed"
-	"net/http"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -30,7 +30,7 @@ func New() *Windows {
 		Config: Config{
 			HTTP: web.HTTP{
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second * 5},
+					Timeout: web.Duration(time.Second * 5),
 				},
 			},
 		},
@@ -68,20 +68,18 @@ func New() *Windows {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type (
 	Windows struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
-		doCheck bool
-
-		httpClient *http.Client
-		prom       prometheus.Prometheus
+		prom prometheus.Prometheus
 
 		cache cache
 	}
@@ -116,31 +114,36 @@ type (
 	}
 )
 
-func (w *Windows) Init() bool {
+func (w *Windows) Configuration() any {
+	return w.Config
+}
+
+func (w *Windows) Init() error {
 	if err := w.validateConfig(); err != nil {
 		w.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
-	httpClient, err := w.initHTTPClient()
-	if err != nil {
-		w.Errorf("init HTTP client: %v", err)
-		return false
-	}
-	w.httpClient = httpClient
-
-	prom, err := w.initPrometheusClient(w.httpClient)
+	prom, err := w.initPrometheusClient()
 	if err != nil {
 		w.Errorf("init prometheus clients: %v", err)
-		return false
+		return err
 	}
 	w.prom = prom
 
-	return true
+	return nil
 }
 
-func (w *Windows) Check() bool {
-	return len(w.Collect()) > 0
+func (w *Windows) Check() error {
+	mx, err := w.collect()
+	if err != nil {
+		w.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (w *Windows) Charts() *module.Charts {
@@ -160,7 +163,7 @@ func (w *Windows) Collect() map[string]int64 {
 }
 
 func (w *Windows) Cleanup() {
-	if w.httpClient != nil {
-		w.httpClient.CloseIdleConnections()
+	if w.prom != nil && w.prom.HTTPClient() != nil {
+		w.prom.HTTPClient().CloseIdleConnections()
 	}
 }

@@ -4,6 +4,7 @@ package dnsquery
 
 import (
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -15,8 +16,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestDNSQuery_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &DNSQuery{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestDNSQuery_Init(t *testing.T) {
@@ -32,7 +47,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration{Duration: time.Second},
+				Timeout:     web.Duration(time.Second),
 			},
 		},
 		"success when using deprecated record_type": {
@@ -43,7 +58,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:    "udp",
 				RecordType: "A",
 				Port:       53,
-				Timeout:    web.Duration{Duration: time.Second},
+				Timeout:    web.Duration(time.Second),
 			},
 		},
 		"fail with default": {
@@ -58,7 +73,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration{Duration: time.Second},
+				Timeout:     web.Duration(time.Second),
 			},
 		},
 		"fail when servers not set": {
@@ -69,7 +84,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration{Duration: time.Second},
+				Timeout:     web.Duration(time.Second),
 			},
 		},
 		"fail when network is invalid": {
@@ -80,7 +95,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "gcp",
 				RecordTypes: []string{"A"},
 				Port:        53,
-				Timeout:     web.Duration{Duration: time.Second},
+				Timeout:     web.Duration(time.Second),
 			},
 		},
 		"fail when record_type is invalid": {
@@ -91,7 +106,7 @@ func TestDNSQuery_Init(t *testing.T) {
 				Network:     "udp",
 				RecordTypes: []string{"B"},
 				Port:        53,
-				Timeout:     web.Duration{Duration: time.Second},
+				Timeout:     web.Duration(time.Second),
 			},
 		},
 	}
@@ -102,9 +117,9 @@ func TestDNSQuery_Init(t *testing.T) {
 			dq.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, dq.Init())
+				assert.Error(t, dq.Init())
 			} else {
-				assert.True(t, dq.Init())
+				assert.NoError(t, dq.Init())
 			}
 		})
 	}
@@ -129,12 +144,12 @@ func TestDNSQuery_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dq := test.prepare()
 
-			require.True(t, dq.Init())
+			require.NoError(t, dq.Init())
 
 			if test.wantFail {
-				assert.False(t, dq.Check())
+				assert.Error(t, dq.Check())
 			} else {
-				assert.True(t, dq.Check())
+				assert.NoError(t, dq.Check())
 			}
 		})
 	}
@@ -145,7 +160,7 @@ func TestDNSQuery_Charts(t *testing.T) {
 
 	dq.Domains = []string{"google.com"}
 	dq.Servers = []string{"192.0.2.0", "192.0.2.1"}
-	require.True(t, dq.Init())
+	require.NoError(t, dq.Init())
 
 	assert.NotNil(t, dq.Charts())
 	assert.Len(t, *dq.Charts(), len(dnsChartsTmpl)*len(dq.Servers))
@@ -186,7 +201,7 @@ func TestDNSQuery_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dq := test.prepare()
 
-			require.True(t, dq.Init())
+			require.NoError(t, dq.Init())
 
 			mx := dq.Collect()
 

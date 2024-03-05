@@ -1,0 +1,5 @@
+update_every: 123
+leases_path: "ok"
+pools:
+  - name: "ok"
+    networks: "ok"

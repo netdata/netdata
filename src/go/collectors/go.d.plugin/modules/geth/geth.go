@@ -7,10 +7,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -24,68 +23,65 @@ func init() {
 }
 
 func New() *Geth {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: "http://127.0.0.1:6060/debug/metrics/prometheus",
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: time.Second},
+	return &Geth{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "http://127.0.0.1:6060/debug/metrics/prometheus",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second),
+				},
 			},
 		},
-	}
-
-	return &Geth{
-		Config: config,
 		charts: charts.Copy(),
 	}
 }
 
-type (
-	Config struct {
-		web.HTTP `yaml:",inline"`
-	}
-
-	Geth struct {
-		module.Base
-		Config `yaml:",inline"`
-
-		prom   prometheus.Prometheus
-		charts *Charts
-	}
-)
-
-func (g Geth) validateConfig() error {
-	if g.URL == "" {
-		return errors.New("URL is not set")
-	}
-	return nil
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
-func (g *Geth) initClient() error {
-	client, err := web.NewHTTPClient(g.Client)
-	if err != nil {
+type Geth struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	charts *Charts
+
+	prom prometheus.Prometheus
+}
+
+func (g *Geth) Configuration() any {
+	return g.Config
+}
+
+func (g *Geth) Init() error {
+	if err := g.validateConfig(); err != nil {
+		g.Errorf("error on validating config: %g", err)
 		return err
 	}
 
-	g.prom = prometheus.New(client, g.Request)
+	prom, err := g.initPrometheusClient()
+	if err != nil {
+		g.Error(err)
+		return err
+	}
+	g.prom = prom
+
 	return nil
 }
 
-func (g *Geth) Init() bool {
-	if err := g.validateConfig(); err != nil {
-		g.Errorf("error on validating config: %g", err)
-		return false
+func (g *Geth) Check() error {
+	mx, err := g.collect()
+	if err != nil {
+		g.Error(err)
+		return err
 	}
-	if err := g.initClient(); err != nil {
-		g.Errorf("error on initializing client: %g", err)
-		return false
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
 	}
-	return true
-}
-
-func (g *Geth) Check() bool {
-	return len(g.Collect()) > 0
+	return nil
 }
 
 func (g *Geth) Charts() *Charts {
@@ -104,4 +100,8 @@ func (g *Geth) Collect() map[string]int64 {
 	return mx
 }
 
-func (Geth) Cleanup() {}
+func (g *Geth) Cleanup() {
+	if g.prom != nil && g.prom.HTTPClient() != nil {
+		g.prom.HTTPClient().CloseIdleConnections()
+	}
+}

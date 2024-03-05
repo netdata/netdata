@@ -23,17 +23,17 @@ type Locker struct {
 }
 
 func (l *Locker) Lock(name string) (bool, error) {
-	name = filepath.Join(l.dir, name+l.suffix)
+	filename := l.filename(name)
 
-	if _, ok := l.locks[name]; ok {
+	if _, ok := l.locks[filename]; ok {
 		return true, nil
 	}
 
-	locker := flock.New(name)
+	locker := flock.New(filename)
 
 	ok, err := locker.TryLock()
 	if ok {
-		l.locks[name] = locker
+		l.locks[filename] = locker
 	} else {
 		_ = locker.Close()
 	}
@@ -41,15 +41,24 @@ func (l *Locker) Lock(name string) (bool, error) {
 	return ok, err
 }
 
-func (l *Locker) Unlock(name string) error {
-	name = filepath.Join(l.dir, name+l.suffix)
+func (l *Locker) Unlock(name string) {
+	filename := l.filename(name)
 
-	locker, ok := l.locks[name]
+	locker, ok := l.locks[filename]
 	if !ok {
-		return nil
+		return
 	}
 
-	delete(l.locks, name)
+	delete(l.locks, filename)
 
-	return locker.Close()
+	_ = locker.Close()
+}
+
+func (l *Locker) isLocked(name string) bool {
+	_, ok := l.locks[l.filename(name)]
+	return ok
+}
+
+func (l *Locker) filename(name string) string {
+	return filepath.Join(l.dir, name+l.suffix)
 }

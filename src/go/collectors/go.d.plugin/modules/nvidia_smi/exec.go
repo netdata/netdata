@@ -16,7 +16,7 @@ import (
 func newNvidiaSMIExec(path string, cfg Config, log *logger.Logger) (*nvidiaSMIExec, error) {
 	return &nvidiaSMIExec{
 		binPath: path,
-		timeout: cfg.Timeout.Duration,
+		timeout: cfg.Timeout.Duration(),
 		Logger:  log,
 	}, nil
 }

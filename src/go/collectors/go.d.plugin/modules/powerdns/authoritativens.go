@@ -4,6 +4,7 @@ package powerdns
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"time"
 
@@ -29,7 +30,7 @@ func New() *AuthoritativeNS {
 					URL: "http://127.0.0.1:8081",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 		},
@@ -37,43 +38,57 @@ func New() *AuthoritativeNS {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type AuthoritativeNS struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
 
 	httpClient *http.Client
-	charts     *module.Charts
 }
 
-func (ns *AuthoritativeNS) Init() bool {
+func (ns *AuthoritativeNS) Configuration() any {
+	return ns.Config
+}
+
+func (ns *AuthoritativeNS) Init() error {
 	err := ns.validateConfig()
 	if err != nil {
 		ns.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	client, err := ns.initHTTPClient()
 	if err != nil {
 		ns.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	ns.httpClient = client
 
 	cs, err := ns.initCharts()
 	if err != nil {
 		ns.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	ns.charts = cs
 
-	return true
+	return nil
 }
 
-func (ns *AuthoritativeNS) Check() bool {
-	return len(ns.Collect()) > 0
+func (ns *AuthoritativeNS) Check() error {
+	mx, err := ns.collect()
+	if err != nil {
+		ns.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (ns *AuthoritativeNS) Charts() *module.Charts {

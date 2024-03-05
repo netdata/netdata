@@ -1,0 +1,10 @@
+update_every: 123
+address: "ok"
+conf_path: "ok"
+timeout: 123.123
+cumulative_stats: yes
+use_tls: yes
+tls_ca: "ok"
+tls_cert: "ok"
+tls_key: "ok"
+tls_skip_verify: yes

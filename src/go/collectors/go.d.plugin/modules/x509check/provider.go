@@ -59,10 +59,10 @@ func newProvider(config Config) (provider, error) {
 		if sourceURL.Scheme == "https" {
 			sourceURL.Scheme = "tcp"
 		}
-		return &fromNet{url: sourceURL, tlsConfig: tlsCfg, timeout: config.Timeout.Duration}, nil
+		return &fromNet{url: sourceURL, tlsConfig: tlsCfg, timeout: config.Timeout.Duration()}, nil
 	case "smtp":
 		sourceURL.Scheme = "tcp"
-		return &fromSMTP{url: sourceURL, tlsConfig: tlsCfg, timeout: config.Timeout.Duration}, nil
+		return &fromSMTP{url: sourceURL, tlsConfig: tlsCfg, timeout: config.Timeout.Duration()}, nil
 	default:
 		return nil, fmt.Errorf("unsupported scheme '%s'", sourceURL)
 	}

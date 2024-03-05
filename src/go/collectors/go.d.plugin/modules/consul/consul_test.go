@@ -8,49 +8,59 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 var (
-	datav1132Checks, _                        = os.ReadFile("testdata/v1.13.2/v1-agent-checks.json")
-	dataV1132ClientSelf, _                    = os.ReadFile("testdata/v1.13.2/client_v1-agent-self.json")
-	dataV1132ClientPromMetrics, _             = os.ReadFile("testdata/v1.13.2/client_v1-agent-metrics.txt")
-	dataV1132ServerSelf, _                    = os.ReadFile("testdata/v1.13.2/server_v1-agent-self.json")
-	dataV1132ServerSelfDisabledPrometheus, _  = os.ReadFile("testdata/v1.13.2/server_v1-agent-self_disabled_prom.json")
-	dataV1132ServerSelfWithHostname, _        = os.ReadFile("testdata/v1.13.2/server_v1-agent-self_with_hostname.json")
-	dataV1132ServerPromMetrics, _             = os.ReadFile("testdata/v1.13.2/server_v1-agent-metrics.txt")
-	dataV1132ServerPromMetricsWithHostname, _ = os.ReadFile("testdata/v1.13.2/server_v1-agent-metrics_with_hostname.txt")
-	dataV1132ServerOperatorAutopilotHealth, _ = os.ReadFile("testdata/v1.13.2/server_v1-operator-autopilot-health.json")
-	dataV1132ServerCoordinateNodes, _         = os.ReadFile("testdata/v1.13.2/server_v1-coordinate-nodes.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataV1143CloudServerPromMetrics, _     = os.ReadFile("testdata/v1.14.3-cloud/server_v1-agent-metrics.txt")
-	dataV1143CloudServerSelf, _            = os.ReadFile("testdata/v1.14.3-cloud/server_v1-agent-self.json")
-	dataV1143CloudServerCoordinateNodes, _ = os.ReadFile("testdata/v1.14.3-cloud/server_v1-coordinate-nodes.json")
-	dataV1143CloudChecks, _                = os.ReadFile("testdata/v1.14.3-cloud/v1-agent-checks.json")
+	dataVer1132Checks, _                        = os.ReadFile("testdata/v1.13.2/v1-agent-checks.json")
+	dataVer1132ClientSelf, _                    = os.ReadFile("testdata/v1.13.2/client_v1-agent-self.json")
+	dataVer1132ClientPromMetrics, _             = os.ReadFile("testdata/v1.13.2/client_v1-agent-metrics.txt")
+	dataVer1132ServerSelf, _                    = os.ReadFile("testdata/v1.13.2/server_v1-agent-self.json")
+	dataVer1132ServerSelfDisabledPrometheus, _  = os.ReadFile("testdata/v1.13.2/server_v1-agent-self_disabled_prom.json")
+	dataVer1132ServerSelfWithHostname, _        = os.ReadFile("testdata/v1.13.2/server_v1-agent-self_with_hostname.json")
+	dataVer1132ServerPromMetrics, _             = os.ReadFile("testdata/v1.13.2/server_v1-agent-metrics.txt")
+	dataVer1132ServerPromMetricsWithHostname, _ = os.ReadFile("testdata/v1.13.2/server_v1-agent-metrics_with_hostname.txt")
+	dataVer1132ServerOperatorAutopilotHealth, _ = os.ReadFile("testdata/v1.13.2/server_v1-operator-autopilot-health.json")
+	dataVer1132ServerCoordinateNodes, _         = os.ReadFile("testdata/v1.13.2/server_v1-coordinate-nodes.json")
+
+	dataVer1143CloudServerPromMetrics, _     = os.ReadFile("testdata/v1.14.3-cloud/server_v1-agent-metrics.txt")
+	dataVer1143CloudServerSelf, _            = os.ReadFile("testdata/v1.14.3-cloud/server_v1-agent-self.json")
+	dataVer1143CloudServerCoordinateNodes, _ = os.ReadFile("testdata/v1.14.3-cloud/server_v1-coordinate-nodes.json")
+	dataVer1143CloudChecks, _                = os.ReadFile("testdata/v1.14.3-cloud/v1-agent-checks.json")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"datav1132Checks":                        datav1132Checks,
-		"dataV1132ClientSelf":                    dataV1132ClientSelf,
-		"dataV1132ClientPromMetrics":             dataV1132ClientPromMetrics,
-		"dataV1132ServerSelf":                    dataV1132ServerSelf,
-		"dataV1132ServerSelfWithHostname":        dataV1132ServerSelfWithHostname,
-		"dataV1132ServerSelfDisabledPrometheus":  dataV1132ServerSelfDisabledPrometheus,
-		"dataV1132ServerPromMetrics":             dataV1132ServerPromMetrics,
-		"dataV1132ServerPromMetricsWithHostname": dataV1132ServerPromMetricsWithHostname,
-		"dataV1132ServerOperatorAutopilotHealth": dataV1132ServerOperatorAutopilotHealth,
-		"dataV1132ServerCoordinateNodes":         dataV1132ServerCoordinateNodes,
-		"dataV1143CloudServerPromMetrics":        dataV1143CloudServerPromMetrics,
-		"dataV1143CloudServerSelf":               dataV1143CloudServerSelf,
-		"dataV1143CloudServerCoordinateNodes":    dataV1143CloudServerCoordinateNodes,
-		"dataV1143CloudChecks":                   dataV1143CloudChecks,
+		"dataConfigJSON":                           dataConfigJSON,
+		"dataConfigYAML":                           dataConfigYAML,
+		"dataVer1132Checks":                        dataVer1132Checks,
+		"dataVer1132ClientSelf":                    dataVer1132ClientSelf,
+		"dataVer1132ClientPromMetrics":             dataVer1132ClientPromMetrics,
+		"dataVer1132ServerSelf":                    dataVer1132ServerSelf,
+		"dataVer1132ServerSelfWithHostname":        dataVer1132ServerSelfWithHostname,
+		"dataVer1132ServerSelfDisabledPrometheus":  dataVer1132ServerSelfDisabledPrometheus,
+		"dataVer1132ServerPromMetrics":             dataVer1132ServerPromMetrics,
+		"dataVer1132ServerPromMetricsWithHostname": dataVer1132ServerPromMetricsWithHostname,
+		"dataVer1132ServerOperatorAutopilotHealth": dataVer1132ServerOperatorAutopilotHealth,
+		"dataVer1132ServerCoordinateNodes":         dataVer1132ServerCoordinateNodes,
+		"dataVer1143CloudServerPromMetrics":        dataVer1143CloudServerPromMetrics,
+		"dataVer1143CloudServerSelf":               dataVer1143CloudServerSelf,
+		"dataVer1143CloudServerCoordinateNodes":    dataVer1143CloudServerCoordinateNodes,
+		"dataVer1143CloudChecks":                   dataVer1143CloudChecks,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
+}
+
+func TestConsul_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Consul{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestConsul_Init(t *testing.T) {
@@ -78,9 +88,9 @@ func TestConsul_Init(t *testing.T) {
 			consul.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, consul.Init())
+				assert.Error(t, consul.Init())
 			} else {
-				assert.True(t, consul.Init())
+				assert.NoError(t, consul.Init())
 			}
 		})
 	}
@@ -131,9 +141,9 @@ func TestConsul_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, consul.Check())
+				assert.Error(t, consul.Check())
 			} else {
-				assert.True(t, consul.Check())
+				assert.NoError(t, consul.Check())
 			}
 		})
 	}
@@ -544,15 +554,15 @@ func caseConsulV1143CloudServerResponse(t *testing.T) (*Consul, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case r.URL.Path == urlPathAgentSelf:
-				_, _ = w.Write(dataV1143CloudServerSelf)
+				_, _ = w.Write(dataVer1143CloudServerSelf)
 			case r.URL.Path == urlPathAgentChecks:
-				_, _ = w.Write(dataV1143CloudChecks)
+				_, _ = w.Write(dataVer1143CloudChecks)
 			case r.URL.Path == urlPathAgentMetrics && r.URL.RawQuery == "format=prometheus":
-				_, _ = w.Write(dataV1143CloudServerPromMetrics)
+				_, _ = w.Write(dataVer1143CloudServerPromMetrics)
 			case r.URL.Path == urlPathOperationAutopilotHealth:
 				w.WriteHeader(http.StatusForbidden)
 			case r.URL.Path == urlPathCoordinateNodes:
-				_, _ = w.Write(dataV1143CloudServerCoordinateNodes)
+				_, _ = w.Write(dataVer1143CloudServerCoordinateNodes)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -561,7 +571,7 @@ func caseConsulV1143CloudServerResponse(t *testing.T) (*Consul, func()) {
 	consul := New()
 	consul.URL = srv.URL
 
-	require.True(t, consul.Init())
+	require.NoError(t, consul.Init())
 
 	return consul, srv.Close
 }
@@ -572,15 +582,15 @@ func caseConsulV1132ServerResponse(t *testing.T) (*Consul, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case r.URL.Path == urlPathAgentSelf:
-				_, _ = w.Write(dataV1132ServerSelf)
+				_, _ = w.Write(dataVer1132ServerSelf)
 			case r.URL.Path == urlPathAgentChecks:
-				_, _ = w.Write(datav1132Checks)
+				_, _ = w.Write(dataVer1132Checks)
 			case r.URL.Path == urlPathAgentMetrics && r.URL.RawQuery == "format=prometheus":
-				_, _ = w.Write(dataV1132ServerPromMetrics)
+				_, _ = w.Write(dataVer1132ServerPromMetrics)
 			case r.URL.Path == urlPathOperationAutopilotHealth:
-				_, _ = w.Write(dataV1132ServerOperatorAutopilotHealth)
+				_, _ = w.Write(dataVer1132ServerOperatorAutopilotHealth)
 			case r.URL.Path == urlPathCoordinateNodes:
-				_, _ = w.Write(dataV1132ServerCoordinateNodes)
+				_, _ = w.Write(dataVer1132ServerCoordinateNodes)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -589,7 +599,7 @@ func caseConsulV1132ServerResponse(t *testing.T) (*Consul, func()) {
 	consul := New()
 	consul.URL = srv.URL
 
-	require.True(t, consul.Init())
+	require.NoError(t, consul.Init())
 
 	return consul, srv.Close
 }
@@ -600,15 +610,15 @@ func caseConsulV1132ServerWithHostnameResponse(t *testing.T) (*Consul, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case r.URL.Path == urlPathAgentSelf:
-				_, _ = w.Write(dataV1132ServerSelfWithHostname)
+				_, _ = w.Write(dataVer1132ServerSelfWithHostname)
 			case r.URL.Path == urlPathAgentChecks:
-				_, _ = w.Write(datav1132Checks)
+				_, _ = w.Write(dataVer1132Checks)
 			case r.URL.Path == urlPathAgentMetrics && r.URL.RawQuery == "format=prometheus":
-				_, _ = w.Write(dataV1132ServerPromMetricsWithHostname)
+				_, _ = w.Write(dataVer1132ServerPromMetricsWithHostname)
 			case r.URL.Path == urlPathOperationAutopilotHealth:
-				_, _ = w.Write(dataV1132ServerOperatorAutopilotHealth)
+				_, _ = w.Write(dataVer1132ServerOperatorAutopilotHealth)
 			case r.URL.Path == urlPathCoordinateNodes:
-				_, _ = w.Write(dataV1132ServerCoordinateNodes)
+				_, _ = w.Write(dataVer1132ServerCoordinateNodes)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -617,7 +627,7 @@ func caseConsulV1132ServerWithHostnameResponse(t *testing.T) (*Consul, func()) {
 	consul := New()
 	consul.URL = srv.URL
 
-	require.True(t, consul.Init())
+	require.NoError(t, consul.Init())
 
 	return consul, srv.Close
 }
@@ -628,13 +638,13 @@ func caseConsulV1132ServerWithDisabledPrometheus(t *testing.T) (*Consul, func())
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case urlPathAgentSelf:
-				_, _ = w.Write(dataV1132ServerSelfDisabledPrometheus)
+				_, _ = w.Write(dataVer1132ServerSelfDisabledPrometheus)
 			case urlPathAgentChecks:
-				_, _ = w.Write(datav1132Checks)
+				_, _ = w.Write(dataVer1132Checks)
 			case urlPathOperationAutopilotHealth:
-				_, _ = w.Write(dataV1132ServerOperatorAutopilotHealth)
+				_, _ = w.Write(dataVer1132ServerOperatorAutopilotHealth)
 			case urlPathCoordinateNodes:
-				_, _ = w.Write(dataV1132ServerCoordinateNodes)
+				_, _ = w.Write(dataVer1132ServerCoordinateNodes)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -643,7 +653,7 @@ func caseConsulV1132ServerWithDisabledPrometheus(t *testing.T) (*Consul, func())
 	consul := New()
 	consul.URL = srv.URL
 
-	require.True(t, consul.Init())
+	require.NoError(t, consul.Init())
 
 	return consul, srv.Close
 }
@@ -654,11 +664,11 @@ func caseConsulV1132ClientResponse(t *testing.T) (*Consul, func()) {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case r.URL.Path == urlPathAgentSelf:
-				_, _ = w.Write(dataV1132ClientSelf)
+				_, _ = w.Write(dataVer1132ClientSelf)
 			case r.URL.Path == urlPathAgentChecks:
-				_, _ = w.Write(datav1132Checks)
+				_, _ = w.Write(dataVer1132Checks)
 			case r.URL.Path == urlPathAgentMetrics && r.URL.RawQuery == "format=prometheus":
-				_, _ = w.Write(dataV1132ClientPromMetrics)
+				_, _ = w.Write(dataVer1132ClientPromMetrics)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -667,7 +677,7 @@ func caseConsulV1132ClientResponse(t *testing.T) (*Consul, func()) {
 	consul := New()
 	consul.URL = srv.URL
 
-	require.True(t, consul.Init())
+	require.NoError(t, consul.Init())
 
 	return consul, srv.Close
 }
@@ -682,7 +692,7 @@ func caseInvalidDataResponse(t *testing.T) (*Consul, func()) {
 	consul := New()
 	consul.URL = srv.URL
 
-	require.True(t, consul.Init())
+	require.NoError(t, consul.Init())
 
 	return consul, srv.Close
 }
@@ -691,7 +701,7 @@ func caseConnectionRefused(t *testing.T) (*Consul, func()) {
 	t.Helper()
 	consul := New()
 	consul.URL = "http://127.0.0.1:65535/"
-	require.True(t, consul.Init())
+	require.NoError(t, consul.Init())
 
 	return consul, func() {}
 }
@@ -705,7 +715,7 @@ func case404(t *testing.T) (*Consul, func()) {
 
 	consul := New()
 	consul.URL = srv.URL
-	require.True(t, consul.Init())
+	require.NoError(t, consul.Init())
 
 	return consul, srv.Close
 }

@@ -107,7 +107,7 @@ modules:
               required: false
             - name: timeout
               description: HTTP request timeout.
-              default_value: 5
+              default_value: 2
               required: false
             - name: username
               description: Username for basic HTTP authentication.

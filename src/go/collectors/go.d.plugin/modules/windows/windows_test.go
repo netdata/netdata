@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/stretchr/testify/assert"
@@ -17,15 +18,24 @@ import (
 )
 
 var (
-	v0200Metrics, _ = os.ReadFile("testdata/v0.20.0/metrics.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer0200Metrics, _ = os.ReadFile("testdata/v0.20.0/metrics.txt")
 )
 
-func Test_TestData(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"v0200Metrics": v0200Metrics,
+		"dataConfigJSON":     dataConfigJSON,
+		"dataConfigYAML":     dataConfigYAML,
+		"dataVer0200Metrics": dataVer0200Metrics,
 	} {
-		assert.NotNilf(t, data, name)
+		assert.NotNil(t, data, name)
 	}
+}
+
+func TestWindows_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Windows{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
@@ -57,9 +67,9 @@ func TestWindows_Init(t *testing.T) {
 			win.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, win.Init())
+				assert.Error(t, win.Init())
 			} else {
-				assert.True(t, win.Init())
+				assert.NoError(t, win.Init())
 			}
 		})
 	}
@@ -92,12 +102,12 @@ func TestWindows_Check(t *testing.T) {
 			win, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, win.Init())
+			require.NoError(t, win.Init())
 
 			if test.wantFail {
-				assert.False(t, win.Check())
+				assert.Error(t, win.Check())
 			} else {
-				assert.True(t, win.Check())
+				assert.NoError(t, win.Check())
 			}
 		})
 	}
@@ -789,7 +799,7 @@ func TestWindows_Collect(t *testing.T) {
 			win, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, win.Init())
+			require.NoError(t, win.Init())
 
 			mx := win.Collect()
 
@@ -1053,7 +1063,7 @@ func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, w *Windows, mx map[str
 func prepareWindowsV0200() (win *Windows, cleanup func()) {
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(v0200Metrics)
+			_, _ = w.Write(dataVer0200Metrics)
 		}))
 
 	win = New()

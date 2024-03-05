@@ -9,7 +9,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
-func (d Dnsmasq) validateConfig() error {
+func (d *Dnsmasq) validateConfig() error {
 	if d.Address == "" {
 		return errors.New("'address' parameter not set")
 	}
@@ -19,11 +19,11 @@ func (d Dnsmasq) validateConfig() error {
 	return nil
 }
 
-func (d Dnsmasq) initDNSClient() (dnsClient, error) {
-	return d.newDNSClient(d.Protocol, d.Timeout.Duration), nil
+func (d *Dnsmasq) initDNSClient() (dnsClient, error) {
+	return d.newDNSClient(d.Protocol, d.Timeout.Duration()), nil
 }
 
-func (d Dnsmasq) initCharts() (*module.Charts, error) {
+func (d *Dnsmasq) initCharts() (*module.Charts, error) {
 	return cacheCharts.Copy(), nil
 }
 

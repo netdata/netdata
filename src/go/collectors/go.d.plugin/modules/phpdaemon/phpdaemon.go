@@ -4,11 +4,11 @@ package phpdaemon
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -21,88 +21,80 @@ func init() {
 	})
 }
 
-const (
-	defaultURL         = "http://127.0.0.1:8509/FullStatus"
-	defaultHTTPTimeout = time.Second * 2
-)
-
-// New creates PHPDaemon with default values.
 func New() *PHPDaemon {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: defaultURL,
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: defaultHTTPTimeout},
+	return &PHPDaemon{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "http://127.0.0.1:8509/FullStatus",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second),
+				},
 			},
 		},
-	}
-
-	return &PHPDaemon{
-		Config: config,
 		charts: charts.Copy(),
 	}
 }
 
-// Config is the PHPDaemon module configuration.
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
-// PHPDaemon PHPDaemon module.
 type PHPDaemon struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
+	charts *Charts
 
 	client *client
-	charts *Charts
 }
 
-// Cleanup makes cleanup.
-func (PHPDaemon) Cleanup() {}
+func (p *PHPDaemon) Configuration() any {
+	return p.Config
+}
 
-// Init makes initialization.
-func (p *PHPDaemon) Init() bool {
-	httpClient, err := web.NewHTTPClient(p.Client)
-	if err != nil {
-		p.Errorf("error on creating http client : %v", err)
-		return false
+func (p *PHPDaemon) Init() error {
+	if err := p.validateConfig(); err != nil {
+		p.Error(err)
+		return err
 	}
 
-	_, err = web.NewHTTPRequest(p.Request)
+	c, err := p.initClient()
 	if err != nil {
-		p.Errorf("error on creating http request to %s : %v", p.URL, err)
-		return false
+		p.Error(err)
+		return err
 	}
-
-	p.client = newAPIClient(httpClient, p.Request)
+	p.client = c
 
 	p.Debugf("using URL %s", p.URL)
-	p.Debugf("using timeout: %s", p.Timeout.Duration)
+	p.Debugf("using timeout: %s", p.Timeout)
 
-	return true
+	return nil
 }
 
-// Check makes check.
-func (p *PHPDaemon) Check() bool {
-	mx := p.Collect()
-
+func (p *PHPDaemon) Check() error {
+	mx, err := p.collect()
+	if err != nil {
+		p.Error(err)
+		return err
+	}
 	if len(mx) == 0 {
-		return false
-	}
-	if _, ok := mx["uptime"]; ok {
-		// TODO: remove panic
-		panicIf(p.charts.Add(uptimeChart.Copy()))
+		return errors.New("no metrics collected")
 	}
 
-	return true
+	if _, ok := mx["uptime"]; ok {
+		_ = p.charts.Add(uptimeChart.Copy())
+	}
+
+	return nil
 }
 
-// Charts creates Charts.
-func (p PHPDaemon) Charts() *Charts { return p.charts }
+func (p *PHPDaemon) Charts() *Charts {
+	return p.charts
+}
 
-// Collect collects metrics.
 func (p *PHPDaemon) Collect() map[string]int64 {
 	mx, err := p.collect()
 
@@ -114,9 +106,8 @@ func (p *PHPDaemon) Collect() map[string]int64 {
 	return mx
 }
 
-func panicIf(err error) {
-	if err == nil {
-		return
+func (p *PHPDaemon) Cleanup() {
+	if p.client != nil && p.client.httpClient != nil {
+		p.client.httpClient.CloseIdleConnections()
 	}
-	panic(err)
 }

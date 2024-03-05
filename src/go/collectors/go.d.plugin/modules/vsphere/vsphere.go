@@ -29,20 +29,18 @@ func init() {
 }
 
 func New() *VSphere {
-	config := Config{
-		HTTP: web.HTTP{
-			Client: web.Client{
-				Timeout: web.Duration{Duration: time.Second * 20},
-			},
-		},
-		DiscoveryInterval: web.Duration{Duration: time.Minute * 5},
-		HostsInclude:      []string{"/*"},
-		VMsInclude:        []string{"/*"},
-	}
-
 	return &VSphere{
-		collectionLock:  new(sync.RWMutex),
-		Config:          config,
+		Config: Config{
+			HTTP: web.HTTP{
+				Client: web.Client{
+					Timeout: web.Duration(time.Second * 20),
+				},
+			},
+			DiscoveryInterval: web.Duration(time.Minute * 5),
+			HostsInclude:      []string{"/*"},
+			VMsInclude:        []string{"/*"},
+		},
+		collectionLock:  &sync.RWMutex{},
 		charts:          &module.Charts{},
 		discoveredHosts: make(map[string]int),
 		discoveredVMs:   make(map[string]int),
@@ -51,17 +49,19 @@ func New() *VSphere {
 }
 
 type Config struct {
-	web.HTTP          `yaml:",inline"`
-	DiscoveryInterval web.Duration       `yaml:"discovery_interval"`
-	HostsInclude      match.HostIncludes `yaml:"host_include"`
-	VMsInclude        match.VMIncludes   `yaml:"vm_include"`
+	web.HTTP          `yaml:",inline" json:""`
+	UpdateEvery       int                `yaml:"update_every" json:"update_every"`
+	DiscoveryInterval web.Duration       `yaml:"discovery_interval" json:"discovery_interval"`
+	HostsInclude      match.HostIncludes `yaml:"host_include" json:"host_include"`
+	VMsInclude        match.VMIncludes   `yaml:"vm_include" json:"vm_include"`
 }
 
 type (
 	VSphere struct {
 		module.Base
-		UpdateEvery int `yaml:"update_every"`
-		Config      `yaml:",inline"`
+		Config `yaml:",inline" json:""`
+
+		charts *module.Charts
 
 		discoverer
 		scraper
@@ -72,7 +72,6 @@ type (
 		discoveredHosts map[string]int
 		discoveredVMs   map[string]int
 		charted         map[string]bool
-		charts          *module.Charts
 	}
 	discoverer interface {
 		Discover() (*rs.Resources, error)
@@ -83,39 +82,41 @@ type (
 	}
 )
 
-func (vs *VSphere) Init() bool {
+func (vs *VSphere) Configuration() any {
+	return vs.Config
+}
+
+func (vs *VSphere) Init() error {
 	if err := vs.validateConfig(); err != nil {
 		vs.Errorf("error on validating config: %v", err)
-		return false
+		return err
 	}
 
 	vsClient, err := vs.initClient()
 	if err != nil {
 		vs.Errorf("error on creating vsphere client: %v", err)
-		return false
+		return err
 	}
 
-	err = vs.initDiscoverer(vsClient)
-	if err != nil {
+	if err := vs.initDiscoverer(vsClient); err != nil {
 		vs.Errorf("error on creating vsphere discoverer: %v", err)
-		return false
+		return err
 	}
 
 	vs.initScraper(vsClient)
 
-	err = vs.discoverOnce()
-	if err != nil {
+	if err := vs.discoverOnce(); err != nil {
 		vs.Errorf("error on discovering: %v", err)
-		return false
+		return err
 	}
 
 	vs.goDiscovery()
 
-	return true
+	return nil
 }
 
-func (vs *VSphere) Check() bool {
-	return true
+func (vs *VSphere) Check() error {
+	return nil
 }
 
 func (vs *VSphere) Charts() *module.Charts {

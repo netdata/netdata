@@ -1,23 +1,37 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/pgbouncer job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
-    },
-    "dsn": {
-      "type": "string"
-    },
-    "timeout": {
-      "type": [
-        "string",
-        "integer"
-      ]
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "PgBouncer collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "dsn": {
+        "title": "DSN",
+        "description": "PgBouncer server Data Source Name in [keyword/value or URI format](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).",
+        "type": "string",
+        "default": "postgres://netdata:password@127.0.0.1:6432/pgbouncer"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for queries, in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      }
     }
   },
-  "required": [
-    "name",
-    "dsn"
-  ]
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    }
+  }
 }

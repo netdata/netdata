@@ -225,14 +225,14 @@ func (p *ProxySQL) openConnection() error {
 }
 
 func (p *ProxySQL) doQueryRow(query string, v any) error {
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
 	defer cancel()
 
 	return p.db.QueryRowContext(ctx, query).Scan(v)
 }
 
 func (p *ProxySQL) doQuery(query string, assign func(column, value string, rowEnd bool)) error {
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
 	defer cancel()
 
 	rows, err := p.db.QueryContext(ctx, query)

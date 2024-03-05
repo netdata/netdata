@@ -7,6 +7,7 @@ package systemdunits
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -30,10 +31,10 @@ func init() {
 func New() *SystemdUnits {
 	return &SystemdUnits{
 		Config: Config{
+			Timeout: web.Duration(time.Second * 2),
 			Include: []string{
 				"*.service",
 			},
-			Timeout: web.Duration{Duration: time.Second * 2},
 		},
 
 		charts: &module.Charts{},
@@ -43,13 +44,14 @@ func New() *SystemdUnits {
 }
 
 type Config struct {
-	Include []string     `yaml:"include"`
-	Timeout web.Duration `yaml:"timeout"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	Include     []string     `yaml:"include" json:"include"`
 }
 
 type SystemdUnits struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	client systemdClient
 	conn   systemdConnection
@@ -61,27 +63,40 @@ type SystemdUnits struct {
 	charts *module.Charts
 }
 
-func (s *SystemdUnits) Init() bool {
+func (s *SystemdUnits) Configuration() any {
+	return s.Config
+}
+
+func (s *SystemdUnits) Init() error {
 	err := s.validateConfig()
 	if err != nil {
 		s.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	sr, err := s.initSelector()
 	if err != nil {
 		s.Errorf("init selector: %v", err)
-		return false
+		return err
 	}
 	s.sr = sr
 
 	s.Debugf("unit names patterns: %v", s.Include)
 	s.Debugf("timeout: %s", s.Timeout)
-	return true
+
+	return nil
 }
 
-func (s *SystemdUnits) Check() bool {
-	return len(s.Collect()) > 0
+func (s *SystemdUnits) Check() error {
+	mx, err := s.collect()
+	if err != nil {
+		s.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (s *SystemdUnits) Charts() *module.Charts {
@@ -89,15 +104,15 @@ func (s *SystemdUnits) Charts() *module.Charts {
 }
 
 func (s *SystemdUnits) Collect() map[string]int64 {
-	ms, err := s.collect()
+	mx, err := s.collect()
 	if err != nil {
 		s.Error(err)
 	}
 
-	if len(ms) == 0 {
+	if len(mx) == 0 {
 		return nil
 	}
-	return ms
+	return mx
 }
 
 func (s *SystemdUnits) Cleanup() {

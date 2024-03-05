@@ -12,7 +12,7 @@ import (
 
 var newSNMPClient = gosnmp.NewHandler
 
-func (s SNMP) validateConfig() error {
+func (s *SNMP) validateConfig() error {
 	if len(s.ChartsInput) == 0 {
 		return errors.New("'charts' are required but not set")
 	}
@@ -35,7 +35,7 @@ func (s SNMP) validateConfig() error {
 	return nil
 }
 
-func (s SNMP) initSNMPClient() (gosnmp.Handler, error) {
+func (s *SNMP) initSNMPClient() (gosnmp.Handler, error) {
 	client := newSNMPClient()
 
 	if client.SetTarget(s.Hostname); client.Target() == "" {
@@ -96,7 +96,7 @@ func (s SNMP) initSNMPClient() (gosnmp.Handler, error) {
 	return client, nil
 }
 
-func (s SNMP) initOIDs() (oids []string) {
+func (s *SNMP) initOIDs() (oids []string) {
 	for _, c := range *s.charts {
 		for _, d := range c.Dims {
 			oids = append(oids, d.ID)

@@ -11,51 +11,6 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/stm"
 )
 
-type (
-	rawData map[string]json.RawMessage
-	rawJMX  struct {
-		Beans []rawData
-	}
-)
-
-func (r rawJMX) isEmpty() bool {
-	return len(r.Beans) == 0
-}
-
-func (r rawJMX) find(f func(rawData) bool) rawData {
-	for _, v := range r.Beans {
-		if f(v) {
-			return v
-		}
-	}
-	return nil
-}
-
-func (r rawJMX) findJvm() rawData {
-	f := func(data rawData) bool { return string(data["modelerType"]) == "\"JvmMetrics\"" }
-	return r.find(f)
-}
-
-func (r rawJMX) findRPCActivity() rawData {
-	f := func(data rawData) bool { return strings.HasPrefix(string(data["modelerType"]), "\"RpcActivityForPort") }
-	return r.find(f)
-}
-
-func (r rawJMX) findFSNameSystem() rawData {
-	f := func(data rawData) bool { return string(data["modelerType"]) == "\"FSNamesystem\"" }
-	return r.find(f)
-}
-
-func (r rawJMX) findFSDatasetState() rawData {
-	f := func(data rawData) bool { return string(data["modelerType"]) == "\"FSDatasetState\"" }
-	return r.find(f)
-}
-
-func (r rawJMX) findDataNodeActivity() rawData {
-	f := func(data rawData) bool { return strings.HasPrefix(string(data["modelerType"]), "\"DataNodeActivity") }
-	return r.find(f)
-}
-
 func (h *HDFS) collect() (map[string]int64, error) {
 	var raw rawJMX
 	err := h.client.doOKWithDecodeJSON(&raw)
@@ -72,7 +27,35 @@ func (h *HDFS) collect() (map[string]int64, error) {
 	return stm.ToMap(mx), nil
 }
 
-func (h HDFS) collectRawJMX(raw rawJMX) *metrics {
+func (h *HDFS) determineNodeType() (nodeType, error) {
+	var raw rawJMX
+	err := h.client.doOKWithDecodeJSON(&raw)
+	if err != nil {
+		return "", err
+	}
+
+	if raw.isEmpty() {
+		return "", errors.New("empty response")
+	}
+
+	jvm := raw.findJvm()
+	if jvm == nil {
+		return "", errors.New("couldn't find jvm in response")
+	}
+
+	v, ok := jvm["tag.ProcessName"]
+	if !ok {
+		return "", errors.New("couldn't find process name in JvmMetrics")
+	}
+
+	t := nodeType(strings.Trim(string(v), "\""))
+	if t == nameNodeType || t == dataNodeType {
+		return t, nil
+	}
+	return "", errors.New("unknown node type")
+}
+
+func (h *HDFS) collectRawJMX(raw rawJMX) *metrics {
 	var mx metrics
 	switch h.nodeType {
 	default:
@@ -85,7 +68,7 @@ func (h HDFS) collectRawJMX(raw rawJMX) *metrics {
 	return &mx
 }
 
-func (h HDFS) collectNameNode(mx *metrics, raw rawJMX) {
+func (h *HDFS) collectNameNode(mx *metrics, raw rawJMX) {
 	err := h.collectJVM(mx, raw)
 	if err != nil {
 		h.Debugf("error on collecting jvm : %v", err)
@@ -102,7 +85,7 @@ func (h HDFS) collectNameNode(mx *metrics, raw rawJMX) {
 	}
 }
 
-func (h HDFS) collectDataNode(mx *metrics, raw rawJMX) {
+func (h *HDFS) collectDataNode(mx *metrics, raw rawJMX) {
 	err := h.collectJVM(mx, raw)
 	if err != nil {
 		h.Debugf("error on collecting jvm : %v", err)
@@ -124,7 +107,7 @@ func (h HDFS) collectDataNode(mx *metrics, raw rawJMX) {
 	}
 }
 
-func (h HDFS) collectJVM(mx *metrics, raw rawJMX) error {
+func (h *HDFS) collectJVM(mx *metrics, raw rawJMX) error {
 	v := raw.findJvm()
 	if v == nil {
 		return nil
@@ -140,7 +123,7 @@ func (h HDFS) collectJVM(mx *metrics, raw rawJMX) error {
 	return nil
 }
 
-func (h HDFS) collectRPCActivity(mx *metrics, raw rawJMX) error {
+func (h *HDFS) collectRPCActivity(mx *metrics, raw rawJMX) error {
 	v := raw.findRPCActivity()
 	if v == nil {
 		return nil
@@ -156,7 +139,7 @@ func (h HDFS) collectRPCActivity(mx *metrics, raw rawJMX) error {
 	return nil
 }
 
-func (h HDFS) collectFSNameSystem(mx *metrics, raw rawJMX) error {
+func (h *HDFS) collectFSNameSystem(mx *metrics, raw rawJMX) error {
 	v := raw.findFSNameSystem()
 	if v == nil {
 		return nil
@@ -174,7 +157,7 @@ func (h HDFS) collectFSNameSystem(mx *metrics, raw rawJMX) error {
 	return nil
 }
 
-func (h HDFS) collectFSDatasetState(mx *metrics, raw rawJMX) error {
+func (h *HDFS) collectFSDatasetState(mx *metrics, raw rawJMX) error {
 	v := raw.findFSDatasetState()
 	if v == nil {
 		return nil
@@ -193,7 +176,7 @@ func (h HDFS) collectFSDatasetState(mx *metrics, raw rawJMX) error {
 	return nil
 }
 
-func (h HDFS) collectDataNodeActivity(mx *metrics, raw rawJMX) error {
+func (h *HDFS) collectDataNodeActivity(mx *metrics, raw rawJMX) error {
 	v := raw.findDataNodeActivity()
 	if v == nil {
 		return nil

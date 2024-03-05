@@ -94,7 +94,7 @@ modules:
               required: true
             - name: timeout
               description: Query timeout in seconds.
-              default_value: 2
+              default_value: 1
               required: false
             - name: databases
               description: Databases selector. Determines which database metrics will be collected.

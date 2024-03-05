@@ -9,28 +9,40 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testStatusData, _ = os.ReadFile("testdata/status.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataStatusMetrics, _ = os.ReadFile("testdata/status.txt")
 )
 
-func TestTengine_Cleanup(t *testing.T) { New().Cleanup() }
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":    dataConfigJSON,
+		"dataConfigYAML":    dataConfigYAML,
+		"dataStatusMetrics": dataStatusMetrics,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
 
-func TestNew(t *testing.T) {
-	job := New()
+func TestTengine_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Tengine{}, dataConfigJSON, dataConfigYAML)
+}
 
-	assert.Implements(t, (*module.Module)(nil), job)
-	assert.Equal(t, defaultURL, job.URL)
-	assert.Equal(t, defaultHTTPTimeout, job.Timeout.Duration)
+func TestTengine_Cleanup(t *testing.T) {
+	New().Cleanup()
 }
 
 func TestTengine_Init(t *testing.T) {
 	job := New()
 
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 	assert.NotNil(t, job.apiClient)
 }
 
@@ -38,22 +50,22 @@ func TestTengine_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusData)
+				_, _ = w.Write(dataStatusMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
-	assert.True(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.NoError(t, job.Check())
 }
 
 func TestTengine_CheckNG(t *testing.T) {
 	job := New()
 
 	job.URL = "http://127.0.0.1:38001/us"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestTengine_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
@@ -62,14 +74,14 @@ func TestTengine_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusData)
+				_, _ = w.Write(dataStatusMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	expected := map[string]int64{
 		"bytes_in":                 5944,
@@ -116,8 +128,8 @@ func TestTengine_InvalidData(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestTengine_404(t *testing.T) {
@@ -130,6 +142,6 @@ func TestTengine_404(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }

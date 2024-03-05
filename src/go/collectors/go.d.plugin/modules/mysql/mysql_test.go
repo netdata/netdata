@@ -21,79 +21,80 @@ import (
 )
 
 var (
-	dataMySQLV8030Version, _                  = os.ReadFile("testdata/mysql/v8.0.30/version.txt")
-	dataMySQLV8030GlobalStatus, _             = os.ReadFile("testdata/mysql/v8.0.30/global_status.txt")
-	dataMySQLV8030GlobalVariables, _          = os.ReadFile("testdata/mysql/v8.0.30/global_variables.txt")
-	dataMySQLV8030ReplicaStatusMultiSource, _ = os.ReadFile("testdata/mysql/v8.0.30/replica_status_multi_source.txt")
-	dataMySQLV8030ProcessList, _              = os.ReadFile("testdata/mysql/v8.0.30/process_list.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
-	dataPerconaV8029Version, _         = os.ReadFile("testdata/percona/v8.0.29/version.txt")
-	dataPerconaV8029GlobalStatus, _    = os.ReadFile("testdata/percona/v8.0.29/global_status.txt")
-	dataPerconaV8029GlobalVariables, _ = os.ReadFile("testdata/percona/v8.0.29/global_variables.txt")
-	dataPerconaV8029UserStatistics, _  = os.ReadFile("testdata/percona/v8.0.29/user_statistics.txt")
-	dataPerconaV8029ProcessList, _     = os.ReadFile("testdata/percona/v8.0.29/process_list.txt")
+	dataMySQLVer8030Version, _                  = os.ReadFile("testdata/mysql/v8.0.30/version.txt")
+	dataMySQLVer8030GlobalStatus, _             = os.ReadFile("testdata/mysql/v8.0.30/global_status.txt")
+	dataMySQLVer8030GlobalVariables, _          = os.ReadFile("testdata/mysql/v8.0.30/global_variables.txt")
+	dataMySQLVer8030ReplicaStatusMultiSource, _ = os.ReadFile("testdata/mysql/v8.0.30/replica_status_multi_source.txt")
+	dataMySQLVer8030ProcessList, _              = os.ReadFile("testdata/mysql/v8.0.30/process_list.txt")
 
-	dataMariaV5564Version, _         = os.ReadFile("testdata/mariadb/v5.5.64/version.txt")
-	dataMariaV5564GlobalStatus, _    = os.ReadFile("testdata/mariadb/v5.5.64/global_status.txt")
-	dataMariaV5564GlobalVariables, _ = os.ReadFile("testdata/mariadb/v5.5.64/global_variables.txt")
-	dataMariaV5564ProcessList, _     = os.ReadFile("testdata/mariadb/v5.5.64/process_list.txt")
+	dataPerconaVer8029Version, _         = os.ReadFile("testdata/percona/v8.0.29/version.txt")
+	dataPerconaVer8029GlobalStatus, _    = os.ReadFile("testdata/percona/v8.0.29/global_status.txt")
+	dataPerconaVer8029GlobalVariables, _ = os.ReadFile("testdata/percona/v8.0.29/global_variables.txt")
+	dataPerconaVer8029UserStatistics, _  = os.ReadFile("testdata/percona/v8.0.29/user_statistics.txt")
+	dataPerconaV8029ProcessList, _       = os.ReadFile("testdata/percona/v8.0.29/process_list.txt")
 
-	dataMariaV1084Version, _                     = os.ReadFile("testdata/mariadb/v10.8.4/version.txt")
-	dataMariaV1084GlobalStatus, _                = os.ReadFile("testdata/mariadb/v10.8.4/global_status.txt")
-	dataMariaV1084GlobalVariables, _             = os.ReadFile("testdata/mariadb/v10.8.4/global_variables.txt")
-	dataMariaV1084AllSlavesStatusSingleSource, _ = os.ReadFile("testdata/mariadb/v10.8.4/all_slaves_status_single_source.txt")
-	dataMariaV1084AllSlavesStatusMultiSource, _  = os.ReadFile("testdata/mariadb/v10.8.4/all_slaves_status_multi_source.txt")
-	dataMariaV1084UserStatistics, _              = os.ReadFile("testdata/mariadb/v10.8.4/user_statistics.txt")
-	dataMariaV1084ProcessList, _                 = os.ReadFile("testdata/mariadb/v10.8.4/process_list.txt")
+	dataMariaVer5564Version, _         = os.ReadFile("testdata/mariadb/v5.5.64/version.txt")
+	dataMariaVer5564GlobalStatus, _    = os.ReadFile("testdata/mariadb/v5.5.64/global_status.txt")
+	dataMariaVer5564GlobalVariables, _ = os.ReadFile("testdata/mariadb/v5.5.64/global_variables.txt")
+	dataMariaVer5564ProcessList, _     = os.ReadFile("testdata/mariadb/v5.5.64/process_list.txt")
 
-	dataMariaGaleraClusterV1084Version, _         = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/version.txt")
-	dataMariaGaleraClusterV1084GlobalStatus, _    = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/global_status.txt")
-	dataMariaGaleraClusterV1084GlobalVariables, _ = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/global_variables.txt")
-	dataMariaGaleraClusterV1084UserStatistics, _  = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/user_statistics.txt")
-	dataMariaGaleraClusterV1084ProcessList, _     = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/process_list.txt")
+	dataMariaVer1084Version, _                     = os.ReadFile("testdata/mariadb/v10.8.4/version.txt")
+	dataMariaVer1084GlobalStatus, _                = os.ReadFile("testdata/mariadb/v10.8.4/global_status.txt")
+	dataMariaVer1084GlobalVariables, _             = os.ReadFile("testdata/mariadb/v10.8.4/global_variables.txt")
+	dataMariaVer1084AllSlavesStatusSingleSource, _ = os.ReadFile("testdata/mariadb/v10.8.4/all_slaves_status_single_source.txt")
+	dataMariaVer1084AllSlavesStatusMultiSource, _  = os.ReadFile("testdata/mariadb/v10.8.4/all_slaves_status_multi_source.txt")
+	dataMariaVer1084UserStatistics, _              = os.ReadFile("testdata/mariadb/v10.8.4/user_statistics.txt")
+	dataMariaVer1084ProcessList, _                 = os.ReadFile("testdata/mariadb/v10.8.4/process_list.txt")
+
+	dataMariaGaleraClusterVer1084Version, _         = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/version.txt")
+	dataMariaGaleraClusterVer1084GlobalStatus, _    = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/global_status.txt")
+	dataMariaGaleraClusterVer1084GlobalVariables, _ = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/global_variables.txt")
+	dataMariaGaleraClusterVer1084UserStatistics, _  = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/user_statistics.txt")
+	dataMariaGaleraClusterVer1084ProcessList, _     = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/process_list.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataMySQLV8030Version":                  dataMySQLV8030Version,
-		"dataMySQLV8030GlobalStatus":             dataMySQLV8030GlobalStatus,
-		"dataMySQLV8030GlobalVariables":          dataMySQLV8030GlobalVariables,
-		"dataMySQLV8030ReplicaStatusMultiSource": dataMySQLV8030ReplicaStatusMultiSource,
-		"dataMySQLV8030ProcessList":              dataMySQLV8030ProcessList,
-
-		"dataPerconaV8029Version":         dataPerconaV8029Version,
-		"dataPerconaV8029GlobalStatus":    dataPerconaV8029GlobalStatus,
-		"dataPerconaV8029GlobalVariables": dataPerconaV8029GlobalVariables,
-		"dataPerconaV8029UserStatistics":  dataPerconaV8029UserStatistics,
-		"dataPerconaV8029ProcessList":     dataPerconaV8029ProcessList,
-
-		"dataMariaV5564Version":         dataMariaV5564Version,
-		"dataMariaV5564GlobalStatus":    dataMariaV5564GlobalStatus,
-		"dataMariaV5564GlobalVariables": dataMariaV5564GlobalVariables,
-		"dataMariaV5564ProcessList":     dataMariaV5564ProcessList,
-
-		"dataMariaV1084Version":                     dataMariaV1084Version,
-		"dataMariaV1084GlobalStatus":                dataMariaV1084GlobalStatus,
-		"dataMariaV1084GlobalVariables":             dataMariaV1084GlobalVariables,
-		"dataMariaV1084AllSlavesStatusSingleSource": dataMariaV1084AllSlavesStatusSingleSource,
-		"dataMariaV1084AllSlavesStatusMultiSource":  dataMariaV1084AllSlavesStatusMultiSource,
-		"dataMariaV1084UserStatistics":              dataMariaV1084UserStatistics,
-		"dataMariaV1084ProcessList":                 dataMariaV1084ProcessList,
-
-		"dataMariaGaleraClusterV1084Version":         dataMariaGaleraClusterV1084Version,
-		"dataMariaGaleraClusterV1084GlobalStatus":    dataMariaGaleraClusterV1084GlobalStatus,
-		"dataMariaGaleraClusterV1084GlobalVariables": dataMariaGaleraClusterV1084GlobalVariables,
-		"dataMariaGaleraClusterV1084UserStatistics":  dataMariaGaleraClusterV1084UserStatistics,
-		"dataMariaGaleraClusterV1084ProcessList":     dataMariaGaleraClusterV1084ProcessList,
+		"dataConfigJSON":                               dataConfigJSON,
+		"dataConfigYAML":                               dataConfigYAML,
+		"dataMySQLVer8030Version":                      dataMySQLVer8030Version,
+		"dataMySQLVer8030GlobalStatus":                 dataMySQLVer8030GlobalStatus,
+		"dataMySQLVer8030GlobalVariables":              dataMySQLVer8030GlobalVariables,
+		"dataMySQLVer8030ReplicaStatusMultiSource":     dataMySQLVer8030ReplicaStatusMultiSource,
+		"dataMySQLVer8030ProcessList":                  dataMySQLVer8030ProcessList,
+		"dataPerconaVer8029Version":                    dataPerconaVer8029Version,
+		"dataPerconaVer8029GlobalStatus":               dataPerconaVer8029GlobalStatus,
+		"dataPerconaVer8029GlobalVariables":            dataPerconaVer8029GlobalVariables,
+		"dataPerconaVer8029UserStatistics":             dataPerconaVer8029UserStatistics,
+		"dataPerconaV8029ProcessList":                  dataPerconaV8029ProcessList,
+		"dataMariaVer5564Version":                      dataMariaVer5564Version,
+		"dataMariaVer5564GlobalStatus":                 dataMariaVer5564GlobalStatus,
+		"dataMariaVer5564GlobalVariables":              dataMariaVer5564GlobalVariables,
+		"dataMariaVer5564ProcessList":                  dataMariaVer5564ProcessList,
+		"dataMariaVer1084Version":                      dataMariaVer1084Version,
+		"dataMariaVer1084GlobalStatus":                 dataMariaVer1084GlobalStatus,
+		"dataMariaVer1084GlobalVariables":              dataMariaVer1084GlobalVariables,
+		"dataMariaVer1084AllSlavesStatusSingleSource":  dataMariaVer1084AllSlavesStatusSingleSource,
+		"dataMariaVer1084AllSlavesStatusMultiSource":   dataMariaVer1084AllSlavesStatusMultiSource,
+		"dataMariaVer1084UserStatistics":               dataMariaVer1084UserStatistics,
+		"dataMariaVer1084ProcessList":                  dataMariaVer1084ProcessList,
+		"dataMariaGaleraClusterVer1084Version":         dataMariaGaleraClusterVer1084Version,
+		"dataMariaGaleraClusterVer1084GlobalStatus":    dataMariaGaleraClusterVer1084GlobalStatus,
+		"dataMariaGaleraClusterVer1084GlobalVariables": dataMariaGaleraClusterVer1084GlobalVariables,
+		"dataMariaGaleraClusterVer1084UserStatistics":  dataMariaGaleraClusterVer1084UserStatistics,
+		"dataMariaGaleraClusterVer1084ProcessList":     dataMariaGaleraClusterVer1084ProcessList,
 	} {
-		require.NotNilf(t, data, fmt.Sprintf("read data: %s", name))
+		require.NotNil(t, data, fmt.Sprintf("read data: %s", name))
 		_, err := prepareMockRows(data)
-		require.NoErrorf(t, err, fmt.Sprintf("prepare mock rows: %s", name))
+		require.NoError(t, err, fmt.Sprintf("prepare mock rows: %s", name))
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func TestMySQL_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &MySQL{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestMySQL_Init(t *testing.T) {
@@ -113,9 +114,9 @@ func TestMySQL_Init(t *testing.T) {
 			mySQL.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, mySQL.Init())
+				assert.Error(t, mySQL.Init())
 			} else {
-				assert.True(t, mySQL.Init())
+				assert.NoError(t, mySQL.Init())
 			}
 		})
 	}
@@ -162,12 +163,12 @@ func TestMySQL_Check(t *testing.T) {
 		"success on all queries": {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
-				mockExpect(t, m, queryShowGlobalStatus, dataMariaV1084GlobalStatus)
-				mockExpect(t, m, queryShowGlobalVariables, dataMariaV1084GlobalVariables)
-				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaV1084AllSlavesStatusMultiSource)
-				mockExpect(t, m, queryShowUserStatistics, dataMariaV1084UserStatistics)
-				mockExpect(t, m, queryShowProcessList, dataMariaV1084ProcessList)
+				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
+				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
+				mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
+				mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 			},
 		},
 		"fails when error on querying version": {
@@ -179,47 +180,47 @@ func TestMySQL_Check(t *testing.T) {
 		"fails when error on querying global status": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
+				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
 				mockExpectErr(m, queryShowGlobalStatus)
 			},
 		},
 		"fails when error on querying global variables": {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
+				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
 				mockExpectErr(m, queryShowGlobalStatus)
 			},
 		},
 		"success when error on querying slave status": {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
-				mockExpect(t, m, queryShowGlobalStatus, dataMariaV1084GlobalStatus)
-				mockExpect(t, m, queryShowGlobalVariables, dataMariaV1084GlobalVariables)
+				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 				mockExpectErr(m, queryShowAllSlavesStatus)
-				mockExpect(t, m, queryShowUserStatistics, dataMariaV1084UserStatistics)
-				mockExpect(t, m, queryShowProcessList, dataMariaV1084ProcessList)
+				mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
+				mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 			},
 		},
 		"success when error on querying user statistics": {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
-				mockExpect(t, m, queryShowGlobalStatus, dataMariaV1084GlobalStatus)
-				mockExpect(t, m, queryShowGlobalVariables, dataMariaV1084GlobalVariables)
-				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaV1084AllSlavesStatusMultiSource)
+				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
+				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
 				mockExpectErr(m, queryShowUserStatistics)
-				mockExpect(t, m, queryShowProcessList, dataMariaV1084ProcessList)
+				mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 			},
 		},
 		"success when error on querying process list": {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-				mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
-				mockExpect(t, m, queryShowGlobalStatus, dataMariaV1084GlobalStatus)
-				mockExpect(t, m, queryShowGlobalVariables, dataMariaV1084GlobalVariables)
-				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaV1084AllSlavesStatusMultiSource)
-				mockExpect(t, m, queryShowUserStatistics, dataMariaV1084UserStatistics)
+				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
+				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
+				mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
 				mockExpectErr(m, queryShowProcessList)
 			},
 		},
@@ -235,14 +236,14 @@ func TestMySQL_Check(t *testing.T) {
 			my.db = db
 			defer func() { _ = db.Close() }()
 
-			require.True(t, my.Init())
+			require.NoError(t, my.Init())
 
 			test.prepareMock(t, mock)
 
 			if test.wantFail {
-				assert.False(t, my.Check())
+				assert.Error(t, my.Check())
 			} else {
-				assert.True(t, my.Check())
+				assert.NoError(t, my.Check())
 			}
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
@@ -258,11 +259,11 @@ func TestMySQL_Collect(t *testing.T) {
 		"MariaDB-Standalone[v5.5.46]: success on all queries": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataMariaV5564Version)
-					mockExpect(t, m, queryShowGlobalStatus, dataMariaV5564GlobalStatus)
-					mockExpect(t, m, queryShowGlobalVariables, dataMariaV5564GlobalVariables)
+					mockExpect(t, m, queryShowVersion, dataMariaVer5564Version)
+					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer5564GlobalStatus)
+					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer5564GlobalVariables)
 					mockExpect(t, m, queryShowSlaveStatus, nil)
-					mockExpect(t, m, queryShowProcessList, dataMariaV5564ProcessList)
+					mockExpect(t, m, queryShowProcessList, dataMariaVer5564ProcessList)
 				},
 				check: func(t *testing.T, my *MySQL) {
 					mx := my.Collect()
@@ -389,12 +390,12 @@ func TestMySQL_Collect(t *testing.T) {
 		"MariaDB-Standalone[v10.8.4]: success on all queries": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
-					mockExpect(t, m, queryShowGlobalStatus, dataMariaV1084GlobalStatus)
-					mockExpect(t, m, queryShowGlobalVariables, dataMariaV1084GlobalVariables)
+					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, nil)
-					mockExpect(t, m, queryShowUserStatistics, dataMariaV1084UserStatistics)
-					mockExpect(t, m, queryShowProcessList, dataMariaV1084ProcessList)
+					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
+					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, my *MySQL) {
 					mx := my.Collect()
@@ -568,12 +569,12 @@ func TestMySQL_Collect(t *testing.T) {
 		"MariaDB-SingleSourceReplication[v10.8.4]: success on all queries": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
-					mockExpect(t, m, queryShowGlobalStatus, dataMariaV1084GlobalStatus)
-					mockExpect(t, m, queryShowGlobalVariables, dataMariaV1084GlobalVariables)
-					mockExpect(t, m, queryShowAllSlavesStatus, dataMariaV1084AllSlavesStatusSingleSource)
-					mockExpect(t, m, queryShowUserStatistics, dataMariaV1084UserStatistics)
-					mockExpect(t, m, queryShowProcessList, dataMariaV1084ProcessList)
+					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
+					mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusSingleSource)
+					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
+					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, my *MySQL) {
 					mx := my.Collect()
@@ -749,12 +750,12 @@ func TestMySQL_Collect(t *testing.T) {
 		"MariaDB-MultiSourceReplication[v10.8.4]: success on all queries": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
-					mockExpect(t, m, queryShowGlobalStatus, dataMariaV1084GlobalStatus)
-					mockExpect(t, m, queryShowGlobalVariables, dataMariaV1084GlobalVariables)
-					mockExpect(t, m, queryShowAllSlavesStatus, dataMariaV1084AllSlavesStatusMultiSource)
-					mockExpect(t, m, queryShowUserStatistics, dataMariaV1084UserStatistics)
-					mockExpect(t, m, queryShowProcessList, dataMariaV1084ProcessList)
+					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
+					mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
+					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
+					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, my *MySQL) {
 					mx := my.Collect()
@@ -933,12 +934,12 @@ func TestMySQL_Collect(t *testing.T) {
 		"MariaDB-MultiSourceReplication[v10.8.4]: error on slaves status (no permissions)": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataMariaV1084Version)
-					mockExpect(t, m, queryShowGlobalStatus, dataMariaV1084GlobalStatus)
-					mockExpect(t, m, queryShowGlobalVariables, dataMariaV1084GlobalVariables)
+					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpectErr(m, queryShowAllSlavesStatus)
-					mockExpect(t, m, queryShowUserStatistics, dataMariaV1084UserStatistics)
-					mockExpect(t, m, queryShowProcessList, dataMariaV1084ProcessList)
+					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
+					mockExpect(t, m, queryShowProcessList, dataMariaVer1084ProcessList)
 				},
 				check: func(t *testing.T, my *MySQL) {
 					mx := my.Collect()
@@ -1111,12 +1112,12 @@ func TestMySQL_Collect(t *testing.T) {
 		"MariaDB-GaleraCluster[v10.8.4]: success on all queries": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataMariaGaleraClusterV1084Version)
-					mockExpect(t, m, queryShowGlobalStatus, dataMariaGaleraClusterV1084GlobalStatus)
-					mockExpect(t, m, queryShowGlobalVariables, dataMariaGaleraClusterV1084GlobalVariables)
+					mockExpect(t, m, queryShowVersion, dataMariaGaleraClusterVer1084Version)
+					mockExpect(t, m, queryShowGlobalStatus, dataMariaGaleraClusterVer1084GlobalStatus)
+					mockExpect(t, m, queryShowGlobalVariables, dataMariaGaleraClusterVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, nil)
-					mockExpect(t, m, queryShowUserStatistics, dataMariaGaleraClusterV1084UserStatistics)
-					mockExpect(t, m, queryShowProcessList, dataMariaGaleraClusterV1084ProcessList)
+					mockExpect(t, m, queryShowUserStatistics, dataMariaGaleraClusterVer1084UserStatistics)
+					mockExpect(t, m, queryShowProcessList, dataMariaGaleraClusterVer1084ProcessList)
 				},
 				check: func(t *testing.T, my *MySQL) {
 					mx := my.Collect()
@@ -1305,11 +1306,11 @@ func TestMySQL_Collect(t *testing.T) {
 		"MySQL-MultiSourceReplication[v8.0.30]: success on all queries": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataMySQLV8030Version)
-					mockExpect(t, m, queryShowGlobalStatus, dataMySQLV8030GlobalStatus)
-					mockExpect(t, m, queryShowGlobalVariables, dataMySQLV8030GlobalVariables)
-					mockExpect(t, m, queryShowReplicaStatus, dataMySQLV8030ReplicaStatusMultiSource)
-					mockExpect(t, m, queryShowProcessListPS, dataMySQLV8030ProcessList)
+					mockExpect(t, m, queryShowVersion, dataMySQLVer8030Version)
+					mockExpect(t, m, queryShowGlobalStatus, dataMySQLVer8030GlobalStatus)
+					mockExpect(t, m, queryShowGlobalVariables, dataMySQLVer8030GlobalVariables)
+					mockExpect(t, m, queryShowReplicaStatus, dataMySQLVer8030ReplicaStatusMultiSource)
+					mockExpect(t, m, queryShowProcessListPS, dataMySQLVer8030ProcessList)
 				},
 				check: func(t *testing.T, my *MySQL) {
 					mx := my.Collect()
@@ -1440,11 +1441,11 @@ func TestMySQL_Collect(t *testing.T) {
 		"Percona-Standalone[v8.0.29]: success on all queries": {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
-					mockExpect(t, m, queryShowVersion, dataPerconaV8029Version)
-					mockExpect(t, m, queryShowGlobalStatus, dataPerconaV8029GlobalStatus)
-					mockExpect(t, m, queryShowGlobalVariables, dataPerconaV8029GlobalVariables)
+					mockExpect(t, m, queryShowVersion, dataPerconaVer8029Version)
+					mockExpect(t, m, queryShowGlobalStatus, dataPerconaVer8029GlobalStatus)
+					mockExpect(t, m, queryShowGlobalVariables, dataPerconaVer8029GlobalVariables)
 					mockExpect(t, m, queryShowReplicaStatus, nil)
-					mockExpect(t, m, queryShowUserStatistics, dataPerconaV8029UserStatistics)
+					mockExpect(t, m, queryShowUserStatistics, dataPerconaVer8029UserStatistics)
 					mockExpect(t, m, queryShowProcessListPS, dataPerconaV8029ProcessList)
 				},
 				check: func(t *testing.T, my *MySQL) {
@@ -1607,7 +1608,7 @@ func TestMySQL_Collect(t *testing.T) {
 			my.db = db
 			defer func() { _ = db.Close() }()
 
-			require.True(t, my.Init())
+			require.NoError(t, my.Init())
 
 			for i, step := range test {
 				t.Run(fmt.Sprintf("step[%d]", i), func(t *testing.T) {

@@ -8,24 +8,33 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testMetricsData, _ = os.ReadFile("testdata/metrics.txt")
-	testTokenData, _   = os.ReadFile("testdata/token.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataMetrics, _             = os.ReadFile("testdata/metrics.txt")
+	dataServiceAccountToken, _ = os.ReadFile("testdata/token.txt")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, testMetricsData)
-	assert.NotNil(t, testTokenData)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":          dataConfigJSON,
+		"dataConfigYAML":          dataConfigYAML,
+		"dataMetrics":             dataMetrics,
+		"dataServiceAccountToken": dataServiceAccountToken,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	job := New()
-
-	assert.IsType(t, (*Kubelet)(nil), job)
+func TestKubelet_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Kubelet{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestKubelet_Charts(t *testing.T) {
@@ -37,57 +46,57 @@ func TestKubelet_Cleanup(t *testing.T) {
 }
 
 func TestKubelet_Init(t *testing.T) {
-	assert.True(t, New().Init())
+	assert.NoError(t, New().Init())
 }
 
 func TestKubelet_Init_ReadServiceAccountToken(t *testing.T) {
 	job := New()
 	job.TokenPath = "testdata/token.txt"
 
-	assert.True(t, job.Init())
-	assert.Equal(t, "Bearer "+string(testTokenData), job.Request.Headers["Authorization"])
+	assert.NoError(t, job.Init())
+	assert.Equal(t, "Bearer "+string(dataServiceAccountToken), job.Request.Headers["Authorization"])
 }
 
 func TestKubelet_InitErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 	job := New()
 	job.Client.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestKubelet_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testMetricsData)
+				_, _ = w.Write(dataMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	assert.True(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.NoError(t, job.Check())
 }
 
 func TestKubelet_Check_ConnectionRefused(t *testing.T) {
 	job := New()
 	job.URL = "http://127.0.0.1:38001/metrics"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestKubelet_Collect(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testMetricsData)
+				_, _ = w.Write(dataMetrics)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	expected := map[string]int64{
 		"apiserver_audit_requests_rejected_total":                                    0,
@@ -185,8 +194,8 @@ func TestKubelet_Collect_ReceiveInvalidResponse(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestKubelet_Collect_Receive404(t *testing.T) {
@@ -199,6 +208,6 @@ func TestKubelet_Collect_Receive404(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/metrics"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }

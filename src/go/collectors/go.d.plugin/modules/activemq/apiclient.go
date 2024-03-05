@@ -5,11 +5,12 @@ package activemq
 import (
 	"encoding/xml"
 	"fmt"
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
+
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 type topics struct {
@@ -104,7 +105,7 @@ func (a *apiClient) getTopics() (*topics, error) {
 	return &topics, nil
 }
 
-func (a apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
+func (a *apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
 	resp, err := a.httpClient.Do(req)
 	if err != nil {
 		return resp, fmt.Errorf("error on request to %s : %v", req.URL, err)
@@ -117,7 +118,7 @@ func (a apiClient) doRequestOK(req *http.Request) (*http.Response, error) {
 	return resp, err
 }
 
-func (a apiClient) createRequest(urlPath string) (*http.Request, error) {
+func (a *apiClient) createRequest(urlPath string) (*http.Request, error) {
 	req := a.request.Copy()
 	u, err := url.Parse(req.URL)
 	if err != nil {

@@ -71,7 +71,7 @@ modules:
               required: true
             - name: timeout
               description: Request timeout in seconds.
-              default_value: 1
+              default_value: 2
               required: false
             - name: collect_container_size
               description: Whether to collect container writable layer size.

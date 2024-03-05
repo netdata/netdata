@@ -5,13 +5,33 @@ package x509check
 import (
 	"crypto/x509"
 	"errors"
+	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		assert.NotNil(t, data, name)
+	}
+}
+
+func TestX509Check_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &X509Check{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestX509Check_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
@@ -20,7 +40,7 @@ func TestX509Check_Cleanup(t *testing.T) {
 func TestX509Check_Charts(t *testing.T) {
 	x509Check := New()
 	x509Check.Source = "https://example.com"
-	require.True(t, x509Check.Init())
+	require.NoError(t, x509Check.Init())
 	assert.NotNil(t, x509Check.Charts())
 }
 
@@ -70,9 +90,9 @@ func TestX509Check_Init(t *testing.T) {
 			x509Check.Config = test.config
 
 			if test.err {
-				assert.False(t, x509Check.Init())
+				assert.Error(t, x509Check.Init())
 			} else {
-				require.True(t, x509Check.Init())
+				require.NoError(t, x509Check.Init())
 
 				var typeOK bool
 				switch test.providerType {
@@ -94,20 +114,20 @@ func TestX509Check_Check(t *testing.T) {
 	x509Check := New()
 	x509Check.prov = &mockProvider{certs: []*x509.Certificate{{}}}
 
-	assert.True(t, x509Check.Check())
+	assert.NoError(t, x509Check.Check())
 }
 
 func TestX509Check_Check_ReturnsFalseOnProviderError(t *testing.T) {
 	x509Check := New()
 	x509Check.prov = &mockProvider{err: true}
 
-	assert.False(t, x509Check.Check())
+	assert.Error(t, x509Check.Check())
 }
 
 func TestX509Check_Collect(t *testing.T) {
 	x509Check := New()
 	x509Check.Source = "https://example.com"
-	require.True(t, x509Check.Init())
+	require.NoError(t, x509Check.Init())
 	x509Check.prov = &mockProvider{certs: []*x509.Certificate{{}}}
 
 	collected := x509Check.Collect()

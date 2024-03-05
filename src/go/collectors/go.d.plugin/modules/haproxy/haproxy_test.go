@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
@@ -16,19 +17,24 @@ import (
 )
 
 var (
-	v2310Metrics, _ = os.ReadFile("testdata/v2.3.10/metrics.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer2310Metrics, _ = os.ReadFile("testdata/v2.3.10/metrics.txt")
 )
 
-func Test_Testdata(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"v2310Metrics": v2310Metrics,
+		"dataConfigJSON":     dataConfigJSON,
+		"dataConfigYAML":     dataConfigYAML,
+		"dataVer2310Metrics": dataVer2310Metrics,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*Haproxy)(nil), New())
+func TestHaproxy_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Haproxy{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestHaproxy_Init(t *testing.T) {
@@ -62,9 +68,9 @@ func TestHaproxy_Init(t *testing.T) {
 			rdb.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, rdb.Init())
+				assert.Error(t, rdb.Init())
 			} else {
-				assert.True(t, rdb.Init())
+				assert.NoError(t, rdb.Init())
 			}
 		})
 	}
@@ -107,9 +113,9 @@ func TestHaproxy_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, h.Check())
+				assert.Error(t, h.Check())
 			} else {
-				assert.True(t, h.Check())
+				assert.NoError(t, h.Check())
 			}
 		})
 	}
@@ -181,11 +187,11 @@ func prepareCaseHaproxyV231Metrics(t *testing.T) (*Haproxy, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(v2310Metrics)
+			_, _ = w.Write(dataVer2310Metrics)
 		}))
 	h := New()
 	h.URL = srv.URL
-	require.True(t, h.Init())
+	require.NoError(t, h.Init())
 
 	return h, srv.Close
 }
@@ -213,7 +219,7 @@ application_backend_http_responses_total{proxy="infra-vernemq-ws",code="other"} 
 		}))
 	h := New()
 	h.URL = srv.URL
-	require.True(t, h.Init())
+	require.NoError(t, h.Init())
 
 	return h, srv.Close
 }
@@ -226,7 +232,7 @@ func prepareCase404Response(t *testing.T) (*Haproxy, func()) {
 		}))
 	h := New()
 	h.URL = srv.URL
-	require.True(t, h.Init())
+	require.NoError(t, h.Init())
 
 	return h, srv.Close
 }
@@ -235,7 +241,7 @@ func prepareCaseConnectionRefused(t *testing.T) (*Haproxy, func()) {
 	t.Helper()
 	h := New()
 	h.URL = "http://127.0.0.1:38001"
-	require.True(t, h.Init())
+	require.NoError(t, h.Init())
 
 	return h, func() {}
 }

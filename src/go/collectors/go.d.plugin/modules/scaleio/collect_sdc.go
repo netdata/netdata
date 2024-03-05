@@ -4,7 +4,7 @@ package scaleio
 
 import "github.com/netdata/netdata/go/go.d.plugin/modules/scaleio/client"
 
-func (s ScaleIO) collectSdc(ss map[string]client.SdcStatistics) map[string]sdcMetrics {
+func (s *ScaleIO) collectSdc(ss map[string]client.SdcStatistics) map[string]sdcMetrics {
 	ms := make(map[string]sdcMetrics, len(ss))
 
 	for id, stats := range ss {

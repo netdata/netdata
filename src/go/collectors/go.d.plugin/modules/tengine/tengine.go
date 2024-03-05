@@ -4,11 +4,11 @@ package tengine
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -21,73 +21,76 @@ func init() {
 	})
 }
 
-const (
-	defaultURL         = "http://127.0.0.1/us"
-	defaultHTTPTimeout = time.Second * 2
-)
-
-// New creates Tengine with default values.
 func New() *Tengine {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: defaultURL,
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: defaultHTTPTimeout},
+	return &Tengine{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "http://127.0.0.1/us",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second * 2),
+				},
 			},
 		},
+		charts: charts.Copy(),
 	}
-	return &Tengine{Config: config}
 }
 
-// Config is the Tengine module configuration.
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
-// Tengine Tengine module.
 type Tengine struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
 
 	apiClient *apiClient
 }
 
-// Cleanup makes cleanup.
-func (Tengine) Cleanup() {}
+func (t *Tengine) Configuration() any {
+	return t.Config
+}
 
-// Init makes initialization.
-func (t *Tengine) Init() bool {
+func (t *Tengine) Init() error {
 	if t.URL == "" {
-		t.Error("URL not set")
-		return false
+		t.Error("url not set")
+		return errors.New("url not set")
 	}
 
 	client, err := web.NewHTTPClient(t.Client)
 	if err != nil {
 		t.Errorf("error on creating http client : %v", err)
-		return false
+		return err
 	}
 
 	t.apiClient = newAPIClient(client, t.Request)
 
 	t.Debugf("using URL: %s", t.URL)
-	t.Debugf("using timeout: %s", t.Timeout.Duration)
-	return true
+	t.Debugf("using timeout: %s", t.Timeout)
+
+	return nil
 }
 
-// Check makes check
-func (t *Tengine) Check() bool {
-	return len(t.Collect()) > 0
+func (t *Tengine) Check() error {
+	mx, err := t.collect()
+	if err != nil {
+		t.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
-// Charts returns Charts.
-func (t Tengine) Charts() *module.Charts {
-	return charts.Copy()
+func (t *Tengine) Charts() *module.Charts {
+	return t.charts
 }
 
-// Collect collects metrics.
 func (t *Tengine) Collect() map[string]int64 {
 	mx, err := t.collect()
 
@@ -97,4 +100,10 @@ func (t *Tengine) Collect() map[string]int64 {
 	}
 
 	return mx
+}
+
+func (t *Tengine) Cleanup() {
+	if t.apiClient != nil && t.apiClient.httpClient != nil {
+		t.apiClient.httpClient.CloseIdleConnections()
+	}
 }

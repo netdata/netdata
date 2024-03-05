@@ -4,13 +4,13 @@ package elasticsearch
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -34,7 +34,7 @@ func New() *Elasticsearch {
 					URL: "http://127.0.0.1:9200",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second * 5},
+					Timeout: web.Duration(time.Second * 2),
 				},
 			},
 			ClusterMode: false,
@@ -54,49 +54,62 @@ func New() *Elasticsearch {
 }
 
 type Config struct {
-	web.HTTP        `yaml:",inline"`
-	ClusterMode     bool `yaml:"cluster_mode"`
-	DoNodeStats     bool `yaml:"collect_node_stats"`
-	DoClusterHealth bool `yaml:"collect_cluster_health"`
-	DoClusterStats  bool `yaml:"collect_cluster_stats"`
-	DoIndicesStats  bool `yaml:"collect_indices_stats"`
+	web.HTTP        `yaml:",inline" json:""`
+	UpdateEvery     int  `yaml:"update_every" json:"update_every"`
+	ClusterMode     bool `yaml:"cluster_mode" json:"cluster_mode"`
+	DoNodeStats     bool `yaml:"collect_node_stats" json:"collect_node_stats"`
+	DoClusterHealth bool `yaml:"collect_cluster_health" json:"collect_cluster_health"`
+	DoClusterStats  bool `yaml:"collect_cluster_stats" json:"collect_cluster_stats"`
+	DoIndicesStats  bool `yaml:"collect_indices_stats" json:"collect_indices_stats"`
 }
 
 type Elasticsearch struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
-	httpClient *http.Client
-	charts     *module.Charts
-
-	clusterName string
-
+	charts                     *module.Charts
 	addClusterHealthChartsOnce *sync.Once
 	addClusterStatsChartsOnce  *sync.Once
 
-	nodes   map[string]bool
-	indices map[string]bool
+	httpClient *http.Client
+
+	clusterName string
+	nodes       map[string]bool
+	indices     map[string]bool
 }
 
-func (es *Elasticsearch) Init() bool {
+func (es *Elasticsearch) Configuration() any {
+	return es.Config
+}
+
+func (es *Elasticsearch) Init() error {
 	err := es.validateConfig()
 	if err != nil {
 		es.Errorf("check configuration: %v", err)
-		return false
+		return err
 	}
 
 	httpClient, err := es.initHTTPClient()
 	if err != nil {
 		es.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	es.httpClient = httpClient
 
-	return true
+	return nil
 }
 
-func (es *Elasticsearch) Check() bool {
-	return len(es.Collect()) > 0
+func (es *Elasticsearch) Check() error {
+	mx, err := es.collect()
+	if err != nil {
+		es.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (es *Elasticsearch) Charts() *module.Charts {

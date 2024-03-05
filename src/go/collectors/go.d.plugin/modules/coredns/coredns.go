@@ -4,19 +4,15 @@ package coredns
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
-	"github.com/blang/semver/v4"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
-)
-
-const (
-	defaultURL         = "http://127.0.0.1:9153/metrics"
-	defaultHTTPTimeout = time.Second * 2
+	"github.com/blang/semver/v4"
 )
 
 //go:embed "config_schema.json"
@@ -29,39 +25,39 @@ func init() {
 	})
 }
 
-// New creates CoreDNS with default values.
 func New() *CoreDNS {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: defaultURL,
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: defaultHTTPTimeout},
+	return &CoreDNS{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "http://127.0.0.1:9153/metrics",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second),
+				},
 			},
 		},
-	}
-	return &CoreDNS{
-		Config:           config,
 		charts:           summaryCharts.Copy(),
 		collectedServers: make(map[string]bool),
 		collectedZones:   make(map[string]bool),
 	}
 }
 
-// Config is the CoreDNS module configuration.
 type Config struct {
-	web.HTTP       `yaml:",inline"`
-	PerServerStats matcher.SimpleExpr `yaml:"per_server_stats"`
-	PerZoneStats   matcher.SimpleExpr `yaml:"per_zone_stats"`
+	web.HTTP       `yaml:",inline" json:""`
+	UpdateEvery    int                `yaml:"update_every" json:"update_every"`
+	PerServerStats matcher.SimpleExpr `yaml:"per_server_stats" json:"per_server_stats"`
+	PerZoneStats   matcher.SimpleExpr `yaml:"per_zone_stats" json:"per_zone_stats"`
 }
 
-// CoreDNS CoreDNS module.
 type CoreDNS struct {
 	module.Base
-	Config           `yaml:",inline"`
-	charts           *Charts
-	prom             prometheus.Prometheus
+	Config `yaml:",inline" json:""`
+
+	prom prometheus.Prometheus
+
+	charts *Charts
+
 	perServerMatcher matcher.Matcher
 	perZoneMatcher   matcher.Matcher
 	collectedServers map[string]bool
@@ -71,56 +67,61 @@ type CoreDNS struct {
 	metricNames      requestMetricsNames
 }
 
-// Cleanup makes cleanup.
-func (CoreDNS) Cleanup() {}
+func (cd *CoreDNS) Configuration() any {
+	return cd.Config
+}
 
-// Init makes initialization.
-func (cd *CoreDNS) Init() bool {
-	if cd.URL == "" {
-		cd.Error("URL not set")
-		return false
+func (cd *CoreDNS) Init() error {
+	if err := cd.validateConfig(); err != nil {
+		cd.Errorf("config validation: %v", err)
+		return err
 	}
 
-	if !cd.PerServerStats.Empty() {
-		m, err := cd.PerServerStats.Parse()
-		if err != nil {
-			cd.Errorf("error on creating 'per_server_stats' matcher : %v", err)
-			return false
-		}
-		cd.perServerMatcher = matcher.WithCache(m)
-	}
-
-	if !cd.PerZoneStats.Empty() {
-		m, err := cd.PerZoneStats.Parse()
-		if err != nil {
-			cd.Errorf("error on creating 'per_zone_stats' matcher : %v", err)
-			return false
-		}
-		cd.perZoneMatcher = matcher.WithCache(m)
-	}
-
-	client, err := web.NewHTTPClient(cd.Client)
+	sm, err := cd.initPerServerMatcher()
 	if err != nil {
-		cd.Errorf("error on creating http client : %v", err)
-		return false
+		cd.Error(err)
+		return err
+	}
+	if sm != nil {
+		cd.perServerMatcher = sm
 	}
 
-	cd.prom = prometheus.New(client, cd.Request)
+	zm, err := cd.initPerZoneMatcher()
+	if err != nil {
+		cd.Error(err)
+		return err
+	}
+	if zm != nil {
+		cd.perZoneMatcher = zm
+	}
 
-	return true
+	prom, err := cd.initPrometheusClient()
+	if err != nil {
+		cd.Error(err)
+		return err
+	}
+	cd.prom = prom
+
+	return nil
 }
 
-// Check makes check.
-func (cd *CoreDNS) Check() bool {
-	return len(cd.Collect()) > 0
+func (cd *CoreDNS) Check() error {
+	mx, err := cd.collect()
+	if err != nil {
+		cd.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
-// Charts creates Charts.
 func (cd *CoreDNS) Charts() *Charts {
 	return cd.charts
 }
 
-// Collect collects metrics.
 func (cd *CoreDNS) Collect() map[string]int64 {
 	mx, err := cd.collect()
 
@@ -130,4 +131,10 @@ func (cd *CoreDNS) Collect() map[string]int64 {
 	}
 
 	return mx
+}
+
+func (cd *CoreDNS) Cleanup() {
+	if cd.prom != nil && cd.prom.HTTPClient() != nil {
+		cd.prom.HTTPClient().CloseIdleConnections()
+	}
 }

@@ -3,6 +3,7 @@
 package module
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -72,10 +73,10 @@ func TestJob_AutoDetectionEvery(t *testing.T) {
 func TestJob_RetryAutoDetection(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() bool {
-			return true
+		InitFunc: func() error {
+			return nil
 		},
-		CheckFunc: func() bool { return false },
+		CheckFunc: func() error { return errors.New("check error") },
 		ChartsFunc: func() *Charts {
 			return &Charts{}
 		},
@@ -86,14 +87,14 @@ func TestJob_RetryAutoDetection(t *testing.T) {
 	assert.True(t, job.RetryAutoDetection())
 	assert.Equal(t, infTries, job.AutoDetectTries)
 	for i := 0; i < 1000; i++ {
-		job.check()
+		_ = job.check()
 	}
 	assert.True(t, job.RetryAutoDetection())
 	assert.Equal(t, infTries, job.AutoDetectTries)
 
 	job.AutoDetectTries = 10
 	for i := 0; i < 10; i++ {
-		job.check()
+		_ = job.check()
 	}
 	assert.False(t, job.RetryAutoDetection())
 	assert.Equal(t, 0, job.AutoDetectTries)
@@ -103,13 +104,13 @@ func TestJob_AutoDetection(t *testing.T) {
 	job := newTestJob()
 	var v int
 	m := &MockModule{
-		InitFunc: func() bool {
+		InitFunc: func() error {
 			v++
-			return true
+			return nil
 		},
-		CheckFunc: func() bool {
+		CheckFunc: func() error {
 			v++
-			return true
+			return nil
 		},
 		ChartsFunc: func() *Charts {
 			v++
@@ -118,47 +119,47 @@ func TestJob_AutoDetection(t *testing.T) {
 	}
 	job.module = m
 
-	assert.True(t, job.AutoDetection())
+	assert.NoError(t, job.AutoDetection())
 	assert.Equal(t, 3, v)
 }
 
 func TestJob_AutoDetection_FailInit(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() bool {
-			return false
+		InitFunc: func() error {
+			return errors.New("init error")
 		},
 	}
 	job.module = m
 
-	assert.False(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection())
 	assert.True(t, m.CleanupDone)
 }
 
 func TestJob_AutoDetection_FailCheck(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() bool {
-			return true
+		InitFunc: func() error {
+			return nil
 		},
-		CheckFunc: func() bool {
-			return false
+		CheckFunc: func() error {
+			return errors.New("check error")
 		},
 	}
 	job.module = m
 
-	assert.False(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection())
 	assert.True(t, m.CleanupDone)
 }
 
 func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() bool {
-			return true
+		InitFunc: func() error {
+			return nil
 		},
-		CheckFunc: func() bool {
-			return true
+		CheckFunc: func() error {
+			return nil
 		},
 		ChartsFunc: func() *Charts {
 			return nil
@@ -166,47 +167,47 @@ func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.False(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection())
 	assert.True(t, m.CleanupDone)
 }
 
 func TestJob_AutoDetection_PanicInit(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() bool {
+		InitFunc: func() error {
 			panic("panic in Init")
 		},
 	}
 	job.module = m
 
-	assert.False(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection())
 	assert.True(t, m.CleanupDone)
 }
 
 func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() bool {
-			return true
+		InitFunc: func() error {
+			return nil
 		},
-		CheckFunc: func() bool {
+		CheckFunc: func() error {
 			panic("panic in Check")
 		},
 	}
 	job.module = m
 
-	assert.False(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection())
 	assert.True(t, m.CleanupDone)
 }
 
 func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 	job := newTestJob()
 	m := &MockModule{
-		InitFunc: func() bool {
-			return true
+		InitFunc: func() error {
+			return nil
 		},
-		CheckFunc: func() bool {
-			return true
+		CheckFunc: func() error {
+			return nil
 		},
 		ChartsFunc: func() *Charts {
 			panic("panic in PostCheck")
@@ -214,7 +215,7 @@ func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.False(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection())
 	assert.True(t, m.CleanupDone)
 }
 

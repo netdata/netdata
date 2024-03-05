@@ -1,0 +1,168 @@
+#Software: Microsoft Internet Information Services 10.0
+#Version: 1.0
+#Date: 2022-11-07 14:29:06
+#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken
+2022-11-07 14:29:06 127.0.0.1 GET /us - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 130
+2022-11-07 14:29:06 127.0.0.1 GET /us - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 1
+2022-11-07 14:29:08 127.0.0.1 GET /status full&json 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:29:08 127.0.0.1 GET /status full&json 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:29:08 ::1 GET /status full&json 80 - ::1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:29:09 127.0.0.1 GET /server-status auto 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:29:09 127.0.0.1 GET /server-status auto 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+#Software: Microsoft Internet Information Services 10.0
+#Version: 1.0
+#Date: 2022-11-07 14:55:17
+#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken
+2022-11-07 14:55:17 127.0.0.1 GET /us - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 187
+2022-11-07 14:55:17 127.0.0.1 GET /us - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:17 127.0.0.1 GET /server-status format=plain 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:17 127.0.0.1 GET /server-status format=plain 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 1
+2022-11-07 14:55:18 127.0.0.1 GET /basic_status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 1
+2022-11-07 14:55:18 127.0.0.1 GET /stub_status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:18 127.0.0.1 GET /stub_status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 1
+2022-11-07 14:55:18 127.0.0.1 GET /nginx_status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:18 127.0.0.1 GET /status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:18 127.0.0.1 GET /status/format/json - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:20 127.0.0.1 GET /admin/api.php version=true 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:20 127.0.0.1 GET /admin/api.php version=true 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:20 127.0.0.1 GET /server-status auto 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:20 127.0.0.1 GET /server-status auto 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:24 127.0.0.1 GET /status full&json 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:24 127.0.0.1 GET /status full&json 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 14:55:24 ::1 GET /status full&json 80 - ::1 Go-http-client/1.1 - 404 0 2 0
+#Software: Microsoft Internet Information Services 10.0
+#Version: 1.0
+#Date: 2022-11-07 15:42:39
+#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken
+2022-11-07 15:42:39 127.0.0.1 GET /server-status format=plain 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 149
+2022-11-07 15:42:39 127.0.0.1 GET /server-status format=plain 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:39 127.0.0.1 GET /server-status auto 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:39 127.0.0.1 GET /server-status auto 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:39 127.0.0.1 GET /status/format/json - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:41 127.0.0.1 GET /basic_status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:41 127.0.0.1 GET /stub_status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:41 127.0.0.1 GET /stub_status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:41 127.0.0.1 GET /nginx_status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:41 127.0.0.1 GET /status - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:41 127.0.0.1 GET /admin/api.php version=true 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:41 127.0.0.1 GET /admin/api.php version=true 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:41 127.0.0.1 GET /us - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:41 127.0.0.1 GET /us - 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:46 127.0.0.1 GET /status full&json 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:46 127.0.0.1 GET /status full&json 80 - 127.0.0.1 Go-http-client/1.1 - 404 0 2 0
+2022-11-07 15:42:46 ::1 GET /status full&json 80 - ::1 Go-http-client/1.1 - 404 0 2 0
+#Software: Microsoft Internet Information Services 10.0
+#Version: 1.0
+#Date: 2022-11-07 16:47:25
+#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken
+2022-11-07 16:47:25 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 256
+2022-11-07 16:47:25 ::1 GET /iisstart.png - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 http://localhost/ 304 0 0 2
+2022-11-07 16:47:25 ::1 GET /favicon.ico - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 http://localhost/ 404 0 2 16
+2022-11-07 16:48:07 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 0
+2022-11-07 16:48:08 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 1
+2022-11-07 16:48:08 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 0
+2022-11-07 16:48:08 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 0
+2022-11-07 16:48:08 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 0
+2022-11-07 16:48:08 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 0
+2022-11-07 16:48:08 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 0
+2022-11-07 16:48:09 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 0
+2022-11-07 16:48:09 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/107.0.0.0+Safari/537.36+Edg/107.0.1418.35 - 304 0 0 0
+2022-11-07 16:49:05 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:05 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:06 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:06 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:06 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 3
+2022-11-07 16:49:06 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:06 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:06 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:07 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:07 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:07 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:07 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:07 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:07 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:09 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:09 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:09 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:09 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:09 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:09 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:10 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:10 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:10 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:10 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:10 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 4
+2022-11-07 16:49:10 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:11 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:11 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:11 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:11 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:11 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:11 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:12 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:12 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:12 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:12 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:12 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:12 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:13 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:13 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:13 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 2
+2022-11-07 16:49:13 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:13 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:13 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:14 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:14 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:14 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:14 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 2
+2022-11-07 16:49:14 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:14 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:15 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:15 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:15 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:15 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:15 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:15 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:16 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:16 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:16 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:16 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:16 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:16 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:17 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:17 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:17 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 2
+2022-11-07 16:49:17 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:17 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:17 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:18 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:18 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 2
+2022-11-07 16:49:18 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:18 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 31
+2022-11-07 16:49:18 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:18 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:19 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 8
+2022-11-07 16:49:19 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:19 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:19 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:19 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:19 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:20 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:20 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:20 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:20 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:20 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:20 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:21 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:21 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:21 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:21 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:21 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:21 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:23 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:23 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:23 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:23 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:23 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:23 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0
+2022-11-07 16:49:24 ::1 GET / - 80 - ::1 Mozilla/5.0+(Windows+NT;+Windows+NT+10.0;+en-US)+WindowsPowerShell/5.1.20348.859 - 200 0 0 0

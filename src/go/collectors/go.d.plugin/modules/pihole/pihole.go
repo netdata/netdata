@@ -4,13 +4,13 @@ package pihole
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -34,7 +34,8 @@ func New() *Pihole {
 					URL: "http://127.0.0.1",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second * 5}},
+					Timeout: web.Duration(time.Second * 5),
+				},
 			},
 			SetupVarsPath: "/etc/pihole/setupVars.conf",
 		},
@@ -46,32 +47,38 @@ func New() *Pihole {
 }
 
 type Config struct {
-	web.HTTP      `yaml:",inline"`
-	SetupVarsPath string `yaml:"setup_vars_path"`
+	web.HTTP      `yaml:",inline" json:""`
+	UpdateEvery   int    `yaml:"update_every" json:"update_every"`
+	SetupVarsPath string `yaml:"setup_vars_path" json:"setup_vars_path"`
 }
 
 type Pihole struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	charts                 *module.Charts
 	addQueriesTypesOnce    *sync.Once
 	addFwsDestinationsOnce *sync.Once
 
-	httpClient   *http.Client
+	httpClient *http.Client
+
 	checkVersion bool
 }
 
-func (p *Pihole) Init() bool {
+func (p *Pihole) Configuration() any {
+	return p.Config
+}
+
+func (p *Pihole) Init() error {
 	if err := p.validateConfig(); err != nil {
 		p.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	httpClient, err := p.initHTTPClient()
 	if err != nil {
 		p.Errorf("init http client: %v", err)
-		return false
+		return err
 	}
 	p.httpClient = httpClient
 
@@ -82,11 +89,19 @@ func (p *Pihole) Init() bool {
 		p.Debugf("web password: %s", p.Password)
 	}
 
-	return true
+	return nil
 }
 
-func (p *Pihole) Check() bool {
-	return len(p.Collect()) > 0
+func (p *Pihole) Check() error {
+	mx, err := p.collect()
+	if err != nil {
+		p.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (p *Pihole) Charts() *module.Charts {

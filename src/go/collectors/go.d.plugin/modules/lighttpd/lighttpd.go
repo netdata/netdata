@@ -4,12 +4,11 @@ package lighttpd
 
 import (
 	_ "embed"
-	"strings"
+	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -22,72 +21,70 @@ func init() {
 	})
 }
 
-const (
-	defaultURL         = "http://127.0.0.1/server-status?auto"
-	defaultHTTPTimeout = time.Second * 2
-)
-
-// New creates Lighttpd with default values.
 func New() *Lighttpd {
-	config := Config{
+	return &Lighttpd{Config: Config{
 		HTTP: web.HTTP{
 			Request: web.Request{
-				URL: defaultURL,
+				URL: "http://127.0.0.1/server-status?auto",
 			},
 			Client: web.Client{
-				Timeout: web.Duration{Duration: defaultHTTPTimeout},
+				Timeout: web.Duration(time.Second * 2),
 			},
 		},
-	}
-	return &Lighttpd{Config: config}
+	}}
 }
 
-// Config is the Lighttpd module configuration.
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type Lighttpd struct {
 	module.Base
-	Config    `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
 	apiClient *apiClient
 }
 
-// Cleanup makes cleanup.
-func (Lighttpd) Cleanup() {}
-
-// Init makes initialization.
-func (l *Lighttpd) Init() bool {
-	if l.URL == "" {
-		l.Error("URL not set")
-		return false
-	}
-
-	if !strings.HasSuffix(l.URL, "?auto") {
-		l.Errorf("bad URL '%s', should ends in '?auto'", l.URL)
-		return false
-	}
-
-	client, err := web.NewHTTPClient(l.Client)
-	if err != nil {
-		l.Errorf("error on creating http client : %v", err)
-		return false
-	}
-	l.apiClient = newAPIClient(client, l.Request)
-
-	l.Debugf("using URL %s", l.URL)
-	l.Debugf("using timeout: %s", l.Timeout.Duration)
-
-	return true
+func (l *Lighttpd) Configuration() any {
+	return l.Config
 }
 
-// Check makes check
-func (l *Lighttpd) Check() bool { return len(l.Collect()) > 0 }
+func (l *Lighttpd) Init() error {
+	if err := l.validateConfig(); err != nil {
+		l.Errorf("config validation: %v", err)
+		return err
+	}
 
-// Charts returns Charts.
-func (l Lighttpd) Charts() *Charts { return charts.Copy() }
+	client, err := l.initApiClient()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	l.apiClient = client
 
-// Collect collects metrics.
+	l.Debugf("using URL %s", l.URL)
+	l.Debugf("using timeout: %s", l.Timeout.Duration())
+
+	return nil
+}
+
+func (l *Lighttpd) Check() error {
+	mx, err := l.collect()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
+}
+
+func (l *Lighttpd) Charts() *Charts {
+	return charts.Copy()
+}
+
 func (l *Lighttpd) Collect() map[string]int64 {
 	mx, err := l.collect()
 
@@ -97,4 +94,10 @@ func (l *Lighttpd) Collect() map[string]int64 {
 	}
 
 	return mx
+}
+
+func (l *Lighttpd) Cleanup() {
+	if l.apiClient != nil && l.apiClient.httpClient != nil {
+		l.apiClient.httpClient.CloseIdleConnections()
+	}
 }

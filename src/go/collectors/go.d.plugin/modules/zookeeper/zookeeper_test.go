@@ -9,30 +9,39 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testMntrData, _               = os.ReadFile("testdata/mntr.txt")
-	testMntrNotInWhiteListData, _ = os.ReadFile("testdata/mntr_notinwhitelist.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataMntrMetrics, _                = os.ReadFile("testdata/mntr.txt")
+	dataMntrNotInWhiteListResponse, _ = os.ReadFile("testdata/mntr_notinwhitelist.txt")
 )
 
-func Test_testDataLoad(t *testing.T) {
-	assert.NotNil(t, testMntrData)
-	assert.NotNil(t, testMntrNotInWhiteListData)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":                 dataConfigJSON,
+		"dataConfigYAML":                 dataConfigYAML,
+		"dataMntrMetrics":                dataMntrMetrics,
+		"dataMntrNotInWhiteListResponse": dataMntrNotInWhiteListResponse,
+	} {
+		assert.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	job := New()
-
-	assert.IsType(t, (*Zookeeper)(nil), job)
+func TestZookeeper_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Zookeeper{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestZookeeper_Init(t *testing.T) {
 	job := New()
 
-	assert.True(t, job.Init())
+	assert.NoError(t, job.Init())
 	assert.NotNil(t, job.fetcher)
 }
 
@@ -41,23 +50,23 @@ func TestZookeeper_InitErrorOnCreatingTLSConfig(t *testing.T) {
 	job.UseTLS = true
 	job.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestZookeeper_Check(t *testing.T) {
 	job := New()
-	require.True(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{data: testMntrData}
+	require.NoError(t, job.Init())
+	job.fetcher = &mockZookeeperFetcher{data: dataMntrMetrics}
 
-	assert.True(t, job.Check())
+	assert.NoError(t, job.Check())
 }
 
 func TestZookeeper_CheckErrorOnFetch(t *testing.T) {
 	job := New()
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 	job.fetcher = &mockZookeeperFetcher{err: true}
 
-	assert.False(t, job.Check())
+	assert.Error(t, job.Check())
 }
 
 func TestZookeeper_Charts(t *testing.T) {
@@ -70,8 +79,8 @@ func TestZookeeper_Cleanup(t *testing.T) {
 
 func TestZookeeper_Collect(t *testing.T) {
 	job := New()
-	require.True(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{data: testMntrData}
+	require.NoError(t, job.Init())
+	job.fetcher = &mockZookeeperFetcher{data: dataMntrMetrics}
 
 	expected := map[string]int64{
 		"approximate_data_size":      44,
@@ -98,15 +107,15 @@ func TestZookeeper_Collect(t *testing.T) {
 
 func TestZookeeper_CollectMntrNotInWhiteList(t *testing.T) {
 	job := New()
-	require.True(t, job.Init())
-	job.fetcher = &mockZookeeperFetcher{data: testMntrNotInWhiteListData}
+	require.NoError(t, job.Init())
+	job.fetcher = &mockZookeeperFetcher{data: dataMntrNotInWhiteListResponse}
 
 	assert.Nil(t, job.Collect())
 }
 
 func TestZookeeper_CollectMntrEmptyResponse(t *testing.T) {
 	job := New()
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 	job.fetcher = &mockZookeeperFetcher{}
 
 	assert.Nil(t, job.Collect())
@@ -114,7 +123,7 @@ func TestZookeeper_CollectMntrEmptyResponse(t *testing.T) {
 
 func TestZookeeper_CollectMntrInvalidData(t *testing.T) {
 	job := New()
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 	job.fetcher = &mockZookeeperFetcher{data: []byte("hello \nand good buy\n")}
 
 	assert.Nil(t, job.Collect())
@@ -122,7 +131,7 @@ func TestZookeeper_CollectMntrInvalidData(t *testing.T) {
 
 func TestZookeeper_CollectMntrReceiveError(t *testing.T) {
 	job := New()
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 	job.fetcher = &mockZookeeperFetcher{err: true}
 
 	assert.Nil(t, job.Collect())

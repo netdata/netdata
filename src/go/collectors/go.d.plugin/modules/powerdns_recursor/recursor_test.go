@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
@@ -16,21 +17,26 @@ import (
 )
 
 var (
-	v431statistics, _          = os.ReadFile("testdata/v4.3.1/statistics.json")
-	authoritativeStatistics, _ = os.ReadFile("testdata/authoritative/statistics.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer431statistics, _        = os.ReadFile("testdata/v4.3.1/statistics.json")
+	dataAuthoritativeStatistics, _ = os.ReadFile("testdata/authoritative/statistics.json")
 )
 
-func Test_testDataIsCorrectlyReadAndValid(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"v431statistics":          v431statistics,
-		"authoritativeStatistics": authoritativeStatistics,
+		"dataConfigJSON":              dataConfigJSON,
+		"dataConfigYAML":              dataConfigYAML,
+		"dataVer431statistics":        dataVer431statistics,
+		"dataAuthoritativeStatistics": dataAuthoritativeStatistics,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*Recursor)(nil), New())
+func TestRecursor_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Recursor{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestRecursor_Init(t *testing.T) {
@@ -70,9 +76,9 @@ func TestRecursor_Init(t *testing.T) {
 			recursor.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, recursor.Init())
+				assert.Error(t, recursor.Init())
 			} else {
-				assert.True(t, recursor.Init())
+				assert.NoError(t, recursor.Init())
 			}
 		})
 	}
@@ -108,12 +114,12 @@ func TestRecursor_Check(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			recursor, cleanup := test.prepare()
 			defer cleanup()
-			require.True(t, recursor.Init())
+			require.NoError(t, recursor.Init())
 
 			if test.wantFail {
-				assert.False(t, recursor.Check())
+				assert.Error(t, recursor.Check())
 			} else {
-				assert.True(t, recursor.Check())
+				assert.NoError(t, recursor.Check())
 			}
 		})
 	}
@@ -121,7 +127,7 @@ func TestRecursor_Check(t *testing.T) {
 
 func TestRecursor_Charts(t *testing.T) {
 	recursor := New()
-	require.True(t, recursor.Init())
+	require.NoError(t, recursor.Init())
 	assert.NotNil(t, recursor.Charts())
 }
 
@@ -271,7 +277,7 @@ func TestRecursor_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			recursor, cleanup := test.prepare()
 			defer cleanup()
-			require.True(t, recursor.Init())
+			require.NoError(t, recursor.Init())
 
 			collected := recursor.Collect()
 
@@ -349,7 +355,7 @@ func preparePowerDNSRecursorEndpoint() *httptest.Server {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case urlPathLocalStatistics:
-				_, _ = w.Write(v431statistics)
+				_, _ = w.Write(dataVer431statistics)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -361,7 +367,7 @@ func preparePowerDNSAuthoritativeEndpoint() *httptest.Server {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case urlPathLocalStatistics:
-				_, _ = w.Write(authoritativeStatistics)
+				_, _ = w.Write(dataAuthoritativeStatistics)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

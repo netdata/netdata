@@ -4,77 +4,84 @@ package vcsa
 
 import (
 	"errors"
+	"os"
 	"testing"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func testNewVCSA() *VCSA {
-	vc := New()
-	vc.URL = "https://127.0.0.1:38001"
-	vc.Username = "user"
-	vc.Password = "pass"
-	return vc
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	job := New()
-
-	assert.IsType(t, (*VCSA)(nil), job)
+func TestVCSA_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &VCSA{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestVCSA_Init(t *testing.T) {
-	job := testNewVCSA()
+	job := prepareVCSA()
 
-	assert.True(t, job.Init())
+	assert.NoError(t, job.Init())
 	assert.NotNil(t, job.client)
 }
 
 func TestVCenter_InitErrorOnValidatingInitParameters(t *testing.T) {
 	job := New()
 
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestVCenter_InitErrorOnCreatingClient(t *testing.T) {
-	job := testNewVCSA()
+	job := prepareVCSA()
 	job.Client.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestVCenter_Check(t *testing.T) {
-	job := testNewVCSA()
-	require.True(t, job.Init())
+	job := prepareVCSA()
+	require.NoError(t, job.Init())
 	job.client = &mockVCenterHealthClient{}
 
-	assert.True(t, job.Check())
+	assert.NoError(t, job.Check())
 }
 
 func TestVCenter_CheckErrorOnLogin(t *testing.T) {
-	job := testNewVCSA()
-	require.True(t, job.Init())
+	job := prepareVCSA()
+	require.NoError(t, job.Init())
 	job.client = &mockVCenterHealthClient{
 		login: func() error { return errors.New("login mock error") },
 	}
 
-	assert.False(t, job.Check())
+	assert.Error(t, job.Check())
 }
 
 func TestVCenter_CheckEnsureLoggedIn(t *testing.T) {
-	job := testNewVCSA()
-	require.True(t, job.Init())
+	job := prepareVCSA()
+	require.NoError(t, job.Init())
 	mock := &mockVCenterHealthClient{}
 	job.client = mock
 
-	assert.True(t, job.Check())
+	assert.NoError(t, job.Check())
 	assert.True(t, mock.loginCalls == 1)
 }
 
 func TestVCenter_Cleanup(t *testing.T) {
-	job := testNewVCSA()
-	require.True(t, job.Init())
+	job := prepareVCSA()
+	require.NoError(t, job.Init())
 	mock := &mockVCenterHealthClient{}
 	job.client = mock
 	job.Cleanup()
@@ -83,7 +90,7 @@ func TestVCenter_Cleanup(t *testing.T) {
 }
 
 func TestVCenter_CleanupWithNilClient(t *testing.T) {
-	job := testNewVCSA()
+	job := prepareVCSA()
 
 	assert.NotPanics(t, job.Cleanup)
 }
@@ -93,8 +100,8 @@ func TestVCenter_Charts(t *testing.T) {
 }
 
 func TestVCenter_Collect(t *testing.T) {
-	job := testNewVCSA()
-	require.True(t, job.Init())
+	job := prepareVCSA()
+	require.NoError(t, job.Init())
 	mock := &mockVCenterHealthClient{}
 	job.client = mock
 
@@ -152,8 +159,8 @@ func TestVCenter_Collect(t *testing.T) {
 }
 
 func TestVCenter_CollectEnsurePingIsCalled(t *testing.T) {
-	job := testNewVCSA()
-	require.True(t, job.Init())
+	job := prepareVCSA()
+	require.NoError(t, job.Init())
 	mock := &mockVCenterHealthClient{}
 	job.client = mock
 	job.Collect()
@@ -162,8 +169,8 @@ func TestVCenter_CollectEnsurePingIsCalled(t *testing.T) {
 }
 
 func TestVCenter_CollectErrorOnPing(t *testing.T) {
-	job := testNewVCSA()
-	require.True(t, job.Init())
+	job := prepareVCSA()
+	require.NoError(t, job.Init())
 	mock := &mockVCenterHealthClient{
 		ping: func() error { return errors.New("ping mock error") },
 	}
@@ -173,8 +180,8 @@ func TestVCenter_CollectErrorOnPing(t *testing.T) {
 }
 
 func TestVCenter_CollectErrorOnHealthCalls(t *testing.T) {
-	job := testNewVCSA()
-	require.True(t, job.Init())
+	job := prepareVCSA()
+	require.NoError(t, job.Init())
 	mock := &mockVCenterHealthClient{
 		applMgmt:         func() (string, error) { return "", errors.New("applMgmt mock error") },
 		databaseStorage:  func() (string, error) { return "", errors.New("databaseStorage mock error") },
@@ -188,6 +195,15 @@ func TestVCenter_CollectErrorOnHealthCalls(t *testing.T) {
 	job.client = mock
 
 	assert.Zero(t, job.Collect())
+}
+
+func prepareVCSA() *VCSA {
+	vc := New()
+	vc.URL = "https://127.0.0.1:38001"
+	vc.Username = "user"
+	vc.Password = "pass"
+
+	return vc
 }
 
 type mockVCenterHealthClient struct {
@@ -231,56 +247,56 @@ func (m *mockVCenterHealthClient) Ping() error {
 	return m.ping()
 }
 
-func (m mockVCenterHealthClient) ApplMgmt() (string, error) {
+func (m *mockVCenterHealthClient) ApplMgmt() (string, error) {
 	if m.applMgmt == nil {
 		return "green", nil
 	}
 	return m.applMgmt()
 }
 
-func (m mockVCenterHealthClient) DatabaseStorage() (string, error) {
+func (m *mockVCenterHealthClient) DatabaseStorage() (string, error) {
 	if m.databaseStorage == nil {
 		return "green", nil
 	}
 	return m.databaseStorage()
 }
 
-func (m mockVCenterHealthClient) Load() (string, error) {
+func (m *mockVCenterHealthClient) Load() (string, error) {
 	if m.load == nil {
 		return "green", nil
 	}
 	return m.load()
 }
 
-func (m mockVCenterHealthClient) Mem() (string, error) {
+func (m *mockVCenterHealthClient) Mem() (string, error) {
 	if m.mem == nil {
 		return "green", nil
 	}
 	return m.mem()
 }
 
-func (m mockVCenterHealthClient) SoftwarePackages() (string, error) {
+func (m *mockVCenterHealthClient) SoftwarePackages() (string, error) {
 	if m.softwarePackages == nil {
 		return "green", nil
 	}
 	return m.softwarePackages()
 }
 
-func (m mockVCenterHealthClient) Storage() (string, error) {
+func (m *mockVCenterHealthClient) Storage() (string, error) {
 	if m.storage == nil {
 		return "green", nil
 	}
 	return m.storage()
 }
 
-func (m mockVCenterHealthClient) Swap() (string, error) {
+func (m *mockVCenterHealthClient) Swap() (string, error) {
 	if m.swap == nil {
 		return "green", nil
 	}
 	return m.swap()
 }
 
-func (m mockVCenterHealthClient) System() (string, error) {
+func (m *mockVCenterHealthClient) System() (string, error) {
 	if m.system == nil {
 		return "green", nil
 	}

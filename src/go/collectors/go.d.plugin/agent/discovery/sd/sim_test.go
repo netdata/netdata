@@ -19,20 +19,21 @@ import (
 var lock = &sync.Mutex{}
 
 type discoverySim struct {
-	configs       []ConfigFile
+	configs       []confFile
 	wantPipelines []*mockPipeline
 }
 
 func (sim *discoverySim) run(t *testing.T) {
 	fact := &mockFactory{}
 	mgr := &ServiceDiscovery{
-		Logger:    logger.New(),
-		sdFactory: fact,
-		confProv: &mockConfigProvider{
-			configs: sim.configs,
-			ch:      make(chan ConfigFile),
+		Logger: logger.New(),
+		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
+			return fact.create(config)
 		},
-		confCache: make(map[string]uint64),
+		confProv: &mockConfigProvider{
+			confFiles: sim.configs,
+			ch:        make(chan confFile),
+		},
 		pipelines: make(map[string]func()),
 	}
 
@@ -65,12 +66,12 @@ func (sim *discoverySim) run(t *testing.T) {
 }
 
 type mockConfigProvider struct {
-	configs []ConfigFile
-	ch      chan ConfigFile
+	confFiles []confFile
+	ch        chan confFile
 }
 
-func (m *mockConfigProvider) Run(ctx context.Context) {
-	for _, conf := range m.configs {
+func (m *mockConfigProvider) run(ctx context.Context) {
+	for _, conf := range m.confFiles {
 		select {
 		case <-ctx.Done():
 			return
@@ -80,7 +81,7 @@ func (m *mockConfigProvider) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (m *mockConfigProvider) Configs() chan ConfigFile {
+func (m *mockConfigProvider) configs() chan confFile {
 	return m.ch
 }
 

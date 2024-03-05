@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -24,9 +25,9 @@ type example struct{ module.Base }
 
 func (example) Cleanup() {}
 
-func (example) Init() bool { return true }
+func (example) Init() error { return nil }
 
-func (example) Check() bool { return true }
+func (example) Check() error { return nil }
 
 func (example) Charts() *module.Charts {
 	return &module.Charts{
@@ -40,6 +41,7 @@ func (example) Charts() *module.Charts {
 		},
 	}
 }
+func (example) Configuration() any { return nil }
 
 func (e *example) Collect() map[string]int64 {
 	return map[string]int64{
@@ -103,12 +105,12 @@ func main() {
 	)
 
 	p := agent.New(agent.Config{
-		Name:              name,
-		ConfDir:           confDir(opt.ConfDir),
-		ModulesConfDir:    modulesConfDir(opt.ConfDir),
-		ModulesSDConfPath: opt.WatchPath,
-		RunModule:         opt.Module,
-		MinUpdateEvery:    opt.UpdateEvery,
+		Name:                 name,
+		ConfDir:              confDir(opt.ConfDir),
+		ModulesConfDir:       modulesConfDir(opt.ConfDir),
+		ModulesConfWatchPath: opt.WatchPath,
+		RunModule:            opt.Module,
+		MinUpdateEvery:       opt.UpdateEvery,
 	})
 
 	p.Run()
@@ -116,10 +118,10 @@ func main() {
 
 func parseCLI() *cli.Option {
 	opt, err := cli.Parse(os.Args)
-	if err != nil {
-		if flagsErr, ok := err.(*flags.Error); ok && flagsErr.Type == flags.ErrHelp {
-			os.Exit(0)
-		}
+	var flagsErr *flags.Error
+	if errors.As(err, &flagsErr) && errors.Is(flagsErr.Type, flags.ErrHelp) {
+		os.Exit(0)
+	} else {
 		os.Exit(1)
 	}
 	return opt

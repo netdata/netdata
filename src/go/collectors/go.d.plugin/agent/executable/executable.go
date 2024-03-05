@@ -22,7 +22,10 @@ func init() {
 
 	_, Name = filepath.Split(path)
 	Name = strings.TrimSuffix(Name, ".plugin")
-	Name = strings.TrimSuffix(Name, ".test")
+
+	if strings.HasSuffix(Name, ".test") {
+		Name = "test"
+	}
 
 	// FIXME: can't use logger because of circular import
 	fi, err := os.Lstat(path)

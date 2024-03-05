@@ -236,7 +236,7 @@ func (p *PgBouncer) queryVersion() (*semver.Version, error) {
 	p.Debugf("executing query: %v", q)
 
 	var resp string
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
 	defer cancel()
 	if err := p.db.QueryRowContext(ctx, q).Scan(&resp); err != nil {
 		return nil, err
@@ -281,7 +281,7 @@ func (p *PgBouncer) openConnection() error {
 }
 
 func (p *PgBouncer) collectQuery(query string, assign func(column, value string)) error {
-	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), p.Timeout.Duration())
 	defer cancel()
 	rows, err := p.db.QueryContext(ctx, query)
 	if err != nil {

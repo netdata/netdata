@@ -4,6 +4,7 @@ package openvpn_status_log
 
 import (
 	_ "embed"
+	"errors"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
@@ -20,56 +21,66 @@ func init() {
 }
 
 func New() *OpenVPNStatusLog {
-	config := Config{
-		LogPath: "/var/log/openvpn/status.log",
-	}
 	return &OpenVPNStatusLog{
-		Config:         config,
+		Config: Config{
+			LogPath: "/var/log/openvpn/status.log",
+		},
 		charts:         charts.Copy(),
 		collectedUsers: make(map[string]bool),
 	}
 }
 
 type Config struct {
-	LogPath      string             `yaml:"log_path"`
-	PerUserStats matcher.SimpleExpr `yaml:"per_user_stats"`
+	UpdateEvery  int                `yaml:"update_every" json:"update_every"`
+	LogPath      string             `yaml:"log_path" json:"log_path"`
+	PerUserStats matcher.SimpleExpr `yaml:"per_user_stats" json:"per_user_stats"`
 }
 
 type OpenVPNStatusLog struct {
 	module.Base
-
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
-	collectedUsers map[string]bool
 	perUserMatcher matcher.Matcher
+	collectedUsers map[string]bool
 }
 
-func (o *OpenVPNStatusLog) Init() bool {
+func (o *OpenVPNStatusLog) Configuration() any {
+	return o.Config
+}
+
+func (o *OpenVPNStatusLog) Init() error {
 	if err := o.validateConfig(); err != nil {
 		o.Errorf("error on validating config: %v", err)
-		return false
+		return err
 	}
 
 	m, err := o.initPerUserStatsMatcher()
 	if err != nil {
 		o.Errorf("error on creating 'per_user_stats' matcher: %v", err)
-		return false
+		return err
 	}
-
 	if m != nil {
 		o.perUserMatcher = m
 	}
 
-	return true
+	return nil
 }
 
-func (o *OpenVPNStatusLog) Check() bool {
-	return len(o.Collect()) > 0
+func (o *OpenVPNStatusLog) Check() error {
+	mx, err := o.collect()
+	if err != nil {
+		o.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
-func (o OpenVPNStatusLog) Charts() *module.Charts {
+func (o *OpenVPNStatusLog) Charts() *module.Charts {
 	return o.charts
 }
 

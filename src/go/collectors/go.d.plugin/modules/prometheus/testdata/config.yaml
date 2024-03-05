@@ -1,0 +1,33 @@
+update_every: 123
+url: "ok"
+body: "ok"
+method: "ok"
+headers:
+  ok: "ok"
+username: "ok"
+password: "ok"
+proxy_url: "ok"
+proxy_username: "ok"
+proxy_password: "ok"
+timeout: 123.123
+not_follow_redirects: yes
+tls_ca: "ok"
+tls_cert: "ok"
+tls_key: "ok"
+tls_skip_verify: yes
+name: "ok"
+app: "ok"
+bearer_token_file: "ok"
+selector:
+  allow:
+    - "ok"
+  deny:
+    - "ok"
+expected_prefix: "ok"
+max_time_series: 123
+max_time_series_per_metric: 123
+fallback_type:
+  gauge:
+    - "ok"
+  counter:
+    - "ok"

@@ -43,7 +43,7 @@ func (d *Docker) collect() (map[string]int64, error) {
 }
 
 func (d *Docker) collectInfo(mx map[string]int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
 	defer cancel()
 
 	info, err := d.client.Info(ctx)
@@ -59,7 +59,7 @@ func (d *Docker) collectInfo(mx map[string]int64) error {
 }
 
 func (d *Docker) collectImages(mx map[string]int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
 	defer cancel()
 
 	images, err := d.client.ImageList(ctx, types.ImageListOptions{})
@@ -106,7 +106,7 @@ func (d *Docker) collectContainers(mx map[string]int64) error {
 
 	for _, status := range containerHealthStatuses {
 		if err := func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration)
+			ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
 			defer cancel()
 
 			v, err := d.client.ContainerList(ctx, types.ContainerListOptions{
@@ -191,7 +191,7 @@ func (d *Docker) collectContainers(mx map[string]int64) error {
 }
 
 func (d *Docker) negotiateAPIVersion() {
-	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
 	defer cancel()
 
 	d.client.NegotiateAPIVersion(ctx)

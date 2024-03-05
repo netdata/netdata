@@ -4,6 +4,7 @@ package nginxplus
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"time"
 
@@ -29,7 +30,7 @@ func New() *NginxPlus {
 					URL: "http://127.0.0.1",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second * 1},
+					Timeout: web.Duration(time.Second * 1),
 				},
 			},
 		},
@@ -40,20 +41,20 @@ func New() *NginxPlus {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type NginxPlus struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
 	httpClient *http.Client
 
 	apiVersion int64
-
-	endpoints struct {
+	endpoints  struct {
 		nginx             bool
 		connections       bool
 		ssl               bool
@@ -68,28 +69,39 @@ type NginxPlus struct {
 	}
 	queryEndpointsTime  time.Time
 	queryEndpointsEvery time.Duration
-
-	cache *cache
+	cache               *cache
 }
 
-func (n *NginxPlus) Init() bool {
+func (n *NginxPlus) Configuration() any {
+	return n.Config
+}
+
+func (n *NginxPlus) Init() error {
 	if n.URL == "" {
 		n.Error("config validation: 'url' can not be empty'")
-		return false
+		return errors.New("url not set")
 	}
 
 	client, err := web.NewHTTPClient(n.Client)
 	if err != nil {
 		n.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	n.httpClient = client
 
-	return true
+	return nil
 }
 
-func (n *NginxPlus) Check() bool {
-	return len(n.Collect()) > 0
+func (n *NginxPlus) Check() error {
+	mx, err := n.collect()
+	if err != nil {
+		n.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (n *NginxPlus) Charts() *module.Charts {

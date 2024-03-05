@@ -42,7 +42,7 @@ func (cdb *CouchDB) collect() (map[string]int64, error) {
 	return collected, nil
 }
 
-func (CouchDB) collectNodeStats(collected map[string]int64, ms *cdbMetrics) {
+func (cdb *CouchDB) collectNodeStats(collected map[string]int64, ms *cdbMetrics) {
 	if !ms.hasNodeStats() {
 		return
 	}
@@ -56,7 +56,7 @@ func (CouchDB) collectNodeStats(collected map[string]int64, ms *cdbMetrics) {
 	}
 }
 
-func (CouchDB) collectSystemStats(collected map[string]int64, ms *cdbMetrics) {
+func (cdb *CouchDB) collectSystemStats(collected map[string]int64, ms *cdbMetrics) {
 	if !ms.hasNodeSystem() {
 		return
 	}
@@ -68,7 +68,7 @@ func (CouchDB) collectSystemStats(collected map[string]int64, ms *cdbMetrics) {
 	collected["peak_msg_queue"] = findMaxMQSize(ms.NodeSystem.MessageQueues)
 }
 
-func (CouchDB) collectActiveTasks(collected map[string]int64, ms *cdbMetrics) {
+func (cdb *CouchDB) collectActiveTasks(collected map[string]int64, ms *cdbMetrics) {
 	collected["active_tasks_indexer"] = 0
 	collected["active_tasks_database_compaction"] = 0
 	collected["active_tasks_replication"] = 0

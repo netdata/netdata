@@ -8,11 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -29,22 +28,21 @@ func init() {
 }
 
 func New() *Pulsar {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: "http://127.0.0.1:8080/metrics",
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: time.Second},
-			},
-		},
-		TopicFiler: matcher.SimpleExpr{
-			Includes: nil,
-			Excludes: []string{"*"},
-		},
-	}
 	return &Pulsar{
-		Config:             config,
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "http://127.0.0.1:8080/metrics",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second * 5),
+				},
+			},
+			TopicFilter: matcher.SimpleExpr{
+				Includes: nil,
+				Excludes: []string{"*"},
+			},
+		},
 		once:               &sync.Once{},
 		charts:             summaryCharts.Copy(),
 		nsCharts:           namespaceCharts.Copy(),
@@ -54,90 +52,65 @@ func New() *Pulsar {
 	}
 }
 
-type (
-	Config struct {
-		web.HTTP   `yaml:",inline"`
-		TopicFiler matcher.SimpleExpr `yaml:"topic_filter"`
-	}
-
-	Pulsar struct {
-		module.Base
-		Config `yaml:",inline"`
-
-		prom               prometheus.Prometheus
-		topicFilter        matcher.Matcher
-		cache              *cache
-		curCache           *cache
-		once               *sync.Once
-		charts             *Charts
-		nsCharts           *Charts
-		topicChartsMapping map[string]string
-	}
-
-	namespace struct{ name string }
-	topic     struct{ namespace, name string }
-	cache     struct {
-		namespaces map[namespace]bool
-		topics     map[topic]bool
-	}
-)
-
-func newCache() *cache {
-	return &cache{
-		namespaces: make(map[namespace]bool),
-		topics:     make(map[topic]bool),
-	}
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int                `yaml:"update_every" json:"update_every"`
+	TopicFilter matcher.SimpleExpr `yaml:"topic_filter" json:"topic_filter"`
 }
 
-func (p Pulsar) validateConfig() error {
-	if p.URL == "" {
-		return errors.New("URL is not set")
-	}
-	return nil
+type Pulsar struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	charts   *Charts
+	nsCharts *Charts
+
+	prom prometheus.Prometheus
+
+	topicFilter        matcher.Matcher
+	cache              *cache
+	curCache           *cache
+	once               *sync.Once
+	topicChartsMapping map[string]string
 }
 
-func (p *Pulsar) initClient() error {
-	client, err := web.NewHTTPClient(p.Client)
-	if err != nil {
+func (p *Pulsar) Configuration() any {
+	return p.Config
+}
+
+func (p *Pulsar) Init() error {
+	if err := p.validateConfig(); err != nil {
+		p.Errorf("config validation: %v", err)
 		return err
 	}
 
-	p.prom = prometheus.New(client, p.Request)
-	return nil
-}
-
-func (p *Pulsar) initTopicFiler() error {
-	if p.TopicFiler.Empty() {
-		p.topicFilter = matcher.TRUE()
-		return nil
-	}
-
-	m, err := p.TopicFiler.Parse()
+	prom, err := p.initPrometheusClient()
 	if err != nil {
+		p.Error(err)
+		return err
+	}
+	p.prom = prom
+
+	m, err := p.initTopicFilerMatcher()
+	if err != nil {
+		p.Error(err)
 		return err
 	}
 	p.topicFilter = m
+
 	return nil
 }
 
-func (p *Pulsar) Init() bool {
-	if err := p.validateConfig(); err != nil {
-		p.Errorf("config validation: %v", err)
-		return false
+func (p *Pulsar) Check() error {
+	mx, err := p.collect()
+	if err != nil {
+		p.Error(err)
+		return err
 	}
-	if err := p.initClient(); err != nil {
-		p.Errorf("client initializing: %v", err)
-		return false
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
 	}
-	if err := p.initTopicFiler(); err != nil {
-		p.Errorf("topic filer initialization: %v", err)
-		return false
-	}
-	return true
-}
-
-func (p *Pulsar) Check() bool {
-	return len(p.Collect()) > 0
+	return nil
 }
 
 func (p *Pulsar) Charts() *Charts {
@@ -156,4 +129,8 @@ func (p *Pulsar) Collect() map[string]int64 {
 	return mx
 }
 
-func (Pulsar) Cleanup() {}
+func (p *Pulsar) Cleanup() {
+	if p.prom != nil && p.prom.HTTPClient() != nil {
+		p.prom.HTTPClient().CloseIdleConnections()
+	}
+}

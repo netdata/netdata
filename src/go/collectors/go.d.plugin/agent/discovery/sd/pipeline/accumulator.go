@@ -14,22 +14,20 @@ import (
 func newAccumulator() *accumulator {
 	return &accumulator{
 		send:      make(chan struct{}, 1),
-		sendEvery: time.Second * 3,
+		sendEvery: time.Second * 2,
 		mux:       &sync.Mutex{},
 		tggs:      make(map[string]model.TargetGroup),
 	}
 }
 
-type (
-	accumulator struct {
-		*logger.Logger
-		discoverers []model.Discoverer
-		send        chan struct{}
-		sendEvery   time.Duration
-		mux         *sync.Mutex
-		tggs        map[string]model.TargetGroup
-	}
-)
+type accumulator struct {
+	*logger.Logger
+	discoverers []model.Discoverer
+	send        chan struct{}
+	sendEvery   time.Duration
+	mux         *sync.Mutex
+	tggs        map[string]model.TargetGroup
+}
 
 func (a *accumulator) run(ctx context.Context, in chan []model.TargetGroup) {
 	updates := make(chan []model.TargetGroup)
@@ -53,12 +51,17 @@ func (a *accumulator) run(ctx context.Context, in chan []model.TargetGroup) {
 			select {
 			case <-done:
 				a.Info("all discoverers exited")
-			case <-time.After(time.Second * 5):
+			case <-time.After(time.Second * 3):
 				a.Warning("not all discoverers exited")
 			}
+			a.trySend(in)
 			return
 		case <-done:
-			a.Info("all discoverers exited")
+			if !isDone(ctx) {
+				a.Info("all discoverers exited before ctx done")
+			} else {
+				a.Info("all discoverers exited")
+			}
 			a.trySend(in)
 			return
 		case <-tk.C:
@@ -80,10 +83,14 @@ func (a *accumulator) runDiscoverer(ctx context.Context, d model.Discoverer, upd
 		case <-ctx.Done():
 			select {
 			case <-done:
-			case <-time.After(time.Second * 5):
+			case <-time.After(time.Second * 2):
+				a.Warningf("discoverer '%v' didn't exit on ctx done", d)
 			}
 			return
 		case <-done:
+			if !isDone(ctx) {
+				a.Infof("discoverer '%v' exited before ctx done", d)
+			}
 			return
 		case tggs := <-updates:
 			a.mux.Lock()
@@ -133,4 +140,13 @@ func (a *accumulator) groupsList() []model.TargetGroup {
 		}
 	}
 	return tggs
+}
+
+func isDone(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
 }

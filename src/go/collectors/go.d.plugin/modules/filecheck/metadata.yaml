@@ -60,7 +60,7 @@ modules:
               default_value: 0
               required: false
             - name: files
-              description: List of files to monitor.
+              description: Files matching the selector will be monitored.
               default_value: ""
               required: true
               detailed_description: |

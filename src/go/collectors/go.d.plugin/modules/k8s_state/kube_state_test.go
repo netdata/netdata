@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -23,8 +24,22 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestKubeState_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &KubeState{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestKubeState_Init(t *testing.T) {
@@ -55,9 +70,9 @@ func TestKubeState_Init(t *testing.T) {
 			ks := test.prepare()
 
 			if test.wantFail {
-				assert.False(t, ks.Init())
+				assert.Error(t, ks.Init())
 			} else {
-				assert.True(t, ks.Init())
+				assert.NoError(t, ks.Init())
 			}
 		})
 	}
@@ -90,12 +105,12 @@ func TestKubeState_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			ks := test.prepare()
-			require.True(t, ks.Init())
+			require.NoError(t, ks.Init())
 
 			if test.wantFail {
-				assert.False(t, ks.Check())
+				assert.Error(t, ks.Check())
 			} else {
-				assert.True(t, ks.Check())
+				assert.NoError(t, ks.Check())
 			}
 		})
 	}
@@ -663,8 +678,8 @@ func TestKubeState_Collect(t *testing.T) {
 			ks := New()
 			ks.newKubeClient = func() (kubernetes.Interface, error) { return test.client, nil }
 
-			require.True(t, ks.Init())
-			require.True(t, ks.Check())
+			require.NoError(t, ks.Init())
+			require.NoError(t, ks.Check())
 			defer ks.Cleanup()
 
 			for i, executeStep := range test.steps {

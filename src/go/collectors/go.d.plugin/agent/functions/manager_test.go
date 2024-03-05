@@ -85,143 +85,173 @@ func TestManager_Run(t *testing.T) {
 		"valid function: single": {
 			register: []string{"fn1"},
 			input: `
-FUNCTION UID 1 "fn1 arg1 arg2"
+FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
 `,
 			expected: []Function{
 				{
-					key:     "FUNCTION",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn1",
-					Args:    []string{"arg1", "arg2"},
-					Payload: nil,
+					key:         "FUNCTION",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn1",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "",
+					Payload:     nil,
 				},
 			},
 		},
 		"valid function: multiple": {
 			register: []string{"fn1", "fn2"},
 			input: `
-FUNCTION UID 1 "fn1 arg1 arg2"
-FUNCTION UID 1 "fn2 arg1 arg2"
+FUNCTION UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test"
+FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
 `,
 			expected: []Function{
 				{
-					key:     "FUNCTION",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn1",
-					Args:    []string{"arg1", "arg2"},
-					Payload: nil,
+					key:         "FUNCTION",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn1",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "",
+					Payload:     nil,
 				},
 				{
-					key:     "FUNCTION",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn2",
-					Args:    []string{"arg1", "arg2"},
-					Payload: nil,
+					key:         "FUNCTION",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn2",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "",
+					Payload:     nil,
 				},
 			},
 		},
 		"valid function: single with payload": {
 			register: []string{"fn1", "fn2"},
 			input: `
-FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2"
+FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
 `,
 			expected: []Function{
 				{
-					key:     "FUNCTION_PAYLOAD",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn1",
-					Args:    []string{"arg1", "arg2"},
-					Payload: []byte("payload line1\npayload line2"),
+					key:         "FUNCTION_PAYLOAD",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn1",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "application/json",
+					Payload:     []byte("payload line1\npayload line2"),
 				},
 			},
 		},
 		"valid function: multiple with payload": {
 			register: []string{"fn1", "fn2"},
 			input: `
-FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2"
+FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
 
-FUNCTION_PAYLOAD UID 1 "fn2 arg1 arg2"
+FUNCTION_PAYLOAD UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test" application/json
 payload line3
 payload line4
 FUNCTION_PAYLOAD_END
 `,
 			expected: []Function{
 				{
-					key:     "FUNCTION_PAYLOAD",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn1",
-					Args:    []string{"arg1", "arg2"},
-					Payload: []byte("payload line1\npayload line2"),
+					key:         "FUNCTION_PAYLOAD",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn1",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "application/json",
+					Payload:     []byte("payload line1\npayload line2"),
 				},
 				{
-					key:     "FUNCTION_PAYLOAD",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn2",
-					Args:    []string{"arg1", "arg2"},
-					Payload: []byte("payload line3\npayload line4"),
+					key:         "FUNCTION_PAYLOAD",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn2",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "application/json",
+					Payload:     []byte("payload line3\npayload line4"),
 				},
 			},
 		},
 		"valid function: multiple with and without payload": {
 			register: []string{"fn1", "fn2", "fn3", "fn4"},
 			input: `
-FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2"
+FUNCTION_PAYLOAD UID 1 "fn1 arg1 arg2" 0xFFFF "method=api,role=test" application/json
 payload line1
 payload line2
 FUNCTION_PAYLOAD_END
 
-FUNCTION UID 1 "fn2 arg1 arg2"
-FUNCTION UID 1 "fn3 arg1 arg2"
+FUNCTION UID 1 "fn2 arg1 arg2" 0xFFFF "method=api,role=test"
+FUNCTION UID 1 "fn3 arg1 arg2" 0xFFFF "method=api,role=test"
 
-FUNCTION_PAYLOAD UID 1 "fn4 arg1 arg2"
+FUNCTION_PAYLOAD UID 1 "fn4 arg1 arg2" 0xFFFF "method=api,role=test" application/json
 payload line3
 payload line4
 FUNCTION_PAYLOAD_END
 `,
 			expected: []Function{
 				{
-					key:     "FUNCTION_PAYLOAD",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn1",
-					Args:    []string{"arg1", "arg2"},
-					Payload: []byte("payload line1\npayload line2"),
+					key:         "FUNCTION_PAYLOAD",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn1",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "application/json",
+					Payload:     []byte("payload line1\npayload line2"),
 				},
 				{
-					key:     "FUNCTION",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn2",
-					Args:    []string{"arg1", "arg2"},
-					Payload: nil,
+					key:         "FUNCTION",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn2",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "",
+					Payload:     nil,
 				},
 				{
-					key:     "FUNCTION",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn3",
-					Args:    []string{"arg1", "arg2"},
-					Payload: nil,
+					key:         "FUNCTION",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn3",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "",
+					Payload:     nil,
 				},
 				{
-					key:     "FUNCTION_PAYLOAD",
-					UID:     "UID",
-					Timeout: time.Second,
-					Name:    "fn4",
-					Args:    []string{"arg1", "arg2"},
-					Payload: []byte("payload line3\npayload line4"),
+					key:         "FUNCTION_PAYLOAD",
+					UID:         "UID",
+					Timeout:     time.Second,
+					Name:        "fn4",
+					Args:        []string{"arg1", "arg2"},
+					Permissions: "0xFFFF",
+					Source:      "method=api,role=test",
+					ContentType: "application/json",
+					Payload:     []byte("payload line3\npayload line4"),
 				},
 			},
 		},

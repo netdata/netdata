@@ -4,6 +4,7 @@ package dnsmasq_dhcp
 
 import (
 	_ "embed"
+	"errors"
 	"net"
 	"time"
 
@@ -22,15 +23,13 @@ func init() {
 }
 
 func New() *DnsmasqDHCP {
-	config := Config{
-		// debian defaults
-		LeasesPath: "/var/lib/misc/dnsmasq.leases",
-		ConfPath:   "/etc/dnsmasq.conf",
-		ConfDir:    "/etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new",
-	}
-
 	return &DnsmasqDHCP{
-		Config:           config,
+		Config: Config{
+			// debian defaults
+			LeasesPath: "/var/lib/misc/dnsmasq.leases",
+			ConfPath:   "/etc/dnsmasq.conf",
+			ConfDir:    "/etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new",
+		},
 		charts:           charts.Copy(),
 		parseConfigEvery: time.Minute,
 		cacheDHCPRanges:  make(map[string]bool),
@@ -39,45 +38,56 @@ func New() *DnsmasqDHCP {
 }
 
 type Config struct {
-	LeasesPath string `yaml:"leases_path"`
-	ConfPath   string `yaml:"conf_path"`
-	ConfDir    string `yaml:"conf_dir"`
+	UpdateEvery int    `yaml:"update_every" json:"update_every"`
+	LeasesPath  string `yaml:"leases_path" json:"leases_path"`
+	ConfPath    string `yaml:"conf_path" json:"conf_path"`
+	ConfDir     string `yaml:"conf_dir" json:"conf_dir"`
 }
 
 type DnsmasqDHCP struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
-	leasesModTime time.Time
-
+	leasesModTime    time.Time
 	parseConfigTime  time.Time
 	parseConfigEvery time.Duration
-
-	dhcpRanges []iprange.Range
-	dhcpHosts  []net.IP
-
-	cacheDHCPRanges map[string]bool
+	dhcpRanges       []iprange.Range
+	dhcpHosts        []net.IP
+	cacheDHCPRanges  map[string]bool
 
 	mx map[string]int64
 }
 
-func (d *DnsmasqDHCP) Init() bool {
+func (d *DnsmasqDHCP) Configuration() any {
+	return d.Config
+}
+
+func (d *DnsmasqDHCP) Init() error {
 	if err := d.validateConfig(); err != nil {
 		d.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 	if err := d.checkLeasesPath(); err != nil {
 		d.Errorf("leases path check: %v", err)
-		return false
+		return err
 	}
 
-	return true
+	return nil
 }
 
-func (d *DnsmasqDHCP) Check() bool {
-	return len(d.Collect()) > 0
+func (d *DnsmasqDHCP) Check() error {
+	mx, err := d.collect()
+	if err != nil {
+		d.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (d *DnsmasqDHCP) Charts() *module.Charts {

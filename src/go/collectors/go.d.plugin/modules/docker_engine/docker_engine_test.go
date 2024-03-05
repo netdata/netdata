@@ -8,30 +8,39 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	metricsNonDockerEngine, _ = os.ReadFile("testdata/non-docker-engine.txt")
-	metricsV17050CE, _        = os.ReadFile("testdata/v17.05.0-ce.txt")
-	metricsV18093CE, _        = os.ReadFile("testdata/v18.09.3-ce.txt")
-	metricsV18093CESwarm, _   = os.ReadFile("testdata/v18.09.3-ce-swarm.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataNonDockerEngineMetrics, _ = os.ReadFile("testdata/non-docker-engine.txt")
+	dataVer17050Metrics, _        = os.ReadFile("testdata/v17.05.0-ce.txt")
+	dataVer18093Metrics, _        = os.ReadFile("testdata/v18.09.3-ce.txt")
+	dataVer18093SwarmMetrics, _   = os.ReadFile("testdata/v18.09.3-ce-swarm.txt")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, metricsNonDockerEngine)
-	assert.NotNil(t, metricsV17050CE)
-	assert.NotNil(t, metricsV18093CE)
-	assert.NotNil(t, metricsV18093CESwarm)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":             dataConfigJSON,
+		"dataConfigYAML":             dataConfigYAML,
+		"dataNonDockerEngineMetrics": dataNonDockerEngineMetrics,
+		"dataVer17050Metrics":        dataVer17050Metrics,
+		"dataVer18093Metrics":        dataVer18093Metrics,
+		"dataVer18093SwarmMetrics":   dataVer18093SwarmMetrics,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func TestDockerEngine_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &DockerEngine{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestDockerEngine_Cleanup(t *testing.T) {
@@ -64,9 +73,9 @@ func TestDockerEngine_Init(t *testing.T) {
 			dockerEngine.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, dockerEngine.Init())
+				assert.Error(t, dockerEngine.Init())
 			} else {
-				assert.True(t, dockerEngine.Init())
+				assert.NoError(t, dockerEngine.Init())
 			}
 		})
 	}
@@ -92,9 +101,9 @@ func TestDockerEngine_Check(t *testing.T) {
 			defer srv.Close()
 
 			if test.wantFail {
-				assert.False(t, dockerEngine.Check())
+				assert.Error(t, dockerEngine.Check())
 			} else {
-				assert.True(t, dockerEngine.Check())
+				assert.NoError(t, dockerEngine.Check())
 			}
 		})
 	}
@@ -115,7 +124,7 @@ func TestDockerEngine_Charts(t *testing.T) {
 			dockerEngine, srv := test.prepare(t)
 			defer srv.Close()
 
-			require.True(t, dockerEngine.Check())
+			require.NoError(t, dockerEngine.Check())
 			assert.Len(t, *dockerEngine.Charts(), test.wantNumCharts)
 		})
 	}
@@ -271,12 +280,12 @@ func prepareClientServerV17050CE(t *testing.T) (*DockerEngine, *httptest.Server)
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(metricsV17050CE)
+			_, _ = w.Write(dataVer17050Metrics)
 		}))
 
 	dockerEngine := New()
 	dockerEngine.URL = srv.URL
-	require.True(t, dockerEngine.Init())
+	require.NoError(t, dockerEngine.Init())
 
 	return dockerEngine, srv
 }
@@ -285,12 +294,12 @@ func prepareClientServerV18093CE(t *testing.T) (*DockerEngine, *httptest.Server)
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(metricsV18093CE)
+			_, _ = w.Write(dataVer18093Metrics)
 		}))
 
 	dockerEngine := New()
 	dockerEngine.URL = srv.URL
-	require.True(t, dockerEngine.Init())
+	require.NoError(t, dockerEngine.Init())
 
 	return dockerEngine, srv
 }
@@ -299,12 +308,12 @@ func prepareClientServerV18093CESwarm(t *testing.T) (*DockerEngine, *httptest.Se
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(metricsV18093CESwarm)
+			_, _ = w.Write(dataVer18093SwarmMetrics)
 		}))
 
 	dockerEngine := New()
 	dockerEngine.URL = srv.URL
-	require.True(t, dockerEngine.Init())
+	require.NoError(t, dockerEngine.Init())
 
 	return dockerEngine, srv
 }
@@ -313,12 +322,12 @@ func prepareClientServerNonDockerEngine(t *testing.T) (*DockerEngine, *httptest.
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(metricsNonDockerEngine)
+			_, _ = w.Write(dataNonDockerEngineMetrics)
 		}))
 
 	dockerEngine := New()
 	dockerEngine.URL = srv.URL
-	require.True(t, dockerEngine.Init())
+	require.NoError(t, dockerEngine.Init())
 
 	return dockerEngine, srv
 }
@@ -332,7 +341,7 @@ func prepareClientServerInvalidData(t *testing.T) (*DockerEngine, *httptest.Serv
 
 	dockerEngine := New()
 	dockerEngine.URL = srv.URL
-	require.True(t, dockerEngine.Init())
+	require.NoError(t, dockerEngine.Init())
 
 	return dockerEngine, srv
 }
@@ -346,7 +355,7 @@ func prepareClientServer404(t *testing.T) (*DockerEngine, *httptest.Server) {
 
 	dockerEngine := New()
 	dockerEngine.URL = srv.URL
-	require.True(t, dockerEngine.Init())
+	require.NoError(t, dockerEngine.Init())
 
 	return dockerEngine, srv
 }
@@ -357,7 +366,7 @@ func prepareClientServerConnectionRefused(t *testing.T) (*DockerEngine, *httptes
 
 	dockerEngine := New()
 	dockerEngine.URL = "http://127.0.0.1:38001/metrics"
-	require.True(t, dockerEngine.Init())
+	require.NoError(t, dockerEngine.Init())
 
 	return dockerEngine, srv
 }

@@ -58,15 +58,18 @@ func parseStaticFormat(reg confgroup.Registry, path string, bs []byte) (*confgro
 	if err := yaml.Unmarshal(bs, &modCfg); err != nil {
 		return nil, err
 	}
+
 	for _, cfg := range modCfg.Jobs {
 		cfg.SetModule(name)
 		def := mergeDef(modCfg.Default, modDef)
-		cfg.Apply(def)
+		cfg.ApplyDefaults(def)
 	}
+
 	group := &confgroup.Group{
 		Configs: modCfg.Jobs,
 		Source:  path,
 	}
+
 	return group, nil
 }
 
@@ -79,7 +82,7 @@ func parseSDFormat(reg confgroup.Registry, path string, bs []byte) (*confgroup.G
 	var i int
 	for _, cfg := range cfgs {
 		if def, ok := reg.Lookup(cfg.Module()); ok && cfg.Module() != "" {
-			cfg.Apply(def)
+			cfg.ApplyDefaults(def)
 			cfgs[i] = cfg
 			i++
 		}
@@ -89,6 +92,7 @@ func parseSDFormat(reg confgroup.Registry, path string, bs []byte) (*confgroup.G
 		Configs: cfgs[:i],
 		Source:  path,
 	}
+
 	return group, nil
 }
 
@@ -102,8 +106,8 @@ func cfgFormat(bs []byte) format {
 	}
 
 	type (
-		static = map[interface{}]interface{}
-		sd     = []interface{}
+		static = map[any]any
+		sd     = []any
 	)
 	switch data.(type) {
 	case static:

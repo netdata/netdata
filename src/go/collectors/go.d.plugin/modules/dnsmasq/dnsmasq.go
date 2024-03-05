@@ -4,6 +4,7 @@ package dnsmasq
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -27,7 +28,7 @@ func New() *Dnsmasq {
 		Config: Config{
 			Protocol: "udp",
 			Address:  "127.0.0.1:53",
-			Timeout:  web.Duration{Duration: time.Second},
+			Timeout:  web.Duration(time.Second),
 		},
 
 		newDNSClient: func(network string, timeout time.Duration) dnsClient {
@@ -40,53 +41,66 @@ func New() *Dnsmasq {
 }
 
 type Config struct {
-	Protocol string       `yaml:"protocol"`
-	Address  string       `yaml:"address"`
-	Timeout  web.Duration `yaml:"timeout"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	Protocol    string       `yaml:"protocol" json:"protocol"`
+	Address     string       `yaml:"address" json:"address"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type (
 	Dnsmasq struct {
 		module.Base
-		Config `yaml:",inline"`
-
-		newDNSClient func(network string, timeout time.Duration) dnsClient
-		dnsClient    dnsClient
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
-	}
 
+		dnsClient    dnsClient
+		newDNSClient func(network string, timeout time.Duration) dnsClient
+	}
 	dnsClient interface {
 		Exchange(msg *dns.Msg, address string) (resp *dns.Msg, rtt time.Duration, err error)
 	}
 )
 
-func (d *Dnsmasq) Init() bool {
+func (d *Dnsmasq) Configuration() any {
+	return d.Config
+}
+
+func (d *Dnsmasq) Init() error {
 	err := d.validateConfig()
 	if err != nil {
 		d.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	client, err := d.initDNSClient()
 	if err != nil {
 		d.Errorf("init DNS client: %v", err)
-		return false
+		return err
 	}
 	d.dnsClient = client
 
 	charts, err := d.initCharts()
 	if err != nil {
 		d.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	d.charts = charts
 
-	return true
+	return nil
 }
 
-func (d *Dnsmasq) Check() bool {
-	return len(d.Collect()) > 0
+func (d *Dnsmasq) Check() error {
+	mx, err := d.collect()
+	if err != nil {
+		d.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (d *Dnsmasq) Charts() *module.Charts {
@@ -105,4 +119,4 @@ func (d *Dnsmasq) Collect() map[string]int64 {
 	return ms
 }
 
-func (Dnsmasq) Cleanup() {}
+func (d *Dnsmasq) Cleanup() {}

@@ -1,0 +1,17 @@
+{
+  "update_every": 123,
+  "charts": {
+    "type": "ok",
+    "num": 123,
+    "contexts": 123,
+    "dimensions": 123,
+    "labels": 123
+  },
+  "hidden_charts": {
+    "type": "ok",
+    "num": 123,
+    "contexts": 123,
+    "dimensions": 123,
+    "labels": 123
+  }
+}

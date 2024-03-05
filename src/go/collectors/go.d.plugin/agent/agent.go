@@ -32,16 +32,17 @@ var isTerminal = isatty.IsTerminal(os.Stdout.Fd())
 
 // Config is an Agent configuration.
 type Config struct {
-	Name              string
-	ConfDir           []string
-	ModulesConfDir    []string
-	ModulesSDConfPath []string
-	VnodesConfDir     []string
-	StateFile         string
-	LockDir           string
-	ModuleRegistry    module.Registry
-	RunModule         string
-	MinUpdateEvery    int
+	Name                 string
+	ConfDir              []string
+	ModulesConfDir       []string
+	ModulesConfSDDir     []string
+	ModulesConfWatchPath []string
+	VnodesConfDir        []string
+	StateFile            string
+	LockDir              string
+	ModuleRegistry       module.Registry
+	RunModule            string
+	MinUpdateEvery       int
 }
 
 // Agent represents orchestrator.
@@ -51,6 +52,7 @@ type Agent struct {
 	Name              string
 	ConfDir           multipath.MultiPath
 	ModulesConfDir    multipath.MultiPath
+	ModulesConfSDDir  multipath.MultiPath
 	ModulesSDConfPath []string
 	VnodesConfDir     multipath.MultiPath
 	StateFile         string
@@ -72,7 +74,8 @@ func New(cfg Config) *Agent {
 		Name:              cfg.Name,
 		ConfDir:           cfg.ConfDir,
 		ModulesConfDir:    cfg.ModulesConfDir,
-		ModulesSDConfPath: cfg.ModulesSDConfPath,
+		ModulesConfSDDir:  cfg.ModulesConfSDDir,
+		ModulesSDConfPath: cfg.ModulesConfWatchPath,
 		VnodesConfDir:     cfg.VnodesConfDir,
 		StateFile:         cfg.StateFile,
 		LockDir:           cfg.LockDir,
@@ -96,11 +99,9 @@ func serve(a *Agent) {
 	var wg sync.WaitGroup
 
 	var exit bool
-	var reload bool
 
 	for {
 		ctx, cancel := context.WithCancel(context.Background())
-		ctx = context.WithValue(ctx, "reload", reload)
 
 		wg.Add(1)
 		go func() { defer wg.Done(); a.run(ctx) }()
@@ -136,7 +137,6 @@ func serve(a *Agent) {
 			os.Exit(0)
 		}
 
-		reload = true
 		time.Sleep(time.Second)
 	}
 }
@@ -169,7 +169,7 @@ func (a *Agent) run(ctx context.Context) {
 
 	discCfg := a.buildDiscoveryConf(enabledModules)
 
-	discoveryManager, err := discovery.NewManager(discCfg)
+	discMgr, err := discovery.NewManager(discCfg)
 	if err != nil {
 		a.Error(err)
 		if isTerminal {
@@ -178,46 +178,32 @@ func (a *Agent) run(ctx context.Context) {
 		return
 	}
 
-	functionsManager := functions.NewManager()
+	fnMgr := functions.NewManager()
 
-	jobsManager := jobmgr.NewManager()
-	jobsManager.PluginName = a.Name
-	jobsManager.Out = a.Out
-	jobsManager.Modules = enabledModules
-
-	// TODO: API will be changed in https://github.com/netdata/netdata/pull/16702
-	//if logger.Level.Enabled(slog.LevelDebug) {
-	//	dyncfgDiscovery, _ := dyncfg.NewDiscovery(dyncfg.Config{
-	//		Plugin:               a.Name,
-	//		API:                  netdataapi.New(a.Out),
-	//		Modules:              enabledModules,
-	//		ModuleConfigDefaults: discCfg.Registry,
-	//		Functions:            functionsManager,
-	//	})
-	//
-	//	discoveryManager.Add(dyncfgDiscovery)
-	//
-	//	jobsManager.Dyncfg = dyncfgDiscovery
-	//}
+	jobMgr := jobmgr.New()
+	jobMgr.PluginName = a.Name
+	jobMgr.Out = a.Out
+	jobMgr.Modules = enabledModules
+	jobMgr.FnReg = fnMgr
 
 	if reg := a.setupVnodeRegistry(); reg == nil || reg.Len() == 0 {
 		vnodes.Disabled = true
 	} else {
-		jobsManager.Vnodes = reg
+		jobMgr.Vnodes = reg
 	}
 
 	if a.LockDir != "" {
-		jobsManager.FileLock = filelock.New(a.LockDir)
+		jobMgr.FileLock = filelock.New(a.LockDir)
 	}
 
-	var statusSaveManager *filestatus.Manager
+	var fsMgr *filestatus.Manager
 	if !isTerminal && a.StateFile != "" {
-		statusSaveManager = filestatus.NewManager(a.StateFile)
-		jobsManager.StatusSaver = statusSaveManager
+		fsMgr = filestatus.NewManager(a.StateFile)
+		jobMgr.FileStatus = fsMgr
 		if store, err := filestatus.LoadStore(a.StateFile); err != nil {
 			a.Warningf("couldn't load state file: %v", err)
 		} else {
-			jobsManager.StatusStore = store
+			jobMgr.FileStatusStore = store
 		}
 	}
 
@@ -225,17 +211,17 @@ func (a *Agent) run(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go func() { defer wg.Done(); functionsManager.Run(ctx) }()
+	go func() { defer wg.Done(); fnMgr.Run(ctx) }()
 
 	wg.Add(1)
-	go func() { defer wg.Done(); jobsManager.Run(ctx, in) }()
+	go func() { defer wg.Done(); jobMgr.Run(ctx, in) }()
 
 	wg.Add(1)
-	go func() { defer wg.Done(); discoveryManager.Run(ctx, in) }()
+	go func() { defer wg.Done(); discMgr.Run(ctx, in) }()
 
-	if statusSaveManager != nil {
+	if fsMgr != nil {
 		wg.Add(1)
-		go func() { defer wg.Done(); statusSaveManager.Run(ctx) }()
+		go func() { defer wg.Done(); fsMgr.Run(ctx) }()
 	}
 
 	wg.Wait()

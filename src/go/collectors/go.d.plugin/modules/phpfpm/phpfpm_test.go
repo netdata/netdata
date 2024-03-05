@@ -9,38 +9,44 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testStatusJSON, _           = os.ReadFile("testdata/status.json")
-	testStatusFullJSON, _       = os.ReadFile("testdata/status-full.json")
-	testStatusFullNoIdleJSON, _ = os.ReadFile("testdata/status-full-no-idle.json")
-	testStatusText, _           = os.ReadFile("testdata/status.txt")
-	testStatusFullText, _       = os.ReadFile("testdata/status-full.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataStatusJSON, _           = os.ReadFile("testdata/status.json")
+	dataStatusFullJSON, _       = os.ReadFile("testdata/status-full.json")
+	dataStatusFullNoIdleJSON, _ = os.ReadFile("testdata/status-full-no-idle.json")
+	dataStatusText, _           = os.ReadFile("testdata/status.txt")
+	dataStatusFullText, _       = os.ReadFile("testdata/status-full.txt")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, testStatusJSON)
-	assert.NotNil(t, testStatusFullJSON)
-	assert.NotNil(t, testStatusFullNoIdleJSON)
-	assert.NotNil(t, testStatusText)
-	assert.NotNil(t, testStatusFullText)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":           dataConfigJSON,
+		"dataConfigYAML":           dataConfigYAML,
+		"dataStatusJSON":           dataStatusJSON,
+		"dataStatusFullJSON":       dataStatusFullJSON,
+		"dataStatusFullNoIdleJSON": dataStatusFullNoIdleJSON,
+		"dataStatusText":           dataStatusText,
+		"dataStatusFullText":       dataStatusFullText,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	job := New()
-
-	assert.Implements(t, (*module.Module)(nil), job)
+func TestPhpfpm_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Phpfpm{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestPhpfpm_Init(t *testing.T) {
 	job := New()
 
-	got := job.Init()
-
-	require.True(t, got)
+	require.NoError(t, job.Init())
 	assert.NotNil(t, job.client)
 }
 
@@ -48,49 +54,42 @@ func TestPhpfpm_Check(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusText)
+				_, _ = w.Write(dataStatusText)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL
-	job.Init()
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
-	got := job.Check()
-
-	assert.True(t, got)
+	assert.NoError(t, job.Check())
 }
 
 func TestPhpfpm_CheckReturnsFalseOnFailure(t *testing.T) {
 	job := New()
 	job.URL = "http://127.0.0.1:38001/us"
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
-	got := job.Check()
-
-	assert.False(t, got)
+	assert.Error(t, job.Check())
 }
 
 func TestPhpfpm_Charts(t *testing.T) {
 	job := New()
 
-	got := job.Charts()
-
-	assert.NotNil(t, got)
+	assert.NotNil(t, job.Charts())
 }
 
 func TestPhpfpm_CollectJSON(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusJSON)
+				_, _ = w.Write(dataStatusJSON)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/?json"
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
 	got := job.Collect()
 
@@ -109,13 +108,13 @@ func TestPhpfpm_CollectJSONFull(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusFullJSON)
+				_, _ = w.Write(dataStatusFullJSON)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/?json"
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
 	got := job.Collect()
 
@@ -143,13 +142,13 @@ func TestPhpfpm_CollectNoIdleProcessesJSONFull(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusFullNoIdleJSON)
+				_, _ = w.Write(dataStatusFullNoIdleJSON)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL + "/?json"
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
 	got := job.Collect()
 
@@ -168,13 +167,13 @@ func TestPhpfpm_CollectText(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusText)
+				_, _ = w.Write(dataStatusText)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
 	got := job.Collect()
 
@@ -193,13 +192,13 @@ func TestPhpfpm_CollectTextFull(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
-				_, _ = w.Write(testStatusFullText)
+				_, _ = w.Write(dataStatusFullText)
 			}))
 	defer ts.Close()
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
 	got := job.Collect()
 
@@ -233,11 +232,9 @@ func TestPhpfpm_CollectReturnsNothingWhenInvalidData(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
-	got := job.Collect()
-
-	assert.Len(t, got, 0)
+	assert.Len(t, job.Collect(), 0)
 }
 
 func TestPhpfpm_CollectReturnsNothingWhenEmptyData(t *testing.T) {
@@ -250,11 +247,9 @@ func TestPhpfpm_CollectReturnsNothingWhenEmptyData(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
-	got := job.Collect()
-
-	assert.Len(t, got, 0)
+	assert.Len(t, job.Collect(), 0)
 }
 
 func TestPhpfpm_CollectReturnsNothingWhenBadStatusCode(t *testing.T) {
@@ -267,11 +262,9 @@ func TestPhpfpm_CollectReturnsNothingWhenBadStatusCode(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 
-	got := job.Collect()
-
-	assert.Len(t, got, 0)
+	assert.Len(t, job.Collect(), 0)
 }
 
 func TestPhpfpm_Cleanup(t *testing.T) {

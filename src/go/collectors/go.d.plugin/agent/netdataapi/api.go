@@ -165,52 +165,49 @@ func (a *API) HOSTDEFINEEND() error {
 }
 
 func (a *API) HOST(guid string) error {
-	_, err := a.Write([]byte("HOST " + "'" + guid + "'" + "\n\n"))
+	_, err := a.Write([]byte("HOST " + "'" +
+		guid + "'\n\n"))
 	return err
 }
 
-func (a *API) DynCfgEnable(pluginName string) error {
-	_, err := a.Write([]byte("DYNCFG_ENABLE '" + pluginName + "'\n\n"))
-	return err
-}
-
-func (a *API) DynCfgReset() error {
-	_, err := a.Write([]byte("DYNCFG_RESET\n"))
-	return err
-}
-
-func (a *API) DyncCfgRegisterModule(moduleName string) error {
-	_, err := fmt.Fprintf(a, "DYNCFG_REGISTER_MODULE '%s' job_array\n\n", moduleName)
-	return err
-}
-
-func (a *API) DynCfgRegisterJob(moduleName, jobName, jobType string) error {
-	_, err := fmt.Fprintf(a, "DYNCFG_REGISTER_JOB '%s' '%s' '%s' 0\n\n", moduleName, jobName, jobType)
-	return err
-}
-
-func (a *API) DynCfgReportJobStatus(moduleName, jobName, status, reason string) error {
-	_, err := fmt.Fprintf(a, "REPORT_JOB_STATUS '%s' '%s' '%s' 0 '%s'\n\n", moduleName, jobName, status, reason)
-	return err
-}
-
-func (a *API) FunctionResultSuccess(uid, contentType, payload string) error {
-	return a.functionResult(uid, contentType, payload, "1")
-}
-
-func (a *API) FunctionResultReject(uid, contentType, payload string) error {
-	return a.functionResult(uid, contentType, payload, "0")
-}
-
-func (a *API) functionResult(uid, contentType, payload, code string) error {
+func (a *API) FUNCRESULT(uid, contentType, payload, code, expireTimestamp string) {
 	var buf bytes.Buffer
 
-	buf.WriteString("FUNCTION_RESULT_BEGIN " + uid + " " + code + " " + contentType + " 0\n")
+	buf.WriteString("FUNCTION_RESULT_BEGIN " +
+		uid + " " +
+		code + " " +
+		contentType + " " +
+		expireTimestamp + "\n",
+	)
+
 	if payload != "" {
 		buf.WriteString(payload + "\n")
 	}
+
 	buf.WriteString("FUNCTION_RESULT_END\n\n")
 
-	_, err := buf.WriteTo(a)
-	return err
+	_, _ = buf.WriteTo(a)
+}
+
+func (a *API) CONFIGCREATE(id, status, configType, path, sourceType, source, supportedCommands string) {
+	// https://learn.netdata.cloud/docs/contributing/external-plugins/#config
+
+	_, _ = a.Write([]byte("CONFIG " +
+		id + " " +
+		"create" + " " +
+		status + " " +
+		configType + " " +
+		path + " " +
+		sourceType + " '" +
+		source + "' '" +
+		supportedCommands + "' 0x0000 0x0000\n\n",
+	))
+}
+
+func (a *API) CONFIGDELETE(id string) {
+	_, _ = a.Write([]byte("CONFIG " + id + " delete\n\n"))
+}
+
+func (a *API) CONFIGSTATUS(id, status string) {
+	_, _ = a.Write([]byte("CONFIG " + id + " status " + status + "\n\n"))
 }

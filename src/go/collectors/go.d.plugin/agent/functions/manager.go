@@ -5,12 +5,18 @@ package functions
 import (
 	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/netdataapi"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/safewriter"
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
 
 	"github.com/mattn/go-isatty"
@@ -25,6 +31,7 @@ func NewManager() *Manager {
 			slog.String("component", "functions manager"),
 		),
 		Input:            os.Stdin,
+		api:              netdataapi.New(safewriter.Stdout),
 		mux:              &sync.Mutex{},
 		FunctionRegistry: make(map[string]func(Function)),
 	}
@@ -34,16 +41,9 @@ type Manager struct {
 	*logger.Logger
 
 	Input            io.Reader
+	api              *netdataapi.API
 	mux              *sync.Mutex
 	FunctionRegistry map[string]func(Function)
-}
-
-func (m *Manager) Register(name string, fn func(Function)) {
-	if fn == nil {
-		m.Warningf("not registering '%s': nil function", name)
-		return
-	}
-	m.addFunction(name, fn)
 }
 
 func (m *Manager) Run(ctx context.Context) {
@@ -102,28 +102,17 @@ func (m *Manager) run(r io.Reader) {
 		function, ok := m.lookupFunction(fn.Name)
 		if !ok {
 			m.Infof("skipping execution of '%s': unregistered function", fn.Name)
+			m.respf(fn, 501, "unregistered function: %s", fn.Name)
 			continue
 		}
 		if function == nil {
 			m.Warningf("skipping execution of '%s': nil function registered", fn.Name)
+			m.respf(fn, 501, "nil function: %s", fn.Name)
 			continue
 		}
 
-		m.Debugf("executing function: '%s'", fn.String())
 		function(*fn)
 	}
-}
-
-func (m *Manager) addFunction(name string, fn func(Function)) {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	if _, ok := m.FunctionRegistry[name]; !ok {
-		m.Debugf("registering function '%s'", name)
-	} else {
-		m.Warningf("re-registering function '%s'", name)
-	}
-	m.FunctionRegistry[name] = fn
 }
 
 func (m *Manager) lookupFunction(name string) (func(Function), bool) {
@@ -132,4 +121,16 @@ func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 
 	f, ok := m.FunctionRegistry[name]
 	return f, ok
+}
+
+func (m *Manager) respf(fn *Function, code int, msgf string, a ...any) {
+	bs, _ := json.Marshal(struct {
+		Status  int    `json:"status"`
+		Message string `json:"message"`
+	}{
+		Status:  code,
+		Message: fmt.Sprintf(msgf, a...),
+	})
+	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	m.api.FUNCRESULT(fn.UID, "application/json", string(bs), strconv.Itoa(code), ts)
 }

@@ -5,6 +5,7 @@ package docker
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -28,7 +29,7 @@ func New() *Docker {
 	return &Docker{
 		Config: Config{
 			Address:              docker.DefaultDockerHost,
-			Timeout:              web.Duration{Duration: time.Second * 5},
+			Timeout:              web.Duration(time.Second * 2),
 			CollectContainerSize: false,
 		},
 
@@ -41,23 +42,24 @@ func New() *Docker {
 }
 
 type Config struct {
-	Timeout              web.Duration `yaml:"timeout"`
-	Address              string       `yaml:"address"`
-	CollectContainerSize bool         `yaml:"collect_container_size"`
+	UpdateEvery          int          `yaml:"update_every" json:"update_every"`
+	Address              string       `yaml:"address" json:"address"`
+	Timeout              web.Duration `yaml:"timeout" json:"timeout"`
+	CollectContainerSize bool         `yaml:"collect_container_size" json:"collect_container_size"`
 }
 
 type (
 	Docker struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
-		newClient     func(Config) (dockerClient, error)
-		client        dockerClient
-		verNegotiated bool
+		client    dockerClient
+		newClient func(Config) (dockerClient, error)
 
-		containers map[string]bool
+		verNegotiated bool
+		containers    map[string]bool
 	}
 	dockerClient interface {
 		NegotiateAPIVersion(context.Context)
@@ -68,12 +70,25 @@ type (
 	}
 )
 
-func (d *Docker) Init() bool {
-	return true
+func (d *Docker) Configuration() any {
+	return d.Config
 }
 
-func (d *Docker) Check() bool {
-	return len(d.Collect()) > 0
+func (d *Docker) Init() error {
+	return nil
+}
+
+func (d *Docker) Check() error {
+	mx, err := d.collect()
+	if err != nil {
+		d.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (d *Docker) Charts() *module.Charts {

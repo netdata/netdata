@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
@@ -16,19 +17,24 @@ import (
 )
 
 var (
-	v221Metrics, _ = os.ReadFile("testdata/v2.2.1/metrics.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer221Metrics, _ = os.ReadFile("testdata/v2.2.1/metrics.txt")
 )
 
-func Test_Testdata(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"v2.2.1_Metrics": v221Metrics,
+		"dataConfigJSON":    dataConfigJSON,
+		"dataConfigYAML":    dataConfigYAML,
+		"dataVer221Metrics": dataVer221Metrics,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*Traefik)(nil), New())
+func TestTraefik_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Traefik{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestTraefik_Init(t *testing.T) {
@@ -62,9 +68,9 @@ func TestTraefik_Init(t *testing.T) {
 			rdb.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, rdb.Init())
+				assert.Error(t, rdb.Init())
 			} else {
-				assert.True(t, rdb.Init())
+				assert.NoError(t, rdb.Init())
 			}
 		})
 	}
@@ -107,9 +113,9 @@ func TestTraefik_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, tk.Check())
+				assert.Error(t, tk.Check())
 			} else {
-				assert.True(t, tk.Check())
+				assert.NoError(t, tk.Check())
 			}
 		})
 	}
@@ -251,11 +257,11 @@ func prepareCaseTraefikV221Metrics(t *testing.T) (*Traefik, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(v221Metrics)
+			_, _ = w.Write(dataVer221Metrics)
 		}))
 	h := New()
 	h.URL = srv.URL
-	require.True(t, h.Init())
+	require.NoError(t, h.Init())
 
 	return h, srv.Close
 }
@@ -292,7 +298,7 @@ traefik_entrypoint_request_duration_seconds_count{code="300",entrypoint="web",me
 		}))
 	h := New()
 	h.URL = srv.URL
-	require.True(t, h.Init())
+	require.NoError(t, h.Init())
 
 	return h, srv.Close
 }
@@ -320,7 +326,7 @@ application_backend_http_responses_total{proxy="infra-vernemq-ws",code="other"} 
 		}))
 	h := New()
 	h.URL = srv.URL
-	require.True(t, h.Init())
+	require.NoError(t, h.Init())
 
 	return h, srv.Close
 }
@@ -333,7 +339,7 @@ func prepareCase404Response(t *testing.T) (*Traefik, func()) {
 		}))
 	h := New()
 	h.URL = srv.URL
-	require.True(t, h.Init())
+	require.NoError(t, h.Init())
 
 	return h, srv.Close
 }
@@ -342,7 +348,7 @@ func prepareCaseConnectionRefused(t *testing.T) (*Traefik, func()) {
 	t.Helper()
 	h := New()
 	h.URL = "http://127.0.0.1:38001"
-	require.True(t, h.Init())
+	require.NoError(t, h.Init())
 
 	return h, func() {}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -15,6 +16,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestPrometheus_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Prometheus{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestPrometheus_Init(t *testing.T) {
 	tests := map[string]struct {
@@ -44,9 +63,9 @@ func TestPrometheus_Init(t *testing.T) {
 			prom.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, prom.Init())
+				assert.Error(t, prom.Init())
 			} else {
-				assert.True(t, prom.Init())
+				assert.NoError(t, prom.Init())
 			}
 		})
 	}
@@ -57,7 +76,7 @@ func TestPrometheus_Cleanup(t *testing.T) {
 
 	prom := New()
 	prom.URL = "http://127.0.0.1"
-	require.True(t, prom.Init())
+	require.NoError(t, prom.Init())
 	assert.NotPanics(t, prom.Cleanup)
 }
 
@@ -169,12 +188,12 @@ test_counter_no_meta_metric_1_total{label1="value2"} 11
 			prom, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, prom.Init())
+			require.NoError(t, prom.Init())
 
 			if test.wantFail {
-				assert.False(t, prom.Check())
+				assert.Error(t, prom.Check())
 			} else {
-				assert.True(t, prom.Check())
+				assert.NoError(t, prom.Check())
 			}
 		})
 	}
@@ -558,7 +577,7 @@ test_gauge_no_meta_metric_1{label1="value2"} 12
 			defer srv.Close()
 
 			prom.URL = srv.URL
-			require.True(t, prom.Init())
+			require.NoError(t, prom.Init())
 
 			for num, step := range test.steps {
 				t.Run(fmt.Sprintf("step num %d ('%s')", num+1, step.desc), func(t *testing.T) {

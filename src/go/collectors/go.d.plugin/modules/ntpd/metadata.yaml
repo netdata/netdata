@@ -67,7 +67,7 @@ modules:
               required: true
             - name: timeout
               description: Connection/read/write timeout.
-              default_value: 3
+              default_value: 1
               required: false
             - name: collect_peers
               description: Determines whether peer metrics will be collected.

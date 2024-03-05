@@ -83,6 +83,13 @@ func modulesConfDir(opts *cli.Option) (mpath multipath.MultiPath) {
 	)
 }
 
+func modulesConfSDDir(confDir multipath.MultiPath) (mpath multipath.MultiPath) {
+	for _, v := range confDir {
+		mpath = append(mpath, filepath.Join(v, "sd"))
+	}
+	return mpath
+}
+
 func watchPaths(opts *cli.Option) []string {
 	if watchPath == "" {
 		return opts.WatchPath
@@ -120,16 +127,19 @@ func main() {
 		logger.Level.Set(slog.LevelDebug)
 	}
 
+	dir := modulesConfDir(opts)
+
 	a := agent.New(agent.Config{
-		Name:              name,
-		ConfDir:           confDir(opts),
-		ModulesConfDir:    modulesConfDir(opts),
-		ModulesSDConfPath: watchPaths(opts),
-		VnodesConfDir:     confDir(opts),
-		StateFile:         stateFile(),
-		LockDir:           lockDir,
-		RunModule:         opts.Module,
-		MinUpdateEvery:    opts.UpdateEvery,
+		Name:                 name,
+		ConfDir:              confDir(opts),
+		ModulesConfDir:       dir,
+		ModulesConfSDDir:     modulesConfSDDir(dir),
+		ModulesConfWatchPath: watchPaths(opts),
+		VnodesConfDir:        confDir(opts),
+		StateFile:            stateFile(),
+		LockDir:              lockDir,
+		RunModule:            opts.Module,
+		MinUpdateEvery:       opts.UpdateEvery,
 	})
 
 	a.Debugf("plugin: name=%s, version=%s", a.Name, version)

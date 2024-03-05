@@ -40,11 +40,11 @@ const (
 )
 
 type ParserConfig struct {
-	LogType string       `yaml:"log_type"`
-	CSV     CSVConfig    `yaml:"csv_config"`
-	LTSV    LTSVConfig   `yaml:"ltsv_config"`
-	RegExp  RegExpConfig `yaml:"regexp_config"`
-	JSON    JSONConfig   `yaml:"json_config"`
+	LogType string       `yaml:"log_type" json:"log_type"`
+	CSV     CSVConfig    `yaml:"csv_config" json:"csv_config"`
+	LTSV    LTSVConfig   `yaml:"ltsv_config" json:"ltsv_config"`
+	RegExp  RegExpConfig `yaml:"regexp_config" json:"regexp_config"`
+	JSON    JSONConfig   `yaml:"json_config" json:"json_config"`
 }
 
 func NewParser(config ParserConfig, in io.Reader) (Parser, error) {

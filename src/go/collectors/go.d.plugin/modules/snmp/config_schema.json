@@ -1,188 +1,338 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
-    },
-    "update_every": {
-      "type": "integer"
-    },
-    "hostname": {
-      "type": "string"
-    },
-    "community": {
-      "type": "string"
-    },
-    "user": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "level": {
-          "type": "string",
-          "enum": [
-            "none",
-            "authNoPriv",
-            "authPriv"
-          ]
-        },
-        "auth_proto": {
-          "type": "string",
-          "enum": [
-            "none",
-            "md5",
-            "sha",
-            "sha224",
-            "sha256",
-            "sha384",
-            "sha512"
-          ]
-        },
-        "auth_key": {
-          "type": "string"
-        },
-        "priv_proto": {
-          "type": "string",
-          "enum": [
-            "none",
-            "des",
-            "aes",
-            "aes192",
-            "aes256",
-            "aes192c"
-          ]
-        },
-        "priv_key": {
-          "type": "string"
-        }
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
       },
-      "required": [
-        "name",
-        "level",
-        "auth_proto",
-        "auth_key",
-        "priv_proto",
-        "priv_key"
-      ]
-    },
-    "options": {
-      "type": "object",
-      "properties": {
-        "port": {
-          "type": "integer"
-        },
-        "retries": {
-          "type": "integer"
-        },
-        "timeout": {
-          "type": "integer"
-        },
-        "version": {
-          "type": "string",
-          "enum": [
-            "1",
-            "2",
-            "3"
-          ]
-        },
-        "max_request_size": {
-          "type": "integer"
-        }
+      "hostname": {
+        "title": "Hostname",
+        "type": "string"
       },
-      "required": [
-        "port",
-        "retries",
-        "timeout",
-        "version",
-        "max_request_size"
-      ]
-    },
-    "charts": {
-      "type": "array",
-      "items": {
+      "community": {
+        "title": "SNMPv1/2 community",
+        "type": "string",
+        "default": "public"
+      },
+      "options": {
+        "title": "Options",
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
+          "version": {
+            "title": "SNMP version",
+            "type": "string",
+            "enum": [
+              "1",
+              "2c",
+              "3"
+            ],
+            "default": "2c"
           },
-          "title": {
-            "type": "string"
+          "port": {
+            "title": "Port",
+            "description": "",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "default": 161
           },
-          "units": {
-            "type": "string"
+          "retries": {
+            "title": "Retries",
+            "description": "Retries to attempt.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 161
           },
-          "family": {
-            "type": "string"
+          "timeout": {
+            "title": "Timeout",
+            "description": "SNMP request/response timeout.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
           },
-          "type": {
-            "type": "string"
-          },
-          "priority": {
-            "type": "integer"
-          },
-          "multiply_range": {
-            "type": "array",
-            "items": {
-              "type": "integer"
-            }
-          },
-          "dimensions": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "oid": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "algorithm": {
-                  "type": "string",
-                  "enum": [
-                    "absolute",
-                    "incremental"
-                  ]
-                },
-                "multiplier": {
-                  "type": "integer"
-                },
-                "divisor": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "oid",
-                "name",
-                "algorithm",
-                "multiplier",
-                "divisor"
-              ]
-            }
+          "max_request_size": {
+            "title": "Max OIDs in request",
+            "description": "Maximum number of OIDs allowed in one one SNMP request.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 60
           }
         },
         "required": [
-          "id",
-          "title",
-          "units",
-          "family",
-          "type",
-          "priority",
-          "multiply_range",
-          "dimensions"
+          "version",
+          "port",
+          "retries",
+          "timeout",
+          "max_request_size"
         ]
+      },
+      "user": {
+        "title": "SNMPv3 configuration",
+        "type": "object",
+        "properties": {
+          "name": {
+            "title": "Username",
+            "type": "string"
+          },
+          "level": {
+            "title": "Security level",
+            "description": "Controls the security aspects of SNMPv3 communication, including authentication and encryption.",
+            "type": "string",
+            "enum": [
+              "none",
+              "authNoPriv",
+              "authPriv"
+            ],
+            "default": "authPriv"
+          },
+          "auth_proto": {
+            "title": "Authentication protocol",
+            "type": "string",
+            "enum": [
+              "none",
+              "md5",
+              "sha",
+              "sha224",
+              "sha256",
+              "sha384",
+              "sha512"
+            ],
+            "default": "sha512"
+          },
+          "auth_key": {
+            "title": "Authentication passphrase",
+            "type": "string"
+          },
+          "priv_proto": {
+            "title": "Privacy protocol",
+            "type": "string",
+            "enum": [
+              "none",
+              "des",
+              "aes",
+              "aes192",
+              "aes256",
+              "aes192c"
+            ],
+            "default": "aes192c"
+          },
+          "priv_key": {
+            "title": "Privacy passphrase",
+            "type": "string"
+          }
+        }
+      },
+      "charts": {
+        "title": "Charts configuration",
+        "type": "array",
+        "uniqueItems": true,
+        "minItems": 1,
+        "items": {
+          "title": "Chart",
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "ID",
+              "description": "Unique identifier for the chart.",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "description": "Title of the chart.",
+              "type": "string"
+            },
+            "units": {
+              "title": "Units",
+              "description": "Unit label for the vertical axis on charts.",
+              "type": "string"
+            },
+            "family": {
+              "title": "Family",
+              "description": "Subsection on the dashboard where the chart will be displayed.",
+              "type": "string"
+            },
+            "type": {
+              "title": "Type",
+              "type": "string",
+              "enum": [
+                "line",
+                "area",
+                "stacked"
+              ],
+              "default": "line"
+            },
+            "priority": {
+              "title": "Priority",
+              "description": "Rendering priority of the chart on the dashboard. Lower priority values will cause the chart to appear before those with higher priority values.",
+              "type": "integer",
+              "minimum": 1,
+              "default": 90000
+            },
+            "multiply_range": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "dimensions": {
+              "title": "Dimensions",
+              "description": "Configuration for dimensions of the chart.",
+              "type": "array",
+              "uniqueItems": true,
+              "minItems": 1,
+              "items": {
+                "title": "Dimension configuration",
+                "type": "object",
+                "properties": {
+                  "oid": {
+                    "title": "OID",
+                    "description": "SNMP OID.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "title": "Dimension",
+                    "description": "Name of the dimension.",
+                    "type": "string"
+                  },
+                  "algorithm": {
+                    "title": "Algorithm",
+                    "description": "Algorithm of the dimension.",
+                    "type": "string",
+                    "enum": [
+                      "absolute",
+                      "incremental"
+                    ],
+                    "default": "absolute"
+                  },
+                  "multiplier": {
+                    "title": "Multiplier",
+                    "description": "Value to multiply the collected value.",
+                    "type": "integer",
+                    "not": {
+                      "const": 0
+                    },
+                    "default": 1
+                  },
+                  "divisor": {
+                    "title": "Divisor",
+                    "description": "Value to divide the collected value.",
+                    "type": "integer",
+                    "not": {
+                      "const": 0
+                    },
+                    "default": 1
+                  }
+                },
+                "required": [
+                  "oid",
+                  "name",
+                  "algorithm",
+                  "multiplier",
+                  "divisor"
+                ]
+              }
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "units",
+            "family",
+            "type",
+            "priority",
+            "dimensions"
+          ]
+        }
       }
-    }
+    },
+    "required": [
+      "hostname",
+      "community",
+      "options",
+      "charts"
+    ]
   },
-  "required": [
-    "name",
-    "update_every",
-    "hostname",
-    "community",
-    "user",
-    "options",
-    "charts"
-  ]
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "options": {
+      "version": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      }
+    },
+    "user": {
+      "level": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "auth_proto": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "priv_proto": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      }
+    },
+    "charts": {
+      "items": {
+        "type": {
+          "ui:widget": "radio",
+          "ui:options": {
+            "inline": true
+          }
+        },
+        "dimensions": {
+          "items": {
+            "algorithm": {
+              "ui:widget": "radio",
+              "ui:options": {
+                "inline": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "hostname",
+            "community",
+            "options"
+          ]
+        },
+        {
+          "title": "SNMPv3",
+          "fields": [
+            "user"
+          ]
+        },
+        {
+          "title": "Charts",
+          "fields": [
+            "charts"
+          ]
+        }
+      ]
+    }
+  }
 }

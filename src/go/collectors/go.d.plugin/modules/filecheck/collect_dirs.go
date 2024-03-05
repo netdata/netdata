@@ -14,7 +14,7 @@ import (
 
 func (fc *Filecheck) collectDirs(ms map[string]int64) {
 	curTime := time.Now()
-	if time.Since(fc.lastDiscoveryDirs) >= fc.DiscoveryEvery.Duration {
+	if time.Since(fc.lastDiscoveryDirs) >= fc.DiscoveryEvery.Duration() {
 		fc.lastDiscoveryDirs = curTime
 		fc.curDirs = fc.discoveryDirs()
 		fc.updateDirsCharts(fc.curDirs)
@@ -54,7 +54,7 @@ func (fc *Filecheck) collectDir(ms map[string]int64, path string, curTime time.T
 	}
 }
 
-func (fc Filecheck) discoveryDirs() (dirs []string) {
+func (fc *Filecheck) discoveryDirs() (dirs []string) {
 	for _, path := range fc.Dirs.Include {
 		if hasMeta(path) {
 			continue

@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
-func (vts NginxVTS) validateConfig() error {
+func (vts *NginxVTS) validateConfig() error {
 	if vts.URL == "" {
 		return errors.New("URL not set")
 	}
@@ -21,11 +21,11 @@ func (vts NginxVTS) validateConfig() error {
 	return nil
 }
 
-func (vts NginxVTS) initHTTPClient() (*http.Client, error) {
+func (vts *NginxVTS) initHTTPClient() (*http.Client, error) {
 	return web.NewHTTPClient(vts.Client)
 }
 
-func (vts NginxVTS) initCharts() (*module.Charts, error) {
+func (vts *NginxVTS) initCharts() (*module.Charts, error) {
 	charts := module.Charts{}
 
 	if err := charts.Add(*mainCharts.Copy()...); err != nil {

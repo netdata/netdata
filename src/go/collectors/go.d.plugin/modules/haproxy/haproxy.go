@@ -4,6 +4,7 @@ package haproxy
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -29,7 +30,7 @@ func New() *Haproxy {
 					URL: "http://127.0.0.1:8404/metrics",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 		},
@@ -41,38 +42,52 @@ func New() *Haproxy {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type Haproxy struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
-	prom            prometheus.Prometheus
+	prom prometheus.Prometheus
+
 	validateMetrics bool
 	proxies         map[string]bool
 }
 
-func (h *Haproxy) Init() bool {
+func (h *Haproxy) Configuration() any {
+	return h.Config
+}
+
+func (h *Haproxy) Init() error {
 	if err := h.validateConfig(); err != nil {
 		h.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	prom, err := h.initPrometheusClient()
 	if err != nil {
 		h.Errorf("prometheus client initialization: %v", err)
-		return false
+		return err
 	}
 	h.prom = prom
 
-	return true
+	return nil
 }
 
-func (h *Haproxy) Check() bool {
-	return len(h.Collect()) > 0
+func (h *Haproxy) Check() error {
+	mx, err := h.collect()
+	if err != nil {
+		h.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (h *Haproxy) Charts() *module.Charts {
@@ -80,18 +95,20 @@ func (h *Haproxy) Charts() *module.Charts {
 }
 
 func (h *Haproxy) Collect() map[string]int64 {
-	ms, err := h.collect()
+	mx, err := h.collect()
 	if err != nil {
 		h.Error(err)
 		return nil
 	}
 
-	if len(ms) == 0 {
+	if len(mx) == 0 {
 		return nil
 	}
-	return ms
+	return mx
 }
 
-func (Haproxy) Cleanup() {
-	// TODO: close http idle connections
+func (h *Haproxy) Cleanup() {
+	if h.prom != nil && h.prom.HTTPClient() != nil {
+		h.prom.HTTPClient().CloseIdleConnections()
+	}
 }

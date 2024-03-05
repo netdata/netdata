@@ -11,98 +11,107 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/logs"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/metrics"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testCommonLog, _          = os.ReadFile("testdata/common.log")
-	testFullLog, _            = os.ReadFile("testdata/full.log")
-	testCustomLog, _          = os.ReadFile("testdata/custom.log")
-	testCustomTimeFieldLog, _ = os.ReadFile("testdata/custom_time_fields.log")
-	testIISLog, _             = os.ReadFile("testdata/u_ex221107.log")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataCommonLog, _          = os.ReadFile("testdata/common.log")
+	dataFullLog, _            = os.ReadFile("testdata/full.log")
+	dataCustomLog, _          = os.ReadFile("testdata/custom.log")
+	dataCustomTimeFieldLog, _ = os.ReadFile("testdata/custom_time_fields.log")
+	dataIISLog, _             = os.ReadFile("testdata/u_ex221107.log")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, testFullLog)
-	assert.NotNil(t, testCommonLog)
-	assert.NotNil(t, testCustomLog)
-	assert.NotNil(t, testCustomTimeFieldLog)
-	assert.NotNil(t, testIISLog)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":         dataConfigJSON,
+		"dataConfigYAML":         dataConfigYAML,
+		"dataCommonLog":          dataCommonLog,
+		"dataFullLog":            dataFullLog,
+		"dataCustomLog":          dataCustomLog,
+		"dataCustomTimeFieldLog": dataCustomTimeFieldLog,
+		"dataIISLog":             dataIISLog,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func TestWebLog_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &WebLog{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestWebLog_Init(t *testing.T) {
 	weblog := New()
 
-	assert.True(t, weblog.Init())
+	assert.NoError(t, weblog.Init())
 }
 
 func TestWebLog_Init_ErrorOnCreatingURLPatterns(t *testing.T) {
 	weblog := New()
 	weblog.URLPatterns = []userPattern{{Match: "* !*"}}
 
-	assert.False(t, weblog.Init())
+	assert.Error(t, weblog.Init())
 }
 
 func TestWebLog_Init_ErrorOnCreatingCustomFields(t *testing.T) {
 	weblog := New()
 	weblog.CustomFields = []customField{{Patterns: []userPattern{{Name: "p1", Match: "* !*"}}}}
 
-	assert.False(t, weblog.Init())
+	assert.Error(t, weblog.Init())
 }
 
 func TestWebLog_Check(t *testing.T) {
 	weblog := New()
 	defer weblog.Cleanup()
 	weblog.Path = "testdata/common.log"
-	require.True(t, weblog.Init())
+	require.NoError(t, weblog.Init())
 
-	assert.True(t, weblog.Check())
+	assert.NoError(t, weblog.Check())
 }
 
 func TestWebLog_Check_ErrorOnCreatingLogReaderNoLogFile(t *testing.T) {
 	weblog := New()
 	defer weblog.Cleanup()
 	weblog.Path = "testdata/not_exists.log"
-	require.True(t, weblog.Init())
+	require.NoError(t, weblog.Init())
 
-	assert.False(t, weblog.Check())
+	assert.Error(t, weblog.Check())
 }
 
 func TestWebLog_Check_ErrorOnCreatingParserUnknownFormat(t *testing.T) {
 	weblog := New()
 	defer weblog.Cleanup()
 	weblog.Path = "testdata/custom.log"
-	require.True(t, weblog.Init())
+	require.NoError(t, weblog.Init())
 
-	assert.False(t, weblog.Check())
+	assert.Error(t, weblog.Check())
 }
 
 func TestWebLog_Check_ErrorOnCreatingParserEmptyLine(t *testing.T) {
 	weblog := New()
 	defer weblog.Cleanup()
 	weblog.Path = "testdata/custom.log"
-	weblog.Parser.LogType = logs.TypeCSV
-	weblog.Parser.CSV.Format = "$one $two"
-	require.True(t, weblog.Init())
+	weblog.ParserConfig.LogType = logs.TypeCSV
+	weblog.ParserConfig.CSV.Format = "$one $two"
+	require.NoError(t, weblog.Init())
 
-	assert.False(t, weblog.Check())
+	assert.Error(t, weblog.Check())
 }
 
 func TestWebLog_Charts(t *testing.T) {
 	weblog := New()
 	defer weblog.Cleanup()
 	weblog.Path = "testdata/common.log"
-	require.True(t, weblog.Init())
-	require.True(t, weblog.Check())
+	require.NoError(t, weblog.Init())
+	require.NoError(t, weblog.Check())
 
 	assert.NotNil(t, weblog.Charts())
 }
@@ -1142,7 +1151,7 @@ func prepareWebLogCollectFull(t *testing.T) *WebLog {
 	}, " ")
 
 	cfg := Config{
-		Parser: logs.ParserConfig{
+		ParserConfig: logs.ParserConfig{
 			LogType: logs.TypeCSV,
 			CSV: logs.CSVConfig{
 				FieldsPerRecord:  -1,
@@ -1187,11 +1196,11 @@ func prepareWebLogCollectFull(t *testing.T) *WebLog {
 	}
 	weblog := New()
 	weblog.Config = cfg
-	require.True(t, weblog.Init())
-	require.True(t, weblog.Check())
+	require.NoError(t, weblog.Init())
+	require.NoError(t, weblog.Check())
 	defer weblog.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.Parser.CSV, bytes.NewReader(testFullLog))
+	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataFullLog))
 	require.NoError(t, err)
 	weblog.parser = p
 	return weblog
@@ -1210,7 +1219,7 @@ func prepareWebLogCollectCommon(t *testing.T) *WebLog {
 	}, " ")
 
 	cfg := Config{
-		Parser: logs.ParserConfig{
+		ParserConfig: logs.ParserConfig{
 			LogType: logs.TypeCSV,
 			CSV: logs.CSVConfig{
 				FieldsPerRecord:  -1,
@@ -1230,11 +1239,11 @@ func prepareWebLogCollectCommon(t *testing.T) *WebLog {
 
 	weblog := New()
 	weblog.Config = cfg
-	require.True(t, weblog.Init())
-	require.True(t, weblog.Check())
+	require.NoError(t, weblog.Init())
+	require.NoError(t, weblog.Check())
 	defer weblog.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.Parser.CSV, bytes.NewReader(testCommonLog))
+	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataCommonLog))
 	require.NoError(t, err)
 	weblog.parser = p
 	return weblog
@@ -1248,7 +1257,7 @@ func prepareWebLogCollectCustom(t *testing.T) *WebLog {
 	}, " ")
 
 	cfg := Config{
-		Parser: logs.ParserConfig{
+		ParserConfig: logs.ParserConfig{
 			LogType: logs.TypeCSV,
 			CSV: logs.CSVConfig{
 				FieldsPerRecord:  2,
@@ -1282,11 +1291,11 @@ func prepareWebLogCollectCustom(t *testing.T) *WebLog {
 	}
 	weblog := New()
 	weblog.Config = cfg
-	require.True(t, weblog.Init())
-	require.True(t, weblog.Check())
+	require.NoError(t, weblog.Init())
+	require.NoError(t, weblog.Check())
 	defer weblog.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.Parser.CSV, bytes.NewReader(testCustomLog))
+	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataCustomLog))
 	require.NoError(t, err)
 	weblog.parser = p
 	return weblog
@@ -1300,7 +1309,7 @@ func prepareWebLogCollectCustomTimeFields(t *testing.T) *WebLog {
 	}, " ")
 
 	cfg := Config{
-		Parser: logs.ParserConfig{
+		ParserConfig: logs.ParserConfig{
 			LogType: logs.TypeCSV,
 			CSV: logs.CSVConfig{
 				FieldsPerRecord:  2,
@@ -1328,11 +1337,11 @@ func prepareWebLogCollectCustomTimeFields(t *testing.T) *WebLog {
 	}
 	weblog := New()
 	weblog.Config = cfg
-	require.True(t, weblog.Init())
-	require.True(t, weblog.Check())
+	require.NoError(t, weblog.Init())
+	require.NoError(t, weblog.Check())
 	defer weblog.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.Parser.CSV, bytes.NewReader(testCustomTimeFieldLog))
+	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataCustomTimeFieldLog))
 	require.NoError(t, err)
 	weblog.parser = p
 	return weblog
@@ -1346,7 +1355,7 @@ func prepareWebLogCollectCustomNumericFields(t *testing.T) *WebLog {
 	}, " ")
 
 	cfg := Config{
-		Parser: logs.ParserConfig{
+		ParserConfig: logs.ParserConfig{
 			LogType: logs.TypeCSV,
 			CSV: logs.CSVConfig{
 				FieldsPerRecord:  2,
@@ -1374,11 +1383,11 @@ func prepareWebLogCollectCustomNumericFields(t *testing.T) *WebLog {
 	}
 	weblog := New()
 	weblog.Config = cfg
-	require.True(t, weblog.Init())
-	require.True(t, weblog.Check())
+	require.NoError(t, weblog.Init())
+	require.NoError(t, weblog.Check())
 	defer weblog.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.Parser.CSV, bytes.NewReader(testCustomTimeFieldLog))
+	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataCustomTimeFieldLog))
 	require.NoError(t, err)
 	weblog.parser = p
 	return weblog
@@ -1404,7 +1413,7 @@ func prepareWebLogCollectIISFields(t *testing.T) *WebLog {
 		"$request_time",   // time-taken
 	}, " ")
 	cfg := Config{
-		Parser: logs.ParserConfig{
+		ParserConfig: logs.ParserConfig{
 			LogType: logs.TypeCSV,
 			CSV: logs.CSVConfig{
 				// Users can define number of fields
@@ -1424,11 +1433,11 @@ func prepareWebLogCollectIISFields(t *testing.T) *WebLog {
 
 	weblog := New()
 	weblog.Config = cfg
-	require.True(t, weblog.Init())
-	require.True(t, weblog.Check())
+	require.NoError(t, weblog.Init())
+	require.NoError(t, weblog.Check())
 	defer weblog.Cleanup()
 
-	p, err := logs.NewCSVParser(weblog.Parser.CSV, bytes.NewReader(testIISLog))
+	p, err := logs.NewCSVParser(weblog.ParserConfig.CSV, bytes.NewReader(dataIISLog))
 	require.NoError(t, err)
 	weblog.parser = p
 	return weblog

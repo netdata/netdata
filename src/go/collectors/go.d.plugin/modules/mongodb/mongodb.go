@@ -4,11 +4,13 @@ package mongo
 
 import (
 	_ "embed"
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -24,8 +26,8 @@ func init() {
 func New() *Mongo {
 	return &Mongo{
 		Config: Config{
-			Timeout: 2,
 			URI:     "mongodb://localhost:27017",
+			Timeout: web.Duration(time.Second),
 			Databases: matcher.SimpleExpr{
 				Includes: []string{},
 				Excludes: []string{},
@@ -45,45 +47,55 @@ func New() *Mongo {
 }
 
 type Config struct {
-	URI       string             `yaml:"uri"`
-	Timeout   time.Duration      `yaml:"timeout"`
-	Databases matcher.SimpleExpr `yaml:"databases"`
+	URI       string             `yaml:"uri" json:"uri"`
+	Timeout   web.Duration       `yaml:"timeout" json:"timeout"`
+	Databases matcher.SimpleExpr `yaml:"databases" json:"databases"`
 }
 
 type Mongo struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
-	charts *module.Charts
+	charts                *module.Charts
+	addShardingChartsOnce *sync.Once
 
 	conn mongoConn
 
-	dbSelector matcher.Matcher
-
-	addShardingChartsOnce *sync.Once
-
+	dbSelector     matcher.Matcher
 	optionalCharts map[string]bool
 	databases      map[string]bool
 	replSetMembers map[string]bool
 	shards         map[string]bool
 }
 
-func (m *Mongo) Init() bool {
+func (m *Mongo) Configuration() any {
+	return m.Config
+}
+
+func (m *Mongo) Init() error {
 	if err := m.verifyConfig(); err != nil {
 		m.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	if err := m.initDatabaseSelector(); err != nil {
 		m.Errorf("init database selector: %v", err)
-		return false
+		return err
 	}
 
-	return true
+	return nil
 }
 
-func (m *Mongo) Check() bool {
-	return len(m.Collect()) > 0
+func (m *Mongo) Check() error {
+	mx, err := m.collect()
+	if err != nil {
+		m.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (m *Mongo) Charts() *module.Charts {

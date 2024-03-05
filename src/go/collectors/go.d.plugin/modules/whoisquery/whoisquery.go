@@ -4,6 +4,7 @@ package whoisquery
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -26,7 +27,7 @@ func init() {
 func New() *WhoisQuery {
 	return &WhoisQuery{
 		Config: Config{
-			Timeout:       web.Duration{Duration: time.Second * 5},
+			Timeout:       web.Duration(time.Second * 5),
 			DaysUntilWarn: 90,
 			DaysUntilCrit: 30,
 		},
@@ -34,41 +35,54 @@ func New() *WhoisQuery {
 }
 
 type Config struct {
-	Source        string
-	Timeout       web.Duration `yaml:"timeout"`
-	DaysUntilWarn int64        `yaml:"days_until_expiration_warning"`
-	DaysUntilCrit int64        `yaml:"days_until_expiration_critical"`
+	UpdateEvery   int          `yaml:"update_every" json:"update_every"`
+	Source        string       `yaml:"source" json:"source"`
+	Timeout       web.Duration `yaml:"timeout" json:"timeout"`
+	DaysUntilWarn int64        `yaml:"days_until_expiration_warning" json:"days_until_expiration_warning"`
+	DaysUntilCrit int64        `yaml:"days_until_expiration_critical" json:"days_until_expiration_critical"`
 }
 
 type WhoisQuery struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
 	prov provider
 }
 
-func (w *WhoisQuery) Init() bool {
+func (w *WhoisQuery) Configuration() any {
+	return w.Config
+}
+
+func (w *WhoisQuery) Init() error {
 	if err := w.validateConfig(); err != nil {
 		w.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	prov, err := w.initProvider()
 	if err != nil {
 		w.Errorf("init whois provider: %v", err)
-		return false
+		return err
 	}
 	w.prov = prov
 
 	w.charts = w.initCharts()
 
-	return true
+	return nil
 }
 
-func (w *WhoisQuery) Check() bool {
-	return len(w.Collect()) > 0
+func (w *WhoisQuery) Check() error {
+	mx, err := w.collect()
+	if err != nil {
+		w.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (w *WhoisQuery) Charts() *module.Charts {

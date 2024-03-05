@@ -5,6 +5,7 @@ package proxysql
 import (
 	"database/sql"
 	_ "embed"
+	"errors"
 	_ "github.com/go-sql-driver/mysql"
 	"sync"
 	"time"
@@ -27,7 +28,7 @@ func New() *ProxySQL {
 	return &ProxySQL{
 		Config: Config{
 			DSN:     "stats:stats@tcp(127.0.0.1:6032)/",
-			Timeout: web.Duration{Duration: time.Second * 2},
+			Timeout: web.Duration(time.Second),
 		},
 
 		charts: baseCharts.Copy(),
@@ -41,37 +42,48 @@ func New() *ProxySQL {
 }
 
 type Config struct {
-	DSN     string       `yaml:"dsn"`
-	MyCNF   string       `yaml:"my.cnf"`
-	Timeout web.Duration `yaml:"timeout"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	DSN         string       `yaml:"dsn" json:"dsn"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
 }
 
-type (
-	ProxySQL struct {
-		module.Base
-		Config `yaml:",inline"`
+type ProxySQL struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-		db *sql.DB
+	charts *module.Charts
 
-		charts *module.Charts
+	db *sql.DB
 
-		once  *sync.Once
-		cache *cache
-	}
-)
+	once  *sync.Once
+	cache *cache
+}
 
-func (p *ProxySQL) Init() bool {
+func (p *ProxySQL) Configuration() any {
+	return p.Config
+}
+
+func (p *ProxySQL) Init() error {
 	if p.DSN == "" {
-		p.Error("'dsn' not set")
-		return false
+		p.Error("dsn not set")
+		return errors.New("dsn not set")
 	}
 
 	p.Debugf("using DSN [%s]", p.DSN)
-	return true
+
+	return nil
 }
 
-func (p *ProxySQL) Check() bool {
-	return len(p.Collect()) > 0
+func (p *ProxySQL) Check() error {
+	mx, err := p.collect()
+	if err != nil {
+		p.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (p *ProxySQL) Charts() *module.Charts {

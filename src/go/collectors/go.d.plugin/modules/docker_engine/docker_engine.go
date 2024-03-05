@@ -7,10 +7,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 )
 
 //go:embed "config_schema.json"
@@ -24,69 +23,69 @@ func init() {
 }
 
 func New() *DockerEngine {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: "http://127.0.0.1:9323/metrics",
-			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: time.Second},
+	return &DockerEngine{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "http://127.0.0.1:9323/metrics",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second),
+				},
 			},
 		},
 	}
-	return &DockerEngine{
-		Config: config,
-	}
 }
 
-type (
-	Config struct {
-		web.HTTP `yaml:",inline"`
-	}
-	DockerEngine struct {
-		module.Base
-		Config `yaml:",inline"`
-
-		prom               prometheus.Prometheus
-		isSwarmManager     bool
-		hasContainerStates bool
-	}
-)
-
-func (de DockerEngine) validateConfig() error {
-	if de.URL == "" {
-		return errors.New("URL is not set")
-	}
-	return nil
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
-func (de *DockerEngine) initClient() error {
-	client, err := web.NewHTTPClient(de.Client)
-	if err != nil {
+type DockerEngine struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	prom prometheus.Prometheus
+
+	isSwarmManager     bool
+	hasContainerStates bool
+}
+
+func (de *DockerEngine) Configuration() any {
+	return de.Config
+}
+
+func (de *DockerEngine) Init() error {
+	if err := de.validateConfig(); err != nil {
+		de.Errorf("config validation: %v", err)
 		return err
 	}
 
-	de.prom = prometheus.New(client, de.Request)
+	prom, err := de.initPrometheusClient()
+	if err != nil {
+		de.Error(err)
+		return err
+	}
+	de.prom = prom
+
 	return nil
 }
 
-func (de *DockerEngine) Init() bool {
-	if err := de.validateConfig(); err != nil {
-		de.Errorf("config validation: %v", err)
-		return false
+func (de *DockerEngine) Check() error {
+	mx, err := de.collect()
+	if err != nil {
+		de.Error(err)
+		return err
 	}
-	if err := de.initClient(); err != nil {
-		de.Errorf("client initialization: %v", err)
-		return false
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
 	}
-	return true
+	return nil
 }
 
-func (de *DockerEngine) Check() bool {
-	return len(de.Collect()) > 0
-}
-
-func (de DockerEngine) Charts() *Charts {
+func (de *DockerEngine) Charts() *Charts {
 	cs := charts.Copy()
 	if !de.hasContainerStates {
 		if err := cs.Remove("engine_daemon_container_states_containers"); err != nil {
@@ -101,6 +100,7 @@ func (de DockerEngine) Charts() *Charts {
 	if err := cs.Add(*swarmManagerCharts.Copy()...); err != nil {
 		de.Warning(err)
 	}
+
 	return cs
 }
 
@@ -117,4 +117,8 @@ func (de *DockerEngine) Collect() map[string]int64 {
 	return mx
 }
 
-func (DockerEngine) Cleanup() {}
+func (de *DockerEngine) Cleanup() {
+	if de.prom != nil && de.prom.HTTPClient() != nil {
+		de.prom.HTTPClient().CloseIdleConnections()
+	}
+}

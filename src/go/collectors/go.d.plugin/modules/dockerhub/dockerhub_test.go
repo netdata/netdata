@@ -9,24 +9,35 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	repo1Data, _ = os.ReadFile("testdata/repo1.txt")
-	repo2Data, _ = os.ReadFile("testdata/repo2.txt")
-	repo3Data, _ = os.ReadFile("testdata/repo3.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataRepo1, _ = os.ReadFile("testdata/repo1.txt")
+	dataRepo2, _ = os.ReadFile("testdata/repo2.txt")
+	dataRepo3, _ = os.ReadFile("testdata/repo3.txt")
 )
 
-func TestNew(t *testing.T) {
-	job := New()
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+		"dataRepo1":      dataRepo1,
+		"dataRepo2":      dataRepo2,
+		"dataRepo3":      dataRepo3,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
 
-	assert.IsType(t, (*DockerHub)(nil), job)
-	assert.Equal(t, defaultURL, job.URL)
-	assert.Equal(t, defaultHTTPTimeout, job.Timeout.Duration)
-	assert.Len(t, job.Repositories, 0)
-	assert.Nil(t, job.client)
+func TestDockerHub_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &DockerHub{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestDockerHub_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
@@ -36,11 +47,13 @@ func TestDockerHub_Cleanup(t *testing.T) { New().Cleanup() }
 func TestDockerHub_Init(t *testing.T) {
 	job := New()
 	job.Repositories = []string{"name/repo"}
-	assert.True(t, job.Init())
+	assert.NoError(t, job.Init())
 	assert.NotNil(t, job.client)
 }
 
-func TestDockerHub_InitNG(t *testing.T) { assert.False(t, New().Init()) }
+func TestDockerHub_InitNG(t *testing.T) {
+	assert.Error(t, New().Init())
+}
 
 func TestDockerHub_Check(t *testing.T) {
 	ts := httptest.NewServer(
@@ -48,11 +61,11 @@ func TestDockerHub_Check(t *testing.T) {
 			func(w http.ResponseWriter, r *http.Request) {
 				switch {
 				case strings.HasSuffix(r.URL.Path, "name1/repo1"):
-					_, _ = w.Write(repo1Data)
+					_, _ = w.Write(dataRepo1)
 				case strings.HasSuffix(r.URL.Path, "name2/repo2"):
-					_, _ = w.Write(repo2Data)
+					_, _ = w.Write(dataRepo2)
 				case strings.HasSuffix(r.URL.Path, "name3/repo3"):
-					_, _ = w.Write(repo3Data)
+					_, _ = w.Write(dataRepo3)
 				}
 			}))
 	defer ts.Close()
@@ -60,16 +73,16 @@ func TestDockerHub_Check(t *testing.T) {
 	job := New()
 	job.URL = ts.URL
 	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.True(t, job.Init())
-	assert.True(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.NoError(t, job.Check())
 }
 
 func TestDockerHub_CheckNG(t *testing.T) {
 	job := New()
 	job.URL = "http://127.0.0.1:38001/metrics"
 	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestDockerHub_Collect(t *testing.T) {
@@ -78,11 +91,11 @@ func TestDockerHub_Collect(t *testing.T) {
 			func(w http.ResponseWriter, r *http.Request) {
 				switch {
 				case strings.HasSuffix(r.URL.Path, "name1/repo1"):
-					_, _ = w.Write(repo1Data)
+					_, _ = w.Write(dataRepo1)
 				case strings.HasSuffix(r.URL.Path, "name2/repo2"):
-					_, _ = w.Write(repo2Data)
+					_, _ = w.Write(dataRepo2)
 				case strings.HasSuffix(r.URL.Path, "name3/repo3"):
-					_, _ = w.Write(repo3Data)
+					_, _ = w.Write(dataRepo3)
 				}
 			}))
 	defer ts.Close()
@@ -90,8 +103,8 @@ func TestDockerHub_Collect(t *testing.T) {
 	job := New()
 	job.URL = ts.URL
 	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	expected := map[string]int64{
 		"star_count_user1/name1": 45,
@@ -127,8 +140,8 @@ func TestDockerHub_InvalidData(t *testing.T) {
 	job := New()
 	job.URL = ts.URL
 	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestDockerHub_404(t *testing.T) {
@@ -141,6 +154,6 @@ func TestDockerHub_404(t *testing.T) {
 
 	job := New()
 	job.Repositories = []string{"name1/repo1", "name2/repo2", "name3/repo3"}
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }

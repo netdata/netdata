@@ -5,19 +5,33 @@ package portcheck
 import (
 	"errors"
 	"net"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	job := New()
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
 
-	assert.Implements(t, (*module.Module)(nil), job)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestPortCheck_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &PortCheck{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestPortCheck_Init(t *testing.T) {
@@ -25,21 +39,21 @@ func TestPortCheck_Init(t *testing.T) {
 
 	job.Host = "127.0.0.1"
 	job.Ports = []int{39001, 39002}
-	assert.True(t, job.Init())
+	assert.NoError(t, job.Init())
 	assert.Len(t, job.ports, 2)
 }
 func TestPortCheck_InitNG(t *testing.T) {
 	job := New()
 
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 	job.Host = "127.0.0.1"
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 	job.Ports = []int{39001, 39002}
-	assert.True(t, job.Init())
+	assert.NoError(t, job.Init())
 }
 
 func TestPortCheck_Check(t *testing.T) {
-	assert.True(t, New().Check())
+	assert.NoError(t, New().Check())
 }
 
 func TestPortCheck_Cleanup(t *testing.T) {
@@ -50,7 +64,7 @@ func TestPortCheck_Charts(t *testing.T) {
 	job := New()
 	job.Ports = []int{1, 2}
 	job.Host = "localhost"
-	require.True(t, job.Init())
+	require.NoError(t, job.Init())
 	assert.Len(t, *job.Charts(), len(chartsTmpl)*len(job.Ports))
 }
 
@@ -61,8 +75,8 @@ func TestPortCheck_Collect(t *testing.T) {
 	job.Ports = []int{39001, 39002}
 	job.UpdateEvery = 5
 	job.dial = testDial(nil)
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	copyLatency := func(dst, src map[string]int64) {
 		for k := range dst {

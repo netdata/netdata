@@ -17,7 +17,8 @@ func NewDiscovery(cfg Config) (*Discovery, error) {
 	}
 	d := &Discovery{
 		Logger: logger.New().With(
-			slog.String("component", "discovery dummy"),
+			slog.String("component", "discovery"),
+			slog.String("discoverer", "dummy"),
 		),
 		reg:   cfg.Registry,
 		names: cfg.Names,
@@ -52,28 +53,24 @@ func (d *Discovery) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	close(in)
 }
 
-func (d *Discovery) groups() (groups []*confgroup.Group) {
+func (d *Discovery) groups() []*confgroup.Group {
+	group := &confgroup.Group{Source: "internal"}
+
 	for _, name := range d.names {
-		groups = append(groups, d.newCfgGroup(name))
-	}
-	return groups
-}
+		def, ok := d.reg.Lookup(name)
+		if !ok {
+			continue
+		}
+		src := "internal"
+		cfg := confgroup.Config{}
+		cfg.SetModule(name)
+		cfg.SetProvider("dummy")
+		cfg.SetSourceType(confgroup.TypeStock)
+		cfg.SetSource(src)
+		cfg.ApplyDefaults(def)
 
-func (d *Discovery) newCfgGroup(name string) *confgroup.Group {
-	def, ok := d.reg.Lookup(name)
-	if !ok {
-		return nil
+		group.Configs = append(group.Configs, cfg)
 	}
 
-	cfg := confgroup.Config{}
-	cfg.SetModule(name)
-	cfg.SetSource(name)
-	cfg.SetProvider("dummy")
-	cfg.Apply(def)
-
-	group := &confgroup.Group{
-		Configs: []confgroup.Config{cfg},
-		Source:  name,
-	}
-	return group
+	return []*confgroup.Group{group}
 }

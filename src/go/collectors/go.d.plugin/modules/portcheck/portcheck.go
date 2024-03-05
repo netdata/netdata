@@ -27,63 +27,58 @@ func init() {
 func New() *PortCheck {
 	return &PortCheck{
 		Config: Config{
-			Timeout: web.Duration{Duration: time.Second * 2},
+			Timeout: web.Duration(time.Second * 2),
 		},
 		dial: net.DialTimeout,
 	}
 }
 
 type Config struct {
-	Host    string       `yaml:"host"`
-	Ports   []int        `yaml:"ports"`
-	Timeout web.Duration `yaml:"timeout"`
-}
-
-type dialFunc func(network, address string, timeout time.Duration) (net.Conn, error)
-
-type port struct {
-	number  int
-	state   checkState
-	inState int
-	latency int
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	Host        string       `yaml:"host" json:"host"`
+	Ports       []int        `yaml:"ports" json:"ports"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
 }
 
 type PortCheck struct {
 	module.Base
-	Config      `yaml:",inline"`
-	UpdateEvery int `yaml:"update_every"`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
-	dial   dialFunc
-	ports  []*port
+
+	dial dialFunc
+
+	ports []*port
 }
 
-func (pc *PortCheck) Init() bool {
+func (pc *PortCheck) Configuration() any {
+	return pc.Config
+}
+
+func (pc *PortCheck) Init() error {
 	if err := pc.validateConfig(); err != nil {
 		pc.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	charts, err := pc.initCharts()
 	if err != nil {
 		pc.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	pc.charts = charts
 
-	for _, p := range pc.Ports {
-		pc.ports = append(pc.ports, &port{number: p})
-	}
+	pc.ports = pc.initPorts()
 
 	pc.Debugf("using host: %s", pc.Host)
 	pc.Debugf("using ports: %v", pc.Ports)
 	pc.Debugf("using TCP connection timeout: %s", pc.Timeout)
 
-	return true
+	return nil
 }
 
-func (pc *PortCheck) Check() bool {
-	return true
+func (pc *PortCheck) Check() error {
+	return nil
 }
 
 func (pc *PortCheck) Charts() *module.Charts {

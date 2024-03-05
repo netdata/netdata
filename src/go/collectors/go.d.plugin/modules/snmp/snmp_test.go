@@ -5,6 +5,7 @@ package snmp
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -16,8 +17,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*SNMP)(nil), New())
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestSNMP_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &SNMP{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestSNMP_Init(t *testing.T) {
@@ -107,9 +122,9 @@ func TestSNMP_Init(t *testing.T) {
 			snmp := test.prepareSNMP()
 
 			if test.wantFail {
-				assert.False(t, snmp.Init())
+				assert.Error(t, snmp.Init())
 			} else {
-				assert.True(t, snmp.Init())
+				assert.NoError(t, snmp.Init())
 			}
 		})
 	}
@@ -209,12 +224,12 @@ func TestSNMP_Check(t *testing.T) {
 			defaultMockExpects(mockSNMP)
 
 			snmp := test.prepareSNMP(mockSNMP)
-			require.True(t, snmp.Init())
+			require.NoError(t, snmp.Init())
 
 			if test.wantFail {
-				assert.False(t, snmp.Check())
+				assert.Error(t, snmp.Check())
 			} else {
-				assert.True(t, snmp.Check())
+				assert.NoError(t, snmp.Check())
 			}
 		})
 	}
@@ -311,7 +326,7 @@ func TestSNMP_Collect(t *testing.T) {
 			defaultMockExpects(mockSNMP)
 
 			snmp := test.prepareSNMP(mockSNMP)
-			require.True(t, snmp.Init())
+			require.NoError(t, snmp.Init())
 
 			collected := snmp.Collect()
 
@@ -328,7 +343,7 @@ func TestSNMP_Cleanup(t *testing.T) {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *SNMP {
 				snmp := New()
 				snmp.Config = prepareV2Config()
-				require.True(t, snmp.Init())
+				require.NoError(t, snmp.Init())
 
 				m.EXPECT().Close().Times(1)
 
@@ -339,7 +354,7 @@ func TestSNMP_Cleanup(t *testing.T) {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *SNMP {
 				snmp := New()
 				snmp.Config = prepareV2Config()
-				require.True(t, snmp.Init())
+				require.NoError(t, snmp.Init())
 				snmp.snmpClient = nil
 
 				return snmp
@@ -371,7 +386,7 @@ func TestSNMP_Charts(t *testing.T) {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *SNMP {
 				snmp := New()
 				snmp.Config = prepareV2Config()
-				require.True(t, snmp.Init())
+				require.NoError(t, snmp.Init())
 
 				return snmp
 			},
@@ -381,7 +396,7 @@ func TestSNMP_Charts(t *testing.T) {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *SNMP {
 				snmp := New()
 				snmp.Config = prepareConfigWithIndexRange(prepareV2Config, 0, 9)
-				require.True(t, snmp.Init())
+				require.NoError(t, snmp.Init())
 
 				return snmp
 			},

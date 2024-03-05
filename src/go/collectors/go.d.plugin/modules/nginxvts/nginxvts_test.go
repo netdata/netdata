@@ -17,19 +17,24 @@ import (
 )
 
 var (
-	v0118Response, _ = os.ReadFile("testdata/vts-v0.1.18.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer0118Response, _ = os.ReadFile("testdata/vts-v0.1.18.json")
 )
 
-func Test_testDataIsCorrectlyReadAndValid(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"v0118Response": v0118Response,
+		"dataConfigJSON":      dataConfigJSON,
+		"dataConfigYAML":      dataConfigYAML,
+		"dataVer0118Response": dataVer0118Response,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func TestNginxVTS_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &NginxVTS{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNginxVTS_Init(t *testing.T) {
@@ -70,9 +75,9 @@ func TestNginxVTS_Init(t *testing.T) {
 			es.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, es.Init())
+				assert.Error(t, es.Init())
 			} else {
-				assert.True(t, es.Init())
+				assert.NoError(t, es.Init())
 				assert.Equal(t, test.wantNumOfCharts, len(*es.Charts()))
 			}
 		})
@@ -96,9 +101,9 @@ func TestNginxVTS_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, vts.Check())
+				assert.Error(t, vts.Check())
 			} else {
-				assert.True(t, vts.Check())
+				assert.NoError(t, vts.Check())
 			}
 		})
 	}
@@ -197,7 +202,7 @@ func prepareNginxVTS(t *testing.T, createNginxVTS func() *NginxVTS) (vts *NginxV
 	srv := prepareNginxVTSEndpoint()
 	vts.URL = srv.URL
 
-	require.True(t, vts.Init())
+	require.NoError(t, vts.Init())
 
 	return vts, srv.Close
 }
@@ -214,7 +219,7 @@ func prepareNginxVTSInvalidData(t *testing.T) (*NginxVTS, func()) {
 		}))
 	vts := New()
 	vts.URL = srv.URL
-	require.True(t, vts.Init())
+	require.NoError(t, vts.Init())
 
 	return vts, srv.Close
 }
@@ -227,7 +232,7 @@ func prepareNginxVTS404(t *testing.T) (*NginxVTS, func()) {
 		}))
 	vts := New()
 	vts.URL = srv.URL
-	require.True(t, vts.Init())
+	require.NoError(t, vts.Init())
 
 	return vts, srv.Close
 }
@@ -236,7 +241,7 @@ func prepareNginxVTSConnectionRefused(t *testing.T) (*NginxVTS, func()) {
 	t.Helper()
 	vts := New()
 	vts.URL = "http://127.0.0.1:18080"
-	require.True(t, vts.Init())
+	require.NoError(t, vts.Init())
 
 	return vts, func() {}
 }
@@ -246,7 +251,7 @@ func prepareNginxVTSEndpoint() *httptest.Server {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case "/":
-				_, _ = w.Write(v0118Response)
+				_, _ = w.Write(dataVer0118Response)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

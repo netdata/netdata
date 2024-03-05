@@ -3,6 +3,7 @@
 package isc_dhcpd
 
 import (
+	"os"
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -11,8 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestDHCPd_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &DHCPd{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestDHCPd_Cleanup(t *testing.T) {
@@ -67,9 +82,9 @@ func TestDHCPd_Init(t *testing.T) {
 			dhcpd.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, dhcpd.Init())
+				assert.Error(t, dhcpd.Init())
 			} else {
-				assert.True(t, dhcpd.Init())
+				assert.NoError(t, dhcpd.Init())
 			}
 		})
 	}
@@ -91,12 +106,12 @@ func TestDHCPd_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			dhcpd := test.prepare()
-			require.True(t, dhcpd.Init())
+			require.NoError(t, dhcpd.Init())
 
 			if test.wantFail {
-				assert.False(t, dhcpd.Check())
+				assert.Error(t, dhcpd.Check())
 			} else {
-				assert.True(t, dhcpd.Check())
+				assert.NoError(t, dhcpd.Check())
 			}
 		})
 	}
@@ -108,7 +123,7 @@ func TestDHCPd_Charts(t *testing.T) {
 	dhcpd.Pools = []PoolConfig{
 		{Name: "name", Networks: "192.0.2.0/24"},
 	}
-	require.True(t, dhcpd.Init())
+	require.NoError(t, dhcpd.Init())
 
 	assert.NotNil(t, dhcpd.Charts())
 }
@@ -209,7 +224,7 @@ func TestDHCPd_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			dhcpd := test.prepare()
-			require.True(t, dhcpd.Init())
+			require.NoError(t, dhcpd.Init())
 
 			collected := dhcpd.Collect()
 

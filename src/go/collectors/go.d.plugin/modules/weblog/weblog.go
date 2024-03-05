@@ -24,7 +24,7 @@ func New() *WebLog {
 		Config: Config{
 			ExcludePath:    "*.gz",
 			GroupRespCodes: true,
-			Parser: logs.ParserConfig{
+			ParserConfig: logs.ParserConfig{
 				LogType: typeAuto,
 				CSV: logs.CSVConfig{
 					FieldsPerRecord:  -1,
@@ -45,67 +45,73 @@ func New() *WebLog {
 
 type (
 	Config struct {
-		Parser              logs.ParserConfig    `yaml:",inline"`
-		Path                string               `yaml:"path"`
-		ExcludePath         string               `yaml:"exclude_path"`
-		URLPatterns         []userPattern        `yaml:"url_patterns"`
-		CustomFields        []customField        `yaml:"custom_fields"`
-		CustomTimeFields    []customTimeField    `yaml:"custom_time_fields"`
-		CustomNumericFields []customNumericField `yaml:"custom_numeric_fields"`
-		Histogram           []float64            `yaml:"histogram"`
-		GroupRespCodes      bool                 `yaml:"group_response_codes"`
+		logs.ParserConfig   `yaml:",inline" json:""`
+		UpdateEvery         int                  `yaml:"update_every" json:"update_every"`
+		Path                string               `yaml:"path" json:"path"`
+		ExcludePath         string               `yaml:"exclude_path" json:"exclude_path"`
+		URLPatterns         []userPattern        `yaml:"url_patterns" json:"url_patterns"`
+		CustomFields        []customField        `yaml:"custom_fields" json:"custom_fields"`
+		CustomTimeFields    []customTimeField    `yaml:"custom_time_fields" json:"custom_time_fields"`
+		CustomNumericFields []customNumericField `yaml:"custom_numeric_fields" json:"custom_numeric_fields"`
+		Histogram           []float64            `yaml:"histogram" json:"histogram"`
+		GroupRespCodes      bool                 `yaml:"group_response_codes" json:"group_response_codes"`
 	}
 	userPattern struct {
-		Name  string `yaml:"name"`
-		Match string `yaml:"match"`
+		Name  string `yaml:"name" json:"name"`
+		Match string `yaml:"match" json:"match"`
 	}
 	customField struct {
-		Name     string        `yaml:"name"`
-		Patterns []userPattern `yaml:"patterns"`
+		Name     string        `yaml:"name" json:"name"`
+		Patterns []userPattern `yaml:"patterns" json:"patterns"`
 	}
 	customTimeField struct {
-		Name      string    `yaml:"name"`
-		Histogram []float64 `yaml:"histogram"`
+		Name      string    `yaml:"name" json:"name"`
+		Histogram []float64 `yaml:"histogram" json:"histogram"`
 	}
 	customNumericField struct {
-		Name       string `yaml:"name"`
-		Units      string `yaml:"units"`
-		Multiplier int    `yaml:"multiplier"`
-		Divisor    int    `yaml:"divisor"`
+		Name       string `yaml:"name" json:"name"`
+		Units      string `yaml:"units" json:"units"`
+		Multiplier int    `yaml:"multiplier" json:"multiplier"`
+		Divisor    int    `yaml:"divisor" json:"divisor"`
 	}
 )
 
 type WebLog struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
-	file        *logs.Reader
-	parser      logs.Parser
-	line        *logLine
-	urlPatterns []*pattern
+	charts *module.Charts
 
+	file   *logs.Reader
+	parser logs.Parser
+	line   *logLine
+
+	urlPatterns         []*pattern
 	customFields        map[string][]*pattern
 	customTimeFields    map[string][]float64
 	customNumericFields map[string]bool
 
-	charts *module.Charts
-	mx     *metricsData
+	mx *metricsData
 }
 
-func (w *WebLog) Init() bool {
+func (w *WebLog) Configuration() any {
+	return w.Config
+}
+
+func (w *WebLog) Init() error {
 	if err := w.createURLPatterns(); err != nil {
 		w.Errorf("init failed: %v", err)
-		return false
+		return err
 	}
 
 	if err := w.createCustomFields(); err != nil {
 		w.Errorf("init failed: %v", err)
-		return false
+		return err
 	}
 
 	if err := w.createCustomTimeFields(); err != nil {
 		w.Errorf("init failed: %v", err)
-		return false
+		return err
 	}
 
 	if err := w.createCustomNumericFields(); err != nil {
@@ -115,26 +121,27 @@ func (w *WebLog) Init() bool {
 	w.createLogLine()
 	w.mx = newMetricsData(w.Config)
 
-	return true
+	return nil
 }
 
-func (w *WebLog) Check() bool {
+func (w *WebLog) Check() error {
 	// Note: these inits are here to make auto-detection retry working
 	if err := w.createLogReader(); err != nil {
 		w.Warning("check failed: ", err)
-		return false
+		return err
 	}
 
 	if err := w.createParser(); err != nil {
 		w.Warning("check failed: ", err)
-		return false
+		return err
 	}
 
 	if err := w.createCharts(w.line); err != nil {
 		w.Warning("check failed: ", err)
-		return false
+		return err
 	}
-	return true
+
+	return nil
 }
 
 func (w *WebLog) Charts() *module.Charts {

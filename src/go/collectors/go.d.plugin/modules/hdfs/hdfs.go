@@ -5,12 +5,10 @@ package hdfs
 import (
 	_ "embed"
 	"errors"
-	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -23,15 +21,15 @@ func init() {
 	})
 }
 
-// New creates HDFS with default values.
 func New() *HDFS {
 	config := Config{
 		HTTP: web.HTTP{
 			Request: web.Request{
-				URL: "http://127.0.0.1:50070/jmx",
+				URL: "http://127.0.0.1:9870/jmx",
 			},
 			Client: web.Client{
-				Timeout: web.Duration{Duration: time.Second}},
+				Timeout: web.Duration(time.Second),
+			},
 		},
 	}
 
@@ -40,93 +38,68 @@ func New() *HDFS {
 	}
 }
 
-type nodeType string
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
+}
+
+type (
+	HDFS struct {
+		module.Base
+		Config `yaml:",inline" json:""`
+
+		client *client
+
+		nodeType
+	}
+	nodeType string
+)
 
 const (
 	dataNodeType nodeType = "DataNode"
 	nameNodeType nodeType = "NameNode"
 )
 
-// Config is the HDFS module configuration.
-type Config struct {
-	web.HTTP `yaml:",inline"`
+func (h *HDFS) Configuration() any {
+	return h.Config
 }
 
-// HDFS HDFS module.
-type HDFS struct {
-	module.Base
-	Config `yaml:",inline"`
-
-	nodeType
-	client *client
-}
-
-// Cleanup makes cleanup.
-func (HDFS) Cleanup() {}
-
-func (h HDFS) createClient() (*client, error) {
-	httpClient, err := web.NewHTTPClient(h.Client)
-	if err != nil {
-		return nil, err
+func (h *HDFS) Init() error {
+	if err := h.validateConfig(); err != nil {
+		h.Errorf("config validation: %v", err)
+		return err
 	}
 
-	return newClient(httpClient, h.Request), nil
-}
-
-func (h HDFS) determineNodeType() (nodeType, error) {
-	var raw rawJMX
-	err := h.client.doOKWithDecodeJSON(&raw)
-	if err != nil {
-		return "", err
-	}
-
-	if raw.isEmpty() {
-		return "", errors.New("empty response")
-	}
-
-	jvm := raw.findJvm()
-	if jvm == nil {
-		return "", errors.New("couldn't find jvm in response")
-	}
-
-	v, ok := jvm["tag.ProcessName"]
-	if !ok {
-		return "", errors.New("couldn't find process name in JvmMetrics")
-	}
-
-	t := nodeType(strings.Trim(string(v), "\""))
-	if t == nameNodeType || t == dataNodeType {
-		return t, nil
-	}
-	return "", errors.New("unknown node type")
-}
-
-// Init makes initialization.
-func (h *HDFS) Init() bool {
 	cl, err := h.createClient()
 	if err != nil {
 		h.Errorf("error on creating client : %v", err)
-		return false
+		return err
 	}
 	h.client = cl
 
-	return true
+	return nil
 }
 
-// Check makes check.
-func (h *HDFS) Check() bool {
-	t, err := h.determineNodeType()
+func (h *HDFS) Check() error {
+	typ, err := h.determineNodeType()
 	if err != nil {
 		h.Errorf("error on node type determination : %v", err)
-		return false
+		return err
 	}
-	h.nodeType = t
+	h.nodeType = typ
 
-	return len(h.Collect()) > 0
+	mx, err := h.collect()
+	if err != nil {
+		h.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
-// Charts returns Charts.
-func (h HDFS) Charts() *Charts {
+func (h *HDFS) Charts() *Charts {
 	switch h.nodeType {
 	default:
 		return nil
@@ -137,7 +110,6 @@ func (h HDFS) Charts() *Charts {
 	}
 }
 
-// Collect collects metrics.
 func (h *HDFS) Collect() map[string]int64 {
 	mx, err := h.collect()
 
@@ -150,4 +122,10 @@ func (h *HDFS) Collect() map[string]int64 {
 	}
 
 	return mx
+}
+
+func (h *HDFS) Cleanup() {
+	if h.client != nil && h.client.httpClient != nil {
+		h.client.httpClient.CloseIdleConnections()
+	}
 }

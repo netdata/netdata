@@ -4,6 +4,7 @@ package dnsdist
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"time"
 
@@ -24,18 +25,6 @@ func init() {
 	})
 }
 
-type Config struct {
-	web.HTTP `yaml:",inline"`
-}
-
-type DNSdist struct {
-	module.Base
-	Config `yaml:",inline"`
-
-	httpClient *http.Client
-	charts     *module.Charts
-}
-
 func New() *DNSdist {
 	return &DNSdist{
 		Config: Config{
@@ -44,39 +33,66 @@ func New() *DNSdist {
 					URL: "http://127.0.0.1:8083",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 		},
 	}
 }
 
-func (d *DNSdist) Init() bool {
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
+}
+
+type DNSdist struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
+
+	httpClient *http.Client
+}
+
+func (d *DNSdist) Configuration() any {
+	return d.Config
+}
+
+func (d *DNSdist) Init() error {
 	err := d.validateConfig()
 	if err != nil {
 		d.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	client, err := d.initHTTPClient()
 	if err != nil {
 		d.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	d.httpClient = client
 
 	cs, err := d.initCharts()
 	if err != nil {
 		d.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	d.charts = cs
 
-	return true
+	return nil
 }
 
-func (d *DNSdist) Check() bool {
-	return len(d.Collect()) > 0
+func (d *DNSdist) Check() error {
+	mx, err := d.collect()
+	if err != nil {
+		d.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (d *DNSdist) Charts() *module.Charts {
@@ -100,6 +116,5 @@ func (d *DNSdist) Cleanup() {
 	if d.httpClient == nil {
 		return
 	}
-
 	d.httpClient.CloseIdleConnections()
 }

@@ -1,0 +1,7 @@
+{
+  "update_every": 123,
+  "source": "ok",
+  "timeout": 123.123,
+  "days_until_expiration_warning": 123,
+  "days_until_expiration_critical": 123
+}

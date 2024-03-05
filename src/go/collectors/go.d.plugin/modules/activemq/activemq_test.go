@@ -5,14 +5,34 @@ package activemq
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+
+	}
+}
+
+func TestActiveMQ_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &ActiveMQ{}, dataConfigJSON, dataConfigYAML)
+}
 
 var (
 	queuesData = []string{
@@ -131,25 +151,16 @@ var (
 	}
 )
 
-func TestNew(t *testing.T) {
-	job := New()
-
-	assert.Implements(t, (*module.Module)(nil), job)
-	assert.Equal(t, defaultURL, job.URL)
-	assert.Equal(t, defaultHTTPTimeout, job.Client.Timeout.Duration)
-	assert.Equal(t, defaultMaxQueues, job.MaxQueues)
-	assert.Equal(t, defaultMaxTopics, job.MaxTopics)
-}
-
 func TestActiveMQ_Init(t *testing.T) {
 	job := New()
 
 	// NG case
-	assert.False(t, job.Init())
+	job.Webadmin = ""
+	assert.Error(t, job.Init())
 
 	// OK case
 	job.Webadmin = "webadmin"
-	assert.True(t, job.Init())
+	assert.NoError(t, job.Init())
 	assert.NotNil(t, job.apiClient)
 }
 
@@ -170,8 +181,8 @@ func TestActiveMQ_Check(t *testing.T) {
 	job.HTTP.Request = web.Request{URL: ts.URL}
 	job.Webadmin = "webadmin"
 
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 }
 
 func TestActiveMQ_Charts(t *testing.T) {
@@ -203,8 +214,8 @@ func TestActiveMQ_Collect(t *testing.T) {
 	job.HTTP.Request = web.Request{URL: ts.URL}
 	job.Webadmin = "webadmin"
 
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	cases := []struct {
 		expected  map[string]int64
@@ -310,8 +321,8 @@ func TestActiveMQ_404(t *testing.T) {
 	job.Webadmin = "webadmin"
 	job.HTTP.Request = web.Request{URL: ts.URL}
 
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestActiveMQ_InvalidData(t *testing.T) {
@@ -324,6 +335,6 @@ func TestActiveMQ_InvalidData(t *testing.T) {
 	mod.Webadmin = "webadmin"
 	mod.HTTP.Request = web.Request{URL: ts.URL}
 
-	require.True(t, mod.Init())
-	assert.False(t, mod.Check())
+	require.NoError(t, mod.Init())
+	assert.Error(t, mod.Check())
 }

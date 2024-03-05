@@ -1,13 +1,21 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/wireguard job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "WireGuard collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      }
     }
   },
-  "required": [
-    "name"
-  ]
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    }
+  }
 }

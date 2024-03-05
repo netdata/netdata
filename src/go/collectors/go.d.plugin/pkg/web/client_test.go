@@ -12,7 +12,7 @@ import (
 
 func TestNewHTTPClient(t *testing.T) {
 	client, _ := NewHTTPClient(Client{
-		Timeout:           Duration{Duration: time.Second * 5},
+		Timeout:           Duration(time.Second * 5),
 		NotFollowRedirect: true,
 		ProxyURL:          "http://127.0.0.1:3128",
 	})

@@ -5,11 +5,32 @@ package upsd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestUpsd_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Upsd{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestUpsd_Cleanup(t *testing.T) {
 	upsd := New()
@@ -19,7 +40,7 @@ func TestUpsd_Cleanup(t *testing.T) {
 	mock := prepareMockConnOK()
 	upsd.newUpsdConn = func(Config) upsdConn { return mock }
 
-	require.True(t, upsd.Init())
+	require.NoError(t, upsd.Init())
 	_ = upsd.Collect()
 	require.NotPanics(t, upsd.Cleanup)
 	assert.True(t, mock.calledDisconnect)
@@ -46,9 +67,9 @@ func TestUpsd_Init(t *testing.T) {
 			upsd.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, upsd.Init())
+				assert.Error(t, upsd.Init())
 			} else {
-				assert.True(t, upsd.Init())
+				assert.NoError(t, upsd.Init())
 			}
 		})
 	}
@@ -92,12 +113,12 @@ func TestUpsd_Check(t *testing.T) {
 			upsd := test.prepareUpsd()
 			upsd.newUpsdConn = func(Config) upsdConn { return test.prepareMock() }
 
-			require.True(t, upsd.Init())
+			require.NoError(t, upsd.Init())
 
 			if test.wantFail {
-				assert.False(t, upsd.Check())
+				assert.Error(t, upsd.Check())
 			} else {
-				assert.True(t, upsd.Check())
+				assert.NoError(t, upsd.Check())
 			}
 		})
 	}
@@ -105,7 +126,7 @@ func TestUpsd_Check(t *testing.T) {
 
 func TestUpsd_Charts(t *testing.T) {
 	upsd := New()
-	require.True(t, upsd.Init())
+	require.NoError(t, upsd.Init())
 	assert.NotNil(t, upsd.Charts())
 }
 
@@ -225,7 +246,7 @@ func TestUpsd_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			upsd := test.prepareUpsd()
-			require.True(t, upsd.Init())
+			require.NoError(t, upsd.Init())
 
 			mock := test.prepareMock()
 			upsd.newUpsdConn = func(Config) upsdConn { return mock }

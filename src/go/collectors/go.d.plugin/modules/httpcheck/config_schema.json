@@ -1,71 +1,205 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/httpcheck job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
-    },
-    "url": {
-      "type": "string"
-    },
-    "timeout": {
-      "type": [
-        "string",
-        "integer"
-      ]
-    },
-    "accepted_statuses": {
-      "type": "array",
-      "items": {
-        "type": "integer"
-      }
-    },
-    "response_match": {
-      "type": "string"
-    },
-    "cookie_file": {
-      "type": "string"
-    },
-    "username": {
-      "type": "string"
-    },
-    "password": {
-      "type": "string"
-    },
-    "proxy_url": {
-      "type": "string"
-    },
-    "proxy_username": {
-      "type": "string"
-    },
-    "proxy_password": {
-      "type": "string"
-    },
-    "headers": {
-      "type": "object",
-      "additionalProperties": {
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "HTTPCheck collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 5
+      },
+      "url": {
+        "title": "URL",
+        "description": "The URL of the HTTP endpoint.",
+        "type": "string",
+        "format": "uri"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "The timeout in seconds for the HTTP request.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 1
+      },
+      "not_follow_redirects": {
+        "title": "Not follow redirects",
+        "description": "If set, the client will not follow HTTP redirects automatically.",
+        "type": "boolean"
+      },
+      "accepted_statuses": {
+        "title": "Status code check",
+        "description": "Specifies the list of HTTP response status codes that are considered acceptable. Responses with status codes not included in this list will be categorized as 'bad status' in the status chart.",
+        "type": "array",
+        "items": {
+          "title": "Code",
+          "type": "integer",
+          "minimum": 100,
+          "default": 200
+        },
+        "minItems": 1,
+        "uniqueItems": true,
+        "default": [
+          200
+        ]
+      },
+      "response_match": {
+        "title": "Content check",
+        "description": "Specifies a regular expression pattern to match against the content of the HTTP response. This check is performed only if the response's status code is accepted.",
+        "type": "string"
+      },
+      "header_match": {
+        "title": "Header check",
+        "description": "Specifies a set of rules to check for specific key-value pairs in the HTTP headers of the response.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "exclude": {
+              "title": "Exclude",
+              "description": "Determines whether the rule checks for the presence or absence of the specified key-value pair in the HTTP headers.",
+              "type": "boolean"
+            },
+            "key": {
+              "title": "Header key",
+              "description": "Specifies the exact name of the HTTP header to check for.",
+              "type": "string"
+            },
+            "value": {
+              "title": "Header value pattern",
+              "description": "Specifies the [matcher pattern](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme) to match against the value of the specified header.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "value"
+          ]
+        }
+      },
+      "username": {
+        "title": "Username",
+        "description": "The username for basic authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "password": {
+        "title": "Password",
+        "description": "The password for basic authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "The URL of the proxy server.",
+        "type": "string"
+      },
+      "proxy_username": {
+        "title": "Proxy username",
+        "description": "The username for proxy authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "proxy_password": {
+        "title": "Proxy password",
+        "description": "The password for proxy authentication.",
+        "type": "string",
+        "sensitive": true
+      },
+      "headers": {
+        "title": "Headers",
+        "description": "Additional HTTP headers to include in the request.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "If set, TLS certificate verification will be skipped.",
+        "type": "boolean"
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "The path to the CA certificate file for TLS verification.",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "The path to the client certificate file for TLS authentication.",
+        "type": "string"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "The path to the client key file for TLS authentication.",
         "type": "string"
       }
     },
-    "not_follow_redirects": {
-      "type": "boolean"
-    },
-    "tls_ca": {
-      "type": "string"
-    },
-    "tls_cert": {
-      "type": "string"
-    },
-    "tls_key": {
-      "type": "string"
-    },
-    "insecure_skip_verify": {
-      "type": "boolean"
-    }
+    "required": [
+      "url",
+      "accepted_statuses"
+    ]
   },
-  "required": [
-    "name",
-    "url"
-  ]
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "url",
+            "timeout",
+            "not_follow_redirects"
+          ]
+        },
+        {
+          "title": "Checks",
+          "fields": [
+            "accepted_statuses",
+            "response_match",
+            "header_match"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "username",
+            "password"
+          ]
+        },
+        {
+          "title": "TLS",
+          "fields": [
+            "tls_skip_verify",
+            "tls_ca",
+            "tls_cert",
+            "tls_key"
+          ]
+        },
+        {
+          "title": "Proxy",
+          "fields": [
+            "proxy_url",
+            "proxy_username",
+            "proxy_password"
+          ]
+        },
+        {
+          "title": "Headers",
+          "fields": [
+            "headers"
+          ]
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    },
+    "timeout": {
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    }
+  }
 }

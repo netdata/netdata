@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,9 @@ import (
 )
 
 var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
 	dataAPI8APIVersions, _       = os.ReadFile("testdata/api-8/api_versions.json")
 	dataAPI8Connections, _       = os.ReadFile("testdata/api-8/connections.json")
 	dataAPI8EndpointsHTTP, _     = os.ReadFile("testdata/api-8/endpoints_http.json")
@@ -35,6 +39,8 @@ var (
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
+		"dataConfigJSON":            dataConfigJSON,
+		"dataConfigYAML":            dataConfigYAML,
 		"dataAPI8APIVersions":       dataAPI8APIVersions,
 		"dataAPI8Connections":       dataAPI8Connections,
 		"dataAPI8EndpointsHTTP":     dataAPI8EndpointsHTTP,
@@ -51,8 +57,12 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataAPI8Resolvers":         dataAPI8Resolvers,
 		"data404":                   data404,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
+}
+
+func TestNginxPlus_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &NginxPlus{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNginxPlus_Init(t *testing.T) {
@@ -80,9 +90,9 @@ func TestNginxPlus_Init(t *testing.T) {
 			nginx.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, nginx.Init())
+				assert.Error(t, nginx.Init())
 			} else {
-				assert.True(t, nginx.Init())
+				assert.NoError(t, nginx.Init())
 			}
 		})
 	}
@@ -117,9 +127,9 @@ func TestNginxPlus_Check(t *testing.T) {
 			defer cleanup()
 
 			if test.wantFail {
-				assert.False(t, nginx.Check())
+				assert.Error(t, nginx.Check())
 			} else {
-				assert.True(t, nginx.Check())
+				assert.NoError(t, nginx.Check())
 			}
 		})
 	}
@@ -500,7 +510,7 @@ func caseAPI8AllRequestsOK(t *testing.T) (*NginxPlus, func()) {
 		}))
 	nginx := New()
 	nginx.URL = srv.URL
-	require.True(t, nginx.Init())
+	require.NoError(t, nginx.Init())
 
 	return nginx, srv.Close
 }
@@ -542,7 +552,7 @@ func caseAPI8AllRequestsExceptStreamOK(t *testing.T) (*NginxPlus, func()) {
 		}))
 	nginx := New()
 	nginx.URL = srv.URL
-	require.True(t, nginx.Init())
+	require.NoError(t, nginx.Init())
 
 	return nginx, srv.Close
 }
@@ -555,7 +565,7 @@ func caseInvalidDataResponse(t *testing.T) (*NginxPlus, func()) {
 		}))
 	nginx := New()
 	nginx.URL = srv.URL
-	require.True(t, nginx.Init())
+	require.NoError(t, nginx.Init())
 
 	return nginx, srv.Close
 }
@@ -564,7 +574,7 @@ func caseConnectionRefused(t *testing.T) (*NginxPlus, func()) {
 	t.Helper()
 	nginx := New()
 	nginx.URL = "http://127.0.0.1:65001"
-	require.True(t, nginx.Init())
+	require.NoError(t, nginx.Init())
 
 	return nginx, func() {}
 }

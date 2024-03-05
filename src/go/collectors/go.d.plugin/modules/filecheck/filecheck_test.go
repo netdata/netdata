@@ -3,6 +3,7 @@
 package filecheck
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -12,8 +13,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestFilecheck_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Filecheck{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestFilecheck_Cleanup(t *testing.T) {
@@ -86,9 +101,9 @@ func TestFilecheck_Init(t *testing.T) {
 			fc.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, fc.Init())
+				assert.Error(t, fc.Init())
 			} else {
-				require.True(t, fc.Init())
+				require.NoError(t, fc.Init())
 				assert.Equal(t, test.wantNumOfCharts, len(*fc.Charts()))
 			}
 		})
@@ -111,9 +126,9 @@ func TestFilecheck_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			fc := test.prepare()
-			require.True(t, fc.Init())
+			require.NoError(t, fc.Init())
 
-			assert.True(t, fc.Check())
+			assert.NoError(t, fc.Check())
 		})
 	}
 }
@@ -226,7 +241,7 @@ func TestFilecheck_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			fc := test.prepare()
-			require.True(t, fc.Init())
+			require.NoError(t, fc.Init())
 
 			collected := fc.Collect()
 

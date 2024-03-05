@@ -129,15 +129,15 @@ func calcMaxPCIEBandwidth(gpu xmlGPUInfo) float64 {
 	var speed, enc float64
 	switch gen {
 	case "1":
-		speed, enc = 2.5, 1/5
+		speed, enc = 2.5, 1.0/5.0
 	case "2":
-		speed, enc = 5, 1/5
+		speed, enc = 5, 1.0/5.0
 	case "3":
-		speed, enc = 8, 2/130
+		speed, enc = 8, 2.0/130.0
 	case "4":
-		speed, enc = 16, 2/130
+		speed, enc = 16, 2.0/130.0
 	case "5":
-		speed, enc = 32, 2/130
+		speed, enc = 32, 2.0/130.0
 	default:
 		return 0
 	}

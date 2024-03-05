@@ -1,0 +1,64 @@
+{
+  "update_every": 123,
+  "path": "ok",
+  "exclude_path": "ok",
+  "log_type": "ok",
+  "csv_config": {
+    "fields_per_record": 123,
+    "delimiter": "ok",
+    "trim_leading_space": true,
+    "format": "ok"
+  },
+  "ltsv_config": {
+    "field_delimiter": "ok",
+    "value_delimiter": "ok",
+    "mapping": {
+      "ok": "ok"
+    }
+  },
+  "regexp_config": {
+    "pattern": "ok"
+  },
+  "json_config": {
+    "mapping": {
+      "ok": "ok"
+    }
+  },
+  "url_patterns": [
+    {
+      "name": "ok",
+      "match": "ok"
+    }
+  ],
+  "custom_fields": [
+    {
+      "name": "ok",
+      "patterns": [
+        {
+          "name": "ok",
+          "match": "ok"
+        }
+      ]
+    }
+  ],
+  "custom_time_fields": [
+    {
+      "name": "ok",
+      "histogram": [
+        123.123
+      ]
+    }
+  ],
+  "custom_numeric_fields": [
+    {
+      "name": "ok",
+      "units": "ok",
+      "multiplier": 123,
+      "divisor": 123
+    }
+  ],
+  "histogram": [
+    123.123
+  ],
+  "group_response_codes": true
+}

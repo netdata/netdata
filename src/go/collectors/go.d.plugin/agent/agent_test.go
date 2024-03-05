@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/safewriter"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,16 +21,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestAgent_Run(t *testing.T) {
-	a := New(Config{
-		Name:              "",
-		ConfDir:           nil,
-		ModulesConfDir:    nil,
-		ModulesSDConfPath: nil,
-		StateFile:         "",
-		ModuleRegistry:    nil,
-		RunModule:         "",
-		MinUpdateEvery:    0,
-	})
+	a := New(Config{Name: "nodyncfg"})
 
 	var buf bytes.Buffer
 	a.Out = safewriter.New(&buf)
@@ -66,7 +58,9 @@ func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) mod
 	for _, name := range names {
 		name := name
 		reg.Register(name, module.Creator{
-			Create: func() module.Module { return prepareMockModule(name, mux, stats) },
+			Create: func() module.Module {
+				return prepareMockModule(name, mux, stats)
+			},
 		})
 	}
 	return reg
@@ -74,17 +68,17 @@ func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) mod
 
 func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) module.Module {
 	return &module.MockModule{
-		InitFunc: func() bool {
+		InitFunc: func() error {
 			mux.Lock()
 			defer mux.Unlock()
 			stats[name+"_init"]++
-			return true
+			return nil
 		},
-		CheckFunc: func() bool {
+		CheckFunc: func() error {
 			mux.Lock()
 			defer mux.Unlock()
 			stats[name+"_check"]++
-			return true
+			return nil
 		},
 		ChartsFunc: func() *module.Charts {
 			mux.Lock()

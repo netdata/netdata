@@ -56,7 +56,7 @@ func TestNewDiscovery(t *testing.T) {
 func TestDiscovery_Run(t *testing.T) {
 	expected := []*confgroup.Group{
 		{
-			Source: "module1",
+			Source: "internal",
 			Configs: []confgroup.Config{
 				{
 					"name":                "module1",
@@ -64,22 +64,19 @@ func TestDiscovery_Run(t *testing.T) {
 					"update_every":        module.UpdateEvery,
 					"autodetection_retry": module.AutoDetectionRetry,
 					"priority":            module.Priority,
-					"__source__":          "module1",
 					"__provider__":        "dummy",
+					"__source_type__":     confgroup.TypeStock,
+					"__source__":          "internal",
 				},
-			},
-		},
-		{
-			Source: "module2",
-			Configs: []confgroup.Config{
 				{
 					"name":                "module2",
 					"module":              "module2",
 					"update_every":        module.UpdateEvery,
 					"autodetection_retry": module.AutoDetectionRetry,
 					"priority":            module.Priority,
-					"__source__":          "module2",
 					"__provider__":        "dummy",
+					"__source_type__":     confgroup.TypeStock,
+					"__source__":          "internal",
 				},
 			},
 		},

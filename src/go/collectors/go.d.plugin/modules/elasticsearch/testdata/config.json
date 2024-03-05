@@ -1,0 +1,25 @@
+{
+  "update_every": 123,
+  "url": "ok",
+  "body": "ok",
+  "method": "ok",
+  "headers": {
+    "ok": "ok"
+  },
+  "username": "ok",
+  "password": "ok",
+  "proxy_url": "ok",
+  "proxy_username": "ok",
+  "proxy_password": "ok",
+  "timeout": 123.123,
+  "not_follow_redirects": true,
+  "tls_ca": "ok",
+  "tls_cert": "ok",
+  "tls_key": "ok",
+  "tls_skip_verify": true,
+  "cluster_mode": true,
+  "collect_node_stats": true,
+  "collect_cluster_health": true,
+  "collect_cluster_stats": true,
+  "collect_indices_stats": true
+}

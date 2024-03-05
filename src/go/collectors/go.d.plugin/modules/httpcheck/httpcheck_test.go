@@ -3,8 +3,10 @@
 package httpcheck
 
 import (
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -13,6 +15,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestHTTPCheck_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &HTTPCheck{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestHTTPCheck_Init(t *testing.T) {
 	tests := map[string]struct {
@@ -56,9 +76,9 @@ func TestHTTPCheck_Init(t *testing.T) {
 			httpCheck.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, httpCheck.Init())
+				assert.Error(t, httpCheck.Init())
 			} else {
-				assert.True(t, httpCheck.Init())
+				assert.NoError(t, httpCheck.Init())
 			}
 		})
 	}
@@ -80,7 +100,7 @@ func TestHTTPCheck_Charts(t *testing.T) {
 			prepare: func(t *testing.T) *HTTPCheck {
 				httpCheck := New()
 				httpCheck.URL = "http://127.0.0.1:38001"
-				require.True(t, httpCheck.Init())
+				require.NoError(t, httpCheck.Init())
 
 				return httpCheck
 			},
@@ -105,7 +125,7 @@ func TestHTTPCheck_Cleanup(t *testing.T) {
 	assert.NotPanics(t, httpCheck.Cleanup)
 
 	httpCheck.URL = "http://127.0.0.1:38001"
-	require.True(t, httpCheck.Init())
+	require.NoError(t, httpCheck.Init())
 	assert.NotPanics(t, httpCheck.Cleanup)
 }
 
@@ -129,12 +149,12 @@ func TestHTTPCheck_Check(t *testing.T) {
 			httpCheck, cleanup := test.prepare()
 			defer cleanup()
 
-			require.True(t, httpCheck.Init())
+			require.NoError(t, httpCheck.Init())
 
 			if test.wantFail {
-				assert.False(t, httpCheck.Check())
+				assert.Error(t, httpCheck.Check())
 			} else {
-				assert.True(t, httpCheck.Check())
+				assert.NoError(t, httpCheck.Check())
 			}
 		})
 	}
@@ -255,7 +275,7 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		"header match include no value success case": {
 			prepare: prepareSuccessCase,
 			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []HeaderMatchConfig{
+				httpCheck.HeaderMatch = []headerMatchConfig{
 					{Key: "header-key2"},
 				}
 			},
@@ -275,7 +295,7 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		"header match include with value success case": {
 			prepare: prepareSuccessCase,
 			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []HeaderMatchConfig{
+				httpCheck.HeaderMatch = []headerMatchConfig{
 					{Key: "header-key2", Value: "= header-value"},
 				}
 			},
@@ -295,7 +315,7 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		"header match include no value bad headers case": {
 			prepare: prepareSuccessCase,
 			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []HeaderMatchConfig{
+				httpCheck.HeaderMatch = []headerMatchConfig{
 					{Key: "header-key99"},
 				}
 			},
@@ -315,7 +335,7 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		"header match include with value bad headers case": {
 			prepare: prepareSuccessCase,
 			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []HeaderMatchConfig{
+				httpCheck.HeaderMatch = []headerMatchConfig{
 					{Key: "header-key2", Value: "= header-value99"},
 				}
 			},
@@ -335,7 +355,7 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		"header match exclude no value success case": {
 			prepare: prepareSuccessCase,
 			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []HeaderMatchConfig{
+				httpCheck.HeaderMatch = []headerMatchConfig{
 					{Exclude: true, Key: "header-key99"},
 				}
 			},
@@ -355,7 +375,7 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		"header match exclude with value success case": {
 			prepare: prepareSuccessCase,
 			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []HeaderMatchConfig{
+				httpCheck.HeaderMatch = []headerMatchConfig{
 					{Exclude: true, Key: "header-key2", Value: "= header-value99"},
 				}
 			},
@@ -375,7 +395,7 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		"header match exclude no value bad headers case": {
 			prepare: prepareSuccessCase,
 			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []HeaderMatchConfig{
+				httpCheck.HeaderMatch = []headerMatchConfig{
 					{Exclude: true, Key: "header-key2"},
 				}
 			},
@@ -395,7 +415,7 @@ func TestHTTPCheck_Collect(t *testing.T) {
 		"header match exclude with value bad headers case": {
 			prepare: prepareSuccessCase,
 			update: func(httpCheck *HTTPCheck) {
-				httpCheck.HeaderMatch = []HeaderMatchConfig{
+				httpCheck.HeaderMatch = []headerMatchConfig{
 					{Exclude: true, Key: "header-key2", Value: "= header-value"},
 				}
 			},
@@ -438,7 +458,7 @@ func TestHTTPCheck_Collect(t *testing.T) {
 				test.update(httpCheck)
 			}
 
-			require.True(t, httpCheck.Init())
+			require.NoError(t, httpCheck.Init())
 
 			var mx map[string]int64
 
@@ -475,11 +495,11 @@ func prepareSuccessCase() (*HTTPCheck, func()) {
 func prepareTimeoutCase() (*HTTPCheck, func()) {
 	httpCheck := New()
 	httpCheck.UpdateEvery = 1
-	httpCheck.Timeout.Duration = time.Millisecond * 100
+	httpCheck.Timeout = web.Duration(time.Millisecond * 100)
 
 	srv := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(httpCheck.Timeout.Duration + time.Millisecond*100)
+			time.Sleep(httpCheck.Timeout.Duration() + time.Millisecond*100)
 		}))
 
 	httpCheck.URL = srv.URL

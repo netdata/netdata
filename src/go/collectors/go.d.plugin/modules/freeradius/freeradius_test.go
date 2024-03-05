@@ -4,57 +4,73 @@ package freeradius
 
 import (
 	"errors"
+	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/modules/freeradius/api"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestFreeRADIUS_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &FreeRADIUS{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestFreeRADIUS_Init(t *testing.T) {
 	freeRADIUS := New()
 
-	assert.True(t, freeRADIUS.Init())
+	assert.NoError(t, freeRADIUS.Init())
 }
 
 func TestFreeRADIUS_Init_ReturnsFalseIfAddressNotSet(t *testing.T) {
 	freeRADIUS := New()
 	freeRADIUS.Address = ""
 
-	assert.False(t, freeRADIUS.Init())
+	assert.Error(t, freeRADIUS.Init())
 }
 
 func TestFreeRADIUS_Init_ReturnsFalseIfPortNotSet(t *testing.T) {
 	freeRADIUS := New()
 	freeRADIUS.Port = 0
 
-	assert.False(t, freeRADIUS.Init())
+	assert.Error(t, freeRADIUS.Init())
 }
 
 func TestFreeRADIUS_Init_ReturnsFalseIfSecretNotSet(t *testing.T) {
 	freeRADIUS := New()
 	freeRADIUS.Secret = ""
 
-	assert.False(t, freeRADIUS.Init())
+	assert.Error(t, freeRADIUS.Init())
 }
 
 func TestFreeRADIUS_Check(t *testing.T) {
 	freeRADIUS := New()
 	freeRADIUS.client = newOKMockClient()
 
-	assert.True(t, freeRADIUS.Check())
+	assert.NoError(t, freeRADIUS.Check())
 }
 
 func TestFreeRADIUS_Check_ReturnsFalseIfClientStatusReturnsError(t *testing.T) {
 	freeRADIUS := New()
 	freeRADIUS.client = newErrorMockClient()
 
-	assert.False(t, freeRADIUS.Check())
+	assert.Error(t, freeRADIUS.Check())
 }
 
 func TestFreeRADIUS_Charts(t *testing.T) {

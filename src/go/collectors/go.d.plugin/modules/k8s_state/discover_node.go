@@ -16,8 +16,8 @@ func newNodeDiscoverer(si cache.SharedInformer, l *logger.Logger) *nodeDiscovere
 		panic("nil node shared informer")
 	}
 
-	queue := workqueue.NewNamed("node")
-	si.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	queue := workqueue.NewWithConfig(workqueue.QueueConfig{Name: "node"})
+	_, _ = si.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { enqueue(queue, obj) },
 		UpdateFunc: func(_, obj interface{}) { enqueue(queue, obj) },
 		DeleteFunc: func(obj interface{}) { enqueue(queue, obj) },

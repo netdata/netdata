@@ -3,11 +3,32 @@
 package example
 
 import (
+	"os"
 	"testing"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestExample_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Example{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestNew(t *testing.T) {
 	// We want to ensure that module is a reference type, nothing more.
@@ -96,9 +117,9 @@ func TestExample_Init(t *testing.T) {
 			example.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, example.Init())
+				assert.Error(t, example.Init())
 			} else {
-				assert.True(t, example.Init())
+				assert.NoError(t, example.Init())
 			}
 		})
 	}
@@ -124,12 +145,12 @@ func TestExample_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			example := test.prepare()
-			require.True(t, example.Init())
+			require.NoError(t, example.Init())
 
 			if test.wantFail {
-				assert.False(t, example.Check())
+				assert.Error(t, example.Check())
 			} else {
-				assert.True(t, example.Check())
+				assert.NoError(t, example.Check())
 			}
 		})
 	}
@@ -153,7 +174,7 @@ func TestExample_Charts(t *testing.T) {
 		"initialized collector": {
 			prepare: func(t *testing.T) *Example {
 				example := New()
-				require.True(t, example.Init())
+				require.NoError(t, example.Init())
 				return example
 			},
 		},
@@ -259,7 +280,7 @@ func TestExample_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			example := test.prepare()
-			require.True(t, example.Init())
+			require.NoError(t, example.Init())
 
 			collected := example.Collect()
 

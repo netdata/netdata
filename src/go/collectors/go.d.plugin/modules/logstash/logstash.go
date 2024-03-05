@@ -4,6 +4,7 @@ package logstash
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"time"
 
@@ -29,7 +30,7 @@ func New() *Logstash {
 					URL: "http://localhost:9600",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 		},
@@ -39,37 +40,54 @@ func New() *Logstash {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type Logstash struct {
 	module.Base
-	Config     `yaml:",inline"`
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
+
 	httpClient *http.Client
-	charts     *module.Charts
-	pipelines  map[string]bool
+
+	pipelines map[string]bool
 }
 
-func (l *Logstash) Init() bool {
+func (l *Logstash) Configuration() any {
+	return l.Config
+}
+
+func (l *Logstash) Init() error {
 	if l.URL == "" {
 		l.Error("config validation: 'url' cannot be empty")
-		return false
+		return errors.New("url not set")
 	}
 
 	httpClient, err := web.NewHTTPClient(l.Client)
 	if err != nil {
 		l.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	l.httpClient = httpClient
 
 	l.Debugf("using URL %s", l.URL)
-	l.Debugf("using timeout: %s", l.Timeout.Duration)
-	return true
+	l.Debugf("using timeout: %s", l.Timeout.Duration())
+
+	return nil
 }
 
-func (l *Logstash) Check() bool {
-	return len(l.Collect()) > 0
+func (l *Logstash) Check() error {
+	mx, err := l.collect()
+	if err != nil {
+		l.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (l *Logstash) Charts() *module.Charts {

@@ -5,6 +5,7 @@ package postgres
 import (
 	"database/sql"
 	_ "embed"
+	"errors"
 	"sync"
 	"time"
 
@@ -30,7 +31,7 @@ func init() {
 func New() *Postgres {
 	return &Postgres{
 		Config: Config{
-			Timeout:            web.Duration{Duration: time.Second * 2},
+			Timeout:            web.Duration(time.Second * 2),
 			DSN:                "postgres://postgres:postgres@127.0.0.1:5432/postgres",
 			XactTimeHistogram:  []float64{.1, .5, 1, 2.5, 5, 10},
 			QueryTimeHistogram: []float64{.1, .5, 1, 2.5, 5, 10},
@@ -56,41 +57,38 @@ func New() *Postgres {
 }
 
 type Config struct {
-	DSN                string       `yaml:"dsn"`
-	Timeout            web.Duration `yaml:"timeout"`
-	DBSelector         string       `yaml:"collect_databases_matching"`
-	XactTimeHistogram  []float64    `yaml:"transaction_time_histogram"`
-	QueryTimeHistogram []float64    `yaml:"query_time_histogram"`
-	MaxDBTables        int64        `yaml:"max_db_tables"`
-	MaxDBIndexes       int64        `yaml:"max_db_indexes"`
+	UpdateEvery        int          `yaml:"update_every" json:"update_every"`
+	DSN                string       `yaml:"dsn" json:"dsn"`
+	Timeout            web.Duration `yaml:"timeout" json:"timeout"`
+	DBSelector         string       `yaml:"collect_databases_matching" json:"collect_databases_matching"`
+	XactTimeHistogram  []float64    `yaml:"transaction_time_histogram" json:"transaction_time_histogram"`
+	QueryTimeHistogram []float64    `yaml:"query_time_histogram" json:"query_time_histogram"`
+	MaxDBTables        int64        `yaml:"max_db_tables" json:"max_db_tables"`
+	MaxDBIndexes       int64        `yaml:"max_db_indexes" json:"max_db_indexes"`
 }
 
 type (
 	Postgres struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
-		charts *module.Charts
+		charts                            *module.Charts
+		addXactQueryRunningTimeChartsOnce *sync.Once
+		addWALFilesChartsOnce             *sync.Once
 
 		db      *sql.DB
 		dbConns map[string]*dbConn
 
-		superUser      *bool
-		pgIsInRecovery *bool
-		pgVersion      int
-
-		addXactQueryRunningTimeChartsOnce *sync.Once
-		addWALFilesChartsOnce             *sync.Once
-
-		dbSr matcher.Matcher
-
-		mx *pgMetrics
-
+		superUser            *bool
+		pgIsInRecovery       *bool
+		pgVersion            int
+		dbSr                 matcher.Matcher
 		recheckSettingsTime  time.Time
 		recheckSettingsEvery time.Duration
+		doSlowTime           time.Time
+		doSlowEvery          time.Duration
 
-		doSlowTime  time.Time
-		doSlowEvery time.Duration
+		mx *pgMetrics
 	}
 	dbConn struct {
 		db         *sql.DB
@@ -99,28 +97,40 @@ type (
 	}
 )
 
-func (p *Postgres) Init() bool {
+func (p *Postgres) Configuration() any {
+	return p.Config
+}
+
+func (p *Postgres) Init() error {
 	err := p.validateConfig()
 	if err != nil {
 		p.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	sr, err := p.initDBSelector()
 	if err != nil {
 		p.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 	p.dbSr = sr
 
 	p.mx.xactTimeHist = metrics.NewHistogramWithRangeBuckets(p.XactTimeHistogram)
 	p.mx.queryTimeHist = metrics.NewHistogramWithRangeBuckets(p.QueryTimeHistogram)
 
-	return true
+	return nil
 }
 
-func (p *Postgres) Check() bool {
-	return len(p.Collect()) > 0
+func (p *Postgres) Check() error {
+	mx, err := p.collect()
+	if err != nil {
+		p.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (p *Postgres) Charts() *module.Charts {

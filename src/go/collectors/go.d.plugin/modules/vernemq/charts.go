@@ -826,9 +826,10 @@ var (
 )
 
 func (v *VerneMQ) notifyNewScheduler(name string) {
-	if v.cache.hasP(name) {
+	if v.cache[name] {
 		return
 	}
+	v.cache[name] = true
 
 	id := chartSchedulerUtilization.ID
 	num := name[len("system_utilization_scheduler_"):]
@@ -841,9 +842,10 @@ func (v *VerneMQ) notifyNewReason(name, reason string) {
 		return
 	}
 	key := join(name, reason)
-	if v.cache.hasP(key) {
+	if v.cache[key] {
 		return
 	}
+	v.cache[key] = true
 
 	var chart Chart
 	switch name {

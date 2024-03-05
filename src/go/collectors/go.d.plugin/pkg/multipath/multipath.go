@@ -3,9 +3,11 @@
 package multipath
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
@@ -17,11 +19,8 @@ func (e ErrNotFound) Error() string { return e.msg }
 
 // IsNotFound returns a boolean indicating whether the error is ErrNotFound or not.
 func IsNotFound(err error) bool {
-	switch err.(type) {
-	case ErrNotFound:
-		return true
-	}
-	return false
+	var errNotFound ErrNotFound
+	return errors.As(err, &errNotFound)
 }
 
 // MultiPath multi-paths
@@ -59,7 +58,7 @@ func (p MultiPath) Find(filename string) (string, error) {
 	return "", ErrNotFound{msg: fmt.Sprintf("can't find '%s' in %v", filename, p)}
 }
 
-func (p MultiPath) FindFiles(suffix string) ([]string, error) {
+func (p MultiPath) FindFiles(suffixes ...string) ([]string, error) {
 	set := make(map[string]bool)
 	var files []string
 
@@ -70,13 +69,20 @@ func (p MultiPath) FindFiles(suffix string) ([]string, error) {
 		}
 
 		for _, e := range entries {
-			if !e.Type().IsRegular() || !strings.HasSuffix(e.Name(), suffix) || set[e.Name()] {
+			if !e.Type().IsRegular() {
 				continue
 			}
-			set[e.Name()] = true
 
-			name := filepath.Join(dir, e.Name())
-			files = append(files, name)
+			ext := filepath.Ext(e.Name())
+			name := strings.TrimSuffix(e.Name(), ext)
+
+			if (len(suffixes) != 0 && !slices.Contains(suffixes, ext)) || set[name] {
+				continue
+			}
+
+			set[name] = true
+			file := filepath.Join(dir, e.Name())
+			files = append(files, file)
 		}
 	}
 

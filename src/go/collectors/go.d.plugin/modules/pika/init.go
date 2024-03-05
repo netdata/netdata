@@ -11,14 +11,14 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-func (p Pika) validateConfig() error {
+func (p *Pika) validateConfig() error {
 	if p.Address == "" {
 		return errors.New("'address' not set")
 	}
 	return nil
 }
 
-func (p Pika) initRedisClient() (*redis.Client, error) {
+func (p *Pika) initRedisClient() (*redis.Client, error) {
 	opts, err := redis.ParseURL(p.Address)
 	if err != nil {
 		return nil, err
@@ -35,13 +35,13 @@ func (p Pika) initRedisClient() (*redis.Client, error) {
 
 	opts.PoolSize = 1
 	opts.TLSConfig = tlsConfig
-	opts.DialTimeout = p.Timeout.Duration
-	opts.ReadTimeout = p.Timeout.Duration
-	opts.WriteTimeout = p.Timeout.Duration
+	opts.DialTimeout = p.Timeout.Duration()
+	opts.ReadTimeout = p.Timeout.Duration()
+	opts.WriteTimeout = p.Timeout.Duration()
 
 	return redis.NewClient(opts), nil
 }
 
-func (p Pika) initCharts() (*module.Charts, error) {
+func (p *Pika) initCharts() (*module.Charts, error) {
 	return pikaCharts.Copy(), nil
 }

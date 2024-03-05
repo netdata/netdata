@@ -28,7 +28,7 @@ func init() {
 func New() *DNSQuery {
 	return &DNSQuery{
 		Config: Config{
-			Timeout:     web.Duration{Duration: time.Second * 2},
+			Timeout:     web.Duration(time.Second * 2),
 			Network:     "udp",
 			RecordTypes: []string{"A"},
 			Port:        53,
@@ -43,59 +43,62 @@ func New() *DNSQuery {
 }
 
 type Config struct {
-	Domains     []string     `yaml:"domains"`
-	Servers     []string     `yaml:"servers"`
-	Network     string       `yaml:"network"`
-	RecordType  string       `yaml:"record_type"`
-	RecordTypes []string     `yaml:"record_types"`
-	Port        int          `yaml:"port"`
-	Timeout     web.Duration `yaml:"timeout"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	Domains     []string     `yaml:"domains" json:"domains"`
+	Servers     []string     `yaml:"servers" json:"servers"`
+	Network     string       `yaml:"network" json:"network"`
+	RecordType  string       `yaml:"record_type" json:"record_type"`
+	RecordTypes []string     `yaml:"record_types" json:"record_types"`
+	Port        int          `yaml:"port" json:"port"`
 }
 
 type (
 	DNSQuery struct {
 		module.Base
-
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
+		dnsClient    dnsClient
 		newDNSClient func(network string, duration time.Duration) dnsClient
-		recordTypes  map[string]uint16
 
-		dnsClient dnsClient
+		recordTypes map[string]uint16
 	}
-
 	dnsClient interface {
 		Exchange(msg *dns.Msg, address string) (response *dns.Msg, rtt time.Duration, err error)
 	}
 )
 
-func (d *DNSQuery) Init() bool {
+func (d *DNSQuery) Configuration() any {
+	return d.Config
+}
+
+func (d *DNSQuery) Init() error {
 	if err := d.verifyConfig(); err != nil {
 		d.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	rt, err := d.initRecordTypes()
 	if err != nil {
 		d.Errorf("init record type: %v", err)
-		return false
+		return err
 	}
 	d.recordTypes = rt
 
 	charts, err := d.initCharts()
 	if err != nil {
 		d.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	d.charts = charts
 
-	return true
+	return nil
 }
 
-func (d *DNSQuery) Check() bool {
-	return true
+func (d *DNSQuery) Check() error {
+	return nil
 }
 
 func (d *DNSQuery) Charts() *module.Charts {

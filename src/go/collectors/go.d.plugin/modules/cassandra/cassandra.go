@@ -4,6 +4,7 @@ package cassandra
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -32,7 +33,7 @@ func New() *Cassandra {
 					URL: "http://127.0.0.1:7072/metrics",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second * 5},
+					Timeout: web.Duration(time.Second * 5),
 				},
 			},
 		},
@@ -43,39 +44,54 @@ func New() *Cassandra {
 }
 
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type Cassandra struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	charts *module.Charts
 
 	prom prometheus.Prometheus
 
 	validateMetrics bool
-	mx              *cassandraMetrics
+
+	mx *cassandraMetrics
 }
 
-func (c *Cassandra) Init() bool {
+func (c *Cassandra) Configuration() any {
+	return c.Config
+}
+
+func (c *Cassandra) Init() error {
 	if err := c.validateConfig(); err != nil {
 		c.Errorf("error on validating config: %v", err)
-		return false
+		return err
 	}
 
 	prom, err := c.initPrometheusClient()
 	if err != nil {
 		c.Errorf("error on init prometheus client: %v", err)
-		return false
+		return err
 	}
 	c.prom = prom
 
-	return true
+	return nil
 }
 
-func (c *Cassandra) Check() bool {
-	return len(c.Collect()) > 0
+func (c *Cassandra) Check() error {
+	mx, err := c.collect()
+	if err != nil {
+		c.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+
+	}
+	return nil
 }
 
 func (c *Cassandra) Charts() *module.Charts {
@@ -94,4 +110,8 @@ func (c *Cassandra) Collect() map[string]int64 {
 	return mx
 }
 
-func (c *Cassandra) Cleanup() {}
+func (c *Cassandra) Cleanup() {
+	if c.prom != nil && c.prom.HTTPClient() != nil {
+		c.prom.HTTPClient().CloseIdleConnections()
+	}
+}

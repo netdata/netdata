@@ -16,8 +16,8 @@ func newPodDiscoverer(si cache.SharedInformer, l *logger.Logger) *podDiscoverer 
 		panic("nil pod shared informer")
 	}
 
-	queue := workqueue.NewNamed("pod")
-	si.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	queue := workqueue.NewWithConfig(workqueue.QueueConfig{Name: "pod"})
+	_, _ = si.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { enqueue(queue, obj) },
 		UpdateFunc: func(_, obj interface{}) { enqueue(queue, obj) },
 		DeleteFunc: func(obj interface{}) { enqueue(queue, obj) },

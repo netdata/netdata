@@ -1,68 +1,167 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/example job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Example collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "charts": {
+        "title": "Charts configuration",
+        "type": "object",
+        "properties": {
+          "type": {
+            "title": "Chart type",
+            "description": "The type of all charts.",
+            "type": "string",
+            "enum": [
+              "line",
+              "area",
+              "stacked"
+            ],
+            "default": "line"
+          },
+          "num": {
+            "title": "Number of charts",
+            "description": "The total number of charts to create.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 1
+          },
+          "contexts": {
+            "title": "Number of contexts",
+            "description": "The total number of unique contexts.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "dimensions": {
+            "title": "Number of dimensions",
+            "description": "The number of dimensions each chart will have.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 4
+          },
+          "labels": {
+            "title": "Number of labels",
+            "description": "The number of labels each chart will have.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "required": [
+          "type",
+          "num",
+          "contexts",
+          "dimensions",
+          "labels"
+        ]
+      },
+      "hidden_charts": {
+        "title": "Hidden charts configuration",
+        "type": "object",
+        "properties": {
+          "type": {
+            "title": "Chart type",
+            "description": "The type of all charts.",
+            "type": "string",
+            "enum": [
+              "line",
+              "area",
+              "stacked"
+            ],
+            "default": "line"
+          },
+          "num": {
+            "title": "Number of charts",
+            "description": "The total number of charts to create.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "contexts": {
+            "title": "Number of contexts",
+            "description": "The total number of unique contexts.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "dimensions": {
+            "title": "Number of dimensions",
+            "description": "The number of dimensions each chart will have.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 4
+          },
+          "labels": {
+            "title": "Number of labels",
+            "description": "The number of labels each chart will have.",
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "required": [
+          "type",
+          "num",
+          "contexts",
+          "dimensions",
+          "labels"
+        ]
+      }
+    },
+    "required": [
+      "charts"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
     },
     "charts": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "num": {
-          "type": "integer"
-        },
-        "contexts": {
-          "type": "integer"
-        },
-        "dimensions": {
-          "type": "integer"
-        },
-        "labels": {
-          "type": "integer"
+      "type": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
         }
-      },
-      "required": [
-        "type",
-        "num",
-        "contexts",
-        "dimensions",
-        "labels"
-      ]
+      }
     },
     "hidden_charts": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "num": {
-          "type": "integer"
-        },
-        "contexts": {
-          "type": "integer"
-        },
-        "dimensions": {
-          "type": "integer"
-        },
-        "labels": {
-          "type": "integer"
+      "type": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
         }
-      },
-      "required": [
-        "type",
-        "num",
-        "contexts",
-        "dimensions",
-        "labels"
+      }
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every"
+          ]
+        },
+        {
+          "title": "Charts",
+          "fields": [
+            "charts"
+          ]
+        },
+        {
+          "title": "Hidden charts",
+          "fields": [
+            "hidden_charts"
+          ]
+        }
       ]
     }
-  },
-  "required": [
-    "name",
-    "charts"
-  ]
+  }
 }

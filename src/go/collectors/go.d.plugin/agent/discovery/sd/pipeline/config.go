@@ -5,27 +5,24 @@ package pipeline
 import (
 	"errors"
 	"fmt"
-	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/hostsocket"
 
-	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/kubernetes"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/kubernetes"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/netlisteners"
 )
 
 type Config struct {
-	Name      string               `yaml:"name"`
-	Discovery DiscoveryConfig      `yaml:"discovery"`
-	Classify  []ClassifyRuleConfig `yaml:"classify"`
-	Compose   []ComposeRuleConfig  `yaml:"compose"` // TODO: "jobs"?
+	Source   string               `yaml:"-"`
+	Name     string               `yaml:"name"`
+	Discover []DiscoveryConfig    `yaml:"discover"`
+	Classify []ClassifyRuleConfig `yaml:"classify"`
+	Compose  []ComposeRuleConfig  `yaml:"compose"`
 }
 
-type (
-	DiscoveryConfig struct {
-		K8s        []kubernetes.Config `yaml:"k8s"`
-		HostSocket HostSocketConfig    `yaml:"hostsocket"`
-	}
-	HostSocketConfig struct {
-		Net *hostsocket.NetworkSocketConfig `yaml:"net"`
-	}
-)
+type DiscoveryConfig struct {
+	Discoverer   string              `yaml:"discoverer"`
+	NetListeners netlisteners.Config `yaml:"net_listeners"`
+	K8s          []kubernetes.Config `yaml:"k8s"`
+}
 
 type ClassifyRuleConfig struct {
 	Name     string `yaml:"name"`
@@ -47,17 +44,31 @@ type ComposeRuleConfig struct {
 }
 
 func validateConfig(cfg Config) error {
-	if cfg.Name != "" {
+	if cfg.Name == "" {
 		return errors.New("'name' not set")
 	}
-	if len(cfg.Discovery.K8s) == 0 {
-		return errors.New("'discovery->k8s' not set")
+	if err := validateDiscoveryConfig(cfg.Discover); err != nil {
+		return fmt.Errorf("discover config: %v", err)
 	}
 	if err := validateClassifyConfig(cfg.Classify); err != nil {
-		return fmt.Errorf("tag rules: %v", err)
+		return fmt.Errorf("classify rules: %v", err)
 	}
 	if err := validateComposeConfig(cfg.Compose); err != nil {
-		return fmt.Errorf("config rules: %v", err)
+		return fmt.Errorf("compose rules: %v", err)
+	}
+	return nil
+}
+
+func validateDiscoveryConfig(config []DiscoveryConfig) error {
+	if len(config) == 0 {
+		return errors.New("no discoverers, must be at least one")
+	}
+	for _, cfg := range config {
+		switch cfg.Discoverer {
+		case "net_listeners", "k8s":
+		default:
+			return fmt.Errorf("unknown discoverer: '%s'", cfg.Discoverer)
+		}
 	}
 	return nil
 }
@@ -67,22 +78,24 @@ func validateClassifyConfig(rules []ClassifyRuleConfig) error {
 		return errors.New("empty config, need least 1 rule")
 	}
 	for i, rule := range rules {
+		i++
 		if rule.Selector == "" {
-			return fmt.Errorf("'rule[%s][%d]->selector' not set", rule.Name, i+1)
+			return fmt.Errorf("'rule[%s][%d]->selector' not set", rule.Name, i)
 		}
 		if rule.Tags == "" {
-			return fmt.Errorf("'rule[%s][%d]->tags' not set", rule.Name, i+1)
+			return fmt.Errorf("'rule[%s][%d]->tags' not set", rule.Name, i)
 		}
 		if len(rule.Match) == 0 {
-			return fmt.Errorf("'rule[%s][%d]->match' not set, need at least 1 rule match", rule.Name, i+1)
+			return fmt.Errorf("'rule[%s][%d]->match' not set, need at least 1 rule match", rule.Name, i)
 		}
 
 		for j, match := range rule.Match {
+			j++
 			if match.Tags == "" {
-				return fmt.Errorf("'rule[%s][%d]->match[%d]->tags' not set", rule.Name, i+1, j+1)
+				return fmt.Errorf("'rule[%s][%d]->match[%d]->tags' not set", rule.Name, i, j)
 			}
 			if match.Expr == "" {
-				return fmt.Errorf("'rule[%s][%d]->match[%d]->expr' not set", rule.Name, i+1, j+1)
+				return fmt.Errorf("'rule[%s][%d]->match[%d]->expr' not set", rule.Name, i, j)
 			}
 		}
 	}
@@ -94,20 +107,22 @@ func validateComposeConfig(rules []ComposeRuleConfig) error {
 		return errors.New("empty config, need least 1 rule")
 	}
 	for i, rule := range rules {
+		i++
 		if rule.Selector == "" {
-			return fmt.Errorf("'rule[%s][%d]->selector' not set", rule.Name, i+1)
+			return fmt.Errorf("'rule[%s][%d]->selector' not set", rule.Name, i)
 		}
 
 		if len(rule.Config) == 0 {
-			return fmt.Errorf("'rule[%s][%d]->config' not set", rule.Name, i+1)
+			return fmt.Errorf("'rule[%s][%d]->config' not set", rule.Name, i)
 		}
 
 		for j, conf := range rule.Config {
+			j++
 			if conf.Selector == "" {
-				return fmt.Errorf("'rule[%s][%d]->config[%d]->selector' not set", rule.Name, i+1, j+1)
+				return fmt.Errorf("'rule[%s][%d]->config[%d]->selector' not set", rule.Name, i, j)
 			}
 			if conf.Template == "" {
-				return fmt.Errorf("'rule[%s][%d]->config[%d]->template' not set", rule.Name, i+1, j+1)
+				return fmt.Errorf("'rule[%s][%d]->config[%d]->template' not set", rule.Name, i, j)
 			}
 		}
 	}

@@ -12,16 +12,16 @@ import (
 // TLSConfig represents the standard client TLS configuration.
 type TLSConfig struct {
 	// TLSCA specifies the certificate authority to use when verifying server certificates.
-	TLSCA string `yaml:"tls_ca"`
+	TLSCA string `yaml:"tls_ca" json:"tls_ca"`
 
 	// TLSCert specifies tls certificate file.
-	TLSCert string `yaml:"tls_cert"`
+	TLSCert string `yaml:"tls_cert" json:"tls_cert"`
 
 	// TLSKey specifies tls key file.
-	TLSKey string `yaml:"tls_key"`
+	TLSKey string `yaml:"tls_key" json:"tls_key"`
 
 	// InsecureSkipVerify controls whether a client verifies the server's certificate chain and host name.
-	InsecureSkipVerify bool `yaml:"tls_skip_verify"`
+	InsecureSkipVerify bool `yaml:"tls_skip_verify" json:"tls_skip_verify"`
 }
 
 // NewTLSConfig creates a tls.Config, may be nil without an error if TLS is not configured.

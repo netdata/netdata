@@ -4,6 +4,7 @@ package couchdb
 
 import (
 	_ "embed"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -33,7 +34,7 @@ func New() *CouchDB {
 					URL: "http://127.0.0.1:5984",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second * 5},
+					Timeout: web.Duration(time.Second * 2),
 				},
 			},
 			Node: "_local",
@@ -41,36 +42,33 @@ func New() *CouchDB {
 	}
 }
 
-type (
-	Config struct {
-		web.HTTP  `yaml:",inline"`
-		Node      string `yaml:"node"`
-		Databases string `yaml:"databases"`
-	}
-
-	CouchDB struct {
-		module.Base
-		Config `yaml:",inline"`
-
-		httpClient *http.Client
-		charts     *module.Charts
-
-		databases []string
-	}
-)
-
-func (cdb *CouchDB) Cleanup() {
-	if cdb.httpClient == nil {
-		return
-	}
-	cdb.httpClient.CloseIdleConnections()
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int    `yaml:"update_every" json:"update_every"`
+	Node        string `yaml:"node" json:"node"`
+	Databases   string `yaml:"databases" json:"databases"`
 }
 
-func (cdb *CouchDB) Init() bool {
+type CouchDB struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
+
+	httpClient *http.Client
+
+	databases []string
+}
+
+func (cdb *CouchDB) Configuration() any {
+	return cdb.Config
+}
+
+func (cdb *CouchDB) Init() error {
 	err := cdb.validateConfig()
 	if err != nil {
 		cdb.Errorf("check configuration: %v", err)
-		return false
+		return err
 	}
 
 	cdb.databases = strings.Fields(cdb.Config.Databases)
@@ -78,26 +76,37 @@ func (cdb *CouchDB) Init() bool {
 	httpClient, err := cdb.initHTTPClient()
 	if err != nil {
 		cdb.Errorf("init HTTP client: %v", err)
-		return false
+		return err
 	}
 	cdb.httpClient = httpClient
 
 	charts, err := cdb.initCharts()
 	if err != nil {
 		cdb.Errorf("init charts: %v", err)
-		return false
+		return err
 	}
 	cdb.charts = charts
 
-	return true
+	return nil
 }
 
-func (cdb *CouchDB) Check() bool {
+func (cdb *CouchDB) Check() error {
 	if err := cdb.pingCouchDB(); err != nil {
 		cdb.Error(err)
-		return false
+		return err
 	}
-	return len(cdb.Collect()) > 0
+
+	mx, err := cdb.collect()
+	if err != nil {
+		cdb.Error(err)
+		return err
+	}
+
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+
+	return nil
 }
 
 func (cdb *CouchDB) Charts() *Charts {
@@ -114,4 +123,11 @@ func (cdb *CouchDB) Collect() map[string]int64 {
 		return nil
 	}
 	return mx
+}
+
+func (cdb *CouchDB) Cleanup() {
+	if cdb.httpClient == nil {
+		return
+	}
+	cdb.httpClient.CloseIdleConnections()
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/tlscfg"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
@@ -16,24 +17,29 @@ import (
 )
 
 var (
-	v430statistics, _     = os.ReadFile("testdata/v4.3.0/statistics.json")
-	recursorStatistics, _ = os.ReadFile("testdata/recursor/statistics.json")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer430statistics, _   = os.ReadFile("testdata/v4.3.0/statistics.json")
+	dataRecursorStatistics, _ = os.ReadFile("testdata/recursor/statistics.json")
 )
 
-func Test_testDataIsCorrectlyReadAndValid(t *testing.T) {
+func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"v430statistics":     v430statistics,
-		"recursorStatistics": recursorStatistics,
+		"dataConfigJSON":         dataConfigJSON,
+		"dataConfigYAML":         dataConfigYAML,
+		"dataVer430statistics":   dataVer430statistics,
+		"dataRecursorStatistics": dataRecursorStatistics,
 	} {
-		require.NotNilf(t, data, name)
+		require.NotNil(t, data, name)
 	}
 }
 
-func TestNew(t *testing.T) {
-	assert.IsType(t, (*AuthoritativeNS)(nil), New())
+func TestAuthoritativeNS_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &AuthoritativeNS{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestRecursor_Init(t *testing.T) {
+func TestAuthoritativeNS_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
 		wantFail bool
@@ -70,17 +76,17 @@ func TestRecursor_Init(t *testing.T) {
 			ns.Config = test.config
 
 			if test.wantFail {
-				assert.False(t, ns.Init())
+				assert.Error(t, ns.Init())
 			} else {
-				assert.True(t, ns.Init())
+				assert.NoError(t, ns.Init())
 			}
 		})
 	}
 }
 
-func TestRecursor_Check(t *testing.T) {
+func TestAuthoritativeNS_Check(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func() (p *AuthoritativeNS, cleanup func())
+		prepare  func() (ns *AuthoritativeNS, cleanup func())
 		wantFail bool
 	}{
 		"success on valid response v4.3.0": {
@@ -106,30 +112,30 @@ func TestRecursor_Check(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			recursor, cleanup := test.prepare()
+			ns, cleanup := test.prepare()
 			defer cleanup()
-			require.True(t, recursor.Init())
+			require.NoError(t, ns.Init())
 
 			if test.wantFail {
-				assert.False(t, recursor.Check())
+				assert.Error(t, ns.Check())
 			} else {
-				assert.True(t, recursor.Check())
+				assert.NoError(t, ns.Check())
 			}
 		})
 	}
 }
 
-func TestRecursor_Charts(t *testing.T) {
-	recursor := New()
-	require.True(t, recursor.Init())
-	assert.NotNil(t, recursor.Charts())
+func TestAuthoritativeNS_Charts(t *testing.T) {
+	ns := New()
+	require.NoError(t, ns.Init())
+	assert.NotNil(t, ns.Charts())
 }
 
-func TestRecursor_Cleanup(t *testing.T) {
+func TestAuthoritativeNS_Cleanup(t *testing.T) {
 	assert.NotPanics(t, New().Cleanup)
 }
 
-func TestRecursor_Collect(t *testing.T) {
+func TestAuthoritativeNS_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepare       func() (p *AuthoritativeNS, cleanup func())
 		wantCollected map[string]int64
@@ -236,7 +242,7 @@ func TestRecursor_Collect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ns, cleanup := test.prepare()
 			defer cleanup()
-			require.True(t, ns.Init())
+			require.NoError(t, ns.Init())
 
 			collected := ns.Collect()
 
@@ -314,7 +320,7 @@ func preparePowerDNSAuthoritativeNSEndpoint() *httptest.Server {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case urlPathLocalStatistics:
-				_, _ = w.Write(v430statistics)
+				_, _ = w.Write(dataVer430statistics)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -326,7 +332,7 @@ func preparePowerDNSRecursorEndpoint() *httptest.Server {
 		func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
 			case urlPathLocalStatistics:
-				_, _ = w.Write(recursorStatistics)
+				_, _ = w.Write(dataRecursorStatistics)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

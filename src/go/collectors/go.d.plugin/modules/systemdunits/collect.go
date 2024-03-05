@@ -148,7 +148,7 @@ func (s *SystemdUnits) getSystemdVersion(conn systemdConnection) (int, error) {
 }
 
 func (s *SystemdUnits) getLoadedUnits(conn systemdConnection) ([]dbus.UnitStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout.Duration())
 	defer cancel()
 
 	s.Debugf("calling function 'ListUnits'")
@@ -169,7 +169,7 @@ func (s *SystemdUnits) getLoadedUnits(conn systemdConnection) ([]dbus.UnitStatus
 }
 
 func (s *SystemdUnits) getLoadedUnitsByPatterns(conn systemdConnection) ([]dbus.UnitStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout.Duration())
 	defer cancel()
 
 	s.Debugf("calling function 'ListUnitsByPatterns'")

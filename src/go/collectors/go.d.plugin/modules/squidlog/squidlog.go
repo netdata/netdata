@@ -20,68 +20,72 @@ func init() {
 }
 
 func New() *SquidLog {
-	cfg := logs.ParserConfig{
-		LogType: logs.TypeCSV,
-		CSV: logs.CSVConfig{
-			FieldsPerRecord:  -1,
-			Delimiter:        " ",
-			TrimLeadingSpace: true,
-			Format:           "- $resp_time $client_address $result_code $resp_size $req_method - - $hierarchy $mime_type",
-			CheckField:       checkCSVFormatField,
-		},
-	}
 	return &SquidLog{
 		Config: Config{
 			Path:        "/var/log/squid/access.log",
 			ExcludePath: "*.gz",
-			Parser:      cfg,
+			ParserConfig: logs.ParserConfig{
+				LogType: logs.TypeCSV,
+				CSV: logs.CSVConfig{
+					FieldsPerRecord:  -1,
+					Delimiter:        " ",
+					TrimLeadingSpace: true,
+					Format:           "- $resp_time $client_address $result_code $resp_size $req_method - - $hierarchy $mime_type",
+					CheckField:       checkCSVFormatField,
+				},
+			},
 		},
 	}
 }
 
-type (
-	Config struct {
-		Parser      logs.ParserConfig `yaml:",inline"`
-		Path        string            `yaml:"path"`
-		ExcludePath string            `yaml:"exclude_path"`
-	}
-
-	SquidLog struct {
-		module.Base
-		Config `yaml:",inline"`
-
-		file   *logs.Reader
-		parser logs.Parser
-		line   *logLine
-
-		mx     *metricsData
-		charts *module.Charts
-	}
-)
-
-func (s *SquidLog) Init() bool {
-	s.line = newEmptyLogLine()
-	s.mx = newMetricsData()
-	return true
+type Config struct {
+	logs.ParserConfig `yaml:",inline" json:""`
+	UpdateEvery       int    `yaml:"update_every" json:"update_every"`
+	Path              string `yaml:"path" json:"path"`
+	ExcludePath       string `yaml:"exclude_path" json:"exclude_path"`
 }
 
-func (s *SquidLog) Check() bool {
+type SquidLog struct {
+	module.Base
+	Config `yaml:",inline" json:""`
+
+	charts *module.Charts
+
+	file   *logs.Reader
+	parser logs.Parser
+	line   *logLine
+
+	mx *metricsData
+}
+
+func (s *SquidLog) Configuration() any {
+	return s.Config
+}
+
+func (s *SquidLog) Init() error {
+	s.line = newEmptyLogLine()
+	s.mx = newMetricsData()
+	return nil
+}
+
+func (s *SquidLog) Check() error {
 	// Note: these inits are here to make auto-detection retry working
 	if err := s.createLogReader(); err != nil {
 		s.Warning("check failed: ", err)
-		return false
+		return err
 	}
 
 	if err := s.createParser(); err != nil {
 		s.Warning("check failed: ", err)
-		return false
+		return err
 	}
 
 	if err := s.createCharts(s.line); err != nil {
 		s.Warning("check failed: ", err)
-		return false
+		return err
 	}
-	return true
+
+	return nil
 }
 
 func (s *SquidLog) Charts() *module.Charts {

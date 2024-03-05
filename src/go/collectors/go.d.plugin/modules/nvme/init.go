@@ -29,7 +29,7 @@ func (n *NVMe) initNVMeCLIExec() (nvmeCLI, error) {
 				n.Debug("using ndsudo")
 				return &nvmeCLIExec{
 					ndsudoPath: ndsudoPath,
-					timeout:    n.Timeout.Duration,
+					timeout:    n.Timeout.Duration(),
 				}, nil
 			}
 		}
@@ -51,14 +51,14 @@ func (n *NVMe) initNVMeCLIExec() (nvmeCLI, error) {
 	}
 
 	if sudoPath != "" {
-		ctx1, cancel1 := context.WithTimeout(context.Background(), n.Timeout.Duration)
+		ctx1, cancel1 := context.WithTimeout(context.Background(), n.Timeout.Duration())
 		defer cancel1()
 
 		if _, err := exec.CommandContext(ctx1, sudoPath, "-n", "-v").Output(); err != nil {
 			return nil, fmt.Errorf("can not run sudo on this host: %v", err)
 		}
 
-		ctx2, cancel2 := context.WithTimeout(context.Background(), n.Timeout.Duration)
+		ctx2, cancel2 := context.WithTimeout(context.Background(), n.Timeout.Duration())
 		defer cancel2()
 
 		if _, err := exec.CommandContext(ctx2, sudoPath, "-n", "-l", nvmePath).Output(); err != nil {
@@ -69,6 +69,6 @@ func (n *NVMe) initNVMeCLIExec() (nvmeCLI, error) {
 	return &nvmeCLIExec{
 		sudoPath: sudoPath,
 		nvmePath: nvmePath,
-		timeout:  n.Timeout.Duration,
+		timeout:  n.Timeout.Duration(),
 	}, nil
 }

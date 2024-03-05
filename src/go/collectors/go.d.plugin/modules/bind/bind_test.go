@@ -8,21 +8,34 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	jsonServerData, _ = os.ReadFile("testdata/query-server.json")
-	xmlServerData, _  = os.ReadFile("testdata/query-server.xml")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataServerStatsJSON, _ = os.ReadFile("testdata/query-server.json")
+	dataServerStatsXML, _  = os.ReadFile("testdata/query-server.xml")
 )
 
-func TestNew(t *testing.T) {
-	job := New()
-	assert.IsType(t, (*Bind)(nil), job)
-	assert.NotNil(t, job.charts)
-	assert.Equal(t, defaultURL, job.URL)
-	assert.Equal(t, defaultHTTPTimeout, job.Timeout.Duration)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":      dataConfigJSON,
+		"dataConfigYAML":      dataConfigYAML,
+		"dataServerStatsJSON": dataServerStatsJSON,
+		"dataServerStatsXML":  dataServerStatsXML,
+	} {
+		require.NotNil(t, data, name)
+
+	}
+}
+
+func TestBind_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &Bind{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestBind_Cleanup(t *testing.T) { New().Cleanup() }
@@ -30,15 +43,13 @@ func TestBind_Cleanup(t *testing.T) { New().Cleanup() }
 func TestBind_Init(t *testing.T) {
 	// OK
 	job := New()
-	assert.True(t, job.Init())
+	assert.NoError(t, job.Init())
 	assert.NotNil(t, job.bindAPIClient)
 
 	//NG
 	job = New()
 	job.URL = ""
-	assert.False(t, job.Init())
-	job.URL = defaultURL[:len(defaultURL)-1]
-	assert.False(t, job.Init())
+	assert.Error(t, job.Init())
 }
 
 func TestBind_Check(t *testing.T) {
@@ -46,7 +57,7 @@ func TestBind_Check(t *testing.T) {
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/json/v1/server" {
-					_, _ = w.Write(jsonServerData)
+					_, _ = w.Write(dataServerStatsJSON)
 				}
 			}))
 	defer ts.Close()
@@ -54,26 +65,28 @@ func TestBind_Check(t *testing.T) {
 	job := New()
 	job.URL = ts.URL + "/json/v1"
 
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 }
 
 func TestBind_CheckNG(t *testing.T) {
 	job := New()
 
 	job.URL = "http://127.0.0.1:38001/xml/v3"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
-func TestBind_Charts(t *testing.T) { assert.NotNil(t, New().Charts()) }
+func TestBind_Charts(t *testing.T) {
+	assert.NotNil(t, New().Charts())
+}
 
 func TestBind_CollectJSON(t *testing.T) {
 	ts := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/json/v1/server" {
-					_, _ = w.Write(jsonServerData)
+					_, _ = w.Write(dataServerStatsJSON)
 				}
 			}))
 	defer ts.Close()
@@ -82,8 +95,8 @@ func TestBind_CollectJSON(t *testing.T) {
 	job.URL = ts.URL + "/json/v1"
 	job.PermitView = "*"
 
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	expected := map[string]int64{
 		"_default_Queryv4":         4503685324,
@@ -250,7 +263,7 @@ func TestBind_CollectXML3(t *testing.T) {
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/xml/v3/server" {
-					_, _ = w.Write(xmlServerData)
+					_, _ = w.Write(dataServerStatsXML)
 				}
 			}))
 	defer ts.Close()
@@ -259,8 +272,8 @@ func TestBind_CollectXML3(t *testing.T) {
 	job.PermitView = "*"
 	job.URL = ts.URL + "/xml/v3"
 
-	require.True(t, job.Init())
-	require.True(t, job.Check())
+	require.NoError(t, job.Init())
+	require.NoError(t, job.Check())
 
 	expected := map[string]int64{
 		"_bind_CookieClientOk":     0,
@@ -504,8 +517,8 @@ func TestBind_InvalidData(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/json/v1"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }
 
 func TestBind_404(t *testing.T) {
@@ -514,6 +527,6 @@ func TestBind_404(t *testing.T) {
 
 	job := New()
 	job.URL = ts.URL + "/json/v1"
-	require.True(t, job.Init())
-	assert.False(t, job.Check())
+	require.NoError(t, job.Init())
+	assert.Error(t, job.Check())
 }

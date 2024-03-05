@@ -9,18 +9,32 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	metricsData, _      = os.ReadFile("testdata/metrics.txt")
-	wrongMetricsData, _ = os.ReadFile("testdata/non_cockroachdb.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataExpectedMetrics, _   = os.ReadFile("testdata/metrics.txt")
+	dataUnexpectedMetrics, _ = os.ReadFile("testdata/non_cockroachdb.txt")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, metricsData)
-	assert.NotNil(t, wrongMetricsData)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":        dataConfigJSON,
+		"dataConfigYAML":        dataConfigYAML,
+		"dataExpectedMetrics":   dataExpectedMetrics,
+		"dataUnexpectedMetrics": dataUnexpectedMetrics,
+	} {
+		assert.NotNil(t, data, name)
+	}
+}
+
+func TestCockroachDB_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &CockroachDB{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestNew(t *testing.T) {
@@ -30,36 +44,36 @@ func TestNew(t *testing.T) {
 func TestCockroachDB_Init(t *testing.T) {
 	cdb := prepareCockroachDB()
 
-	assert.True(t, cdb.Init())
+	assert.NoError(t, cdb.Init())
 }
 
 func TestCockroachDB_Init_ReturnsFalseIfConfigURLIsNotSet(t *testing.T) {
 	cdb := prepareCockroachDB()
 	cdb.URL = ""
 
-	assert.False(t, cdb.Init())
+	assert.Error(t, cdb.Init())
 }
 
 func TestCockroachDB_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
 	cdb := prepareCockroachDB()
 	cdb.Client.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.False(t, cdb.Init())
+	assert.Error(t, cdb.Init())
 }
 
 func TestCockroachDB_Check(t *testing.T) {
 	cdb, srv := prepareClientServer(t)
 	defer srv.Close()
 
-	assert.True(t, cdb.Check())
+	assert.NoError(t, cdb.Check())
 }
 
 func TestCockroachDB_Check_ReturnsFalseIfConnectionRefused(t *testing.T) {
 	cdb := New()
 	cdb.URL = "http://127.0.0.1:38001/metrics"
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 
-	assert.False(t, cdb.Check())
+	assert.Error(t, cdb.Check())
 }
 
 func TestCockroachDB_Charts(t *testing.T) {
@@ -221,7 +235,7 @@ func TestCockroachDB_Collect_ReturnsNilIfNotCockroachDBMetrics(t *testing.T) {
 
 func TestCockroachDB_Collect_ReturnsNilIfConnectionRefused(t *testing.T) {
 	cdb := prepareCockroachDB()
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 
 	assert.Nil(t, cdb.Collect())
 }
@@ -267,12 +281,12 @@ func prepareClientServer(t *testing.T) (*CockroachDB, *httptest.Server) {
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(metricsData)
+			_, _ = w.Write(dataExpectedMetrics)
 		}))
 
 	cdb := New()
 	cdb.URL = ts.URL
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 
 	return cdb, ts
 }
@@ -281,12 +295,12 @@ func prepareClientServerNotCockroachDBMetricResponse(t *testing.T) (*CockroachDB
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(wrongMetricsData)
+			_, _ = w.Write(dataUnexpectedMetrics)
 		}))
 
 	cdb := New()
 	cdb.URL = ts.URL
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 
 	return cdb, ts
 }
@@ -300,7 +314,7 @@ func prepareClientServerInvalidDataResponse(t *testing.T) (*CockroachDB, *httpte
 
 	cdb := New()
 	cdb.URL = ts.URL
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 
 	return cdb, ts
 }
@@ -314,6 +328,6 @@ func prepareClientServerResponse404(t *testing.T) (*CockroachDB, *httptest.Serve
 
 	cdb := New()
 	cdb.URL = ts.URL
-	require.True(t, cdb.Init())
+	require.NoError(t, cdb.Init())
 	return cdb, ts
 }

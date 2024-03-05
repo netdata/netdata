@@ -4,6 +4,7 @@ package nvme
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -27,8 +28,9 @@ func New() *NVMe {
 	return &NVMe{
 		Config: Config{
 			BinaryPath: "nvme",
-			Timeout:    web.Duration{Duration: time.Second * 2},
+			Timeout:    web.Duration(time.Second * 2),
 		},
+
 		charts:           &module.Charts{},
 		devicePaths:      make(map[string]bool),
 		listDevicesEvery: time.Minute * 10,
@@ -37,14 +39,15 @@ func New() *NVMe {
 }
 
 type Config struct {
-	Timeout    web.Duration
-	BinaryPath string `yaml:"binary_path"`
+	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	BinaryPath  string       `yaml:"binary_path" json:"binary_path"`
 }
 
 type (
 	NVMe struct {
 		module.Base
-		Config `yaml:",inline"`
+		Config `yaml:",inline" json:""`
 
 		charts *module.Charts
 
@@ -61,24 +64,36 @@ type (
 	}
 )
 
-func (n *NVMe) Init() bool {
+func (n *NVMe) Configuration() any {
+	return n.Config
+}
+
+func (n *NVMe) Init() error {
 	if err := n.validateConfig(); err != nil {
 		n.Errorf("config validation: %v", err)
-		return false
+		return err
 	}
 
 	v, err := n.initNVMeCLIExec()
 	if err != nil {
 		n.Errorf("init nvme-cli exec: %v", err)
-		return false
+		return err
 	}
 	n.exec = v
 
-	return true
+	return nil
 }
 
-func (n *NVMe) Check() bool {
-	return len(n.Collect()) > 0
+func (n *NVMe) Check() error {
+	mx, err := n.collect()
+	if err != nil {
+		n.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
 func (n *NVMe) Charts() *module.Charts {

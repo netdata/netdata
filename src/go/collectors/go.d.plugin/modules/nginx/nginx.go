@@ -4,11 +4,11 @@ package nginx
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
 //go:embed "config_schema.json"
@@ -21,78 +21,85 @@ func init() {
 	})
 }
 
-const (
-	defaultURL         = "http://127.0.0.1/stub_status"
-	defaultHTTPTimeout = time.Second
-)
-
-// New creates Nginx with default values.
 func New() *Nginx {
-	config := Config{
-		HTTP: web.HTTP{
-			Request: web.Request{
-				URL: defaultURL,
+	return &Nginx{
+		Config: Config{
+			HTTP: web.HTTP{
+				Request: web.Request{
+					URL: "http://127.0.0.1/stub_status",
+				},
+				Client: web.Client{
+					Timeout: web.Duration(time.Second * 1),
+				},
 			},
-			Client: web.Client{
-				Timeout: web.Duration{Duration: defaultHTTPTimeout},
-			},
-		},
-	}
-
-	return &Nginx{Config: config}
+		}}
 }
 
-// Config is the Nginx module configuration.
 type Config struct {
-	web.HTTP `yaml:",inline"`
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
-// Nginx nginx module.
 type Nginx struct {
 	module.Base
-	Config `yaml:",inline"`
+	Config `yaml:",inline" json:""`
 
 	apiClient *apiClient
 }
 
-// Cleanup makes cleanup.
-func (Nginx) Cleanup() {}
+func (n *Nginx) Configuration() any {
+	return n.Config
+}
 
-// Init makes initialization.
-func (n *Nginx) Init() bool {
+func (n *Nginx) Init() error {
 	if n.URL == "" {
 		n.Error("URL not set")
-		return false
+		return errors.New("url not set")
 	}
 
 	client, err := web.NewHTTPClient(n.Client)
 	if err != nil {
 		n.Error(err)
-		return false
+		return err
 	}
 
 	n.apiClient = newAPIClient(client, n.Request)
 
 	n.Debugf("using URL %s", n.URL)
-	n.Debugf("using timeout: %s", n.Timeout.Duration)
+	n.Debugf("using timeout: %s", n.Timeout)
 
-	return true
+	return nil
 }
 
-// Check makes check.
-func (n *Nginx) Check() bool { return len(n.Collect()) > 0 }
+func (n *Nginx) Check() error {
+	mx, err := n.collect()
+	if err != nil {
+		n.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
 
-// Charts creates Charts.
-func (Nginx) Charts() *Charts { return charts.Copy() }
+	}
+	return nil
+}
 
-// Collect collects metrics.
+func (n *Nginx) Charts() *Charts {
+	return charts.Copy()
+}
+
 func (n *Nginx) Collect() map[string]int64 {
 	mx, err := n.collect()
-
 	if err != nil {
 		n.Error(err)
 		return nil
 	}
 
 	return mx
+}
+
+func (n *Nginx) Cleanup() {
+	if n.apiClient != nil && n.apiClient.httpClient != nil {
+		n.apiClient.httpClient.CloseIdleConnections()
+	}
 }

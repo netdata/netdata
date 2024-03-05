@@ -1,26 +1,48 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/docker job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Docker collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "address": {
+        "title": "Address",
+        "description": "Docker daemon's Unix or TCP (listening address) socket.",
+        "type": "string",
+        "default": "unix:///var/run/docker.sock"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for establishing a connection and communication (reading and writing) in seconds.",
+        "type": "number",
+        "default": 2
+      },
+      "collect_container_size": {
+        "title": "Collect container size",
+        "description": "Collect container writable layer size.",
+        "type": "boolean",
+        "default": false
+      }
+    },
+    "required": [
+      "address"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
     },
     "address": {
-      "type": "string"
+      "ui:help": "Use `unix://{path_to_socket}` for Unix socket or `tcp://{ip}:{port}` for TCP socket."
     },
     "timeout": {
-      "type": [
-        "string",
-        "integer"
-      ]
-    },
-    "collect_container_size": {
-      "type": "boolean"
+      "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     }
-  },
-  "required": [
-    "name",
-    "address"
-  ]
+  }
 }

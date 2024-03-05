@@ -9,63 +9,74 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	metricsV1101MQTTv5, _ = os.ReadFile("testdata/metrics-v1.10.1-mqtt5.txt")
-	invalidMetrics, _     = os.ReadFile("testdata/non_vernemq.txt")
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+
+	dataVer1101MQTTv5Metrics, _ = os.ReadFile("testdata/metrics-v1.10.1-mqtt5.txt")
+	dataUnexpectedMetrics, _    = os.ReadFile("testdata/non_vernemq.txt")
 )
 
-func Test_readTestData(t *testing.T) {
-	assert.NotNil(t, metricsV1101MQTTv5)
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON":           dataConfigJSON,
+		"dataConfigYAML":           dataConfigYAML,
+		"dataVer1101MQTTv5Metrics": dataVer1101MQTTv5Metrics,
+		"dataUnexpectedMetrics":    dataUnexpectedMetrics,
+	} {
+		require.NotNil(t, data, name)
+	}
 }
 
-func TestNew(t *testing.T) {
-	assert.Implements(t, (*module.Module)(nil), New())
+func TestVerneMQ_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &VerneMQ{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestVerneMQ_Init(t *testing.T) {
 	verneMQ := prepareVerneMQ()
 
-	assert.True(t, verneMQ.Init())
+	assert.NoError(t, verneMQ.Init())
 }
 
 func TestVerneMQ_Init_ReturnsFalseIfURLIsNotSet(t *testing.T) {
 	verneMQ := prepareVerneMQ()
 	verneMQ.URL = ""
 
-	assert.False(t, verneMQ.Init())
+	assert.Error(t, verneMQ.Init())
 }
 
 func TestVerneMQ_Init_ReturnsFalseIfClientWrongTLSCA(t *testing.T) {
 	verneMQ := prepareVerneMQ()
 	verneMQ.Client.TLSConfig.TLSCA = "testdata/tls"
 
-	assert.False(t, verneMQ.Init())
+	assert.Error(t, verneMQ.Init())
 }
 
 func TestVerneMQ_Check(t *testing.T) {
 	verneMQ, srv := prepareClientServerV1101(t)
 	defer srv.Close()
 
-	assert.True(t, verneMQ.Check())
+	assert.NoError(t, verneMQ.Check())
 }
 
 func TestVerneMQ_Check_ReturnsFalseIfConnectionRefused(t *testing.T) {
 	verneMQ := prepareVerneMQ()
-	require.True(t, verneMQ.Init())
+	require.NoError(t, verneMQ.Init())
 
-	assert.False(t, verneMQ.Check())
+	assert.Error(t, verneMQ.Check())
 }
 
 func TestVerneMQ_Check_ReturnsFalseIfMetricsAreNotVerneMQ(t *testing.T) {
 	verneMQ, srv := prepareClientServerNotVerneMQ(t)
 	defer srv.Close()
-	require.True(t, verneMQ.Init())
+	require.NoError(t, verneMQ.Init())
 
-	assert.False(t, verneMQ.Check())
+	assert.Error(t, verneMQ.Check())
 }
 
 func TestVerneMQ_Charts(t *testing.T) {
@@ -87,7 +98,7 @@ func TestVerneMQ_Collect(t *testing.T) {
 
 func TestVerneMQ_Collect_ReturnsNilIfConnectionRefused(t *testing.T) {
 	verneMQ := prepareVerneMQ()
-	require.True(t, verneMQ.Init())
+	require.NoError(t, verneMQ.Init())
 
 	assert.Nil(t, verneMQ.Collect())
 }
@@ -140,12 +151,12 @@ func prepareClientServerV1101(t *testing.T) (*VerneMQ, *httptest.Server) {
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(metricsV1101MQTTv5)
+			_, _ = w.Write(dataVer1101MQTTv5Metrics)
 		}))
 
 	verneMQ := New()
 	verneMQ.URL = ts.URL
-	require.True(t, verneMQ.Init())
+	require.NoError(t, verneMQ.Init())
 
 	return verneMQ, ts
 }
@@ -154,12 +165,12 @@ func prepareClientServerNotVerneMQ(t *testing.T) (*VerneMQ, *httptest.Server) {
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write(invalidMetrics)
+			_, _ = w.Write(dataUnexpectedMetrics)
 		}))
 
 	verneMQ := New()
 	verneMQ.URL = ts.URL
-	require.True(t, verneMQ.Init())
+	require.NoError(t, verneMQ.Init())
 
 	return verneMQ, ts
 }
@@ -173,7 +184,7 @@ func prepareClientServerInvalid(t *testing.T) (*VerneMQ, *httptest.Server) {
 
 	verneMQ := New()
 	verneMQ.URL = ts.URL
-	require.True(t, verneMQ.Init())
+	require.NoError(t, verneMQ.Init())
 
 	return verneMQ, ts
 }
@@ -187,7 +198,7 @@ func prepareClientServerResponse404(t *testing.T) (*VerneMQ, *httptest.Server) {
 
 	verneMQ := New()
 	verneMQ.URL = ts.URL
-	require.True(t, verneMQ.Init())
+	require.NoError(t, verneMQ.Init())
 	return verneMQ, ts
 }
 

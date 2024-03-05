@@ -1,44 +1,128 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "go.d/postgres job configuration schema.",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Postgres collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "dsn": {
+        "title": "DSN",
+        "description": "Postgres server Data Source Name in [keyword/value or URI format](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).",
+        "type": "string",
+        "default": "postgres://netdata:password@127.0.0.1:5432/postgres"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Timeout for queries, in seconds.",
+        "type": "number",
+        "minimum": 0.5,
+        "default": 2
+      },
+      "collect_databases_matching": {
+        "title": "Database selector",
+        "description": "Configuration for monitoring specific databases using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). If left empty, no database metrics will be collected.",
+        "type": "string"
+      },
+      "max_db_tables": {
+        "title": "Table limit",
+        "description": "Table metrics will not be collected for databases that have more tables than the limit. Set to 0 for no limit.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 50
+      },
+      "max_db_indexes": {
+        "title": "Index limit",
+        "description": "Index metrics will not be collected for databases that have more indexes than the limit. Set to 0 for no limit.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 250
+      },
+      "transaction_time_histogram": {
+        "title": "Transaction time histogram",
+        "description": "Buckets for transaction time histogram in milliseconds.",
+        "type": "array",
+        "items": {
+          "title": "Bucket",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "uniqueItems": true,
+        "default": [
+          0.1,
+          0.5,
+          1,
+          2.5,
+          5,
+          10
+        ]
+      },
+      "query_time_histogram": {
+        "title": "Query time histogram",
+        "description": "Buckets for query time histogram in milliseconds.",
+        "type": "array",
+        "items": {
+          "title": "Bucket",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "uniqueItems": true,
+        "default": [
+          0.1,
+          0.5,
+          1,
+          2.5,
+          5,
+          10
+        ]
+      }
     },
-    "dsn": {
-      "type": "string"
+    "required": [
+      "dsn"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
     },
-    "timeout": {
-      "type": [
-        "string",
-        "integer"
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "dsn",
+            "timeout"
+          ]
+        },
+        {
+          "title": "Database stats",
+          "fields": [
+            "max_db_tables",
+            "max_db_indexes",
+            "collect_databases_matching"
+          ]
+        },
+        {
+          "title": "Histograms",
+          "fields": [
+            "transaction_time_histogram",
+            "query_time_histogram"
+          ]
+        }
       ]
     },
-    "collect_databases_matching": {
-      "type": "string"
-    },
     "transaction_time_histogram": {
-      "type": "array",
-      "items": {
-        "type": "number"
-      }
+      "ui:listFlavour": "list"
     },
     "query_time_histogram": {
-      "type": "array",
-      "items": {
-        "type": "number"
-      }
-    },
-    "max_db_tables": {
-      "type": "integer"
-    },
-    "max_db_indexes": {
-      "type": "integer"
+      "ui:listFlavour": "list"
     }
-  },
-  "required": [
-    "name",
-    "dsn"
-  ]
+  }
 }

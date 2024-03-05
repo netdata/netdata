@@ -4,11 +4,32 @@ package whoisquery
 
 import (
 	"errors"
+	"os"
 	"testing"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
+	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
+)
+
+func Test_testDataIsValid(t *testing.T) {
+	for name, data := range map[string][]byte{
+		"dataConfigJSON": dataConfigJSON,
+		"dataConfigYAML": dataConfigYAML,
+	} {
+		require.NotNil(t, data, name)
+	}
+}
+
+func TestWhoisQuery_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &WhoisQuery{}, dataConfigJSON, dataConfigYAML)
+}
 
 func TestWhoisQuery_Cleanup(t *testing.T) {
 	New().Cleanup()
@@ -17,7 +38,7 @@ func TestWhoisQuery_Cleanup(t *testing.T) {
 func TestWhoisQuery_Charts(t *testing.T) {
 	whoisquery := New()
 	whoisquery.Source = "example.com"
-	require.True(t, whoisquery.Init())
+	require.NoError(t, whoisquery.Init())
 
 	assert.NotNil(t, whoisquery.Charts())
 }
@@ -45,9 +66,9 @@ func TestWhoisQuery_Init(t *testing.T) {
 			whoisquery.Config = test.config
 
 			if test.err {
-				assert.False(t, whoisquery.Init())
+				assert.Error(t, whoisquery.Init())
 			} else {
-				require.True(t, whoisquery.Init())
+				require.NoError(t, whoisquery.Init())
 
 				var typeOK bool
 				if test.providerType == net {
@@ -64,20 +85,20 @@ func TestWhoisQuery_Check(t *testing.T) {
 	whoisquery := New()
 	whoisquery.prov = &mockProvider{remTime: 12345.678}
 
-	assert.True(t, whoisquery.Check())
+	assert.NoError(t, whoisquery.Check())
 }
 
 func TestWhoisQuery_Check_ReturnsFalseOnProviderError(t *testing.T) {
 	whoisquery := New()
 	whoisquery.prov = &mockProvider{err: true}
 
-	assert.False(t, whoisquery.Check())
+	assert.Error(t, whoisquery.Check())
 }
 
 func TestWhoisQuery_Collect(t *testing.T) {
 	whoisquery := New()
 	whoisquery.Source = "example.com"
-	require.True(t, whoisquery.Init())
+	require.NoError(t, whoisquery.Init())
 	whoisquery.prov = &mockProvider{remTime: 12345}
 
 	collected := whoisquery.Collect()
@@ -96,7 +117,7 @@ func TestWhoisQuery_Collect(t *testing.T) {
 func TestWhoisQuery_Collect_ReturnsNilOnProviderError(t *testing.T) {
 	whoisquery := New()
 	whoisquery.Source = "example.com"
-	require.True(t, whoisquery.Init())
+	require.NoError(t, whoisquery.Init())
 	whoisquery.prov = &mockProvider{err: true}
 
 	assert.Nil(t, whoisquery.Collect())

@@ -4,12 +4,15 @@ package pipeline
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/kubernetes"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/netlisteners"
+
 	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
-	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/hostsocket"
-	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/kubernetes"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
@@ -19,14 +22,28 @@ func New(cfg Config) (*Pipeline, error) {
 		return nil, err
 	}
 
+	clr, err := newTargetClassificator(cfg.Classify)
+	if err != nil {
+		return nil, fmt.Errorf("classify rules: %v", err)
+	}
+
+	cmr, err := newConfigComposer(cfg.Compose)
+	if err != nil {
+		return nil, fmt.Errorf("compose rules: %v", err)
+	}
+
 	p := &Pipeline{
 		Logger: logger.New().With(
-			slog.String("component", "discovery sd pipeline"),
+			slog.String("component", "service discovery"),
+			slog.String("pipeline", cfg.Name),
 		),
+		clr:         clr,
+		cmr:         cmr,
 		accum:       newAccumulator(),
 		discoverers: make([]model.Discoverer, 0),
-		items:       make(map[string]map[uint64][]confgroup.Config),
+		configs:     make(map[string]map[uint64][]confgroup.Config),
 	}
+	p.accum.Logger = p.Logger
 
 	if err := p.registerDiscoverers(cfg); err != nil {
 		return nil, err
@@ -41,11 +58,9 @@ type (
 
 		discoverers []model.Discoverer
 		accum       *accumulator
-
-		clr classificator
-		cmr composer
-
-		items map[string]map[uint64][]confgroup.Config // [source][targetHash]
+		clr         classificator
+		cmr         composer
+		configs     map[string]map[uint64][]confgroup.Config // [targetSource][targetHash]
 	}
 	classificator interface {
 		classify(model.Target) model.Tags
@@ -56,19 +71,30 @@ type (
 )
 
 func (p *Pipeline) registerDiscoverers(conf Config) error {
-	for _, cfg := range conf.Discovery.K8s {
-		td, err := kubernetes.NewKubeDiscoverer(cfg)
-		if err != nil {
-			return err
+	for _, cfg := range conf.Discover {
+		switch cfg.Discoverer {
+		case "net_listeners":
+			cfg.NetListeners.Source = conf.Source
+			td, err := netlisteners.NewDiscoverer(cfg.NetListeners)
+			if err != nil {
+				return fmt.Errorf("failed to create 'net_listeners' discoverer: %v", err)
+			}
+			p.discoverers = append(p.discoverers, td)
+		case "k8s":
+			for _, k8sCfg := range cfg.K8s {
+				td, err := kubernetes.NewKubeDiscoverer(k8sCfg)
+				if err != nil {
+					return fmt.Errorf("failed to create 'k8s' discoverer: %v", err)
+				}
+				p.discoverers = append(p.discoverers, td)
+			}
+		default:
+			return fmt.Errorf("unknown discoverer: '%s'", cfg.Discoverer)
 		}
-		p.discoverers = append(p.discoverers, td)
 	}
-	if conf.Discovery.HostSocket.Net != nil {
-		td, err := hostsocket.NewNetSocketDiscoverer(*conf.Discovery.HostSocket.Net)
-		if err != nil {
-			return err
-		}
-		p.discoverers = append(p.discoverers, td)
+
+	if len(p.discoverers) == 0 {
+		return errors.New("no discoverers registered")
 	}
 
 	return nil
@@ -90,43 +116,49 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 		case <-ctx.Done():
 			select {
 			case <-done:
-			case <-time.After(time.Second * 5):
+			case <-time.After(time.Second * 4):
 			}
 			return
 		case <-done:
 			return
 		case tggs := <-updates:
-			p.Infof("received %d target groups", len(tggs))
-			send(ctx, in, p.processGroups(tggs))
+			p.Debugf("received %d target groups", len(tggs))
+			if cfggs := p.processGroups(tggs); len(cfggs) > 0 {
+				select {
+				case <-ctx.Done():
+				case in <- cfggs: // FIXME: potentially stale configs if upstream cannot receive (blocking)
+				}
+			}
 		}
 	}
 }
 
 func (p *Pipeline) processGroups(tggs []model.TargetGroup) []*confgroup.Group {
-	var confGroups []*confgroup.Group
+	var groups []*confgroup.Group
 	// updates come from the accumulator, this ensures that all groups have different sources
 	for _, tgg := range tggs {
-		p.Infof("processing group '%s' with %d target(s)", tgg.Source(), len(tgg.Targets()))
+		p.Debugf("processing group '%s' with %d target(s)", tgg.Source(), len(tgg.Targets()))
 		if v := p.processGroup(tgg); v != nil {
-			confGroups = append(confGroups, v)
+			groups = append(groups, v)
 		}
 	}
-	return confGroups
+	return groups
 }
 
 func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 	if len(tgg.Targets()) == 0 {
-		if _, ok := p.items[tgg.Source()]; !ok {
+		if _, ok := p.configs[tgg.Source()]; !ok {
 			return nil
 		}
-		delete(p.items, tgg.Source())
+		delete(p.configs, tgg.Source())
+
 		return &confgroup.Group{Source: tgg.Source()}
 	}
 
-	targetsCache, ok := p.items[tgg.Source()]
+	targetsCache, ok := p.configs[tgg.Source()]
 	if !ok {
 		targetsCache = make(map[uint64][]confgroup.Config)
-		p.items[tgg.Source()] = targetsCache
+		p.configs[tgg.Source()] = targetsCache
 	}
 
 	var changed bool
@@ -144,19 +176,22 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 			continue
 		}
 
+		targetsCache[hash] = nil
+
 		if tags := p.clr.classify(tgt); len(tags) > 0 {
 			tgt.Tags().Merge(tags)
 
-			if configs := p.cmr.compose(tgt); len(configs) > 0 {
-				for _, cfg := range configs {
+			if cfgs := p.cmr.compose(tgt); len(cfgs) > 0 {
+				targetsCache[hash] = cfgs
+				changed = true
+
+				for _, cfg := range cfgs {
+					// TODO: set
 					cfg.SetProvider(tgg.Provider())
 					cfg.SetSource(tgg.Source())
+					cfg.SetSourceType(confgroup.TypeDiscovered)
 				}
-				targetsCache[hash] = configs
-				changed = true
 			}
-		} else {
-			p.Infof("target '%s' classify: fail", tgt.TUID())
 		}
 	}
 
@@ -164,7 +199,7 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 		if seen[hash] {
 			continue
 		}
-		if configs := targetsCache[hash]; len(configs) > 0 {
+		if cfgs := targetsCache[hash]; len(cfgs) > 0 {
 			changed = true
 		}
 		delete(targetsCache, hash)
@@ -176,21 +211,10 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 
 	// TODO: deepcopy?
 	cfgGroup := &confgroup.Group{Source: tgg.Source()}
+
 	for _, cfgs := range targetsCache {
 		cfgGroup.Configs = append(cfgGroup.Configs, cfgs...)
 	}
 
 	return cfgGroup
-}
-
-func send(ctx context.Context, in chan<- []*confgroup.Group, configs []*confgroup.Group) {
-	if len(configs) == 0 {
-		return
-	}
-
-	select {
-	case <-ctx.Done():
-		return
-	case in <- configs:
-	}
 }

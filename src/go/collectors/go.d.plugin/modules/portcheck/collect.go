@@ -41,7 +41,7 @@ func (pc *PortCheck) collect() (map[string]int64, error) {
 
 func (pc *PortCheck) checkPort(p *port) {
 	start := time.Now()
-	conn, err := pc.dial("tcp", fmt.Sprintf("%s:%d", pc.Host, p.number), pc.Timeout.Duration)
+	conn, err := pc.dial("tcp", fmt.Sprintf("%s:%d", pc.Host, p.number), pc.Timeout.Duration())
 	dur := time.Since(start)
 
 	defer func() {

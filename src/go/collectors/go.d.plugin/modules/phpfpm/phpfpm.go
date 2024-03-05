@@ -4,14 +4,16 @@ package phpfpm
 
 import (
 	_ "embed"
+	"errors"
 	"time"
 
-	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
-
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
-//go:embed "config_schema.json"
+////go:embed "config_schema.json"
+//var configSchema string
+
 var configSchema string
 
 func init() {
@@ -29,7 +31,7 @@ func New() *Phpfpm {
 					URL: "http://127.0.0.1/status?full&json",
 				},
 				Client: web.Client{
-					Timeout: web.Duration{Duration: time.Second},
+					Timeout: web.Duration(time.Second),
 				},
 			},
 			FcgiPath: "/status",
@@ -37,36 +39,49 @@ func New() *Phpfpm {
 	}
 }
 
-type (
-	Config struct {
-		web.HTTP `yaml:",inline"`
-		Socket   string `yaml:"socket"`
-		Address  string `yaml:"address"`
-		FcgiPath string `yaml:"fcgi_path"`
-	}
-	Phpfpm struct {
-		module.Base
-		Config `yaml:",inline"`
+type Config struct {
+	web.HTTP    `yaml:",inline" json:""`
+	UpdateEvery int    `yaml:"update_every" json:"update_every"`
+	Socket      string `yaml:"socket" json:"socket"`
+	Address     string `yaml:"address" json:"address"`
+	FcgiPath    string `yaml:"fcgi_path" json:"fcgi_path"`
+}
 
-		client client
-	}
-)
+type Phpfpm struct {
+	module.Base
+	Config `yaml:",inline" json:""`
 
-func (p *Phpfpm) Init() bool {
+	client client
+}
+
+func (p *Phpfpm) Configuration() any {
+	return p.Config
+}
+
+func (p *Phpfpm) Init() error {
 	c, err := p.initClient()
 	if err != nil {
 		p.Errorf("init client: %v", err)
-		return false
+		return err
 	}
 	p.client = c
-	return true
+
+	return nil
 }
 
-func (p *Phpfpm) Check() bool {
-	return len(p.Collect()) > 0
+func (p *Phpfpm) Check() error {
+	mx, err := p.collect()
+	if err != nil {
+		p.Error(err)
+		return err
+	}
+	if len(mx) == 0 {
+		return errors.New("no metrics collected")
+	}
+	return nil
 }
 
-func (Phpfpm) Charts() *Charts {
+func (p *Phpfpm) Charts() *Charts {
 	return charts.Copy()
 }
 
@@ -82,4 +97,4 @@ func (p *Phpfpm) Collect() map[string]int64 {
 	return mx
 }
 
-func (Phpfpm) Cleanup() {}
+func (p *Phpfpm) Cleanup() {}

@@ -97,7 +97,7 @@ func (m *MySQL) openConnection() error {
 
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	ctx, cancel := context.WithTimeout(context.Background(), m.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), m.Timeout.Duration())
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
@@ -145,7 +145,7 @@ func hasTableOpenCacheOverflowsMetrics(collected map[string]int64) bool {
 }
 
 func (m *MySQL) collectQuery(query string, assign func(column, value string, lineEnd bool)) (duration int64, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), m.Timeout.Duration)
+	ctx, cancel := context.WithTimeout(context.Background(), m.Timeout.Duration())
 	defer cancel()
 
 	s := time.Now()

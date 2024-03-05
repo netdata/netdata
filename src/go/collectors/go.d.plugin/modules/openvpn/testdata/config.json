@@ -1,0 +1,13 @@
+{
+  "update_every": 123,
+  "address": "ok",
+  "timeout": 123.123,
+  "per_user_stats": {
+    "includes": [
+      "ok"
+    ],
+    "excludes": [
+      "ok"
+    ]
+  }
+}
