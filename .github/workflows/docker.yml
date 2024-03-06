@@ -59,7 +59,6 @@ jobs:
             .github/workflows/docker.yml
             .github/scripts/docker-test.sh
             .github/scripts/gen-docker-tags.py
-            .github/scripts/gen-docker-build-info.py
             .github/scripts/gen-docker-imagetool-args.py
             packaging/cmake/
             packaging/docker/
@@ -259,7 +258,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
-          outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=netdata/netdata-ci-test,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
         id: export-digest
         if: github.repository == 'netdata/netdata'
@@ -331,7 +330,7 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetool create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' ${{ needs.gen-tags.outputs.tags }})
+        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' ${{ needs.gen-tags.outputs.tags }})
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -410,7 +409,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
-          outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=quay.io/netdata/netdata-ci-test,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
         id: export-digest
         if: github.repository == 'netdata/netdata'
@@ -483,7 +482,7 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetool create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' ${{ needs.gen-tags.outputs.tags }})
+        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' ${{ needs.gen-tags.outputs.tags }})
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
