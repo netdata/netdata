@@ -126,13 +126,14 @@ jobs:
         id: package-upload
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         run: |
-          for arch in ${{ matrix.arches }}; do
-            for suffix in '' -edge -repoconfig ; do
+          # shellcheck disable=SC2043
+          for arch in "${{ matrix.arches }}"; do
+            for suffix in '' -edge -repoconfig; do
               .github/scripts/package-upload.sh \
-              ${{ matrix.pkgclouddistro }} \
-              ${arch} \
-              ${{ matrix.format }} \
-              netdata/netdata${suffix}
+              "${{ matrix.pkgclouddistro }}" \
+              "${arch}" \
+              "${{ matrix.format }}" \
+              netdata/netdata"${suffix}"
             done
           done
       - name: Failure Notification
