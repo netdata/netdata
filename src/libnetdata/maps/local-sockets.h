@@ -1295,16 +1295,6 @@ static inline void local_sockets_read_sockets_from_proc(LS_STATE *ls) {
         local_sockets_read_proc_inode_link(ls, path, &ls->proc_self_net_ns_inode, "net");
     }
 
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    if (ls->use_ebpf) {
-        ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls);
-        /* Keeping commented while the rest of the algorithm is inserted to compare with other collections
-        if (ls->use_ebpf)
-            return;
-            */
-    }
-#endif
-
     if(ls->config.cmdline || ls->config.comm || ls->config.pid || ls->config.namespaces) {
         snprintfz(path, sizeof(path), "%s/proc", ls->config.host_prefix);
         local_sockets_find_all_sockets_in_proc(ls, path);
