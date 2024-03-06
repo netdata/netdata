@@ -101,6 +101,7 @@ func (m *Manager) registerDiscoverers(cfg Config) error {
 	}
 
 	if len(cfg.SD.ConfDir) != 0 {
+		cfg.SD.ConfigDefaults = cfg.Registry
 		d, err := sd.NewServiceDiscovery(cfg.SD)
 		if err != nil {
 			return err
