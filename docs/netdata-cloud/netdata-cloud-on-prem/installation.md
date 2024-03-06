@@ -1,6 +1,6 @@
 # Netdata Cloud On-Prem Installation
 
-This installation guide assumes the prerequisites for installing Netdata Cloud On-Prem as satisfied. For more information please refer to the [requirements documentation](Netdata-Cloud-On-Prem.md#requirements).
+This installation guide assumes the prerequisites for installing Netdata Cloud On-Prem as satisfied. For more information please refer to the [requirements documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-cloud-on-prem/README.md#requirements).
 
 ## Installation Requirements
 
