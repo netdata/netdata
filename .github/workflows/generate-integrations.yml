@@ -79,9 +79,7 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to create PR rebuilding integrations.js
               Checkout Agent: ${{ steps.checkout-agent.outcome }}
-              Get Go Ref: ${{ steps.get-go-ref.outcome }}
-              Checkout Go: ${{ steps.checkout-go.outcome }}
-              Prepare Dependencies: ${{ steps.prep-deps.outcome }}
+              Prep python env and deps: ${{ steps.prep-deps.outcome }}
               Generate Integrations: ${{ steps.generate.outcome }}
               Generate Integrations Documentation: ${{ steps.generate-integrations-documentation.outcome }}
               Generate src/collectors/COLLECTORS.md: ${{ steps.generate-collectors-md.outcome }}
