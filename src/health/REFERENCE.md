@@ -60,8 +60,6 @@ For example, here is the first health entity in `health.d/cpu.conf`:
     class: Utilization
      type: System
 component: CPU
-       os: linux
-    hosts: *
    lookup: average -10m unaligned of user,system,softirq,irq,guest
     units: %
     every: 1m
@@ -238,10 +236,6 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`class`](#alert-line-class)                        | no              | The general alert classification.                                                     |
 | [`type`](#alert-line-type)                          | no              | What area of the system the alert monitors.                                           |
 | [`component`](#alert-line-component)                | no              | Specific component of the type of the alert.                                          |
-| [`os`](#alert-line-os)                              | no              | Which operating systems to run this chart.                                            |
-| [`hosts`](#alert-line-hosts)                        | no              | Which hostnames will run this alert.                                                  |
-| [`plugin`](#alert-line-plugin)                      | no              | Restrict an alert or template to only a certain plugin.                               |
-| [`module`](#alert-line-module)                      | no              | Restrict an alert or template to only a certain module.                               |
 | [`lookup`](#alert-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on`. |
 | [`calc`](#alert-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable.           |
 | [`every`](#alert-line-every)                        | no              | The frequency of the alert.                                                           |
@@ -383,54 +377,6 @@ component: MySQL
 ```
 
 As with the `class` and `type` line, if `component` is missing from the configuration, its value will default to `Unknown`.
-
-#### Alert line `os`
-
-The alert or template will be used only if the operating system of the host matches this list specified in `os`. The
-value is a space-separated list.
-
-The following example enables the entity on Linux, FreeBSD, and macOS, but no other operating systems.
-
-```yaml
-os: linux freebsd macos
-```
-
-#### Alert line `hosts`
-
-The alert or template will be used only if the hostname of the host matches this space-separated list.
-
-The following example will load on systems with the hostnames `server` and `server2`, and any system with hostnames that
-begin with `database`. It _will not load_ on the host `redis3`, but will load on any _other_ systems with hostnames that
-begin with `redis`.
-
-```yaml
-hosts: server1 server2 database* !redis3 redis*
-```
-
-#### Alert line `plugin`
-
-The `plugin` line filters which plugin within the context this alert should apply to. The value is a space-separated
-list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). For example,
-you can create a filter for an alert that applies specifically to `python.d.plugin`:
-
-```yaml
-plugin: python.d.plugin
-```
-
-The `plugin` line is best used with other options like `module`. When used alone, the `plugin` line creates a very
-inclusive filter that is unlikely to be of much use in production. See [`module`](#alert-line-module) for a
-comprehensive example using both.
-
-#### Alert line `module`
-
-The `module` line filters which module within the context this alert should apply to. The value is a space-separated
-list of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md). For
-example, you can create an alert that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
-
-```yaml
-plugin: python.d.plugin
-module: isc_dhcpd
-```
 
 #### Alert line `lookup`
 
@@ -694,13 +640,13 @@ chart labels: mount_point=!/mnt/disk1 *
 ```
 
 The `chart labels` is a space-separated list that accepts simple patterns. If you use multiple different chart labels,
-then the result is an OR between them. i.e. the following:
+then the result is an AND between them. i.e. the following:
 
 ```yaml
 chart labels: mount_point=/mnt/disk1 device=sda
 ```
 
-Will create the alert if the `mount_point` is `/mnt/disk1` or the `device` is `sda`. Furthermore, if a chart label name
+Will create the alert if the `mount_point` is `/mnt/disk1` and the `device` is `sda`. Furthermore, if a chart label name
 is specified that does not exist in the chart, the chart won't be matched.
 
 See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) for more examples.
@@ -1096,8 +1042,6 @@ Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/bl
 ```yaml
 template: ml_5min_cpu_chart
       on: system.cpu
-      os: linux
-   hosts: *
   lookup: average -5m anomaly-bit of *
     calc: $this
    units: %
@@ -1117,8 +1061,6 @@ Warning if 5 minute rolling [anomaly rate](https://github.com/netdata/netdata/bl
 ```yaml
 template: ml_5min_node
       on: anomaly_detection.anomaly_rate
-      os: linux
-   hosts: *
   lookup: average -5m of anomaly_rate
     calc: $this
    units: %
