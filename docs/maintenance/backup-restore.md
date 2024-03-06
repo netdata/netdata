@@ -31,10 +31,10 @@ In this standard scenario you are backing up your Netdata Agent in case of a nod
    sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
    ```
    
-   Stopping the Netdata agent is mostly required in order to back up the _database files_ of the Netdata Agent.  
+   Stopping the Netdata agent is typically necessary to back up the database files of the Netdata Agent.
 
 
-If you wish to minimize the gap in metrics caused by stopping the Netdata Agent, then you could have a backup job or script that uses the following sequence:
+If you want to minimize the gap in metrics caused by stopping the Netdata Agent, consider implementing a backup job or script that follows this sequence:
   
 - Backup the Agent configuration Identity directories
 - Stop the Netdata service
