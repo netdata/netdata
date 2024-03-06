@@ -15,29 +15,29 @@ When preparing to backup a Netdata Agent it is worth considering that there are 
 
 ### Backing up to restore data in case of a node failure
 
-In this standard scenario you are backing up your Netdata Agent in case of a node failure or data corruption so that the metrics and the configuration can be recovered. The purpose is not to backup/restore the application itself.
+In this standard scenario, you are backing up your Netdata Agent in case of a node failure or data corruption so that the metrics and the configuration can be recovered. The purpose is not to backup/restore the application itself.
 
-1. Verify that the directory-paths in the table above contain the information you expect.  
+1. Verify that the directory paths in the table above contain the information you expect.  
 
    > **Note**  
-   > The specific paths may vary depending upon installation method, Operating System and whether it is a Docker/Kubernetes deployment.
+   > The specific paths may vary depending on installation method, Operating System, and whether it is a Docker/Kubernetes deployment.
 
 2. It is recommended that you [stop the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) when backing up the Metrics/database files.  
-   Backing up the Agent configuration and Identity folders is straight-forward as they should not be changing very frequently.
+   Backing up the Agent configuration and Identity folders is straightforward as they should not be changing very frequently.
 
-3. Using a backup tool such as `tar` you will need to run the backup as _root_ or as the _netdata_ user in order to access all the files in the directories.
+3. Using a backup tool such as `tar` you will need to run the backup as _root_ or as the _netdata_ user to access all the files in the directories.
+   
+   ```
+   sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
+   ```
+   
+   Stopping the Netdata agent is typically necessary to back up the database files of the Netdata Agent.
 
-  ```
-  sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
-  ```
-  
-  Stopping the Netdata agent is mostly required in order to back up the _database files_ of the Netdata Agent.
-  
-  If you wish to minimize the gap in metrics caused by stopping the Netdata Agent, then you could have a backup job or script that uses the following sequence:
+If you want to minimize the gap in metrics caused by stopping the Netdata Agent, consider implementing a backup job or script that follows this sequence:
   
 - Backup the Agent configuration Identity directories
 - Stop the Netdata service
-- Backup up up the database files
+- Backup up the database files
 - Restart the netdata agent.
 
 ### Restoring Netdata
