@@ -634,10 +634,9 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to prepare release artifacts for upload.
-              CHeckout: ${{ steps.checkout.outcome }}
+              Checkout: ${{ steps.checkout.outcome }}
               Prepare environment: ${{ steps.prepare.outcome }}
               Fetch dist tarball: ${{ steps.fetch-dist.outcome }}
-              Fetch static builds: ${{ steps.fetch-static.outcome }}
               Consolidate artifacts: ${{ steps.consolidate.outcome }}
               Store: ${{ steps.store.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
