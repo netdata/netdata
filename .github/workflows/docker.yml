@@ -258,7 +258,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
-          outputs: type=image,name=netdata/netdata-ci-test,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
         id: export-digest
         if: github.repository == 'netdata/netdata'
@@ -413,7 +413,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
-          outputs: type=image,name=quay.io/netdata/netdata-ci-test,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=quay.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
         id: export-digest
         if: github.repository == 'netdata/netdata'
@@ -489,7 +489,7 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' ${{ needs.gen-tags.outputs.tags }})
+        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' ${{ needs.gen-tags.outputs.tags }})
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -500,6 +500,162 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Publishing Docker images on Quay.io failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Download digests: ${{ steps.fetch-digests.outcome }}
+              Setup buildx: ${{ steps.prepare.outcome }}
+              Login to registry: ${{ steps.login.outcome }}
+              Create and push manifest: ${{ steps.manifest.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.repository == 'netdata/netdata'
+          }}
+
+  build-images-ghcr:
+    name: Push Images to GHCR
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - build-images
+      - gen-tags
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/i386
+          - linux/arm/v7
+          - linux/arm64
+          - linux/ppc64le
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Generate Artifact Name
+        id: artifact-name
+        run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
+      - name: Download Cache
+        id: fetch-cache
+        uses: actions/download-artifact@v4
+        with:
+          name: cache-${{ steps.artifact-name.outputs.platform }}
+          path: /tmp/build-cache
+      - name: Mark image as official
+        id: env
+        if: github.repository == 'netdata/netdata'
+        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
+      - name: Setup QEMU
+        id: qemu
+        if: matrix.platform != 'linux/i386' && matrix.platform != 'linux/amd64'
+        uses: docker/setup-qemu-action@v3
+      - name: Setup Buildx
+        id: prepare
+        uses: docker/setup-buildx-action@v3
+      - name: Registry Login
+        id: login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.username }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          platforms: ${{ matrix.platform }}
+          cache-from: type=local,src=/tmp/build-cache
+          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+          outputs: type=image,name=ghcr.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
+      - name: Export Digest
+        id: export-digest
+        if: github.repository == 'netdata/netdata'
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      - name: Upload digest
+        id: upload-digest
+        if: github.repository == 'netdata/netdata'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghcr-digests-${{ steps.artifact-name.outputs.platform }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'GHCR upload failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Creating or uploading Docker image for ${{ matrix.platform }} on GHCR failed.
+              Checkout: ${{ steps.checkout.outcome }}
+              Determine artifact name: ${{ steps.artifact-name.outcome }}
+              Fetch build cache: ${{ steps.fetch-cache.outcome }}
+              Setup environment: ${{ steps.env.outcome }}
+              Setup QEMU: ${{ steps.qemu.outcome }}
+              Setup buildx: ${{ steps.prepare.outcome }}
+              Login to registry: ${{ steps.login.outcome }}
+              Build image: ${{ steps.build.outcome }}
+              Export digest: ${{ steps.export-digest.outcome }}
+              Upload digest: ${{ steps.upload-digest.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.repository == 'netdata/netdata'
+          }}
+
+  publish-ghcr:
+    name: Consolidate and tag images for GHCR
+    if: github.event_name == 'workflow_dispatch'
+    needs:
+      - build-images-quay
+      - gen-tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+      - name: Download digests
+        id: fetch-digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: ghcr-digests-*
+          merge-multiple: true
+      - name: Setup Buildx
+        id: prepare
+        uses: docker/setup-buildx-action@v3
+      - name: Registry Login
+        id: login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
+          password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
+      - name: Create and Push Manifest
+        id: manifest
+        if: github.repository == 'netdata/netdata'
+        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' ${{ needs.gen-tags.outputs.tags }})
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Publishing Docker images on GHCR failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Publishing Docker images on GHCR failed.
               Checkout: ${{ steps.checkout.outcome }}
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}

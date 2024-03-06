@@ -5,12 +5,12 @@ import sys
 github_event = sys.argv[1]
 version = sys.argv[2]
 
-REPO = 'netdata/netdata-ci-test'
+REPO = 'netdata/netdata'
 
 REPOS = (
     REPO,
-    # f'ghcr.io/{REPO}',
     f'quay.io/{REPO}',
+    f'ghcr.io/{REPO}',
 )
 
 match version:
