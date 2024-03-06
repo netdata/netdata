@@ -17,7 +17,8 @@ import (
 )
 
 type Config struct {
-	ConfDir multipath.MultiPath
+	ConfigDefaults confgroup.Registry
+	ConfDir        multipath.MultiPath
 }
 
 func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
@@ -26,8 +27,9 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 	)
 
 	d := &ServiceDiscovery{
-		Logger:   log,
-		confProv: newConfFileReader(log, cfg.ConfDir),
+		Logger:         log,
+		confProv:       newConfFileReader(log, cfg.ConfDir),
+		configDefaults: cfg.ConfigDefaults,
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
 			return pipeline.New(config)
 		},
@@ -43,8 +45,9 @@ type (
 
 		confProv confFileProvider
 
-		newPipeline func(config pipeline.Config) (sdPipeline, error)
-		pipelines   map[string]func()
+		configDefaults confgroup.Registry
+		newPipeline    func(config pipeline.Config) (sdPipeline, error)
+		pipelines      map[string]func()
 	}
 	sdPipeline interface {
 		Run(ctx context.Context, in chan<- []*confgroup.Group)
@@ -54,6 +57,10 @@ type (
 		configs() chan confFile
 	}
 )
+
+func (d *ServiceDiscovery) String() string {
+	return "service discovery"
+}
 
 func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	d.Info("instance is started")
@@ -106,6 +113,7 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile, in ch
 	}
 
 	cfg.Source = fmt.Sprintf("file=%s", conf.source)
+	cfg.ConfigDefaults = d.configDefaults
 
 	pl, err := d.newPipeline(cfg)
 	if err != nil {

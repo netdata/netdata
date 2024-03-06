@@ -9,10 +9,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/kubernetes"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/netlisteners"
-
-	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
@@ -37,11 +36,12 @@ func New(cfg Config) (*Pipeline, error) {
 			slog.String("component", "service discovery"),
 			slog.String("pipeline", cfg.Name),
 		),
-		clr:         clr,
-		cmr:         cmr,
-		accum:       newAccumulator(),
-		discoverers: make([]model.Discoverer, 0),
-		configs:     make(map[string]map[uint64][]confgroup.Config),
+		configDefaults: cfg.ConfigDefaults,
+		clr:            clr,
+		cmr:            cmr,
+		accum:          newAccumulator(),
+		discoverers:    make([]model.Discoverer, 0),
+		configs:        make(map[string]map[uint64][]confgroup.Config),
 	}
 	p.accum.Logger = p.Logger
 
@@ -56,11 +56,12 @@ type (
 	Pipeline struct {
 		*logger.Logger
 
-		discoverers []model.Discoverer
-		accum       *accumulator
-		clr         classificator
-		cmr         composer
-		configs     map[string]map[uint64][]confgroup.Config // [targetSource][targetHash]
+		configDefaults confgroup.Registry
+		discoverers    []model.Discoverer
+		accum          *accumulator
+		clr            classificator
+		cmr            composer
+		configs        map[string]map[uint64][]confgroup.Config // [targetSource][targetHash]
 	}
 	classificator interface {
 		classify(model.Target) model.Tags
@@ -186,10 +187,12 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 				changed = true
 
 				for _, cfg := range cfgs {
-					// TODO: set
 					cfg.SetProvider(tgg.Provider())
 					cfg.SetSource(tgg.Source())
 					cfg.SetSourceType(confgroup.TypeDiscovered)
+					if def, ok := p.configDefaults.Lookup(cfg.Module()); ok {
+						cfg.ApplyDefaults(def)
+					}
 				}
 			}
 		}

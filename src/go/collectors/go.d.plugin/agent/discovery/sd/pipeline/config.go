@@ -6,12 +6,15 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/kubernetes"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/netlisteners"
 )
 
 type Config struct {
-	Source   string               `yaml:"-"`
+	Source         string             `yaml:"-"`
+	ConfigDefaults confgroup.Registry `yaml:"-"`
+
 	Name     string               `yaml:"name"`
 	Discover []DiscoveryConfig    `yaml:"discover"`
 	Classify []ClassifyRuleConfig `yaml:"classify"`
