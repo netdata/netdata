@@ -811,19 +811,19 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
                 .family = stored.family,
                 .protocol = stored.protocol,
                 .port = key.sport,
-                },
-                .remote = {
+            },
+            .remote = {
                 .family = stored.family,
                 .protocol = stored.protocol,
                 .port = key.dport,
-                },
-                .timer = stored.timer,
-                .retransmits = stored.retransmits,
-                .expires = stored.expires,
-                .rqueue = stored.rqueue,
-                .wqueue = stored.wqueue,
-                .uid = stored.uid,
-                };
+            },
+            .timer = stored.timer,
+            .retransmits = stored.retransmits,
+            .expires = stored.expires,
+            .rqueue = stored.rqueue,
+            .wqueue = stored.wqueue,
+            .uid = stored.uid,
+        };
 
         if (stored.family == AF_INET) {
             memcpy(&n.local.ip.ipv4, &key.saddr.ipv4, sizeof(n.local.ip.ipv4));
@@ -866,8 +866,9 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
 
 end_socket_read_loop:
         key = next_key;
-        // cleanup avoiding garbage from previous socket
-        memset(&stored, 0, sizeof(stored));
+        if (stored.closed) {
+            bpf_map_delete_elem(fd, &key);
+        }
     }
 
     return (!counter) ? false : true;
