@@ -32,9 +32,6 @@ jobs:
     outputs:
       run: ${{ steps.check-run.outputs.run }}
     steps:
-      - name: Skip File Check
-        if: github.event_name == 'workflow_dispatch'
-        run: echo 'run=true' >> "${GITHUB_OUTPUT}"
       - name: Checkout
         id: checkout
         if: github.event_name != 'workflow_dispatch'
@@ -88,7 +85,6 @@ jobs:
           done
       - name: Check Run
         id: check-run
-        if: github.event_name != 'workflow_dispatch'
         run: |
           if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
