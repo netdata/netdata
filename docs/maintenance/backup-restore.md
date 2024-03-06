@@ -26,14 +26,15 @@ In this standard scenario you are backing up your Netdata Agent in case of a nod
    Backing up the Agent configuration and Identity folders is straight-forward as they should not be changing very frequently.
 
 3. Using a backup tool such as `tar` you will need to run the backup as _root_ or as the _netdata_ user in order to access all the files in the directories.
+   
+   ```
+   sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
+   ```
+   
+   Stopping the Netdata agent is mostly required in order to back up the _database files_ of the Netdata Agent.  
 
-  ```
-  sudo tar -cvpzf netdata_backup.tar.gz /etc/netdata/ /var/cache/netdata /var/lib/netdata
-  ```
-  
-  Stopping the Netdata agent is mostly required in order to back up the _database files_ of the Netdata Agent.
-  
-  If you wish to minimize the gap in metrics caused by stopping the Netdata Agent, then you could have a backup job or script that uses the following sequence:
+
+If you wish to minimize the gap in metrics caused by stopping the Netdata Agent, then you could have a backup job or script that uses the following sequence:
   
 - Backup the Agent configuration Identity directories
 - Stop the Netdata service
