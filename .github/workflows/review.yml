@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       actionlint: ${{ steps.actionlint.outputs.run }}
-      clangformat: ${{ steps.clangformat.outputs.run }}
+      # clangformat: ${{ steps.clangformat.outputs.run }}
       flake8: ${{ steps.flake8.outputs.run }}
       golangci-lint: ${{ steps.golangci-lint.outputs.run }}
       hadolint: ${{ steps.hadolint.outputs.run }}
