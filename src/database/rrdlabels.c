@@ -1483,6 +1483,7 @@ void pattern_array_free(struct pattern_array *pa)
         (void) JudyLDel(&(pa->JudyL), Index, PJE0);
         Index = 0;
     }
+    freez(pa);
 }
 
 // ----------------------------------------------------------------------------
