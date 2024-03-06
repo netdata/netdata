@@ -310,6 +310,9 @@ jobs:
       - gen-tags
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
       - name: Download digests
         id: fetch-digests
         uses: actions/download-artifact@v4
@@ -341,6 +344,7 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Publishing Docker images to Docker Hub failed.
+              Checkout: ${{ steps.checkout.outcome }}
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
@@ -461,6 +465,9 @@ jobs:
       - gen-tags
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
       - name: Download digests
         id: fetch-digests
         uses: actions/download-artifact@v4
@@ -493,6 +500,7 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Publishing Docker images on Quay.io failed.
+              Checkout: ${{ steps.checkout.outcome }}
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
