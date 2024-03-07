@@ -680,8 +680,14 @@ void cancel_main_threads() {
         sleep_usec(step);
         found = 0;
         for (i = 0; static_threads[i].name != NULL ; i++) {
-            if (static_threads[i].enabled != NETDATA_MAIN_THREAD_EXITED)
-                found++;
+            if (static_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED)
+                continue;
+
+            // Don't wait ourselves.
+            if (static_threads[i].thread && (*static_threads[i].thread == pthread_self()))
+                continue;
+
+            found++;
         }
     }
 
