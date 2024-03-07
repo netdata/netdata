@@ -14,7 +14,8 @@
         "title": "Log file",
         "description": "The file path to the Webserver log file.",
         "type": "string",
-        "default": "/var/log/nginx/access.log"
+        "default": "/var/log/nginx/access.log",
+        "pattern": "^/"
       },
       "exclude_path": {
         "title": "Exclude path",
@@ -345,6 +346,12 @@
       "ui:options": {
         "inline": true
       }
+    },
+    "custom_fields": {
+      "ui:collapsible": true
+    },
+    "custom_time_fields": {
+      "ui:collapsible": true
     },
     "ui:flavour": "tabs",
     "ui:options": {

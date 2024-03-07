@@ -13,7 +13,7 @@
       },
       "dsn": {
         "title": "DSN",
-        "description": "Postgres server Data Source Name in [keyword/value or URI format](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).",
+        "description": "Postgres server Data Source Name in [key/value string](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-KEYWORD-VALUE) or [URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) format.",
         "type": "string",
         "default": "postgres://netdata:password@127.0.0.1:5432/postgres"
       },
@@ -117,6 +117,9 @@
           ]
         }
       ]
+    },
+    "dsn": {
+      "ui:placeholder": "postgres://username:password@host:port/dbname"
     },
     "transaction_time_histogram": {
       "ui:listFlavour": "list"

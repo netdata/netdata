@@ -13,7 +13,7 @@
       },
       "privileged": {
         "title": "Privileged mode",
-        "description": "Determines the type of ping packets. If unset, sends unprivileged UDP ping packets; if set, sends raw ICMP ping packets (requires elevated privileges).",
+        "description": "If unset, sends unprivileged UDP ping packets (require [additional configuration](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/ping#overview)); otherwise, sends raw ICMP ping packets ([not recommended](https://github.com/netdata/netdata/issues/15410)).",
         "type": "boolean",
         "default": false
       },

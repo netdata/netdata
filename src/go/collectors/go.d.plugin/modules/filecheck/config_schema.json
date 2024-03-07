@@ -22,7 +22,8 @@
             "type": "array",
             "items": {
               "title": "Filepath",
-              "type": "string"
+              "type": "string",
+              "pattern": "^/"
             },
             "uniqueItems": true
           },
@@ -32,7 +33,8 @@
             "type": "array",
             "items": {
               "title": "Filepath",
-              "type": "string"
+              "type": "string",
+              "pattern": "^/"
             },
             "uniqueItems": true
           }
@@ -58,7 +60,8 @@
             "type": "array",
             "items": {
               "title": "Directory",
-              "type": "string"
+              "type": "string",
+              "pattern": "^/"
             },
             "uniqueItems": true
           },
@@ -68,7 +71,8 @@
             "type": "array",
             "items": {
               "title": "Directory",
-              "type": "string"
+              "type": "string",
+              "pattern": "^/"
             },
             "uniqueItems": true
           }
@@ -80,34 +84,16 @@
     }
   },
   "uiSchema": {
-    "ui:flavour": "tabs",
-    "ui:options": {
-      "tabs": [
-        {
-          "title": "Files",
-          "fields": [
-            "update_every",
-            "files"
-          ]
-        },
-        {
-          "title": "Directories",
-          "fields": [
-            "update_every",
-            "collect_dir_size",
-            "dirs"
-          ]
-        }
-      ]
-    },
     "uiOptions": {
       "fullPage": true
     },
     "files": {
-      "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`."
+      "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`.",
+      "ui:collapsible": true
     },
     "dirs": {
-      "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`."
+      "ui:help": "The logic for inclusion and exclusion is as follows: `(include1 OR include2) AND !(exclude1 OR exclude2)`.",
+      "ui:collapsible": true
     }
   }
 }

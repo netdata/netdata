@@ -15,19 +15,22 @@
         "title": "Leases file",
         "description": "File path to the Dnsmasq DHCP server's lease database.",
         "type": "string",
-        "default": "/var/lib/misc/dnsmasq.leases"
+        "default": "/var/lib/misc/dnsmasq.leases",
+        "pattern": "^/"
       },
       "conf_path": {
         "title": "Config file",
         "description": "File path for the Dnsmasq configuration. Used to find all configured DHCP ranges.",
         "type": "string",
-        "default": "/etc/dnsmasq.conf"
+        "default": "/etc/dnsmasq.conf",
+        "pattern": "^/"
       },
       "conf_dir": {
         "title": "Config directory",
         "description": "Directory path for Dnsmasq configurations. The syntax follows the same format as the [--conf-dir](https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html) option.",
         "type": "string",
-        "default": "/etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new"
+        "default": "/etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new",
+        "pattern": "^/"
       }
     },
     "required": [

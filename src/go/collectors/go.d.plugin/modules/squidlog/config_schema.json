@@ -14,7 +14,8 @@
         "title": "Log file",
         "description": "The file path to the Squid server log file.",
         "type": "string",
-        "default": "/var/log/squid/access.log"
+        "default": "/var/log/squid/access.log",
+        "pattern": "^/"
       },
       "exclude_path": {
         "title": "Exclude path",

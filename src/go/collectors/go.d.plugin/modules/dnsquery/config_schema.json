@@ -109,6 +109,12 @@
       "ui:options": {
         "inline": true
       }
+    },
+    "servers": {
+      "ui:listFlavour": "list"
+    },
+    "domains": {
+      "ui:listFlavour": "list"
     }
   }
 }

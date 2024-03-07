@@ -51,8 +51,6 @@ func (m *Manager) Run(ctx context.Context) {
 	defer func() { m.Info("instance is stopped") }()
 
 	if !isTerminal {
-		var wg sync.WaitGroup
-
 		r, err := cancelreader.NewReader(m.Input)
 		if err != nil {
 			m.Errorf("fail to create cancel reader: %v", err)
@@ -60,6 +58,8 @@ func (m *Manager) Run(ctx context.Context) {
 		}
 
 		go func() { <-ctx.Done(); r.Cancel() }()
+
+		var wg sync.WaitGroup
 
 		wg.Add(1)
 		go func() { defer wg.Done(); m.run(r) }()

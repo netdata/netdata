@@ -15,7 +15,7 @@
         "title": "URL",
         "description": "The base URL of the RabbitMQ [management API](https://rabbitmq-website.pages.dev/docs/management).",
         "type": "string",
-        "default": "https://127.0.0.1:80",
+        "default": "http://localhost:15672",
         "format": "uri"
       },
       "timeout": {
@@ -40,12 +40,14 @@
         "title": "Username",
         "description": "The username for basic authentication.",
         "type": "string",
+        "default": "guest",
         "sensitive": true
       },
       "password": {
         "title": "Password",
         "description": "The password for basic authentication.",
         "type": "string",
+        "default": "guest",
         "sensitive": true
       },
       "proxy_url": {
@@ -81,17 +83,20 @@
       "tls_ca": {
         "title": "TLS CA",
         "description": "The path to the CA certificate file for TLS verification.",
-        "type": "string"
+        "type": "string",
+        "pattern": "^/"
       },
       "tls_cert": {
         "title": "TLS certificate",
         "description": "The path to the client certificate file for TLS authentication.",
-        "type": "string"
+        "type": "string",
+        "pattern": "^/"
       },
       "tls_key": {
         "title": "TLS key",
         "description": "The path to the client key file for TLS authentication.",
-        "type": "string"
+        "type": "string",
+        "pattern": "^/"
       }
     },
     "required": [

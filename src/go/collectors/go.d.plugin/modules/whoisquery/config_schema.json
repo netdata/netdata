@@ -46,6 +46,9 @@
     "uiOptions": {
       "fullPage": true
     },
+    "source": {
+      "ui:placeholder": "example.com"
+    },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     }

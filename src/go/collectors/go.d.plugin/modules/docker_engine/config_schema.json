@@ -75,17 +75,20 @@
       "tls_ca": {
         "title": "TLS CA",
         "description": "The path to the CA certificate file for TLS verification.",
-        "type": "string"
+        "type": "string",
+        "pattern": "^/"
       },
       "tls_cert": {
         "title": "TLS certificate",
         "description": "The path to the client certificate file for TLS authentication.",
-        "type": "string"
+        "type": "string",
+        "pattern": "^/"
       },
       "tls_key": {
         "title": "TLS key",
         "description": "The path to the client key file for TLS authentication.",
-        "type": "string"
+        "type": "string",
+        "pattern": "^/"
       }
     },
     "required": [
@@ -93,6 +96,9 @@
     ]
   },
   "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -136,9 +142,6 @@
           ]
         }
       ]
-    },
-    "uiOptions": {
-      "fullPage": true
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
