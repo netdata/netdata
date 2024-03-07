@@ -514,6 +514,34 @@ if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                 find_package(Protobuf REQUIRED)
                 set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ${NETDATA_FIND_PACKAGE_PREFER_CONFIG})
                 unset(NETDATA_FIND_PACKAGE_PREFER_CONFIG)
+
+                # We also need to correctly handle the protoc executable for
+                # systems that lack backwards compatibility for the
+                # FindProtobuf module shipped with CMake.
+                if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
+                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                IMPORTED_LOCATION_RELEASE)
+                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                        IMPORTED_LOCATION_RELWITHDEBINFO)
+                        endif()
+                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                        IMPORTED_LOCATION_MINSIZEREL)
+                        endif()
+                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                        IMPORTED_LOCATION_DEBUG)
+                        endif()
+                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                        IMPORTED_LOCATION_NOCONFIG)
+                        endif()
+                endif()
+
+                if(NOT PROTOBUF_PROTOC_EXECUTABLE)
+                        set(PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
+                endif()
         endif()
 
         set(ENABLE_PROTOBUF True)
