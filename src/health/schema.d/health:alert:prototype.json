@@ -348,6 +348,9 @@
     ]
   },
   "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
     "format_version": {
       "ui:widget": "hidden"
     },
@@ -543,8 +546,5 @@
         }
       }
     }
-  },
-  "uiOptions": {
-    "fullPage": true
   }
 }
