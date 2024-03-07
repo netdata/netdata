@@ -501,7 +501,19 @@ if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                         set(Protobuf_USE_STATIC_LIBS On)
                 endif()
 
+                # The FindProtobuf CMake module shipped by upstream CMake is
+                # broken for Protobuf version 22.0 and newer because it does
+                # not correctly pull in the new Abseil dependencies. Protobuf
+                # itself sometimes ships a CMake Package Configuration module
+                # that _does_ work correctly, so use that in preference to the
+                # Find module shipped with CMake.
+                #
+                # Upstream bug reference: https://gitlab.kitware.com/cmake/cmake/-/issues/24321
+                set(NETDATA_FIND_PACKAGE_PREFER_CONFIG ${CMAKE_FIND_PACKAGE_PREFER_CONFIG})
+                set(CMAKE_FIND_PACKAGE_PREFER_CONFIG True)
                 find_package(Protobuf REQUIRED)
+                set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ${NETDATA_FIND_PACKAGE_PREFER_CONFIG})
+                unset(NETDATA_FIND_PACKAGE_PREFER_CONFIG)
         endif()
 
         set(ENABLE_PROTOBUF True)
