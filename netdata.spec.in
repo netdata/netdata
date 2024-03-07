@@ -703,7 +703,6 @@ Requires: bash
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
 %if 0%{?centos_ver} != 7
-Suggests: nut
 Suggests: apcupsd
 Suggests: iw
 Suggests: sudo
