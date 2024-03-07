@@ -6,8 +6,14 @@
 
 **Merged pull requests:**
 
+- minor fix; broken link on on prem installation doc [\#17118](https://github.com/netdata/netdata/pull/17118) ([tkatsoulas](https://github.com/tkatsoulas))
+- very minor docs update [\#17117](https://github.com/netdata/netdata/pull/17117) ([Ancairon](https://github.com/Ancairon))
+- remove deprecated settings from the health ref doc [\#17116](https://github.com/netdata/netdata/pull/17116) ([ilyam8](https://github.com/ilyam8))
+- fix discovered config default values [\#17115](https://github.com/netdata/netdata/pull/17115) ([ilyam8](https://github.com/ilyam8))
+- Fix memory leak [\#17114](https://github.com/netdata/netdata/pull/17114) ([stelfrag](https://github.com/stelfrag))
 - remove "os" "hosts" "plugin" and "module" from stock alarms [\#17113](https://github.com/netdata/netdata/pull/17113) ([ilyam8](https://github.com/ilyam8))
 - go.d.plugin add notice log level [\#17112](https://github.com/netdata/netdata/pull/17112) ([ilyam8](https://github.com/ilyam8))
+- Second pass at reworking Docker CI. [\#17111](https://github.com/netdata/netdata/pull/17111) ([Ferroin](https://github.com/Ferroin))
 - rm unused files from go.d.plugin [\#17110](https://github.com/netdata/netdata/pull/17110) ([ilyam8](https://github.com/ilyam8))
 - fix links in go.d.plugin [\#17108](https://github.com/netdata/netdata/pull/17108) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17107](https://github.com/netdata/netdata/pull/17107) ([netdatabot](https://github.com/netdatabot))
@@ -17,6 +23,7 @@
 - Fix ebpf compilation warnings [\#17100](https://github.com/netdata/netdata/pull/17100) ([stelfrag](https://github.com/stelfrag))
 - Remove distributed-data-architecture.md and omit mentions to it [\#17097](https://github.com/netdata/netdata/pull/17097) ([Ancairon](https://github.com/Ancairon))
 - Remove deployment-strategies [\#17096](https://github.com/netdata/netdata/pull/17096) ([Ancairon](https://github.com/Ancairon))
+- fix links [\#17095](https://github.com/netdata/netdata/pull/17095) ([Ancairon](https://github.com/Ancairon))
 - delete docs/netdata-security.md and replace links to proper points [\#17094](https://github.com/netdata/netdata/pull/17094) ([Ancairon](https://github.com/Ancairon))
 - fix go.d.plugin/pulsar tests [\#17093](https://github.com/netdata/netdata/pull/17093) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/stretchr/testify from 1.8.4 to 1.9.0 in /src/go/collectors/go.d.plugin [\#17092](https://github.com/netdata/netdata/pull/17092) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -394,13 +401,6 @@
 - logs-management: Disable logs management monitoring section [\#16525](https://github.com/netdata/netdata/pull/16525) ([Dim-P](https://github.com/Dim-P))
 - log method = none is not respected [\#16523](https://github.com/netdata/netdata/pull/16523) ([ktsaou](https://github.com/ktsaou))
 - include more cases for megacli degraded state [\#16522](https://github.com/netdata/netdata/pull/16522) ([ClaraCrazy](https://github.com/ClaraCrazy))
-- update bundled UI to v6.65.0 [\#16520](https://github.com/netdata/netdata/pull/16520) ([ilyam8](https://github.com/ilyam8))
-- log2journal improvements 5 [\#16519](https://github.com/netdata/netdata/pull/16519) ([ktsaou](https://github.com/ktsaou))
-- change log level to debug for dbengine routine operations on start [\#16518](https://github.com/netdata/netdata/pull/16518) ([ilyam8](https://github.com/ilyam8))
-- remove system info logging [\#16517](https://github.com/netdata/netdata/pull/16517) ([ilyam8](https://github.com/ilyam8))
-- python.d: logger: remove timestamp when logging to journald. [\#16516](https://github.com/netdata/netdata/pull/16516) ([ilyam8](https://github.com/ilyam8))
-- python.d: mute stock jobs logging during check\(\) [\#16515](https://github.com/netdata/netdata/pull/16515) ([ilyam8](https://github.com/ilyam8))
-- logs-management: Add prefix to chart names [\#16514](https://github.com/netdata/netdata/pull/16514) ([Dim-P](https://github.com/Dim-P))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
