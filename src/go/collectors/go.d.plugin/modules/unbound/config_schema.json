@@ -51,19 +51,22 @@
       "tls_ca": {
         "title": "TLS CA",
         "description": "The path to the CA certificate file for TLS verification.",
-        "type": "string"
+        "type": "string",
+        "pattern": "^/"
       },
       "tls_cert": {
         "title": "TLS certificate",
         "description": "The path to the client certificate file for TLS authentication.",
         "type": "string",
-        "default": "/etc/unbound/unbound_control.pem"
+        "default": "/etc/unbound/unbound_control.pem",
+        "pattern": "^/"
       },
       "tls_key": {
         "title": "TLS key",
         "description": "The path to the client key file for TLS authentication.",
         "type": "string",
-        "default": "/etc/unbound/unbound_control.key"
+        "default": "/etc/unbound/unbound_control.key",
+        "pattern": "^/"
       }
     },
     "required": [

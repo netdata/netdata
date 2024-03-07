@@ -33,6 +33,9 @@
     "uiOptions": {
       "fullPage": true
     },
+    "dsn": {
+      "ui:placeholder": "username:password@protocol(address)/dbname"
+    },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     }

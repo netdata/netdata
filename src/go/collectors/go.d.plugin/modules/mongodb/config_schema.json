@@ -60,6 +60,9 @@
     "uiOptions": {
       "fullPage": true
     },
+    "uri": {
+      "ui:placeholder": "mongodb://username:password@host:port"
+    },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },

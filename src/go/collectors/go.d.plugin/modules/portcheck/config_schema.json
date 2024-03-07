@@ -12,17 +12,17 @@
         "minimum": 1,
         "default": 5
       },
-      "host": {
-        "title": "Network host",
-        "description": "The IP address or domain name of the network host.",
-        "type": "string"
-      },
       "timeout": {
         "title": "Timeout",
         "description": "Timeout for establishing a connection, including domain name resolution, in seconds.",
         "type": "number",
         "minimum": 0.5,
         "default": 2
+      },
+      "host": {
+        "title": "Network host",
+        "description": "The IP address or domain name of the network host.",
+        "type": "string"
       },
       "ports": {
         "title": "Ports",
@@ -48,6 +48,12 @@
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "host": {
+      "ui:placeholder": "127.0.0.1"
+    },
+    "ports": {
+      "ui:listFlavour": "list"
     }
   }
 }

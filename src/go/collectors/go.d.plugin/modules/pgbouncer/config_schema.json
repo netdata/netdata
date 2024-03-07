@@ -13,7 +13,7 @@
       },
       "dsn": {
         "title": "DSN",
-        "description": "PgBouncer server Data Source Name in [keyword/value or URI format](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).",
+        "description": "PgBouncer server Data Source Name in [key/value string](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-KEYWORD-VALUE) or [URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS) format.",
         "type": "string",
         "default": "postgres://netdata:password@127.0.0.1:6432/pgbouncer"
       },
@@ -24,11 +24,17 @@
         "minimum": 0.5,
         "default": 1
       }
-    }
+    },
+    "required": [
+      "dsn"
+    ]
   },
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "dsn": {
+      "ui:placeholder": "postgres://username:password@host:port/dbname"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."

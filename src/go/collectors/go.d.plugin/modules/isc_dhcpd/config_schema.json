@@ -15,11 +15,12 @@
         "title": "Leases file",
         "description": "File path to the ISC DHCP server's lease database.",
         "type": "string",
-        "default": "/var/lib/dhcp/dhcpd.leases"
+        "default": "/var/lib/dhcp/dhcpd.leases",
+        "pattern": "^/"
       },
       "pools": {
         "title": "IP pools",
-        "description": "A list of IP pools to monitor.",
+        "description": "A list of IP pools to monitor. Each pool consists of a descriptive name and corresponding IP ranges.",
         "type": "array",
         "items": {
           "title": "IP pool",
@@ -32,7 +33,7 @@
             },
             "networks": {
               "title": "Networks",
-              "description": "A space-separated list of [IP ranges](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/iprange#supported-formats).",
+              "description": "A space-separated list of [IP ranges](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/iprange#supported-formats) for the pool.",
               "type": "string"
             }
           },

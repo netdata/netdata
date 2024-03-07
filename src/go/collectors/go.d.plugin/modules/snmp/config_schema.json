@@ -12,15 +12,18 @@
       },
       "hostname": {
         "title": "Hostname",
+        "description": "The hostname or IP address of the SNMP-enabled device.",
         "type": "string"
       },
       "community": {
         "title": "SNMPv1/2 community",
+        "description": "The SNMP community string for SNMPv1/v2c authentication.",
         "type": "string",
         "default": "public"
       },
       "options": {
         "title": "Options",
+        "description": "Configuration options for SNMP monitoring.",
         "type": "object",
         "properties": {
           "version": {
@@ -35,28 +38,28 @@
           },
           "port": {
             "title": "Port",
-            "description": "",
+            "description": "The port number on which the SNMP service is running.",
             "type": "integer",
             "exclusiveMinimum": 0,
             "default": 161
           },
           "retries": {
             "title": "Retries",
-            "description": "Retries to attempt.",
+            "description": "The number of retries to attempt for SNMP requests.",
             "type": "integer",
             "minimum": 0,
             "default": 161
           },
           "timeout": {
             "title": "Timeout",
-            "description": "SNMP request/response timeout.",
+            "description": "The timeout duration in seconds for SNMP requests.",
             "type": "integer",
             "minimum": 1,
             "default": 1
           },
           "max_request_size": {
             "title": "Max OIDs in request",
-            "description": "Maximum number of OIDs allowed in one one SNMP request.",
+            "description": "The maximum number of OIDs allowed in a single SNMP request.",
             "type": "integer",
             "minimum": 1,
             "default": 60
@@ -72,10 +75,12 @@
       },
       "user": {
         "title": "SNMPv3 configuration",
+        "description": "Configuration options for SNMPv3 authentication and encryption.",
         "type": "object",
         "properties": {
           "name": {
             "title": "Username",
+            "description": "The username for SNMPv3 authentication.",
             "type": "string"
           },
           "level": {
@@ -173,10 +178,16 @@
               "default": 90000
             },
             "multiply_range": {
+              "title": "OID index range",
+              "description": "Specifies the range of indexes used to create multiple charts. If set, a chart will be created for each index in the specified range. Each chart will have the index appended to the OID dimension.",
               "type": "array",
               "items": {
-                "type": "integer"
-              }
+                "title": "Index",
+                "type": "integer",
+                "minimum": 0
+              },
+              "uniqueItems": true,
+              "maxItems": 2
             },
             "dimensions": {
               "title": "Dimensions",
@@ -290,14 +301,19 @@
     },
     "charts": {
       "items": {
+        "ui:collapsible": true,
         "type": {
           "ui:widget": "radio",
           "ui:options": {
             "inline": true
           }
         },
+        "multiply_range": {
+          "ui:listFlavour": "list"
+        },
         "dimensions": {
           "items": {
+            "ui:collapsible": true,
             "algorithm": {
               "ui:widget": "radio",
               "ui:options": {

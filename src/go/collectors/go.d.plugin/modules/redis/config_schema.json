@@ -73,7 +73,8 @@
       "fullPage": true
     },
     "address": {
-      "ui:help": "Tcp connection: `redis://<user>:<password>@<host>:<port>/<db_number>`. Unix connection: `unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>`."
+      "ui:placeholder": "redis://user:password@host:port",
+      "ui:help": "Tcp connection: `redis://user:password@host:port`. Unix connection: `unix://user:password@/path/to/redis.sock`."
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
