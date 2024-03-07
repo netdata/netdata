@@ -25,6 +25,10 @@ char cgroup_chart_id_prefix[] = "cgroup_";
 char services_chart_id_prefix[] = "systemd_";
 char *cgroups_rename_script = NULL;
 
+// Shared memory with information from detected cgroups
+netdata_ebpf_cgroup_shm_t shm_cgroup_ebpf = {NULL, NULL};
+int shm_fd_cgroup_ebpf = -1;
+sem_t *shm_mutex_cgroup_ebpf = SEM_FAILED;
 
 // ----------------------------------------------------------------------------
 
@@ -1027,6 +1031,82 @@ static int discovery_is_cgroup_duplicate(struct cgroup *cg) {
 }
 
 // ----------------------------------------------------------------------------
+// ebpf shared memory
+
+static void netdata_cgroup_ebpf_set_values(size_t length)
+{
+    sem_wait(shm_mutex_cgroup_ebpf);
+
+    shm_cgroup_ebpf.header->cgroup_max = cgroup_root_max;
+    shm_cgroup_ebpf.header->systemd_enabled = cgroup_enable_systemd_services |
+                                              cgroup_enable_systemd_services_detailed_memory |
+                                              cgroup_used_memory;
+    shm_cgroup_ebpf.header->body_length = length;
+
+    sem_post(shm_mutex_cgroup_ebpf);
+}
+
+static void netdata_cgroup_ebpf_initialize_shm()
+{
+    shm_fd_cgroup_ebpf = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_CREAT | O_RDWR, 0660);
+    if (shm_fd_cgroup_ebpf < 0) {
+        collector_error("Cannot initialize shared memory used by cgroup and eBPF, integration won't happen.");
+        return;
+    }
+
+    size_t length = sizeof(netdata_ebpf_cgroup_shm_header_t) + cgroup_root_max * sizeof(netdata_ebpf_cgroup_shm_body_t);
+    if (ftruncate(shm_fd_cgroup_ebpf, length)) {
+        collector_error("Cannot set size for shared memory.");
+        goto end_init_shm;
+    }
+
+    shm_cgroup_ebpf.header = (netdata_ebpf_cgroup_shm_header_t *) mmap(NULL, length,
+                                                                       PROT_READ | PROT_WRITE, MAP_SHARED,
+                                                                       shm_fd_cgroup_ebpf, 0);
+
+    if (unlikely(MAP_FAILED == shm_cgroup_ebpf.header)) {
+        shm_cgroup_ebpf.header = NULL;
+        collector_error("Cannot map shared memory used between cgroup and eBPF, integration won't happen");
+        goto end_init_shm;
+    }
+    shm_cgroup_ebpf.body = (netdata_ebpf_cgroup_shm_body_t *) ((char *)shm_cgroup_ebpf.header +
+                                                               sizeof(netdata_ebpf_cgroup_shm_header_t));
+
+    shm_mutex_cgroup_ebpf = sem_open(NETDATA_NAMED_SEMAPHORE_EBPF_CGROUP_NAME, O_CREAT,
+                                     S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, 1);
+
+    if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
+        netdata_cgroup_ebpf_set_values(length);
+        return;
+    }
+
+    collector_error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
+    munmap(shm_cgroup_ebpf.header, length);
+    shm_cgroup_ebpf.header = NULL;
+
+    end_init_shm:
+    close(shm_fd_cgroup_ebpf);
+    shm_fd_cgroup_ebpf = -1;
+    shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
+}
+
+static void cgroup_cleanup_ebpf_integration()
+{
+    if (shm_mutex_cgroup_ebpf != SEM_FAILED) {
+        sem_close(shm_mutex_cgroup_ebpf);
+    }
+
+    if (shm_cgroup_ebpf.header) {
+        shm_cgroup_ebpf.header->cgroup_root_count = 0;
+        munmap(shm_cgroup_ebpf.header, shm_cgroup_ebpf.header->body_length);
+    }
+
+    if (shm_fd_cgroup_ebpf > 0) {
+        close(shm_fd_cgroup_ebpf);
+    }
+}
+
+// ----------------------------------------------------------------------------
 // cgroup network interfaces
 
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
@@ -1231,6 +1311,8 @@ void cgroup_discovery_worker(void *ptr)
 
     service_register(SERVICE_THREAD_TYPE_LIBUV, NULL, NULL, NULL, false);
 
+    netdata_cgroup_ebpf_initialize_shm();
+
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
@@ -1244,6 +1326,7 @@ void cgroup_discovery_worker(void *ptr)
         discovery_find_all_cgroups();
     }
     collector_info("discovery thread stopped");
+    cgroup_cleanup_ebpf_integration();
     worker_unregister();
     service_exits();
     __atomic_store_n(&discovery_thread.exited,1,__ATOMIC_RELAXED);

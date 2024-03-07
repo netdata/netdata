@@ -386,10 +386,6 @@ extern uint32_t throttled_time_hash;
 extern uint32_t throttled_usec_hash;
 extern struct cgroup *cgroup_root;
 
-extern netdata_ebpf_cgroup_shm_t shm_cgroup_ebpf;
-extern int shm_fd_cgroup_ebpf;
-extern sem_t *shm_mutex_cgroup_ebpf;
-
 enum cgroups_type { CGROUPS_AUTODETECT_FAIL, CGROUPS_V1, CGROUPS_V2 };
 
 enum cgroups_systemd_setting {

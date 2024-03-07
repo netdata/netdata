@@ -277,11 +277,11 @@ static void ebpf_obsolete_specific_dc_charts(char *type, int update_every);
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_dc_services(ebpf_module_t *em)
+static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
 {
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              id,
                               NETDATA_DC_HIT_CHART,
-                              "",
                               "Percentage of files inside directory cache",
                               EBPF_COMMON_DIMENSION_PERCENTAGE,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -291,8 +291,8 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em)
                               em->update_every);
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              id,
                               NETDATA_DC_REFERENCE_CHART,
-                              "",
                               "Count file access",
                               EBPF_COMMON_DIMENSION_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -302,8 +302,8 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em)
                               em->update_every);
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              id,
                               NETDATA_DC_REQUEST_NOT_CACHE_CHART,
-                              "",
                               "Files not present inside directory cache",
                               EBPF_COMMON_DIMENSION_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -313,14 +313,14 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em)
                               em->update_every);
 
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
+                              id,
                               NETDATA_DC_REQUEST_NOT_FOUND_CHART,
-                              "",
                               "Files not found",
                               EBPF_COMMON_DIMENSION_FILES,
                               NETDATA_DIRECTORY_CACHE_SUBMENU,
                               NETDATA_EBPF_CHART_TYPE_LINE,
                               NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT,
-                              21202,
+                              21203,
                               em->update_every);
 }
 
@@ -334,12 +334,13 @@ static void ebpf_obsolete_dc_services(ebpf_module_t *em)
 static inline void ebpf_obsolete_dc_cgroup_charts(ebpf_module_t *em) {
     pthread_mutex_lock(&mutex_cgroup_shm);
 
-    ebpf_obsolete_dc_services(em);
-
     ebpf_cgroup_target_t *ect;
     for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (ect->systemd)
+        if (ect->systemd) {
+            ebpf_obsolete_dc_services(em, ect->name);
+
             continue;
+        }
 
         ebpf_obsolete_specific_dc_charts(ect->name, em->update_every);
     }
@@ -1039,45 +1040,82 @@ void ebpf_dc_calc_chart_values()
  **/
 static void ebpf_create_systemd_dc_charts(int update_every)
 {
-    ebpf_create_charts_on_systemd(NETDATA_DC_HIT_CHART,
-                                  "Percentage of files inside directory cache",
-                                  EBPF_COMMON_DIMENSION_PERCENTAGE,
-                                  NETDATA_DIRECTORY_CACHE_SUBMENU,
-                                  NETDATA_EBPF_CHART_TYPE_LINE,
-                                  21200,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT,
-                                  update_every);
+    static ebpf_systemd_args_t data_dc_hit_ratio = {
+        .title = "Percentage of files inside directory cache",
+        .units = EBPF_COMMON_DIMENSION_PERCENTAGE,
+        .family = NETDATA_DIRECTORY_CACHE_SUBMENU,
+        .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
+        .order = 21200,
+        .algorithm = EBPF_CHART_ALGORITHM_ABSOLUTE,
+        .context = NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT,
+        .module = NETDATA_EBPF_MODULE_NAME_DCSTAT,
+        .update_every = 0,
+        .suffix = NETDATA_DC_HIT_CHART,
+        .dimension = "percentage"
+    };
 
-    ebpf_create_charts_on_systemd(NETDATA_DC_REFERENCE_CHART,
-                                  "Count file access",
-                                  EBPF_COMMON_DIMENSION_FILES,
-                                  NETDATA_DIRECTORY_CACHE_SUBMENU,
-                                  NETDATA_EBPF_CHART_TYPE_LINE,
-                                  21201,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT,
-                                  update_every);
+    static ebpf_systemd_args_t data_dc_references = {
+        .title = "Count file access",
+        .units = EBPF_COMMON_DIMENSION_FILES,
+        .family = NETDATA_DIRECTORY_CACHE_SUBMENU,
+        .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
+        .order = 21201,
+        .algorithm = EBPF_CHART_ALGORITHM_ABSOLUTE,
+        .context = NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT,
+        .module = NETDATA_EBPF_MODULE_NAME_DCSTAT,
+        .update_every = 0,
+        .suffix = NETDATA_DC_REFERENCE_CHART,
+        .dimension = "files"
+    };
 
-    ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_CACHE_CHART,
-                                  "Files not present inside directory cache",
-                                  EBPF_COMMON_DIMENSION_FILES,
-                                  NETDATA_DIRECTORY_CACHE_SUBMENU,
-                                  NETDATA_EBPF_CHART_TYPE_LINE,
-                                  21202,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT,
-                                  update_every);
+    static ebpf_systemd_args_t data_dc_not_cache = {
+        .title = "Files not present inside directory cache",
+        .units = EBPF_COMMON_DIMENSION_FILES,
+        .family = NETDATA_DIRECTORY_CACHE_SUBMENU,
+        .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
+        .order = 21202,
+        .algorithm = EBPF_CHART_ALGORITHM_ABSOLUTE,
+        .context = NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT,
+        .module = NETDATA_EBPF_MODULE_NAME_DCSTAT,
+        .update_every = 0,
+        .suffix = NETDATA_DC_REQUEST_NOT_CACHE_CHART,
+        .dimension = "files"
+    };
 
-    ebpf_create_charts_on_systemd(NETDATA_DC_REQUEST_NOT_FOUND_CHART,
-                                  "Files not found",
-                                  EBPF_COMMON_DIMENSION_FILES,
-                                  NETDATA_DIRECTORY_CACHE_SUBMENU,
-                                  NETDATA_EBPF_CHART_TYPE_LINE,
-                                  21202,
-                                  ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX],
-                                  NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT, NETDATA_EBPF_MODULE_NAME_DCSTAT,
-                                  update_every);
+    static ebpf_systemd_args_t data_dc_not_found = {
+        .title = "Files not found",
+        .units = EBPF_COMMON_DIMENSION_FILES,
+        .family = NETDATA_DIRECTORY_CACHE_SUBMENU,
+        .charttype = NETDATA_EBPF_CHART_TYPE_LINE,
+        .order = 21203,
+        .algorithm = EBPF_CHART_ALGORITHM_ABSOLUTE,
+        .context = NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT,
+        .module = NETDATA_EBPF_MODULE_NAME_DCSTAT,
+        .update_every = 0,
+        .suffix = NETDATA_DC_REQUEST_NOT_FOUND_CHART,
+        .dimension = "files"
+    };
+
+    if (!data_dc_not_cache.update_every)
+        data_dc_hit_ratio.update_every = data_dc_not_cache.update_every =
+        data_dc_not_found.update_every = data_dc_references.update_every = update_every;
+
+    ebpf_cgroup_target_t *w;
+    for (w = ebpf_cgroup_pids; w; w = w->next) {
+        if (unlikely(!w->systemd || w->flags & NETDATA_EBPF_SERVICES_HAS_DC_CHART))
+            continue;
+
+        data_dc_hit_ratio.id = data_dc_not_cache.id = data_dc_not_found.id = data_dc_references.id = w->name;
+        ebpf_create_charts_on_systemd(&data_dc_hit_ratio);
+
+        ebpf_create_charts_on_systemd(&data_dc_not_found);
+
+        ebpf_create_charts_on_systemd(&data_dc_not_cache);
+
+        ebpf_create_charts_on_systemd(&data_dc_references);
+
+        w->flags |= NETDATA_EBPF_SERVICES_HAS_DC_CHART;
+    }
 }
 
 /**
@@ -1087,48 +1125,37 @@ static void ebpf_create_systemd_dc_charts(int update_every)
  */
 static void ebpf_send_systemd_dc_charts()
 {
-    collected_number value;
     ebpf_cgroup_target_t *ect;
-    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_HIT_CHART, "");
-    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            write_chart_dimension(ect->name, (long long) ect->publish_dc.ratio);
+    collected_number value;
+    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
+        if (unlikely(!(ect->flags & NETDATA_EBPF_SERVICES_HAS_DC_CHART)) ) {
+            continue;
         }
-    }
-    ebpf_write_end_chart();
 
-    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REFERENCE_CHART, "");
-    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            write_chart_dimension(ect->name, (long long) ect->publish_dc.cache_access);
-        }
-    }
-    ebpf_write_end_chart();
+        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_HIT_CHART);
+        write_chart_dimension("percentage", (long long) ect->publish_dc.ratio);
+        ebpf_write_end_chart();
 
-    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REQUEST_NOT_CACHE_CHART, "");
-    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
+        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_REFERENCE_CHART);
+        write_chart_dimension("files", (long long) ect->publish_dc.cache_access);
+        ebpf_write_end_chart();
+
+        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_REQUEST_NOT_CACHE_CHART);
+        value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
                 (long long )ect->publish_dc.curr.file_system - (long long)ect->publish_dc.prev.file_system;
-            ect->publish_dc.prev.file_system = ect->publish_dc.curr.file_system;
+        ect->publish_dc.prev.file_system = ect->publish_dc.curr.file_system;
+        write_chart_dimension("files", (long long) value);
+        ebpf_write_end_chart();
 
-            write_chart_dimension(ect->name, (long long) value);
-        }
-    }
-    ebpf_write_end_chart();
-
-    ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, NETDATA_DC_REQUEST_NOT_FOUND_CHART, "");
-    for (ect = ebpf_cgroup_pids; ect ; ect = ect->next) {
-        if (unlikely(ect->systemd) && unlikely(ect->updated)) {
-            value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
+        ebpf_write_begin_chart(NETDATA_SERVICE_FAMILY, ect->name, NETDATA_DC_REQUEST_NOT_FOUND_CHART);
+        value = (collected_number) (!ect->publish_dc.cache_access) ? 0 :
                 (long long)ect->publish_dc.curr.not_found - (long long)ect->publish_dc.prev.not_found;
 
-            ect->publish_dc.prev.not_found = ect->publish_dc.curr.not_found;
+        ect->publish_dc.prev.not_found = ect->publish_dc.curr.not_found;
 
-            write_chart_dimension(ect->name, (long long) value);
-        }
+        write_chart_dimension("files", (long long) value);
+        ebpf_write_end_chart();
     }
-    ebpf_write_end_chart();
 }
 
 /**
@@ -1174,15 +1201,11 @@ static void ebpf_send_specific_dc_data(char *type, netdata_publish_dcstat_t *pdc
 */
 void ebpf_dc_send_cgroup_data(int update_every)
 {
-    if (!ebpf_cgroup_pids)
-        return;
-
     pthread_mutex_lock(&mutex_cgroup_shm);
     ebpf_cgroup_target_t *ect;
     ebpf_dc_calc_chart_values();
 
-    int has_systemd = shm_ebpf_cgroup.header->systemd_enabled;
-    if (has_systemd) {
+    if (shm_ebpf_cgroup.header->systemd_enabled) {
         if (send_cgroup_chart) {
             ebpf_create_systemd_dc_charts(update_every);
         }

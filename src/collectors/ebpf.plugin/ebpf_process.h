@@ -9,7 +9,6 @@
 
 // Groups used on Dashboard
 #define NETDATA_PROCESS_GROUP "processes"
-#define NETDATA_PROCESS_CGROUP_GROUP "processes (eBPF)"
 
 // Global chart name
 #define NETDATA_EXIT_SYSCALL "exit"
@@ -34,11 +33,11 @@
 #define NETDATA_CGROUP_PROCESS_EXIT_CONTEXT "cgroup.task_exit"
 #define NETDATA_CGROUP_PROCESS_ERROR_CONTEXT "cgroup.task_error"
 
-#define NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT "services.process_create"
-#define NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT "services.thread_create"
-#define NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT "services.task_close"
-#define NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT "services.task_exit"
-#define NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT "services.task_error"
+#define NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT "systemd.services.process_create"
+#define NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT "systemd.services.thread_create"
+#define NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT "systemd.services.task_close"
+#define NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT "systemd.services.task_exit"
+#define NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT "systemd.services.task_error"
 
 #define NETDATA_EBPF_CGROUP_UPDATE 30
 

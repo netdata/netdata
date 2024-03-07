@@ -327,17 +327,22 @@ void ebpf_parse_cgroup_shm_data()
  * @param module    chart module name, this is the eBPF thread.
  * @param update_every value to overwrite the update frequency set by the server.
  */
-void ebpf_create_charts_on_systemd(char *id, char *title, char *units, char *family, char *charttype, int order,
-                                   char *algorithm, char *context, char *module, int update_every)
+void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
 {
-    ebpf_cgroup_target_t *w;
-    ebpf_write_chart_cmd(NETDATA_SERVICE_FAMILY, id, "", title, units, family, charttype, context,
-                         order, update_every, module);
-
-    for (w = ebpf_cgroup_pids; w; w = w->next) {
-        if (unlikely(w->systemd) && unlikely(w->updated))
-            fprintf(stdout, "DIMENSION %s '' %s 1 1\n", w->name, algorithm);
-    }
+    ebpf_write_chart_cmd(NETDATA_SERVICE_FAMILY,
+                         chart->id,
+                         chart->suffix,
+                         chart->title,
+                         chart->units,
+                         chart->family,
+                         chart->charttype,
+                         chart->context,
+                         chart->order,
+                         chart->update_every,
+                         chart->module);
+    ebpf_create_chart_labels("service_name", chart->id, 0);
+    ebpf_commit_label();
+    fprintf(stdout, "DIMENSION %s '' %s 1 1\n", chart->dimension, chart->algorithm);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

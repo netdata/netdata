@@ -39,7 +39,6 @@
 
 // Group used on Dashboard
 #define NETDATA_VFS_GROUP "vfs"
-#define NETDATA_VFS_CGROUP_GROUP "vfs (eBPF)"
 
 // Contexts
 #define NETDATA_CGROUP_VFS_UNLINK_CONTEXT "cgroup.vfs_unlink"
@@ -56,19 +55,19 @@
 #define NETDATA_CGROUP_VFS_FSYNC_CONTEXT "cgroup.vfs_fsync"
 #define NETDATA_CGROUP_VFS_FSYNC_ERROR_CONTEXT "cgroup.vfs_fsync_error"
 
-#define NETDATA_SYSTEMD_VFS_UNLINK_CONTEXT "services.vfs_unlink"
-#define NETDATA_SYSTEMD_VFS_WRITE_CONTEXT "services.vfs_write"
-#define NETDATA_SYSTEMD_VFS_WRITE_ERROR_CONTEXT "services.vfs_write_error"
-#define NETDATA_SYSTEMD_VFS_READ_CONTEXT "services.vfs_read"
-#define NETDATA_SYSTEMD_VFS_READ_ERROR_CONTEXT "services.vfs_read_error"
-#define NETDATA_SYSTEMD_VFS_WRITE_BYTES_CONTEXT "services.vfs_write_bytes"
-#define NETDATA_SYSTEMD_VFS_READ_BYTES_CONTEXT "services.vfs_read_bytes"
-#define NETDATA_SYSTEMD_VFS_CREATE_CONTEXT "services.vfs_create"
-#define NETDATA_SYSTEMD_VFS_CREATE_ERROR_CONTEXT "services.vfs_create_error"
-#define NETDATA_SYSTEMD_VFS_OPEN_CONTEXT "services.vfs_open"
-#define NETDATA_SYSTEMD_VFS_OPEN_ERROR_CONTEXT "services.vfs_open_error"
-#define NETDATA_SYSTEMD_VFS_FSYNC_CONTEXT "services.vfs_fsync"
-#define NETDATA_SYSTEMD_VFS_FSYNC_ERROR_CONTEXT "services.vfs_fsync_error"
+#define NETDATA_SYSTEMD_VFS_UNLINK_CONTEXT "systemd.services.vfs_unlink"
+#define NETDATA_SYSTEMD_VFS_WRITE_CONTEXT "systemd.services.vfs_write"
+#define NETDATA_SYSTEMD_VFS_WRITE_ERROR_CONTEXT "systemd.services.vfs_write_error"
+#define NETDATA_SYSTEMD_VFS_READ_CONTEXT "systemd.services.vfs_read"
+#define NETDATA_SYSTEMD_VFS_READ_ERROR_CONTEXT "systemd.services.vfs_read_error"
+#define NETDATA_SYSTEMD_VFS_WRITE_BYTES_CONTEXT "systemd.services.vfs_write_bytes"
+#define NETDATA_SYSTEMD_VFS_READ_BYTES_CONTEXT "systemd.services.vfs_read_bytes"
+#define NETDATA_SYSTEMD_VFS_CREATE_CONTEXT "systemd.services.vfs_create"
+#define NETDATA_SYSTEMD_VFS_CREATE_ERROR_CONTEXT "systemd.services.vfs_create_error"
+#define NETDATA_SYSTEMD_VFS_OPEN_CONTEXT "systemd.services.vfs_open"
+#define NETDATA_SYSTEMD_VFS_OPEN_ERROR_CONTEXT "systemd.services.vfs_open_error"
+#define NETDATA_SYSTEMD_VFS_FSYNC_CONTEXT "systemd.services.vfs_fsync"
+#define NETDATA_SYSTEMD_VFS_FSYNC_ERROR_CONTEXT "systemd.services.vfs_fsync_error"
 
 // ARAL name
 #define NETDATA_EBPF_VFS_ARAL_NAME "ebpf_vfs"

@@ -95,8 +95,7 @@ typedef enum ebpf_socket_idx {
 } ebpf_socket_index_t;
 
 #define NETDATA_SOCKET_KERNEL_FUNCTIONS "kernel"
-#define NETDATA_NETWORK_CONNECTIONS_GROUP "network connections"
-#define NETDATA_CGROUP_NET_GROUP "network (eBPF)"
+#define NETDATA_CGROUP_NET_GROUP "network"
 
 // Global chart name
 #define NETDATA_TCP_OUTBOUND_CONNECTIONS "tcp_outbound_conn"
@@ -142,15 +141,15 @@ typedef enum ebpf_socket_idx {
 #define NETDATA_CGROUP_SOCKET_UDP_RECV_CONTEXT "cgroup.net_udp_recv"
 #define NETDATA_CGROUP_SOCKET_UDP_SEND_CONTEXT "cgroup.net_udp_send"
 
-#define NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT "services.net_conn_ipv4"
-#define NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT "services.net_conn_ipv6"
-#define NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT "services.net_bytes_recv"
-#define NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT "services.net_bytes_send"
-#define NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT "services.net_tcp_recv"
-#define NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT "services.net_tcp_send"
-#define NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT "services.net_retransmit"
-#define NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT "services.net_udp_recv"
-#define NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT "services.net_udp_send"
+#define NETDATA_SERVICES_SOCKET_TCP_V4_CONN_CONTEXT "systemd.services.net_conn_ipv4"
+#define NETDATA_SERVICES_SOCKET_TCP_V6_CONN_CONTEXT "systemd.services.net_conn_ipv6"
+#define NETDATA_SERVICES_SOCKET_BYTES_RECV_CONTEXT "systemd.services.net_bytes_recv"
+#define NETDATA_SERVICES_SOCKET_BYTES_SEND_CONTEXT "systemd.services.net_bytes_send"
+#define NETDATA_SERVICES_SOCKET_TCP_RECV_CONTEXT "systemd.services.net_tcp_recv"
+#define NETDATA_SERVICES_SOCKET_TCP_SEND_CONTEXT "systemd.services.net_tcp_send"
+#define NETDATA_SERVICES_SOCKET_TCP_RETRANSMIT_CONTEXT "systemd.services.net_retransmit"
+#define NETDATA_SERVICES_SOCKET_UDP_RECV_CONTEXT "systemd.services.net_udp_recv"
+#define NETDATA_SERVICES_SOCKET_UDP_SEND_CONTEXT "systemd.services.net_udp_send"
 
 // ARAL name
 #define NETDATA_EBPF_SOCKET_ARAL_NAME "ebpf_socket"

@@ -14,7 +14,6 @@
 #define NETDATA_CACHESTAT_MISSES_CHART "cachestat_misses"
 
 #define NETDATA_CACHESTAT_SUBMENU "page_cache"
-#define NETDATA_CACHESTAT_CGROUP_SUBMENU "page cache (eBPF)"
 
 #define EBPF_CACHESTAT_DIMENSION_PAGE "pages/s"
 #define EBPF_CACHESTAT_DIMENSION_HITS "hits/s"
@@ -29,10 +28,10 @@
 #define NETDATA_CGROUP_CACHESTAT_HIT_FILES_CONTEXT "cgroup.cachestat_hits"
 #define NETDATA_CGROUP_CACHESTAT_MISS_FILES_CONTEXT "cgroup.cachestat_misses"
 
-#define NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT "services.cachestat_ratio"
-#define NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT "services.cachestat_dirties"
-#define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "services.cachestat_hits"
-#define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "services.cachestat_misses"
+#define NETDATA_SYSTEMD_CACHESTAT_HIT_RATIO_CONTEXT "systemd.services.cachestat_ratio"
+#define NETDATA_SYSTEMD_CACHESTAT_MODIFIED_CACHE_CONTEXT "systemd.services.cachestat_dirties"
+#define NETDATA_SYSTEMD_CACHESTAT_HIT_FILE_CONTEXT "systemd.services.cachestat_hits"
+#define NETDATA_SYSTEMD_CACHESTAT_MISS_FILES_CONTEXT "systemd.services.cachestat_misses"
 
 // variables
 enum cachestat_counters {

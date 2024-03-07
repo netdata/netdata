@@ -179,7 +179,6 @@ typedef struct ebpf_tracepoint {
 #define NETDATA_EBPF_MEMORY_GROUP "mem"
 #define NETDATA_EBPF_SYSTEM_GROUP "system"
 #define NETDATA_SYSTEM_SWAP_SUBMENU "swap"
-#define NETDATA_SYSTEM_CGROUP_SWAP_SUBMENU "swap (eBPF)"
 #define NETDATA_SYSTEM_IPC_SHM_SUBMENU "ipc shared memory"
 #define NETDATA_MONITORING_FAMILY "netdata"
 
@@ -340,6 +339,9 @@ void ebpf_pid_file(char *filename, size_t length);
 #define EBPF_COMMON_DIMENSION_FILES "files"
 #define EBPF_COMMON_DIMENSION_MILLISECONDS "milliseconds"
 #define EBPF_COMMON_DIMENSION_KILLS "kills"
+
+#define EBPF_CHART_ALGORITHM_ABSOLUTE "absolute"
+#define EBPF_CHART_ALGORITHM_INCREMENTAL "incremental"
 
 // Common variables
 extern int debug_enabled;
