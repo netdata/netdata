@@ -800,6 +800,14 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
     ebpf_nv_idx_t key =  { };
     ebpf_nv_idx_t next_key = { };
     ebpf_nv_data_t stored = {};
+
+    char path[FILENAME_MAX + 1];
+
+    if(ls->config.namespaces) {
+        snprintfz(path, sizeof(path), "%s/proc/self/ns/net", ls->config.host_prefix);
+        local_sockets_read_proc_inode_link(ls, path, &ls->proc_self_net_ns_inode, "net");
+    }
+
     int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
     uint64_t counter = 0;
     uint64_t removed = 0;
@@ -1364,13 +1372,12 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
         local_sockets_netlink_init(ls);
 #endif
 
-        // read all sockets from /proc
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
         if (ls->use_ebpf) {
             ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls);
         } else
 #endif
-
+            // read all sockets from /proc
             local_sockets_read_sockets_from_proc(ls);
 
         // send all sockets to parent
@@ -1511,8 +1518,13 @@ static inline void local_sockets_process(LS_STATE *ls) {
     // initialize our hashtables
     local_sockets_init(ls);
 
-    // read all sockets from /proc
-    local_sockets_read_sockets_from_proc(ls);
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    if (ls->use_ebpf) {
+        ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls);
+    } else
+#endif
+        // read all sockets from /proc
+        local_sockets_read_sockets_from_proc(ls);
 
     // check all socket namespaces
     if(ls->config.namespaces)
