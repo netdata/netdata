@@ -560,7 +560,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.username }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Image
         id: build
@@ -639,9 +639,9 @@ jobs:
         if: github.repository == 'netdata/netdata'
         uses: docker/login-action@v3
         with:
-          registry: quay.io
-          username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
-          password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
