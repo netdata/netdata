@@ -1075,9 +1075,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    if(argc == 2 && strcmp(argv[1], "debug") == 0) {
+    if(argc >= 2 && strcmp(argv[1], "debug") == 0) {
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        network_viewer_load_ebpf();
+        if(argc == 3 && strcmp(argv[2], "ebpf") == 0)
+            network_viewer_load_ebpf();
 
         if (ebpf_nv_module.maps[0].map_fd > 0)
             nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGIN: the plugin will use eBPF %s to monitor sockets.",
@@ -1101,7 +1102,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     }
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    network_viewer_load_ebpf();
+    if(argc == 3 && strcmp(argv[2], "ebpf") == 0)
+        network_viewer_load_ebpf();
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
