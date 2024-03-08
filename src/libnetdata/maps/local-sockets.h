@@ -740,6 +740,11 @@ enum ebpf_nv_tables_list {
     NETWORK_VIEWER_EBPF_NV_CONTROL
 };
 
+enum ebpf_nv_load_data {
+    NETWORK_VIEWER_EBPF_NV_LOAD_DATA,
+    NETWORK_VIEWER_EBPF_NV_ONLY_READ
+};
+
 typedef struct ebpf_nv_idx {
     union ipv46 saddr;
     uint16_t sport;
