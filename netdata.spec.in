@@ -703,7 +703,6 @@ Requires: bash
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
 %if 0%{?centos_ver} != 7
-Suggests: nut
 Suggests: apcupsd
 Suggests: iw
 Suggests: sudo
@@ -711,7 +710,7 @@ Suggests: sudo
 
 %description plugin-chartsd
  This plugin adds a selection of additional collectors written in shell script to the Netdata Agent.
-It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless access point statistics.
+It includes collectors for APCUPSD, LibreSWAN, OpenSIPS, and Wireless access point statistics.
 
 %pre plugin-chartsd
 

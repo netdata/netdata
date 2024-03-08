@@ -102,10 +102,10 @@ Depends: bash,
          netdata (= ${source:Version})
 Pre-Depends: adduser
 Conflicts: netdata (<< ${source:Version})
-Suggests: apcupsd, nut, iw, sudo
+Suggests: apcupsd, iw, sudo
 Description: The charts.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in shell
- script to the Netdata Agent. It includes collectors for NUT, APCUPSD,
+ script to the Netdata Agent. It includes collectors for APCUPSD,
  LibreSWAN, OpenSIPS, and Wireless access point statistics.
 
 Package: netdata-plugin-ebpf
