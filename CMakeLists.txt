@@ -493,9 +493,9 @@ endif()
 
 if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         if(ENABLE_BUNDLED_PROTOBUF)
-                set(PROTOBUF_PROTOC_EXECUTABLE "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/protoc")
-                set(PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src")
-                set(PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/.libs/libprotobuf.a")
+                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/protoc")
+                set(NETDATA_PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src")
+                set(NETDATA_PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/.libs/libprotobuf.a")
         else()
                 if (NOT BUILD_SHARED_LIBS)
                         set(Protobuf_USE_STATIC_LIBS On)
@@ -508,39 +508,62 @@ if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                 # that _does_ work correctly, so use that in preference to the
                 # Find module shipped with CMake.
                 #
+                # The code below works by first attempting to use find_package
+                # in config mode, and then checking for the existence of the
+                # target we actually use that gets defined by the protobuf
+                # CMake Package Configuration Module to determine if that
+                # worked. A bit of extra logic is required in the case of the
+                # config mode working, because some systems ship compatibility
+                # logic for the old FindProtobuf module while others do not.
+                #
                 # Upstream bug reference: https://gitlab.kitware.com/cmake/cmake/-/issues/24321
-                set(NETDATA_FIND_PACKAGE_PREFER_CONFIG ${CMAKE_FIND_PACKAGE_PREFER_CONFIG})
-                set(CMAKE_FIND_PACKAGE_PREFER_CONFIG True)
-                find_package(Protobuf REQUIRED)
-                set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ${NETDATA_FIND_PACKAGE_PREFER_CONFIG})
-                unset(NETDATA_FIND_PACKAGE_PREFER_CONFIG)
+                find_package(Protobuf CONFIG)
 
-                # We also need to correctly handle the protoc executable for
-                # systems that lack backwards compatibility for the
-                # FindProtobuf module shipped with CMake.
-                if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
-                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                IMPORTED_LOCATION_RELEASE)
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                if(TARGET protobuf::libprotobuf)
+                        if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
                                 get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_RELWITHDEBINFO)
+                                        IMPORTED_LOCATION_RELEASE)
+                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                                IMPORTED_LOCATION_RELWITHDEBINFO)
+                                endif()
+                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                                IMPORTED_LOCATION_MINSIZEREL)
+                                endif()
+                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                                IMPORTED_LOCATION_DEBUG)
+                                endif()
+                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                                IMPORTED_LOCATION_NOCONFIG)
+                                endif()
                         endif()
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_MINSIZEREL)
-                        endif()
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_DEBUG)
-                        endif()
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_NOCONFIG)
-                        endif()
-                endif()
 
-                if(NOT PROTOBUF_PROTOC_EXECUTABLE)
-                        set(PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
+                        # It is technically possible that this may still not
+                        # be set by this point, so we need to check it and
+                        # fail noisily if it isn't because the build won't
+                        # work without it.
+                        if(NOT Protobuf_PROTOC_EXECUTABLE)
+                                message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
+                        endif()
+
+                        set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
+                        set(NETDATA_PROTOBUF_LIBS protobuf::libprotobuf)
+                        get_target_property(NETDATA_PROTOBUF_CFLAGS_OTHER
+                                            protobuf::libprotobuf
+                                            INTERFACE_COMPILE_DEFINITIONS)
+                        get_target_property(NETDATA_PROTOBUF_INCLUDE_DIRS
+                                            protobuf::libprotobuf
+                                            INTERFACE_INCLUDE_DIRECTORIES)
+                else()
+                        message(STATUS "Could not find Protobuf using Config mode, falling back to Module mode")
+                        find_package(Protobuf REQUIRED)
+                        set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${PROTOBUF_PROTOC_EXECUTABLE})
+                        set(NETDATA_PROTOBUF_CFLAGS_OTHER ${PROTOBUF_CFLAGS_OTHER})
+                        set(NETDATA_PROTOBUF_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
+                        set(NETDATA_PROTOBUF_LIBS ${PROTOBUF_LIBRARIES})
                 endif()
         endif()
 
@@ -1676,8 +1699,8 @@ function(protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
                 list(APPEND ${HDRS} ${GENERATED_PB_H})
 
                 add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
-                                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} ARGS -I=${INC_DIR} --cpp_out=${OUT_DIR} ${ABS_FIL}
-                                   DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
+                                   COMMAND ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE} ARGS -I=${INC_DIR} --cpp_out=${OUT_DIR} ${ABS_FIL}
+                                   DEPENDS ${ABS_FIL} ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
                                    COMMENT "Running C++ protocol buffer compiler on ${FIL}"
                                    VERBATIM)
         endforeach()
@@ -2080,14 +2103,14 @@ add_executable(netdata
 )
 
 target_compile_definitions(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_CFLAGS_OTHER}>"
+        "$<$<BOOL:${ENABLE_PROTOBUF}>:${NETDATA_PROTOBUF_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_ML}>:DLIB_NO_GUI_SUPPORT>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_CFLAGS_OTHER}>"
 )
 
 target_include_directories(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_INCLUDE_DIRS}>"
+        "$<$<BOOL:${ENABLE_PROTOBUF}>:${NETDATA_PROTOBUF_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
@@ -2098,7 +2121,7 @@ target_link_libraries(netdata PRIVATE
         libnetdata
         "$<$<BOOL:${LINUX}>:rt>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
-        "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_LIBRARIES}>"
+        "$<$<BOOL:${ENABLE_PROTOBUF}>:${NETDATA_PROTOBUF_LIBS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
