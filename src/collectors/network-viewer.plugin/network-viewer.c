@@ -1013,6 +1013,8 @@ static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver
 
     if (!ret) {
         ebpf_update_controller(nv_maps[1].map_fd, em);
+        // We are going to use the optional value to determine when data is loaded in kernel
+        ebpf_nv_module.optional = NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
     }
 
     return ret;
