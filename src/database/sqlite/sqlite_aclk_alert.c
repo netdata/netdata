@@ -351,7 +351,8 @@ static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
                                  strdupz("UNKNOWN=0=UNKNOWN");
         alarm_log.command = strdupz(edit_command);
 
-        alarm_log.duration = (time_t) sqlite3_column_int64(res, 6);
+        time_t duration = (time_t) sqlite3_column_int64(res, 6);
+        alarm_log.duration = (duration > 0) ? duration : 0;
         alarm_log.non_clear_duration = (time_t) sqlite3_column_int64(res, 7);
         alarm_log.status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS) sqlite3_column_int(res, 19));
         alarm_log.old_status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS) sqlite3_column_int(res, 20));
