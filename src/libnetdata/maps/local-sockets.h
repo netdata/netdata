@@ -900,10 +900,12 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
 
 end_socket_read_loop:
         key = next_key;
+        /*
         if (stored.closed) {
             removed++;
             bpf_map_delete_elem(fd, &key);
         }
+        */
     }
 
     if (removed) {
@@ -1582,6 +1584,11 @@ static inline void local_sockets_process(LS_STATE *ls) {
 
 #ifdef HAVE_LIBMNL
     local_sockets_netlink_cleanup(ls);
+#endif
+
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    ls->ebpf_module->optional = (ls->use_ebpf && ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_ONLY_READ)?
+                                NETWORK_VIEWER_EBPF_NV_ONLY_READ : NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
 #endif
 }
 
