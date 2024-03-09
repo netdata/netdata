@@ -945,6 +945,33 @@ static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "PLUGIN: cannot insert value inside table.");
 }
 
+static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *n) {
+    ebpf_nv_idx_t key =  { };
+    ebpf_nv_data_t data = {};
+
+    key.sport = n->local_port_key.port;
+    key.dport = n->remote.port;
+    if (n->local.family == AF_INET) {
+        key.saddr.ipv4 = n->local.ip.ipv4;
+        key.daddr.ipv4 = n->remote.ip.ipv4;
+    }
+    else {
+        memcpy(&key.saddr.ipv6, &n->local.ip.ipv6, sizeof(n->local.ip.ipv6));
+        memcpy(&key.daddr.ipv6, &n->remote.ip.ipv6, sizeof(n->local.ip.ipv6));
+    }
+
+    data.protocol = n->local.protocol;
+    data.family = n->local.family;
+    data.uid = n->uid;
+    data.pid = n->pid;
+    data.direction = n->direction;
+    strncpyz(data.name, n->comm, sizeof(n->comm) - 1);
+
+    int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
+    if (bpf_map_update_elem(fd, &key, &data, BPF_ANY))
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "PLUGIN: cannot insert value inside table.");
+}
+
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 
 #ifdef HAVE_LIBMNL
