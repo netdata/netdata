@@ -46,7 +46,7 @@ Additionally, the following build time features require additional dependencies:
 ## Preparing the source tree
 
 Certain features in Netdata require custom versions of specific libraries,
-which the the build system will link statically into Netdata. These
+which the build system will link statically into Netdata. These
 libraries and their header files must be copied into specific locations
 in the source tree to be used.
 

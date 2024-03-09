@@ -216,7 +216,7 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available.
   --disable-plugin-xenstat   Explicitly disable the xenstat plugin.
-  --enable-plugin-systemd-journal Enable the the systemd journal plugin. Default: enable it when libsystemd is available.
+  --enable-plugin-systemd-journal Enable the systemd journal plugin. Default: enable it when libsystemd is available.
   --disable-plugin-systemd-journal Explicitly disable the systemd journal plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
