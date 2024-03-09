@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- packaging: remove Suggests nut [\#17129](https://github.com/netdata/netdata/pull/17129) ([ilyam8](https://github.com/ilyam8))
+- Fix login to GHCR when publishing Docker images. [\#17127](https://github.com/netdata/netdata/pull/17127) ([Ferroin](https://github.com/Ferroin))
+- Detect self thread when exiting. [\#17126](https://github.com/netdata/netdata/pull/17126) ([vkalintiris](https://github.com/vkalintiris))
 - fix health alert dyncfg schema fullPage option [\#17125](https://github.com/netdata/netdata/pull/17125) ([ilyam8](https://github.com/ilyam8))
 - improve go.d.plugin dyncfg config schemas [\#17124](https://github.com/netdata/netdata/pull/17124) ([ilyam8](https://github.com/ilyam8))
 - minor fix; broken link on on prem installation doc [\#17118](https://github.com/netdata/netdata/pull/17118) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -400,8 +403,6 @@
 - Acquire receiver\_lock to to avoid race condition [\#16531](https://github.com/netdata/netdata/pull/16531) ([stelfrag](https://github.com/stelfrag))
 - link aclk.log to stdout in docker [\#16529](https://github.com/netdata/netdata/pull/16529) ([ilyam8](https://github.com/ilyam8))
 - Update getting-started.md [\#16528](https://github.com/netdata/netdata/pull/16528) ([Ancairon](https://github.com/Ancairon))
-- Make image available to Learn + add a category overview page for new … [\#16527](https://github.com/netdata/netdata/pull/16527) ([Ancairon](https://github.com/Ancairon))
-- logs-management: Disable logs management monitoring section [\#16525](https://github.com/netdata/netdata/pull/16525) ([Dim-P](https://github.com/Dim-P))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
