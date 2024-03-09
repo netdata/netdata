@@ -324,6 +324,10 @@ static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+static void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *n);
+#endif
+
 static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
     for(SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_first_read_only_LOCAL_SOCKET(&ls->sockets_hashtable);
          sl;
@@ -339,6 +343,10 @@ static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
             // we have to call the callback for this socket
             if (ls->config.cb)
                 ls->config.cb(ls, n, ls->config.data);
+
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+            local_sockets_ebpf_store_sockets(ls, n);
+#endif
         }
     }
 }
@@ -905,6 +913,33 @@ end_socket_read_loop:
     return (!counter) ? false : true;
 }
 
+static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *n) {
+    ebpf_nv_idx_t key =  { };
+    ebpf_nv_data_t data = {};
+
+    key.sport = n->local_port_key.port;
+    key.dport = n->remote.port;
+    if (n->local.family == AF_INET) {
+        key.saddr.ipv4 = n->local.ip.ipv4;
+        key.daddr.ipv4 = n->remote.ip.ipv4;
+    }
+    else {
+        memcpy(&key.saddr.ipv6, &n->local.ip.ipv6, sizeof(n->local.ip.ipv6));
+        memcpy(&key.daddr.ipv6, &n->remote.ip.ipv6, sizeof(n->local.ip.ipv6));
+    }
+
+    data.protocol = n->local.protocol;
+    data.family = n->local.family;
+    data.uid = n->uid;
+    data.pid = n->pid;
+    data.direction = n->direction;
+    strncpyz(data.name, n->comm, sizeof(n->comm) - 1);
+
+    int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
+    if (bpf_map_update_elem(fd, &key, &data, BPF_ANY))
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "PLUGIN: cannot insert value inside table.");
+}
+
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 
 #ifdef HAVE_LIBMNL
@@ -1378,7 +1413,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
 #endif
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        if (ls->use_ebpf) {
+        if (ls->use_ebpf && ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
             ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls);
         } else
 #endif
@@ -1524,7 +1559,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
     local_sockets_init(ls);
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    if (ls->use_ebpf) {
+    if (ls->use_ebpf && ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
         ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls);
     } else
 #endif
