@@ -749,8 +749,9 @@ enum ebpf_nv_tables_list {
 };
 
 enum ebpf_nv_load_data {
-    NETWORK_VIEWER_EBPF_NV_LOAD_DATA,
-    NETWORK_VIEWER_EBPF_NV_ONLY_READ
+    NETWORK_VIEWER_EBPF_NV_LOAD_DATA = 1<<0,
+    NETWORK_VIEWER_EBPF_NV_ONLY_READ = 1<<1,
+    NETWORK_VEIWER_EBPF_NV_CLEANUP = 1<<2
 };
 
 typedef struct ebpf_nv_idx {
@@ -809,7 +810,7 @@ static inline void local_sockets_reset_ebpf_value(LS_STATE *ls, uint64_t removed
     }
 }
 
-static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
+static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_load_data action) {
     ebpf_nv_idx_t key =  { };
     ebpf_nv_idx_t next_key = { };
     ebpf_nv_data_t stored = {};
@@ -824,7 +825,7 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
     int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
     uint64_t counter = 0;
     uint64_t removed = 0;
-    char filename[FILENAME_MAX + 1];
+    bool cleanup = (action & NETWORK_VEIWER_EBPF_NV_CLEANUP);
     while (!bpf_map_get_next_key(fd, &key, &next_key)) {
         if (bpf_map_lookup_elem(fd, &key, &stored)) {
             goto end_socket_read_loop;
@@ -873,12 +874,10 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
 
 end_socket_read_loop:
         key = next_key;
-        /*
-        if (stored.closed) {
+        if (cleanup && stored.closed) {
             removed++;
             bpf_map_delete_elem(fd, &key);
         }
-        */
     }
 
     if (removed) {
@@ -1390,7 +1389,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
         if (ls->use_ebpf && ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
-            ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls);
+            ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VEIWER_EBPF_NV_CLEANUP);
         } else
 #endif
             // read all sockets from /proc
@@ -1536,7 +1535,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     if (ls->use_ebpf && ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
-        ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls);
+        ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VIEWER_EBPF_NV_LOAD_DATA);
     } else
 #endif
         // read all sockets from /proc
