@@ -749,12 +749,13 @@ enum ebpf_nv_tables_list {
 };
 
 enum ebpf_nv_load_data {
+    NETWORK_VIEWER_EBPF_NV_NOT_RUNNING = 0,
     NETWORK_VIEWER_EBPF_NV_LOAD_DATA = 1<<0,
     NETWORK_VIEWER_EBPF_NV_ONLY_READ = 1<<1,
     NETWORK_VEIWER_EBPF_NV_CLEANUP = 1<<2
 };
 
-#define NETWORK_VIEWER_EBPF_ACTION_LIMIT 10
+#define NETWORK_VIEWER_EBPF_ACTION_LIMIT 5
 
 typedef struct ebpf_nv_idx {
     union ipv46 saddr;
@@ -786,9 +787,15 @@ typedef struct ebpf_nv_data {
 } ebpf_nv_data_t;
 
 static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
+    ebpf_module_t *em = ls->ebpf_module;
     // We loaded with success eBPF codes
-    if (ls->ebpf_module->maps && ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
+    if (em->maps && em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
         ls->use_ebpf = true;
+
+    if (em->optional == NETWORK_VIEWER_EBPF_NV_NOT_RUNNING)
+        em->optional = NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
+
+    em->running_time = now_realtime_sec();
 }
 
 static inline bool local_sockets_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t *data) {
@@ -1536,7 +1543,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
     local_sockets_init(ls);
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    if (ls->use_ebpf && ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
+    if (ls->use_ebpf && ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
         ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VIEWER_EBPF_NV_LOAD_DATA);
     } else
 #endif
@@ -1563,11 +1570,13 @@ static inline void local_sockets_process(LS_STATE *ls) {
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     static int load_again = 0;
-    if (ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_LOAD_DATA && ls->use_ebpf) {
-        ls->ebpf_module->optional = NETWORK_VIEWER_EBPF_NV_ONLY_READ;
+    if (ls->use_ebpf && ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_LOAD_DATA) {
+        ls->ebpf_module->optional |= (NETWORK_VIEWER_EBPF_NV_ONLY_READ |
+                                      (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_LOAD_DATA));
     }
     else if (load_again == NETWORK_VIEWER_EBPF_ACTION_LIMIT) {
-        ls->ebpf_module->optional = NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
+        ls->ebpf_module->optional |= (NETWORK_VIEWER_EBPF_NV_LOAD_DATA |
+                                      (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_ONLY_READ));
         load_again = 0;
     }
 
