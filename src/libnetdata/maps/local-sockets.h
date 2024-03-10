@@ -1587,8 +1587,10 @@ static inline void local_sockets_process(LS_STATE *ls) {
 #endif
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    ls->ebpf_module->optional = (ls->use_ebpf && ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_ONLY_READ)?
-                                NETWORK_VIEWER_EBPF_NV_ONLY_READ : NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
+    if (ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_LOAD_DATA)
+        ls->ebpf_module->optional = NETWORK_VIEWER_EBPF_NV_ONLY_READ;
+    else
+        ls->ebpf_module->optional = NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
 #endif
 }
 
