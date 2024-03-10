@@ -359,7 +359,8 @@ typedef struct ebpf_module {
     int cgroup_charts;
     netdata_run_mode_t mode;
     uint32_t thread_id;
-    int optional;
+    uint32_t optional;
+    RW_SPINLOCK rw_spinlock;
     ebpf_local_maps_t *maps;
     ebpf_specify_name_t *names;
     uint32_t pid_map_size;
