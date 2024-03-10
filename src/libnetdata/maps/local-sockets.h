@@ -965,6 +965,7 @@ static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *
     data.uid = n->uid;
     data.pid = n->pid;
     data.direction = n->direction;
+    data.ts = n->inode;
     strncpyz(data.name, n->comm, sizeof(n->comm) - 1);
 
     int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
