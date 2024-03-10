@@ -754,6 +754,8 @@ enum ebpf_nv_load_data {
     NETWORK_VEIWER_EBPF_NV_CLEANUP = 1<<2
 };
 
+#define NETWORK_VIEWER_EBPF_ACTION_LIMIT 10
+
 typedef struct ebpf_nv_idx {
     union ipv46 saddr;
     uint16_t sport;
@@ -1560,10 +1562,16 @@ static inline void local_sockets_process(LS_STATE *ls) {
 #endif
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    if (ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_LOAD_DATA)
+    static int load_again = 0;
+    if (ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_LOAD_DATA && ls->use_ebpf) {
         ls->ebpf_module->optional = NETWORK_VIEWER_EBPF_NV_ONLY_READ;
-    else
+    }
+    else if (load_again == NETWORK_VIEWER_EBPF_ACTION_LIMIT) {
         ls->ebpf_module->optional = NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
+        load_again = 0;
+    }
+
+    load_again++;
 #endif
 }
 
