@@ -123,29 +123,29 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     }
 
     int param = 0;
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->unique_id),done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->alarm_id), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->alarm_event_id), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->updated_by_id), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->updates_id), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->when), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->duration), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->non_clear_duration), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->flags), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->exec_run_timestamp), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->delay_up_to_timestamp), done);
-    SQLITE_BIND_FAIL(SQLITE3_BIND_STRING_OR_NULL(res, ae->info, ++param), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int(res, ++param, ae->exec_code), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int(res, ++param, ae->new_status), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int(res, ++param, ae->old_status), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int(res, ++param, ae->delay), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_double(res, ++param, ae->new_value), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_double(res, ++param, ae->old_value), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->last_repeat), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->global_id), done);
-    SQLITE_BIND_FAIL(SQLITE3_BIND_STRING_OR_NULL(res, ae->summary, ++param), done);
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->alarm_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->alarm_event_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->updated_by_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->updates_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->when));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->duration));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->non_clear_duration));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->flags));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->exec_run_timestamp));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->delay_up_to_timestamp));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->info, ++param));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->exec_code));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->new_status));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->old_status));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->delay));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_double(res, ++param, ae->new_value));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_double(res, ++param, ae->old_value));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->last_repeat));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->global_id));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->summary, ++param));
 
     param = 0;
     rc = execute_insert(res);
@@ -198,17 +198,17 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     int param = 0;
-    SQLITE_BIND_FAIL(sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->alarm_id), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_blob(res, ++param, &ae->config_hash_id, sizeof(ae->config_hash_id), SQLITE_STATIC), done);
-    SQLITE_BIND_FAIL(SQLITE3_BIND_STRING_OR_NULL(res, ae->name, ++param), done);
-    SQLITE_BIND_FAIL(SQLITE3_BIND_STRING_OR_NULL(res, ae->chart, ++param), done);
-    SQLITE_BIND_FAIL(SQLITE3_BIND_STRING_OR_NULL(res, ae->exec, ++param), done);
-    SQLITE_BIND_FAIL(SQLITE3_BIND_STRING_OR_NULL(res, ae->recipient, ++param), done);
-    SQLITE_BIND_FAIL(SQLITE3_BIND_STRING_OR_NULL(res, ae->units, ++param), done);
-    SQLITE_BIND_FAIL(SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_context, ++param), done);
-    SQLITE_BIND_FAIL(sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC), done);
-    SQLITE_BIND_FAIL(SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_name, ++param), done);
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->alarm_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->config_hash_id, sizeof(ae->config_hash_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->name, ++param));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->chart, ++param));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->exec, ++param));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->recipient, ++param));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->units, ++param));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_context, ++param));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_name, ++param));
 
     // Reset param to mark all bind commands succedeed
     param = 0;

@@ -8,7 +8,7 @@
 
 void analytics_set_data_str(char **name, const char *value);
 
-#define SQLITE_BIND_FAIL(rc, label)                                                                                    \
+#define SQLITE_BIND_FAIL(label, rc)                                                                                    \
     do {                                                                                                               \
         if ((rc) != SQLITE_OK)                                                                                         \
             goto label;                                                                                                \
