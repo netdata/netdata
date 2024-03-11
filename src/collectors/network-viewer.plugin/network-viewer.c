@@ -1063,7 +1063,30 @@ static inline void network_viewer_load_ebpf()
     if (network_viewer_load_ebpf_to_kernel(&ebpf_nv_module, kver))
         network_viewer_unload_ebpf();
 }
-#endif
+
+void *network_viewer_ebpf_worker(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t max = 5 * NETWORK_VIEWER_EBPF_ACTION_LIMIT;
+    while(!plugin_should_exit) {
+       (void)heartbeat_next(&hb, USEC_PER_SEC);
+
+       rw_spinlock_write_lock(&em->rw_spinlock);
+       uint32_t curr = now_realtime_sec() - em->running_time;
+       if (em->optional != NETWORK_VIEWER_EBPF_NV_NOT_RUNNING || curr < max) {
+           rw_spinlock_write_unlock(&em->rw_spinlock);
+           continue;
+       }
+       em->running_time = now_realtime_sec();
+       em->optional = NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
+       rw_spinlock_write_unlock(&em->rw_spinlock);
+   }
+
+   return NULL;
+}
+#endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 
 // ----------------------------------------------------------------------------------------------------------------
 // main
@@ -1107,8 +1130,19 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     }
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    if(argc == 3 && strcmp(argv[2], "ebpf") == 0)
+    static netdata_thread_t *nv_clean_thread = NULL;
+    if(argc == 3 && strcmp(argv[2], "ebpf") == 0) {
         network_viewer_load_ebpf();
+
+        if (ebpf_nv_module.maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd > 0) {
+            nv_clean_thread = mallocz(sizeof(netdata_thread_t));
+            netdata_thread_create(nv_clean_thread,
+                                  "P[networkviewer ebpf]",
+                                  NETDATA_THREAD_OPTION_JOINABLE,
+                                  network_viewer_ebpf_worker,
+                                  &ebpf_nv_module);
+        }
+    }
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -1149,6 +1183,10 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     }
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    if (nv_clean_thread) {
+        netdata_thread_join(*nv_clean_thread, NULL);
+        freez(nv_clean_thread);
+    }
     network_viewer_unload_ebpf();
 #endif
 
