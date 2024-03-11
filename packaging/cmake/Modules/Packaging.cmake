@@ -308,9 +308,29 @@ set(CPACK_DEBIAN_GO_D_PLUGIN_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/go.d/postinst")
 
 #
+# ebpf.plugin
+#
+
+# TODO: - changelog/copyright
+#       - depend on legacy
+set(CPACK_COMPONENT_EBPF_PLUGIN_DESCRIPTION
+		"Description: The eBPF metrics collection plugin for the Netdata Agent
+This plugin allows the Netdata Agent to use eBPF code to collect more
+detailed kernel-level metrics for the system.")
+
+set(CPACK_COMPONENT_EBPF_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_EBPF_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_EBPF_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_EBPF_PLUGIN_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+
+set(CPACK_DEBIAN_EBPF_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf.d/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf.d/postinst")
+
+#
 # CPack components
 #
 
-set(CPACK_COMPONENTS_ALL "netdata;go_d_plugin;systemd_journal_plugin;perf_plugin;logs_management_plugin;freeipmi_plugin;nfacct_plugin;debugfs_plugin;cups_plugin;xenstat_plugin;slabinfo_plugin;apps_plugin;network_viewer_plugin")
+set(CPACK_COMPONENTS_ALL "netdata;ebpf_plugin;go_d_plugin;systemd_journal_plugin;perf_plugin;logs_management_plugin;freeipmi_plugin;nfacct_plugin;debugfs_plugin;cups_plugin;xenstat_plugin;slabinfo_plugin;apps_plugin;network_viewer_plugin")
 
 include(CPack)

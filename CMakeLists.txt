@@ -1969,6 +1969,32 @@ if(ENABLE_PLUGIN_EBPF)
     install(TARGETS ebpf.plugin
             COMPONENT ebpf_plugin
             DESTINATION usr/libexec/netdata/plugins.d)
+
+    install(FILES
+            src/collectors/ebpf.plugin/ebpf.d.conf
+            COMPONENT ebpf_plugin
+            DESTINATION usr/lib/netdata/conf.d)
+
+    install(FILES
+            src/collectors/ebpf.plugin/ebpf.d/cachestat.conf
+            src/collectors/ebpf.plugin/ebpf.d/dcstat.conf
+            src/collectors/ebpf.plugin/ebpf.d/disk.conf
+            src/collectors/ebpf.plugin/ebpf.d/ebpf_kernel_reject_list.txt
+            src/collectors/ebpf.plugin/ebpf.d/fd.conf
+            src/collectors/ebpf.plugin/ebpf.d/filesystem.conf
+            src/collectors/ebpf.plugin/ebpf.d/hardirq.conf
+            src/collectors/ebpf.plugin/ebpf.d/mdflush.conf
+            src/collectors/ebpf.plugin/ebpf.d/mount.conf
+            src/collectors/ebpf.plugin/ebpf.d/network.conf
+            src/collectors/ebpf.plugin/ebpf.d/oomkill.conf
+            src/collectors/ebpf.plugin/ebpf.d/process.conf
+            src/collectors/ebpf.plugin/ebpf.d/shm.conf
+            src/collectors/ebpf.plugin/ebpf.d/softirq.conf
+            src/collectors/ebpf.plugin/ebpf.d/swap.conf
+            src/collectors/ebpf.plugin/ebpf.d/sync.conf
+            src/collectors/ebpf.plugin/ebpf.d/vfs.conf
+            COMPONENT ebpf_plugin
+            DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
@@ -2229,7 +2255,6 @@ install(DIRECTORY COMPONENT netdata DESTINATION var/run)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/charts.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/custom-plugins.d)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/ebpf.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/go.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/health.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/python.d)
@@ -2566,36 +2591,6 @@ install(FILES
         src/health/schema.d/health:alert:prototype.json
         COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/schema.d)
-
-#
-# ebpf files
-#
-
-if(ENABLE_PLUGIN_EBPF)
-        install(FILES
-                src/collectors/ebpf.plugin/ebpf.d.conf
-                DESTINATION usr/lib/netdata/conf.d)
-
-        install(FILES
-                src/collectors/ebpf.plugin/ebpf.d/cachestat.conf
-                src/collectors/ebpf.plugin/ebpf.d/dcstat.conf
-                src/collectors/ebpf.plugin/ebpf.d/disk.conf
-                src/collectors/ebpf.plugin/ebpf.d/ebpf_kernel_reject_list.txt
-                src/collectors/ebpf.plugin/ebpf.d/fd.conf
-                src/collectors/ebpf.plugin/ebpf.d/filesystem.conf
-                src/collectors/ebpf.plugin/ebpf.d/hardirq.conf
-                src/collectors/ebpf.plugin/ebpf.d/mdflush.conf
-                src/collectors/ebpf.plugin/ebpf.d/mount.conf
-                src/collectors/ebpf.plugin/ebpf.d/network.conf
-                src/collectors/ebpf.plugin/ebpf.d/oomkill.conf
-                src/collectors/ebpf.plugin/ebpf.d/process.conf
-                src/collectors/ebpf.plugin/ebpf.d/shm.conf
-                src/collectors/ebpf.plugin/ebpf.d/softirq.conf
-                src/collectors/ebpf.plugin/ebpf.d/swap.conf
-                src/collectors/ebpf.plugin/ebpf.d/sync.conf
-                src/collectors/ebpf.plugin/ebpf.d/vfs.conf
-                DESTINATION usr/lib/netdata/conf.d/ebpf.d)
-endif()
 
 #
 # python.d files

@@ -5,7 +5,9 @@ set -exu -o pipefail
 #
 # Build the debs
 #
-git clean -xfd . && driver -r debs
+rm -rf artifacts/
+
+driver -r debs
 
 pushd build
 cpack -G DEB
@@ -23,6 +25,7 @@ packages=(
     [apps_plugin]=netdata-apps_plugin_6.7.8_amd64.deb
     [cups_plugin]=netdata-cups_plugin_6.7.8_amd64.deb
     [debugfs_plugin]=netdata-debugfs_plugin_6.7.8_amd64.deb
+    [ebpf_plugin]=netdata-ebpf_plugin_6.7.8_amd64.deb
     [freeipmi_plugin]=netdata-freeipmi_plugin_6.7.8_amd64.deb
     [go_d_plugin]=netdata-go_d_plugin_6.7.8_amd64.deb
     [logs_management_plugin]=netdata-logs_management_plugin_6.7.8_amd64.deb
