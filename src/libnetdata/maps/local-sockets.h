@@ -1475,6 +1475,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     static int load_again = 0;
+    rw_spinlock_write_lock(&ls->ebpf_module->rw_spinlock);
     if (ls->use_ebpf && ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_LOAD_DATA) {
         ls->ebpf_module->optional |= (NETWORK_VIEWER_EBPF_NV_ONLY_READ |
                                       (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_LOAD_DATA));
@@ -1484,6 +1485,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
                                       (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_ONLY_READ));
         load_again = 0;
     }
+    rw_spinlock_write_unlock(&ls->ebpf_module->rw_spinlock);
 
     load_again++;
 #endif
