@@ -206,8 +206,8 @@ github.com/likexian/gokit v0.25.13 h1:p2Uw3+6fGG53CwdU2Dz0T6bOycdb2+bAFAa3ymwWVk
 github.com/likexian/gokit v0.25.13/go.mod h1:qQhEWFBEfqLCO3/vOEo2EDKd+EycekVtUK4tex+l2H4=
 github.com/likexian/whois v1.15.1 h1:6vTMI8n9s1eJdmcO4R9h1x99aQWIZZX1CD3am68gApU=
 github.com/likexian/whois v1.15.1/go.mod h1:/nxmQ6YXvLz+qTxC/QFtEJNAt0zLuRxJrKiWpBJX8X0=
-github.com/likexian/whois-parser v1.24.10 h1:Gfr+Q96PIo+HigM4r4rJ0SjN47h+URMRTdGcZ9jDXU4=
-github.com/likexian/whois-parser v1.24.10/go.mod h1:b6STMHHDaSKbd4PzGrP50wWE5NzeBUETa/hT9gI0G9I=
+github.com/likexian/whois-parser v1.24.11 h1:U9hs+TX+eUnJTj1LPRc3HVHmuVRC0tKTGDhiTAqrCdA=
+github.com/likexian/whois-parser v1.24.11/go.mod h1:b6STMHHDaSKbd4PzGrP50wWE5NzeBUETa/hT9gI0G9I=
 github.com/lmittmann/tint v1.0.4 h1:LeYihpJ9hyGvE0w+K2okPTGUdVLfng1+nDNVR4vWISc=
 github.com/lmittmann/tint v1.0.4/go.mod h1:HIS3gSy7qNwGCj+5oRjAutErFBl4BzdQP6cJZ0NfMwE=
 github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=
