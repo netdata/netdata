@@ -84,6 +84,10 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS
 # 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/postrm")
 
 #
+# TODO: DEBHELPER
+#
+
+#
 # debugfs.plugin
 #
 
@@ -148,9 +152,165 @@ set(CPACK_DEBIAN_SLABINFO_PLUGIN_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/slabinfo/postinst")
 
 #
+# apps.plugin
+#
+
+# TODO: changelog/copyright
+set(CPACK_COMPONENT_APPS_PLUGIN_PLUGIN_DESCRIPTION
+		"Description: The per-application metrics collector plugin for the Netdata Agent
+This plugin allows the Netdata Agent to collect per-application and
+per-user metrics without using cgroups.")
+
+set(CPACK_COMPONENT_APPS_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_APPS_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_APPS_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_APPS_PLUGIN_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+
+set(CPACK_DEBIAN_APPS_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/apps/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/apps/postinst")
+
+#
+# network-viewer.plugin
+#
+
+# TODO: - changelog/copyright
+#       - recommends netdata-plugin-ebpf
+set(CPACK_COMPONENT_NETWORK_VIEWER_PLUGIN_DESCRIPTION
+		"Description: The network viewer plugin for the Netdata Agent
+This plugin allows the Netdata Agent to provide network connection
+mapping functionality for use in Netdata Cloud.")
+
+set(CPACK_COMPONENT_NETWORK_VIEWER_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_NETWORK_VIEWER_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_NETWORK_VIEWER_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_NETWORK_VIEWER_PLUGIN_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+
+set(CPACK_DEBIAN_NETWORK_VIEWER_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/network-viewer/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/network-viewer/postinst")
+
+#
+# nfacct.plugin
+#
+
+# TODO: - changelog/copyright
+set(CPACK_COMPONENT_NFACCT_PLUGIN_DESCRIPTION
+		"Description: The NFACCT metrics collection plugin for the Netdata Agent
+This plugin allows the Netdata Agent to collect metrics from the firewall
+using NFACCT objects.")
+
+set(CPACK_COMPONENT_NFACCT_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_NFACCT_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_NFACCT_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_NFACCT_PLUGIN_PACKAGE_PREDEPENDS "adduser")
+
+set(CPACK_DEBIAN_NFACCT_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/nfacct/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/nfacct/postinst")
+
+#
+# freeipmi.plugin
+#
+
+# TODO: - changelog/copyright
+set(CPACK_COMPONENT_FREEIPMI_PLUGIN_DESCRIPTION
+		"Description: The FreeIPMI metrics collection plugin for the Netdata Agent
+This plugin allows the Netdata Agent to collect metrics from hardware
+using FreeIPMI.")
+
+set(CPACK_COMPONENT_FREEIPMI_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_FREEIPMI_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_FREEIPMI_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_FREEIPMI_PLUGIN_PACKAGE_PREDEPENDS "adduser")
+
+set(CPACK_DEBIAN_FREEIPMI_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/freeipmi/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/freeipmi/postinst")
+
+#
+# logs-management.plugin
+#
+
+# TODO: - changelog/copyright
+set(CPACK_COMPONENT_LOGS_MANAGEMENT_PLUGIN_DESCRIPTION
+		"Description: The logs-management plugin for the Netdata Agent
+This plugin allows the Netdata Agent to collect logs from the system
+and parse them to extract metrics.")
+
+set(CPACK_COMPONENT_LOGS_MANAGEMENT_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_LOGS_MANAGEMENT_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_LOGS_MANAGEMENT_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_LOGS_MANAGEMENT_PLUGIN_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+
+set(CPACK_DEBIAN_LOGS_MANAGEMENT_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/logs-management/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/logs-management/postinst")
+
+#
+# perf.plugin
+#
+
+# TODO: - changelog/copyright
+set(CPACK_COMPONENT_PERF_PLUGIN_DESCRIPTION
+		"Description: The perf metrics collector for the Netdata Agent
+This plugin allows the Netdata to collect metrics from the Linux perf
+subsystem.")
+
+set(CPACK_COMPONENT_PERF_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_PERF_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PERF_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_PERF_PLUGIN_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+
+set(CPACK_DEBIAN_PERF_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/perf/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/perf/postinst")
+
+#
+# systemd-journal.plugin
+#
+
+# TODO: - changelog/copyright
+set(CPACK_COMPONENT_SYSTEMD_JOURNAL_PLUGIN_DESCRIPTION
+		"Description: The systemd-journal collector for the Netdata Agent
+This plugin allows the Netdata Agent to present logs from the systemd
+journal on Netdata Cloud or the local Agent dashboard.")
+
+set(CPACK_COMPONENT_SYSTEMD_JOURNAL_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_SYSTEMD_JOURNAL_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_SYSTEMD_JOURNAL_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_SYSTEMD_JOURNAL_PLUGIN_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+
+set(CPACK_DEBIAN_SYSTEMD_JOURNAL_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/systemd-journal/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/systemd-journal/postinst")
+
+#
+# go.d.plugin
+#
+
+# TODO: - changelog/copyright
+set(CPACK_COMPONENT_GO_D_PLUGIN_DESCRIPTION
+		"Description: The go.d metrics collection plugin for the Netdata Agent
+This plugin adds a selection of additional collectors written in Go to
+the Netdata Agent. A significant percentage of the application specific
+collectors provided by Netdata are part of this plugin, so most users
+will want it installed.")
+
+set(CPACK_COMPONENT_GO_D_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_GO_D_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_GO_D_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_GO_D_PLUGIN_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+set(CPACK_DEBIAN_GO_D_PLUGIN_PACKAGE_SUGGESTS "nvme-cli, sudo")
+
+set(CPACK_DEBIAN_GO_D_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/go.d/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/go.d/postinst")
+
+#
 # CPack components
 #
 
-set(CPACK_COMPONENTS_ALL "netdata;debugfs_plugin;cups_plugin;xenstat_plugin;slabinfo_plugin")
+set(CPACK_COMPONENTS_ALL "netdata;go_d_plugin;systemd_journal_plugin;perf_plugin;logs_management_plugin;freeipmi_plugin;nfacct_plugin;debugfs_plugin;cups_plugin;xenstat_plugin;slabinfo_plugin;apps_plugin;network_viewer_plugin")
 
 include(CPack)
