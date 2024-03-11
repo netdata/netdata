@@ -1420,7 +1420,30 @@ static inline void network_viewer_load_ebpf()
     if (network_viewer_load_ebpf_to_kernel(&ebpf_nv_module, kver))
         network_viewer_unload_ebpf();
 }
-#endif
+
+void *network_viewer_ebpf_worker(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t max = 5 * NETWORK_VIEWER_EBPF_ACTION_LIMIT;
+    while(!plugin_should_exit) {
+       (void)heartbeat_next(&hb, USEC_PER_SEC);
+
+       rw_spinlock_write_lock(&em->rw_spinlock);
+       uint32_t curr = now_realtime_sec() - em->running_time;
+       if (em->optional != NETWORK_VIEWER_EBPF_NV_NOT_RUNNING || curr < max) {
+           rw_spinlock_write_unlock(&em->rw_spinlock);
+           continue;
+       }
+       em->running_time = now_realtime_sec();
+       em->optional = NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
+       rw_spinlock_write_unlock(&em->rw_spinlock);
+   }
+
+   return NULL;
+}
+#endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 
 // ----------------------------------------------------------------------------------------------------------------
 // main
