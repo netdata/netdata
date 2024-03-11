@@ -12,6 +12,9 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/docker/docker/api/types"
+	typesContainer "github.com/docker/docker/api/types/container"
+	typesImage "github.com/docker/docker/api/types/image"
+	typesSystem "github.com/docker/docker/api/types/system"
 	docker "github.com/docker/docker/client"
 )
 
@@ -63,9 +66,9 @@ type (
 	}
 	dockerClient interface {
 		NegotiateAPIVersion(context.Context)
-		Info(context.Context) (types.Info, error)
-		ImageList(context.Context, types.ImageListOptions) ([]types.ImageSummary, error)
-		ContainerList(context.Context, types.ContainerListOptions) ([]types.Container, error)
+		Info(context.Context) (typesSystem.Info, error)
+		ImageList(context.Context, types.ImageListOptions) ([]typesImage.Summary, error)
+		ContainerList(context.Context, typesContainer.ListOptions) ([]types.Container, error)
 		Close() error
 	}
 )

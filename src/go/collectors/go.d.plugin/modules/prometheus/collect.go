@@ -10,8 +10,8 @@ import (
 
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus"
 
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
-	"github.com/prometheus/prometheus/model/textparse"
 )
 
 const (
@@ -61,15 +61,15 @@ func (p *Prometheus) collect() (map[string]int64, error) {
 		}
 
 		switch mf.Type() {
-		case textparse.MetricTypeGauge:
+		case model.MetricTypeGauge:
 			p.collectGauge(mx, mf)
-		case textparse.MetricTypeCounter:
+		case model.MetricTypeCounter:
 			p.collectCounter(mx, mf)
-		case textparse.MetricTypeSummary:
+		case model.MetricTypeSummary:
 			p.collectSummary(mx, mf)
-		case textparse.MetricTypeHistogram:
+		case model.MetricTypeHistogram:
 			p.collectHistogram(mx, mf)
-		case textparse.MetricTypeUnknown:
+		case model.MetricTypeUnknown:
 			p.collectUntyped(mx, mf)
 		}
 	}

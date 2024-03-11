@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types"
+	typesContainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 )
 
@@ -109,7 +110,7 @@ func (d *Docker) collectContainers(mx map[string]int64) error {
 			ctx, cancel := context.WithTimeout(context.Background(), d.Timeout.Duration())
 			defer cancel()
 
-			v, err := d.client.ContainerList(ctx, types.ContainerListOptions{
+			v, err := d.client.ContainerList(ctx, typesContainer.ListOptions{
 				All:     true,
 				Filters: filters.NewArgs(filters.KeyValuePair{Key: "health", Value: status}),
 				Size:    d.CollectContainerSize,

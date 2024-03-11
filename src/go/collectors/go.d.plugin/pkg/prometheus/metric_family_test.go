@@ -3,8 +3,8 @@ package prometheus
 import (
 	"testing"
 
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
-	"github.com/prometheus/prometheus/model/textparse"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -66,15 +66,15 @@ func TestMetricFamilies_GetGauge(t *testing.T) {
 		wantMF *MetricFamily
 	}{
 		"metric is found and is Gauge": {
-			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: textparse.MetricTypeGauge}},
-			wantMF: &MetricFamily{name: n, typ: textparse.MetricTypeGauge},
+			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: model.MetricTypeGauge}},
+			wantMF: &MetricFamily{name: n, typ: model.MetricTypeGauge},
 		},
 		"metric is found but it is not Gauge": {
-			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: textparse.MetricTypeUnknown}},
+			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: model.MetricTypeUnknown}},
 			wantMF: nil,
 		},
 		"metric is not found": {
-			mfs:    MetricFamilies{"!" + n: &MetricFamily{name: n, typ: textparse.MetricTypeGauge}},
+			mfs:    MetricFamilies{"!" + n: &MetricFamily{name: n, typ: model.MetricTypeGauge}},
 			wantMF: nil,
 		},
 		"not initialized": {
@@ -98,15 +98,15 @@ func TestMetricFamilies_GetCounter(t *testing.T) {
 		wantMF *MetricFamily
 	}{
 		"metric is found and is Counter": {
-			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: textparse.MetricTypeCounter}},
-			wantMF: &MetricFamily{name: n, typ: textparse.MetricTypeCounter},
+			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: model.MetricTypeCounter}},
+			wantMF: &MetricFamily{name: n, typ: model.MetricTypeCounter},
 		},
 		"metric is found but it is not Counter": {
-			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: textparse.MetricTypeGauge}},
+			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: model.MetricTypeGauge}},
 			wantMF: nil,
 		},
 		"metric is not found": {
-			mfs:    MetricFamilies{"!" + n: &MetricFamily{name: n, typ: textparse.MetricTypeGauge}},
+			mfs:    MetricFamilies{"!" + n: &MetricFamily{name: n, typ: model.MetricTypeGauge}},
 			wantMF: nil,
 		},
 		"not initialized": {
@@ -130,15 +130,15 @@ func TestMetricFamilies_GetSummary(t *testing.T) {
 		wantMF *MetricFamily
 	}{
 		"metric is found and is Summary": {
-			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: textparse.MetricTypeSummary}},
-			wantMF: &MetricFamily{name: n, typ: textparse.MetricTypeSummary},
+			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: model.MetricTypeSummary}},
+			wantMF: &MetricFamily{name: n, typ: model.MetricTypeSummary},
 		},
 		"metric is found but it is not Summary": {
-			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: textparse.MetricTypeGauge}},
+			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: model.MetricTypeGauge}},
 			wantMF: nil,
 		},
 		"metric is not found": {
-			mfs:    MetricFamilies{"!" + n: &MetricFamily{name: n, typ: textparse.MetricTypeGauge}},
+			mfs:    MetricFamilies{"!" + n: &MetricFamily{name: n, typ: model.MetricTypeGauge}},
 			wantMF: nil,
 		},
 		"not initialized": {
@@ -162,15 +162,15 @@ func TestMetricFamilies_GetHistogram(t *testing.T) {
 		wantMF *MetricFamily
 	}{
 		"metric is found and is Histogram": {
-			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: textparse.MetricTypeHistogram}},
-			wantMF: &MetricFamily{name: n, typ: textparse.MetricTypeHistogram},
+			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: model.MetricTypeHistogram}},
+			wantMF: &MetricFamily{name: n, typ: model.MetricTypeHistogram},
 		},
 		"metric is found but it is not Histogram": {
-			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: textparse.MetricTypeGauge}},
+			mfs:    MetricFamilies{n: &MetricFamily{name: n, typ: model.MetricTypeGauge}},
 			wantMF: nil,
 		},
 		"metric is not found": {
-			mfs:    MetricFamilies{"!" + n: &MetricFamily{name: n, typ: textparse.MetricTypeGauge}},
+			mfs:    MetricFamilies{"!" + n: &MetricFamily{name: n, typ: model.MetricTypeGauge}},
 			wantMF: nil,
 		},
 		"not initialized": {
@@ -192,8 +192,8 @@ func TestMetricFamily_Name(t *testing.T) {
 }
 
 func TestMetricFamily_Type(t *testing.T) {
-	mf := &MetricFamily{typ: textparse.MetricTypeGauge}
-	assert.Equal(t, mf.Type(), textparse.MetricTypeGauge)
+	mf := &MetricFamily{typ: model.MetricTypeGauge}
+	assert.Equal(t, mf.Type(), model.MetricTypeGauge)
 }
 
 func TestMetricFamily_Help(t *testing.T) {

@@ -11,6 +11,9 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 
 	"github.com/docker/docker/api/types"
+	typesContainer "github.com/docker/docker/api/types/container"
+	typesImage "github.com/docker/docker/api/types/image"
+	typesSystem "github.com/docker/docker/api/types/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -756,19 +759,19 @@ type mockClient struct {
 	closeCalled               bool
 }
 
-func (m *mockClient) Info(_ context.Context) (types.Info, error) {
+func (m *mockClient) Info(_ context.Context) (typesSystem.Info, error) {
 	if m.errOnInfo {
-		return types.Info{}, errors.New("mockClient.Info() error")
+		return typesSystem.Info{}, errors.New("mockClient.Info() error")
 	}
 
-	return types.Info{
+	return typesSystem.Info{
 		ContainersRunning: 4,
 		ContainersPaused:  5,
 		ContainersStopped: 6,
 	}, nil
 }
 
-func (m *mockClient) ContainerList(_ context.Context, opts types.ContainerListOptions) ([]types.Container, error) {
+func (m *mockClient) ContainerList(_ context.Context, opts typesContainer.ListOptions) ([]types.Container, error) {
 	if m.errOnContainerList {
 		return nil, errors.New("mockClient.ContainerList() error")
 	}
@@ -822,12 +825,12 @@ func (m *mockClient) ContainerList(_ context.Context, opts types.ContainerListOp
 	return containers, nil
 }
 
-func (m *mockClient) ImageList(_ context.Context, _ types.ImageListOptions) ([]types.ImageSummary, error) {
+func (m *mockClient) ImageList(_ context.Context, _ types.ImageListOptions) ([]typesImage.Summary, error) {
 	if m.errOnImageList {
 		return nil, errors.New("mockClient.ImageList() error")
 	}
 
-	return []types.ImageSummary{
+	return []typesImage.Summary{
 		{
 			Containers: 0,
 			Size:       100,
