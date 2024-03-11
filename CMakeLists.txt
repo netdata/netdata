@@ -181,6 +181,7 @@ endif()
 
 if(ENABLE_BUNDLED_PROTOBUF AND NEED_PROTOBUF)
         include(FetchContent)
+        include(NetdataFetchContentExtra)
 
         if(USE_CXX_11)
             # This version needs to stay as it is, as newer versions need C++14
@@ -216,7 +217,7 @@ if(ENABLE_BUNDLED_PROTOBUF AND NEED_PROTOBUF)
                         GIT_REPOSITORY https://github.com/abseil/abseil-cpp
                         GIT_TAG ${ABSL_TAG}
                 )
-                FetchContent_MakeAvailable(absl)
+                FetchContent_MakeAvailable_NoInstall(absl)
                 message(STATUS "Finished preparing bundled Abseil")
         endif()
 
@@ -230,7 +231,7 @@ if(ENABLE_BUNDLED_PROTOBUF AND NEED_PROTOBUF)
                 GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
                 GIT_TAG ${PROTOBUF_TAG}
         )
-        FetchContent_MakeAvailable(protobuf)
+        FetchContent_MakeAvailable_NoInstall(protobuf)
         message(STATUS "Finished preparing bundled Protobuf.")
 
         set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE "${NETDATA_FETCHCONTENT_TRY_FIND_PACKAGE_MODE}")
@@ -1720,7 +1721,8 @@ function(protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
                 list(APPEND ${HDRS} ${GENERATED_PB_H})
 
                 add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
-                                   COMMAND ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE} ARGS -I=${INC_DIR} --cpp_out=${OUT_DIR} ${ABS_FIL}
+                                   COMMAND ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
+                                   ARGS -I=${INC_DIR} "$<$<BOOL:${ENABLE_BUNDLED_PROTOBUF}>:-I=${CMAKE_BINARY_DIR}/_deps/protobuf-src/src/>" --cpp_out=${OUT_DIR} ${ABS_FIL}
                                    DEPENDS ${ABS_FIL} ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
                                    COMMENT "Running C++ protocol buffer compiler on ${FIL}"
                                    VERBATIM)
