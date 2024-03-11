@@ -43,54 +43,31 @@ static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
         }
     }
 
-    rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) ae->updated_by_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind updated_by_id parameter for SQL_UPDATE_HEALTH_LOG");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->updated_by_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->flags));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->exec_run_timestamp));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->exec_code));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->alarm_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC));
 
-    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) ae->flags);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind flags parameter for SQL_UPDATE_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 3, (sqlite3_int64) ae->exec_run_timestamp);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind exec_run_timestamp parameter for SQL_UPDATE_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int(res, 4, ae->exec_code);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind exec_code parameter for SQL_UPDATE_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 5, (sqlite3_int64) ae->unique_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind unique_id parameter for SQL_UPDATE_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_int64(res, 6, (sqlite3_int64) ae->alarm_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind unique_id parameter for SQL_UPDATE_HEALTH_LOG");
-        goto failed;
-    }
-
-    rc = sqlite3_bind_blob(res, 7, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for SQL_UPDATE_HEALTH_LOG.");
-        goto failed;
-    }
-
+    param = 0;
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("HEALTH [%s]: Failed to update health log, rc = %d", rrdhost_hostname(host), rc);
     }
 
-failed:
+done:
+    if (param) {
+        const char *failed_param = sqlite3_bind_parameter_name(res, param);
+        error_report(
+            "HEALTH [%s]: Failed to bind paramater %d (%s) when updating health log",
+            rrdhost_hostname(host),
+            param,
+            failed_param ? failed_param : "anonymous");
+    }
+
     if (unlikely(sqlite3_reset(res) != SQLITE_OK))
         error_report("HEALTH [%s]: Failed to reset statement for updating health log.", rrdhost_hostname(host));
 }
@@ -302,26 +279,29 @@ void sql_health_alarm_log_cleanup(RRDHOST *host, bool claimed) {
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind first host_id for sql_health_alarm_log_cleanup.");
-        goto done;
-    }
-
-    rc = sqlite3_bind_int64(res, 2, (sqlite3_int64)host->health_log.health_log_history);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind health log history for sql_health_alarm_log_cleanup.");
-        goto done;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)host->health_log.health_log_history));
 
     rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to cleanup health log detail table, rc = %d", rc);
 
+    param = 0;
+
     if (aclk_table_exists)
         sql_aclk_alert_clean_dead_entries(host);
 
 done:
+    if (param) {
+        const char *failed_param = sqlite3_bind_parameter_name(res, param);
+        error_report(
+            "HEALTH [%s]: Failed to bind paramater %d (%s) when doing sql_health_alarm_log_cleanup",
+            rrdhost_hostname(host),
+            param,
+            failed_param ? failed_param : "anonymous");
+    }
+
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize the prepared statement to cleanup health log detail table (claimed)");
@@ -1572,12 +1552,10 @@ bool sql_find_alert_transition(
 
     bool ok = false;
 
-    rc = sqlite3_bind_blob(res, 1, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind transition");
-        goto done;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC));
 
+    param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         ok = true;
         uuid_unparse_lower(*(uuid_t *) sqlite3_column_blob(res, 1), machine_guid);
@@ -1585,6 +1563,14 @@ bool sql_find_alert_transition(
     }
 
 done:
+    if (param) {
+        const char *failed_param = sqlite3_bind_parameter_name(res, param);
+        error_report(
+            "Failed to bind paramater %d (%s) when request alert transition",
+            param,
+            failed_param ? failed_param : "anonymous");
+    }
+
     rc = sqlite3_reset(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to reset the statement when trying to find transition");
@@ -1708,34 +1694,15 @@ void sql_alert_transitions(
         goto done_only_drop;
     }
 
-    int param = 1;
-    rc = sqlite3_bind_int64(res, param++, (sqlite3_int64)(after * USEC_PER_SEC));
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind after parameter");
-        goto done;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)(after * USEC_PER_SEC)));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)(before * USEC_PER_SEC)));
 
-    rc = sqlite3_bind_int64(res, param++, (sqlite3_int64)(before * USEC_PER_SEC));
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind before parameter");
-        goto done;
-    }
+    if (context)
+        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, context, -1, SQLITE_STATIC));
 
-    if (context) {
-        rc = sqlite3_bind_text(res, param++, context, -1, SQLITE_STATIC);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to bind context parameter");
-            goto done;
-        }
-    }
-
-    if (alert_name) {
-        rc = sqlite3_bind_text(res, param++, alert_name, -1, SQLITE_STATIC);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to bind alert_name parameter");
-            goto done;
-        }
-    }
+    if (alert_name)
+        SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, alert_name, -1, SQLITE_STATIC));
 
 run_query:;
 
@@ -1776,8 +1743,17 @@ run_query:;
 
         cb(&atd, data);
     }
+    param = 0;
 
 done:
+    if (param) {
+        const char *failed_param = sqlite3_bind_parameter_name(res, param);
+        error_report(
+            "Failed to bind paramater %d (%s) when fetching alert transitions",
+            param,
+            failed_param ? failed_param : "anonymous");
+    }
+
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement for sql_alert_transitions");
