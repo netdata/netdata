@@ -1,0 +1,53 @@
+---
+# CI code for build and test on macOS
+name: macOS Build and test
+on:
+  push: # Master branch checks only validate the build and generate artifacts for testing.
+    branches:
+      - master
+  pull_request: null # PR checks only validate the build and generate artifacts for testing.
+  workflow_dispatch: # Dispatch runs build and validate, then push to the appropriate storage location.
+    inputs:          # Inputs for this workflow can be omitted
+      type:
+        description: Build Type
+        default: nightly
+        required: true
+      version:
+        description: Version Tag
+        default: nightly
+        required: true
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+jobs:
+  build-test:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - name: macos-12
+            runner: macos-12
+          - name: macos-13
+            runner: macos-13
+          - name: macos-14-M1
+            runner: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup fundamental depedencies
+        run: |
+          brew install bash
+      - name: Install netdata dependencies
+        run: |
+          export DISABLE_TELEMETRY=1
+          export GITHUB_ACTIONS=true
+          bash ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
+      - name: Build
+        run: |
+          sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --require-cloud --one-time-build
+      - name: Test
+        run: |
+          /usr/local/netdata/usr/sbin/netdata -D > ./netdata.log 2>&1 &
+          ./packaging/runtime-check.sh || exit 1
