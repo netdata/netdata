@@ -807,9 +807,9 @@ static inline bool local_sockets_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t 
     return false;
 }
 
-static inline void local_sockets_reset_ebpf_value(LS_STATE *ls, uint64_t removed)
+static inline void local_sockets_reset_ebpf_value(ebpf_module_t *em, uint64_t removed)
 {
-    int ctrl_fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd;
+    int ctrl_fd = em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd;
     uint32_t control = NETDATA_CONTROLLER_PID_TABLE_ADD;
     uint64_t current_value = 0;
     if (!bpf_map_lookup_elem(ctrl_fd, &control, &current_value)) {
@@ -890,7 +890,7 @@ end_socket_read_loop:
     }
 
     if (removed) {
-        local_sockets_reset_ebpf_value(ls, removed);
+        local_sockets_reset_ebpf_value(ls->ebpf_module, removed);
     }
 
     return (!counter) ? false : true;
