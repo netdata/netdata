@@ -126,7 +126,7 @@ To define table data, the UI expects this:
 }
 ```
 
-### ${\color{yellow}IMPORTANT}$
+**IMPORTANT**
 
 On Data values, `timestamp` column value must be in unix micro.
 
@@ -358,7 +358,7 @@ Facets are a special case of `multiselect` fields. They are used to provide addi
 }
 ```
 
-### ${\color{yellow}IMPORTANT}$
+**IMPORTANT**
 
 On Result Data, `timestamps` must be in unix milli.
 
