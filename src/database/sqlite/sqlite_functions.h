@@ -8,6 +8,12 @@
 
 void analytics_set_data_str(char **name, const char *value);
 
+#define SQLITE_BIND_FAIL(rc, label)                                                                                    \
+    do {                                                                                                               \
+        if ((rc) != SQLITE_OK)                                                                                         \
+            goto label;                                                                                                \
+    } while (0)
+
 #define SQL_MAX_RETRY (100)
 #define SQLITE_INSERT_DELAY (10)        // Insert delay in case of lock
 
