@@ -1580,6 +1580,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
                                       (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_ONLY_READ));
         load_again = 0;
     }
+    ls->ebpf_module->running_time = now_realtime_sec();
     rw_spinlock_write_unlock(&ls->ebpf_module->rw_spinlock);
 
     load_again++;
