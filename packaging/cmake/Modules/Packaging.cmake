@@ -349,9 +349,30 @@ set(CPACK_DEBIAN_CHARTS_D_PLUGIN_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/charts.d/postinst")
 
 #
+# python.d.plugin
+#
+
+# TODO: - changelog/copyright
+set(CPACK_COMPONENT_PYTHON_D_PLUGIN_DESCRIPTION
+		"Description: The python.d metrics collection plugin for the Netdata Agent
+Many of the collectors provided by this package are also available
+in netdata-plugin-god. In msot cases, you probably want to use those
+versions instead of the Python versions.")
+
+set(CPACK_COMPONENT_PYTHON_D_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_PYTHON_D_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PYTHON_D_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_PYTHON_D_PLUGIN_PACKAGE_PREDEPENDS "adduser")
+set(CPACK_DEBIAN_PYTHON_D_PLUGIN_PACKAGE_SUGGESTS "sudo")
+
+set(CPACK_DEBIAN_PYTHON_D_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/python.d/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/python.d/postinst")
+
+#
 # CPack components
 #
 
-set(CPACK_COMPONENTS_ALL "netdata;charts_d_plugin;ebpf_plugin;go_d_plugin;systemd_journal_plugin;perf_plugin;logs_management_plugin;freeipmi_plugin;nfacct_plugin;debugfs_plugin;cups_plugin;xenstat_plugin;slabinfo_plugin;apps_plugin;network_viewer_plugin")
+set(CPACK_COMPONENTS_ALL "netdata;python_d_plugin;charts_d_plugin;ebpf_plugin;go_d_plugin;systemd_journal_plugin;perf_plugin;logs_management_plugin;freeipmi_plugin;nfacct_plugin;debugfs_plugin;cups_plugin;xenstat_plugin;slabinfo_plugin;apps_plugin;network_viewer_plugin")
 
 include(CPack)

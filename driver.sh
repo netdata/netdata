@@ -33,6 +33,7 @@ packages=(
     [network_viewer_plugin]=netdata-network_viewer_plugin_6.7.8_amd64.deb
     [nfacct_plugin]=netdata-nfacct_plugin_6.7.8_amd64.deb
     [perf_plugin]=netdata-perf_plugin_6.7.8_amd64.deb
+    [python_d_plugin]=netdata-python_d_plugin_6.7.8_amd64.deb
     [slabinfo_plugin]=netdata-slabinfo_plugin_6.7.8_amd64.deb
     [systemd_journal_plugin]=netdata-systemd_journal_plugin_6.7.8_amd64.deb
     [xenstat_plugin]=netdata-xenstat_plugin_6.7.8_amd64.deb

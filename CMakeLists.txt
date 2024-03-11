@@ -2597,7 +2597,7 @@ install(FILES
         DESTINATION usr/lib/netdata/conf.d/schema.d)
 
 #
-# python.d files
+# python.d plugin
 #
 
 configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
@@ -2610,10 +2610,8 @@ install(DIRECTORY src/collectors/python.d.plugin/python_modules
         DESTINATION usr/libexec/netdata/python.d)
 
 install(FILES src/collectors/python.d.plugin/python.d.conf
-        COMPONENT pytohn_d_plugin
+        COMPONENT python_d_plugin
         DESTINATION usr/lib/netdata/conf.d)
-
-# conf files
 
 install(FILES
         src/collectors/python.d.plugin/adaptec_raid/adaptec_raid.conf
@@ -2665,8 +2663,6 @@ install(FILES
         COMPONENT python_d_plugin
         DESTINATION usr/lib/netdata/conf.d/python.d)
 
-# scripts
-
 install(FILES
         src/collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
         src/collectors/python.d.plugin/alarms/alarms.chart.py
@@ -2717,7 +2713,10 @@ install(FILES
         COMPONENT python_d_plugin
         DESTINATION usr/libexec/netdata/python.d)
 
-# FIXME: don't install this unconditionally
+#
+# ioping.plugin
+#
+
 configure_file(src/collectors/ioping.plugin/ioping.plugin.in src/collectors/ioping.plugin/ioping.plugin @ONLY)
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
         COMPONENT ioping_plugin
