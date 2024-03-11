@@ -6,8 +6,8 @@
 #include "health/health_internals.h"
 
 #define MAX_HEALTH_SQL_SIZE 2048
-#define SQLITE3_BIND_STRING_OR_NULL(res, key, param)                                                                   \
-    ((key) ? sqlite3_bind_text(res, param, string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null(res, param))
+#define SQLITE3_BIND_STRING_OR_NULL(res, param, key)                                                                   \
+    ((key) ? sqlite3_bind_text((res), (param), string2str(key), -1, SQLITE_STATIC) : sqlite3_bind_null((res), (param)))
 
 #define SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, param)                                                                   \
     ({                                                                                                                 \
@@ -135,7 +135,7 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->flags));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->exec_run_timestamp));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->delay_up_to_timestamp));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->info, ++param));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->info));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->exec_code));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->new_status));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->old_status));
@@ -145,7 +145,7 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->last_repeat));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->global_id));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->summary, ++param));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->summary));
 
     param = 0;
     rc = execute_insert(res);
@@ -201,14 +201,14 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->config_hash_id, sizeof(ae->config_hash_id), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->name, ++param));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->chart, ++param));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->exec, ++param));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->recipient, ++param));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->units, ++param));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_context, ++param));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->name));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->chart));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->exec));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->recipient));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->units));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->chart_context));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ae->chart_name, ++param));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->chart_name));
 
     // Reset param to mark all bind commands succedeed
     param = 0;
@@ -874,42 +874,41 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
         goto bind_fail;
 
     if (ap->match.is_template)
-        rc = SQLITE3_BIND_STRING_OR_NULL(res, NULL, ++param);
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, NULL);
     else
-        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.name, ++param);
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.name);
 
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     if (ap->match.is_template)
-        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.name, ++param);
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.name);
     else
-        rc = SQLITE3_BIND_STRING_OR_NULL(res, NULL, ++param);
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, NULL);
 
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     if (ap->match.is_template)
-        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.on.context, ++param);
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.on.context);
     else
-        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.on.chart, ++param);
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.on.chart);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.classification, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.classification);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.component, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.component);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.type, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.type);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    // Rebuild lookup
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, NULL, ++param); // lookup line
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, NULL); // lookup line
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -917,7 +916,7 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.units, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.units);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -952,15 +951,15 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.exec, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.exec);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.recipient, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.recipient);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.info, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.info);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -992,12 +991,12 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.host_labels, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.host_labels);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
     if (ap->config.after) {
-        rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.dimensions, ++param);
+        rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.dimensions);
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
@@ -1042,15 +1041,15 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.source, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.source);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->match.chart_labels, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.chart_labels);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.summary, ++param);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.summary);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -1515,14 +1514,14 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
         return alarm_id;
     }
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, chart, 2);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, 2, chart);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind char parameter for SQL_GET_ALARM_ID.");
         sqlite3_finalize(res);
         return alarm_id;
     }
 
-    rc = SQLITE3_BIND_STRING_OR_NULL(res, name, 3);
+    rc = SQLITE3_BIND_STRING_OR_NULL(res, 3, name);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind name parameter for SQL_GET_ALARM_ID.");
         sqlite3_finalize(res);
