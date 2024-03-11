@@ -866,6 +866,7 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_loa
             .expires = stored.expires,
             .rqueue = stored.rqueue,
             .wqueue = stored.wqueue,
+            .pid = stored.pid,
             .uid = stored.uid,
         };
 
