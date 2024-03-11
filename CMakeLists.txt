@@ -128,6 +128,12 @@ option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
 
+if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
+        set(NEED_PROTOBUF True)
+else()
+        set(NEED_PROTOBUF False)
+endif()
+
 if(ENABLE_PLUGIN_GO)
     include(NetdataGoTools)
 
@@ -171,6 +177,63 @@ if(ENABLE_WEBRTC)
             GIT_TAG v0.20.1
         )
         FetchContent_MakeAvailable(libdatachannel)
+endif()
+
+if(ENABLE_BUNDLED_PROTOBUF AND NEED_PROTOBUF)
+        include(FetchContent)
+
+        if(USE_CXX_11)
+            # This version needs to stay as it is, as newer versions need C++14
+            # It can be dropped once we no longer support systems using GCC
+            # older than GCC 7.
+            set(PROTOBUF_TAG v21.12)
+            set(NEED_ABSL False)
+        else()
+            # These versions are what should be updated if bumping bundled
+            # version of protobuf
+            set(PROTOBUF_TAG v25.3)
+            set(NEED_ABSL True)
+            set(ABSL_TAG 20240116.1)
+        endif()
+
+        if(NOT FETCHCONTENT_TRY_FIND_PACKAGE_MODE)
+            # Codify the default behavior for this variable.
+            set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE OPT_IN)
+        endif()
+
+        set(NETDATA_FETCHCONTENT_TRY_FIND_PACKAGE_MODE "${FETCHCONTENT_TRY_FIND_PACKAGE_MODE}")
+        set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
+
+        # ignore debhelper
+        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
+
+        if(NEED_ABSL)
+                set(ABSL_PROPAGATE_CXX_STD On)
+                set(ABSL_ENABLE_INSTALL Off)
+
+                message(STATUS "Preparing bundled Abseil (required by bundled Protobuf)")
+                FetchContent_Declare(absl
+                        GIT_REPOSITORY https://github.com/abseil/abseil-cpp
+                        GIT_TAG ${ABSL_TAG}
+                )
+                FetchContent_MakeAvailable(absl)
+                message(STATUS "Finished preparing bundled Abseil")
+        endif()
+
+        set(protobuf_INSTALL Off)
+        set(protobuf_BUILD_LIBPROTOC Off)
+        set(protobuf_BUILD_TESTS Off)
+        set(protobuf_BUILD_SHARED_LIBS Off)
+
+        message(STATUS "Preparing bundled Protobuf")
+        FetchContent_Declare(protobuf
+                GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
+                GIT_TAG ${PROTOBUF_TAG}
+        )
+        FetchContent_MakeAvailable(protobuf)
+        message(STATUS "Finished preparing bundled Protobuf.")
+
+        set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE "${NETDATA_FETCHCONTENT_TRY_FIND_PACKAGE_MODE}")
 endif()
 
 #
@@ -491,12 +554,10 @@ endif()
 # figure out if we need protoc/protobuf
 #
 
-if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
-        if(ENABLE_BUNDLED_PROTOBUF)
-                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/protoc")
-                set(NETDATA_PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src")
-                set(NETDATA_PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/.libs/libprotobuf.a")
-        else()
+if(NEED_PROTOBUF)
+        include(NetdataProtobufCompat)
+
+        if(NOT ENABLE_BUNDLED_PROTOBUF)
                 if (NOT BUILD_SHARED_LIBS)
                         set(Protobuf_USE_STATIC_LIBS On)
                 endif()
@@ -519,53 +580,13 @@ if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                 # Upstream bug reference: https://gitlab.kitware.com/cmake/cmake/-/issues/24321
                 find_package(Protobuf CONFIG)
 
-                if(TARGET protobuf::libprotobuf)
-                        if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_RELEASE)
-                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                                IMPORTED_LOCATION_RELWITHDEBINFO)
-                                endif()
-                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                                IMPORTED_LOCATION_MINSIZEREL)
-                                endif()
-                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                                IMPORTED_LOCATION_DEBUG)
-                                endif()
-                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                                IMPORTED_LOCATION_NOCONFIG)
-                                endif()
-                        endif()
-
-                        # It is technically possible that this may still not
-                        # be set by this point, so we need to check it and
-                        # fail noisily if it isn't because the build won't
-                        # work without it.
-                        if(NOT Protobuf_PROTOC_EXECUTABLE)
-                                message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
-                        endif()
-
-                        set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
-                        set(NETDATA_PROTOBUF_LIBS protobuf::libprotobuf)
-                        get_target_property(NETDATA_PROTOBUF_CFLAGS_OTHER
-                                            protobuf::libprotobuf
-                                            INTERFACE_COMPILE_DEFINITIONS)
-                        get_target_property(NETDATA_PROTOBUF_INCLUDE_DIRS
-                                            protobuf::libprotobuf
-                                            INTERFACE_INCLUDE_DIRECTORIES)
-                else()
+                if(NOT TARGET protobuf::libprotobuf)
                         message(STATUS "Could not find Protobuf using Config mode, falling back to Module mode")
                         find_package(Protobuf REQUIRED)
-                        set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${PROTOBUF_PROTOC_EXECUTABLE})
-                        set(NETDATA_PROTOBUF_CFLAGS_OTHER ${PROTOBUF_CFLAGS_OTHER})
-                        set(NETDATA_PROTOBUF_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
-                        set(NETDATA_PROTOBUF_LIBS ${PROTOBUF_LIBRARIES})
                 endif()
         endif()
+
+        set_netdata_protobuf_vars()
 
         set(ENABLE_PROTOBUF True)
         set(HAVE_PROTOBUF True)
