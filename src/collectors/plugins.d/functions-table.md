@@ -7,7 +7,7 @@ One of these responses is the `table`. This is used in almost all functions impl
 
 # Functions Tables
 
-Tables are defined when `"type": "table"` is set. The following is the standard header that should be available on all `table` responses: 
+Tables are defined when `"type": "table"` is set. The following is the standard header that should be available on all `table` responses:
 
 ```json
 {
@@ -56,7 +56,29 @@ The response from the plugin is expected to have the following:
 If there are no required parameters, `required_params` can be omitted.
 If there are no accepted parameters, `accepted_params` can be omitted. `accepted_param` can be sent during normal responses to update the UI with a new set of parameters available, between calls.
 
-If there are `required_params`, the UI by default selects the first option. [](VERIFY_WITH_UI) 
+For `logs`, the UI requires this set of `accepted_params`.
+
+Ref [Pagination](#pagination), [Deltas](#incremental-responses)
+```json
+[
+  "info", // boolean: requests the preflight `info` request
+  "after", // interval start timestamp
+  "before", // interval end timestamp
+  "direction", // sort direction [backward,forward]
+  "last", // number of records to retrieve
+  "anchor", // timestamp to divide records in pages
+  "facets",
+  "histogram", // selects facet to be used on the histogram
+  "if_modified_since", // used in PLAY mode, to indicate that the UI wants data newer than the specified timestamp
+  "data_only", // boolean: requests data (logs) only
+  "delta", // boolean: requests incremental responses
+  "tail",
+  "sampling",
+  "slice"
+]
+```
+
+If there are `required_params`, the UI by default selects the first option. [](VERIFY_WITH_UI)
 
 ## Table data
 
@@ -104,6 +126,10 @@ To define table data, the UI expects this:
 }
 ```
 
+**IMPORTANT**
+
+On Data values, `timestamp` column value must be in unix micro.
+
 
 ### Sorting order
 
@@ -146,7 +172,7 @@ TBD
 
 - `none`, this facet is not selectable by users
 - `multiselect`, the user can select any number of the available options
-- `facet`, similar to `multiselect`, but it also indicates that the column has been indexed and has values with counters. Columns set to `facet` must appear in the `facets` list.  
+- `facet`, similar to `multiselect`, but it also indicates that the column has been indexed and has values with counters. Columns set to `facet` must appear in the `facets` list.
 - `range`, the user can select a range of values (numeric)
 
 The plugin may send non visible columns with filter type `facet`. This means that the plugin can enable indexing on these columns, but it has not done it. Then the UI may send `facets:{ID1},{ID2},{ID3},...` to enable indexing of the columns specified.
@@ -155,7 +181,7 @@ What is the default?
 
 #### Facets
 
-Facets are a special case of `multiselect` fields. They are used to provide additional information about each possible value, including their relative sort order and the number of times each value appears in the result set. Facets are filters handled by the plugin. So, the plugin will receive user selected filter like: `{KEY}:{VALUE1},{VALUE2},...`, where `{KEY}` is the id of the column and `{VALUEX}` is the id the facet option the user selected. 
+Facets are a special case of `multiselect` fields. They are used to provide additional information about each possible value, including their relative sort order and the number of times each value appears in the result set. Facets are filters handled by the plugin. So, the plugin will receive user selected filter like: `{KEY}:{VALUE1},{VALUE2},...`, where `{KEY}` is the id of the column and `{VALUEX}` is the id the facet option the user selected.
 
 ```json
 {
@@ -166,6 +192,7 @@ Facets are a special case of `multiselect` fields. They are used to provide addi
     {
       "id": "string: the unique id of the facet",
       "name": "string: the human readable name of the facet",
+      "order": "integer: the sorting order of this facet - lower numbers move items above others"
       "options": [
         {
           "id": "string: the unique id of the facet value",
@@ -187,10 +214,10 @@ Facets are a special case of `multiselect` fields. They are used to provide addi
 {
   // header,
   "charts": {
-    
+
   },
   "default_charts": [
-    
+
   ]
 }
 ```
@@ -200,15 +227,140 @@ Facets are a special case of `multiselect` fields. They are used to provide addi
 
 ```json
 {
-  // header,
   "available_histograms": [
-    
+    {
+      "id": "string: the unique id of the histogram",
+      "name": "string: the human readable name of the histogram",
+      "order": "integer: the sorting order of available histograms - lower numbers move items above others"
+    }
   ],
   "histogram": {
-    
+    "id": "string: the unique id of the histogram",
+    "name": "string: the human readable name of the histogram",
+    "chart": {
+      "summary": {
+        "nodes": [
+          {
+            "mg": "string",
+            "nm": "string: node name",
+            "ni": "integer: node index"
+          }
+        ],
+        "contexts": [
+          {
+            "id": "string: context id"
+          }
+        ],
+        "instances": [
+          {
+            "id": "string: instance id",
+            "ni": "integer: instance index"
+          }
+        ],
+        "dimensions": [
+          {
+            "id": "string: dimension id",
+            "pri": "integer",
+            "sts": {
+              "min": "float: dimension min value",
+              "max": "float: dimension max value",
+              "avg": "float: dimension avarage value",
+              "arp": "float",
+              "con": "float"
+            }
+          }
+        ]
+      },
+      "result": {
+        "labels": [
+          // histogram labels
+        ],
+        "point": {
+          "value": "integer",
+          "arp": "integer",
+          "pa": "integer"
+        },
+        "data": [
+          [
+            "timestamp" // unix milli
+            // one array per label
+            [
+              // values
+            ],
+          ]
+        ]
+      },
+      "view": {
+        "title": "string: histogram tittle",
+        "update_every": "integer",
+        "after": "timestamp: histogram window start",
+        "before": "timestamp: histogram window end",
+        "units": "string: histogram units",
+        "chart_type": "string: histogram chart type",
+        "min": "integer: histogram min value",
+        "max": "integer: histogram max value",
+        "dimensions": {
+          "grouped_by": [
+            // "string: histogram grouped by",
+          ],
+          "ids": [
+            // "string: histogram label id",
+          ],
+          "names": [
+            // "string: histogram human readable label name",
+          ],
+          "colors": [],
+          "units": [
+            // "string: histogram label unit",
+          ],
+          "sts": {
+            "min": [
+              // "float: label min value",
+            ],
+            "max": [
+              // "float: label max value",
+            ],
+            "avg": [
+              // "float: label avarage value",
+            ],
+            "arp": [
+              // "float",
+            ],
+            "con": [
+              // "float",
+            ]
+          }
+        }
+      },
+      "totals": {
+        "nodes": {
+          "sl": "integer",
+          "qr": "integer"
+        },
+        "contexts":  {
+          "sl": "integer",
+          "qr": "integer"
+        },
+        "instances":  {
+          "sl": "integer",
+          "qr": "integer"
+        },
+        "dimensions":  {
+          "sl": "integer",
+          "qr": "integer"
+        }
+      },
+      "db": {
+        "update_every": "integer"
+      }
+    }
   }
 }
 ```
+
+**IMPORTANT**
+
+On Result Data, `timestamps` must be in unix milli.
 
 ## Grouping
 
@@ -216,7 +368,7 @@ Facets are a special case of `multiselect` fields. They are used to provide addi
 {
   // header,
   "group_by": {
-    
+
   }
 }
 ```
@@ -248,8 +400,8 @@ The UI supports paginating results when `has_history: true`. So, when the result
 
 Once pagination is enabled, the plugin must support the following parameters:
 
-- `{ANCHOR}:{VALUE}`, `{ANCHOR}` is the `pagination.key`, `{VALUE}` is the point the user wants to see entries at, formatted according to `pagination.units`. 
-- `direction:backward` or `direction:forward` to specify if the data to be returned if before are after the anchor. 
+- `{ANCHOR}:{VALUE}`, `{ANCHOR}` is the `pagination.key`, `{VALUE}` is the point the user wants to see entries at, formatted according to `pagination.units`.
+- `direction:backward` or `direction:forward` to specify if the data to be returned if before are after the anchor.
 - `last:NUMER`, the number of entries the plugin should return in the table data.
 - `query:STRING`, the full text search string the user wants to search for.
 - `if_modified_since:TIMESTAMP_USEC` and `tail:true`, used in PLAY mode, to indicate that the UI wants data newer than the specified timestamp. If there are no new data, the plugin must respond with 304 (Not Modified).
