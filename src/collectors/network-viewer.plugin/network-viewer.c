@@ -1373,6 +1373,8 @@ static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver
         // We are going to use the optional value to determine when data is loaded in kernel
         ebpf_nv_module.optional = NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
         ebpf_nv_module.running_time = now_realtime_sec();
+
+        rw_spinlock_init(&ebpf_nv_module.rw_spinlock);
     }
 
     return ret;
