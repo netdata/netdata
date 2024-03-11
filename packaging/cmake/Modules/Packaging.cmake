@@ -328,9 +328,30 @@ set(CPACK_DEBIAN_EBPF_PLUGIN_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf.d/postinst")
 
 #
+# charts.d.plugin
+#
+
+# TODO: - changelog/copyright
+set(CPACK_COMPONENT_CHARTS_D_PLUGIN_DESCRIPTION
+		"Description: The charts.d metrics collection plugin for the Netdata Agent
+This plugin adds a selection of additional collectors written in shell
+script to the Netdata Agent. It includes collectors for APCUPSD,
+LibreSWAN, OpenSIPS, and Wireless access point statistics.")
+
+set(CPACK_COMPONENT_CHARTS_D_PLUGIN_DEPENDS "netdata")
+set(CPACK_DEBIAN_CHARTS_D_PLUGIN_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_CHARTS_D_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_CHARTS_D_PLUGIN_PACKAGE_PREDEPENDS "adduser")
+set(CPACK_DEBIAN_CHARTS_D_PLUGIN_PACKAGE_DEPENDS "bash")
+
+set(CPACK_DEBIAN_CHARTS_D_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/charts.d/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/charts.d/postinst")
+
+#
 # CPack components
 #
 
-set(CPACK_COMPONENTS_ALL "netdata;ebpf_plugin;go_d_plugin;systemd_journal_plugin;perf_plugin;logs_management_plugin;freeipmi_plugin;nfacct_plugin;debugfs_plugin;cups_plugin;xenstat_plugin;slabinfo_plugin;apps_plugin;network_viewer_plugin")
+set(CPACK_COMPONENTS_ALL "netdata;charts_d_plugin;ebpf_plugin;go_d_plugin;systemd_journal_plugin;perf_plugin;logs_management_plugin;freeipmi_plugin;nfacct_plugin;debugfs_plugin;cups_plugin;xenstat_plugin;slabinfo_plugin;apps_plugin;network_viewer_plugin")
 
 include(CPack)

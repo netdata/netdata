@@ -2253,7 +2253,6 @@ install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/registry)
 install(DIRECTORY COMPONENT netdata DESTINATION var/lib/netdata/cloud.d)
 install(DIRECTORY COMPONENT netdata DESTINATION var/run)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata)
-install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/charts.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/custom-plugins.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/go.d)
 install(DIRECTORY COMPONENT netdata DESTINATION etc/netdata/health.d)
@@ -2533,24 +2532,52 @@ install(FILES
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
-# charts.d files
+# charts.d plugin
 #
+
+install(DIRECTORY COMPONENT charts_d_plugin DESTINATION etc/netdata/charts.d)
 
 configure_file(src/collectors/charts.d.plugin/charts.d.plugin.in src/collectors/charts.d.plugin/charts.d.plugin @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
-        COMPONENT chartsd_plugin
+        COMPONENT charts_d_plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES
         src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
+        COMPONENT charts_d_plugin
+        DESTINATION usr/libexec/netdata/plugins.d)
+
+# loopsleepms is used by the tc.plugin -> ship it in the netdata component
+install(FILES
         src/collectors/charts.d.plugin/loopsleepms.sh.inc
-        COMPONENT chartsd_plugin
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES
         src/collectors/charts.d.plugin/charts.d.conf
+        COMPONENT charts_d_plugin
         DESTINATION usr/lib/netdata/conf.d)
+
+install(FILES
+        src/collectors/charts.d.plugin/ap/ap.chart.sh
+        src/collectors/charts.d.plugin/apcupsd/apcupsd.chart.sh
+        src/collectors/charts.d.plugin/example/example.chart.sh
+        src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
+        src/collectors/charts.d.plugin/opensips/opensips.chart.sh
+        src/collectors/charts.d.plugin/sensors/sensors.chart.sh
+        COMPONENT charts_d_plugin
+        DESTINATION usr/libexec/netdata/charts.d)
+
+install(FILES
+        src/collectors/charts.d.plugin/ap/ap.conf
+        src/collectors/charts.d.plugin/apcupsd/apcupsd.conf
+        src/collectors/charts.d.plugin/example/example.conf
+        src/collectors/charts.d.plugin/libreswan/libreswan.conf
+        src/collectors/charts.d.plugin/opensips/opensips.conf
+        src/collectors/charts.d.plugin/sensors/sensors.conf
+        COMPONENT charts_d_plugin
+        DESTINATION usr/lib/netdata/conf.d/charts.d)
 
 #
 # tc-qos-helper
@@ -2562,30 +2589,7 @@ install(PROGRAMS
         COMPONENT tc_plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
-# scripts
-
-install(FILES
-        src/collectors/charts.d.plugin/ap/ap.chart.sh
-        src/collectors/charts.d.plugin/apcupsd/apcupsd.chart.sh
-        src/collectors/charts.d.plugin/example/example.chart.sh
-        src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
-        src/collectors/charts.d.plugin/opensips/opensips.chart.sh
-        src/collectors/charts.d.plugin/sensors/sensors.chart.sh
-        COMPONENT chartsd_plugin
-        DESTINATION usr/libexec/netdata/charts.d)
-
 # confs
-
-install(FILES
-        src/collectors/charts.d.plugin/ap/ap.conf
-        src/collectors/charts.d.plugin/apcupsd/apcupsd.conf
-        src/collectors/charts.d.plugin/example/example.conf
-        src/collectors/charts.d.plugin/libreswan/libreswan.conf
-        src/collectors/charts.d.plugin/opensips/opensips.conf
-        src/collectors/charts.d.plugin/sensors/sensors.conf
-        COMPONENT chartsd_plugin
-        DESTINATION usr/lib/netdata/conf.d/charts.d)
-
 install(FILES
         src/collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
         src/health/schema.d/health:alert:prototype.json
@@ -2598,15 +2602,15 @@ install(FILES
 
 configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
-        COMPONENT chartsd_plugin
+        COMPONENT python_d_plugin
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(DIRECTORY src/collectors/python.d.plugin/python_modules
-        COMPONENT chartsd_plugin
+        COMPONENT python_d_plugin
         DESTINATION usr/libexec/netdata/python.d)
 
 install(FILES src/collectors/python.d.plugin/python.d.conf
-        COMPONENT chartsd_plugin
+        COMPONENT pytohn_d_plugin
         DESTINATION usr/lib/netdata/conf.d)
 
 # conf files
@@ -2658,7 +2662,7 @@ install(FILES
         src/collectors/python.d.plugin/varnish/varnish.conf
         src/collectors/python.d.plugin/w1sensor/w1sensor.conf
         src/collectors/python.d.plugin/zscores/zscores.conf
-        COMPONENT chartsd_plugin
+        COMPONENT python_d_plugin
         DESTINATION usr/lib/netdata/conf.d/python.d)
 
 # scripts
@@ -2710,7 +2714,7 @@ install(FILES
         src/collectors/python.d.plugin/varnish/varnish.chart.py
         src/collectors/python.d.plugin/w1sensor/w1sensor.chart.py
         src/collectors/python.d.plugin/zscores/zscores.chart.py
-        COMPONENT chartsd_plugin
+        COMPONENT python_d_plugin
         DESTINATION usr/libexec/netdata/python.d)
 
 # FIXME: don't install this unconditionally

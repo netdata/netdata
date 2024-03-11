@@ -23,6 +23,7 @@ declare -A packages
 packages=(
     [netdata]=netdata-netdata_6.7.8_amd64.deb
     [apps_plugin]=netdata-apps_plugin_6.7.8_amd64.deb
+    [charts_d_plugin]=netdata-charts_d_plugin_6.7.8_amd64.deb
     [cups_plugin]=netdata-cups_plugin_6.7.8_amd64.deb
     [debugfs_plugin]=netdata-debugfs_plugin_6.7.8_amd64.deb
     [ebpf_plugin]=netdata-ebpf_plugin_6.7.8_amd64.deb
