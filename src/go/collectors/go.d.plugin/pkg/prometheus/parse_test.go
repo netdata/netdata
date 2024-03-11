@@ -9,8 +9,8 @@ import (
 
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus/selector"
 
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
-	"github.com/prometheus/prometheus/model/textparse"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,7 +60,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				"test_gauge_metric_1": {
 					name: "test_gauge_metric_1",
 					help: "First line. Second line.",
-					typ:  textparse.MetricTypeGauge,
+					typ:  model.MetricTypeGauge,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -76,7 +76,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				"test_gauge_metric_1": {
 					name: "test_gauge_metric_1",
 					help: "Test Gauge Metric 1",
-					typ:  textparse.MetricTypeGauge,
+					typ:  model.MetricTypeGauge,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -98,7 +98,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_gauge_metric_2": {
 					name: "test_gauge_metric_2",
-					typ:  textparse.MetricTypeGauge,
+					typ:  model.MetricTypeGauge,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -126,7 +126,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				"test_counter_metric_1_total": {
 					name: "test_counter_metric_1_total",
 					help: "Test Counter Metric 1",
-					typ:  textparse.MetricTypeCounter,
+					typ:  model.MetricTypeCounter,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -148,7 +148,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_counter_metric_2_total": {
 					name: "test_counter_metric_2_total",
-					typ:  textparse.MetricTypeCounter,
+					typ:  model.MetricTypeCounter,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -176,7 +176,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				"test_summary_1_duration_microseconds": {
 					name: "test_summary_1_duration_microseconds",
 					help: "Test Summary Metric 1",
-					typ:  textparse.MetricTypeSummary,
+					typ:  model.MetricTypeSummary,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -230,7 +230,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_summary_2_duration_microseconds": {
 					name: "test_summary_2_duration_microseconds",
-					typ:  textparse.MetricTypeSummary,
+					typ:  model.MetricTypeSummary,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -290,7 +290,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				"test_histogram_1_duration_seconds": {
 					name: "test_histogram_1_duration_seconds",
 					help: "Test Histogram Metric 1",
-					typ:  textparse.MetricTypeHistogram,
+					typ:  model.MetricTypeHistogram,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -344,7 +344,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_histogram_2_duration_seconds": {
 					name: "test_histogram_2_duration_seconds",
-					typ:  textparse.MetricTypeHistogram,
+					typ:  model.MetricTypeHistogram,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -403,7 +403,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 			want: MetricFamilies{
 				"test_gauge_no_meta_metric_1": {
 					name: "test_gauge_no_meta_metric_1",
-					typ:  textparse.MetricTypeUnknown,
+					typ:  model.MetricTypeUnknown,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -425,7 +425,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_gauge_no_meta_metric_2": {
 					name: "test_gauge_no_meta_metric_2",
-					typ:  textparse.MetricTypeUnknown,
+					typ:  model.MetricTypeUnknown,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -452,7 +452,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 			want: MetricFamilies{
 				"test_counter_no_meta_metric_1_total": {
 					name: "test_counter_no_meta_metric_1_total",
-					typ:  textparse.MetricTypeUnknown,
+					typ:  model.MetricTypeUnknown,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -474,7 +474,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_counter_no_meta_metric_2_total": {
 					name: "test_counter_no_meta_metric_2_total",
-					typ:  textparse.MetricTypeUnknown,
+					typ:  model.MetricTypeUnknown,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -501,7 +501,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 			want: MetricFamilies{
 				"test_summary_no_meta_1_duration_microseconds": {
 					name: "test_summary_no_meta_1_duration_microseconds",
-					typ:  textparse.MetricTypeSummary,
+					typ:  model.MetricTypeSummary,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -555,7 +555,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_summary_no_meta_2_duration_microseconds": {
 					name: "test_summary_no_meta_2_duration_microseconds",
-					typ:  textparse.MetricTypeSummary,
+					typ:  model.MetricTypeSummary,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -614,7 +614,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 			want: MetricFamilies{
 				"test_histogram_no_meta_1_duration_seconds": {
 					name: "test_histogram_no_meta_1_duration_seconds",
-					typ:  textparse.MetricTypeHistogram,
+					typ:  model.MetricTypeHistogram,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -668,7 +668,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_histogram_no_meta_2_duration_seconds": {
 					name: "test_histogram_no_meta_2_duration_seconds",
-					typ:  textparse.MetricTypeHistogram,
+					typ:  model.MetricTypeHistogram,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -728,7 +728,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				"test_gauge_metric_1": {
 					name: "test_gauge_metric_1",
 					help: "Test Gauge Metric 1",
-					typ:  textparse.MetricTypeGauge,
+					typ:  model.MetricTypeGauge,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -750,7 +750,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_gauge_metric_2": {
 					name: "test_gauge_metric_2",
-					typ:  textparse.MetricTypeGauge,
+					typ:  model.MetricTypeGauge,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -773,7 +773,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				"test_counter_metric_1_total": {
 					name: "test_counter_metric_1_total",
 					help: "Test Counter Metric 1",
-					typ:  textparse.MetricTypeCounter,
+					typ:  model.MetricTypeCounter,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -795,7 +795,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_counter_metric_2_total": {
 					name: "test_counter_metric_2_total",
-					typ:  textparse.MetricTypeCounter,
+					typ:  model.MetricTypeCounter,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -818,7 +818,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				"test_summary_1_duration_microseconds": {
 					name: "test_summary_1_duration_microseconds",
 					help: "Test Summary Metric 1",
-					typ:  textparse.MetricTypeSummary,
+					typ:  model.MetricTypeSummary,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -872,7 +872,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_summary_2_duration_microseconds": {
 					name: "test_summary_2_duration_microseconds",
-					typ:  textparse.MetricTypeSummary,
+					typ:  model.MetricTypeSummary,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -927,7 +927,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				"test_histogram_1_duration_seconds": {
 					name: "test_histogram_1_duration_seconds",
 					help: "Test Histogram Metric 1",
-					typ:  textparse.MetricTypeHistogram,
+					typ:  model.MetricTypeHistogram,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -981,7 +981,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_histogram_2_duration_seconds": {
 					name: "test_histogram_2_duration_seconds",
-					typ:  textparse.MetricTypeHistogram,
+					typ:  model.MetricTypeHistogram,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -1035,7 +1035,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_gauge_no_meta_metric_1": {
 					name: "test_gauge_no_meta_metric_1",
-					typ:  textparse.MetricTypeUnknown,
+					typ:  model.MetricTypeUnknown,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -1057,7 +1057,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_gauge_no_meta_metric_2": {
 					name: "test_gauge_no_meta_metric_2",
-					typ:  textparse.MetricTypeUnknown,
+					typ:  model.MetricTypeUnknown,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -1079,7 +1079,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_counter_no_meta_metric_1_total": {
 					name: "test_counter_no_meta_metric_1_total",
-					typ:  textparse.MetricTypeUnknown,
+					typ:  model.MetricTypeUnknown,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -1101,7 +1101,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_counter_no_meta_metric_2_total": {
 					name: "test_counter_no_meta_metric_2_total",
-					typ:  textparse.MetricTypeUnknown,
+					typ:  model.MetricTypeUnknown,
 					metrics: []Metric{
 						{
 							labels:  labels.Labels{{Name: "label1", Value: "value1"}},
@@ -1123,7 +1123,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_summary_no_meta_1_duration_microseconds": {
 					name: "test_summary_no_meta_1_duration_microseconds",
-					typ:  textparse.MetricTypeSummary,
+					typ:  model.MetricTypeSummary,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -1177,7 +1177,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_summary_no_meta_2_duration_microseconds": {
 					name: "test_summary_no_meta_2_duration_microseconds",
-					typ:  textparse.MetricTypeSummary,
+					typ:  model.MetricTypeSummary,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -1231,7 +1231,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_histogram_no_meta_1_duration_seconds": {
 					name: "test_histogram_no_meta_1_duration_seconds",
-					typ:  textparse.MetricTypeHistogram,
+					typ:  model.MetricTypeHistogram,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -1285,7 +1285,7 @@ func TestPromTextParser_parseToMetricFamilies(t *testing.T) {
 				},
 				"test_histogram_no_meta_2_duration_seconds": {
 					name: "test_histogram_no_meta_2_duration_seconds",
-					typ:  textparse.MetricTypeHistogram,
+					typ:  model.MetricTypeHistogram,
 					metrics: []Metric{
 						{
 							labels: labels.Labels{{Name: "label1", Value: "value1"}},
@@ -1375,7 +1375,7 @@ test_gauge_metric_2{label1="value2"} 1
 	want := MetricFamilies{
 		"test_gauge_metric_1": &MetricFamily{
 			name: "test_gauge_metric_1",
-			typ:  textparse.MetricTypeUnknown,
+			typ:  model.MetricTypeUnknown,
 			metrics: []Metric{
 				{labels: labels.Labels{{Name: "label1", Value: "value2"}}, untyped: &Untyped{value: 1}},
 			},

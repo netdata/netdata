@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/prometheus/selector"
 
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/textparse"
 )
@@ -126,15 +127,15 @@ func (p *promTextParser) parseToMetricFamilies(text []byte) (MetricFamilies, err
 			_, _, value := parser.Series()
 
 			switch p.currMF.typ {
-			case textparse.MetricTypeGauge:
+			case model.MetricTypeGauge:
 				p.addGauge(value)
-			case textparse.MetricTypeCounter:
+			case model.MetricTypeCounter:
 				p.addCounter(value)
-			case textparse.MetricTypeSummary:
+			case model.MetricTypeSummary:
 				p.addSummary(value)
-			case textparse.MetricTypeHistogram:
+			case model.MetricTypeHistogram:
 				p.addHistogram(value)
-			case textparse.MetricTypeUnknown:
+			case model.MetricTypeUnknown:
 				p.addUnknown(value)
 			}
 		}
@@ -152,7 +153,7 @@ func (p *promTextParser) parseToMetricFamilies(text []byte) (MetricFamilies, err
 func (p *promTextParser) setMetricFamilyByName(name string) {
 	mf, ok := p.metrics[name]
 	if !ok {
-		mf = &MetricFamily{name: name, typ: textparse.MetricTypeUnknown}
+		mf = &MetricFamily{name: name, typ: model.MetricTypeUnknown}
 		p.metrics[name] = mf
 	}
 	p.currMF = mf
@@ -165,13 +166,13 @@ func (p *promTextParser) setMetricFamilyBySeries() {
 	name := p.currSeries[0].Value
 
 	if p.currMF != nil && p.currMF.name == name {
-		if p.currMF.typ == textparse.MetricTypeSummary {
+		if p.currMF.typ == model.MetricTypeSummary {
 			p.setQuantile()
 		}
 		return
 	}
 
-	typ := textparse.MetricTypeUnknown
+	typ := model.MetricTypeUnknown
 
 	switch {
 	case strings.HasSuffix(name, sumSuffix):
@@ -202,15 +203,15 @@ func (p *promTextParser) setMetricFamilyBySeries() {
 			p.currSeries[0].Value = n
 			p.setBucket()
 			name = n
-			typ = textparse.MetricTypeHistogram
+			typ = model.MetricTypeHistogram
 		}
 	case p.currSeries.Has(quantileLabel):
-		typ = textparse.MetricTypeSummary
+		typ = model.MetricTypeSummary
 		p.setQuantile()
 	}
 
 	p.setMetricFamilyByName(name)
-	if p.currMF.typ == "" || p.currMF.typ == textparse.MetricTypeUnknown {
+	if p.currMF.typ == "" || p.currMF.typ == model.MetricTypeUnknown {
 		p.currMF.typ = typ
 	}
 }
@@ -407,6 +408,6 @@ func removeLabel(lbs labels.Labels, name string) (labels.Labels, string, bool) {
 	return lbs, "", false
 }
 
-func isSummaryOrHistogram(typ textparse.MetricType) bool {
-	return typ == textparse.MetricTypeSummary || typ == textparse.MetricTypeHistogram
+func isSummaryOrHistogram(typ model.MetricType) bool {
+	return typ == model.MetricTypeSummary || typ == model.MetricTypeHistogram
 }

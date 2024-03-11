@@ -3,8 +3,8 @@
 package prometheus
 
 import (
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
-	"github.com/prometheus/prometheus/model/textparse"
 )
 
 type (
@@ -13,7 +13,7 @@ type (
 	MetricFamily struct {
 		name    string
 		help    string
-		typ     textparse.MetricType
+		typ     model.MetricType
 		metrics []Metric
 	}
 	Metric struct {
@@ -62,22 +62,22 @@ func (mfs MetricFamilies) Get(name string) *MetricFamily {
 }
 
 func (mfs MetricFamilies) GetGauge(name string) *MetricFamily {
-	return mfs.get(name, textparse.MetricTypeGauge)
+	return mfs.get(name, model.MetricTypeGauge)
 }
 
 func (mfs MetricFamilies) GetCounter(name string) *MetricFamily {
-	return mfs.get(name, textparse.MetricTypeCounter)
+	return mfs.get(name, model.MetricTypeCounter)
 }
 
 func (mfs MetricFamilies) GetSummary(name string) *MetricFamily {
-	return mfs.get(name, textparse.MetricTypeSummary)
+	return mfs.get(name, model.MetricTypeSummary)
 }
 
 func (mfs MetricFamilies) GetHistogram(name string) *MetricFamily {
-	return mfs.get(name, textparse.MetricTypeHistogram)
+	return mfs.get(name, model.MetricTypeHistogram)
 }
 
-func (mfs MetricFamilies) get(name string, typ textparse.MetricType) *MetricFamily {
+func (mfs MetricFamilies) get(name string, typ model.MetricType) *MetricFamily {
 	mf := mfs.Get(name)
 	if mf == nil || mf.typ != typ {
 		return nil
@@ -85,10 +85,10 @@ func (mfs MetricFamilies) get(name string, typ textparse.MetricType) *MetricFami
 	return mf
 }
 
-func (mf *MetricFamily) Name() string               { return mf.name }
-func (mf *MetricFamily) Help() string               { return mf.help }
-func (mf *MetricFamily) Type() textparse.MetricType { return mf.typ }
-func (mf *MetricFamily) Metrics() []Metric          { return mf.metrics }
+func (mf *MetricFamily) Name() string           { return mf.name }
+func (mf *MetricFamily) Help() string           { return mf.help }
+func (mf *MetricFamily) Type() model.MetricType { return mf.typ }
+func (mf *MetricFamily) Metrics() []Metric      { return mf.metrics }
 
 func (m *Metric) Labels() labels.Labels { return m.labels }
 func (m *Metric) Gauge() *Gauge         { return m.gauge }
