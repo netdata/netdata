@@ -852,7 +852,8 @@ static void ebpf_networkviewer_set_trampoline_target(struct networkviewer_bpf *o
                                    targets[NETDATA_FCNT_TCP_SET_STATE].name);
 }
 
-static int ebpf_networkviewer_attach_probes(struct networkviewer_bpf *obj, netdata_ebpf_targets_t *targets) {
+static int ebpf_networkviewer_attach_probes(struct networkviewer_bpf *obj, netdata_ebpf_targets_t *targets)
+{
     obj->links.netdata_nv_inet_csk_accept_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_inet_csk_accept_kretprobe,
                                                                                  true,
                                                                                  targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
@@ -943,7 +944,7 @@ static inline int ebpf_networkviewer_load_and_attach(struct networkviewer_bpf *o
         ret = networkviewer_bpf__load(obj);
         if (!ret)
             ret = networkviewer_bpf__attach(obj);
-    } else {  // kprobe
+    } else { // kprobe
         ebpf_networkviewer_disable_trampoline(obj);
 
         ret = networkviewer_bpf__load(obj);
@@ -957,7 +958,7 @@ static inline int ebpf_networkviewer_load_and_attach(struct networkviewer_bpf *o
 
 static inline void network_viwer_set_module(ebpf_module_t *em)
 {
-    static char *binary_name = { "network_viewer" };
+    static char *binary_name = {"network_viewer"};
 
     em->info.thread_name = em->info.config_name = binary_name;
     em->maps = nv_maps;
@@ -989,7 +990,8 @@ static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver
             ret = -1;
         else {
             struct bpf_map *map;
-            bpf_object__for_each_map(map, em->objects) {
+            bpf_object__for_each_map(map, em->objects)
+            {
                 const char *name = bpf_map__name(map);
                 int fd = bpf_map__fd(map);
                 if (!strcmp(name, nv_maps[0].name))
@@ -1005,8 +1007,8 @@ static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver
         networkviewer_bpf_obj = networkviewer_bpf__open();
         ret = (!networkviewer_bpf_obj) ? -1 : ebpf_networkviewer_load_and_attach(networkviewer_bpf_obj, em);
         if (!ret) {
-            em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd =  bpf_map__fd(networkviewer_bpf_obj->maps.tbl_nv_socket);
-            em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd =  bpf_map__fd(networkviewer_bpf_obj->maps.nv_ctrl);
+            em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd = bpf_map__fd(networkviewer_bpf_obj->maps.tbl_nv_socket);
+            em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd = bpf_map__fd(networkviewer_bpf_obj->maps.nv_ctrl);
         }
     }
 #endif
@@ -1045,7 +1047,7 @@ static inline void network_viewer_unload_ebpf()
 
 static inline void network_viewer_load_ebpf()
 {
-    memset(&ebpf_nv_module , 0, sizeof(ebpf_module_t));
+    memset(&ebpf_nv_module, 0, sizeof(ebpf_module_t));
 
     if (ebpf_can_plugin_load_code(ebpf_get_kernel_version(), "networkviewer.plugin"))
         return;
@@ -1070,21 +1072,41 @@ void *network_viewer_ebpf_worker(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
     uint32_t max = 5 * NETWORK_VIEWER_EBPF_ACTION_LIMIT;
-    while(!plugin_should_exit) {
-       (void)heartbeat_next(&hb, USEC_PER_SEC);
+    uint64_t removed = 0;
+    while (!plugin_should_exit) {
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
 
-       rw_spinlock_write_lock(&em->rw_spinlock);
-       uint32_t curr = now_realtime_sec() - em->running_time;
-       if (em->optional != NETWORK_VIEWER_EBPF_NV_NOT_RUNNING || curr < max) {
-           rw_spinlock_write_unlock(&em->rw_spinlock);
-           continue;
-       }
-       em->running_time = now_realtime_sec();
-       em->optional = NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
-       rw_spinlock_write_unlock(&em->rw_spinlock);
-   }
+        rw_spinlock_write_lock(&em->rw_spinlock);
+        uint32_t curr = now_realtime_sec() - em->running_time;
+        if (em->optional != NETWORK_VIEWER_EBPF_NV_NOT_RUNNING || curr < max) {
+            rw_spinlock_write_unlock(&em->rw_spinlock);
+            continue;
+        }
+        em->running_time = now_realtime_sec();
+        em->optional = NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
+        rw_spinlock_write_unlock(&em->rw_spinlock);
 
-   return NULL;
+        ebpf_nv_idx_t key = {};
+        ebpf_nv_idx_t next_key = {};
+        ebpf_nv_data_t stored = {};
+        int fd = em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
+        while (!bpf_map_get_next_key(fd, &key, &next_key)) {
+            if (!bpf_map_lookup_elem(fd, &key, &stored)) {
+                if (stored.closed) {
+                    bpf_map_delete_elem(fd, &key);
+                    removed++;
+                }
+            }
+
+            stored.closed = 0;
+            key = next_key;
+        }
+    }
+
+    if (removed)
+        local_sockets_reset_ebpf_value(em, removed);
+
+    return NULL;
 }
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 
