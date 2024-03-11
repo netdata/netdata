@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/dockerd"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/kubernetes"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/netlisteners"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
@@ -78,14 +79,21 @@ func (p *Pipeline) registerDiscoverers(conf Config) error {
 			cfg.NetListeners.Source = conf.Source
 			td, err := netlisteners.NewDiscoverer(cfg.NetListeners)
 			if err != nil {
-				return fmt.Errorf("failed to create 'net_listeners' discoverer: %v", err)
+				return fmt.Errorf("failed to create '%s' discoverer: %v", cfg.Discoverer, err)
+			}
+			p.discoverers = append(p.discoverers, td)
+		case "docker":
+			cfg.Docker.Source = conf.Source
+			td, err := dockerd.NewDiscoverer(cfg.Docker)
+			if err != nil {
+				return fmt.Errorf("failed to create '%s' discoverer: %v", cfg.Discoverer, err)
 			}
 			p.discoverers = append(p.discoverers, td)
 		case "k8s":
 			for _, k8sCfg := range cfg.K8s {
 				td, err := kubernetes.NewKubeDiscoverer(k8sCfg)
 				if err != nil {
-					return fmt.Errorf("failed to create 'k8s' discoverer: %v", err)
+					return fmt.Errorf("failed to create '%s' discoverer: %v", cfg.Discoverer, err)
 				}
 				p.discoverers = append(p.discoverers, td)
 			}

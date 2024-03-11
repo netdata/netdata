@@ -33,10 +33,10 @@ func (sim discoverySim) run(t *testing.T) {
 	require.Nilf(t, err, "cfg unmarshal")
 
 	clr, err := newTargetClassificator(cfg.Classify)
-	require.Nilf(t, err, "classify %v", err)
+	require.Nil(t, err, "newTargetClassificator")
 
 	cmr, err := newConfigComposer(cfg.Compose)
-	require.Nilf(t, err, "compose")
+	require.Nil(t, err, "newConfigComposer")
 
 	mockClr := &mockClassificator{clr: clr}
 	mockCmr := &mockComposer{cmr: cmr}

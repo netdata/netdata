@@ -46,10 +46,11 @@ type (
 )
 
 func (c *targetClassificator) classify(tgt model.Target) model.Tags {
+	tgtTags := tgt.Tags().Clone()
 	var tags model.Tags
 
 	for i, rule := range c.rules {
-		if !rule.sr.matches(tgt.Tags()) {
+		if !rule.sr.matches(tgtTags) {
 			continue
 		}
 
@@ -70,6 +71,7 @@ func (c *targetClassificator) classify(tgt model.Target) model.Tags {
 
 			tags.Merge(rule.tags)
 			tags.Merge(match.tags)
+			tgtTags.Merge(tags)
 		}
 	}
 
