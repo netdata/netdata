@@ -1325,7 +1325,7 @@ static inline void network_viwer_set_module(ebpf_module_t *em)
     em->mode = MODE_ENTRY;
     em->targets = nv_targets;
     em->apps_charts = NETDATA_EBPF_APPS_FLAG_YES;
-    em->apps_level = NETDATA_APPS_LEVEL_ALL;
+    em->apps_level = args->level;
 
 #ifdef LIBBPF_MAJOR_VERSION
     em->load |= EBPF_LOAD_CORE; // Prefer CO-RE avoiding kprobes
@@ -1401,7 +1401,7 @@ static inline void network_viewer_unload_ebpf()
     maps[0].map_fd = maps[1].map_fd = -1;
 }
 
-static inline void network_viewer_load_ebpf()
+static inline void network_viewer_load_ebpf(networkviewer_opt_t *args)
 {
     memset(&ebpf_nv_module, 0, sizeof(ebpf_module_t));
 
@@ -1416,7 +1416,7 @@ static inline void network_viewer_load_ebpf()
 #endif
 
     int kver = ebpf_get_kernel_version();
-    network_viwer_set_module(&ebpf_nv_module);
+    network_viwer_set_module(&ebpf_nv_module, args);
 
     if (network_viewer_load_ebpf_to_kernel(&ebpf_nv_module, kver))
         network_viewer_unload_ebpf();
@@ -1465,6 +1465,34 @@ void *network_viewer_ebpf_worker(void *ptr)
     return NULL;
 }
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+
+// ----------------------------------------------------------------------------------------------------------------
+// Parse Args
+
+static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char **argv)
+{
+    int i;
+    for(i = 1; i < argc; i++) {
+        if (strcmp("debug", argv[i]) == 0)
+            args->debug = true;
+        else if (strcmp("ebpf", argv[i]) == 0) {
+            args->ebpf = true;
+            args->level = NETDATA_APPS_LEVEL_ALL;
+        }
+        else if (strcmp("apps-level", argv[i]) == 0) {
+            if(argc <= i + 1) {
+                nd_log(NDLS_COLLECTORS, NDLP_INFO, "Parameter 'apps-level' requires a number between %u and %u as argument.",
+                       NETDATA_APPS_LEVEL_REAL_PARENT, NETDATA_APPS_LEVEL_ALL);
+                exit(1);
+            }
+
+            i++;
+            args->level = str2i(argv[i]);
+            if (args->level < NETDATA_APPS_LEVEL_REAL_PARENT || args->level > NETDATA_APPS_LEVEL_ALL)
+                args->level = NETDATA_APPS_LEVEL_ALL;
+        }
+    }
+}
 
 // ----------------------------------------------------------------------------------------------------------------
 // main
