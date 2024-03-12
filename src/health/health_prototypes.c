@@ -377,7 +377,7 @@ void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
     UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
     uuid_copy(ap->config.hash_id, uuid.uuid);
 
-    (void) sql_alert_store_config(ap);
+    sql_alert_store_config(ap);
 }
 
 bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap) {
