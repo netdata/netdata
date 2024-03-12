@@ -7,24 +7,38 @@ learn_topic_type: "References"
 learn_rel_path: "Integrations/Monitor/System metrics"
 -->
 
-# Network Vieiwer monitoring (network-viewer.plugin)
+# Network Viewer monitoring (network-viewer.plugin)
 
-The `network-viewer.plugin` provides users with information about TCP and UDP resources.  
+The `network-viewer.plugin` provides users with information about TCP and UDP
+resources.
 It is enabled by default on every Netdata installation.
 
-To accomplish this, it scans through the entire process tree, gathering socket information for each process identified during its parsing of `/proc` or using `libmnl`. Alternatively, it monitors calls to kernel internal functions when utilizing `eBPF`.
+To accomplish this, it scans through the entire process tree, gathering socket
+information for each process identified during its parsing of `/proc` or using
+`libmnl`. Alternatively, it monitors calls to kernel internal functions when
+utilizing `eBPF`.
 
 ## Functions
 
-To visualize your network traffic, you'll need to log in to the Netdata cloud. Navigate to the `Top` tab, select a specific host, and then click on `Network connections`.
+To visualize your network traffic, you'll need to log in to the Netdata cloud.
+Navigate to the `Top` tab, select a specific host, and then click on
+`Network connections`.
 
 ## Performance
 
-The `network-viewer.plugin` is a sophisticated piece of software that requires significant processing.
+The `network-viewer.plugin` is a sophisticated piece of software that requires
+significant processing.
 
-On Linux systems, the plugin reads multiple `network-viewer.plugin` reads several `/proc` files for each running process to gather necessary data. Performing this task every second, particularly on hosts with numerous processes, can result in increased CPU utilization by the plugin.
+On Linux systems, the plugin reads multiple `network-viewer.plugin` reads
+several `/proc` files for each running process to gather necessary data.
+Performing this task every second, particularly on hosts with numerous
+processes, can result in increased CPU utilization by the plugin.
 
-To minimize the load caused by parsing `/proc` the plugin can utilize `eBPF`, provided it's available on your host. However, this approach will introduce additional overhead for each TCP and UDP function call on the host. To switch from using `/proc` files to eBPF, adjustments to the configuration file are also required:
+To minimize the load caused by parsing `/proc` the plugin can utilize `eBPF`,
+provided it's available on your host. However, this approach will introduce
+additional overhead for each TCP and UDP function call on the host. To switch
+from using `/proc` files to eBPF, adjustments to the configuration file are also
+required:
 
 ```
 [plugin:network-viewer]
@@ -32,7 +46,8 @@ To minimize the load caused by parsing `/proc` the plugin can utilize `eBPF`, pr
 	command options = ebpf
 ```
 
-You can further customize the collection level by specifying the desired option `apps-level`:
+You can further customize the collection level by specifying the desired option
+`apps-level`:
 
 ```
 [plugin:network-viewer]
