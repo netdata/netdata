@@ -225,16 +225,6 @@ enum netdata_controller {
     NETDATA_CONTROLLER_END
 };
 
-// Control how Netdata will monitor PIDs (apps and cgroups)
-typedef enum netdata_apps_level {
-    NETDATA_APPS_LEVEL_REAL_PARENT,
-    NETDATA_APPS_LEVEL_PARENT,
-    NETDATA_APPS_LEVEL_ALL,
-
-    // Present only in user ring
-    NETDATA_APPS_NOT_SET
-} netdata_apps_level_t;
-
 typedef struct ebpf_local_maps {
     char *name;
     uint32_t internal_input;
