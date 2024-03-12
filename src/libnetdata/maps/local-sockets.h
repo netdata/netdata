@@ -820,6 +820,8 @@ static inline void local_sockets_reset_ebpf_value(ebpf_module_t *em, uint64_t re
     }
 }
 
+static inline void local_sockets_read_sockets_from_proc(LS_STATE *ls);
+
 static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_load_data action) {
     ebpf_nv_idx_t key =  { };
     ebpf_nv_idx_t next_key = { };
@@ -895,7 +897,13 @@ end_socket_read_loop:
         local_sockets_reset_ebpf_value(ls->ebpf_module, removed);
     }
 
-    return (!counter) ? false : true;
+    // We did not have any call to functions, let us use proc
+    if (!counter) {
+        local_sockets_read_sockets_from_proc(ls);
+        return false;
+    }
+
+    return true;
 }
 
 static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *n) {
