@@ -1722,7 +1722,7 @@ function(protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
 
                 add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
                                    COMMAND ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
-                                   ARGS -I=${INC_DIR} "$<$<BOOL:${ENABLE_BUNDLED_PROTOBUF}>:-I=${CMAKE_BINARY_DIR}/_deps/protobuf-src/src/>" --cpp_out=${OUT_DIR} ${ABS_FIL}
+                                   ARGS -I=${INC_DIR} $<$<BOOL:${ENABLE_BUNDLED_PROTOBUF}>:-I=${CMAKE_BINARY_DIR}/_deps/protobuf-src/src/> --cpp_out=${OUT_DIR} ${ABS_FIL}
                                    DEPENDS ${ABS_FIL} ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
                                    COMMENT "Running C++ protocol buffer compiler on ${FIL}"
                                    VERBATIM)
