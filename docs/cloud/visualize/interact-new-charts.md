@@ -283,7 +283,7 @@ The Anomaly Rate ribbon on top of each chart visualizes the combined anomaly rat
 
 Hovering over the Anomaly Rate ribbon provides a histogram of the anomaly rates per presented dimension, for the specific point in time.  
 
-Anomaly Rate visualization does not make Netdata slower. Anomaly rate is saved in the the Netdata database, together with metric values, and due to the smart design of Netdata, it does not even incur a disk footprint penalty.
+Anomaly Rate visualization does not make Netdata slower. Anomaly rate is saved in the Netdata database, together with metric values, and due to the smart design of Netdata, it does not even incur a disk footprint penalty.
 
 ## Hover over the chart
 

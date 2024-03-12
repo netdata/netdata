@@ -62,7 +62,7 @@ To achieve this you can check the [Update plan](https://github.com/netdata/netda
 
 > ⚠️ Downgrade or cancellation may affect users in your Space. Please check what roles are available on the [each plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#areas-impacted-by-plans). Users with unavailable roles on the new plan will immediately have restricted access to the Space.
 
-> ⚠️ Any credit given to you will be available to use on future paid subscriptions with us. It will be available until the the **end of the following year**.
+> ⚠️ Any credit given to you will be available to use on future paid subscriptions with us. It will be available until the **end of the following year**.
 
 ### Areas impacted by plans
 

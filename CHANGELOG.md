@@ -286,7 +286,7 @@
 - disable logsmanagement when installing on macOS [\#16708](https://github.com/netdata/netdata/pull/16708) ([ilyam8](https://github.com/ilyam8))
 - dyncfg v2 [\#16702](https://github.com/netdata/netdata/pull/16702) ([ktsaou](https://github.com/ktsaou))
 - delay collecting double linked network interfaces [\#16701](https://github.com/netdata/netdata/pull/16701) ([ilyam8](https://github.com/ilyam8))
-- fix quota calculation when the the db is empty [\#16699](https://github.com/netdata/netdata/pull/16699) ([ktsaou](https://github.com/ktsaou))
+- fix quota calculation when the db is empty [\#16699](https://github.com/netdata/netdata/pull/16699) ([ktsaou](https://github.com/ktsaou))
 - disable logsmanagement when installing on macOS [\#16697](https://github.com/netdata/netdata/pull/16697) ([ilyam8](https://github.com/ilyam8))
 - Remove Ubuntu 23.04 from the CI [\#16694](https://github.com/netdata/netdata/pull/16694) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix installing service file and start/stop ND using `launchctl` on macOS [\#16693](https://github.com/netdata/netdata/pull/16693) ([ilyam8](https://github.com/ilyam8))
