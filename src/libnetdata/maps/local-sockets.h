@@ -957,7 +957,7 @@ static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *
     }
     else {
         memcpy(&key.saddr.ipv6, &n->local.ip.ipv6, sizeof(n->local.ip.ipv6));
-        memcpy(&key.daddr.ipv6, &n->remote.ip.ipv6, sizeof(n->local.ip.ipv6));
+        memcpy(&key.daddr.ipv6, &n->remote.ip.ipv6, sizeof(n->remote.ip.ipv6));
     }
 
     data.protocol = n->local.protocol;
