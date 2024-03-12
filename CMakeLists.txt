@@ -1720,12 +1720,18 @@ function(protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
                 set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
                 list(APPEND ${HDRS} ${GENERATED_PB_H})
 
+                list(APPEND _PROTOC_INCLUDE_DIRS ${INC_DIR})
+
+                if(ENABLE_BUNDLED_PROTOBUF)
+                        list(APPEND _PROTOC_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/_deps/protobuf-src/src/)
+                endif()
+
                 add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
                                    COMMAND ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
-                                   ARGS -I=${INC_DIR} $<$<BOOL:${ENABLE_BUNDLED_PROTOBUF}>:-I=${CMAKE_BINARY_DIR}/_deps/protobuf-src/src/> --cpp_out=${OUT_DIR} ${ABS_FIL}
+                                   ARGS "-I$<JOIN:${_PROTOC_INCLUDE_DIRS},;-I>" --cpp_out=${OUT_DIR} ${ABS_FIL}
                                    DEPENDS ${ABS_FIL} ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
                                    COMMENT "Running C++ protocol buffer compiler on ${FIL}"
-                                   VERBATIM)
+                                   COMMAND_EXPAND_LISTS)
         endforeach()
 
         set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
