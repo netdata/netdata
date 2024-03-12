@@ -622,7 +622,7 @@ void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report,
 //----------------------------------------------------------------------------------------------------------------------
 
 /**
- * Unload loegacy code
+ * Unload legacy code
  *
  * @param objects       objects loaded from eBPF programs
  * @param probe_links   links from loader
