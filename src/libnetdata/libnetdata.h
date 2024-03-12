@@ -460,6 +460,16 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
 extern char *netdata_configured_host_prefix;
 
 #include "os/os.h"
+// Control how Netdata will monitor PIDs (apps and cgroups)
+// This enum is used directly by eBPF plugin and integrated plugins
+typedef enum netdata_apps_level {
+    NETDATA_APPS_LEVEL_REAL_PARENT,
+    NETDATA_APPS_LEVEL_PARENT,
+    NETDATA_APPS_LEVEL_ALL,
+
+    // Present only in user ring
+    NETDATA_APPS_NOT_SET
+} netdata_apps_level_t;
 
 #define XXH_INLINE_ALL
 #include "xxhash.h"
