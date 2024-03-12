@@ -640,8 +640,7 @@ void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe
     }
 
     freez(probe_links);
-    if (objects)
-        bpf_object__close(objects);
+    bpf_object__close(objects);
 }
 
 //----------------------------------------------------------------------------------------------------------------------
