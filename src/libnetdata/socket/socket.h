@@ -48,9 +48,10 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 bool fd_is_socket(int fd);
 bool sock_has_output_error(int fd);
 
-int sock_setnonblock(int fd);
+int sock_setnonblock_closexec(int fd, bool closexec);
 int sock_delnonblock(int fd);
 int sock_setreuse(int fd, int reuse);
+void sock_setcloexec(int fd);
 int sock_setreuse_port(int fd, int reuse);
 int sock_enlarge_in(int fd);
 int sock_enlarge_out(int fd);
@@ -67,9 +68,14 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
 #define SOCK_NONBLOCK 00004000
 #endif  /* #ifndef SOCK_NONBLOCK */
 
+#ifdef COMPILED_FOR_MACOS
+#undef SOCK_CLOEXEC
+#define SOCK_CLOEXEC 0
+#else
 #ifndef SOCK_CLOEXEC
 #define SOCK_CLOEXEC 02000000
 #endif /* #ifndef SOCK_CLOEXEC */
+#endif /* #COMPILED_FOR_MACOS */
 
 #endif /* #ifndef HAVE_ACCEPT4 */
 

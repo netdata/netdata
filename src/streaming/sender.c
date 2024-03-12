@@ -943,7 +943,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
     }
 
-    if(sock_setnonblock(s->rrdpush_sender_socket) < 0)
+    if(sock_setnonblock_closexec(s->rrdpush_sender_socket, true) < 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM %s [send to %s]: cannot set non-blocking mode for socket.",
                rrdhost_hostname(host), s->connected_to);

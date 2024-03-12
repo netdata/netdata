@@ -223,7 +223,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
         }
         else {
             // we couldn't read 7 bytes
-            sock_setnonblock(w->ifd);
+            sock_setnonblock_closexec(w->ifd, false);
             goto cleanup;
         }
 
@@ -237,7 +237,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
                 WEB_CLIENT_IS_DEAD(w);
         }
 
-        sock_setnonblock(w->ifd);
+        sock_setnonblock_closexec(w->ifd, false);
     }
 #endif
 

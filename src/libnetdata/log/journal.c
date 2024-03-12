@@ -51,6 +51,8 @@ int journal_direct_fd(const char *path) {
     int fd = socket(AF_UNIX, SOCK_DGRAM| SOCK_CLOEXEC, 0);
     if (fd < 0) return -1;
 
+    sock_setcloexec(fd);
+
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(struct sockaddr_un));
     addr.sun_family = AF_UNIX;

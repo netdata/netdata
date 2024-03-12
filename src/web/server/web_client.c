@@ -533,7 +533,7 @@ static int mysendfile(struct web_client *w, char *filename) {
         }
     }
 
-    sock_setnonblock(w->ifd);
+    sock_setnonblock_closexec(w->ifd, false);
 
     w->response.data->content_type = contenttype_for_filename(web_filename);
     netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Sending file '%s' (%"PRId64" bytes, ifd %d, ofd %d).", w->id, web_filename, (int64_t)statbuf.st_size, w->ifd, w->ofd);

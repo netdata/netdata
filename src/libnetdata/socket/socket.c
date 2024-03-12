@@ -150,11 +150,18 @@ bool sock_has_output_error(int fd) {
     return ((pfd.revents & errors) || !(pfd.revents & POLLOUT));
 }
 
-int sock_setnonblock(int fd) {
+int sock_setnonblock_closexec(int fd, bool closexec)
+{
+    UNUSED(closexec);
     int flags;
 
     flags = fcntl(fd, F_GETFL);
     flags |= O_NONBLOCK;
+
+#ifdef COMPILED_FOR_MACOS
+    if (closexec)
+        flags |= FD_CLOEXEC;
+#endif
 
     int ret = fcntl(fd, F_SETFL, flags);
     if(ret < 0)
@@ -189,6 +196,18 @@ int sock_setreuse(int fd, int reuse) {
                fd);
 
     return ret;
+}
+
+void sock_setcloexec(int fd)
+{
+    UNUSED(fd);
+#ifdef COMPILED_FOR_MACOS
+    int flags = fcntl(fd, F_GETFD);
+    if (flags != -1) {
+        flags |= FD_CLOEXEC;
+        (void) fcntl(fd, F_SETFD, flags);
+    }
+#endif
 }
 
 int sock_setreuse_port(int fd, int reuse) {
@@ -271,7 +290,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
         return -1;
     }
 
-    sock_setnonblock(sock);
+    sock_setnonblock_closexec(sock, true);
     sock_enlarge_in(sock);
 
     struct sockaddr_un name;
@@ -324,10 +343,9 @@ int create_listen_socket4(int socktype, const char *ip, uint16_t port, int liste
 
         return -1;
     }
-
     sock_setreuse(sock, 1);
     sock_setreuse_port(sock, 0);
-    sock_setnonblock(sock);
+    sock_setnonblock_closexec(sock, true);
     sock_enlarge_in(sock);
 
     struct sockaddr_in name;
@@ -382,10 +400,9 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
         return -1;
     }
-
     sock_setreuse(sock, 1);
     sock_setreuse_port(sock, 0);
-    sock_setnonblock(sock);
+    sock_setnonblock_closexec(sock, true);
     sock_enlarge_in(sock);
 
     /* IPv6 only */
@@ -797,6 +814,8 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
                    path);
     }
 
+    sock_setcloexec(fd);
+
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
@@ -902,6 +921,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                            "Failed to set timeout on the socket to ip '%s' port '%s'",
                            hostBfr, servBfr);
             }
+            sock_setcloexec(fd);
 
             errno = 0;
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
@@ -1401,6 +1421,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
             strncpyz(client_ip, "localhost", ipsize);
         }
+        sock_setcloexec(nfd);
 
 #ifdef __FreeBSD__
         if(((struct sockaddr *)&sadr)->sa_family == AF_LOCAL)
