@@ -6,6 +6,16 @@
 
 **Merged pull requests:**
 
+- bring back old docs that were containing missing information [\#17146](https://github.com/netdata/netdata/pull/17146) ([Ancairon](https://github.com/Ancairon))
+- Update go.d.plugin packages [\#17145](https://github.com/netdata/netdata/pull/17145) ([ilyam8](https://github.com/ilyam8))
+- Check alert duration on submission to the cloud [\#17144](https://github.com/netdata/netdata/pull/17144) ([stelfrag](https://github.com/stelfrag))
+- Bump github.com/go-sql-driver/mysql from 1.7.1 to 1.8.0 in /src/go/collectors/go.d.plugin [\#17142](https://github.com/netdata/netdata/pull/17142) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/prometheus-community/pro-bing from 0.3.0 to 0.4.0 in /src/go/collectors/go.d.plugin [\#17141](https://github.com/netdata/netdata/pull/17141) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/vmware/govmomi from 0.35.0 to 0.36.0 in /src/go/collectors/go.d.plugin [\#17140](https://github.com/netdata/netdata/pull/17140) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/likexian/whois-parser from 1.24.10 to 1.24.11 in /src/go/collectors/go.d.plugin [\#17137](https://github.com/netdata/netdata/pull/17137) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/cloudflare/cfssl from 1.6.4 to 1.6.5 in /src/go/collectors/go.d.plugin [\#17136](https://github.com/netdata/netdata/pull/17136) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/jackc/pgx/v4 from 4.18.1 to 4.18.3 in /src/go/collectors/go.d.plugin [\#17135](https://github.com/netdata/netdata/pull/17135) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump golang.org/x/net from 0.21.0 to 0.22.0 in /src/go/collectors/go.d.plugin [\#17134](https://github.com/netdata/netdata/pull/17134) ([dependabot[bot]](https://github.com/apps/dependabot))
 - packaging: remove Suggests nut [\#17129](https://github.com/netdata/netdata/pull/17129) ([ilyam8](https://github.com/ilyam8))
 - Fix login to GHCR when publishing Docker images. [\#17127](https://github.com/netdata/netdata/pull/17127) ([Ferroin](https://github.com/Ferroin))
 - Detect self thread when exiting. [\#17126](https://github.com/netdata/netdata/pull/17126) ([vkalintiris](https://github.com/vkalintiris))
@@ -39,6 +49,7 @@
 - rename network plugin post and pre install actions [\#17084](https://github.com/netdata/netdata/pull/17084) ([tkatsoulas](https://github.com/tkatsoulas))
 - Improve message in kickstart if a static build can’t be found. [\#17081](https://github.com/netdata/netdata/pull/17081) ([Ferroin](https://github.com/Ferroin))
 - Make watcher thread wait for explicit steps. [\#17079](https://github.com/netdata/netdata/pull/17079) ([vkalintiris](https://github.com/vkalintiris))
+- Update functions tables docs [\#17071](https://github.com/netdata/netdata/pull/17071) ([car12o](https://github.com/car12o))
 - add missing "gotify" to list of notification methods in alarm-notify.sh [\#17069](https://github.com/netdata/netdata/pull/17069) ([ilyam8](https://github.com/ilyam8))
 - Add CI checks for Go code. [\#17066](https://github.com/netdata/netdata/pull/17066) ([Ferroin](https://github.com/Ferroin))
 - go.d.plugin dyncfgv2 [\#17064](https://github.com/netdata/netdata/pull/17064) ([ilyam8](https://github.com/ilyam8))
@@ -367,8 +378,6 @@
 - Bump new version on the release changelog GHA [\#16551](https://github.com/netdata/netdata/pull/16551) ([tkatsoulas](https://github.com/tkatsoulas))
 - set "HOME" after switching to netdata user [\#16548](https://github.com/netdata/netdata/pull/16548) ([ilyam8](https://github.com/ilyam8))
 - code cleanup [\#16542](https://github.com/netdata/netdata/pull/16542) ([ktsaou](https://github.com/ktsaou))
-- Assorted kickstart script fixes. [\#16537](https://github.com/netdata/netdata/pull/16537) ([Ferroin](https://github.com/Ferroin))
-- wip documentation about functions table [\#16535](https://github.com/netdata/netdata/pull/16535) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
@@ -394,15 +403,6 @@
 - docs required for release [\#16546](https://github.com/netdata/netdata/pull/16546) ([ktsaou](https://github.com/ktsaou))
 - Add option to change page type for tier 0 to gorilla [\#16545](https://github.com/netdata/netdata/pull/16545) ([vkalintiris](https://github.com/vkalintiris))
 - fix alpine deps [\#16543](https://github.com/netdata/netdata/pull/16543) ([tkatsoulas](https://github.com/tkatsoulas))
-- change level to debug "took too long to be updated" [\#16540](https://github.com/netdata/netdata/pull/16540) ([ilyam8](https://github.com/ilyam8))
-- apps: fix uptime for groups with 0 processes [\#16538](https://github.com/netdata/netdata/pull/16538) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#16536](https://github.com/netdata/netdata/pull/16536) ([netdatabot](https://github.com/netdatabot))
-- Reorg kickstart guide's steps [\#16534](https://github.com/netdata/netdata/pull/16534) ([tkatsoulas](https://github.com/tkatsoulas))
-- update go.d plugin to v0.57.2 [\#16533](https://github.com/netdata/netdata/pull/16533) ([ilyam8](https://github.com/ilyam8))
-- Update getting-started-light-poc.md [\#16532](https://github.com/netdata/netdata/pull/16532) ([M4itee](https://github.com/M4itee))
-- Acquire receiver\_lock to to avoid race condition [\#16531](https://github.com/netdata/netdata/pull/16531) ([stelfrag](https://github.com/stelfrag))
-- link aclk.log to stdout in docker [\#16529](https://github.com/netdata/netdata/pull/16529) ([ilyam8](https://github.com/ilyam8))
-- Update getting-started.md [\#16528](https://github.com/netdata/netdata/pull/16528) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
