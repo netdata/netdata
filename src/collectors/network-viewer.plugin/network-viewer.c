@@ -105,6 +105,12 @@ ENUM_STR_MAP_DEFINE(TCP_STATE) = {
 };
 ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
 
+typedef struct networkviewer_opt {
+    bool debug;
+    bool ebpf;
+    int  level;
+} networkviewer_opt_t;
+
 static void local_socket_to_json_array(BUFFER *wb, LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
     char local_address[INET6_ADDRSTRLEN];
     char remote_address[INET6_ADDRSTRLEN];
@@ -956,7 +962,7 @@ static inline int ebpf_networkviewer_load_and_attach(struct networkviewer_bpf *o
 }
 #endif
 
-static inline void network_viwer_set_module(ebpf_module_t *em)
+static inline void network_viwer_set_module(ebpf_module_t *em, networkviewer_opt_t *args)
 {
     static char *binary_name = {"network_viewer"};
 
@@ -969,7 +975,7 @@ static inline void network_viwer_set_module(ebpf_module_t *em)
     em->mode = MODE_ENTRY;
     em->targets = nv_targets;
     em->apps_charts = NETDATA_EBPF_APPS_FLAG_YES;
-    em->apps_level = NETDATA_APPS_LEVEL_ALL;
+    em->apps_level = args->level;
 
 #ifdef LIBBPF_MAJOR_VERSION
     em->load |= EBPF_LOAD_CORE; // Prefer CO-RE avoiding kprobes
@@ -1045,7 +1051,7 @@ static inline void network_viewer_unload_ebpf()
     maps[0].map_fd = maps[1].map_fd = -1;
 }
 
-static inline void network_viewer_load_ebpf()
+static inline void network_viewer_load_ebpf(networkviewer_opt_t *args)
 {
     memset(&ebpf_nv_module, 0, sizeof(ebpf_module_t));
 
@@ -1060,7 +1066,7 @@ static inline void network_viewer_load_ebpf()
 #endif
 
     int kver = ebpf_get_kernel_version();
-    network_viwer_set_module(&ebpf_nv_module);
+    network_viwer_set_module(&ebpf_nv_module, args);
 
     if (network_viewer_load_ebpf_to_kernel(&ebpf_nv_module, kver))
         network_viewer_unload_ebpf();
@@ -1111,6 +1117,34 @@ void *network_viewer_ebpf_worker(void *ptr)
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 
 // ----------------------------------------------------------------------------------------------------------------
+// Parse Args
+
+static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char **argv)
+{
+    int i;
+    for(i = 1; i < argc; i++) {
+        if (strcmp("debug", argv[i]) == 0)
+            args->debug = true;
+        else if (strcmp("ebpf", argv[i]) == 0) {
+            args->ebpf = true;
+            args->level = NETDATA_APPS_LEVEL_ALL;
+        }
+        else if (strcmp("apps-level", argv[i]) == 0) {
+            if(argc <= i + 1) {
+                nd_log(NDLS_COLLECTORS, NDLP_INFO, "Parameter 'apps-level' requires a number between %u and %u as argument.",
+                       NETDATA_APPS_LEVEL_REAL_PARENT, NETDATA_APPS_LEVEL_ALL);
+                exit(1);
+            }
+
+            i++;
+            args->level = str2i(argv[i]);
+            if (args->level < NETDATA_APPS_LEVEL_REAL_PARENT || args->level > NETDATA_APPS_LEVEL_ALL)
+                args->level = NETDATA_APPS_LEVEL_ALL;
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------------------------------------------
 // main
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
@@ -1125,10 +1159,12 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    if(argc >= 2 && strcmp(argv[1], "debug") == 0) {
+    networkviewer_opt_t args =  {};
+    networkviewer_parse_args(&args, argc, argv);
+    if(args.debug) {
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        if(argc == 3 && strcmp(argv[2], "ebpf") == 0)
-            network_viewer_load_ebpf();
+        if(args.ebpf)
+            network_viewer_load_ebpf(&args);
 
         if (ebpf_nv_module.maps[0].map_fd > 0)
             nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGIN: the plugin will use eBPF %s to monitor sockets.",
@@ -1146,15 +1182,15 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
                                 NULL, HTTP_ACCESS_ALL, NULL, NULL);
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        network_viewer_unload_ebpf();
+        network_viewer_unload_ebpf(&args);
 #endif
         exit(1);
     }
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     static netdata_thread_t *nv_clean_thread = NULL;
-    if(argc == 3 && strcmp(argv[2], "ebpf") == 0) {
-        network_viewer_load_ebpf();
+    if(args.ebpf) {
+        network_viewer_load_ebpf(&args);
 
         if (ebpf_nv_module.maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd > 0) {
             nv_clean_thread = mallocz(sizeof(netdata_thread_t));
