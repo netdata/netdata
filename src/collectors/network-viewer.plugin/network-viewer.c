@@ -1048,7 +1048,8 @@ static inline void network_viewer_unload_ebpf()
         ebpf_unload_legacy_code(ebpf_nv_module.objects, ebpf_nv_module.probe_links);
 #endif
     ebpf_local_maps_t *maps = ebpf_nv_module.maps;
-    maps[0].map_fd = maps[1].map_fd = -1;
+    if (maps)
+        maps[0].map_fd = maps[1].map_fd = -1;
 }
 
 static inline void network_viewer_load_ebpf(networkviewer_opt_t *args)
@@ -1166,7 +1167,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         if(args.ebpf)
             network_viewer_load_ebpf(&args);
 
-        if (ebpf_nv_module.maps[0].map_fd > 0)
+        if (ebpf_nv_module.maps && ebpf_nv_module.maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd > 0)
             nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGIN: the plugin will use eBPF %s to monitor sockets.",
                    (nv_targets[0].mode == EBPF_LOAD_TRAMPOLINE) ? "trampoline" : "kprobe");
 #endif
@@ -1182,7 +1183,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
                                 NULL, HTTP_ACCESS_ALL, NULL, NULL);
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        network_viewer_unload_ebpf(&args);
+        if (args.ebpf)
+            network_viewer_unload_ebpf();
 #endif
         exit(1);
     }
@@ -1245,7 +1247,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         netdata_thread_join(*nv_clean_thread, NULL);
         freez(nv_clean_thread);
     }
-    network_viewer_unload_ebpf();
+    if (args.ebpf)
+        network_viewer_unload_ebpf();
 #endif
 
     return 0;

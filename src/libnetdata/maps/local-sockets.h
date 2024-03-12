@@ -345,7 +345,8 @@ static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
                 ls->config.cb(ls, n, ls->config.data);
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-            local_sockets_ebpf_store_sockets(ls, n);
+            if (ls->ebpf_module->maps)
+                local_sockets_ebpf_store_sockets(ls, n);
 #endif
         }
     }
