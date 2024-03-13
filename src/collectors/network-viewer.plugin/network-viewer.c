@@ -1489,7 +1489,7 @@ static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char *
             i++;
             args->level = str2i(argv[i]);
             if (args->level < NETDATA_APPS_LEVEL_REAL_PARENT || args->level > NETDATA_APPS_LEVEL_ALL)
-                args->level = NETDATA_APPS_LEVEL_ALL;
+                args->level = NETDATA_APPS_LEVEL_PARENT;
         }
     }
 }
