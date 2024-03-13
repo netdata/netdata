@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Document new field on PagerDuty cloud integration [\#17149](https://github.com/netdata/netdata/pull/17149) ([juacker](https://github.com/juacker))
 - bring back old docs that were containing missing information [\#17146](https://github.com/netdata/netdata/pull/17146) ([Ancairon](https://github.com/Ancairon))
 - Update go.d.plugin packages [\#17145](https://github.com/netdata/netdata/pull/17145) ([ilyam8](https://github.com/ilyam8))
 - Check alert duration on submission to the cloud [\#17144](https://github.com/netdata/netdata/pull/17144) ([stelfrag](https://github.com/stelfrag))
@@ -16,6 +17,7 @@
 - Bump github.com/cloudflare/cfssl from 1.6.4 to 1.6.5 in /src/go/collectors/go.d.plugin [\#17136](https://github.com/netdata/netdata/pull/17136) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/jackc/pgx/v4 from 4.18.1 to 4.18.3 in /src/go/collectors/go.d.plugin [\#17135](https://github.com/netdata/netdata/pull/17135) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump golang.org/x/net from 0.21.0 to 0.22.0 in /src/go/collectors/go.d.plugin [\#17134](https://github.com/netdata/netdata/pull/17134) ([dependabot[bot]](https://github.com/apps/dependabot))
+- remove repetitive words [\#17131](https://github.com/netdata/netdata/pull/17131) ([carrychair](https://github.com/carrychair))
 - packaging: remove Suggests nut [\#17129](https://github.com/netdata/netdata/pull/17129) ([ilyam8](https://github.com/ilyam8))
 - Fix login to GHCR when publishing Docker images. [\#17127](https://github.com/netdata/netdata/pull/17127) ([Ferroin](https://github.com/Ferroin))
 - Detect self thread when exiting. [\#17126](https://github.com/netdata/netdata/pull/17126) ([vkalintiris](https://github.com/vkalintiris))
@@ -286,7 +288,7 @@
 - disable logsmanagement when installing on macOS [\#16708](https://github.com/netdata/netdata/pull/16708) ([ilyam8](https://github.com/ilyam8))
 - dyncfg v2 [\#16702](https://github.com/netdata/netdata/pull/16702) ([ktsaou](https://github.com/ktsaou))
 - delay collecting double linked network interfaces [\#16701](https://github.com/netdata/netdata/pull/16701) ([ilyam8](https://github.com/ilyam8))
-- fix quota calculation when the db is empty [\#16699](https://github.com/netdata/netdata/pull/16699) ([ktsaou](https://github.com/ktsaou))
+- fix quota calculation when the the db is empty [\#16699](https://github.com/netdata/netdata/pull/16699) ([ktsaou](https://github.com/ktsaou))
 - disable logsmanagement when installing on macOS [\#16697](https://github.com/netdata/netdata/pull/16697) ([ilyam8](https://github.com/ilyam8))
 - Remove Ubuntu 23.04 from the CI [\#16694](https://github.com/netdata/netdata/pull/16694) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix installing service file and start/stop ND using `launchctl` on macOS [\#16693](https://github.com/netdata/netdata/pull/16693) ([ilyam8](https://github.com/ilyam8))
@@ -377,7 +379,6 @@
 - Add README for gorilla [\#16553](https://github.com/netdata/netdata/pull/16553) ([vkalintiris](https://github.com/vkalintiris))
 - Bump new version on the release changelog GHA [\#16551](https://github.com/netdata/netdata/pull/16551) ([tkatsoulas](https://github.com/tkatsoulas))
 - set "HOME" after switching to netdata user [\#16548](https://github.com/netdata/netdata/pull/16548) ([ilyam8](https://github.com/ilyam8))
-- code cleanup [\#16542](https://github.com/netdata/netdata/pull/16542) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
@@ -402,7 +403,6 @@
 - Proper Learn-friendly links [\#16547](https://github.com/netdata/netdata/pull/16547) ([Ancairon](https://github.com/Ancairon))
 - docs required for release [\#16546](https://github.com/netdata/netdata/pull/16546) ([ktsaou](https://github.com/ktsaou))
 - Add option to change page type for tier 0 to gorilla [\#16545](https://github.com/netdata/netdata/pull/16545) ([vkalintiris](https://github.com/vkalintiris))
-- fix alpine deps [\#16543](https://github.com/netdata/netdata/pull/16543) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
