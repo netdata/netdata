@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0516
+# Next unused error code: F0517
 
 # ======================================================================
 # Constants
@@ -1936,6 +1936,10 @@ prepare_offline_install_source() {
         if ! download "${NETDATA_STATIC_ARCHIVE_OLD_URL}" "netdata-x86_64-latest.gz.run"; then
           warning "Failed to download static installer archive for x86_64. ${BADNET_MSG}."
         fi
+      fi
+
+      if ! find . -name '*.gz.run'; then
+        fatal "Did not actually download any static installer archives, cannot continue. ${BADNET_MSG}." F0516
       fi
 
       progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
