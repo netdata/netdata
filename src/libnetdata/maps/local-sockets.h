@@ -760,8 +760,8 @@ enum ebpf_nv_load_data {
 
 typedef struct ebpf_nv_idx {
     union ipv46 saddr;
-    uint16_t sport;
     union ipv46 daddr;
+    uint16_t sport;
     uint16_t dport;
 } ebpf_nv_idx_t;
 
