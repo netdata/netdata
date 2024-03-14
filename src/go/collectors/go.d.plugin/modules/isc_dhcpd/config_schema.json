@@ -16,7 +16,7 @@
         "description": "File path to the ISC DHCP server's lease database.",
         "type": "string",
         "default": "/var/lib/dhcp/dhcpd.leases",
-        "pattern": "^/"
+        "pattern": "^$|^/"
       },
       "pools": {
         "title": "IP pools",
