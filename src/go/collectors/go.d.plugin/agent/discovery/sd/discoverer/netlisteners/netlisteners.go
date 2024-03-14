@@ -51,7 +51,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 			binPath: filepath.Join(dir, "local-listeners"),
 			timeout: time.Second * 5,
 		},
-		interval:   time.Second * 60,
+		interval:   time.Minute * 2,
 		expiryTime: time.Minute * 10,
 		cache:      make(map[uint64]*cacheItem),
 		started:    make(chan struct{}),
