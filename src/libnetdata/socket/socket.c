@@ -1282,11 +1282,6 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 
     if (fd < 0) return fd;
 
-    if (flags & SOCK_NONBLOCK) {
-        newflags |= O_NONBLOCK;
-        flags &= ~SOCK_NONBLOCK;
-    }
-
 #ifdef SOCK_CLOEXEC
 #ifdef O_CLOEXEC
     if (flags & SOCK_CLOEXEC) {
@@ -1802,11 +1797,27 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
     char client_port[NI_MAXSERV] = "";
     char client_host[NI_MAXHOST] = "";
 
+#ifdef SOCK_NONBLOCK
+    int flags = SOCK_NONBLOCK;
+#else
+    int flags = 0;
+#endif
+
     int nfd = accept_socket(
-        pf->fd,SOCK_NONBLOCK,
+        pf->fd, flags,
         client_ip, INET6_ADDRSTRLEN, client_port,NI_MAXSERV, client_host, NI_MAXHOST,
         p->access_list, p->allow_dns
         );
+
+#ifndef SOCK_NONBLOCK
+    if (nfd > 0) {
+        int flags = fcntl(fd, F_GETFL);
+        if (flags != -1) {
+            flags |= O_NONBLOCK;
+            (void)fcntl(fd, F_SETFL, flags);
+        }
+    }
+#endif
 
     if (unlikely(nfd < 0)) {
         // accept failed
