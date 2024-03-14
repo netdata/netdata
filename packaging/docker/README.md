@@ -172,6 +172,43 @@ Add `- /run/dbus:/run/dbus:ro` to the netdata service `volumes`.
 </TabItem>
 </Tabs>
 
+### With NVIDIA GPUs monitoring
+
+
+Monitoring NVIDIA GPUs requires:
+
+- Using official [NVIDIA driver](https://www.nvidia.com/Download/index.aspx).
+- Installing [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+- Allowing the Netdata container to access GPU resources.
+
+
+<Tabs>
+<TabItem value="docker_run" label="docker run">
+
+<h3> Using the <code>docker run</code> command </h3>
+
+Add `--gpus 'all,capabilities=utility'` to your `docker run`.
+
+</TabItem>
+<TabItem value="docker compose" label="docker-compose">
+
+<h3> Using the <code>docker-compose</code> command</h3>
+
+Add the following to the netdata service.
+
+```yaml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+```
+
+</TabItem>
+</Tabs>
+
 ### With host-editable configuration
 
 Use a [bind mount](https://docs.docker.com/storage/bind-mounts/) for `/etc/netdata` rather than a volume.
