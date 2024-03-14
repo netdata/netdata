@@ -32,6 +32,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 			slog.String("component", "service discovery"),
 			slog.String("discoverer", "docker"),
 		),
+		cfgSource: cfg.Source,
 		newDockerClient: func(addr string) (dockerClient, error) {
 			return docker.NewClientWithOpts(docker.WithHost(addr))
 		},
