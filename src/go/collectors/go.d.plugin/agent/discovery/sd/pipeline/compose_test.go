@@ -38,7 +38,8 @@ func TestConfigComposer_compose(t *testing.T) {
         name: {{ .Name }}-5
     - selector: "bar6"
       template: |
-        name: {{ .Name }}-6
+        - name: {{ .Name }}-6
+        - name: {{ .Name }}-7
 `
 	tests := map[string]struct {
 		target      model.Target
@@ -70,6 +71,7 @@ func TestConfigComposer_compose(t *testing.T) {
 				{"name": "mock-4"},
 				{"name": "mock-5"},
 				{"name": "mock-6"},
+				{"name": "mock-7"},
 			},
 		},
 	}
