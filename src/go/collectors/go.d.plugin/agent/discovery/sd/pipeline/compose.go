@@ -4,6 +4,7 @@ package pipeline
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"text/template"
 
@@ -70,14 +71,13 @@ func (c *configComposer) compose(tgt model.Target) []confgroup.Config {
 				continue
 			}
 
-			var cfg confgroup.Config
-
-			if err := yaml.Unmarshal(c.buf.Bytes(), &cfg); err != nil {
-				c.Warningf("failed on yaml unmarshalling: %v", err)
+			cfgs, err := c.parseTemplateData(c.buf.Bytes())
+			if err != nil {
+				c.Warningf("failed to parse template data: %v", err)
 				continue
 			}
 
-			configs = append(configs, cfg)
+			configs = append(configs, cfgs...)
 		}
 	}
 
@@ -85,6 +85,35 @@ func (c *configComposer) compose(tgt model.Target) []confgroup.Config {
 		c.Debugf("created %d config(s) for target '%s'", len(configs), tgt.TUID())
 	}
 	return configs
+}
+
+func (c *configComposer) parseTemplateData(bs []byte) ([]confgroup.Config, error) {
+	var data any
+	if err := yaml.Unmarshal(bs, &data); err != nil {
+		return nil, err
+	}
+
+	type (
+		single = map[any]any
+		multi  = []any
+	)
+
+	switch data.(type) {
+	case single:
+		var cfg confgroup.Config
+		if err := yaml.Unmarshal(bs, &cfg); err != nil {
+			return nil, err
+		}
+		return []confgroup.Config{cfg}, nil
+	case multi:
+		var cfgs []confgroup.Config
+		if err := yaml.Unmarshal(bs, &cfgs); err != nil {
+			return nil, err
+		}
+		return cfgs, nil
+	default:
+		return nil, errors.New("unknown config format")
+	}
 }
 
 func newComposeRules(cfg []ComposeRuleConfig) ([]*composeRule, error) {
