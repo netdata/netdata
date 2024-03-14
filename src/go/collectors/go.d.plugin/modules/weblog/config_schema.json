@@ -26,7 +26,10 @@
       "histogram": {
         "title": "Request processing time histogram",
         "description": "Buckets for the histogram in milliseconds.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Bucket",
           "type": "number",
@@ -50,10 +53,16 @@
       "url_patterns": {
         "title": "URL patterns",
         "description": "Patterns used to match against the full original request URI. For each pattern, the web log will collect responses by status code, method, bandwidth, and processing time.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Patterns",
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "properties": {
             "name": {
               "title": "Dimension",
@@ -76,11 +85,17 @@
       "custom_fields": {
         "title": "Custom fields",
         "description": "Configuration for custom fields. Fild value expected to be string. Patterns used to match against the value of the specified field. For each pattern, the web log will collect responses by status code.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "uniqueItems": true,
         "items": {
           "title": "Field configuration",
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "properties": {
             "name": {
               "title": "Field name",
@@ -90,10 +105,16 @@
             "patterns": {
               "title": "Patterns",
               "description": "",
-              "type": "array",
+              "type": [
+                "array",
+                "null"
+              ],
               "items": {
                 "title": "User patterns",
-                "type": "object",
+                "type": [
+                  "object",
+                  "null"
+                ],
                 "properties": {
                   "name": {
                     "title": "Dimension",
@@ -122,10 +143,16 @@
       "custom_time_fields": {
         "title": "Custom time fields",
         "description": "Configuration for custom time fields. Field value expected to be numeric and represent time. For each field, the web log will calculate the minimum, average, maximum value, and histogram.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Field configuration",
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "properties": {
             "name": {
               "title": "Field mame",
@@ -135,7 +162,10 @@
             "histogram": {
               "title": "Histogram",
               "description": "Buckets for the histogram in milliseconds.",
-              "type": "array",
+              "type": [
+                "array",
+                "null"
+              ],
               "uniqueItems": true,
               "items": {
                 "title": "Bucket",
@@ -165,10 +195,16 @@
       "custom_numeric_fields": {
         "title": "Custom numeric field",
         "description": "Configuration for custom numeric fields. Fild value expected to be numeric. For each field, the web log will calculate the minimum, average, maximum value.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Field configuration",
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "properties": {
             "name": {
               "title": "Name",
@@ -229,7 +265,10 @@
               },
               "csv_config": {
                 "title": "CSV parser configuration",
-                "type": "object",
+                "type": [
+                  "object",
+                  "null"
+                ],
                 "properties": {
                   "format": {
                     "title": "Format",
@@ -261,7 +300,10 @@
               },
               "regexp_config": {
                 "title": "Regular expression parser configuration",
-                "type": "object",
+                "type": [
+                  "object",
+                  "null"
+                ],
                 "properties": {
                   "pattern": {
                     "title": "Pattern with named groups",
@@ -286,12 +328,18 @@
               },
               "json_config": {
                 "title": "JSON parser configuration",
-                "type": "object",
+                "type": [
+                  "object",
+                  "null"
+                ],
                 "properties": {
                   "mapping": {
                     "title": "Field mapping",
                     "description": "Dictionary mapping fields in logs to known fields.",
-                    "type": "object",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
                     "additionalProperties": {
                       "type": "string"
                     }
@@ -307,7 +355,10 @@
               },
               "ltsv_config": {
                 "title": "LTSV parser configuration",
-                "type": "object",
+                "type": [
+                  "object",
+                  "null"
+                ],
                 "properties": {
                   "field_delimiter": {
                     "title": "Field delimiter",
@@ -324,7 +375,10 @@
                   "mapping": {
                     "title": "Field mapping",
                     "description": "Dictionary mapping fields in logs to known fields.",
-                    "type": "object",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
                     "additionalProperties": {
                       "type": "string"
                     }

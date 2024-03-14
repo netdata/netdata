@@ -27,12 +27,18 @@
       "per_user_stats": {
         "title": "User selector",
         "description": "Configuration for monitoring specific users. If left empty, no user stats will be collected.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "includes": {
             "title": "Include",
             "description": "Include users whose usernames match any of the specified inclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Username pattern",
               "type": "string"
@@ -42,7 +48,10 @@
           "excludes": {
             "title": "Exclude",
             "description": "Exclude users whose usernames match any of the specified exclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Username pattern",
               "type": "string"

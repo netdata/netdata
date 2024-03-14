@@ -41,7 +41,10 @@
         "type": "string"
       },
       "headers": {
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "additionalProperties": {
           "type": "string"
         }

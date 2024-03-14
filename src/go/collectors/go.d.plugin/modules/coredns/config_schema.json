@@ -33,12 +33,18 @@
       "per_server_stats": {
         "title": "Server selector",
         "description": "Configures collection of per-server statistics. If left empty, no stats will be collected. Matching is performed against the `server` label value.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "includes": {
             "title": "Include",
             "description": "Include servers whose names match any of the specified inclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Server pattern",
               "type": "string"
@@ -48,7 +54,10 @@
           "excludes": {
             "title": "Exclude",
             "description": "Exclude servers whose names match any of the specified exclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Server pattern",
               "type": "string"
@@ -60,12 +69,18 @@
       "per_zone_stats": {
         "title": "Zone selector",
         "description": "Configures collection of per-zone statistics. If left empty, no stats will be collected. Matching is performed against the `zone` label value.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "includes": {
             "title": "Include",
             "description": "Include zones whose names match any of the specified inclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Zone pattern",
               "type": "string"
@@ -75,7 +90,10 @@
           "excludes": {
             "title": "Exclude",
             "description": "Exclude zones whose names match any of the specified exclusion [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Zone pattern",
               "type": "string"
@@ -116,7 +134,10 @@
       "headers": {
         "title": "Headers",
         "description": "Additional HTTP headers to include in the request.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "additionalProperties": {
           "type": "string"
         }

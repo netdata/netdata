@@ -37,7 +37,10 @@
       "record_types": {
         "title": "Record types",
         "description": "Types of DNS records to query for each server.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "type": "string",
           "enum": [
@@ -63,7 +66,10 @@
       "servers": {
         "title": "Servers",
         "description": "List of DNS servers to query.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "DNS server",
           "description": "IP address or hostname of the DNS server.",
@@ -78,7 +84,10 @@
       "domains": {
         "title": "Domains",
         "description": "List of domains or subdomains to query. A random domain will be selected from this list at each iteration.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Domain",
           "type": "string"

@@ -21,10 +21,16 @@
       "pools": {
         "title": "IP pools",
         "description": "A list of IP pools to monitor. Each pool consists of a descriptive name and corresponding IP ranges.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "IP pool",
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "properties": {
             "name": {
               "title": "Name",

@@ -50,7 +50,10 @@
               },
               "csv_config": {
                 "title": "CSV parser configuration",
-                "type": "object",
+                "type": [
+                  "object",
+                  "null"
+                ],
                 "properties": {
                   "format": {
                     "title": "Format",
@@ -82,7 +85,10 @@
               },
               "regexp_config": {
                 "title": "Regular expression parser configuration",
-                "type": "object",
+                "type": [
+                  "object",
+                  "null"
+                ],
                 "properties": {
                   "pattern": {
                     "title": "Pattern with named groups",
@@ -107,12 +113,18 @@
               },
               "json_config": {
                 "title": "JSON parser configuration",
-                "type": "object",
+                "type": [
+                  "object",
+                  "null"
+                ],
                 "properties": {
                   "mapping": {
                     "title": "Field mapping",
                     "description": "Dictionary mapping fields in logs to known fields.",
-                    "type": "object",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
                     "additionalProperties": {
                       "type": "string"
                     }
@@ -128,7 +140,10 @@
               },
               "ltsv_config": {
                 "title": "LTSV parser configuration",
-                "type": "object",
+                "type": [
+                  "object",
+                  "null"
+                ],
                 "properties": {
                   "field_delimiter": {
                     "title": "Field delimiter",
@@ -145,7 +160,10 @@
                   "mapping": {
                     "title": "Field mapping",
                     "description": "Dictionary mapping fields in logs to known fields.",
-                    "type": "object",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
                     "additionalProperties": {
                       "type": "string"
                     }

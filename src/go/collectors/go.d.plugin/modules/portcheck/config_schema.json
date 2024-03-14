@@ -27,7 +27,10 @@
       "ports": {
         "title": "Ports",
         "description": "A list of ports to monitor for TCP service availability and response time.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Port",
           "type": "integer",
