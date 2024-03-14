@@ -54,6 +54,7 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		interval:   time.Second * 60,
 		expiryTime: time.Minute * 10,
 		cache:      make(map[uint64]*cacheItem),
+		started:    make(chan struct{}),
 	}
 
 	d.Tags().Merge(tags)
@@ -78,6 +79,8 @@ type (
 
 		expiryTime time.Duration
 		cache      map[uint64]*cacheItem // [target.Hash]
+
+		started chan struct{}
 	}
 	cacheItem struct {
 		lastSeenTime time.Time
@@ -93,6 +96,11 @@ func (d *Discoverer) String() string {
 }
 
 func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup) {
+	d.Info("instance is started")
+	defer func() { d.Info("instance is stopped") }()
+
+	close(d.started)
+
 	if err := d.discoverLocalListeners(ctx, in); err != nil {
 		d.Error(err)
 		return
