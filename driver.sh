@@ -1,47 +1,109 @@
 #!/usr/bin/env bash
 
-set -exu -o pipefail
+set -eu -o pipefail
 
-#
-# Build the debs
-#
-rm -rf artifacts/
+OPTIONS="asori"
+LONGOPTIONS="address-sanitizer,sentry,optimized,root,install"
 
-driver -r debs
+PARSED=$(getopt --options=$OPTIONS --longoptions=$LONGOPTIONS --name "$0" -- "$@")
+if [[ $? -ne 0 ]]; then
+    exit 2
+fi
 
-pushd build
-cpack -G DEB
-popd
+eval set -- "$PARSED"
 
-#
-# Extract the artifacts
-#
-pushd artifacts
+# Initialize ASAN_OPTION variable
+ASAN_OPTION=""
+SENTRY_OPTION=""
+BUILD_TYPE="Debug"
+WT_PREFIX=""
+INSTALL=""
 
-declare -A packages
-
-packages=(
-    [netdata]=netdata-netdata_6.7.8_amd64.deb
-    [apps_plugin]=netdata-apps_plugin_6.7.8_amd64.deb
-    [charts_d_plugin]=netdata-charts_d_plugin_6.7.8_amd64.deb
-    [cups_plugin]=netdata-cups_plugin_6.7.8_amd64.deb
-    [debugfs_plugin]=netdata-debugfs_plugin_6.7.8_amd64.deb
-    [ebpf_plugin]=netdata-ebpf_plugin_6.7.8_amd64.deb
-    [freeipmi_plugin]=netdata-freeipmi_plugin_6.7.8_amd64.deb
-    [go_d_plugin]=netdata-go_d_plugin_6.7.8_amd64.deb
-    [logs_management_plugin]=netdata-logs_management_plugin_6.7.8_amd64.deb
-    [network_viewer_plugin]=netdata-network_viewer_plugin_6.7.8_amd64.deb
-    [nfacct_plugin]=netdata-nfacct_plugin_6.7.8_amd64.deb
-    [perf_plugin]=netdata-perf_plugin_6.7.8_amd64.deb
-    [python_d_plugin]=netdata-python_d_plugin_6.7.8_amd64.deb
-    [slabinfo_plugin]=netdata-slabinfo_plugin_6.7.8_amd64.deb
-    [systemd_journal_plugin]=netdata-systemd_journal_plugin_6.7.8_amd64.deb
-    [xenstat_plugin]=netdata-xenstat_plugin_6.7.8_amd64.deb
-)
-
-for key in "${!packages[@]}"; do
-    package=${packages[$key]}
-    dpkg-deb -R "$package" "$key"
+# Extract options and arguments
+while true; do
+    case "$1" in
+        -a|--address-sanitizer)
+            ASAN_OPTION="-DENABLE_ADDRESS_SANITIZER=On"
+            shift
+            ;;
+        -o|--optimized)
+            BUILD_TYPE="RelWithDebInfo"
+            shift
+            ;;
+        -s|--sentry)
+            SENTRY_OPTION="true"
+            shift
+            ;;
+        -r|--root)
+            WT_PREFIX="/"
+            shift
+            ;;
+        -i|--install)
+            INSTALL="yes"
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "Programming error"
+            exit 3
+            ;;
+    esac
 done
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 [-a|--asan] [-i|--install] [-o|--optimized] [-r|--root] [-s|--sentry] <worktree-name>"
+    exit 1
+fi
+
+WT_NAME="$1"
+WT_ROOT="${HOME}/repos/nd/${WT_NAME}"
+WT_PREFIX=${WT_PREFIX:-"${HOME}/opt/${WT_NAME}/netdata"}
+
+pushd "${WT_ROOT}"
+
+set -x
+
+SENTRY_FLAGS=""
+if [[ "$SENTRY_OPTION" == "true" ]]; then
+    declare -A sentry_flags=(
+        [ENABLE_SENTRY]="On"
+        [NETDATA_SENTRY_ENVIRONMENT]="Development-CI"
+        [NETDATA_SENTRY_RELEASE]="7.7.7"
+        [NETDATA_SENTRY_DIST]="dist"
+        [NETDATA_SENTRY_DSN]="https://4c37747b97164e9bbfc9fa426e9200b4@o382276.ingest.sentry.io/4505069981401088"
+        [ENABLE_LIBBACKTRACE]="On"
+    )
+
+    for key in "${!sentry_flags[@]}"; do
+        SENTRY_FLAGS+="-D${key}=${sentry_flags[$key]} "
+    done
+fi
+
+/usr/bin/cmake -S "${WT_ROOT}" -B "${WT_ROOT}/build" \
+    -G Ninja \
+    -DCMAKE_INSTALL_PREFIX="${WT_PREFIX}" \
+    -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+    -DCMAKE_C_FLAGS="-Wall -Wextra" \
+    -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=mold" \
+    -DNETDATA_USER=vk \
+    -DENABLE_PLUGIN_EBPF=Off \
+    -DENABLE_PLUGIN_LOGS_MANAGEMENT=On \
+    -DENABLE_LOGS_MANAGEMENT_TESTS=Off \
+    -DENABLE_BUNDLED_JSONC=Off \
+    -DENABLE_BUNDLED_YAML=Off \
+    -DENABLE_BUNDLED_PROTOBUF=Off \
+    ${ASAN_OPTION} \
+    ${SENTRY_FLAGS}
+
+if [ "$INSTALL" = "yes" ]; then
+    ninja -v -C "${WT_ROOT}/build" install
+else
+    ninja -v -C "${WT_ROOT}/build" all
+fi
+
+set +x
 
 popd
