@@ -5,6 +5,7 @@ package hostinfo
 import (
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
 	"time"
 )
@@ -26,4 +27,13 @@ func getHostname() string {
 	}
 
 	return string(bytes.TrimSpace(bs))
+}
+
+var (
+	envKubeHost = os.Getenv("KUBERNETES_SERVICE_HOST")
+	envKubePort = os.Getenv("KUBERNETES_SERVICE_PORT")
+)
+
+func IsInsideK8sCluster() bool {
+	return envKubeHost != "" && envKubePort != ""
 }

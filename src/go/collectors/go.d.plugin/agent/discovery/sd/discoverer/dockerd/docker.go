@@ -174,6 +174,7 @@ func (d *Discoverer) buildTargetGroup(cntr types.Container) model.TargetGroup {
 	}
 
 	for netDriver, network := range cntr.NetworkSettings.Networks {
+		// container with network mode host will be discovered by local-listeners
 		for _, port := range cntr.Ports {
 			tgt := &target{
 				ID:            cntr.ID,

@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/kubernetes"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/netlisteners"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/hostinfo"
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
@@ -83,6 +84,10 @@ func (p *Pipeline) registerDiscoverers(conf Config) error {
 			}
 			p.discoverers = append(p.discoverers, td)
 		case "docker":
+			if hostinfo.IsInsideK8sCluster() {
+				p.Infof("not registering '%s' discoverer: disabled in k8s environment", cfg.Discoverer)
+				continue
+			}
 			cfg.Docker.Source = conf.Source
 			td, err := dockerd.NewDiscoverer(cfg.Docker)
 			if err != nil {
