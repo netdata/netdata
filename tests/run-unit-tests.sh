@@ -21,11 +21,13 @@
 install_netdata() {
   echo "Installing Netdata"
 
-  NETDATA_CMAKE_OPTIONS="-DCMAKE_BUILD_TYPE=Debug" \
+  NETDATA_CMAKE_OPTIONS="-DCMAKE_BUILD_TYPE=Debug -DENABLE_ADDRESS_SANITIZER=On" \
   fakeroot ./netdata-installer.sh \
     --install-prefix "$HOME" \
     --dont-wait \
     --dont-start-it \
+    --enable-plugin-nfacct \
+    --enable-plugin-freeipmi \
     --disable-lto \
     --enable-logsmanagement-tests
 }
