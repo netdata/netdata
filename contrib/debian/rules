@@ -11,10 +11,10 @@ BASE_CONFIG = system/netdata.conf
 
 SYSTEMD_VERSION = $(shell /bin/sh -c "systemd --version 2>&1 | head -n 1 | cut -f 2 -d ' '")
 
-ifeq ($(shell test $(SYSTEMD_VERSION) -ge 235 && echo "1"), 1)
-SYSTEMD_UNIT = $(BUILDDIR)/system/systemd/netdata.service.v235
-else
+ifeq ($(shell test $(SYSTEMD_VERSION) -gt 235 && echo "1"), 1)
 SYSTEMD_UNIT = $(BUILDDIR)/system/systemd/netdata.service
+else
+SYSTEMD_UNIT = $(BUILDDIR)/system/systemd/netdata.service.v235
 endif
 
 ifeq ($(shell test ${DEB_TARGET_ARCH} != "amd64" && echo "1"), 1)
