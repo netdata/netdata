@@ -1811,10 +1811,10 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
 
 #ifndef SOCK_NONBLOCK
     if (nfd > 0) {
-        int flags = fcntl(fd, F_GETFL);
+        int flags = fcntl(nfd, F_GETFL);
         if (flags != -1) {
             flags |= O_NONBLOCK;
-            (void)fcntl(fd, F_SETFL, flags);
+            (void)fcntl(nfd, F_SETFL, flags);
         }
     }
 #endif
