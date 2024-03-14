@@ -76,19 +76,19 @@
         "title": "TLS CA",
         "description": "The path to the CA certificate file for TLS verification.",
         "type": "string",
-        "pattern": "^/"
+        "pattern": "^$|^/"
       },
       "tls_cert": {
         "title": "TLS certificate",
         "description": "The path to the client certificate file for TLS authentication.",
         "type": "string",
-        "pattern": "^/"
+        "pattern": "^$|^/"
       },
       "tls_key": {
         "title": "TLS key",
         "description": "The path to the client key file for TLS authentication.",
         "type": "string",
-        "pattern": "^/"
+        "pattern": "^$|^/"
       }
     },
     "required": [

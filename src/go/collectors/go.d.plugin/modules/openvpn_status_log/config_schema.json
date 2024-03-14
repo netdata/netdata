@@ -16,7 +16,7 @@
         "description": "Path to the status log file.",
         "type": "string",
         "default": "/var/log/openvpn/status.log",
-        "pattern": "^/"
+        "pattern": "^$|^/"
       },
       "per_user_stats": {
         "title": "User selector",

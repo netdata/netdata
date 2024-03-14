@@ -158,19 +158,19 @@
         "title": "TLS CA",
         "description": "The path to the CA certificate file for TLS verification.",
         "type": "string",
-        "pattern": "^/"
+        "pattern": "^$|^/"
       },
       "tls_cert": {
         "title": "TLS certificate",
         "description": "The path to the client certificate file for TLS authentication.",
         "type": "string",
-        "pattern": "^/"
+        "pattern": "^$|^/"
       },
       "tls_key": {
         "title": "TLS key",
         "description": "The path to the client key file for TLS authentication.",
         "type": "string",
-        "pattern": "^/"
+        "pattern": "^$|^/"
       }
     },
     "required": [
@@ -248,7 +248,7 @@
       ]
     },
     "url": {
-      "ui:placeholder": "https://203.0.113.0"
+      "ui:placeholder": "http://203.0.113.0"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."

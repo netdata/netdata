@@ -23,7 +23,7 @@
             "items": {
               "title": "Filepath",
               "type": "string",
-              "pattern": "^/"
+              "pattern": "^$|^/"
             },
             "uniqueItems": true
           },
@@ -34,7 +34,7 @@
             "items": {
               "title": "Filepath",
               "type": "string",
-              "pattern": "^/"
+              "pattern": "^$|^/"
             },
             "uniqueItems": true
           }
@@ -61,7 +61,7 @@
             "items": {
               "title": "Directory",
               "type": "string",
-              "pattern": "^/"
+              "pattern": "^$|^/"
             },
             "uniqueItems": true
           },
@@ -72,7 +72,7 @@
             "items": {
               "title": "Directory",
               "type": "string",
-              "pattern": "^/"
+              "pattern": "^$|^/"
             },
             "uniqueItems": true
           }
