@@ -17,6 +17,7 @@ func TestDiscoverer_Discover(t *testing.T) {
 				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.addListener("TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				time.Sleep(interval * 2)
 			},
 			wantGroups: []model.TargetGroup{&targetGroup{
 				provider: "sd:net_listeners",
@@ -53,15 +54,62 @@ func TestDiscoverer_Discover(t *testing.T) {
 				},
 			}},
 		},
-		"remove listeners": {
+		"remove listeners; not expired": {
 			listenersCli: func(cli listenersCli, interval, expiry time.Duration) {
 				cli.addListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.addListener("TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
-				time.Sleep(expiry * 2)
+				time.Sleep(interval * 2)
 				cli.removeListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
 				cli.removeListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				time.Sleep(interval * 2)
+			},
+			wantGroups: []model.TargetGroup{&targetGroup{
+				provider: "sd:net_listeners",
+				source:   "discoverer=net_listeners,host=localhost",
+				targets: []model.Target{
+					withHash(&target{
+						Protocol: "UDP6",
+						Address:  "::1",
+						Port:     "8125",
+						Comm:     "netdata",
+						Cmdline:  "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					}),
+					withHash(&target{
+						Protocol: "TCP6",
+						Address:  "::1",
+						Port:     "8125",
+						Comm:     "netdata",
+						Cmdline:  "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					}),
+					withHash(&target{
+						Protocol: "TCP",
+						Address:  "127.0.0.1",
+						Port:     "8125",
+						Comm:     "netdata",
+						Cmdline:  "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					}),
+					withHash(&target{
+						Protocol: "UDP",
+						Address:  "127.0.0.1",
+						Port:     "53768",
+						Comm:     "go.d.plugin",
+						Cmdline:  "/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1",
+					}),
+				},
+			}},
+		},
+		"remove listeners; expired": {
+			listenersCli: func(cli listenersCli, interval, expiry time.Duration) {
+				cli.addListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				time.Sleep(interval * 2)
+				cli.removeListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.removeListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				time.Sleep(expiry * 2)
 			},
 			wantGroups: []model.TargetGroup{&targetGroup{
 				provider: "sd:net_listeners",

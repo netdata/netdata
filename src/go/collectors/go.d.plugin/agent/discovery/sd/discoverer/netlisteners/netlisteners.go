@@ -155,7 +155,7 @@ func (d *Discoverer) processTargets(tgts []model.Target) []model.TargetGroup {
 		tgg.source += fmt.Sprintf(",%s", d.cfgSource)
 	}
 
-	if d.expiryTime.Seconds() == 0 {
+	if d.expiryTime.Milliseconds() == 0 {
 		tgg.targets = tgts
 		return []model.TargetGroup{tgg}
 	}

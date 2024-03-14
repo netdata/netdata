@@ -39,7 +39,7 @@ func (sim *discoverySim) run(t *testing.T) {
 	d.ll = mock
 
 	d.interval = time.Millisecond * 100
-	d.expiryTime = time.Millisecond * 500
+	d.expiryTime = time.Second * 1
 
 	seen := make(map[string]model.TargetGroup)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -80,7 +80,6 @@ func (sim *discoverySim) run(t *testing.T) {
 	}
 
 	sim.listenersCli(mock, d.interval, d.expiryTime)
-	time.Sleep(time.Second)
 
 	cancel()
 
@@ -98,7 +97,7 @@ func (sim *discoverySim) run(t *testing.T) {
 	sortTargetGroups(tggs)
 	sortTargetGroups(sim.wantGroups)
 
-	wantLen, gotLen := len(sim.wantGroups), len(tggs)
+	wantLen, gotLen := calcTargets(sim.wantGroups), calcTargets(tggs)
 	assert.Equalf(t, wantLen, gotLen, "different len (want %d got %d)", wantLen, gotLen)
 	assert.Equal(t, sim.wantGroups, tggs)
 }
@@ -144,6 +143,14 @@ func (m *mockLocalListenersExec) discover(context.Context) ([]byte, error) {
 	}
 
 	return []byte(buf.String()), nil
+}
+
+func calcTargets(tggs []model.TargetGroup) int {
+	var n int
+	for _, tgg := range tggs {
+		n += len(tgg.Targets())
+	}
+	return n
 }
 
 func sortTargetGroups(tggs []model.TargetGroup) {
