@@ -3,28 +3,23 @@
 package netlisteners
 
 import (
-	"context"
-	"errors"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/model"
 )
 
-var (
-	localListenersOutputSample = []byte(`
-UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D
-TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D
-TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D
-UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1
-`)
-)
-
 func TestDiscoverer_Discover(t *testing.T) {
 	tests := map[string]discoverySim{
-		"valid response": {
-			mock:                 &mockLocalListenersExec{},
-			wantDoneBeforeCancel: false,
-			wantTargetGroups: []model.TargetGroup{&targetGroup{
+		"add listeners": {
+			listenersCli: func(cli listenersCli, interval, expiry time.Duration) {
+				cli.addListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				time.Sleep(interval * 2)
+			},
+			wantGroups: []model.TargetGroup{&targetGroup{
 				provider: "sd:net_listeners",
 				source:   "discoverer=net_listeners,host=localhost",
 				targets: []model.Target{
@@ -59,23 +54,83 @@ func TestDiscoverer_Discover(t *testing.T) {
 				},
 			}},
 		},
-		"empty response": {
-			mock:                 &mockLocalListenersExec{emptyResponse: true},
-			wantDoneBeforeCancel: false,
-			wantTargetGroups: []model.TargetGroup{&targetGroup{
+		"remove listeners; not expired": {
+			listenersCli: func(cli listenersCli, interval, expiry time.Duration) {
+				cli.addListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				time.Sleep(interval * 2)
+				cli.removeListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.removeListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				time.Sleep(interval * 2)
+			},
+			wantGroups: []model.TargetGroup{&targetGroup{
 				provider: "sd:net_listeners",
 				source:   "discoverer=net_listeners,host=localhost",
+				targets: []model.Target{
+					withHash(&target{
+						Protocol: "UDP6",
+						Address:  "::1",
+						Port:     "8125",
+						Comm:     "netdata",
+						Cmdline:  "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					}),
+					withHash(&target{
+						Protocol: "TCP6",
+						Address:  "::1",
+						Port:     "8125",
+						Comm:     "netdata",
+						Cmdline:  "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					}),
+					withHash(&target{
+						Protocol: "TCP",
+						Address:  "127.0.0.1",
+						Port:     "8125",
+						Comm:     "netdata",
+						Cmdline:  "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					}),
+					withHash(&target{
+						Protocol: "UDP",
+						Address:  "127.0.0.1",
+						Port:     "53768",
+						Comm:     "go.d.plugin",
+						Cmdline:  "/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1",
+					}),
+				},
 			}},
 		},
-		"error on exec": {
-			mock:                 &mockLocalListenersExec{err: true},
-			wantDoneBeforeCancel: true,
-			wantTargetGroups:     nil,
-		},
-		"invalid data": {
-			mock:                 &mockLocalListenersExec{invalidResponse: true},
-			wantDoneBeforeCancel: true,
-			wantTargetGroups:     nil,
+		"remove listeners; expired": {
+			listenersCli: func(cli listenersCli, interval, expiry time.Duration) {
+				cli.addListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				time.Sleep(interval * 2)
+				cli.removeListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
+				cli.removeListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				time.Sleep(expiry * 2)
+			},
+			wantGroups: []model.TargetGroup{&targetGroup{
+				provider: "sd:net_listeners",
+				source:   "discoverer=net_listeners,host=localhost",
+				targets: []model.Target{
+					withHash(&target{
+						Protocol: "TCP6",
+						Address:  "::1",
+						Port:     "8125",
+						Comm:     "netdata",
+						Cmdline:  "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					}),
+					withHash(&target{
+						Protocol: "TCP",
+						Address:  "127.0.0.1",
+						Port:     "8125",
+						Comm:     "netdata",
+						Cmdline:  "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					}),
+				},
+			}},
 		},
 	}
 
@@ -88,26 +143,7 @@ func TestDiscoverer_Discover(t *testing.T) {
 
 func withHash(l *target) *target {
 	l.hash, _ = calcHash(l)
-	tags, _ := model.ParseTags("hostnetsocket")
+	tags, _ := model.ParseTags("netlisteners")
 	l.Tags().Merge(tags)
 	return l
-}
-
-type mockLocalListenersExec struct {
-	err             bool
-	emptyResponse   bool
-	invalidResponse bool
-}
-
-func (m *mockLocalListenersExec) discover(context.Context) ([]byte, error) {
-	if m.err {
-		return nil, errors.New("mock discover() error")
-	}
-	if m.emptyResponse {
-		return nil, nil
-	}
-	if m.invalidResponse {
-		return []byte("this is very incorrect data"), nil
-	}
-	return localListenersOutputSample, nil
 }

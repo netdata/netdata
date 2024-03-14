@@ -4,6 +4,10 @@ package netlisteners
 
 import (
 	"context"
+	"errors"
+	"sort"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,63 +17,150 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type listenersCli interface {
+	addListener(s string)
+	removeListener(s string)
+}
+
 type discoverySim struct {
-	mock                 *mockLocalListenersExec
-	wantDoneBeforeCancel bool
-	wantTargetGroups     []model.TargetGroup
+	listenersCli func(cli listenersCli, interval, expiry time.Duration)
+	wantGroups   []model.TargetGroup
 }
 
 func (sim *discoverySim) run(t *testing.T) {
-	d, err := NewDiscoverer(Config{Tags: "hostnetsocket"})
+	d, err := NewDiscoverer(Config{
+		Source: "",
+		Tags:   "netlisteners",
+	})
 	require.NoError(t, err)
 
-	d.ll = sim.mock
+	mock := newMockLocalListenersExec()
 
+	d.ll = mock
+
+	d.interval = time.Millisecond * 100
+	d.expiryTime = time.Second * 1
+
+	seen := make(map[string]model.TargetGroup)
 	ctx, cancel := context.WithCancel(context.Background())
-	tggs, done := sim.collectTargetGroups(t, ctx, d)
-
-	if sim.wantDoneBeforeCancel {
-		select {
-		case <-done:
-		default:
-			assert.Fail(t, "discovery hasn't finished before cancel")
-		}
-	}
-	assert.Equal(t, sim.wantTargetGroups, tggs)
-
-	cancel()
-	select {
-	case <-done:
-	case <-time.After(time.Second * 3):
-		assert.Fail(t, "discovery hasn't finished after cancel")
-	}
-}
-
-func (sim *discoverySim) collectTargetGroups(t *testing.T, ctx context.Context, d *Discoverer) ([]model.TargetGroup, chan struct{}) {
-
 	in := make(chan []model.TargetGroup)
-	done := make(chan struct{})
+	var wg sync.WaitGroup
 
-	go func() { defer close(done); d.Discover(ctx, in) }()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		d.Discover(ctx, in)
+	}()
 
-	timeout := time.Second * 5
-	var tggs []model.TargetGroup
-
-	func() {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		for {
 			select {
-			case groups := <-in:
-				if tggs = append(tggs, groups...); len(tggs) == len(sim.wantTargetGroups) {
-					return
+			case <-ctx.Done():
+				return
+			case tggs := <-in:
+				for _, tgg := range tggs {
+					seen[tgg.Source()] = tgg
 				}
-			case <-done:
-				return
-			case <-time.After(timeout):
-				t.Logf("discovery timed out after %s", timeout)
-				return
 			}
 		}
 	}()
 
-	return tggs, done
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+
+	select {
+	case <-d.started:
+	case <-time.After(time.Second * 3):
+		require.Fail(t, "discovery failed to start")
+	}
+
+	sim.listenersCli(mock, d.interval, d.expiryTime)
+
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second * 3):
+		require.Fail(t, "discovery hasn't finished after cancel")
+	}
+
+	var tggs []model.TargetGroup
+	for _, tgg := range seen {
+		tggs = append(tggs, tgg)
+	}
+
+	sortTargetGroups(tggs)
+	sortTargetGroups(sim.wantGroups)
+
+	wantLen, gotLen := calcTargets(sim.wantGroups), calcTargets(tggs)
+	assert.Equalf(t, wantLen, gotLen, "different len (want %d got %d)", wantLen, gotLen)
+	assert.Equal(t, sim.wantGroups, tggs)
+}
+
+func newMockLocalListenersExec() *mockLocalListenersExec {
+	return &mockLocalListenersExec{
+		listeners: make(map[string]bool),
+	}
+}
+
+type mockLocalListenersExec struct {
+	errResponse bool
+	mux         sync.Mutex
+	listeners   map[string]bool
+}
+
+func (m *mockLocalListenersExec) addListener(s string) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	m.listeners[s] = true
+}
+
+func (m *mockLocalListenersExec) removeListener(s string) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	delete(m.listeners, s)
+}
+
+func (m *mockLocalListenersExec) discover(context.Context) ([]byte, error) {
+	if m.errResponse {
+		return nil, errors.New("mock discover() error")
+	}
+
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	var buf strings.Builder
+	for s := range m.listeners {
+		buf.WriteString(s)
+		buf.WriteByte('\n')
+	}
+
+	return []byte(buf.String()), nil
+}
+
+func calcTargets(tggs []model.TargetGroup) int {
+	var n int
+	for _, tgg := range tggs {
+		n += len(tgg.Targets())
+	}
+	return n
+}
+
+func sortTargetGroups(tggs []model.TargetGroup) {
+	if len(tggs) == 0 {
+		return
+	}
+	sort.Slice(tggs, func(i, j int) bool { return tggs[i].Source() < tggs[j].Source() })
+
+	for idx := range tggs {
+		tgts := tggs[idx].Targets()
+		sort.Slice(tgts, func(i, j int) bool { return tgts[i].Hash() < tgts[j].Hash() })
+	}
 }
