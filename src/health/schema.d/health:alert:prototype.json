@@ -195,22 +195,6 @@
             "type": "string",
             "title": "Critical Expression",
             "description": "The alert value is available as '$this'. If this expression evaluates to a non-zero value, the alert is considered to be in critical level."
-          },
-          "green": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "title": "Healthy threshold",
-            "description": "A threshold that indicates a healthy status. This threshold can be used as '$green' in the alert conditions."
-          },
-          "red": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "title": "Critical threshold",
-            "description": "A threshold that indicates a critical status. This threshold can be used as '$red' in the alert conditions."
           }
         }
       },
@@ -500,16 +484,10 @@
           "conditions": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "warning_condition": {
-              "ui:classNames": "dyncfg-grid-col-span-1-3"
+              "ui:classNames": "dyncfg-grid-col-span-1-6"
             },
             "critical_condition": {
-              "ui:classNames": "dyncfg-grid-col-span-4-3"
-            },
-            "green": {
-              "ui:classNames": "dyncfg-grid-col-span-1-3"
-            },
-            "red": {
-              "ui:classNames": "dyncfg-grid-col-span-4-3"
+              "ui:classNames": "dyncfg-grid-col-span-1-6"
             }
           },
           "action": {

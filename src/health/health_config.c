@@ -340,6 +340,24 @@ static inline void strip_quotes(char *s) {
     }
 }
 
+static void replace_green_red(RRD_ALERT_PROTOTYPE *ap, NETDATA_DOUBLE green, NETDATA_DOUBLE red) {
+    if(!isnan(green)) {
+        STRING *green_str = string_strdupz("green");
+        expression_hardcode_variable(ap->config.calculation, green_str, green);
+        expression_hardcode_variable(ap->config.warning, green_str, green);
+        expression_hardcode_variable(ap->config.critical, green_str, green);
+        string_freez(green_str);
+    }
+
+    if(!isnan(red)) {
+        STRING *red_str = string_strdupz("red");
+        expression_hardcode_variable(ap->config.calculation, red_str, red);
+        expression_hardcode_variable(ap->config.warning, red_str, red);
+        expression_hardcode_variable(ap->config.critical, red_str, red);
+        string_freez(red_str);
+    }
+}
+
 #define PARSE_HEALTH_CONFIG_LOG_DUPLICATE_STRING_MSG(ax, member) do {                               \
     if(strcmp(string2str(ax->member), value) != 0)                                                  \
         netdata_log_error(                                                                          \
@@ -390,8 +408,6 @@ static inline void strip_quotes(char *s) {
         ax->member = string_strdupz(_buf);                                                          \
     }                                                                                               \
 } while(0)
-
-
 
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
     netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
@@ -466,6 +482,8 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
     RRD_ALERT_PROTOTYPE *ap = NULL;
     struct rrd_alert_config *ac = NULL;
     struct rrd_alert_match *am = NULL;
+    NETDATA_DOUBLE green = NAN;
+    NETDATA_DOUBLE red = NAN;
 
     size_t line = 0, append = 0;
     char *s;
@@ -522,6 +540,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
 
         if((hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) || (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY))) {
             if(ap) {
+                replace_green_red(ap, green, red);
                 health_prototype_add(ap);
                 freez(ap);
             }
@@ -544,8 +563,8 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             ap->match.is_template = (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY));
             ap->config.source = health_source_file(line, filename);
             ap->config.source_type = stock_config ? DYNCFG_SOURCE_TYPE_STOCK : DYNCFG_SOURCE_TYPE_USER;
-            ap->config.green = NAN;
-            ap->config.red = NAN;
+            green = NAN;
+            red = NAN;
             ap->config.delay_multiplier = 1;
             ap->config.warn_repeat_every = health_globals.config.default_warn_repeat_every;
             ap->config.crit_repeat_every = health_globals.config.default_crit_repeat_every;
@@ -608,7 +627,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         }
         else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
             char *e;
-            ac->green = str2ndd(value, &e);
+            green = str2ndd(value, &e);
             if(e && *e) {
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
@@ -618,7 +637,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         }
         else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
             char *e;
-            ac->red = str2ndd(value, &e);
+            red = str2ndd(value, &e);
             if(e && *e) {
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
@@ -705,6 +724,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
     }
 
     if(ap) {
+        replace_green_red(ap, green, red);
         health_prototype_add(ap);
         freez(ap);
     }

@@ -50,10 +50,6 @@ struct rrd_alert_config {
 
     ALERT_ACTION_OPTIONS alert_action_options;
 
-    // the red and green threshold of this alarm (to be set to the chart)
-    NETDATA_DOUBLE green;
-    NETDATA_DOUBLE red;
-
     // ------------------------------------------------------------------------
     // database lookup settings
 

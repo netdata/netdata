@@ -985,11 +985,13 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_double(res, ++param, ap->config.green);
+    NETDATA_DOUBLE green = NAN;
+    rc = sqlite3_bind_double(res, ++param, green);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_double(res, ++param, ap->config.red);
+    NETDATA_DOUBLE red = NAN;
+    rc = sqlite3_bind_double(res, ++param, red);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 

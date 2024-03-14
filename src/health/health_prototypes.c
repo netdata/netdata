@@ -424,9 +424,6 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
 
     dst->update_every = src->update_every;
 
-    dst->green = src->green;
-    dst->red = src->red;
-
     dst->dimensions = string_dup(src->dimensions);
 
     dst->group = src->group;

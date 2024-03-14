@@ -153,11 +153,11 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     }
 
     buffer_strcat(wb, "\t\t\t\"green\":");
-    buffer_print_netdata_double(wb, rc->config.green);
+    buffer_print_netdata_double(wb, NAN);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\t\"red\":");
-    buffer_print_netdata_double(wb, rc->config.red);
+    buffer_print_netdata_double(wb, NAN);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\t\"value\":");

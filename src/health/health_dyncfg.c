@@ -40,8 +40,6 @@ static bool parse_config_value(json_object *jobj, const char *path, struct rrd_a
 }
 
 static bool parse_config_conditions(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "green", config->green, error);
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "red", config->red, error);
     JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "warning_condition", config->warning, error);
     JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "critical_condition", config->critical, error);
     return true;
@@ -75,8 +73,6 @@ static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYP
     // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "source_type", dyncfg_source_type2id, ap->config.source_type, error);
     // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "source", ap->config.source, error, true);
 
-    JSONC_PARSE_SUBOBJECT(jobj, path, "match", &ap->match, parse_match, error);
-
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "summary", ap->config.summary, error, true);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "info", ap->config.info, error, true);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "type", ap->config.type, error, true);
@@ -86,6 +82,7 @@ static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYP
     JSONC_PARSE_SUBOBJECT(jobj, path, "value", &ap->config, parse_config_value, error);
     JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", &ap->config, parse_config_conditions, error);
     JSONC_PARSE_SUBOBJECT(jobj, path, "action", &ap->config, parse_config_action, error);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "match", &ap->match, parse_match, error);
 
     return true;
 }
@@ -252,8 +249,6 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
 
             buffer_json_member_add_object(wb, "conditions");
             {
-                buffer_json_member_add_double(wb, "green", ap->config.green);
-                buffer_json_member_add_double(wb, "red", ap->config.red);
                 buffer_json_member_add_string(wb, "warning_condition", expression_source(ap->config.warning));
                 buffer_json_member_add_string(wb, "critical_condition", expression_source(ap->config.critical));
             }

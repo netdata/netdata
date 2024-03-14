@@ -339,12 +339,6 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
 
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->config.name, &rc->next_event_id, &rc->config.hash_id);
 
-    if(!isnan(rc->config.green) && isnan(st->green))
-        st->green = rc->config.green;
-
-    if(!isnan(rc->config.red) && isnan(st->red))
-        st->red = rc->config.red;
-
     expression_set_variable_lookup_callback(rc->config.calculation, alert_variable_lookup, rc);
     expression_set_variable_lookup_callback(rc->config.warning, alert_variable_lookup, rc);
     expression_set_variable_lookup_callback(rc->config.critical, alert_variable_lookup, rc);

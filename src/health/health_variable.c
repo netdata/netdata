@@ -166,8 +166,6 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
                   *warning_string = NULL,
                   *critical_string = NULL,
                   *last_collected_t_string = NULL,
-                  *green_string = NULL,
-                  *red_string = NULL,
                   *update_every_string = NULL;
 
 
@@ -202,8 +200,6 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
         warning_string = string_strdupz("WARNING");
         critical_string = string_strdupz("CRITICAL");
         last_collected_t_string = string_strdupz("last_collected_t");
-        green_string = string_strdupz("green");
-        red_string = string_strdupz("red");
         update_every_string = string_strdupz("update_every");
     }
 
@@ -306,22 +302,6 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
     if(unlikely(variable == update_every_string)) {
         *result = (NETDATA_DOUBLE)st->update_every;
         source = "current instance update_every";
-        source_st = st;
-        found = true;
-        goto log;
-    }
-
-    if(unlikely(variable == green_string)) {
-        *result = (NETDATA_DOUBLE)rc->config.green;
-        source = "current alert green threshold";
-        source_st = st;
-        found = true;
-        goto log;
-    }
-
-    if(unlikely(variable == red_string)) {
-        *result = (NETDATA_DOUBLE)rc->config.red;
-        source = "current alert red threshold";
         source_st = st;
         found = true;
         goto log;
