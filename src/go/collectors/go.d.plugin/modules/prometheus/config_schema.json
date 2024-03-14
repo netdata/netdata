@@ -248,7 +248,7 @@
       ]
     },
     "url": {
-      "ui:placeholder": "https://203.0.113.0"
+      "ui:placeholder": "http://203.0.113.0"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
