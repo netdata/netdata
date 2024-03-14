@@ -25,6 +25,8 @@ func Test_defaultConfigs(t *testing.T) {
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
 
+	require.NotEmpty(t, entries)
+
 	for _, e := range entries {
 		if strings.Contains(e.Name(), "prometheus") {
 			continue

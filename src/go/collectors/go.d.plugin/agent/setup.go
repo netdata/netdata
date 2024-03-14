@@ -91,7 +91,7 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 	var readPaths, dummyPaths []string
 
 	if len(a.ModulesConfDir) == 0 {
-		if isInsideK8sCluster() {
+		if hostinfo.IsInsideK8sCluster() {
 			return discovery.Config{Registry: reg}
 		}
 		a.Info("modules conf dir not provided, will use default config for all enabled modules")
@@ -126,7 +126,7 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 		a.Debugf("looking for '%s' in %v", cfgName, a.ModulesConfDir)
 
 		path, err := a.ModulesConfDir.Find(cfgName)
-		if isInsideK8sCluster() {
+		if hostinfo.IsInsideK8sCluster() {
 			if err != nil {
 				a.Infof("not found '%s', won't use default (reading stock configs is disabled in k8s)", cfgName)
 				continue
@@ -196,12 +196,8 @@ func loadYAML(conf any, path string) error {
 }
 
 var (
-	envKubeHost         = os.Getenv("KUBERNETES_SERVICE_HOST")
-	envKubePort         = os.Getenv("KUBERNETES_SERVICE_PORT")
 	envNDStockConfigDir = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
 )
-
-func isInsideK8sCluster() bool { return envKubeHost != "" && envKubePort != "" }
 
 func isStockConfig(path string) bool {
 	if envNDStockConfigDir == "" {

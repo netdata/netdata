@@ -11,8 +11,6 @@ var prometheusPortAllocations = map[int]string{
 	6060:  "crowdsec",
 	7300:  "midonet_agent",
 	8001:  "netbox",
-	8080:  "traefik",
-	8082:  "trickster",
 	8088:  "fawkes",
 	8089:  "prom2teams",
 	8292:  "phabricator_webhook_for_alertmanager",

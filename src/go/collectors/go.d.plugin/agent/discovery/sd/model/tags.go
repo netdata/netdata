@@ -35,6 +35,12 @@ func (t Tags) Merge(tags Tags) {
 	}
 }
 
+func (t Tags) Clone() Tags {
+	ts := NewTags()
+	ts.Merge(t)
+	return ts
+}
+
 func (t Tags) String() string {
 	ts := make([]string, 0, len(t))
 	for key := range t {

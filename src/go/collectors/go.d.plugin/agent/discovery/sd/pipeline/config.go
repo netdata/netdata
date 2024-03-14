@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/confgroup"
+	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/dockerd"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/kubernetes"
 	"github.com/netdata/netdata/go/go.d.plugin/agent/discovery/sd/discoverer/netlisteners"
 )
@@ -24,6 +25,7 @@ type Config struct {
 type DiscoveryConfig struct {
 	Discoverer   string              `yaml:"discoverer"`
 	NetListeners netlisteners.Config `yaml:"net_listeners"`
+	Docker       dockerd.Config      `yaml:"docker"`
 	K8s          []kubernetes.Config `yaml:"k8s"`
 }
 
@@ -68,7 +70,7 @@ func validateDiscoveryConfig(config []DiscoveryConfig) error {
 	}
 	for _, cfg := range config {
 		switch cfg.Discoverer {
-		case "net_listeners", "k8s":
+		case "net_listeners", "docker", "k8s":
 		default:
 			return fmt.Errorf("unknown discoverer: '%s'", cfg.Discoverer)
 		}
