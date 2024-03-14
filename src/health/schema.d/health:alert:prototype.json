@@ -92,11 +92,55 @@
                 "title": "Database Query to Get Value",
                 "description": "The database query to be executed to calculate the value of the alert. When set, the query is executed before any other calculations. The result of the query will be available as $this in further calculations.",
                 "properties": {
+                  "grouping": {
+                    "type": "string",
+                    "oneOf": [
+                      { "const": "average", "title": "AVG()" },
+                      { "const": "median", "title": "MEDIAN()" },
+                      { "const": "min", "title": "MIN()" },
+                      { "const": "max", "title": "MAX()" },
+                      { "const": "sum", "title": "SUM()" },
+                      { "const": "incremental_sum", "title": "INCREMENTAL SUM()" },
+                      { "const": "stddev", "title": "STDDEV()" },
+                      { "const": "cv", "title": "CV()" },
+                      { "const": "trimmed-mean1", "title": "TRIMMED MEAN(1%)" },
+                      { "const": "trimmed-mean2", "title": "TRIMMED MEAN(2%)" },
+                      { "const": "trimmed-mean3", "title": "TRIMMED MEAN(3%)" },
+                      { "const": "trimmed-mean", "title": "TRIMMED MEAN(5%)" },
+                      { "const": "trimmed-mean10", "title": "TRIMMED MEAN(10%)" },
+                      { "const": "trimmed-mean15", "title": "TRIMMED MEAN(15%)" },
+                      { "const": "trimmed-mean20", "title": "TRIMMED MEAN(20%)" },
+                      { "const": "trimmed-mean25", "title": "TRIMMED MEAN(25%)" },
+                      { "const": "trimmed-median1", "title": "TRIMMED MEDIAN(1%)" },
+                      { "const": "trimmed-median2", "title": "TRIMMED MEDIAN(2%)" },
+                      { "const": "trimmed-median3", "title": "TRIMMED MEDIAN(3%)" },
+                      { "const": "trimmed-median", "title": "TRIMMED MEDIAN(5%)" },
+                      { "const": "trimmed-median10", "title": "TRIMMED MEDIAN(10%)" },
+                      { "const": "trimmed-median15", "title": "TRIMMED MEDIAN(15%)" },
+                      { "const": "trimmed-median20", "title": "TRIMMED MEDIAN(20%)" },
+                      { "const": "trimmed-median25", "title": "TRIMMED MEDIAN(25%)" },
+                      { "const": "percentile99", "title": "PERCENTILE(99%)" },
+                      { "const": "percentile98", "title": "PERCENTILE(98%)" },
+                      { "const": "percentile97", "title": "PERCENTILE(97%)" },
+                      { "const": "percentile", "title": "PERCENTILE(95%)" },
+                      { "const": "percentile90", "title": "PERCENTILE(90%)" },
+                      { "const": "percentile80", "title": "PERCENTILE(80%)" },
+                      { "const": "percentile75", "title": "PERCENTILE(75%)" },
+                      { "const": "percentile50", "title": "PERCENTILE(50%)" },
+                      { "const": "percentile25", "title": "PERCENTILE(25%)" },
+                      { "const": "ses", "title": "SES()" },
+                      { "const": "des", "title": "DES()" },
+                      { "const": "countif", "title": "COUNT(=0)" }
+                    ],
+                    "default": "average",
+                    "title": "Time Aggregation",
+                    "description": "on sample values"
+                  },
                   "after": {
                     "type": "integer",
                     "default": 0,
                     "title": "From",
-                    "description": "Starting timestamp"
+                    "description": "Starting (relative to 'To')"
                   },
                   "before": {
                     "type": "integer",
@@ -109,50 +153,6 @@
                     "title": "Dimensions",
                     "description": "Simple pattern",
                     "default": "*"
-                  },
-                  "grouping": {
-                    "type": "string",
-                    "oneOf": [
-                      { "const": "average", "title": "The mean (average) value" },
-                      { "const": "median", "title": "The median value" },
-                      { "const": "min", "title": "The minimum value" },
-                      { "const": "max", "title": "The maximum value" },
-                      { "const": "sum", "title": "The sum of all the values" },
-                      { "const": "incremental_sum", "title": "The delta of the latest and oldest values" },
-                      { "const": "stddev", "title": "The standard deviation of the values" },
-                      { "const": "cv", "title": "The standard deviation expresses as a % of the mean value" },
-                      { "const": "trimmed-mean1", "title": "The mean after trimming 1% of the extreme values" },
-                      { "const": "trimmed-mean2", "title": "The mean after trimming 2% of the extreme values" },
-                      { "const": "trimmed-mean3", "title": "The mean after trimming 3% of the extreme values" },
-                      { "const": "trimmed-mean", "title": "The mean after trimming 5% of the extreme values" },
-                      { "const": "trimmed-mean10", "title": "The mean after trimming 10% of the extreme values" },
-                      { "const": "trimmed-mean15", "title": "The mean after trimming 15% of the extreme values" },
-                      { "const": "trimmed-mean20", "title": "The mean after trimming 20% of the extreme values" },
-                      { "const": "trimmed-mean25", "title": "The mean after trimming 25% of the extreme values" },
-                      { "const": "trimmed-median1", "title": "The median after trimming 1% of the extreme values" },
-                      { "const": "trimmed-median2", "title": "The median after trimming 2% of the extreme values" },
-                      { "const": "trimmed-median3", "title": "The median after trimming 3% of the extreme values" },
-                      { "const": "trimmed-median", "title": "The median after trimming 5% of the extreme values" },
-                      { "const": "trimmed-median10", "title": "The median after trimming 10% of the extreme values" },
-                      { "const": "trimmed-median15", "title": "The median after trimming 15% of the extreme values" },
-                      { "const": "trimmed-median20", "title": "The median after trimming 20% of the extreme values" },
-                      { "const": "trimmed-median25", "title": "The median after trimming 25% of the extreme values" },
-                      { "const": "percentile99", "title": "The 99th percentile of the values" },
-                      { "const": "percentile98", "title": "The 98th percentile of the values" },
-                      { "const": "percentile97", "title": "The 97th percentile of the values" },
-                      { "const": "percentile", "title": "The 95th percentile of the values" },
-                      { "const": "percentile90", "title": "The 90th percentile of the values" },
-                      { "const": "percentile80", "title": "The 80th percentile of the values" },
-                      { "const": "percentile75", "title": "The 75th percentile of the values" },
-                      { "const": "percentile50", "title": "The 50th percentile of the values" },
-                      { "const": "percentile25", "title": "The 25th percentile of the values" },
-                      { "const": "ses", "title": "Single Exponential Smoothing" },
-                      { "const": "des", "title": "Double Exponential Smoothing" },
-                      { "const": "countif", "title": "Count If zero" }
-                    ],
-                    "default": "average",
-                    "title": "Time Aggregation Function",
-                    "description": "When querying time-series data we need to come up with a single value. This function is used to aggregate all the values of the time-series data to a single value."
                   },
                   "options": {
                     "type": "array",
@@ -438,20 +438,21 @@
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "ui:collapsible": true,
               "ui:initiallyExpanded": true,
+              "grouping": {
+                "ui:help": "When querying time-series data we need to come up with a single value. This function is used to aggregate all the values of the time-series data to a single value.",
+                "ui:classNames": "dyncfg-grid-col-span-1-2"
+              },
               "after": {
                 "ui:help": "The oldest timestamp of the time-series data to be included in the query. Negative values define a duration in seconds in the past of 'To' (so, -60 means a minute ago from 'To').",
-                "ui:classNames": "dyncfg-grid-col-span-1-1"
+                "ui:classNames": "dyncfg-grid-col-span-3-1"
               },
               "before": {
                 "ui:help": "The newest timestamp of the time-series data to be included in the query. Negative value define a duration in seconds in the past (so, -60 means a minute ago). Zero means now.",
-                "ui:classNames": "dyncfg-grid-col-span-2-1"
+                "ui:classNames": "dyncfg-grid-col-span-4-1"
               },
               "dimensions": {
                 "ui:help": "A simple pattern to match the dimensions that should be included in the query",
-                "ui:classNames": "dyncfg-grid-col-span-3-4"
-              },
-              "grouping": {
-                "ui:classNames": "dyncfg-grid-col-span-1-6"
+                "ui:classNames": "dyncfg-grid-col-span-5-2"
               },
               "options": {
                 "ui:classNames": "dyncfg-grid-col-span-1-6"
