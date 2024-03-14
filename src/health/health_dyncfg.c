@@ -70,20 +70,22 @@ static bool parse_config_action(json_object *jobj, const char *path, struct rrd_
     return true;
 }
 
-static bool parse_config(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
+static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *ap, BUFFER *error) {
     // we shouldn't parse these from the payload - they are given to us via the function call
-    // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "source_type", dyncfg_source_type2id, config->source_type);
-    // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "source", config->source);
+    // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "source_type", dyncfg_source_type2id, ap->config.source_type, error);
+    // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "source", ap->config.source, error, true);
 
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "summary", config->summary, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "info", config->info, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "type", config->type, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "component", config->component, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "classification", config->classification, error, true);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "match", &ap->match, parse_match, error);
 
-    JSONC_PARSE_SUBOBJECT(jobj, path, "value", config, parse_config_value, error);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", config, parse_config_conditions, error);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "action", config, parse_config_action, error);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "summary", ap->config.summary, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "info", ap->config.info, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "type", ap->config.type, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "component", ap->config.component, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "classification", ap->config.classification, error, true);
+
+    JSONC_PARSE_SUBOBJECT(jobj, path, "value", &ap->config, parse_config_value, error);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", &ap->config, parse_config_conditions, error);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "action", &ap->config, parse_config_action, error);
 
     return true;
 }
@@ -126,8 +128,7 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
                 return false;
             }
 
-            JSONC_PARSE_SUBOBJECT(rule, path, "match", &ap->match, parse_match, error);
-            JSONC_PARSE_SUBOBJECT(rule, path, "config", &ap->config, parse_config, error);
+            JSONC_PARSE_SUBOBJECT(rule, path, "config", ap, parse_config, error);
 
             ap = NULL; // so that we will create another one, if available
         }
@@ -204,18 +205,6 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
         buffer_json_member_add_boolean(wb, "enabled", ap->match.enabled);
         buffer_json_member_add_string(wb, "type", ap->match.is_template ? "template" : "instance");
 
-        buffer_json_member_add_object(wb, "match");
-        {
-            if(ap->match.is_template)
-                buffer_json_member_add_string(wb, "on", string2str(ap->match.on.context));
-            else
-                buffer_json_member_add_string(wb, "on", string2str(ap->match.on.chart));
-
-            buffer_json_member_add_string_or_empty(wb, "host_labels", ap->match.host_labels ? string2str(ap->match.host_labels) : "*");
-            buffer_json_member_add_string_or_empty(wb, "instance_labels", ap->match.chart_labels ? string2str(ap->match.chart_labels) : "*");
-        }
-        buffer_json_object_close(wb); // match
-
         buffer_json_member_add_object(wb, "config");
         {
             if(!for_hashing) {
@@ -223,6 +212,18 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
                 buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(ap->config.source_type));
                 buffer_json_member_add_string(wb, "source", string2str(ap->config.source));
             }
+
+            buffer_json_member_add_object(wb, "match");
+            {
+                if(ap->match.is_template)
+                    buffer_json_member_add_string(wb, "on", string2str(ap->match.on.context));
+                else
+                    buffer_json_member_add_string(wb, "on", string2str(ap->match.on.chart));
+
+                buffer_json_member_add_string_or_empty(wb, "host_labels", ap->match.host_labels ? string2str(ap->match.host_labels) : "*");
+                buffer_json_member_add_string_or_empty(wb, "instance_labels", ap->match.chart_labels ? string2str(ap->match.chart_labels) : "*");
+            }
+            buffer_json_object_close(wb); // match
 
             buffer_json_member_add_string(wb, "summary", string2str(ap->config.summary));
             buffer_json_member_add_string(wb, "info", string2str(ap->config.info));
