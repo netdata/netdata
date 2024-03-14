@@ -1259,6 +1259,7 @@ static void ebpf_send_specific_cachestat_data(char *type, netdata_publish_caches
  */
 static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
 {
+    char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_RATIO_CHART,
                       "Hit ratio",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_CACHESTAT_SUBMENU,
@@ -1266,6 +1267,8 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5200,
                       ebpf_create_global_dimension,
                       cachestat_counter_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_DIRTY_CHART,
                       "Number of dirty pages",
@@ -1275,6 +1278,8 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_DIRTY], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_HIT_CHART,
                       "Number of accessed files",
@@ -1284,6 +1289,8 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_HIT], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_CACHESTAT_MISSES_CHART,
                       "Files out of page cache",
@@ -1293,6 +1300,8 @@ static void ebpf_create_specific_cachestat_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &cachestat_counter_publish_aggregated[NETDATA_CACHESTAT_IDX_MISS], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_CACHESTAT);
+    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_commit_label();
 }
 
 /**
