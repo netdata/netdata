@@ -13,6 +13,7 @@
 - Bump github.com/go-sql-driver/mysql from 1.7.1 to 1.8.0 in /src/go/collectors/go.d.plugin [\#17142](https://github.com/netdata/netdata/pull/17142) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus-community/pro-bing from 0.3.0 to 0.4.0 in /src/go/collectors/go.d.plugin [\#17141](https://github.com/netdata/netdata/pull/17141) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/vmware/govmomi from 0.35.0 to 0.36.0 in /src/go/collectors/go.d.plugin [\#17140](https://github.com/netdata/netdata/pull/17140) ([ilyam8](https://github.com/ilyam8))
+- Add macos check \(build from source\) [\#17139](https://github.com/netdata/netdata/pull/17139) ([tkatsoulas](https://github.com/tkatsoulas))
 - Bump github.com/likexian/whois-parser from 1.24.10 to 1.24.11 in /src/go/collectors/go.d.plugin [\#17137](https://github.com/netdata/netdata/pull/17137) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/cloudflare/cfssl from 1.6.4 to 1.6.5 in /src/go/collectors/go.d.plugin [\#17136](https://github.com/netdata/netdata/pull/17136) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/jackc/pgx/v4 from 4.18.1 to 4.18.3 in /src/go/collectors/go.d.plugin [\#17135](https://github.com/netdata/netdata/pull/17135) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -402,7 +403,6 @@
 - Improve page validity check during database extent load [\#16552](https://github.com/netdata/netdata/pull/16552) ([stelfrag](https://github.com/stelfrag))
 - Proper Learn-friendly links [\#16547](https://github.com/netdata/netdata/pull/16547) ([Ancairon](https://github.com/Ancairon))
 - docs required for release [\#16546](https://github.com/netdata/netdata/pull/16546) ([ktsaou](https://github.com/ktsaou))
-- Add option to change page type for tier 0 to gorilla [\#16545](https://github.com/netdata/netdata/pull/16545) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.43.2](https://github.com/netdata/netdata/tree/v1.43.2) (2023-10-30)
 
