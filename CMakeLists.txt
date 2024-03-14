@@ -80,7 +80,7 @@ if(NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-# XXX: ASAN is currently broken
+# FIXME: ASAN is currently broken
 option(ENABLE_ADDRESS_SANITIZER "enable address sanitizer" False)
 
 if(ENABLE_ADDRESS_SANITIZER)
