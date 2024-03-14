@@ -9,7 +9,7 @@ BUILDDIR = $(CURDIR)/debian/build
 
 BASE_CONFIG = system/netdata.conf
 
-SYSTEMD_VERSION = $(shell /bin/sh -c "systemctl --version 2>&1 | head -n 1 | cut -f 2 -d ' '")
+SYSTEMD_VERSION = $(shell /bin/sh -c "systemd --version 2>&1 | head -n 1 | cut -f 2 -d ' '")
 
 ifeq ($(shell test $(SYSTEMD_VERSION) -gt 235 && echo "1"), 1)
 SYSTEMD_UNIT = $(BUILDDIR)/system/systemd/netdata.service
