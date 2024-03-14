@@ -47,12 +47,15 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 			slog.String("discoverer", shortName),
 		),
 		cfgSource: cfg.Source,
-		interval:  time.Second * 60,
 		ll: &localListenersExec{
 			binPath: filepath.Join(dir, "local-listeners"),
 			timeout: time.Second * 5,
 		},
+		interval:   time.Second * 60,
+		expiryTime: time.Minute * 10,
+		cache:      make(map[uint64]*cacheItem),
 	}
+
 	d.Tags().Merge(tags)
 
 	return d, nil
@@ -72,6 +75,13 @@ type (
 
 		interval time.Duration
 		ll       localListeners
+
+		expiryTime time.Duration
+		cache      map[uint64]*cacheItem // [target.Hash]
+	}
+	cacheItem struct {
+		lastSeenTime time.Time
+		tgt          model.Target
 	}
 	localListeners interface {
 		discover(ctx context.Context) ([]byte, error)
@@ -88,20 +98,20 @@ func (d *Discoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup
 		return
 	}
 
-	//tk := time.NewTicker(d.interval)
-	//defer tk.Stop()
-	//
-	//for {
-	//	select {
-	//	case <-ctx.Done():
-	//		return
-	//	case <-tk.C:
-	//		if err := d.discoverLocalListeners(ctx, in); err != nil {
-	//			d.Error(err)
-	//			return
-	//		}
-	//	}
-	//}
+	tk := time.NewTicker(d.interval)
+	defer tk.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tk.C:
+			if err := d.discoverLocalListeners(ctx, in); err != nil {
+				d.Warning(err)
+				return
+			}
+		}
+	}
 }
 
 func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []model.TargetGroup) error {
@@ -113,10 +123,12 @@ func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []mod
 		return err
 	}
 
-	tggs, err := d.parseLocalListeners(bs)
+	tgts, err := d.parseLocalListeners(bs)
 	if err != nil {
 		return err
 	}
+
+	tggs := d.processTargets(tgts)
 
 	select {
 	case <-ctx.Done():
@@ -126,7 +138,42 @@ func (d *Discoverer) discoverLocalListeners(ctx context.Context, in chan<- []mod
 	return nil
 }
 
-func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.TargetGroup, error) {
+func (d *Discoverer) processTargets(tgts []model.Target) []model.TargetGroup {
+	tgg := &targetGroup{
+		provider: fullName,
+		source:   fmt.Sprintf("discoverer=%s,host=localhost", shortName),
+	}
+	if d.cfgSource != "" {
+		tgg.source += fmt.Sprintf(",%s", d.cfgSource)
+	}
+
+	if d.expiryTime.Seconds() == 0 {
+		tgg.targets = tgts
+		return []model.TargetGroup{tgg}
+	}
+
+	now := time.Now()
+
+	for _, tgt := range tgts {
+		hash := tgt.Hash()
+		if _, ok := d.cache[hash]; !ok {
+			d.cache[hash] = &cacheItem{tgt: tgt}
+		}
+		d.cache[hash].lastSeenTime = now
+	}
+
+	for k, v := range d.cache {
+		if now.Sub(v.lastSeenTime) > d.expiryTime {
+			delete(d.cache, k)
+			continue
+		}
+		tgg.targets = append(tgg.targets, v.tgt)
+	}
+
+	return []model.TargetGroup{tgg}
+}
+
+func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 	var tgts []model.Target
 
 	sc := bufio.NewScanner(bytes.NewReader(bs))
@@ -161,17 +208,7 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.TargetGroup, error)
 		tgts = append(tgts, &tgt)
 	}
 
-	tgg := &targetGroup{
-		provider: fullName,
-		source:   fmt.Sprintf("discoverer=%s,host=localhost", shortName),
-		targets:  tgts,
-	}
-
-	if d.cfgSource != "" {
-		tgg.source += fmt.Sprintf(",%s", d.cfgSource)
-	}
-
-	return []model.TargetGroup{tgg}, nil
+	return tgts, nil
 }
 
 type localListenersExec struct {
