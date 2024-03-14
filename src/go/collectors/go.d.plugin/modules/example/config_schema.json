@@ -13,7 +13,10 @@
       },
       "charts": {
         "title": "Charts configuration",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "type": {
             "title": "Chart type",
@@ -65,7 +68,10 @@
       },
       "hidden_charts": {
         "title": "Hidden charts configuration",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "type": {
             "title": "Chart type",

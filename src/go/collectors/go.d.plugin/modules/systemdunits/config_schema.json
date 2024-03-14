@@ -21,7 +21,10 @@
       "include": {
         "title": "Include",
         "description": "Configuration for monitoring specific systemd units. Include systemd units whose names match any of the specified [patterns](https://golang.org/pkg/path/filepath/#Match).",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "uniqueItems": true,
         "minItems": 1,
         "items": {

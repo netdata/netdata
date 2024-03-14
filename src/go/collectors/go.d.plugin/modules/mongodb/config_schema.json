@@ -27,12 +27,18 @@
       "databases": {
         "title": "Database selector",
         "description": "Configuration for monitoring specific databases. If left empty, no [database stats](https://docs.mongodb.com/manual/reference/command/dbStats/) will be collected.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "includes": {
             "title": "Include",
             "description": "Include databases that match any of the specified include [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Pattern",
               "type": "string"
@@ -42,7 +48,10 @@
           "excludes": {
             "title": "Exclude",
             "description": "Exclude databases that match any of the specified exclude [patterns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/matcher#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Pattern",
               "type": "string"

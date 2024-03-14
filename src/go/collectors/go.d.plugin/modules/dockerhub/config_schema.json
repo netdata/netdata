@@ -28,7 +28,10 @@
       "repositories": {
         "title": "Repositories",
         "description": "List of repositories to monitor.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Name",
           "description": "The name of the repository.",
@@ -74,7 +77,10 @@
       "headers": {
         "title": "Headers",
         "description": "Additional HTTP headers to include in the request.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "additionalProperties": {
           "type": "string"
         }

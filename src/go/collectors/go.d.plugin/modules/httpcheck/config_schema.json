@@ -32,7 +32,10 @@
       "accepted_statuses": {
         "title": "Status code check",
         "description": "Specifies the list of **HTTP response status codes** that are considered **acceptable**. Responses with status codes not included in this list will be categorized as 'bad status' in the status chart.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Code",
           "type": "integer",
@@ -53,9 +56,15 @@
       "header_match": {
         "title": "Header check",
         "description": "Specifies a set of rules to check for specific key-value pairs in the HTTP headers of the response.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
-          "type": "object",
+          "type": [
+            "object",
+            "null"
+          ],
           "properties": {
             "exclude": {
               "title": "Exclude",
@@ -111,7 +120,10 @@
       "headers": {
         "title": "Headers",
         "description": "Additional HTTP headers to include in the request.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "additionalProperties": {
           "type": "string"
         }

@@ -46,7 +46,10 @@
       "transaction_time_histogram": {
         "title": "Transaction time histogram",
         "description": "Buckets for transaction time histogram in milliseconds.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Bucket",
           "type": "number",
@@ -65,7 +68,10 @@
       "query_time_histogram": {
         "title": "Query time histogram",
         "description": "Buckets for query time histogram in milliseconds.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Bucket",
           "type": "number",

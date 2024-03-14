@@ -96,7 +96,10 @@
       "headers": {
         "title": "Headers",
         "description": "Additional HTTP headers to include in the request.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "additionalProperties": {
           "type": "string"
         }

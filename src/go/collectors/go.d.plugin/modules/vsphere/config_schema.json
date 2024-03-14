@@ -39,7 +39,10 @@
       "host_include": {
         "title": "Host selectors",
         "description": "Configuration for monitoring specific hosts. The selector format follows the pattern `/Datacenter/Cluster/Host`, where each value can be set using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme).",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "uniqueItems": true,
         "items": {
           "title": "Host selector",
@@ -55,7 +58,10 @@
       "vm_include": {
         "title": "Virtual machine selectors",
         "description": "Configuration for monitoring specific virtual machines. The selector format follows the pattern `/Datacenter/Cluster/Host/VM`, where each value can be set using [Netdata simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme).",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "uniqueItems": true,
         "items": {
           "title": "VM selector",
@@ -100,7 +106,10 @@
       "headers": {
         "title": "Headers",
         "description": "Additional HTTP headers to include in the request.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "additionalProperties": {
           "type": "string"
         }

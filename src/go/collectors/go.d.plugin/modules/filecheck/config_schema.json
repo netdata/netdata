@@ -14,12 +14,18 @@
       "files": {
         "title": "File selector",
         "description": "Configuration for monitoring specific files. If left empy, no files will be monitored.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "include": {
             "title": "Include",
             "description": "Include files that match any of the specified include [patterns](https://golang.org/pkg/path/filepath/#Match).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Filepath",
               "type": "string",
@@ -30,7 +36,10 @@
           "exclude": {
             "title": "Exclude",
             "description": "Exclude files that match any of the specified exclude [patterns](https://golang.org/pkg/path/filepath/#Match).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Filepath",
               "type": "string",
@@ -52,12 +61,18 @@
       "dirs": {
         "title": "Directory selector",
         "description": "Configuration for monitoring specific directories. If left empy, no directories will be monitored.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "include": {
             "title": "Include",
             "description": "Include directories that match any of the specified include [patterns](https://golang.org/pkg/path/filepath/#Match).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Directory",
               "type": "string",
@@ -68,7 +83,10 @@
           "exclude": {
             "title": "Exclude",
             "description": "Exclude directories that match any of the specified exclude [patterns](https://golang.org/pkg/path/filepath/#Match).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Directory",
               "type": "string",

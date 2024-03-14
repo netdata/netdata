@@ -42,12 +42,18 @@
       "selector": {
         "title": "Selectors",
         "description": "Configuration for selecting and filtering a set of time series using Prometheus selectors. If left empty, no filtering is applied.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "allow": {
             "title": "Allow",
             "description": "Allow time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/prometheus/selector#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Selector",
               "type": "string"
@@ -57,7 +63,10 @@
           "deny": {
             "title": "Deny",
             "description": "Deny time series that match any of the specified [selectors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/prometheus/selector#readme).",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Selector",
               "type": "string"
@@ -83,12 +92,18 @@
       "fallback_type": {
         "title": "Untyped metrics fallback",
         "description": "Process Untyped metrics as Counter or Gauge instead of ignoring them.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "gauge": {
             "title": "As Gauge",
             "description": "Untyped metrics matching any [pattern](https://golang.org/pkg/path/filepath/#Match) will be processed as Gauge.",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Pattern",
               "type": "string"
@@ -98,7 +113,10 @@
           "Counter": {
             "title": "As Counter",
             "description": "Untyped metrics matching any [pattern](https://golang.org/pkg/path/filepath/#Match) will be processed as Counter.",
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "title": "Pattern",
               "type": "string"
@@ -144,7 +162,10 @@
       "headers": {
         "title": "Headers",
         "description": "Additional HTTP headers to include in the request.",
-        "type": "object",
+        "type": [
+          "object",
+          "null"
+        ],
         "additionalProperties": {
           "type": "string"
         }

@@ -20,7 +20,10 @@
       "hosts": {
         "title": "Network hosts",
         "description": "List of network hosts (IP addresses or domain names) to send ping packets.",
-        "type": "array",
+        "type": [
+          "array",
+          "null"
+        ],
         "items": {
           "title": "Host",
           "type": "string"
