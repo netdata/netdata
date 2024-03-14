@@ -48,7 +48,7 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 bool fd_is_socket(int fd);
 bool sock_has_output_error(int fd);
 
-int sock_setnonblock_closexec(int fd, bool closexec);
+int sock_setnonblock(int fd);
 int sock_delnonblock(int fd);
 int sock_setreuse(int fd, int reuse);
 void sock_setcloexec(int fd);
@@ -63,21 +63,13 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
 #ifndef HAVE_ACCEPT4
 int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
-
-#ifndef SOCK_NONBLOCK
-#define SOCK_NONBLOCK 00004000
-#endif  /* #ifndef SOCK_NONBLOCK */
-
-#ifdef COMPILED_FOR_MACOS
-#undef SOCK_CLOEXEC
-#define SOCK_CLOEXEC 0
-#else
-#ifndef SOCK_CLOEXEC
-#define SOCK_CLOEXEC 02000000
-#endif /* #ifndef SOCK_CLOEXEC */
-#endif /* #COMPILED_FOR_MACOS */
-
 #endif /* #ifndef HAVE_ACCEPT4 */
+
+#ifdef SOCK_CLOEXEC
+#define DEFAULT_SOCKET_FLAGS SOCK_CLOEXEC
+#else
+#define DEFAULT_SOCKET_FLAGS 0
+#endif
 
 
 // ----------------------------------------------------------------------------

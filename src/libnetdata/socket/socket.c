@@ -150,18 +150,11 @@ bool sock_has_output_error(int fd) {
     return ((pfd.revents & errors) || !(pfd.revents & POLLOUT));
 }
 
-int sock_setnonblock_closexec(int fd, bool closexec)
-{
-    UNUSED(closexec);
+int sock_setnonblock(int fd) {
     int flags;
 
     flags = fcntl(fd, F_GETFL);
     flags |= O_NONBLOCK;
-
-#ifdef COMPILED_FOR_MACOS
-    if (closexec)
-        flags |= FD_CLOEXEC;
-#endif
 
     int ret = fcntl(fd, F_SETFL, flags);
     if(ret < 0)
@@ -201,7 +194,7 @@ int sock_setreuse(int fd, int reuse) {
 void sock_setcloexec(int fd)
 {
     UNUSED(fd);
-#ifdef COMPILED_FOR_MACOS
+#ifndef SOCK_CLOEXEC
     int flags = fcntl(fd, F_GETFD);
     if (flags != -1) {
         flags |= FD_CLOEXEC;
@@ -281,7 +274,7 @@ char *strdup_client_description(int family, const char *protocol, const char *ip
 int create_listen_socket_unix(const char *path, int listen_backlog) {
     int sock;
 
-    sock = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    sock = socket(AF_UNIX, SOCK_STREAM | DEFAULT_SOCKET_FLAGS, 0);
     if(sock < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: UNIX socket() on path '%s' failed.",
@@ -290,7 +283,8 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
         return -1;
     }
 
-    sock_setnonblock_closexec(sock, true);
+    sock_setnonblock(sock);
+    sock_setcloexec(sock);
     sock_enlarge_in(sock);
 
     struct sockaddr_un name;
@@ -335,7 +329,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
 int create_listen_socket4(int socktype, const char *ip, uint16_t port, int listen_backlog) {
     int sock;
 
-    sock = socket(AF_INET, socktype | SOCK_CLOEXEC, 0);
+    sock = socket(AF_INET, socktype | DEFAULT_SOCKET_FLAGS, 0);
     if(sock < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: IPv4 socket() on ip '%s' port %d, socktype %d failed.",
@@ -345,7 +339,8 @@ int create_listen_socket4(int socktype, const char *ip, uint16_t port, int liste
     }
     sock_setreuse(sock, 1);
     sock_setreuse_port(sock, 0);
-    sock_setnonblock_closexec(sock, true);
+    sock_setnonblock(sock);
+    sock_setcloexec(sock);
     sock_enlarge_in(sock);
 
     struct sockaddr_in name;
@@ -392,7 +387,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     int sock;
     int ipv6only = 1;
 
-    sock = socket(AF_INET6, socktype | SOCK_CLOEXEC, 0);
+    sock = socket(AF_INET6, socktype | DEFAULT_SOCKET_FLAGS, 0);
     if (sock < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: IPv6 socket() on ip '%s' port %d, socktype %d, failed.",
@@ -402,7 +397,8 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     }
     sock_setreuse(sock, 1);
     sock_setreuse_port(sock, 0);
-    sock_setnonblock_closexec(sock, true);
+    sock_setnonblock(sock);
+    sock_setcloexec(sock);
     sock_enlarge_in(sock);
 
     /* IPv6 only */
@@ -798,7 +794,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 // timeout     the timeout for establishing a connection
 
 static inline int connect_to_unix(const char *path, struct timeval *timeout) {
-    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    int fd = socket(AF_UNIX, SOCK_STREAM | DEFAULT_SOCKET_FLAGS, 0);
     if(fd == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "Failed to create UNIX socket() for '%s'",
@@ -913,7 +909,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             }
         }
 
-        fd = socket(ai->ai_family, ai->ai_socktype | SOCK_CLOEXEC, ai->ai_protocol);
+        fd = socket(ai->ai_family, ai->ai_socktype | DEFAULT_SOCKET_FLAGS, ai->ai_protocol);
         if(fd != -1) {
             if(timeout) {
                 if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
@@ -1407,7 +1403,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     struct sockaddr_storage sadr;
     socklen_t addrlen = sizeof(sadr);
 
-    int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags | SOCK_CLOEXEC);
+    int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags | DEFAULT_SOCKET_FLAGS);
     if (likely(nfd >= 0)) {
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
