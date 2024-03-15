@@ -196,10 +196,7 @@ void sock_setcloexec(int fd)
     UNUSED(fd);
 #ifndef SOCK_CLOEXEC
     int flags = fcntl(fd, F_GETFD);
-    if (flags != -1) {
-        flags |= FD_CLOEXEC;
-        (void) fcntl(fd, F_SETFD, flags);
-    }
+    (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 #endif
 }
 
@@ -1812,10 +1809,7 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
 #ifndef SOCK_NONBLOCK
     if (nfd > 0) {
         int flags = fcntl(nfd, F_GETFL);
-        if (flags != -1) {
-            flags |= O_NONBLOCK;
-            (void)fcntl(nfd, F_SETFL, flags);
-        }
+        (void)fcntl(nfd, F_SETFL, flags| O_NONBLOCK);
     }
 #endif
 

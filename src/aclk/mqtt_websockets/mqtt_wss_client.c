@@ -589,10 +589,9 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         return -1;
     }
 
-#ifdef COMPILED_FOR_MACOS
+#ifndef SOCK_CLOEXEC
     int flags = fcntl(client->sockfd, F_GETFD);
-    flags |= FD_CLOEXEC;
-    (void) fcntl(client->sockfd, F_SETFD, flags);
+    (void) fcntl(client->sockfd, F_SETFD, flags| FD_CLOEXEC);
 #endif
 
     int flag = 1;
