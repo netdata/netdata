@@ -70,7 +70,6 @@ var prometheusPortAllocations = map[int]string{
 	9150:  "memcached_exporter",
 	9151:  "varnish_request_exporter",
 	9152:  "command_runner_exporter",
-	9153:  "coredns",
 	9154:  "postfix_exporter",
 	9155:  "vsphere_graphite",
 	9156:  "webdriver_exporter",
