@@ -187,14 +187,14 @@ if(ENABLE_BUNDLED_PROTOBUF AND NEED_PROTOBUF)
             # This version needs to stay as it is, as newer versions need C++14
             # It can be dropped once we no longer support systems using GCC
             # older than GCC 7.
-            set(PROTOBUF_TAG v21.12)
+            set(PROTOBUF_TAG f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c) # v21.12
             set(NEED_ABSL False)
         else()
             # These versions are what should be updated if bumping bundled
             # version of protobuf
-            set(PROTOBUF_TAG v25.3)
+            set(PROTOBUF_TAG 4a2aef570deb2bfb8927426558701e8bfc26f2a4) # v25.3
             set(NEED_ABSL True)
-            set(ABSL_TAG 20240116.1)
+            set(ABSL_TAG 2f9e432cce407ce0ae50676696666f33a77d42ac) # 20240116.1
         endif()
 
         if(NOT FETCHCONTENT_TRY_FIND_PACKAGE_MODE)
