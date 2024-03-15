@@ -101,42 +101,20 @@
               "time_group": {
                 "type": "string",
                 "oneOf": [
-                  { "const": "average", "title": "Average()" },
-                  { "const": "median", "title": "Median()" },
-                  { "const": "min", "title": "Minimum()" },
-                  { "const": "max", "title": "Maximum()" },
-                  { "const": "sum", "title": "Sum()" },
-                  { "const": "incremental_sum", "title": "Incremental Sum()" },
-                  { "const": "stddev", "title": "Standard Deviation()" },
-                  { "const": "cv", "title": "Coefficient of Variation()" },
-                  { "const": "trimmed-mean1", "title": "Trimmed Mean(1%)" },
-                  { "const": "trimmed-mean2", "title": "Trimmed Mean(2%)" },
-                  { "const": "trimmed-mean3", "title": "Trimmed Mean(3%)" },
-                  { "const": "trimmed-mean", "title": "Trimmed Mean(5%)" },
-                  { "const": "trimmed-mean10", "title": "Trimmed Mean(10%)" },
-                  { "const": "trimmed-mean15", "title": "Trimmed Mean(15%)" },
-                  { "const": "trimmed-mean20", "title": "Trimmed Mean(20%)" },
-                  { "const": "trimmed-mean25", "title": "Trimmed Mean(25%)" },
-                  { "const": "trimmed-median1", "title": "Trimmed Median(1%)" },
-                  { "const": "trimmed-median2", "title": "Trimmed Median(2%)" },
-                  { "const": "trimmed-median3", "title": "Trimmed Median(3%)" },
-                  { "const": "trimmed-median", "title": "Trimmed Median(5%)" },
-                  { "const": "trimmed-median10", "title": "Trimmed Median(10%)" },
-                  { "const": "trimmed-median15", "title": "Trimmed Median(15%)" },
-                  { "const": "trimmed-median20", "title": "Trimmed Median(20%)" },
-                  { "const": "trimmed-median25", "title": "Trimmed Median(25%)" },
-                  { "const": "percentile99", "title": "Percentile(99%)" },
-                  { "const": "percentile98", "title": "Percentile(98%)" },
-                  { "const": "percentile97", "title": "Percentile(97%)" },
-                  { "const": "percentile", "title": "Percentile(95%)" },
-                  { "const": "percentile90", "title": "Percentile(90%)" },
-                  { "const": "percentile80", "title": "Percentile(80%)" },
-                  { "const": "percentile75", "title": "Percentile(75%)" },
-                  { "const": "percentile50", "title": "Percentile(50%)" },
-                  { "const": "percentile25", "title": "Percentile(25%)" },
-                  { "const": "ses", "title": "Simple Exponential Smoothing()" },
-                  { "const": "des", "title": "Double Exponential Smoothing()" },
-                  { "const": "countif", "title": "Count If(=0)" }
+                  { "const": "average", "title": "Average" },
+                  { "const": "median", "title": "Median" },
+                  { "const": "min", "title": "Minimum" },
+                  { "const": "max", "title": "Maximum" },
+                  { "const": "sum", "title": "Sum" },
+                  { "const": "incremental_sum", "title": "Incremental Sum" },
+                  { "const": "stddev", "title": "Standard Deviation" },
+                  { "const": "cv", "title": "Coefficient of Variation" },
+                  { "const": "trimmed-mean", "title": "Trimmed Mean" },
+                  { "const": "trimmed-median", "title": "Trimmed Median" },
+                  { "const": "percentile", "title": "Percentile" },
+                  { "const": "ses", "title": "Simple Exponential Smoothing" },
+                  { "const": "des", "title": "Double Exponential Smoothing" },
+                  { "const": "countif", "title": "Count If" }
                 ],
                 "default": "average",
                 "title": "Time Aggregation",
@@ -144,7 +122,7 @@
               },
               "after": {
                 "type": "integer",
-                "default": 0,
+                "default": -600,
                 "title": "From",
                 "description": "Relative to 'To'"
               },
@@ -157,11 +135,11 @@
               "dims_group": {
                 "type": "string",
                 "oneOf": [
-                  { "const": "average", "title": "Average()", "description": "The average of all dimensions" },
-                  { "const": "min", "title": "Minimum()", "description": "The minimum of all dimensions" },
-                  { "const": "max", "title": "Maximum()", "description": "The maximum of all dimensions" },
-                  { "const": "sum", "title": "Sum()", "description": "The sum of all dimensions" },
-                  { "const": "min2max", "title": "Min-to-Max()", "description": "The delta between the minimum of the maximum of the dimensions" }
+                  { "const": "average", "title": "Average", "description": "The average of all dimensions" },
+                  { "const": "min", "title": "Minimum", "description": "The minimum of all dimensions" },
+                  { "const": "max", "title": "Maximum", "description": "The maximum of all dimensions" },
+                  { "const": "sum", "title": "Sum", "description": "The sum of all dimensions" },
+                  { "const": "min2max", "title": "Min-to-Max", "description": "The delta between the minimum of the maximum of the dimensions" }
                 ],
                 "default": "sum",
                 "title": "Dims Aggregation",
@@ -189,7 +167,103 @@
                 },
                 "default": [ "unaligned" ]
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "time_group": {
+                      "enum": ["trimmed-mean"]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "time_group_value": {
+                      "type": "integer",
+                      "default": 1,
+                      "title": "Trim %",
+                      "description": ""
+                    }
+                  },
+                  "required": ["time_group_value"]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "time_group": {
+                      "enum": ["trimmed-median"]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "time_group_value": {
+                      "type": "integer",
+                      "default": 1,
+                      "title": "Trim %",
+                      "description": ""
+                    }
+                  },
+                  "required": ["time_group_value"]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "time_group": {
+                      "enum": ["percentile"]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "time_group_value": {
+                      "type": "integer",
+                      "default": 95,
+                      "title": "Percentage",
+                      "description": ""
+                    }
+                  },
+                  "required": ["time_group_value"]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "time_group": {
+                      "const": "countif"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "time_group_condition": {
+                      "type": "string",
+                      "oneOf": [
+                        { "const": "!=", "title": "!=" },
+                        { "const": "=", "title": "==" },
+                        { "const": ">=", "title": ">=" },
+                        { "const": ">", "title": ">" },
+                        { "const": "<=", "title": "<=" },
+                        { "const": "<", "title": "<" }
+                      ],
+                      "default": "equal",
+                      "title": "Condition",
+                      "description": ""
+                    },
+                    "time_group_value": {
+                      "type": "number",
+                      "default": 1,
+                      "title": "Value to match",
+                      "description": ""
+                    }
+                  },
+                  "required": ["time_group_condition", "time_group_value"]
+                }
+              }
+            ]
           },
           "calculation": {
             "type": "string",
@@ -469,6 +543,7 @@
           "value": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "database_lookup": {
+              "ui:order": ["data_source", "time_group", "time_group_condition", "time_group_value", "after", "before", "dims_group", "dimensions", "options"],
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "ui:collapsible": true,
               "ui:initiallyExpanded": true,
@@ -480,6 +555,12 @@
               "time_group": {
                 "ui:help": "When querying time-series data we need to come up with a single value. This function is used to aggregate all the values of the time-series data to a single value.",
                 "ui:classNames": "dyncfg-grid-col-span-1-2"
+              },
+              "time_group_condition": {
+                "ui:classNames": "dyncfg-grid-col-span-3-1"
+              },
+              "time_group_value": {
+                "ui:classNames": "dyncfg-grid-col-span-4-1"
               },
               "after": {
                 "ui:help": "The oldest timestamp of the time-series data to be included in the query. Negative values define a duration in seconds in the past of 'To' (so, -60 means a minute ago from 'To').",

@@ -9,10 +9,6 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap);
 // ---------------------------------------------------------------------------------------------------------------------
 // parse the json object of an alert definition
 
-#define RRDR_OPTIONS_DATA_SOURCES (RRDR_OPTION_PERCENTAGE|RRDR_OPTION_ANOMALY_BIT)
-#define RRDR_OPTIONS_DIMS_AGGREGATION (RRDR_OPTION_DIMS_MIN|RRDR_OPTION_DIMS_MAX|RRDR_OPTION_DIMS_AVERAGE|RRDR_OPTION_DIMS_MIN2MAX)
-#define RRDR_OPTIONS_REMOVE_OVERLAPPING(options) ((options) &= ~(RRDR_OPTIONS_DIMS_AGGREGATION|RRDR_OPTIONS_DATA_SOURCES))
-
 static void dims_grouping_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
     ap->config.options &= ~(RRDR_OPTIONS_DIMS_AGGREGATION);
 
@@ -77,6 +73,22 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group", time_grouping_txt2id, config->time_group, error);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error);
+
+    switch(config->time_group) {
+        default:
+            break;
+
+        case RRDR_GROUPING_COUNTIF:
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group_condition", alerts_group_condition2id, config->time_group_condition, error);
+            // fall through
+
+        case RRDR_GROUPING_TRIMMED_MEAN:
+        case RRDR_GROUPING_TRIMMED_MEDIAN:
+        case RRDR_GROUPING_PERCENTILE:
+            JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "time_group_value", config->time_group_value, error);
+            break;
+    }
+
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "dimensions", config->dimensions, error, true);
     return true;
@@ -289,6 +301,8 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
                     buffer_json_member_add_int64(wb, "after", ap->config.after);
                     buffer_json_member_add_int64(wb, "before", ap->config.before);
                     buffer_json_member_add_string(wb, "time_group", time_grouping_id2txt(ap->config.time_group));
+                    buffer_json_member_add_string(wb, "time_group_condition", alerts_group_conditions_id2txt(ap->config.time_group_condition));
+                    buffer_json_member_add_double(wb, "time_group_value", ap->config.time_group_value);
                     buffer_json_member_add_string(wb, "dims_group", alerts_dims_grouping_id2group(ap->config.dims_group));
                     buffer_json_member_add_string(wb, "data_source", alerts_data_source_id2source(ap->config.data_source));
                     rrdr_options_to_buffer_json_array(wb, "options", RRDR_OPTIONS_REMOVE_OVERLAPPING(ap->config.options));

@@ -81,6 +81,46 @@ const char *alerts_data_source_id2source(ALERT_LOOKUP_DATA_SOURCE source) {
 // ---------------------------------------------------------------------------------------------------------------------
 
 static struct {
+    ALERT_LOOKUP_TIME_GROUP_CONDITION condition;
+    const char *name;
+} group_conditions[] = {
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, .name = "=" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, .name = "!=" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, .name = ">" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, .name = ">=" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, .name = "<" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL, .name = "<=" },
+
+    // terminator
+    { .condition = 0, .name = NULL },
+};
+
+ALERT_LOOKUP_TIME_GROUP_CONDITION alerts_group_condition2id(const char *source) {
+    if(!source || !*source)
+        return group_conditions[0].condition;
+
+    for(size_t i = 0; group_conditions[i].name ;i++) {
+        if(strcmp(group_conditions[i].name, source) == 0)
+            return group_conditions[i].condition;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "Alert data source '%s' is not valid", source);
+    return group_conditions[0].condition;
+}
+
+const char *alerts_group_conditions_id2txt(ALERT_LOOKUP_TIME_GROUP_CONDITION source) {
+    for(size_t i = 0; group_conditions[i].name ;i++) {
+        if(source == group_conditions[i].condition)
+            return group_conditions[i].name;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "Alert data source %d is not valid", source);
+    return group_conditions[0].name;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
+static struct {
     const char *name;
     uint32_t hash;
     ALERT_ACTION_OPTIONS value;

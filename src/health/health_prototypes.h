@@ -28,6 +28,17 @@ typedef enum __attribute__((packed)) {
 ALERT_LOOKUP_DIMS_GROUPING alerts_dims_grouping2id(const char *group);
 const char *alerts_dims_grouping_id2group(ALERT_LOOKUP_DIMS_GROUPING grouping);
 
+typedef enum __attribute__((packed)) {
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL,
+} ALERT_LOOKUP_TIME_GROUP_CONDITION;
+ALERT_LOOKUP_TIME_GROUP_CONDITION alerts_group_condition2id(const char *source);
+const char *alerts_group_conditions_id2txt(ALERT_LOOKUP_TIME_GROUP_CONDITION source);
+
 struct rrd_alert_match {
     bool enabled;
 
@@ -62,7 +73,6 @@ struct rrd_alert_config {
     STRING *units;                  // the units of the alarm
     STRING *summary;                // a short alert summary
     STRING *info;                   // a description of the alarm
-    STRING *lookup;                 // the lookup field
 
     int update_every;               // update frequency for the alarm
 
@@ -73,6 +83,8 @@ struct rrd_alert_config {
 
     STRING *dimensions;             // the chart dimensions
     RRDR_TIME_GROUPING time_group;  // grouping method: average, max, etc.
+    ALERT_LOOKUP_TIME_GROUP_CONDITION time_group_condition;
+    NETDATA_DOUBLE time_group_value;
     ALERT_LOOKUP_DIMS_GROUPING dims_group; // grouping method for dimensions
     ALERT_LOOKUP_DATA_SOURCE data_source;
     int before;                     // ending point in time-series

@@ -385,13 +385,15 @@ This line makes a database lookup to find a value. This result of this lookup is
 The format is:
 
 ```yaml
-lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
+lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
 ```
 
 The full [database query API](https://github.com/netdata/netdata/blob/master/src/web/api/queries/README.md) is supported. In short:
 
 - `METHOD` is one of  the available [grouping methods](https://github.com/netdata/netdata/blob/master/src/web/api/queries/README.md#grouping-methods) such as `average`, `min`, `max` etc.
      This is required.
+
+  - `GROUPING OPTIONS` are optional and can have the form `CONDITION VALUE`, where `CONDITION` is `!=`, `=`, `<=`, `<`, `>`, `>=` and `VALUE` is a number. The `CONDITION` and `VALUE` are required for `countif`, while `VALUE` is used by `percentile`, `trimmed_mean` and `trimmed_median`.
 
 - `AFTER` is a relative number of seconds, but it also accepts a single letter for changing
      the units, like `-1s` = 1 second in the past, `-1m` = 1 minute in the past, `-1h` = 1 hour
