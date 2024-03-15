@@ -1860,7 +1860,8 @@ done_only_drop:
     "SELECT ah.hash_id, alarm, template, on_key, class, component, type, lookup, every, "                              \
     " units, calc, families, green, red, warn, crit, "                                                                 \
     " exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, "           \
-    " p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every, source, chart_labels, summary "      \
+    " p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every, source, chart_labels, summary,  "    \
+    " time_group_condition, time_group_value, dims_group, data_source "                                                \
     " FROM alert_hash ah, c_%p t where ah.hash_id = t.hash_id"
 
 int sql_get_alert_configuration(
@@ -1965,6 +1966,10 @@ int sql_get_alert_configuration(
         acd.source = (const char *) sqlite3_column_text(res, param++);
         acd.selectors.chart_labels = (const char *) sqlite3_column_text(res, param++);
         acd.summary = (const char *) sqlite3_column_text(res, param++);
+        acd.value.db.time_group_condition =(int32_t) sqlite3_column_int(res, param++);
+        acd.value.db.time_group_value = sqlite3_column_double(res, param++);
+        acd.value.db.dims_group = (int32_t) sqlite3_column_int(res, param++);
+        acd.value.db.data_source = (int32_t) sqlite3_column_int(res, param++);
 
         cb(&acd, data);
         added++;

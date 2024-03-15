@@ -476,6 +476,10 @@ struct sql_alert_config_data {
         struct {
             const char *dimensions;
             const char *method;
+            ALERT_LOOKUP_TIME_GROUP_CONDITION time_group_condition;
+            NETDATA_DOUBLE time_group_value;
+            ALERT_LOOKUP_DIMS_GROUPING dims_group;
+            ALERT_LOOKUP_DATA_SOURCE data_source;
             uint32_t options;
 
             int32_t after;
