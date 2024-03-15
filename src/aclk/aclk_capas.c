@@ -18,7 +18,7 @@ const struct capability *aclk_get_agent_capas()
         { .name = "http_api_v2", .version = HTTP_API_V2_VERSION, .enabled = 1 },
         { .name = "health",      .version = 1, .enabled = 0 }, // index 7, below
         { .name = "req_cancel",  .version = 1, .enabled = 1 },
-        //{ .name = "dyncfg",      .version = 1, .enabled = 1 },
+        { .name = "dyncfg",      .version = 1, .enabled = 1 },
         { .name = NULL,          .version = 0, .enabled = 0 }
     };
     agent_capabilities[2].version = ml_capable() ? 1 : 0;
@@ -35,6 +35,7 @@ const struct capability *aclk_get_agent_capas()
 struct capability *aclk_get_node_instance_capas(RRDHOST *host)
 {
     bool functions = (host == localhost || (host->receiver && stream_has_capability(host->receiver, STREAM_CAP_FUNCTIONS)));
+    bool dyncfg = (host == localhost || dyncfg_available_for_rrdhost(host));
 
     struct capability ni_caps[] = {
         { .name = "proto",       .version = 1,                     .enabled = 1 },
@@ -47,7 +48,7 @@ struct capability *aclk_get_node_instance_capas(RRDHOST *host)
         { .name = "http_api_v2", .version = HTTP_API_V2_VERSION,   .enabled = 1 },
         { .name = "health",      .version = 1,                     .enabled = host->health.health_enabled },
         { .name = "req_cancel",  .version = 1,                     .enabled = 1 },
-        //{ .name = "dyncfg",      .version = 1,                     .enabled = 1 },
+        { .name = "dyncfg",      .version = 1,                     .enabled = dyncfg },
         { .name = NULL,          .version = 0,                     .enabled = 0 }
     };
 
