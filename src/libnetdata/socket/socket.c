@@ -191,6 +191,16 @@ int sock_setreuse(int fd, int reuse) {
     return ret;
 }
 
+void sock_setcloexec(int fd)
+{
+    UNUSED(fd);
+#ifndef SOCK_CLOEXEC
+    int flags = fcntl(fd, F_GETFD);
+    if (flags != -1)
+        (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+#endif
+}
+
 int sock_setreuse_port(int fd, int reuse) {
     int ret;
 
@@ -262,7 +272,7 @@ char *strdup_client_description(int family, const char *protocol, const char *ip
 int create_listen_socket_unix(const char *path, int listen_backlog) {
     int sock;
 
-    sock = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    sock = socket(AF_UNIX, SOCK_STREAM | DEFAULT_SOCKET_FLAGS, 0);
     if(sock < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: UNIX socket() on path '%s' failed.",
@@ -272,6 +282,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
     }
 
     sock_setnonblock(sock);
+    sock_setcloexec(sock);
     sock_enlarge_in(sock);
 
     struct sockaddr_un name;
@@ -316,7 +327,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
 int create_listen_socket4(int socktype, const char *ip, uint16_t port, int listen_backlog) {
     int sock;
 
-    sock = socket(AF_INET, socktype | SOCK_CLOEXEC, 0);
+    sock = socket(AF_INET, socktype | DEFAULT_SOCKET_FLAGS, 0);
     if(sock < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: IPv4 socket() on ip '%s' port %d, socktype %d failed.",
@@ -324,10 +335,10 @@ int create_listen_socket4(int socktype, const char *ip, uint16_t port, int liste
 
         return -1;
     }
-
     sock_setreuse(sock, 1);
     sock_setreuse_port(sock, 0);
     sock_setnonblock(sock);
+    sock_setcloexec(sock);
     sock_enlarge_in(sock);
 
     struct sockaddr_in name;
@@ -374,7 +385,7 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
     int sock;
     int ipv6only = 1;
 
-    sock = socket(AF_INET6, socktype | SOCK_CLOEXEC, 0);
+    sock = socket(AF_INET6, socktype | DEFAULT_SOCKET_FLAGS, 0);
     if (sock < 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "LISTENER: IPv6 socket() on ip '%s' port %d, socktype %d, failed.",
@@ -382,10 +393,10 @@ int create_listen_socket6(int socktype, uint32_t scope_id, const char *ip, int p
 
         return -1;
     }
-
     sock_setreuse(sock, 1);
     sock_setreuse_port(sock, 0);
     sock_setnonblock(sock);
+    sock_setcloexec(sock);
     sock_enlarge_in(sock);
 
     /* IPv6 only */
@@ -781,7 +792,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 // timeout     the timeout for establishing a connection
 
 static inline int connect_to_unix(const char *path, struct timeval *timeout) {
-    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    int fd = socket(AF_UNIX, SOCK_STREAM | DEFAULT_SOCKET_FLAGS, 0);
     if(fd == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "Failed to create UNIX socket() for '%s'",
@@ -796,6 +807,8 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
                    "Failed to set timeout on UNIX socket '%s'",
                    path);
     }
+
+    sock_setcloexec(fd);
 
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
@@ -894,7 +907,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
             }
         }
 
-        fd = socket(ai->ai_family, ai->ai_socktype | SOCK_CLOEXEC, ai->ai_protocol);
+        fd = socket(ai->ai_family, ai->ai_socktype | DEFAULT_SOCKET_FLAGS, ai->ai_protocol);
         if(fd != -1) {
             if(timeout) {
                 if(setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *) timeout, sizeof(struct timeval)) < 0)
@@ -902,6 +915,7 @@ int connect_to_this_ip46(int protocol, int socktype, const char *host, uint32_t 
                            "Failed to set timeout on the socket to ip '%s' port '%s'",
                            hostBfr, servBfr);
             }
+            sock_setcloexec(fd);
 
             errno = 0;
             if(connect(fd, ai->ai_addr, ai->ai_addrlen) < 0) {
@@ -1266,11 +1280,6 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 
     if (fd < 0) return fd;
 
-    if (flags & SOCK_NONBLOCK) {
-        newflags |= O_NONBLOCK;
-        flags &= ~SOCK_NONBLOCK;
-    }
-
 #ifdef SOCK_CLOEXEC
 #ifdef O_CLOEXEC
     if (flags & SOCK_CLOEXEC) {
@@ -1387,7 +1396,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     struct sockaddr_storage sadr;
     socklen_t addrlen = sizeof(sadr);
 
-    int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags | SOCK_CLOEXEC);
+    int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags | DEFAULT_SOCKET_FLAGS);
     if (likely(nfd >= 0)) {
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
@@ -1401,6 +1410,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
             strncpyz(client_ip, "localhost", ipsize);
         }
+        sock_setcloexec(nfd);
 
 #ifdef __FreeBSD__
         if(((struct sockaddr *)&sadr)->sa_family == AF_LOCAL)
@@ -1785,11 +1795,24 @@ static int poll_process_new_tcp_connection(POLLJOB *p, POLLINFO *pi, struct poll
     char client_port[NI_MAXSERV] = "";
     char client_host[NI_MAXHOST] = "";
 
+#ifdef SOCK_NONBLOCK
+    int flags = SOCK_NONBLOCK;
+#else
+    int flags = 0;
+#endif
+
     int nfd = accept_socket(
-        pf->fd,SOCK_NONBLOCK,
+        pf->fd, flags,
         client_ip, INET6_ADDRSTRLEN, client_port,NI_MAXSERV, client_host, NI_MAXHOST,
         p->access_list, p->allow_dns
         );
+
+#ifndef SOCK_NONBLOCK
+    if (nfd > 0) {
+        int flags = fcntl(nfd, F_GETFL);
+        (void)fcntl(nfd, F_SETFL, flags| O_NONBLOCK);
+    }
+#endif
 
     if (unlikely(nfd < 0)) {
         // accept failed

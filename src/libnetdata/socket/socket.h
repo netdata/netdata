@@ -51,6 +51,7 @@ bool sock_has_output_error(int fd);
 int sock_setnonblock(int fd);
 int sock_delnonblock(int fd);
 int sock_setreuse(int fd, int reuse);
+void sock_setcloexec(int fd);
 int sock_setreuse_port(int fd, int reuse);
 int sock_enlarge_in(int fd);
 int sock_enlarge_out(int fd);
@@ -62,16 +63,13 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
 #ifndef HAVE_ACCEPT4
 int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
-
-#ifndef SOCK_NONBLOCK
-#define SOCK_NONBLOCK 00004000
-#endif  /* #ifndef SOCK_NONBLOCK */
-
-#ifndef SOCK_CLOEXEC
-#define SOCK_CLOEXEC 02000000
-#endif /* #ifndef SOCK_CLOEXEC */
-
 #endif /* #ifndef HAVE_ACCEPT4 */
+
+#ifdef SOCK_CLOEXEC
+#define DEFAULT_SOCKET_FLAGS SOCK_CLOEXEC
+#else
+#define DEFAULT_SOCKET_FLAGS 0
+#endif
 
 
 // ----------------------------------------------------------------------------
