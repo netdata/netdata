@@ -413,17 +413,17 @@
               "type": "boolean",
               "default": true,
               "title": "Enabled",
-              "description": "Enable or disable this rule."
+              "description": ""
             },
             "type": {
               "type": "string",
               "oneOf": [
-                { "const":  "instance" , "title": "Apply this rule to a specific instance (deprecated)" },
-                { "const":  "template" , "title": "Apply this rule to all instances" }
+                { "const":  "instance" , "title": "A specific Instance" },
+                { "const":  "template" , "title": "Each of the Instances" }
               ],
               "default": "template",
-              "title": "Type of rule",
-              "description": "Select the type of this rule."
+              "title": "Apply this rule to:",
+              "description": ""
             }
           },
           "required": [ "type", "enabled" ],
@@ -467,8 +467,12 @@
           "ui:widget": "checkbox"
         },
         "type": {
-          "ui:classNames": "dyncfg-grid-col-span-3-4",
-          "ui:help": "Rules can be configured to match a specific instance (like a specific disk), or match all the instances (like all the disks). All rules are always checked against all nodes streamed to this Netdata, so the matching rules include patterns to match both instances and nodes."
+          "ui:classNames": "dyncfg-grid-col-span-5-2",
+          "ui:help": "Rules can be configured to match a specific instance (like a specific disk), or match all the instances (like all the disks). All rules are always checked against all nodes streamed to this Netdata, so the matching rules include patterns to match both instances and nodes.",
+          "ui:widget": "radio",
+          "ui:options": {
+            "flavour": "buttonGroup"
+          }
         },
         "config": {
           "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
@@ -549,7 +553,9 @@
               "ui:initiallyExpanded": true,
               "data_source": {
                 "ui:widget": "radio",
-                "ui:options": { "inline":  true },
+                "ui:options": {
+                  "flavour": "buttonGroup"
+                },
                 "ui:classNames": "dyncfg-grid-col-span-1-6"
               },
               "time_group": {
