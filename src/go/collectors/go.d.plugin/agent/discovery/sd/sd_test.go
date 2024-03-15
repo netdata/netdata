@@ -20,6 +20,12 @@ func TestServiceDiscovery_Run(t *testing.T) {
 				{name: "name", started: true, stopped: false},
 			},
 		},
+		"add disabled pipeline": {
+			configs: []confFile{
+				prepareDisabledConfigFile("source", "name"),
+			},
+			wantPipelines: nil,
+		},
 		"remove pipeline": {
 			configs: []confFile{
 				prepareConfigFile("source", "name"),
@@ -87,5 +93,14 @@ func prepareConfigFile(source, name string) confFile {
 func prepareEmptyConfigFile(source string) confFile {
 	return confFile{
 		source: source,
+	}
+}
+
+func prepareDisabledConfigFile(source, name string) confFile {
+	bs, _ := yaml.Marshal(pipeline.Config{Name: name, Disabled: true})
+
+	return confFile{
+		source:  source,
+		content: bs,
 	}
 }
