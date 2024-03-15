@@ -14,11 +14,14 @@ static struct {
         , {"reversed"          , 0    , RRDR_OPTION_REVERSED}
         , {"reverse"           , 0    , RRDR_OPTION_REVERSED}
         , {"jsonwrap"          , 0    , RRDR_OPTION_JSON_WRAP}
-        , {"min2max"           , 0    , RRDR_OPTION_MIN2MAX}
+        , {"min2max"           , 0    , RRDR_OPTION_DIMS_MIN2MAX}   // rrdr2value() only
+        , {"average"           , 0    , RRDR_OPTION_DIMS_AVERAGE}   // rrdr2value() only
+        , {"min"               , 0    , RRDR_OPTION_DIMS_MIN}       // rrdr2value() only
+        , {"max"               , 0    , RRDR_OPTION_DIMS_MAX}       // rrdr2value() only
         , {"ms"                , 0    , RRDR_OPTION_MILLISECONDS}
         , {"milliseconds"      , 0    , RRDR_OPTION_MILLISECONDS}
-        , {"abs"               , 0    , RRDR_OPTION_ABSOLUTE}
         , {"absolute"          , 0    , RRDR_OPTION_ABSOLUTE}
+        , {"abs"               , 0    , RRDR_OPTION_ABSOLUTE}
         , {"absolute_sum"      , 0    , RRDR_OPTION_ABSOLUTE}
         , {"absolute-sum"      , 0    , RRDR_OPTION_ABSOLUTE}
         , {"display_absolute"  , 0    , RRDR_OPTION_DISPLAY_ABS}
@@ -326,6 +329,20 @@ void rrdr_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS
     }
 
     buffer_json_array_close(wb);
+}
+
+void rrdr_options_to_buffer(BUFFER *wb, RRDR_OPTIONS options) {
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    size_t added = 0;
+    for(int i = 0; rrdr_options[i].name ; i++) {
+        if (unlikely((rrdr_options[i].value & options) && !(rrdr_options[i].value & used))) {
+            const char *name = rrdr_options[i].name;
+            used |= rrdr_options[i].value;
+
+            if(added++) buffer_strcat(wb, " ");
+            buffer_strcat(wb, name);
+        }
+    }
 }
 
 void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options) {

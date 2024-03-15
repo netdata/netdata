@@ -9,6 +9,54 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap);
 // ---------------------------------------------------------------------------------------------------------------------
 // parse the json object of an alert definition
 
+#define RRDR_OPTIONS_DATA_SOURCES (RRDR_OPTION_PERCENTAGE|RRDR_OPTION_ANOMALY_BIT)
+#define RRDR_OPTIONS_DIMS_AGGREGATION (RRDR_OPTION_DIMS_MIN|RRDR_OPTION_DIMS_MAX|RRDR_OPTION_DIMS_AVERAGE|RRDR_OPTION_DIMS_MIN2MAX)
+#define RRDR_OPTIONS_REMOVE_OVERLAPPING(options) ((options) &= ~(RRDR_OPTIONS_DIMS_AGGREGATION|RRDR_OPTIONS_DATA_SOURCES))
+
+static void dims_grouping_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
+    ap->config.options &= ~(RRDR_OPTIONS_DIMS_AGGREGATION);
+
+    switch(ap->config.dims_group) {
+        default:
+        case ALERT_LOOKUP_DIMS_SUM:
+            break;
+
+        case ALERT_LOOKUP_DIMS_AVERAGE:
+            ap->config.options |= RRDR_OPTION_DIMS_AVERAGE;
+            break;
+
+        case ALERT_LOOKUP_DIMS_MIN:
+            ap->config.options |= RRDR_OPTION_DIMS_MIN;
+            break;
+
+        case ALERT_LOOKUP_DIMS_MAX:
+            ap->config.options |= RRDR_OPTION_DIMS_MAX;
+            break;
+
+        case ALERT_LOOKUP_DIMS_MIN2MAX:
+            ap->config.options |= RRDR_OPTION_DIMS_MIN2MAX;
+            break;
+    }
+}
+
+static void data_source_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
+    ap->config.options &= ~(RRDR_OPTIONS_DATA_SOURCES);
+
+    switch(ap->config.data_source) {
+        default:
+        case ALERT_LOOKUP_DATA_SOURCE_SAMPLES:
+            break;
+
+        case ALERT_LOOKUP_DATA_SOURCE_PERCENTAGES:
+            ap->config.options |= RRDR_OPTION_PERCENTAGE;
+            break;
+
+        case ALERT_LOOKUP_DATA_SOURCE_ANOMALIES:
+            ap->config.options |= RRDR_OPTION_ANOMALY_BIT;
+            break;
+    }
+}
+
 static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_match *match, BUFFER *error) {
     STRING *on = NULL;
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "on", on, error, true);
@@ -26,7 +74,9 @@ static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_ma
 static bool parse_config_value_database_lookup(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
     JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "after", config->after, error);
     JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "before", config->before, error);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "grouping", time_grouping_txt2id, config->group, error);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group", time_grouping_txt2id, config->time_group, error);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "dimensions", config->dimensions, error, true);
     return true;
@@ -175,6 +225,9 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
             goto cleanup;
         }
 
+        data_source_to_rrdr_options(ap);
+        dims_grouping_to_rrdr_options(ap);
+
         if(ap->match.enabled)
             base->_internal.enabled = true;
     }
@@ -235,8 +288,10 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
                 {
                     buffer_json_member_add_int64(wb, "after", ap->config.after);
                     buffer_json_member_add_int64(wb, "before", ap->config.before);
-                    buffer_json_member_add_string(wb, "grouping", time_grouping_id2txt(ap->config.group));
-                    rrdr_options_to_buffer_json_array(wb, "options", ap->config.options);
+                    buffer_json_member_add_string(wb, "time_group", time_grouping_id2txt(ap->config.time_group));
+                    buffer_json_member_add_string(wb, "dims_group", alerts_dims_grouping_id2group(ap->config.dims_group));
+                    buffer_json_member_add_string(wb, "data_source", alerts_data_source_id2source(ap->config.data_source));
+                    rrdr_options_to_buffer_json_array(wb, "options", RRDR_OPTIONS_REMOVE_OVERLAPPING(ap->config.options));
                     buffer_json_member_add_string(wb, "dimensions", string2str(ap->config.dimensions));
                 }
                 buffer_json_object_close(wb); // database lookup
@@ -554,8 +609,8 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
                    DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
                    (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !ap->_internal.is_on_disk ? DYNCFG_CMD_REMOVE : 0),
-               HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG,
-               HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_EDIT_AGENT_CONFIG,
+               HTTP_ACCESS_NONE,
+               HTTP_ACCESS_NONE,
                dyncfg_health_cb, NULL);
 
 #ifdef NETDATA_TEST_HEALTH_PROTOTYPES_JSON_AND_PARSING
@@ -586,8 +641,8 @@ void health_dyncfg_register_all_prototypes(void) {
                DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE_TEMPLATE,
                DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_TEST,
-               HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG,
-               HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_EDIT_AGENT_CONFIG,
+               HTTP_ACCESS_NONE,
+               HTTP_ACCESS_NONE,
                dyncfg_health_cb, NULL);
 
     dfe_start_read(health_globals.prototypes.dict, ap) {

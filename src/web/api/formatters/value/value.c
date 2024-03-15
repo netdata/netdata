@@ -2,7 +2,6 @@
 
 #include "value.h"
 
-
 inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all_values_are_null, NETDATA_DOUBLE *anomaly_rate) {
     size_t c;
 
@@ -10,60 +9,63 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
     NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
 
-    NETDATA_DOUBLE sum = 0, min = 0, max = 0, v;
-    int all_null = 1, init = 1;
+    NETDATA_DOUBLE sum = NAN, min = NAN, max = NAN, v = NAN;
+    size_t dims = 0;
 
     NETDATA_DOUBLE total_anomaly_rate = 0;
 
     // for each dimension
     for (c = 0; c < r->d ; c++) {
-        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+        if(unlikely(!rrdr_dimension_should_be_exposed(r->od[c], options)))
+            continue;
+
+        if(unlikely((co[c] & RRDR_VALUE_EMPTY)))
             continue;
 
         NETDATA_DOUBLE n = cn[c];
 
-        if(unlikely(init)) {
-            if(n > 0) {
-                min = 0;
-                max = n;
-            }
-            else {
-                min = n;
-                max = 0;
-            }
-            init = 0;
-        }
+        if(unlikely(!dims))
+            min = max = n;
 
-        if(likely(!(co[c] & RRDR_VALUE_EMPTY))) {
-            all_null = 0;
-            sum += n;
-        }
+        sum += n;
 
-        if(n < min) min = n;
-        if(n > max) max = n;
+        if (n < min) min = n;
+        if (n > max) max = n;
 
         total_anomaly_rate += ar[c];
+
+        dims++;
     }
 
-    if(anomaly_rate) {
-        if(!r->d) *anomaly_rate = 0;
-        else *anomaly_rate = total_anomaly_rate / (NETDATA_DOUBLE)r->d;
-    }
+    if(!dims) {
+        if(anomaly_rate)
+            *anomaly_rate = 0;
 
-    if(unlikely(all_null)) {
-        if(likely(all_values_are_null))
+        if(all_values_are_null)
             *all_values_are_null = 1;
-        return 0;
-    }
-    else {
-        if(likely(all_values_are_null))
-            *all_values_are_null = 0;
+
+        return (options & RRDR_OPTION_NULL2ZERO) ? 0 : NAN;
     }
 
-    if(options & RRDR_OPTION_MIN2MAX)
+    if(anomaly_rate)
+        *anomaly_rate = total_anomaly_rate / (NETDATA_DOUBLE)dims;
+
+    if(all_values_are_null)
+        *all_values_are_null = 0;
+
+    if(options & RRDR_OPTION_DIMS_MIN2MAX)
         v = max - min;
+    else if(options & RRDR_OPTION_DIMS_AVERAGE)
+        v = sum / (NETDATA_DOUBLE)dims;
+    else if(options & RRDR_OPTION_DIMS_MIN)
+        v = min;
+    else if(options & RRDR_OPTION_DIMS_MAX)
+        v = max;
     else
         v = sum;
+
+    if((options & RRDR_OPTION_NULL2ZERO) && (isnan(v) || isinf(v)))
+        v = 0;
 
     return v;
 }

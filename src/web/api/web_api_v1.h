@@ -15,6 +15,7 @@ void web_client_api_request_v2_contexts_alerts_status_to_buffer_json_array(BUFFE
 RRDR_OPTIONS rrdr_options_parse(char *o);
 RRDR_OPTIONS rrdr_options_parse_one(const char *o);
 
+void rrdr_options_to_buffer(BUFFER *wb, RRDR_OPTIONS options);
 void rrdr_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options);
 void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options);
 

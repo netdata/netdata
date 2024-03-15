@@ -239,7 +239,19 @@ static inline int health_parse_db_lookup(
             *options |= RRDR_OPTION_ABSOLUTE;
         }
         else if(!strcasecmp(key, "min2max")) {
-            *options |= RRDR_OPTION_MIN2MAX;
+            *options |= RRDR_OPTION_DIMS_MIN2MAX;
+        }
+        else if(!strcasecmp(key, "average")) {
+            *options |= RRDR_OPTION_DIMS_AVERAGE;
+        }
+        else if(!strcasecmp(key, "min")) {
+            *options |= RRDR_OPTION_DIMS_MIN;
+        }
+        else if(!strcasecmp(key, "max")) {
+            *options |= RRDR_OPTION_DIMS_MAX;
+        }
+        else if(!strcasecmp(key, "sum")) {
+            ;
         }
         else if(!strcasecmp(key, "null2zero")) {
             *options |= RRDR_OPTION_NULL2ZERO;
@@ -356,6 +368,28 @@ static void replace_green_red(RRD_ALERT_PROTOTYPE *ap, NETDATA_DOUBLE green, NET
         expression_hardcode_variable(ap->config.critical, red_str, red);
         string_freez(red_str);
     }
+}
+
+static void dims_grouping_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
+    if(ap->config.options & RRDR_OPTION_DIMS_MIN)
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_MIN;
+    else if(ap->config.options & RRDR_OPTION_DIMS_MAX)
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_MAX;
+    else if(ap->config.options & RRDR_OPTION_DIMS_MIN2MAX)
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_MIN2MAX;
+    else if(ap->config.options & RRDR_OPTION_DIMS_AVERAGE)
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_AVERAGE;
+    else
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_SUM;
+}
+
+static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
+    if(ap->config.options & RRDR_OPTION_PERCENTAGE)
+        ap->config.data_source = ALERT_LOOKUP_DATA_SOURCE_PERCENTAGES;
+    else if(ap->config.options & RRDR_OPTION_ANOMALY_BIT)
+        ap->config.data_source = ALERT_LOOKUP_DATA_SOURCE_ANOMALIES;
+    else
+        ap->config.data_source = ALERT_LOOKUP_DATA_SOURCE_SAMPLES;
 }
 
 #define PARSE_HEALTH_CONFIG_LOG_DUPLICATE_STRING_MSG(ax, member) do {                               \
@@ -540,6 +574,8 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
 
         if((hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) || (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY))) {
             if(ap) {
+                lookup_data_source_from_rrdr_options(ap);
+                dims_grouping_from_rrdr_options(ap);
                 replace_green_red(ap, green, red);
                 health_prototype_add(ap);
                 freez(ap);
@@ -614,7 +650,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
             ac->lookup = string_strdupz(value);
             health_parse_db_lookup(line, filename, value,
-                                   &ac->group, &ac->after, &ac->before,
+                                   &ac->time_group, &ac->after, &ac->before,
                                    &ac->update_every, &ac->options,
                                    &ac->dimensions);
         }
@@ -724,6 +760,8 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
     }
 
     if(ap) {
+        lookup_data_source_from_rrdr_options(ap);
+        dims_grouping_from_rrdr_options(ap);
         replace_green_red(ap, green, red);
         health_prototype_add(ap);
         freez(ap);

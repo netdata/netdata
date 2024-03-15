@@ -1058,7 +1058,7 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
-        rc = sqlite3_bind_text(res, ++param, time_grouping_id2txt(ap->config.group), -1, SQLITE_STATIC);
+        rc = sqlite3_bind_text(res, ++param, time_grouping_id2txt(ap->config.time_group), -1, SQLITE_STATIC);
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 

@@ -341,7 +341,7 @@ static void health_event_loop(void) {
                     int value_is_null = 0;
 
                     int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
-                                                  rc->config.after, rc->config.before, rc->config.group, NULL,
+                                                  rc->config.after, rc->config.before, rc->config.time_group, NULL,
                                                   0, rc->config.options | RRDR_OPTION_SELECTED_TIER,
                                                   &rc->db_after,&rc->db_before,
                                                   NULL, NULL, NULL,

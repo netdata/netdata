@@ -129,11 +129,11 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                         "\t\t\t\"lookup_options\": \"",
                        (unsigned long) rc->db_after,
                        (unsigned long) rc->db_before,
-            time_grouping_id2txt(rc->config.group),
+                       time_grouping_id2txt(rc->config.time_group),
                        rc->config.after,
                        rc->config.before
         );
-        buffer_data_options2string(wb, rc->config.options);
+        rrdr_options_to_buffer(wb, rc->config.options);
         buffer_strcat(wb, "\",\n");
     }
 

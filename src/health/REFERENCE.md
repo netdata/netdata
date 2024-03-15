@@ -404,8 +404,19 @@ The full [database query API](https://github.com/netdata/netdata/blob/master/src
 - `every DURATION` sets the updated frequency of the lookup (supports single letter units as
      above too).
 
-- `OPTIONS` is a space separated list of `percentage`, `absolute`, `min2max`, `unaligned`,
-     `match-ids`, `match-names`. Check the [badges](https://github.com/netdata/netdata/blob/master/src/web/api/badges/README.md) documentation for more info.
+- `OPTIONS` is a space separated list of `percentage`, `absolute`, `min`, `max`, `average`, `sum`,
+     `min2max`, `unaligned`, `match-ids`, `match-names`.
+
+  - `percentage` during time-aggregation, calculate the percentage of the selected dimensions over the total of all dimensions.
+  - `absolute` during time-aggregation, turns all sample values positive before using them.
+  - `min` after time-aggregation of each dimension, return the minimum of all dimensions.
+  - `max` after time-aggregation of each dimension, return the maximum of all dimensions.
+  - `average` after time-aggregation of each dimension, return the average of all dimensions.
+  - `sum` after time-aggregation of each dimension, return the sum of all dimensions (this is the default).
+  - `min2max` after time-aggregation of each dimension, return the delta between the min and the max of the dimensions.
+  - `unligned` prevents shifting the query window to multiples of the query duration.
+  - `match-ids` matches the dimensions based on their IDs (the default is enabled, give `match-names` to disable).
+  - `match-names` matches the dimension based on their names (the default is enabled, give `match-ids` to disable).
 
 - `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
      by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
