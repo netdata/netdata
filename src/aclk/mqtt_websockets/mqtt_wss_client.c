@@ -591,7 +591,8 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
 
 #ifndef SOCK_CLOEXEC
     int flags = fcntl(client->sockfd, F_GETFD);
-    (void) fcntl(client->sockfd, F_SETFD, flags| FD_CLOEXEC);
+    if (flags != -1)
+        (void) fcntl(client->sockfd, F_SETFD, flags| FD_CLOEXEC);
 #endif
 
     int flag = 1;

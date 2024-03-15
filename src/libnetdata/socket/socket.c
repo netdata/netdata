@@ -196,7 +196,8 @@ void sock_setcloexec(int fd)
     UNUSED(fd);
 #ifndef SOCK_CLOEXEC
     int flags = fcntl(fd, F_GETFD);
-    (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+    if (flags != -1)
+        (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
 #endif
 }
 
