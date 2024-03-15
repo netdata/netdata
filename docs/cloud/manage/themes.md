@@ -1,4 +1,4 @@
-# Choose your Netdata Cloud theme
+# Choose your Netdata UI theme
 
 The Dark theme is the default in the Netdata UI.
 
