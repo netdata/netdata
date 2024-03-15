@@ -1338,6 +1338,10 @@ static void contexts_v2_alert_config_to_json_from_sql_alert_config_data(struct s
 
                     buffer_json_member_add_time_t(wb, "after", t->value.db.after);
                     buffer_json_member_add_time_t(wb, "before", t->value.db.before);
+                    buffer_json_member_add_string(wb, "time_group_condition", alerts_group_conditions_id2txt(t->value.db.time_group_condition));
+                    buffer_json_member_add_double(wb, "time_group_value", t->value.db.time_group_value);
+                    buffer_json_member_add_string(wb, "dims_group", alerts_dims_grouping_id2group(t->value.db.dims_group));
+                    buffer_json_member_add_string(wb, "data_source", alerts_data_source_id2source(t->value.db.data_source));
                     buffer_json_member_add_string(wb, "method", t->value.db.method);
                     buffer_json_member_add_string(wb, "dimensions", t->value.db.dimensions);
                     rrdr_options_to_buffer_json_array(wb, "options", (RRDR_OPTIONS)t->value.db.options);
