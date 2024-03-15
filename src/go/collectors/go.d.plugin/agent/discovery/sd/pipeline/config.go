@@ -16,6 +16,7 @@ type Config struct {
 	Source         string             `yaml:"-"`
 	ConfigDefaults confgroup.Registry `yaml:"-"`
 
+	Disabled bool                 `yaml:"disabled"`
 	Name     string               `yaml:"name"`
 	Discover []DiscoveryConfig    `yaml:"discover"`
 	Classify []ClassifyRuleConfig `yaml:"classify"`
