@@ -895,16 +895,19 @@ void sql_health_alarm_log_load(RRDHOST *host)
 /*
  * Store an alert config hash in the database
  */
-#define SQL_STORE_ALERT_CONFIG_HASH                                                                                     \
-    "insert or replace into alert_hash (hash_id, date_updated, alarm, template, "                                       \
-    "on_key, class, component, type, lookup, every, units, calc, "                                                      \
-    "green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, "                                 \
-    "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, "                              \
-    "p_db_lookup_before, p_update_every, source, chart_labels, summary) values (@hash_id,UNIXEPOCH(),@alarm,@template," \
-    "@on_key,@class,@component,@type,@lookup,@every,@units,@calc,"                                                      \
-    "@green,@red,@warn,@crit,@exec,@to_key,@info,@delay,@options,@repeat,@host_labels,"                                 \
-    "@p_db_lookup_dimensions,@p_db_lookup_method,@p_db_lookup_options,@p_db_lookup_after,"                              \
-    "@p_db_lookup_before,@p_update_every,@source,@chart_labels,@summary)"
+#define SQL_STORE_ALERT_CONFIG_HASH                                                                                    \
+    "insert or replace into alert_hash (hash_id, date_updated, alarm, template, "                                      \
+    "on_key, class, component, type, lookup, every, units, calc, "                                                     \
+    "green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, "                                \
+    "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, "                             \
+    "p_db_lookup_before, p_update_every, source, chart_labels, summary, time_group_condition, "                        \
+    "time_group_value, dims_group, data_source) "                                                                      \
+    "values (@hash_id,UNIXEPOCH(),@alarm,@template,"                                                                   \
+    "@on_key,@class,@component,@type,@lookup,@every,@units,@calc,"                                                     \
+    "@green,@red,@warn,@crit,@exec,@to_key,@info,@delay,@options,@repeat,@host_labels,"                                \
+    "@p_db_lookup_dimensions,@p_db_lookup_method,@p_db_lookup_options,@p_db_lookup_after,"                             \
+    "@p_db_lookup_before,@p_update_every,@source,@chart_labels,@summary, @time_group_condition, "                      \
+    "@time_group_value, @dims_group, @data_source)"
 
 int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
 {
@@ -966,6 +969,7 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
+    // Rebuild lookup
     rc = SQLITE3_BIND_STRING_OR_NULL(res, NULL, ++param); // lookup line
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
@@ -1062,7 +1066,7 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
-        rc = sqlite3_bind_int(res, ++param, (int) ap->config.options);
+        rc = sqlite3_bind_int(res, ++param, (int) RRDR_OPTIONS_REMOVE_OVERLAPPING(ap->config.options));
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
@@ -1108,6 +1112,22 @@ int sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
         goto bind_fail;
 
     rc = SQLITE3_BIND_STRING_OR_NULL(res, ap->config.summary, ++param);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, ap->config.time_group_condition);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_double(res, ++param, ap->config.time_group_value);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, ap->config.dims_group);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_int(res, ++param, ap->config.data_source);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 

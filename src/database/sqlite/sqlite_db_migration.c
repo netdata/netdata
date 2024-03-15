@@ -153,6 +153,15 @@ const char *database_migrate_v13_v14[] = {
     NULL
 };
 
+const char *database_migrate_v16_v17[] = {
+    "ALTER TABLE alert_hash ADD time_group_condition INT",
+    "ALTER TABLE alert_hash ADD time_group_value DOUBLE",
+    "ALTER TABLE alert_hash ADD dims_group INT",
+    "ALTER TABLE alert_hash ADD data_source INT",
+    NULL
+};
+
+
 static int do_migration_v1_v2(sqlite3 *database)
 {
     if (table_exists_in_database(database, "host") && !column_exists_in_table(database, "host", "hops"))
@@ -430,6 +439,15 @@ static int do_migration_v15_v16(sqlite3 *database)
     return 0;
 }
 
+static int do_migration_v16_v17(sqlite3 *database)
+{
+    if (table_exists_in_database(database, "alert_hash") && !column_exists_in_table(database, "alert_hash", "time_group_condition"))
+        return init_database_batch(database, &database_migrate_v16_v17[0], "meta_migrate");
+
+    return 0;
+}
+
+
 static int do_migration_v12_v13(sqlite3 *database)
 {
     int rc = 0;
@@ -527,6 +545,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v13 to v14",  .func = do_migration_v13_v14},
     {.name = "v14 to v15",  .func = do_migration_v14_v15},
     {.name = "v15 to v16",  .func = do_migration_v15_v16},
+    {.name = "v16 to v17",  .func = do_migration_v16_v17},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
