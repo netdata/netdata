@@ -607,7 +607,7 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
                ap->_internal.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
                ap->config.source_type, string2str(ap->config.source),
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
-                   DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
+                   DYNCFG_CMD_UPDATE |
                    (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !ap->_internal.is_on_disk ? DYNCFG_CMD_REMOVE : 0),
                HTTP_ACCESS_NONE,
                HTTP_ACCESS_NONE,
@@ -640,7 +640,7 @@ void health_dyncfg_register_all_prototypes(void) {
                DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX, "/health/alerts/prototypes",
                DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE_TEMPLATE,
                DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
-               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_TEST,
+               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
                HTTP_ACCESS_NONE,
                HTTP_ACCESS_NONE,
                dyncfg_health_cb, NULL);
