@@ -5,9 +5,8 @@
 #ifdef __APPLE__
 static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
     int bufferSize = proc_pidinfo(p->pid, PROC_PIDPATHINFO, 0, cmdline, (int)bytes-1);
-    if (bufferSize <= 0) {
+    if (bufferSize <= 0)
         return false;
-    }
 
     // Ensure null termination
     cmdline[bufferSize] = '\0';

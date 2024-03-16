@@ -35,6 +35,15 @@
 #define ALL_PIDS_ARE_READ_INSTANTLY 0
 #endif
 
+#if defined(__APPLE__)
+struct pid_info {
+    struct proc_taskinfo taskinfo;
+    struct proc_bsdinfo bsdinfo;
+    struct rusage_info_v4 rusageinfo;
+
+};
+#endif
+
 // ----------------------------------------------------------------------------
 
 extern bool debug_enabled;
@@ -90,7 +99,7 @@ extern size_t pagesize;
 
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
-#define MAX_CMDLINE 16384
+#define MAX_CMDLINE 65536
 
 // ----------------------------------------------------------------------------
 // to avoid reallocating too frequently, we can increase the number of spare

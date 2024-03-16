@@ -16,35 +16,15 @@ static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
 #endif
 
 #ifdef __APPLE__
-static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
-    struct proc_taskinfo taskinfo;
-    struct proc_bsdinfo bsdinfo;
-    struct rusage_info_v4 rusageinfo;
+static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
+    struct pid_info *pi = ptr;
 
-    int st = proc_pidinfo(p->pid, PROC_PIDTASKINFO, 0, &taskinfo, PROC_PIDTASKINFO_SIZE);
-    if (st <= 0) {
-        netdata_log_error("Failed to get task info for PID %d", p->pid);
-        return false;
-    }
-
-    st = proc_pidinfo(p->pid, PROC_PIDTBSDINFO, 0, &bsdinfo, PROC_PIDTBSDINFO_SIZE);
-    if (st <= 0) {
-        netdata_log_error("Failed to get BSD info for PID %d", p->pid);
-        return false;
-    }
-
-    st = proc_pid_rusage(p->pid, RUSAGE_INFO_V4, (rusage_info_t *)&rusageinfo);
-    if (st <= 0) {
-        netdata_log_error("Failed to get resource usage info for PID %d", p->pid);
-        return false;
-    }
-
-    p->uid = bsdinfo.pbi_uid;
-    p->gid = bsdinfo.pbi_gid;
-    p->status_vmsize = taskinfo.pti_virtual_size / 1024; // Convert bytes to KiB
-    p->status_vmrss = taskinfo.pti_resident_size / 1024; // Convert bytes to KiB
+    p->uid = pi->bsdinfo.pbi_uid;
+    p->gid = pi->bsdinfo.pbi_gid;
+    p->status_vmsize = pi->taskinfo.pti_virtual_size / 1024; // Convert bytes to KiB
+    p->status_vmrss = pi->taskinfo.pti_resident_size / 1024; // Convert bytes to KiB
     // p->status_vmswap = rusageinfo.ri_swapins + rusageinfo.ri_swapouts; // This is not directly available, consider an alternative representation
-    p->status_voluntary_ctxt_switches = taskinfo.pti_csw;
+    p->status_voluntary_ctxt_switches = pi->taskinfo.pti_csw;
     // p->status_nonvoluntary_ctxt_switches = taskinfo.pti_nivcsw;
 
     return true;

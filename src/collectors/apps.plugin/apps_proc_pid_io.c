@@ -30,18 +30,13 @@ static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
 #endif
 
 #ifdef __APPLE__
-static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
-    struct rusage_info_v4 rusage_info;
-    int st = proc_pid_rusage(p->pid, RUSAGE_INFO_V4, (rusage_info_t *)&rusage_info);
-    if (st <= 0) {
-        netdata_log_error("Failed to get resource usage info for PID %d", p->pid);
-        return false;
-    }
+static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
+    struct pid_info *pi = ptr;
 
     // On MacOS, the proc_pid_rusage provides disk_io_statistics which includes io bytes read and written
     // but does not provide the same level of detail as Linux, like separating logical and physical I/O bytes.
-    pid_incremental_rate(io, p->io_storage_bytes_read, rusage_info.ri_diskio_bytesread);
-    pid_incremental_rate(io, p->io_storage_bytes_written, rusage_info.ri_diskio_byteswritten);
+    pid_incremental_rate(io, p->io_storage_bytes_read, pi->rusageinfo.ri_diskio_bytesread);
+    pid_incremental_rate(io, p->io_storage_bytes_written, pi->rusageinfo.ri_diskio_byteswritten);
 
     p->io_logical_bytes_read = 0;
     p->io_logical_bytes_written = 0;

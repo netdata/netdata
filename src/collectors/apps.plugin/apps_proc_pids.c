@@ -539,7 +539,27 @@ static inline bool collect_data_for_all_pids_per_os(void) {
         pid_t pid = pids[i];
         if (pid <= 0) continue;
 
-        collect_data_for_pid(pid, NULL);
+        struct pid_info pi = { 0 };
+
+        int st = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &pi.taskinfo, sizeof(pi.taskinfo));
+        if (st <= 0) {
+            netdata_log_error("Failed to get task info for PID %d", pid);
+            continue;
+        }
+
+        st = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &pi.bsdinfo, sizeof(pi.bsdinfo));
+        if (st <= 0) {
+            netdata_log_error("Failed to get BSD info for PID %d", pid);
+            continue;
+        }
+
+        st = proc_pid_rusage(pid, RUSAGE_INFO_V4, (rusage_info_t *)&pi.rusageinfo);
+        if (st < 0) {
+            netdata_log_error("Failed to get resource usage info for PID %d", pid);
+            continue;
+        }
+
+        collect_data_for_pid(pid, &pi);
     }
 
     return true;

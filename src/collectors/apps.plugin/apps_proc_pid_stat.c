@@ -117,29 +117,23 @@ cleanup:
 #endif // __FreeBSD__
 
 #ifdef __APPLE__
-static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
-    struct proc_taskinfo taskinfo;
-    int result = proc_pidinfo(p->pid, PROC_PIDTASKINFO, 0, &taskinfo, sizeof(taskinfo));
-    if (result <= 0) {
-        netdata_log_error("Failed to get task info for PID %d", p->pid);
-        clear_pid_stat(p, true);
-        return false;
-    }
+static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
+    struct pid_info *pi = ptr;
 
     // Update command name and target if changed
     char comm[PROC_PIDPATHINFO_MAXSIZE];
-    int ret = proc_pidpath(p->pid, comm, sizeof(comm));
-    if (ret <= 0) {
+    int ret = proc_name(p->pid, comm, sizeof(comm));
+    if (ret <= 0)
         strncpy(comm, "unknown", sizeof(comm));
-    }
+
     update_pid_comm(p, comm);
 
     // Map the values from taskinfo to the pid_stat structure
-    pid_incremental_rate(stat, p->minflt, taskinfo.pti_faults);
-    pid_incremental_rate(stat, p->majflt, taskinfo.pti_pageins);
-    pid_incremental_rate(stat, p->utime, taskinfo.pti_total_user / 10000);  // Convert to 100Hz ticks
-    pid_incremental_rate(stat, p->stime, taskinfo.pti_total_system / 10000); // Convert to 100Hz ticks
-    p->num_threads = taskinfo.pti_threadnum;
+    pid_incremental_rate(stat, p->minflt, pi->taskinfo.pti_faults);
+    pid_incremental_rate(stat, p->majflt, pi->taskinfo.pti_pageins);
+    pid_incremental_rate(stat, p->utime, pi->taskinfo.pti_total_user / 10000);  // Convert to 100Hz ticks
+    pid_incremental_rate(stat, p->stime, pi->taskinfo.pti_total_system / 10000); // Convert to 100Hz ticks
+    p->num_threads = pi->taskinfo.pti_threadnum;
 
     // Note: Some values such as guest time, cutime, cstime, etc., are not directly available in MacOS.
     // You might need to approximate or leave them unset depending on your needs.
@@ -152,7 +146,8 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __may
     if(unlikely(global_iterations_counter == 1))
         clear_pid_stat(p, false);
 
-    // MacOS doesn't have a direct concept of process state like Linux, so updating process state count might need a different approach.
+    // MacOS doesn't have a direct concept of process state like Linux,
+    // so updating process state count might need a different approach.
 
     return true;
 }
