@@ -1145,7 +1145,7 @@ int main(int argc, char **argv) {
         if(global_iterations_counter % 10 == 0)
             get_MemTotal();
 
-        if(!collect_data_for_all_processes()) {
+        if(!collect_data_for_all_pids()) {
             netdata_log_error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
             printf("DISABLE\n");
             netdata_mutex_unlock(&apps_and_stdout_mutex);

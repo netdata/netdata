@@ -2,7 +2,56 @@
 
 #include "apps_plugin.h"
 
-#ifndef __FreeBSD__
+#if defined(__FreeBSD__)
+static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr) {
+    struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
+
+    p->uid                  = proc_info->ki_uid;
+    p->gid                  = proc_info->ki_groups[0];
+    p->status_vmsize        = proc_info->ki_size / 1024; // in KiB
+    p->status_vmrss         = proc_info->ki_rssize * pagesize / 1024; // in KiB
+    // TODO: what about shared and swap memory on FreeBSD?
+    return true;
+}
+#endif
+
+#ifdef __APPLE__
+static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+    struct proc_taskinfo taskinfo;
+    struct proc_bsdinfo bsdinfo;
+    struct rusage_info_v4 rusageinfo;
+
+    int st = proc_pidinfo(p->pid, PROC_PIDTASKINFO, 0, &taskinfo, PROC_PIDTASKINFO_SIZE);
+    if (st <= 0) {
+        netdata_log_error("Failed to get task info for PID %d", p->pid);
+        return false;
+    }
+
+    st = proc_pidinfo(p->pid, PROC_PIDBSDINFO, 0, &bsdinfo, PROC_PIDBSDINFO_SIZE);
+    if (st <= 0) {
+        netdata_log_error("Failed to get BSD info for PID %d", p->pid);
+        return false;
+    }
+
+    st = proc_pid_rusage(p->pid, RUSAGE_INFO_V4, (rusage_info_t *)&rusageinfo);
+    if (st <= 0) {
+        netdata_log_error("Failed to get resource usage info for PID %d", p->pid);
+        return false;
+    }
+
+    p->uid = bsdinfo.pbi_uid;
+    p->gid = bsdinfo.pbi_gid;
+    p->status_vmsize = taskinfo.pti_virtual_size / 1024; // Convert bytes to KiB
+    p->status_vmrss = taskinfo.pti_resident_size / 1024; // Convert bytes to KiB
+    p->status_vmswap = rusageinfo.ri_swapins + rusageinfo.ri_swapouts; // This is not directly available, consider an alternative representation
+    p->status_voluntary_ctxt_switches = taskinfo.pti_csw;
+    p->status_nonvoluntary_ctxt_switches = taskinfo.pti_nivcsw;
+
+    return true;
+}
+#endif // __APPLE__
+
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
 struct arl_callback_ptr {
     struct pid_stat *p;
     procfile *ff;
@@ -94,30 +143,8 @@ void arl_callback_status_nonvoluntary_ctxt_switches(const char *name, uint32_t h
     struct pid_stat *p = aptr->p;
     pid_incremental_rate(stat, p->status_nonvoluntary_ctxt_switches, str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)));
 }
-#endif // !__FreeBSD__
 
-int read_proc_pid_status(struct pid_stat *p, void *ptr) {
-    p->status_vmsize           = 0;
-    p->status_vmrss            = 0;
-    p->status_vmshared         = 0;
-    p->status_rssfile          = 0;
-    p->status_rssshmem         = 0;
-    p->status_vmswap           = 0;
-    p->status_voluntary_ctxt_switches = 0;
-    p->status_nonvoluntary_ctxt_switches = 0;
-
-#ifdef __FreeBSD__
-    struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
-
-    p->uid                  = proc_info->ki_uid;
-    p->gid                  = proc_info->ki_groups[0];
-    p->status_vmsize        = proc_info->ki_size / 1024; // in KiB
-    p->status_vmrss         = proc_info->ki_rssize * pagesize / 1024; // in KiB
-    // TODO: what about shared and swap memory on FreeBSD?
-    return 1;
-#else
-    (void)ptr;
-
+static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     static struct arl_callback_ptr arl_ptr;
     static procfile *ff = NULL;
 
@@ -134,7 +161,6 @@ int read_proc_pid_status(struct pid_stat *p, void *ptr) {
         arl_expect_custom(p->status_arl, "nonvoluntary_ctxt_switches", arl_callback_status_nonvoluntary_ctxt_switches, &arl_ptr);
     }
 
-
     if(unlikely(!p->status_filename)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/status", netdata_configured_host_prefix, p->pid);
@@ -142,10 +168,10 @@ int read_proc_pid_status(struct pid_stat *p, void *ptr) {
     }
 
     ff = procfile_reopen(ff, p->status_filename, (!ff)?" \t:,-()/":NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    if(unlikely(!ff)) return 0;
+    if(unlikely(!ff)) return false;
 
     ff = procfile_readall(ff);
-    if(unlikely(!ff)) return 0;
+    if(unlikely(!ff)) return false;
 
     calls_counter++;
 
@@ -168,6 +194,19 @@ int read_proc_pid_status(struct pid_stat *p, void *ptr) {
 
     // debug_log("%s uid %d, gid %d, VmSize %zu, VmRSS %zu, RssFile %zu, RssShmem %zu, shared %zu", p->comm, (int)p->uid, (int)p->gid, p->status_vmsize, p->status_vmrss, p->status_rssfile, p->status_rssshmem, p->status_vmshared);
 
-    return 1;
-#endif
+    return true;
+}
+#endif // !__FreeBSD__ !__APPLE__
+
+int read_proc_pid_status(struct pid_stat *p, void *ptr) {
+    p->status_vmsize           = 0;
+    p->status_vmrss            = 0;
+    p->status_vmshared         = 0;
+    p->status_rssfile          = 0;
+    p->status_rssshmem         = 0;
+    p->status_vmswap           = 0;
+    p->status_voluntary_ctxt_switches = 0;
+    p->status_nonvoluntary_ctxt_switches = 0;
+
+    return read_proc_pid_status_per_os(p, ptr) ? 1 : 0;
 }

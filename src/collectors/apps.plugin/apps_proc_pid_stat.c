@@ -38,14 +38,129 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
     }
 }
 
-int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
-    (void)ptr;
+static inline void update_pid_comm(struct pid_stat *p, const char *comm) {
+    if(strcmp(p->comm, comm) != 0) {
+        if(unlikely(debug_enabled)) {
+            if(p->comm[0])
+                debug_log("\tpid %d (%s) changed name to '%s'", p->pid, p->comm, comm);
+            else
+                debug_log("\tJust added %d (%s)", p->pid, comm);
+        }
 
-#ifdef __FreeBSD__
+        strncpyz(p->comm, comm, MAX_COMPARE_NAME);
+
+        // /proc/<pid>/cmdline
+        if(likely(proc_pid_cmdline_is_needed))
+            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
+
+        assign_target_to_pid(p);
+    }
+}
+
+static inline void clear_pid_stat(struct pid_stat *p, bool threads) {
+    p->minflt           = 0;
+    p->cminflt          = 0;
+    p->majflt           = 0;
+    p->cmajflt          = 0;
+    p->utime            = 0;
+    p->stime            = 0;
+    p->gtime            = 0;
+    p->cutime           = 0;
+    p->cstime           = 0;
+    p->cgtime           = 0;
+
+    if(threads)
+        p->num_threads      = 0;
+
+    // p->rss              = 0;
+}
+
+#if defined(__FreeBSD__)
+static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
     if (unlikely(proc_info->ki_tdflags & TDF_IDLETD))
         goto cleanup;
-#else
+
+    char *comm          = proc_info->ki_comm;
+    p->ppid             = proc_info->ki_ppid;
+
+    update_pid_comm(p, comm);
+
+    pid_incremental_rate(stat, p->minflt,  (kernel_uint_t)proc_info->ki_rusage.ru_minflt);
+    pid_incremental_rate(stat, p->cminflt, (kernel_uint_t)proc_info->ki_rusage_ch.ru_minflt);
+    pid_incremental_rate(stat, p->majflt,  (kernel_uint_t)proc_info->ki_rusage.ru_majflt);
+    pid_incremental_rate(stat, p->cmajflt, (kernel_uint_t)proc_info->ki_rusage_ch.ru_majflt);
+    pid_incremental_rate(stat, p->utime,   (kernel_uint_t)proc_info->ki_rusage.ru_utime.tv_sec * 100 + proc_info->ki_rusage.ru_utime.tv_usec / 10000);
+    pid_incremental_rate(stat, p->stime,   (kernel_uint_t)proc_info->ki_rusage.ru_stime.tv_sec * 100 + proc_info->ki_rusage.ru_stime.tv_usec / 10000);
+    pid_incremental_rate(stat, p->cutime,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_utime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_utime.tv_usec / 10000);
+    pid_incremental_rate(stat, p->cstime,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_stime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_stime.tv_usec / 10000);
+
+    p->num_threads      = proc_info->ki_numthreads;
+
+    if(enable_guest_charts) {
+        enable_guest_charts = false;
+        netdata_log_info("Guest charts aren't supported by FreeBSD");
+    }
+
+    if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
+        debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d", netdata_configured_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
+
+    if(unlikely(global_iterations_counter == 1))
+        clear_pid_stat(p, false);
+
+    update_proc_state_count(p->state);
+    return true;
+
+cleanup:
+    clear_pid_stat(p, true);
+    return false;
+}
+#endif // __FreeBSD__
+
+#ifdef __APPLE__
+static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+    struct proc_taskinfo taskinfo;
+    int result = proc_pidinfo(p->pid, PROC_PIDTASKINFO, 0, &taskinfo, sizeof(taskinfo));
+    if (result <= 0) {
+        netdata_log_error("Failed to get task info for PID %d", p->pid);
+        clear_pid_stat(p, true);
+        return false;
+    }
+
+    // Update command name and target if changed
+    char comm[PROC_PIDPATHINFO_MAXSIZE];
+    int ret = proc_pidpath(p->pid, comm, sizeof(comm));
+    if (ret <= 0) {
+        strncpy(comm, "unknown", sizeof(comm));
+    }
+    update_pid_comm(p, comm);
+
+    // Map the values from taskinfo to the pid_stat structure
+    pid_incremental_rate(stat, p->minflt, taskinfo.pti_faults);
+    pid_incremental_rate(stat, p->majflt, taskinfo.pti_pageins);
+    pid_incremental_rate(stat, p->utime, taskinfo.pti_total_user / 10000);  // Convert to 100Hz ticks
+    pid_incremental_rate(stat, p->stime, taskinfo.pti_total_system / 10000); // Convert to 100Hz ticks
+    p->num_threads = taskinfo.pti_threadnum;
+
+    // Note: Some values such as guest time, cutime, cstime, etc., are not directly available in MacOS.
+    // You might need to approximate or leave them unset depending on your needs.
+
+    if(unlikely(debug_enabled || (p->target && p->target->debug_enabled))) {
+        debug_log_int("READ PROC/PID/STAT for MacOS: process: '%s' on target '%s' VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", threads=%d",
+                      p->comm, (p->target) ? p->target->name : "UNSET", p->utime, p->stime, p->minflt, p->majflt, p->num_threads);
+    }
+
+    if(unlikely(global_iterations_counter == 1))
+        clear_pid_stat(p, false);
+
+    // MacOS doesn't have a direct concept of process state like Linux, so updating process state count might need a different approach.
+
+    return true;
+}
+#endif // __APPLE__
+
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
+static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     static procfile *ff = NULL;
 
     if(unlikely(!p->stat_filename)) {
@@ -65,16 +180,7 @@ int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
-#endif
 
-    p->last_stat_collected_usec = p->stat_collected_usec;
-    p->stat_collected_usec = now_monotonic_usec();
-    calls_counter++;
-
-#ifdef __FreeBSD__
-    char *comm          = proc_info->ki_comm;
-    p->ppid             = proc_info->ki_ppid;
-#else
     // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0));
     char *comm          = procfile_lineword(ff, 0, 1);
     p->state            = *(procfile_lineword(ff, 0, 2));
@@ -84,41 +190,9 @@ int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->tty_nr        = (int32_t)str2pid_t(procfile_lineword(ff, 0, 6));
     // p->tpgid         = (int32_t)str2pid_t(procfile_lineword(ff, 0, 7));
     // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
-#endif
-    if(strcmp(p->comm, comm) != 0) {
-        if(unlikely(debug_enabled)) {
-            if(p->comm[0])
-                debug_log("\tpid %d (%s) changed name to '%s'", p->pid, p->comm, comm);
-            else
-                debug_log("\tJust added %d (%s)", p->pid, comm);
-        }
 
-        strncpyz(p->comm, comm, MAX_COMPARE_NAME);
+    update_pid_comm(p, comm);
 
-        // /proc/<pid>/cmdline
-        if(likely(proc_pid_cmdline_is_needed))
-            managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
-
-        assign_target_to_pid(p);
-    }
-
-#ifdef __FreeBSD__
-    pid_incremental_rate(stat, p->minflt,  (kernel_uint_t)proc_info->ki_rusage.ru_minflt);
-    pid_incremental_rate(stat, p->cminflt, (kernel_uint_t)proc_info->ki_rusage_ch.ru_minflt);
-    pid_incremental_rate(stat, p->majflt,  (kernel_uint_t)proc_info->ki_rusage.ru_majflt);
-    pid_incremental_rate(stat, p->cmajflt, (kernel_uint_t)proc_info->ki_rusage_ch.ru_majflt);
-    pid_incremental_rate(stat, p->utime,   (kernel_uint_t)proc_info->ki_rusage.ru_utime.tv_sec * 100 + proc_info->ki_rusage.ru_utime.tv_usec / 10000);
-    pid_incremental_rate(stat, p->stime,   (kernel_uint_t)proc_info->ki_rusage.ru_stime.tv_sec * 100 + proc_info->ki_rusage.ru_stime.tv_usec / 10000);
-    pid_incremental_rate(stat, p->cutime,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_utime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_utime.tv_usec / 10000);
-    pid_incremental_rate(stat, p->cstime,  (kernel_uint_t)proc_info->ki_rusage_ch.ru_stime.tv_sec * 100 + proc_info->ki_rusage_ch.ru_stime.tv_usec / 10000);
-
-    p->num_threads      = proc_info->ki_numthreads;
-
-    if(enable_guest_charts) {
-        enable_guest_charts = false;
-        netdata_log_info("Guest charts aren't supported by FreeBSD");
-    }
-#else
     pid_incremental_rate(stat, p->minflt,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
     pid_incremental_rate(stat, p->cminflt, str2kernel_uint_t(procfile_lineword(ff, 0, 10)));
     pid_incremental_rate(stat, p->majflt,  str2kernel_uint_t(procfile_lineword(ff, 0, 11)));
@@ -155,7 +229,6 @@ int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->delayacct_blkio_ticks = str2kernel_uint_t(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
-
         pid_incremental_rate(stat, p->gtime,  str2kernel_uint_t(procfile_lineword(ff, 0, 42)));
         pid_incremental_rate(stat, p->cgtime, str2kernel_uint_t(procfile_lineword(ff, 0, 43)));
 
@@ -165,39 +238,29 @@ int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
             show_guest_time = 1;
         }
     }
-#endif
 
     if(unlikely(debug_enabled || (p->target && p->target->debug_enabled)))
         debug_log_int("READ PROC/PID/STAT: %s/proc/%d/stat, process: '%s' on target '%s' (dt=%llu) VALUES: utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT ", threads=%d", netdata_configured_host_prefix, p->pid, p->comm, (p->target)?p->target->name:"UNSET", p->stat_collected_usec - p->last_stat_collected_usec, p->utime, p->stime, p->cutime, p->cstime, p->minflt, p->majflt, p->cminflt, p->cmajflt, p->num_threads);
 
-    if(unlikely(global_iterations_counter == 1)) {
-        p->minflt           = 0;
-        p->cminflt          = 0;
-        p->majflt           = 0;
-        p->cmajflt          = 0;
-        p->utime            = 0;
-        p->stime            = 0;
-        p->gtime            = 0;
-        p->cutime           = 0;
-        p->cstime           = 0;
-        p->cgtime           = 0;
-    }
+    if(unlikely(global_iterations_counter == 1))
+        clear_pid_stat(p, false);
+
     update_proc_state_count(p->state);
-    return 1;
+    return true;
 
 cleanup:
-    p->minflt           = 0;
-    p->cminflt          = 0;
-    p->majflt           = 0;
-    p->cmajflt          = 0;
-    p->utime            = 0;
-    p->stime            = 0;
-    p->gtime            = 0;
-    p->cutime           = 0;
-    p->cstime           = 0;
-    p->cgtime           = 0;
-    p->num_threads      = 0;
-    // p->rss              = 0;
-    return 0;
+    clear_pid_stat(p, true);
+    return false;
 }
+#endif // !__FreeBSD__ !__APPLE__
 
+int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
+    if(!read_proc_pid_stat_per_os(p, ptr))
+        return 0;
+
+    p->last_stat_collected_usec = p->stat_collected_usec;
+    p->stat_collected_usec = now_monotonic_usec();
+    calls_counter++;
+
+    return 1;
+}

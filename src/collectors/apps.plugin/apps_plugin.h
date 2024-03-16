@@ -10,6 +10,13 @@
 #include <sys/user.h>
 #endif
 
+#ifdef __APPLE__
+#include <mach/mach.h>
+#include <mach/mach_host.h>
+#include <libproc.h>
+#include <sys/proc_info.h>
+#endif
+
 // ----------------------------------------------------------------------------
 // per O/S configuration
 
@@ -22,11 +29,13 @@
 // set this to 1
 // when set to 0, apps.plugin builds a sort list of processes, in order
 // to process children processes, before parent processes
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #define ALL_PIDS_ARE_READ_INSTANTLY 1
 #else
 #define ALL_PIDS_ARE_READ_INSTANTLY 0
 #endif
+
+// ----------------------------------------------------------------------------
 
 extern bool debug_enabled;
 extern bool enable_guest_charts;
@@ -89,7 +98,7 @@ extern kernel_uint_t global_uptime;
 // having a lot of spares, increases the CPU utilization of the plugin.
 #define MAX_SPARE_FDS 1
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
 extern int max_fds_cache_seconds;
 #endif
 
@@ -260,7 +269,7 @@ struct pid_limits {
 struct pid_fd {
     int fd;
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
     ino_t inode;
     char *filename;
     uint32_t link_hash;
@@ -517,7 +526,7 @@ int read_proc_pid_io(struct pid_stat *p, void *ptr);
 int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
 int read_global_time(void);
 
-int collect_data_for_all_processes(void);
+bool collect_data_for_all_pids(void);
 void cleanup_exited_pids(void);
 
 void clear_pid_fd(struct pid_fd *pfd);

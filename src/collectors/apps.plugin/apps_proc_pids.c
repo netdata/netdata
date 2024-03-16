@@ -33,7 +33,7 @@ static inline void del_pid_entry(pid_t pid) {
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(root_of_pids, p, prev, next);
 
     // free the filename
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
     {
         size_t i;
         for(i = 0; i < p->fds_size; i++)
@@ -47,7 +47,7 @@ static inline void del_pid_entry(pid_t pid) {
     freez(p->stat_filename);
     freez(p->status_filename);
     freez(p->limits_filename);
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
     arl_free(p->status_arl);
 #endif
     freez(p->io_filename);
@@ -312,7 +312,7 @@ static inline kernel_uint_t remove_exited_child_from_parent(kernel_uint_t *field
     return absorbed;
 }
 
-static inline void process_exited_processes() {
+static inline void process_exited_pids() {
     struct pid_stat *p;
 
     for(p = root_of_pids; p ; p = p->next) {
@@ -437,26 +437,23 @@ static inline void process_exited_processes() {
 // to avoid filling up all disk space
 // if debug is enabled, all errors are printed
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-static int compar_pid(const void *pid1, const void *pid2) {
-
-    struct pid_stat *p1 = all_pids[*((pid_t *)pid1)];
-    struct pid_stat *p2 = all_pids[*((pid_t *)pid2)];
-
-    if(p1->sortlist > p2->sortlist)
-        return -1;
-    else
-        return 1;
+static inline void mark_pid_as_unread(struct pid_stat *p) {
+    p->read = false; // mark it as not read, so that collect_data_for_pid() will read it
+    p->updated = false;
+    p->merged = false;
+    p->children_count = 0;
+    p->parent = NULL;
 }
-#endif
 
-int collect_data_for_all_processes(void) {
+#if defined(__FreeBSD__)
+bool collect_data_for_all_processes_per_os(void) {
+    // Mark all processes as unread before collecting new data
     struct pid_stat *p = NULL;
+    if(all_pids_count) {
+        for(p = root_of_pids; p ; p = p->next)
+            mark_pid_as_unread(p);
+    }
 
-#ifndef __FreeBSD__
-    // clear process state counter
-    memset(proc_state_count, 0, sizeof proc_state_count);
-#else
     int i, procnum;
 
     static size_t procbase_size = 0;
@@ -467,7 +464,7 @@ int collect_data_for_all_processes(void) {
     int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
     if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
         netdata_log_error("sysctl error: Can't get processes data size");
-        return 0;
+        return false;
     }
 
     // give it some air for processes that may be started
@@ -487,32 +484,92 @@ int collect_data_for_all_processes(void) {
     // get the processes from the system
     if (unlikely(sysctl(mib, 3, procbase, &new_procbase_size, NULL, 0))) {
         netdata_log_error("sysctl error: Can't get processes data");
-        return 0;
+        return false;
     }
 
     // based on the amount of data filled in
     // calculate the number of processes we got
     procnum = new_procbase_size / sizeof(struct kinfo_proc);
 
-#endif
+    for (i = 0 ; i < procnum ; ++i) {
+        pid_t pid = procbase[i].ki_pid;
+        if (pid <= 0) continue;
+        collect_data_for_pid(pid, &procbase[i]);
+    }
+
+    return true;
+}
+#endif // __FreeBSD__
+
+#if defined(__APPLE__)
+bool collect_data_for_all_processes_per_os(void) {
+    // Mark all processes as unread before collecting new data
+    struct pid_stat *p;
+    if(all_pids_count) {
+        for(p = root_of_pids; p; p = p->next)
+            mark_pid_as_unread(p);
+    }
+
+    static pid_t *pids = NULL;
+    static int allocatedProcessCount = 0;
+
+    // Get the number of processes
+    int numberOfProcesses = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);
+    if (numberOfProcesses <= 0) {
+        netdata_log_error("Failed to retrieve the process count");
+        return false;
+    }
+
+    // Allocate or reallocate space to hold all the process IDs if necessary
+    if (numberOfProcesses > allocatedProcessCount) {
+        // Allocate additional space to avoid frequent reallocations
+        allocatedProcessCount = numberOfProcesses + 100;
+        pids = reallocz(pids, allocatedProcessCount * sizeof(pid_t));
+    }
+
+    numberOfProcesses = proc_listpids(PROC_ALL_PIDS, 0, pids, allocatedProcessCount * sizeof(pid_t));
+    if (numberOfProcesses <= 0) {
+        netdata_log_error("Failed to retrieve the process IDs");
+        return false;
+    }
+
+    // Collect data for each process
+    for (int i = 0; i < numberOfProcesses; ++i) {
+        pid_t pid = pids[i];
+        if (pid <= 0) continue;
+
+        collect_data_for_pid(pid, NULL);
+    }
+
+    return true;
+}
+#endif // __APPLE__
+
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
+static int compar_pid(const void *pid1, const void *pid2) {
+
+    struct pid_stat *p1 = all_pids[*((pid_t *)pid1)];
+    struct pid_stat *p2 = all_pids[*((pid_t *)pid2)];
+
+    if(p1->sortlist > p2->sortlist)
+        return -1;
+    else
+        return 1;
+}
+
+bool collect_data_for_all_pids_per_os(void) {
+    struct pid_stat *p = NULL;
+
+    // clear process state counter
+    memset(proc_state_count, 0, sizeof proc_state_count);
 
     if(all_pids_count) {
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         size_t slc = 0;
-#endif
         for(p = root_of_pids; p ; p = p->next) {
-            p->read             = false; // mark it as not read, so that collect_data_for_pid() will read it
-            p->updated          = false;
-            p->merged           = false;
-            p->children_count   = 0;
-            p->parent           = NULL;
-
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
+            mark_pid_as_unread(p);
             all_pids_sortlist[slc++] = p->pid;
-#endif
         }
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         if(unlikely(slc != all_pids_count)) {
             netdata_log_error("Internal error: I was thinking I had %zu processes in my arrays, but it seems there are %zu.", all_pids_count, slc);
             all_pids_count = slc;
@@ -534,15 +591,8 @@ int collect_data_for_all_processes(void) {
                 collect_data_for_pid(all_pids_sortlist[slc], NULL);
             }
         }
-#endif
     }
 
-#ifdef __FreeBSD__
-    for (i = 0 ; i < procnum ; ++i) {
-        pid_t pid = procbase[i].ki_pid;
-        collect_data_for_pid(pid, &procbase[i]);
-    }
-#else
     static char uptime_filename[FILENAME_MAX + 1] = "";
     if(*uptime_filename == '\0')
         snprintfz(uptime_filename, FILENAME_MAX, "%s/proc/uptime", netdata_configured_host_prefix);
@@ -553,7 +603,7 @@ int collect_data_for_all_processes(void) {
 
     snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
     DIR *dir = opendir(dirname);
-    if(!dir) return 0;
+    if(!dir) return false;
 
     struct dirent *de = NULL;
 
@@ -572,10 +622,17 @@ int collect_data_for_all_processes(void) {
         collect_data_for_pid(pid, NULL);
     }
     closedir(dir);
-#endif
+
+    return true;
+}
+#endif // !__FreeBSD__ && !__APPLE__
+
+bool collect_data_for_all_pids(void) {
+    if(!collect_data_for_all_pids_per_os())
+        return false;
 
     if(!all_pids_count)
-        return 0;
+        return false;
 
     // we need /proc/stat to normalize the cpu consumption of the exited childs
     read_global_time();
@@ -588,6 +645,7 @@ int collect_data_for_all_processes(void) {
     // so let's find the exited ones
     // we do this by collecting the ownership of process
     // if we manage to get the ownership, the process still runs
-    process_exited_processes();
-    return 1;
+    process_exited_pids();
+
+    return true;
 }
