@@ -524,7 +524,10 @@ static inline bool collect_data_for_all_pids_per_os(void) {
         pids = reallocz(pids, allocatedProcessCount * sizeof(pid_t));
     }
 
+    // this is required, otherwise the PIDs become totally random
     memset(pids, 0, allocatedProcessCount * sizeof(pid_t));
+
+    // get the list of PIDs
     numberOfProcesses = proc_listpids(PROC_ALL_PIDS, 0, pids, allocatedProcessCount * sizeof(pid_t));
     if (numberOfProcesses <= 0) {
         netdata_log_error("Failed to retrieve the process IDs");
