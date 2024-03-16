@@ -317,6 +317,8 @@ prepare_cmake_options() {
       ENABLE_APPS=1
   fi
 
+  enable_feature PLUGIN_APPS "${ENABLE_APPS}"
+
   check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
   check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
   check_for_feature PLUGIN_FREEIPMI "${ENABLE_FREEIPMI}" libipmimonitoring
