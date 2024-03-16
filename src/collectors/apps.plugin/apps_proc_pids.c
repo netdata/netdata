@@ -3,7 +3,7 @@
 #include "apps_plugin.h"
 
 static inline struct pid_stat *get_pid_entry(pid_t pid) {
-    if(unlikely(all_pids[pid]))
+    if(likely(all_pids[pid]))
         return all_pids[pid];
 
     struct pid_stat *p = callocz(sizeof(struct pid_stat), 1);
@@ -32,7 +32,6 @@ static inline void del_pid_entry(pid_t pid) {
 
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(root_of_pids, p, prev, next);
 
-    // free the filename
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
     {
         size_t i;
@@ -40,16 +39,14 @@ static inline void del_pid_entry(pid_t pid) {
             if(p->fds[i].filename)
                 freez(p->fds[i].filename);
     }
+    arl_free(p->status_arl);
 #endif
-    freez(p->fds);
 
+    freez(p->fds);
     freez(p->fds_dirname);
     freez(p->stat_filename);
     freez(p->status_filename);
     freez(p->limits_filename);
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
-    arl_free(p->status_arl);
-#endif
     freez(p->io_filename);
     freez(p->cmdline_filename);
     freez(p->cmdline);
