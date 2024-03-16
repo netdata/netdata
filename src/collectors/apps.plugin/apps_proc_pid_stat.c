@@ -108,7 +108,6 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     if(unlikely(global_iterations_counter == 1))
         clear_pid_stat(p, false);
 
-    update_proc_state_count(p->state);
     return true;
 
 cleanup:
