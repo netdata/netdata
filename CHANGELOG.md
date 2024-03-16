@@ -6,14 +6,21 @@
 
 **Merged pull requests:**
 
+- Update themes.md [\#17176](https://github.com/netdata/netdata/pull/17176) ([Ancairon](https://github.com/Ancairon))
+- go.d sd docker use well-known port for app identification too [\#17174](https://github.com/netdata/netdata/pull/17174) ([ilyam8](https://github.com/ilyam8))
+- go.d sd docker add mongodb-community-server [\#17173](https://github.com/netdata/netdata/pull/17173) ([ilyam8](https://github.com/ilyam8))
+- Update themes.md [\#17172](https://github.com/netdata/netdata/pull/17172) ([Ancairon](https://github.com/Ancairon))
+- go.d sd config add "disabled" [\#17171](https://github.com/netdata/netdata/pull/17171) ([ilyam8](https://github.com/ilyam8))
 - docs: add "With NVIDIA GPUs monitoring" to docker install [\#17167](https://github.com/netdata/netdata/pull/17167) ([ilyam8](https://github.com/ilyam8))
 - go.d.plugin: jsonschema allow array/object to be null [\#17166](https://github.com/netdata/netdata/pull/17166) ([ilyam8](https://github.com/ilyam8))
 - go.d.plugin: update file path pattern in jsonschema [\#17164](https://github.com/netdata/netdata/pull/17164) ([ilyam8](https://github.com/ilyam8))
+- Announce dynamic configuration capability to the cloud [\#17162](https://github.com/netdata/netdata/pull/17162) ([stelfrag](https://github.com/stelfrag))
 - go.d.plugin: execute local-listeners periodically [\#17160](https://github.com/netdata/netdata/pull/17160) ([ilyam8](https://github.com/ilyam8))
 - Install the correct service file based on systemd version [\#17159](https://github.com/netdata/netdata/pull/17159) ([tkatsoulas](https://github.com/tkatsoulas))
 - go.d.plugin: sd compose: allow multi config template [\#17157](https://github.com/netdata/netdata/pull/17157) ([ilyam8](https://github.com/ilyam8))
 - Bump google.golang.org/protobuf from 1.32.0 to 1.33.0 in /src/go/collectors/go.d.plugin [\#17154](https://github.com/netdata/netdata/pull/17154) ([dependabot[bot]](https://github.com/apps/dependabot))
 - go.d.plugin: add docker service discovery [\#17152](https://github.com/netdata/netdata/pull/17152) ([ilyam8](https://github.com/ilyam8))
+- Fix macOS issue with SOCK\_CLOEXEC [\#17151](https://github.com/netdata/netdata/pull/17151) ([stelfrag](https://github.com/stelfrag))
 - Document new field on PagerDuty cloud integration [\#17149](https://github.com/netdata/netdata/pull/17149) ([juacker](https://github.com/juacker))
 - bring back old docs that were containing missing information [\#17146](https://github.com/netdata/netdata/pull/17146) ([Ancairon](https://github.com/Ancairon))
 - Update go.d.plugin packages [\#17145](https://github.com/netdata/netdata/pull/17145) ([ilyam8](https://github.com/ilyam8))
@@ -379,12 +386,6 @@
 - fix cpu arch/ram/disk values in buildinfo [\#16567](https://github.com/netdata/netdata/pull/16567) ([ilyam8](https://github.com/ilyam8))
 - Remove Netdata packages from APT cache when attempting to install. [\#16566](https://github.com/netdata/netdata/pull/16566) ([Ferroin](https://github.com/Ferroin))
 - Resolve issue on startup in servers with 1 core [\#16565](https://github.com/netdata/netdata/pull/16565) ([stelfrag](https://github.com/stelfrag))
-- Update naming for swagger api [\#16564](https://github.com/netdata/netdata/pull/16564) ([tkatsoulas](https://github.com/tkatsoulas))
-- Fix release metadata workflow [\#16563](https://github.com/netdata/netdata/pull/16563) ([tkatsoulas](https://github.com/tkatsoulas))
-- Make  the systemd-journal mandatory package on Centos 7  and Amazon linux 2 [\#16562](https://github.com/netdata/netdata/pull/16562) ([tkatsoulas](https://github.com/tkatsoulas))
-- Fix for AMD GPU drm different format proc file [\#16561](https://github.com/netdata/netdata/pull/16561) ([MrZammler](https://github.com/MrZammler))
-- Revert "remove discourse badge from readme" [\#16560](https://github.com/netdata/netdata/pull/16560) ([ilyam8](https://github.com/ilyam8))
-- Change the workflow on how we set the right permissions for perf-plugin [\#16558](https://github.com/netdata/netdata/pull/16558) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
