@@ -255,12 +255,12 @@ cleanup:
 #endif // !__FreeBSD__ !__APPLE__
 
 int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
-    if(!read_proc_pid_stat_per_os(p, ptr))
-        return 0;
-
     p->last_stat_collected_usec = p->stat_collected_usec;
     p->stat_collected_usec = now_monotonic_usec();
     calls_counter++;
+
+    if(!read_proc_pid_stat_per_os(p, ptr))
+        return 0;
 
     return 1;
 }
