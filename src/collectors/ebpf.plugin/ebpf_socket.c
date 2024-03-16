@@ -2118,7 +2118,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     if (tcp_v6_connect_address.type == 'T') {
@@ -2135,7 +2135,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                           1,
                           update_every,
                           NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("cgroup_name", label, 0);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
     }
 
@@ -2148,7 +2148,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_SENT,
@@ -2160,7 +2160,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       socket_publish_aggregated, 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
@@ -2172,7 +2172,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
@@ -2184,7 +2184,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       socket_publish_aggregated, 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
@@ -2196,7 +2196,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
@@ -2208,7 +2208,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_SENDMSG], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
@@ -2220,7 +2220,7 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 }
 

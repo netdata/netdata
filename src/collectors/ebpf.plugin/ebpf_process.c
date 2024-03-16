@@ -827,7 +827,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5000,
                       ebpf_create_global_dimension, &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_THREAD, "Threads started",
@@ -837,7 +837,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_CLONE],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_EXIT, "Tasks starts exit process.",
@@ -847,7 +847,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_CLOSE, "Tasks closed",
@@ -857,7 +857,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     if (em->mode < MODE_ENTRY) {
@@ -868,7 +868,7 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                           ebpf_create_global_dimension,
                           &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
-        ebpf_create_chart_labels("cgroup_name", label, 0);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
     }
 }

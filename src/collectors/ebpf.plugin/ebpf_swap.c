@@ -703,7 +703,7 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
                       ebpf_create_global_dimension,
                       swap_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_MEM_SWAP_WRITE_CHART,
@@ -714,7 +714,7 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 }
 

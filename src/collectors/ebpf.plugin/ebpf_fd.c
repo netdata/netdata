@@ -912,7 +912,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       &fd_publish_aggregated[NETDATA_FD_SYSCALL_OPEN],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_FD);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     if (em->mode < MODE_ENTRY) {
@@ -924,7 +924,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                           &fd_publish_aggregated[NETDATA_FD_SYSCALL_OPEN],
                           1, em->update_every,
                           NETDATA_EBPF_MODULE_NAME_FD);
-        ebpf_create_chart_labels("cgroup_name", label, 0);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
     }
 
@@ -935,7 +935,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       &fd_publish_aggregated[NETDATA_FD_SYSCALL_CLOSE],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_FD);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     if (em->mode < MODE_ENTRY) {
@@ -947,7 +947,7 @@ static void ebpf_create_specific_fd_charts(char *type, ebpf_module_t *em)
                           &fd_publish_aggregated[NETDATA_FD_SYSCALL_CLOSE],
                           1, em->update_every,
                           NETDATA_EBPF_MODULE_NAME_FD);
-        ebpf_create_chart_labels("cgroup_name", label, 0);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
     }
 }
