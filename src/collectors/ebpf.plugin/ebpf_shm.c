@@ -748,7 +748,7 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
                       1,
                       update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SHMAT_CHART,
@@ -763,7 +763,7 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
                       1,
                       update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SHMDT_CHART,
@@ -778,7 +778,7 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
                       1,
                       update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SHMCTL_CHART,
@@ -793,7 +793,7 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
                       1,
                       update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 }
 

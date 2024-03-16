@@ -917,7 +917,7 @@ static void ebpf_create_specific_dc_charts(char *type, int update_every)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5700,
                       ebpf_create_global_dimension,
                       dcstat_counter_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_DC_REFERENCE_CHART, "Count file access",
@@ -927,7 +927,7 @@ static void ebpf_create_specific_dc_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_DC_REQUEST_NOT_CACHE_CHART,
@@ -938,7 +938,7 @@ static void ebpf_create_specific_dc_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_SLOW], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_DC_REQUEST_NOT_FOUND_CHART,
@@ -949,7 +949,7 @@ static void ebpf_create_specific_dc_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_MISS], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 }
 

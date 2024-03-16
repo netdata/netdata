@@ -1362,7 +1362,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5500,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_UNLINK],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_WRITE_CALLS, "Write to disk",
@@ -1370,7 +1370,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5501,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     if (em->mode < MODE_ENTRY) {
@@ -1379,7 +1379,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5502,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-        ebpf_create_chart_labels("cgroup_name", label, 0);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
     }
 
@@ -1388,7 +1388,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5503,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     if (em->mode < MODE_ENTRY) {
@@ -1397,7 +1397,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5504,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-        ebpf_create_chart_labels("cgroup_name", label, 0);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
     }
 
@@ -1406,7 +1406,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5505,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_WRITE],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_READ_BYTES, "Bytes read from disk",
@@ -1414,7 +1414,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5506,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_READ],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_VFS_FSYNC, "Calls to vfs_fsync.",
@@ -1422,7 +1422,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5507,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     if (em->mode < MODE_ENTRY) {
@@ -1431,7 +1431,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5508,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_FSYNC],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-        ebpf_create_chart_labels("cgroup_name", label, 0);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
     }
 
@@ -1440,7 +1440,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5509,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     if (em->mode < MODE_ENTRY) {
@@ -1449,7 +1449,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5510,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_OPEN],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-        ebpf_create_chart_labels("cgroup_name", label, 0);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
     }
 
@@ -1458,7 +1458,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                       NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5511,
                       ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-    ebpf_create_chart_labels("cgroup_name", label, 0);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
     ebpf_commit_label();
 
     if (em->mode < MODE_ENTRY) {
@@ -1467,7 +1467,7 @@ static void ebpf_create_specific_vfs_charts(char *type, ebpf_module_t *em)
                           NETDATA_EBPF_CHART_TYPE_LINE, NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5512,
                           ebpf_create_global_dimension, &vfs_publish_aggregated[NETDATA_KEY_PUBLISH_VFS_CREATE],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_VFS);
-        ebpf_create_chart_labels("cgroup_name", label, 0);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
     }
 }
