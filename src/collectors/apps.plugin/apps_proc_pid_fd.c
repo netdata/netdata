@@ -433,7 +433,7 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __may
         if(fds)
             freez(fds);
 
-        fds = mallocz(fds, bufferSize);
+        fds = mallocz(bufferSize);
         fdsCapacity = bufferSize;
     }
 
@@ -463,10 +463,6 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __may
                 break;
             }
 
-            case PROX_FDTYPE_PSXSHM: // POSIX shared memory
-            case PROX_FDTYPE_PSXSEM: // POSIX semaphore
-            case PROX_FDTYPE_KQUEUE: // kqueue
-            case PROX_FDTYPE_FSEVENTS: // fsevents
             default:
                 p->openfds.other++;
                 break;

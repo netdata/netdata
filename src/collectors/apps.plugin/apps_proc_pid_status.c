@@ -27,7 +27,7 @@ static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __m
         return false;
     }
 
-    st = proc_pidinfo(p->pid, PROC_PIDBSDINFO, 0, &bsdinfo, PROC_PIDBSDINFO_SIZE);
+    st = proc_pidinfo(p->pid, PROC_PIDTBSDINFO, 0, &bsdinfo, PROC_PIDTBSDINFO_SIZE);
     if (st <= 0) {
         netdata_log_error("Failed to get BSD info for PID %d", p->pid);
         return false;
@@ -43,9 +43,9 @@ static inline bool read_proc_pid_status_per_os(struct pid_stat *p, void *ptr __m
     p->gid = bsdinfo.pbi_gid;
     p->status_vmsize = taskinfo.pti_virtual_size / 1024; // Convert bytes to KiB
     p->status_vmrss = taskinfo.pti_resident_size / 1024; // Convert bytes to KiB
-    p->status_vmswap = rusageinfo.ri_swapins + rusageinfo.ri_swapouts; // This is not directly available, consider an alternative representation
+    // p->status_vmswap = rusageinfo.ri_swapins + rusageinfo.ri_swapouts; // This is not directly available, consider an alternative representation
     p->status_voluntary_ctxt_switches = taskinfo.pti_csw;
-    p->status_nonvoluntary_ctxt_switches = taskinfo.pti_nivcsw;
+    // p->status_nonvoluntary_ctxt_switches = taskinfo.pti_nivcsw;
 
     return true;
 }

@@ -67,7 +67,10 @@ struct user_or_group_ids all_group_ids = {
     .filename = "",
 };
 
-int file_changed(const struct stat *statbuf, struct timespec *last_modification_time) {
+int file_changed(const struct stat *statbuf __maybe_unused, struct timespec *last_modification_time __maybe_unused) {
+#if defined(__APPLE__)
+    return 0;
+#else
     if(likely(statbuf->st_mtim.tv_sec == last_modification_time->tv_sec &&
                statbuf->st_mtim.tv_nsec == last_modification_time->tv_nsec)) return 0;
 
@@ -75,6 +78,7 @@ int file_changed(const struct stat *statbuf, struct timespec *last_modification_
     last_modification_time->tv_nsec = statbuf->st_mtim.tv_nsec;
 
     return 1;
+#endif
 }
 
 int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_modification_time) {

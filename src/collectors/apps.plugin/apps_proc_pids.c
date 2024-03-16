@@ -443,7 +443,7 @@ static inline void mark_pid_as_unread(struct pid_stat *p) {
 }
 
 #if defined(__FreeBSD__)
-bool collect_data_for_all_processes_per_os(void) {
+static inline bool collect_data_for_all_pids_per_os(void) {
     // Mark all processes as unread before collecting new data
     struct pid_stat *p = NULL;
     if(all_pids_count) {
@@ -499,7 +499,7 @@ bool collect_data_for_all_processes_per_os(void) {
 #endif // __FreeBSD__
 
 #if defined(__APPLE__)
-bool collect_data_for_all_processes_per_os(void) {
+static inline bool collect_data_for_all_pids_per_os(void) {
     // Mark all processes as unread before collecting new data
     struct pid_stat *p;
     if(all_pids_count) {
@@ -554,7 +554,7 @@ static int compar_pid(const void *pid1, const void *pid2) {
         return 1;
 }
 
-bool collect_data_for_all_pids_per_os(void) {
+static inline bool collect_data_for_all_pids_per_os(void) {
     struct pid_stat *p = NULL;
 
     // clear process state counter
