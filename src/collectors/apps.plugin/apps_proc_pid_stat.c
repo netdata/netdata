@@ -160,6 +160,28 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __may
 #endif // __APPLE__
 
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
+static inline void update_proc_state_count(char proc_stt) {
+    switch (proc_stt) {
+        case 'S':
+            proc_state_count[PROC_STATUS_SLEEPING] += 1;
+            break;
+        case 'R':
+            proc_state_count[PROC_STATUS_RUNNING] += 1;
+            break;
+        case 'D':
+            proc_state_count[PROC_STATUS_SLEEPING_D] += 1;
+            break;
+        case 'Z':
+            proc_state_count[PROC_STATUS_ZOMBIE] += 1;
+            break;
+        case 'T':
+            proc_state_count[PROC_STATUS_STOPPED] += 1;
+            break;
+        default:
+            break;
+    }
+}
+
 static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     static procfile *ff = NULL;
 

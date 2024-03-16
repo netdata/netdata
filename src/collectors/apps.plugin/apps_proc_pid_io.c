@@ -2,11 +2,59 @@
 
 #include "apps_plugin.h"
 
-int read_proc_pid_io(struct pid_stat *p, void *ptr) {
-    (void)ptr;
-#ifdef __FreeBSD__
+static inline void clear_pid_io(struct pid_stat *p) {
+    p->io_logical_bytes_read        = 0;
+    p->io_logical_bytes_written     = 0;
+    p->io_read_calls                = 0;
+    p->io_write_calls               = 0;
+    p->io_storage_bytes_read        = 0;
+    p->io_storage_bytes_written     = 0;
+    p->io_cancelled_write_bytes     = 0;
+}
+
+#if defined(__FreeBSD__)
+static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr) {
     struct kinfo_proc *proc_info = (struct kinfo_proc *)ptr;
-#else
+
+    pid_incremental_rate(io, p->io_storage_bytes_read,       proc_info->ki_rusage.ru_inblock);
+    pid_incremental_rate(io, p->io_storage_bytes_written,    proc_info->ki_rusage.ru_oublock);
+
+    p->io_logical_bytes_read = 0;
+    p->io_logical_bytes_written = 0;
+    p->io_read_calls = 0;
+    p->io_write_calls = 0;
+    p->io_cancelled_write_bytes = 0;
+
+    return true;
+}
+#endif
+
+#ifdef __APPLE__
+static inline bool read_proc_pid_io_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+    struct rusage_info_v4 rusage_info;
+    int st = proc_pid_rusage(p->pid, RUSAGE_INFO_V4, (rusage_info_t *)&rusage_info);
+    if (st <= 0) {
+        netdata_log_error("Failed to get resource usage info for PID %d", p->pid);
+        return false;
+    }
+
+    // On MacOS, the proc_pid_rusage provides disk_io_statistics which includes io bytes read and written
+    // but does not provide the same level of detail as Linux, like separating logical and physical I/O bytes.
+    pid_incremental_rate(io, p->io_storage_bytes_read, rusage_info.ri_diskio_bytesread);
+    pid_incremental_rate(io, p->io_storage_bytes_written, rusage_info.ri_diskio_byteswritten);
+
+    p->io_logical_bytes_read = 0;
+    p->io_logical_bytes_written = 0;
+    p->io_read_calls = 0;
+    p->io_write_calls = 0;
+    p->io_cancelled_write_bytes = 0;
+
+    return true;
+}
+#endif // __APPLE__
+
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
+static inline int read_proc_pid_io_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     static procfile *ff = NULL;
 
     if(unlikely(!p->io_filename)) {
@@ -21,17 +69,7 @@ int read_proc_pid_io(struct pid_stat *p, void *ptr) {
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) goto cleanup;
-#endif
 
-    calls_counter++;
-
-    p->last_io_collected_usec = p->io_collected_usec;
-    p->io_collected_usec = now_monotonic_usec();
-
-#ifdef __FreeBSD__
-    pid_incremental_rate(io, p->io_storage_bytes_read,       proc_info->ki_rusage.ru_inblock);
-    pid_incremental_rate(io, p->io_storage_bytes_written,    proc_info->ki_rusage.ru_oublock);
-#else
     pid_incremental_rate(io, p->io_logical_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 0,  1)));
     pid_incremental_rate(io, p->io_logical_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 1,  1)));
     pid_incremental_rate(io, p->io_read_calls,               str2kernel_uint_t(procfile_lineword(ff, 2,  1)));
@@ -39,29 +77,24 @@ int read_proc_pid_io(struct pid_stat *p, void *ptr) {
     pid_incremental_rate(io, p->io_storage_bytes_read,       str2kernel_uint_t(procfile_lineword(ff, 4,  1)));
     pid_incremental_rate(io, p->io_storage_bytes_written,    str2kernel_uint_t(procfile_lineword(ff, 5,  1)));
     pid_incremental_rate(io, p->io_cancelled_write_bytes,    str2kernel_uint_t(procfile_lineword(ff, 6,  1)));
-#endif
 
-    if(unlikely(global_iterations_counter == 1)) {
-        p->io_logical_bytes_read        = 0;
-        p->io_logical_bytes_written     = 0;
-        p->io_read_calls                = 0;
-        p->io_write_calls               = 0;
-        p->io_storage_bytes_read        = 0;
-        p->io_storage_bytes_written     = 0;
-        p->io_cancelled_write_bytes     = 0;
-    }
+    return true;
 
-    return 1;
-
-#ifndef __FreeBSD__
 cleanup:
-    p->io_logical_bytes_read        = 0;
-    p->io_logical_bytes_written     = 0;
-    p->io_read_calls                = 0;
-    p->io_write_calls               = 0;
-    p->io_storage_bytes_read        = 0;
-    p->io_storage_bytes_written     = 0;
-    p->io_cancelled_write_bytes     = 0;
-    return 0;
-#endif
+    clear_pid_io(p);
+    return false;
+}
+#endif // !__FreeBSD__ !__APPLE__
+
+int read_proc_pid_io(struct pid_stat *p, void *ptr) {
+    p->last_io_collected_usec = p->io_collected_usec;
+    p->io_collected_usec = now_monotonic_usec();
+    calls_counter++;
+
+    bool ret = read_proc_pid_io_per_os(p, ptr);
+
+    if(unlikely(global_iterations_counter == 1))
+        clear_pid_io(p);
+
+    return ret ? 1 : 0;
 }

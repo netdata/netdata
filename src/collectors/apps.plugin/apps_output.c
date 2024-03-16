@@ -176,7 +176,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("system", (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cstime * cstime_fix_ratio)) : 0ULL));
         send_END();
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         if (enable_guest_charts) {
             send_BEGIN(type, w->clean_name, "cpu_guest_utilization", dt);
             send_SET("guest", (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)) : 0ULL));
@@ -206,13 +206,13 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("major", (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)) : 0ULL));
         send_END();
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         send_BEGIN(type, w->clean_name, "swap_usage", dt);
         send_SET("swap", w->status_vmswap);
         send_END();
 #endif
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         if (w->processes == 0) {
             send_BEGIN(type, w->clean_name, "uptime", dt);
             send_SET("uptime", 0);
@@ -245,7 +245,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("writes", w->io_storage_bytes_written);
         send_END();
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         send_BEGIN(type, w->clean_name, "disk_logical_io", dt);
         send_SET("reads", w->io_logical_bytes_read);
         send_SET("writes", w->io_logical_bytes_written);
@@ -303,7 +303,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
         fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", time_factor * RATES_DETAIL / 100LLU);
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         if (enable_guest_charts) {
             fprintf(stdout, "CHART %s.%s_cpu_guest_utilization '' '%s CPU guest utlization (100%% = 1 core)' 'percentage' cpu %s.cpu_guest_utilization line 20005 %d\n", type, w->clean_name, title, type, update_every);
             fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
@@ -339,14 +339,14 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L);
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         fprintf(stdout, "CHART %s.%s_swap_usage '' '%s swap usage' 'MiB' mem %s.swap_usage area 20065 %d\n", type, w->clean_name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L);
 #endif
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n", type, w->clean_name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
@@ -396,7 +396,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             fprintf(stdout, "DIMENSION other '' absolute 1 1\n");
         }
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n", type, w->clean_name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
@@ -415,7 +415,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 }
 
 void send_proc_states_count(usec_t dt __maybe_unused) {
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
     static bool chart_added = false;
     // create chart for count of processes in different states
     if (!chart_added) {

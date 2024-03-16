@@ -197,12 +197,12 @@ void function_processes(const char *transaction, char *function,
         , FDs_max = 0
         ;
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
     unsigned long long
         LReads_max = 0
         , LWrites_max = 0
         ;
-#endif
+#endif // !__FreeBSD__ !__APPLE_
 
     int rows= 0;
     for(p = root_of_pids; p ; p = p->next) {
@@ -292,7 +292,7 @@ void function_processes(const char *transaction, char *function,
         add_value_field_llu_with_max(wb, PWrites, p->io_storage_bytes_written / io_divisor);
 
         // Logical I/O
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         add_value_field_llu_with_max(wb, LReads, p->io_logical_bytes_read / io_divisor);
         add_value_field_llu_with_max(wb, LWrites, p->io_logical_bytes_written / io_divisor);
 #endif
@@ -488,7 +488,7 @@ void function_processes(const char *transaction, char *function,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
 
         // Logical I/O
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         buffer_rrdf_table_add_field(wb, field_id++, "LReads", "Logical I/O Reads", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER,
                                     2, "KiB/s", LReads_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
@@ -696,7 +696,7 @@ void function_processes(const char *transaction, char *function,
             buffer_json_object_close(wb);
         }
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         // I/O Reads chart
         buffer_json_member_add_object(wb, "Reads");
         {

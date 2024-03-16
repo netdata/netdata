@@ -38,6 +38,117 @@ struct file_descriptor {
     int pos;
 } *all_files = NULL;
 
+// ----------------------------------------------------------------------------
+
+static inline void reallocate_target_fds(struct target *w) {
+    if(unlikely(!w))
+        return;
+
+    if(unlikely(!w->target_fds || w->target_fds_size < all_files_size)) {
+        w->target_fds = reallocz(w->target_fds, sizeof(int) * all_files_size);
+        memset(&w->target_fds[w->target_fds_size], 0, sizeof(int) * (all_files_size - w->target_fds_size));
+        w->target_fds_size = all_files_size;
+    }
+}
+
+static void aggregage_fd_type_on_openfds(FD_FILETYPE type, struct openfds *openfds) {
+    switch(type) {
+        case FILETYPE_FILE:
+            openfds->files++;
+            break;
+
+        case FILETYPE_PIPE:
+            openfds->pipes++;
+            break;
+
+        case FILETYPE_SOCKET:
+            openfds->sockets++;
+            break;
+
+        case FILETYPE_INOTIFY:
+            openfds->inotifies++;
+            break;
+
+        case FILETYPE_EVENTFD:
+            openfds->eventfds++;
+            break;
+
+        case FILETYPE_TIMERFD:
+            openfds->timerfds++;
+            break;
+
+        case FILETYPE_SIGNALFD:
+            openfds->signalfds++;
+            break;
+
+        case FILETYPE_EVENTPOLL:
+            openfds->eventpolls++;
+            break;
+
+        case FILETYPE_OTHER:
+            openfds->other++;
+            break;
+    }
+}
+
+static inline void aggregate_fd_on_target(int fd, struct target *w) {
+    if(unlikely(!w))
+        return;
+
+    if(unlikely(w->target_fds[fd])) {
+        // it is already aggregated
+        // just increase its usage counter
+        w->target_fds[fd]++;
+        return;
+    }
+
+    // increase its usage counter
+    // so that we will not add it again
+    w->target_fds[fd]++;
+
+    aggregage_fd_type_on_openfds(all_files[fd].type, &w->openfds);
+}
+
+void aggregate_pid_fds_on_targets(struct pid_stat *p) {
+
+    if(unlikely(!p->updated)) {
+        // the process is not running
+        return;
+    }
+
+    struct target *w = p->target, *u = p->user_target, *g = p->group_target;
+
+    reallocate_target_fds(w);
+    reallocate_target_fds(u);
+    reallocate_target_fds(g);
+
+    p->openfds.files = 0;
+    p->openfds.pipes = 0;
+    p->openfds.sockets = 0;
+    p->openfds.inotifies = 0;
+    p->openfds.eventfds = 0;
+    p->openfds.timerfds = 0;
+    p->openfds.signalfds = 0;
+    p->openfds.eventpolls = 0;
+    p->openfds.other = 0;
+
+    long currentfds = 0;
+    size_t c, size = p->fds_size;
+    struct pid_fd *fds = p->fds;
+    for(c = 0; c < size ;c++) {
+        int fd = fds[c].fd;
+
+        if(likely(fd <= 0 || fd >= all_files_size))
+            continue;
+
+        currentfds++;
+        aggregage_fd_type_on_openfds(all_files[fd].type, &p->openfds);
+
+        aggregate_fd_on_target(fd, w);
+        aggregate_fd_on_target(fd, u);
+        aggregate_fd_on_target(fd, g);
+    }
+}
 
 // ----------------------------------------------------------------------------
 
@@ -263,7 +374,7 @@ static inline int file_descriptor_find_or_add(const char *name, uint32_t hash) {
 void clear_pid_fd(struct pid_fd *pfd) {
     pfd->fd = 0;
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
     pfd->link_hash = 0;
     pfd->inode = 0;
     pfd->cache_iterations_counter = 0;
@@ -298,7 +409,7 @@ void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
     struct pid_fd *pfd = &p->fds[first], *pfdend = &p->fds[first + size];
 
     while(pfd < pfdend) {
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         pfd->filename = NULL;
 #endif
         clear_pid_fd(pfd);
@@ -306,9 +417,68 @@ void init_pid_fds(struct pid_stat *p, size_t first, size_t size) {
     }
 }
 
-int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
-    (void)ptr;
-#ifdef __FreeBSD__
+#ifdef __APPLE__
+static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+    static struct proc_fdinfo *fds = NULL;
+    static int fdsCapacity = 0;
+
+    int bufferSize = proc_pidinfo(p->pid, PROC_PIDLISTFDS, 0, NULL, 0);
+    if (bufferSize <= 0) {
+        netdata_log_error("Failed to get the size of file descriptors for PID %d", p->pid);
+        return false;
+    }
+
+    // Resize buffer if necessary
+    if (bufferSize > fdsCapacity) {
+        if(fds)
+            freez(fds);
+
+        fds = mallocz(fds, bufferSize);
+        fdsCapacity = bufferSize;
+    }
+
+    int num_fds = proc_pidinfo(p->pid, PROC_PIDLISTFDS, 0, fds, bufferSize) / PROC_PIDLISTFD_SIZE;
+    if (num_fds <= 0) {
+        netdata_log_error("Failed to get the file descriptors for PID %d", p->pid);
+        return false;
+    }
+
+    for (int i = 0; i < num_fds; i++) {
+        switch (fds[i].proc_fdtype) {
+            case PROX_FDTYPE_VNODE: {
+                struct vnode_fdinfowithpath vi;
+                if (proc_pidfdinfo(p->pid, fds[i].proc_fd, PROC_PIDFDVNODEPATHINFO, &vi, sizeof(vi)) > 0)
+                    p->openfds.files++;
+                else
+                    p->openfds.other++;
+
+                break;
+            }
+            case PROX_FDTYPE_SOCKET: {
+                p->openfds.sockets++;
+                break;
+            }
+            case PROX_FDTYPE_PIPE: {
+                p->openfds.pipes++;
+                break;
+            }
+
+            case PROX_FDTYPE_PSXSHM: // POSIX shared memory
+            case PROX_FDTYPE_PSXSEM: // POSIX semaphore
+            case PROX_FDTYPE_KQUEUE: // kqueue
+            case PROX_FDTYPE_FSEVENTS: // fsevents
+            default:
+                p->openfds.other++;
+                break;
+        }
+    }
+
+    return true;
+}
+#endif // __APPLE__
+
+#if defined(__FreeBSD__)
+static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
     int mib[4];
     size_t size;
     struct kinfo_file *fds;
@@ -330,13 +500,13 @@ int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
     if (unlikely(sysctl(mib, 4, NULL, &size, NULL, 0))) {
         netdata_log_error("sysctl error: Can't get file descriptors data size for pid %d", p->pid);
-        return 0;
+        return false;
     }
     if (likely(size > 0))
         fdsbuf = reallocz(fdsbuf, size);
     if (unlikely(sysctl(mib, 4, fdsbuf, &size, NULL, 0))) {
         netdata_log_error("sysctl error: Can't get file descriptors data for pid %d", p->pid);
-        return 0;
+        return false;
     }
 
     bfdsbuf = fdsbuf;
@@ -437,7 +607,13 @@ int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
 
         bfdsbuf += fds->kf_structsize;
     }
-#else
+
+    return true;
+}
+#endif // __FreeBSD__
+
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
+static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     if(unlikely(!p->fds_dirname)) {
         char dirname[FILENAME_MAX+1];
         snprintfz(dirname, FILENAME_MAX, "%s/proc/%d/fd", netdata_configured_host_prefix, p->pid);
@@ -445,7 +621,7 @@ int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     }
 
     DIR *fds = opendir(p->fds_dirname);
-    if(unlikely(!fds)) return 0;
+    if(unlikely(!fds)) return false;
 
     struct dirent *de;
     char linkname[FILENAME_MAX + 1];
@@ -566,119 +742,14 @@ int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
     }
 
     closedir(fds);
-#endif
+
+    return true;
+}
+#endif // !__FreeBSD__ !__APPLE
+
+int read_pid_file_descriptors(struct pid_stat *p, void *ptr) {
+    bool ret = read_pid_file_descriptors_per_os(p, ptr);
     cleanup_negative_pid_fds(p);
 
-    return 1;
-}
-
-
-static inline void reallocate_target_fds(struct target *w) {
-    if(unlikely(!w))
-        return;
-
-    if(unlikely(!w->target_fds || w->target_fds_size < all_files_size)) {
-        w->target_fds = reallocz(w->target_fds, sizeof(int) * all_files_size);
-        memset(&w->target_fds[w->target_fds_size], 0, sizeof(int) * (all_files_size - w->target_fds_size));
-        w->target_fds_size = all_files_size;
-    }
-}
-
-static void aggregage_fd_type_on_openfds(FD_FILETYPE type, struct openfds *openfds) {
-    switch(type) {
-        case FILETYPE_FILE:
-            openfds->files++;
-            break;
-
-        case FILETYPE_PIPE:
-            openfds->pipes++;
-            break;
-
-        case FILETYPE_SOCKET:
-            openfds->sockets++;
-            break;
-
-        case FILETYPE_INOTIFY:
-            openfds->inotifies++;
-            break;
-
-        case FILETYPE_EVENTFD:
-            openfds->eventfds++;
-            break;
-
-        case FILETYPE_TIMERFD:
-            openfds->timerfds++;
-            break;
-
-        case FILETYPE_SIGNALFD:
-            openfds->signalfds++;
-            break;
-
-        case FILETYPE_EVENTPOLL:
-            openfds->eventpolls++;
-            break;
-
-        case FILETYPE_OTHER:
-            openfds->other++;
-            break;
-    }
-}
-
-static inline void aggregate_fd_on_target(int fd, struct target *w) {
-    if(unlikely(!w))
-        return;
-
-    if(unlikely(w->target_fds[fd])) {
-        // it is already aggregated
-        // just increase its usage counter
-        w->target_fds[fd]++;
-        return;
-    }
-
-    // increase its usage counter
-    // so that we will not add it again
-    w->target_fds[fd]++;
-
-    aggregage_fd_type_on_openfds(all_files[fd].type, &w->openfds);
-}
-
-void aggregate_pid_fds_on_targets(struct pid_stat *p) {
-
-    if(unlikely(!p->updated)) {
-        // the process is not running
-        return;
-    }
-
-    struct target *w = p->target, *u = p->user_target, *g = p->group_target;
-
-    reallocate_target_fds(w);
-    reallocate_target_fds(u);
-    reallocate_target_fds(g);
-
-    p->openfds.files = 0;
-    p->openfds.pipes = 0;
-    p->openfds.sockets = 0;
-    p->openfds.inotifies = 0;
-    p->openfds.eventfds = 0;
-    p->openfds.timerfds = 0;
-    p->openfds.signalfds = 0;
-    p->openfds.eventpolls = 0;
-    p->openfds.other = 0;
-
-    long currentfds = 0;
-    size_t c, size = p->fds_size;
-    struct pid_fd *fds = p->fds;
-    for(c = 0; c < size ;c++) {
-        int fd = fds[c].fd;
-
-        if(likely(fd <= 0 || fd >= all_files_size))
-            continue;
-
-        currentfds++;
-        aggregage_fd_type_on_openfds(all_files[fd].type, &p->openfds);
-
-        aggregate_fd_on_target(fd, w);
-        aggregate_fd_on_target(fd, u);
-        aggregate_fd_on_target(fd, g);
-    }
+    return ret ? 1 : 0;
 }

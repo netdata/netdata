@@ -4,30 +4,6 @@
 
 // ----------------------------------------------------------------------------
 
-void update_proc_state_count(char proc_stt) {
-#ifndef __FreeBSD__
-    switch (proc_stt) {
-        case 'S':
-            proc_state_count[PROC_STATUS_SLEEPING] += 1;
-            break;
-        case 'R':
-            proc_state_count[PROC_STATUS_RUNNING] += 1;
-            break;
-        case 'D':
-            proc_state_count[PROC_STATUS_SLEEPING_D] += 1;
-            break;
-        case 'Z':
-            proc_state_count[PROC_STATUS_ZOMBIE] += 1;
-            break;
-        case 'T':
-            proc_state_count[PROC_STATUS_STOPPED] += 1;
-            break;
-        default:
-            break;
-    }
-#endif // !__FreeBSD__
-}
-
 #define MAX_PROC_PID_LIMITS 8192
 #define PROC_PID_LIMITS_MAX_OPEN_FILES_KEY "\nMax open files "
 
@@ -45,14 +21,16 @@ static inline kernel_uint_t get_proc_pid_limits_limit(char *buf, const char *key
     return str2ull(v, NULL);
 }
 
-int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
-    (void)ptr;
+#if defined(__FreeBSD__) || defined(__APPLE__)
+int read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
+    return false;
+}
+#endif
 
-#ifdef __FreeBSD__
-    return 0;
-#else
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
+static inline bool read_proc_pid_limits_per_os(struct pid_stat *p, void *ptr __maybe_unused) {
     static char proc_pid_limits_buffer[MAX_PROC_PID_LIMITS + 1];
-    int ret = 0;
+    bool ret = false;
     bool read_limits = false;
 
     errno = 0;
@@ -61,7 +39,7 @@ int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
     kernel_uint_t all_fds = pid_openfds_sum(p);
     if(all_fds < p->limits.max_open_files / 2 && p->io_collected_usec > p->last_limits_collected_usec && p->io_collected_usec - p->last_limits_collected_usec <= 60 * USEC_PER_SEC) {
         // too frequent, we want to collect limits once per minute
-        ret = 1;
+        ret = true;
         goto cleanup;
     }
 
@@ -93,14 +71,14 @@ int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
         // the process has open are more than 1...
         // https://github.com/netdata/netdata/issues/15443
         p->limits.max_open_files = 0;
-        ret = 1;
+        ret = true;
         goto cleanup;
     }
 
     p->last_limits_collected_usec = p->io_collected_usec;
     read_limits = true;
 
-    ret = 1;
+    ret = true;
 
 cleanup:
     if(p->limits.max_open_files)
@@ -165,8 +143,9 @@ cleanup:
         p->log_thrown &= ~PID_LOG_LIMITS_DETAIL;
 
     return ret;
-#endif
 }
+#endif // !__FreeBSD__ !__APPLE__
 
-
-
+int read_proc_pid_limits(struct pid_stat *p, void *ptr) {
+    return read_proc_pid_limits_per_os(p, ptr) ? 1 : 0;
+}

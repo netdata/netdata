@@ -517,7 +517,6 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status);
 #define pid_incremental_rate(type, var, value) \
     incremental_rate(var, var##_raw, value, p->type##_collected_usec, p->last_##type##_collected_usec)
 
-void update_proc_state_count(char proc_stt);
 int read_proc_pid_stat(struct pid_stat *p, void *ptr);
 int read_proc_pid_limits(struct pid_stat *p, void *ptr);
 int read_proc_pid_status(struct pid_stat *p, void *ptr);
@@ -525,6 +524,7 @@ int read_proc_pid_cmdline(struct pid_stat *p);
 int read_proc_pid_io(struct pid_stat *p, void *ptr);
 int read_pid_file_descriptors(struct pid_stat *p, void *ptr);
 int read_global_time(void);
+void get_MemTotal(void);
 
 bool collect_data_for_all_pids(void);
 void cleanup_exited_pids(void);

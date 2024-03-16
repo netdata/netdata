@@ -1730,7 +1730,8 @@ if(ENABLE_PLUGIN_APPS)
             src/collectors/apps.plugin/apps_proc_pid_io.c
             src/collectors/apps.plugin/apps_proc_stat.c
             src/collectors/apps.plugin/apps_proc_pid_fd.c
-            src/collectors/apps.plugin/apps_proc_pids.c)
+            src/collectors/apps.plugin/apps_proc_pids.c
+            src/collectors/apps.plugin/apps_proc_meminfo.c)
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
     target_link_libraries(apps.plugin libnetdata ${CAP_LIBRARIES})

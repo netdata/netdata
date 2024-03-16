@@ -34,7 +34,7 @@ bool enable_groups_charts = true;
 bool include_exited_childs = true;
 bool proc_pid_cmdline_is_needed = false; // true when we need to read /proc/cmdline
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 bool enable_file_charts = false;
 #else
 bool enable_file_charts = true;
@@ -104,15 +104,8 @@ unsigned int time_factor = 0;
 
 int update_every = 1;
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
 int max_fds_cache_seconds = 60;
-#endif
-
-// will be changed to getenv(NETDATA_USER_CONFIG_DIR) if it exists
-static char *user_config_dir = CONFIG_DIR;
-static char *stock_config_dir = LIBCONFIG_DIR;
-
-#ifndef __FreeBSD__
 proc_state proc_state_count[PROC_STATUS_END];
 const char *proc_states[] = {
     [PROC_STATUS_RUNNING] = "running",
@@ -120,8 +113,12 @@ const char *proc_states[] = {
     [PROC_STATUS_SLEEPING_D] = "sleeping_uninterruptible",
     [PROC_STATUS_ZOMBIE] = "zombie",
     [PROC_STATUS_STOPPED] = "stopped",
-    };
+};
 #endif
+
+// will be changed to getenv(NETDATA_USER_CONFIG_DIR) if it exists
+static char *user_config_dir = CONFIG_DIR;
+static char *stock_config_dir = LIBCONFIG_DIR;
 
 struct target
         *apps_groups_default_target = NULL, // the default target
@@ -156,7 +153,7 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status) {
                 p->log_thrown |= log;
                 switch(log) {
                     case PID_LOG_IO:
-                        #ifdef __FreeBSD__
+                        #if defined(__FreeBSD__) || defined(__APPLE__)
                         netdata_log_error("Cannot fetch process %d I/O info (command '%s')", p->pid, p->comm);
                         #else
                         netdata_log_error("Cannot process %s/proc/%d/io (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
@@ -164,7 +161,7 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status) {
                         break;
 
                     case PID_LOG_STATUS:
-                        #ifdef __FreeBSD__
+                        #if defined(__FreeBSD__) || defined(__APPLE__)
                         netdata_log_error("Cannot fetch process %d status info (command '%s')", p->pid, p->comm);
                         #else
                         netdata_log_error("Cannot process %s/proc/%d/status (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
@@ -172,7 +169,7 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status) {
                         break;
 
                     case PID_LOG_CMDLINE:
-                        #ifdef __FreeBSD__
+                        #if defined(__FreeBSD__) || defined(__APPLE__)
                         netdata_log_error("Cannot fetch process %d command line (command '%s')", p->pid, p->comm);
                         #else
                         netdata_log_error("Cannot process %s/proc/%d/cmdline (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
@@ -180,7 +177,7 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status) {
                         break;
 
                     case PID_LOG_FDS:
-                        #ifdef __FreeBSD__
+                        #if defined(__FreeBSD__) || defined(__APPLE__)
                         netdata_log_error("Cannot fetch process %d files (command '%s')", p->pid, p->comm);
                         #else
                         netdata_log_error("Cannot process entries in %s/proc/%d/fd (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
@@ -188,7 +185,7 @@ int managed_log(struct pid_stat *p, PID_LOG log, int status) {
                         break;
 
                     case PID_LOG_LIMITS:
-                        #ifdef __FreeBSD__
+                        #if defined(__FreeBSD__) || defined(__APPLE__)
                         ;
                         #else
                         netdata_log_error("Cannot process %s/proc/%d/limits (command '%s')", netdata_configured_host_prefix, p->pid, p->comm);
@@ -764,7 +761,7 @@ static void parse_args(int argc, char **argv)
             continue;
         }
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
         if(strcmp("fds-cache-secs", argv[i]) == 0) {
             if(argc <= i + 1) {
                 fprintf(stderr, "Parameter 'fds-cache-secs' requires a number as argument.\n");
@@ -866,7 +863,7 @@ static void parse_args(int argc, char **argv)
                     "\n"
                     " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
                     "\n"
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
                     " fds-cache-secs N       cache the files of processed for N seconds\n"
                     "                        caching is adaptive per file (when a file\n"
                     "                        is found, it starts at 0 and while the file\n"
@@ -878,7 +875,7 @@ static void parse_args(int argc, char **argv)
                     " version or -v or -V print program version and exit\n"
                     "\n"
                     , VERSION
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
                     , max_fds_cache_seconds
 #endif
             );
@@ -979,39 +976,6 @@ struct target *find_target_by_name(struct target *base, const char *name) {
     return NULL;
 }
 
-kernel_uint_t MemTotal = 0;
-
-static void get_MemTotal(void) {
-#ifdef __FreeBSD__
-    // TODO - fix this for FreeBSD
-     return;
-#else
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/meminfo", netdata_configured_host_prefix);
-
-    procfile *ff = procfile_open(filename, ": \t", PROCFILE_FLAG_DEFAULT);
-    if(!ff)
-        return;
-
-    ff = procfile_readall(ff);
-    if(!ff)
-        return;
-
-    size_t line, lines = procfile_lines(ff);
-
-    for(line = 0; line < lines ;line++) {
-        size_t words = procfile_linewords(ff, line);
-        if(words == 3 && strcmp(procfile_lineword(ff, line, 0), "MemTotal") == 0 && strcmp(procfile_lineword(ff, line, 2), "kB") == 0) {
-            kernel_uint_t n = str2ull(procfile_lineword(ff, line, 1), NULL);
-            if(n) MemTotal = n;
-            break;
-        }
-    }
-
-    procfile_close(ff);
-#endif
-}
-
 static bool apps_plugin_exit = false;
 
 int main(int argc, char **argv) {
@@ -1061,7 +1025,7 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
 
     get_system_HZ();
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
     time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
 #else
     time_factor = system_hz; // Linux uses clock ticks
