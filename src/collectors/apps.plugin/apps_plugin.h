@@ -83,6 +83,7 @@ extern NETDATA_DOUBLE
     cmajflt_fix_ratio;
 
 extern kernel_uint_t global_uptime;
+extern size_t pagesize;
 
 // ----------------------------------------------------------------------------
 // string lengths
