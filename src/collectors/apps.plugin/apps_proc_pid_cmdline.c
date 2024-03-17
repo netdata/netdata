@@ -3,20 +3,42 @@
 #include "apps_plugin.h"
 
 #ifdef __APPLE__
-static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
-    int bufferSize = proc_pidinfo(p->pid, PROC_PIDPATHINFO, 0, cmdline, (int)bytes-1);
-    if (bufferSize <= 0)
+bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t maxBytes) {
+    int mib[3] = {CTL_KERN, KERN_PROCARGS2, p->pid};
+    static char *args = NULL;
+    static size_t size = 0;
+
+    size_t new_size;
+    if (sysctl(mib, 3, NULL, &new_size, NULL, 0) == -1) {
         return false;
-
-    // Ensure null termination
-    cmdline[bufferSize] = '\0';
-
-    // Replace null characters with spaces to maintain consistency with Linux representation
-    for (size_t i = 0; i < bufferSize; i++) {
-        if (cmdline[i] == '\0') {
-            cmdline[i] = ' ';
-        }
     }
+
+    if(new_size > size) {
+        if(args)
+            freez(args);
+
+        args = mallocz(new_size);
+        size = new_size;
+    }
+
+    size_t used_size = size;
+    if (sysctl(mib, 3, args, &used_size, NULL, 0) == -1) {
+        return false;
+    }
+
+    // The first part of the buffer contains the argc value (integer),
+    // followed by the null-terminated executable path, and then the arguments.
+    int argc;
+    memcpy(&argc, args, sizeof(argc));
+    char *ptr = args + sizeof(argc);
+    size_t bytesCopied = 0;
+
+    // Copy arguments to the cmdline buffer
+    size_t i = 0;
+    for (; i < size - bytesCopied - 1 && i < maxBytes - 1; ++i) {
+        cmdline[i] = ptr[i] ? ptr[i] : ' ';
+    }
+    cmdline[i] = '\0'; // Null-terminate the string
 
     return true;
 }

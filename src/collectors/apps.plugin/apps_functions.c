@@ -266,6 +266,11 @@ void function_processes(const char *transaction, char *function,
         // gid
         buffer_json_add_array_item_uint64(wb, p->gid);
 
+//        if(strcmp(p->comm, "apps.plugin") == 0) {
+//            int x = 0;
+//            x++;
+//        }
+
         // CPU utilization %
         add_value_field_ndd_with_max(wb, CPU, (NETDATA_DOUBLE)(p->utime + p->stime + p->gtime + p->cutime + p->cstime + p->cgtime) / cpu_divisor);
         add_value_field_ndd_with_max(wb, UserCPU, (NETDATA_DOUBLE)(p->utime) / cpu_divisor);

@@ -171,6 +171,23 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         if (unlikely(!w->processes && !w->is_other))
             continue;
 
+//        if(strcmp(w->name, "run1core") == 0) {
+//            for(struct pid_stat *p = root_of_pids; p ; p = p->next) {
+//                if(p->target == w) {
+//                    unsigned int cpu_divisor = time_factor * RATES_DETAIL / 100LLU;
+//
+//                    double total = (p->utime + p->stime) / cpu_divisor;
+//                    double user = p->utime / cpu_divisor;
+//                    double system = p->stime / cpu_divisor;
+//
+//                    int x = 0;
+//                    x += p->utime;
+//                    x += p->stime;
+//
+//                }
+//            }
+//        }
+
         send_BEGIN(type, w->clean_name, "cpu_utilization", dt);
         send_SET("user", (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cutime * cutime_fix_ratio)) : 0ULL));
         send_SET("system", (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cstime * cstime_fix_ratio)) : 0ULL));
