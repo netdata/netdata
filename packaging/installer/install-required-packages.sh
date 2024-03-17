@@ -616,7 +616,7 @@ declare -A pkg_find=(
   ['clearlinux']="findutils"
   ['rhel']="findutils"
   ['centos']="findutils"
-  ['macos']="NOTREQUIRED"
+  ['macos']="findutils"
   ['freebsd']="NOTREQUIRED"
   ['default']="WARNING|"
 )
@@ -741,7 +741,7 @@ declare -A pkg_libsystemd_dev=(
   ['debian']="libsystemd-dev"
   ['freebsd']="NOTREQUIRED"
   ['gentoo']="NOTREQUIRED" # inherently present on systems actually using systemd
-  ['macos']="NOTREQUIRED"
+  ['macos']="WARNING|"
   ['sabayon']="NOTREQUIRED" # inherently present on systems actually using systemd
   ['ubuntu']="libsystemd-dev"
   ['default']="systemd-devel"
