@@ -130,11 +130,14 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
 
     update_pid_comm(p, comm);
 
+    kernel_uint_t userCPU = (pi->taskinfo.pti_total_user * mach_info.numer) / mach_info.denom / NSEC_PER_USEC / 10000;
+    kernel_uint_t systemCPU = (pi->taskinfo.pti_total_system * mach_info.numer) / mach_info.denom / NSEC_PER_USEC / 10000;
+
     // Map the values from taskinfo to the pid_stat structure
     pid_incremental_rate(stat, p->minflt, pi->taskinfo.pti_faults);
     pid_incremental_rate(stat, p->majflt, pi->taskinfo.pti_pageins);
-    pid_incremental_rate(stat, p->utime, pi->taskinfo.pti_total_user / 10000);  // Convert to 100Hz ticks
-    pid_incremental_rate(stat, p->stime, pi->taskinfo.pti_total_system / 10000); // Convert to 100Hz ticks
+    pid_incremental_rate(stat, p->utime, userCPU);
+    pid_incremental_rate(stat, p->stime, systemCPU);
     p->num_threads = pi->taskinfo.pti_threadnum;
 
     // Note: Some values such as guest time, cutime, cstime, etc., are not directly available in MacOS.

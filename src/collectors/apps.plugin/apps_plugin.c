@@ -104,6 +104,10 @@ unsigned int time_factor = 0;
 
 int update_every = 1;
 
+#if defined(__APPLE__)
+mach_timebase_info_data_t mach_info;
+#endif
+
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
 int max_fds_cache_seconds = 60;
 proc_state proc_state_count[PROC_STATUS_END];
@@ -1025,9 +1029,14 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
 
     get_system_HZ();
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(__FreeBSD__)
     time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
-#else
+#endif
+#if defined(__APPLE__)
+    mach_timebase_info(&mach_info);
+    time_factor = 1000000ULL / RATES_DETAIL;
+#endif
+#if !defined(__FreeBSD__) && !defined(__APPLE__)
     time_factor = system_hz; // Linux uses clock ticks
 #endif
 

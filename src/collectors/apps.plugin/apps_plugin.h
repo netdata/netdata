@@ -16,6 +16,11 @@
 #include <libproc.h>
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
+#include <mach/mach_time.h> // For mach_timebase_info_data_t and mach_timebase_info
+#endif
+
+#if defined(__APPLE__)
+extern mach_timebase_info_data_t mach_info;
 #endif
 
 // ----------------------------------------------------------------------------
