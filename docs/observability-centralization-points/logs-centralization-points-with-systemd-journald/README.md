@@ -2,9 +2,9 @@
 
 ```mermaid
 stateDiagram-v2
-    classDef userFeature fill:#f00,color:white,font-weight:bold,stroke-width:2px,stroke:yellow
-    classDef usedByNC fill:#090,color:white,font-weight:bold,stroke-width:2px,stroke:yellow
-    classDef thirdparty fill:#333,color:#aaa,font-weight:normal,stroke-width:1px,stroke:#fff
+    classDef userFeature fill:#f00,color:white,font-weight:bold,stroke-width:2px,stroke:orange
+    classDef usedByNC fill:#090,color:white,font-weight:bold,stroke-width:2px,stroke:orange
+    classDef log2journal fill:#040,color:white,font-weight:bold,stroke-width:2px,stroke:orange
 
     logsQuery:::usedByNC
     logsDashboard:::userFeature
@@ -14,6 +14,7 @@ stateDiagram-v2
     journalFiles:::thirdparty
     logSources:::thirdparty
     textFiles:::thirdparty
+    log2journal:::log2journal
      
     journalRemote: systemd-journal-remote
     journalUpload: systemd-journal-upload
