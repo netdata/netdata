@@ -170,7 +170,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
 
         if (unlikely(!w->processes && !w->is_other))
             continue;
-        
+
         send_BEGIN(type, w->clean_name, "cpu_utilization", dt);
         send_SET("user", (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cutime * cutime_fix_ratio)) : 0ULL));
         send_SET("system", (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cstime * cstime_fix_ratio)) : 0ULL));

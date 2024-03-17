@@ -13,31 +13,50 @@ bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t maxBytes) {
         return false;
     }
 
-    if(new_size > size) {
-        if(args)
+    if (new_size > size) {
+        if (args)
             freez(args);
 
-        args = mallocz(new_size);
+        args = (char *)mallocz(new_size);
         size = new_size;
     }
 
-    size_t used_size = size;
-    if (sysctl(mib, 3, args, &used_size, NULL, 0) == -1) {
-        return false;
-    }
+    memset(cmdline, 0, new_size < maxBytes ? new_size : maxBytes);
 
-    // The first part of the buffer contains the argc value (integer),
-    // followed by the null-terminated executable path, and then the arguments.
+    size_t used_size = size;
+    if (sysctl(mib, 3, args, &used_size, NULL, 0) == -1)
+        return false;
+
     int argc;
     memcpy(&argc, args, sizeof(argc));
     char *ptr = args + sizeof(argc);
-    size_t bytesCopied = 0;
+    used_size -= sizeof(argc);
 
-    // Copy arguments to the cmdline buffer
-    size_t i = 0;
-    for (; i < size - bytesCopied - 1 && i < maxBytes - 1; ++i) {
-        cmdline[i] = ptr[i] ? ptr[i] : ' ';
+    // Skip the executable path
+    while (*ptr && used_size > 0) {
+        ptr++;
+        used_size--;
     }
+
+    // Copy only the arguments to the cmdline buffer, skipping the environment variables
+    size_t i = 0, copied_args = 0;
+    bool inArg = false;
+    for (; used_size > 0 && i < maxBytes - 1 && copied_args < argc; --used_size, ++ptr) {
+        if (*ptr == '\0') {
+            if (inArg) {
+                cmdline[i++] = ' ';  // Replace nulls between arguments with spaces
+                inArg = false;
+                copied_args++;
+            }
+        } else {
+            cmdline[i++] = *ptr;
+            inArg = true;
+        }
+    }
+
+    if (i > 0 && cmdline[i - 1] == ' ')
+        i--;  // Remove the trailing space if present
+
     cmdline[i] = '\0'; // Null-terminate the string
 
     return true;
