@@ -120,6 +120,8 @@ cleanup:
 static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;
 
+    p->ppid = pi->proc.kp_eproc.e_ppid;
+
     // Update command name and target if changed
     char comm[PROC_PIDPATHINFO_MAXSIZE];
     int ret = proc_name(p->pid, comm, sizeof(comm));

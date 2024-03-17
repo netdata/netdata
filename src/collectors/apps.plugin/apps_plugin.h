@@ -37,6 +37,7 @@
 
 #if defined(__APPLE__)
 struct pid_info {
+    struct kinfo_proc proc;
     struct proc_taskinfo taskinfo;
     struct proc_bsdinfo bsdinfo;
     struct rusage_info_v4 rusageinfo;

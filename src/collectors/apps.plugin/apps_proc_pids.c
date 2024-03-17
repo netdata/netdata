@@ -541,6 +541,16 @@ static inline bool collect_data_for_all_pids_per_os(void) {
 
         struct pid_info pi = { 0 };
 
+        int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, pid};
+
+        size_t procSize = sizeof(pi.proc);
+        if(sysctl(mib, 4, &pi.proc, &procSize, NULL, 0) == -1) {
+            netdata_log_error("Failed to get proc for PID %d", pid);
+            continue;
+        }
+        if(procSize == 0) // no such process
+            continue;
+
         int st = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &pi.taskinfo, sizeof(pi.taskinfo));
         if (st <= 0) {
             netdata_log_error("Failed to get task info for PID %d", pid);
