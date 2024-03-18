@@ -98,7 +98,7 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     p->num_threads      = proc_info->ki_numthreads;
 
     usec_t started_ut = timeval_usec(&proc_info->ki_start);
-    p->uptime = (system_current_time_ut > started_ut) ? system_current_time_ut - started_ut : 0;
+    p->uptime = (system_current_time_ut > started_ut) ? (system_current_time_ut - started_ut) / USEC_PER_SEC : 0;
 
     if(enable_guest_charts) {
         enable_guest_charts = false;
@@ -144,7 +144,7 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     p->num_threads = pi->taskinfo.pti_threadnum;
 
     usec_t started_ut = timeval_usec(&pi->proc.kp_proc.p_starttime);
-    p->uptime = (system_current_time_ut > started_ut) ? system_current_time_ut - started_ut : 0;
+    p->uptime = (system_current_time_ut > started_ut) ? (system_current_time_ut - started_ut) / USEC_PER_SEC : 0;
 
     // Note: Some values such as guest time, cutime, cstime, etc., are not directly available in MacOS.
     // You might need to approximate or leave them unset depending on your needs.
