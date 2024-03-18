@@ -126,7 +126,7 @@ static inline bool read_proc_pid_stat_per_os(struct pid_stat *p, void *ptr) {
     char comm[PROC_PIDPATHINFO_MAXSIZE];
     int ret = proc_name(p->pid, comm, sizeof(comm));
     if (ret <= 0)
-        strncpy(comm, "unknown", sizeof(comm));
+        strncpyz(comm, "unknown", sizeof(comm) - 1);
 
     update_pid_comm(p, comm);
 

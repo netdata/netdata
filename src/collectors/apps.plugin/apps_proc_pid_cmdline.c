@@ -86,7 +86,7 @@ static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t 
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
 static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t bytes) {
     if(unlikely(!p->cmdline_filename)) {
-        char filename[FILENAME_MAX + 1];
+        char filename[FILENAME_MAX];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/cmdline", netdata_configured_host_prefix, p->pid);
         p->cmdline_filename = strdupz(filename);
     }
@@ -110,7 +110,7 @@ static inline bool get_cmdline_per_os(struct pid_stat *p, char *cmdline, size_t 
 #endif // !__FreeBSD__ !__APPLE__
 
 int read_proc_pid_cmdline(struct pid_stat *p) {
-    static char cmdline[MAX_CMDLINE + 1];
+    static char cmdline[MAX_CMDLINE];
 
     if(unlikely(!get_cmdline_per_os(p, cmdline, sizeof(cmdline))))
         goto cleanup;
