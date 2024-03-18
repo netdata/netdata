@@ -16,8 +16,9 @@ typedef enum prometheus_output_flags {
     PROMETHEUS_OUTPUT_NAMES      = (1 << 2),
     PROMETHEUS_OUTPUT_TIMESTAMPS = (1 << 3),
     PROMETHEUS_OUTPUT_VARIABLES  = (1 << 4),
-	PROMETHEUS_OUTPUT_OLDUNITS   = (1 << 5),
-	PROMETHEUS_OUTPUT_HIDEUNITS  = (1 << 6)
+    PROMETHEUS_OUTPUT_OLDUNITS   = (1 << 5),
+    PROMETHEUS_OUTPUT_HIDEUNITS  = (1 << 6),
+    PROMETHEUS_OUTPUT_COMMENT    = (1 << 7)
 } PROMETHEUS_OUTPUT_OPTIONS;
 
 void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
