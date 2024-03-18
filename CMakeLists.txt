@@ -1717,7 +1717,23 @@ endif()
 if(ENABLE_PLUGIN_APPS)
     pkg_check_modules(CAP QUIET libcap)
 
-    set(APPS_PLUGIN_FILES src/collectors/apps.plugin/apps_plugin.c)
+    set(APPS_PLUGIN_FILES
+            src/collectors/apps.plugin/apps_plugin.c
+            src/collectors/apps.plugin/apps_plugin.h
+            src/collectors/apps.plugin/apps_functions.c
+            src/collectors/apps.plugin/apps_targets.c
+            src/collectors/apps.plugin/apps_users_and_groups.c
+            src/collectors/apps.plugin/apps_output.c
+            src/collectors/apps.plugin/apps_proc_pid_status.c
+            src/collectors/apps.plugin/apps_proc_pid_limits.c
+            src/collectors/apps.plugin/apps_proc_pid_stat.c
+            src/collectors/apps.plugin/apps_proc_pid_cmdline.c
+            src/collectors/apps.plugin/apps_proc_pid_io.c
+            src/collectors/apps.plugin/apps_proc_stat.c
+            src/collectors/apps.plugin/apps_proc_pid_fd.c
+            src/collectors/apps.plugin/apps_proc_pids.c
+            src/collectors/apps.plugin/apps_proc_meminfo.c
+    )
 
     add_executable(apps.plugin ${APPS_PLUGIN_FILES})
     target_link_libraries(apps.plugin libnetdata ${CAP_LIBRARIES})
