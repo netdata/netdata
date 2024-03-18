@@ -197,9 +197,11 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("rss", w->status_vmrss);
         send_END();
 
+#if !defined(__APPLE__)
         send_BEGIN(type, w->clean_name, "vmem_usage", dt);
         send_SET("vmem", w->status_vmsize);
         send_END();
+#endif
 
         send_BEGIN(type, w->clean_name, "mem_page_faults", dt);
         send_SET("minor", (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs ? ((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)) : 0ULL));
@@ -326,16 +328,18 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L);
 
+#if !defined(__APPLE__)
+        fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n", type, w->clean_name, title, type, update_every);
+        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
+        fprintf(stdout, "CLABEL_COMMIT\n");
+        fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L);
+#endif
+
         fprintf(stdout, "CHART %s.%s_mem_page_faults '' '%s memory page faults' 'pgfaults/s' mem %s.mem_page_faults stacked 20060 %d\n", type, w->clean_name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION major '' absolute 1 %llu\n", RATES_DETAIL);
         fprintf(stdout, "DIMENSION minor '' absolute 1 %llu\n", RATES_DETAIL);
-
-        fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n", type, w->clean_name, title, type, update_every);
-        fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
-        fprintf(stdout, "CLABEL_COMMIT\n");
-        fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L);
 
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
         fprintf(stdout, "CHART %s.%s_swap_usage '' '%s swap usage' 'MiB' mem %s.swap_usage area 20065 %d\n", type, w->clean_name, title, type, update_every);
