@@ -212,7 +212,6 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_END();
 #endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
         if (w->processes == 0) {
             send_BEGIN(type, w->clean_name, "uptime", dt);
             send_SET("uptime", 0);
@@ -238,7 +237,6 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
                 send_END();
             }
         }
-#endif
 
         send_BEGIN(type, w->clean_name, "disk_physical_io", dt);
         send_SET("reads", w->io_storage_bytes_read);
@@ -396,7 +394,6 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             fprintf(stdout, "DIMENSION other '' absolute 1 1\n");
         }
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
         fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n", type, w->clean_name, title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, w->name);
         fprintf(stdout, "CLABEL_COMMIT\n");
@@ -410,7 +407,6 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             fprintf(stdout, "DIMENSION avg '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION max '' absolute 1 1\n");
         }
-#endif
     }
 }
 
