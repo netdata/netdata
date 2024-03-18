@@ -452,7 +452,7 @@ struct gen_parameters {
  * @param homogeneous a flag for homogeneous charts.
  * @param prometheus_collector a flag for metrics from prometheus collector.
  */
-static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p, int homogeneous, int prometheus_collector)
+static void generate_as_collected_prom_comment(BUFFER *wb, struct gen_parameters *p, int homogeneous, int prometheus_collector)
 {
     buffer_sprintf(wb, "# COMMENT %s_%s", p->prefix, p->context);
 
@@ -771,7 +771,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
-                                generate_as_collected_prom_help(wb, &p, homogeneous, prometheus_collector);
+                                generate_as_collected_prom_comment(wb, &p, homogeneous, prometheus_collector);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, p.type);
@@ -788,7 +788,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 PROMETHEUS_ELEMENT_MAX);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
-                                generate_as_collected_prom_help(wb, &p, homogeneous, prometheus_collector);
+                                generate_as_collected_prom_comment(wb, &p, homogeneous, prometheus_collector);
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(
