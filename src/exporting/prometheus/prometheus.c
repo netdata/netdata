@@ -694,6 +694,16 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             prometheus_label_copy(family, rrdset_family(st), PROMETHEUS_ELEMENT_MAX);
             prometheus_name_copy(context, rrdset_context(st), PROMETHEUS_ELEMENT_MAX);
 
+            struct gen_parameters p;
+            p.prefix = prefix;
+            p.labels_prefix = plabels_prefix;
+            p.context = context;
+            p.chart = chart;
+            p.family = family;
+            p.output_options = output_options;
+            p.st = st;
+            p.rd = NULL;
+
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
             int prometheus_collector = 0;
@@ -735,17 +745,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     if (as_collected) {
                         // we need as-collected / raw data
 
-                        struct gen_parameters p;
-                        p.prefix = prefix;
-                        p.labels_prefix = instance->config.label_prefix;
-                        p.context = context;
                         p.suffix = suffix;
-                        p.chart = chart;
                         p.dimension = dimension;
-                        p.family = family;
                         p.labels = labels;
-                        p.output_options = output_options;
-                        p.st = st;
                         p.rd = rd;
 
                         if (unlikely(rd->collector.last_collected_time.tv_sec < instance->after))
