@@ -42,7 +42,7 @@ jobs:
       - name: Check files
         id: check-files
         if: github.event_name != 'workflow_dispatch'
-        uses: tj-actions/changed-files@v42
+        uses: tj-actions/changed-files@v43
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |

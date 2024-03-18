@@ -25,7 +25,7 @@ jobs:
           submodules: recursive
       - name: Check files
         id: check-files
-        uses: tj-actions/changed-files@v42
+        uses: tj-actions/changed-files@v43
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
