@@ -377,14 +377,14 @@ static int print_host_variables_callback(const DICTIONARY_ITEM *item __maybe_unu
     if (!opts->host_header_printed) {
         opts->host_header_printed = 1;
 
-        if (opts->output_options & PROMETHEUS_OUTPUT_HELP) {
+        if (opts->output_options & PROMETHEUS_OUTPUT_COMMENT) {
             buffer_sprintf(opts->wb, "\n# COMMENT global host and chart variables\n");
         }
     }
 
     NETDATA_DOUBLE value = rrdvar2number(rv);
     if (isnan(value) || isinf(value)) {
-        if (opts->output_options & PROMETHEUS_OUTPUT_HELP)
+        if (opts->output_options & PROMETHEUS_OUTPUT_COMMENT)
             buffer_sprintf(
                 opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rrdvar_name(rv), (isnan(value)) ? "NAN" : "INF");
 
@@ -743,7 +743,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                         units, rrdset_units(st), PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
-            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
+            if (unlikely(output_options & PROMETHEUS_OUTPUT_COMMENT)) {
                 buffer_sprintf(
                     wb,
                     "\n# COMMENT %s chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n",
@@ -752,6 +752,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     rrdset_context(st),
                     rrdset_family(st),
                     rrdset_units(st));
+            }
+
+            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
                 generate_as_collected_prom_help(wb, &p, prometheus_collector);
             }
 
@@ -792,8 +795,11 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
 
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
+                            if (unlikely(output_options & PROMETHEUS_OUTPUT_COMMENT)) {
                                 generate_as_collected_prom_comment(wb, &p, homogeneous, prometheus_collector);
+                            }
+
+                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
                                 generate_as_collected_prom_help(wb, &p, prometheus_collector);
                             }
 
@@ -811,8 +817,11 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
 
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
+                            if (unlikely(output_options & PROMETHEUS_OUTPUT_COMMENT)) {
                                 generate_as_collected_prom_comment(wb, &p, homogeneous, prometheus_collector);
+                            }
+
+                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
                                 generate_as_collected_prom_help(wb, &p, prometheus_collector);
                             }
 
@@ -845,7 +854,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             buffer_sprintf(plabels_buffer, "%1$schart=\"%2$s\",%1$sdimension=\"%3$s\",%1$sfamily=\"%4$s\"", plabels_prefix, chart, dimension, family);
                             rrdlabels_walkthrough_read(st->rrdlabels, format_prometheus_chart_label_callback, plabels_buffer);
 
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
+                            if (unlikely(output_options & PROMETHEUS_OUTPUT_COMMENT)) {
                                 buffer_sprintf(
                                     wb,
                                     "# COMMENT %s_%s%s%s: dimension \"%s\", value is %s, gauge, dt %llu to %llu inclusive\n",
@@ -857,6 +866,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                     rrdset_units(st),
                                     (unsigned long long)first_time,
                                     (unsigned long long)last_time);
+                            }
+
+                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
                                 generate_as_collected_prom_help(wb, &p, prometheus_collector);
                             }
 
@@ -941,7 +953,7 @@ static inline time_t prometheus_preparation(
         after = now - instance->config.update_every;
     }
 
-    if (output_options & PROMETHEUS_OUTPUT_HELP) {
+    if (output_options & PROMETHEUS_OUTPUT_COMMENT) {
         char *mode;
         if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
             mode = "as collected";
