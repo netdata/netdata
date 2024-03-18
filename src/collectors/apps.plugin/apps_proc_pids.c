@@ -442,6 +442,14 @@ static inline void mark_pid_as_unread(struct pid_stat *p) {
     p->parent = NULL;
 }
 
+#if defined(__FreeBSD__) || defined(__APPLE__)
+static inline void get_current_time(void) {
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+    system_current_time_ut = timeval_usec(&current_time);
+}
+#endif
+
 #if defined(__FreeBSD__)
 static inline bool collect_data_for_all_pids_per_os(void) {
     // Mark all processes as unread before collecting new data
@@ -488,6 +496,8 @@ static inline bool collect_data_for_all_pids_per_os(void) {
     // calculate the number of processes we got
     procnum = new_procbase_size / sizeof(struct kinfo_proc);
 
+    get_current_time();
+
     for (i = 0 ; i < procnum ; ++i) {
         pid_t pid = procbase[i].ki_pid;
         if (pid <= 0) continue;
@@ -533,6 +543,8 @@ static inline bool collect_data_for_all_pids_per_os(void) {
         netdata_log_error("Failed to retrieve the process IDs");
         return false;
     }
+
+    get_current_time();
 
     // Collect data for each process
     for (int i = 0; i < numberOfProcesses; ++i) {
@@ -628,7 +640,7 @@ static inline bool collect_data_for_all_pids_per_os(void) {
     if(*uptime_filename == '\0')
         snprintfz(uptime_filename, FILENAME_MAX, "%s/proc/uptime", netdata_configured_host_prefix);
 
-    global_uptime = (kernel_uint_t)(uptime_msec(uptime_filename) / MSEC_PER_SEC);
+    system_uptime_secs = (kernel_uint_t)(uptime_msec(uptime_filename) / MSEC_PER_SEC);
 
     char dirname[FILENAME_MAX + 1];
 

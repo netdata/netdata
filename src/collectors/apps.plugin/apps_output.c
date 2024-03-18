@@ -227,7 +227,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
             }
         } else {
             send_BEGIN(type, w->clean_name, "uptime", dt);
-            send_SET("uptime", (global_uptime > w->starttime) ? (global_uptime - w->starttime) : 0);
+            send_SET("uptime", w->uptime_max);
             send_END();
 
             if (enable_detailed_uptime_charts) {

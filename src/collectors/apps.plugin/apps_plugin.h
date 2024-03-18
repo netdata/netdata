@@ -98,7 +98,12 @@ extern NETDATA_DOUBLE
     cminflt_fix_ratio,
     cmajflt_fix_ratio;
 
-extern kernel_uint_t global_uptime;
+#if defined(__FreeBSD__) || defined(__APPLE__)
+extern usec_t system_current_time_ut;
+#else
+extern kernel_uint_t system_uptime_secs;
+#endif
+
 extern size_t pagesize;
 
 // ----------------------------------------------------------------------------
@@ -222,8 +227,6 @@ struct target {
 
     NETDATA_DOUBLE max_open_files_percent;
 
-    kernel_uint_t starttime;
-    kernel_uint_t collected_starttime;
     kernel_uint_t uptime_min;
     kernel_uint_t uptime_sum;
     kernel_uint_t uptime_max;
@@ -337,7 +340,7 @@ struct pid_stat {
     // int64_t nice;
     int32_t num_threads;
     // int64_t itrealvalue;
-    kernel_uint_t collected_starttime;
+    // kernel_uint_t collected_starttime;
     // kernel_uint_t vsize;
     // kernel_uint_t rss;
     // kernel_uint_t rsslim;

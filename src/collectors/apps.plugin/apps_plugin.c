@@ -60,7 +60,11 @@ int
     show_guest_time = 0,            // 1 when guest values are collected
     show_guest_time_old = 0;
 
-kernel_uint_t global_uptime;
+#if defined(__FreeBSD__) || defined(__APPLE__)
+usec_t system_current_time_ut;
+#else
+kernel_uint_t system_uptime_secs;
+#endif
 
 // ----------------------------------------------------------------------------
 // Normalization
@@ -392,7 +396,6 @@ static size_t zero_all_targets(struct target *root) {
             w->max_open_files_percent = 0.0;
         }
 
-        w->collected_starttime = 0;
         w->uptime_min = 0;
         w->uptime_sum = 0;
         w->uptime_max = 0;
@@ -463,10 +466,9 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->processes++;
     w->num_threads += p->num_threads;
 
-    if(!w->collected_starttime || p->collected_starttime < w->collected_starttime) w->collected_starttime = p->collected_starttime;
     if(!w->uptime_min || p->uptime < w->uptime_min) w->uptime_min = p->uptime;
-    w->uptime_sum += p->uptime;
     if(!w->uptime_max || w->uptime_max < p->uptime) w->uptime_max = p->uptime;
+    w->uptime_sum += p->uptime;
 
     if(unlikely(debug_enabled || w->debug_enabled)) {
         debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
@@ -475,19 +477,6 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
         pid_on_target->pid = p->pid;
         pid_on_target->next = w->root_pid;
         w->root_pid = pid_on_target;
-    }
-}
-
-static inline void post_aggregate_targets(struct target *root) {
-    struct target *w;
-    for (w = root; w ; w = w->next) {
-        if(w->collected_starttime) {
-            if (!w->starttime || w->collected_starttime < w->starttime) {
-                w->starttime = w->collected_starttime;
-            }
-        } else {
-            w->starttime = 0;
-        }
     }
 }
 
@@ -549,10 +538,6 @@ static void calculate_netdata_statistics(void) {
         if(enable_file_charts)
             aggregate_pid_fds_on_targets(p);
     }
-
-    post_aggregate_targets(apps_groups_root_target);
-    post_aggregate_targets(users_root_target);
-    post_aggregate_targets(groups_root_target);
 
     cleanup_exited_pids();
 }
