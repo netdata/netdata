@@ -2,6 +2,13 @@
 
 #include "../libnetdata.h"
 
+typedef enum __attribute__((packed)) {
+    EVAL_VALUE_INVALID = 0,
+    EVAL_VALUE_NUMBER,
+    EVAL_VALUE_VARIABLE,
+    EVAL_VALUE_EXPRESSION
+} EVAL_VALUE_TYPE;
+
 // ----------------------------------------------------------------------------
 // data structures for storing the parsed expression in memory
 
@@ -11,7 +18,7 @@ typedef struct eval_variable {
 } EVAL_VARIABLE;
 
 typedef struct eval_value {
-    int type;
+    EVAL_VALUE_TYPE type;
 
     union {
         NETDATA_DOUBLE number;
@@ -1142,4 +1149,103 @@ void expression_set_variable_lookup_callback(EVAL_EXPRESSION *expression, eval_e
 
     expression->variable_lookup_cb = cb;
     expression->variable_lookup_cb_data = data;
+}
+
+static size_t expression_hardcode_node_variable(EVAL_NODE *node, STRING *variable, NETDATA_DOUBLE value) {
+    size_t matches = 0;
+
+    for(int i = 0; i < node->count; i++) {
+        switch(node->ops[i].type) {
+            case EVAL_VALUE_NUMBER:
+            case EVAL_VALUE_INVALID:
+                break;
+
+            case EVAL_VALUE_VARIABLE:
+                if(node->ops[i].variable->name == variable) {
+                    string_freez(node->ops[i].variable->name);
+                    freez(node->ops[i].variable);
+                    node->ops[i].type = EVAL_VALUE_NUMBER;
+                    node->ops[i].number = value;
+                    matches++;
+                }
+                break;
+
+            case EVAL_VALUE_EXPRESSION:
+                matches += expression_hardcode_node_variable(node->ops[i].expression, variable, value);
+                break;
+        }
+    }
+
+    return matches;
+}
+
+void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable, NETDATA_DOUBLE value) {
+    if (!expression || !variable || isnan(value))
+        return;
+
+    size_t matches = expression_hardcode_node_variable(expression->nodes, variable, value);
+    if (matches) {
+        char replace[1024];
+        snprintfz(replace, sizeof(replace), NETDATA_DOUBLE_FORMAT_AUTO, value);
+        size_t replace_len = strlen(replace);
+
+        size_t source_len = string_strlen(expression->source);
+        const char *source_str = string2str(expression->source);
+
+        // Allocate enough space to accommodate all replacements.
+        char buf[source_len + 1 + matches * (replace_len + 1)];
+
+        char find1[string_strlen(variable) + 1 + 1];
+        snprintfz(find1, sizeof(find1), "$%s", string2str(variable));
+        size_t find1_len = strlen(find1);
+
+        char find2[string_strlen(variable) + 1 + 3];
+        snprintfz(find2, sizeof(find2), "${%s}", string2str(variable));
+        size_t find2_len = strlen(find2);
+
+        size_t found = 0;
+        char *buf_ptr = buf;
+        const char *source_ptr = source_str;
+
+        while (*source_ptr) {
+            char *s1 = strstr(source_ptr, find1);
+            char *s2 = strstr(source_ptr, find2);
+
+            char *s = s1;
+            size_t len = find1_len;
+            if (s2 && (!s1 || s2 < s1)) {
+                s = s2;
+                len = find2_len;
+            }
+
+            if (s) {
+                if (s == s1 && (isalnum(s[len]) || s[len] == '_')) {
+                    // Move past the variable if it's part of a larger word.
+                    source_ptr = s + len;
+                    continue;
+                }
+
+                // Copy the part before the variable.
+                memcpy(buf_ptr, source_ptr, s - source_ptr);
+                buf_ptr += (s - source_ptr);
+
+                // Copy the replacement.
+                memcpy(buf_ptr, replace, replace_len);
+                buf_ptr += replace_len;
+                *buf_ptr = '\0';
+
+                // Move the source pointer past the replaced variable.
+                source_ptr = s + len;
+                found++;
+            } else {
+                // Copy the rest of the string if no more variables are found.
+                strcpy(buf_ptr, source_ptr);
+                break;
+            }
+        }
+
+        // Update the expression source with the new string.
+        string_freez(expression->source);
+        expression->source = string_strdupz(buf);
+    }
 }

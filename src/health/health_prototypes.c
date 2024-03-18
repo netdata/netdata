@@ -5,6 +5,122 @@
 // ---------------------------------------------------------------------------------------------------------------------
 
 static struct {
+    ALERT_LOOKUP_DIMS_GROUPING group;
+    const char *name;
+} dims_grouping[] = {
+    { .group = ALERT_LOOKUP_DIMS_SUM, .name = "sum" },
+    { .group = ALERT_LOOKUP_DIMS_MIN, .name = "min" },
+    { .group = ALERT_LOOKUP_DIMS_MAX, .name = "max" },
+    { .group = ALERT_LOOKUP_DIMS_AVERAGE, .name = "average" },
+    { .group = ALERT_LOOKUP_DIMS_MIN2MAX, .name = "min2max" },
+
+    // terminator
+    { .group = 0, .name = NULL },
+};
+
+ALERT_LOOKUP_DIMS_GROUPING alerts_dims_grouping2id(const char *group) {
+    if(!group || !*group)
+        return dims_grouping[0].group;
+
+    for(size_t i = 0; dims_grouping[i].name ;i++) {
+        if(strcmp(dims_grouping[i].name, group) == 0)
+            return dims_grouping[i].group;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "Alert lookup dimensions grouping '%s' is not valid", group);
+    return dims_grouping[0].group;
+}
+
+const char *alerts_dims_grouping_id2group(ALERT_LOOKUP_DIMS_GROUPING grouping) {
+    for(size_t i = 0; dims_grouping[i].name ;i++) {
+        if(grouping == dims_grouping[i].group)
+            return dims_grouping[i].name;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "Alert lookup dimensions grouping %d is not valid", grouping);
+    return dims_grouping[0].name;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
+static struct {
+    ALERT_LOOKUP_DATA_SOURCE source;
+    const char *name;
+} data_sources[] = {
+    { .source = ALERT_LOOKUP_DATA_SOURCE_SAMPLES, .name = "samples" },
+    { .source = ALERT_LOOKUP_DATA_SOURCE_PERCENTAGES, .name = "percentages" },
+    { .source = ALERT_LOOKUP_DATA_SOURCE_ANOMALIES, .name = "anomalies" },
+
+    // terminator
+    { .source = 0, .name = NULL },
+};
+
+ALERT_LOOKUP_DATA_SOURCE alerts_data_sources2id(const char *source) {
+    if(!source || !*source)
+        return data_sources[0].source;
+
+    for(size_t i = 0; data_sources[i].name ;i++) {
+        if(strcmp(data_sources[i].name, source) == 0)
+            return data_sources[i].source;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "Alert data source '%s' is not valid", source);
+    return data_sources[0].source;
+}
+
+const char *alerts_data_source_id2source(ALERT_LOOKUP_DATA_SOURCE source) {
+    for(size_t i = 0; data_sources[i].name ;i++) {
+        if(source == data_sources[i].source)
+            return data_sources[i].name;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "Alert data source %d is not valid", source);
+    return data_sources[0].name;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
+static struct {
+    ALERT_LOOKUP_TIME_GROUP_CONDITION condition;
+    const char *name;
+} group_conditions[] = {
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, .name = "=" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, .name = "!=" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, .name = ">" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, .name = ">=" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, .name = "<" },
+    { .condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL, .name = "<=" },
+
+    // terminator
+    { .condition = 0, .name = NULL },
+};
+
+ALERT_LOOKUP_TIME_GROUP_CONDITION alerts_group_condition2id(const char *source) {
+    if(!source || !*source)
+        return group_conditions[0].condition;
+
+    for(size_t i = 0; group_conditions[i].name ;i++) {
+        if(strcmp(group_conditions[i].name, source) == 0)
+            return group_conditions[i].condition;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "Alert data source '%s' is not valid", source);
+    return group_conditions[0].condition;
+}
+
+const char *alerts_group_conditions_id2txt(ALERT_LOOKUP_TIME_GROUP_CONDITION source) {
+    for(size_t i = 0; group_conditions[i].name ;i++) {
+        if(source == group_conditions[i].condition)
+            return group_conditions[i].name;
+    }
+
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "Alert data source %d is not valid", source);
+    return group_conditions[0].name;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
+static struct {
     const char *name;
     uint32_t hash;
     ALERT_ACTION_OPTIONS value;
@@ -424,12 +540,9 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
 
     dst->update_every = src->update_every;
 
-    dst->green = src->green;
-    dst->red = src->red;
-
     dst->dimensions = string_dup(src->dimensions);
 
-    dst->group = src->group;
+    dst->time_group = src->time_group;
     dst->before = src->before;
     dst->after = src->after;
     dst->options = src->options;

@@ -162,25 +162,21 @@ static inline int isvariableterm(const char s) {
     return 1;
 }
 
-static inline int health_parse_db_lookup(
-        size_t line, const char *filename, char *string,
-        RRDR_TIME_GROUPING *group_method, int *after, int *before, int *every,
-        RRDR_OPTIONS *options, STRING **dimensions
-) {
-    netdata_log_debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
-
-    if(*dimensions) string_freez(*dimensions);
-    *dimensions = NULL;
-    *after = 0;
-    *before = 0;
-    *every = 0;
-    *options = 0;
+static inline int health_parse_db_lookup(size_t line, const char *filename, char *string, struct rrd_alert_config *ac) {
+    if(ac->dimensions) string_freez(ac->dimensions);
+    ac->dimensions = NULL;
+    ac->after = 0;
+    ac->before = 0;
+    ac->update_every = 0;
+    ac->options = 0;
+    ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
+    ac->time_group_value = NAN;
 
     char *s = string, *key;
 
     // first is the group method
     key = s;
-    while(*s && !isspace(*s)) s++;
+    while(*s && !isspace(*s) && *s != '(') s++;
     while(*s && isspace(*s)) *s++ = '\0';
     if(!*s) {
         netdata_log_error("Health configuration invalid chart calculation at line %zu of file '%s': expected group method followed by the 'after' time, but got '%s'",
@@ -188,10 +184,88 @@ static inline int health_parse_db_lookup(
         return 0;
     }
 
-    if((*group_method = time_grouping_parse(key, RRDR_GROUPING_UNDEFINED)) == RRDR_GROUPING_UNDEFINED) {
+    bool group_options = false;
+    if(*s == '(') {
+        *s++ = '\0';
+        group_options = true;
+    }
+
+    if((ac->time_group = time_grouping_parse(key, RRDR_GROUPING_UNDEFINED)) == RRDR_GROUPING_UNDEFINED) {
         netdata_log_error("Health configuration at line %zu of file '%s': invalid group method '%s'",
                           line, filename, key);
         return 0;
+    }
+
+    if(group_options) {
+        if(*s == '!') {
+            s++;
+            if(*s == '=') s++;
+            ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL;
+        }
+        else if(*s == '<') {
+            s++;
+            if(*s == '>') {
+                s++;
+                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL;
+            }
+            else if(*s == '=') {
+                s++;
+                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
+            }
+            else
+                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
+        }
+        else if(*s == '>') {
+            if(*s == '=') {
+                s++;
+                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL;
+            }
+            else
+                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS;
+        }
+
+        while(*s && isspace(*s)) s++;
+
+        if(*s) {
+            if(isdigit(*s) || *s == '.') {
+                ac->time_group_value = str2ndd(s, &s);
+                while(s && *s && isspace(*s)) s++;
+
+                if(!s || *s != ')') {
+                    netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after number in aggregation method on '%s'",
+                                      line, filename, key);
+                    return 0;
+                }
+            }
+        }
+        else if(*s != ')') {
+            netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after method on '%s'",
+                              line, filename, key);
+            return 0;
+        }
+
+        s++;
+    }
+
+    switch (ac->time_group) {
+        default:
+            break;
+
+        case RRDR_GROUPING_COUNTIF:
+            if(isnan(ac->time_group_value))
+                ac->time_group_value = 0;
+            break;
+
+        case RRDR_GROUPING_TRIMMED_MEAN:
+        case RRDR_GROUPING_TRIMMED_MEDIAN:
+            if(isnan(ac->time_group_value))
+                ac->time_group_value = 5;
+            break;
+
+        case RRDR_GROUPING_PERCENTILE:
+            if(isnan(ac->time_group_value))
+                ac->time_group_value = 95;
+            break;
     }
 
     // then is the 'after' time
@@ -199,14 +273,14 @@ static inline int health_parse_db_lookup(
     while(*s && !isspace(*s)) s++;
     while(*s && isspace(*s)) *s++ = '\0';
 
-    if(!config_parse_duration(key, after)) {
+    if(!config_parse_duration(key, &ac->after)) {
         netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' after group method",
                           line, filename, key);
         return 0;
     }
 
     // sane defaults
-    *every = ABS(*after);
+    ac->update_every = ABS(ac->after);
 
     // now we may have optional parameters
     while(*s) {
@@ -220,7 +294,7 @@ static inline int health_parse_db_lookup(
             while(*s && !isspace(*s)) s++;
             while(*s && isspace(*s)) *s++ = '\0';
 
-            if (!config_parse_duration(value, before)) {
+            if (!config_parse_duration(value, &ac->before)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
             }
@@ -230,34 +304,46 @@ static inline int health_parse_db_lookup(
             while(*s && !isspace(*s)) s++;
             while(*s && isspace(*s)) *s++ = '\0';
 
-            if (!config_parse_duration(value, every)) {
+            if (!config_parse_duration(value, &ac->update_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
             }
         }
         else if(!strcasecmp(key, "absolute") || !strcasecmp(key, "abs") || !strcasecmp(key, "absolute_sum")) {
-            *options |= RRDR_OPTION_ABSOLUTE;
+            ac->options |= RRDR_OPTION_ABSOLUTE;
         }
         else if(!strcasecmp(key, "min2max")) {
-            *options |= RRDR_OPTION_MIN2MAX;
+            ac->options |= RRDR_OPTION_DIMS_MIN2MAX;
+        }
+        else if(!strcasecmp(key, "average")) {
+            ac->options |= RRDR_OPTION_DIMS_AVERAGE;
+        }
+        else if(!strcasecmp(key, "min")) {
+            ac->options |= RRDR_OPTION_DIMS_MIN;
+        }
+        else if(!strcasecmp(key, "max")) {
+            ac->options |= RRDR_OPTION_DIMS_MAX;
+        }
+        else if(!strcasecmp(key, "sum")) {
+            ;
         }
         else if(!strcasecmp(key, "null2zero")) {
-            *options |= RRDR_OPTION_NULL2ZERO;
+            ac->options |= RRDR_OPTION_NULL2ZERO;
         }
         else if(!strcasecmp(key, "percentage")) {
-            *options |= RRDR_OPTION_PERCENTAGE;
+            ac->options |= RRDR_OPTION_PERCENTAGE;
         }
         else if(!strcasecmp(key, "unaligned")) {
-            *options |= RRDR_OPTION_NOT_ALIGNED;
+            ac->options |= RRDR_OPTION_NOT_ALIGNED;
         }
         else if(!strcasecmp(key, "anomaly-bit")) {
-            *options |= RRDR_OPTION_ANOMALY_BIT;
+            ac->options |= RRDR_OPTION_ANOMALY_BIT;
         }
         else if(!strcasecmp(key, "match-ids") || !strcasecmp(key, "match_ids")) {
-            *options |= RRDR_OPTION_MATCH_IDS;
+            ac->options |= RRDR_OPTION_MATCH_IDS;
         }
         else if(!strcasecmp(key, "match-names") || !strcasecmp(key, "match_names")) {
-            *options |= RRDR_OPTION_MATCH_NAMES;
+            ac->options |= RRDR_OPTION_MATCH_NAMES;
         }
         else if(!strcasecmp(key, "of")) {
             char *find = NULL;
@@ -266,7 +352,7 @@ static inline int health_parse_db_lookup(
                 if(find) {
                     *find = '\0';
                 }
-                *dimensions = string_strdupz(s);
+                ac->dimensions = string_strdupz(s);
             }
 
             if(!find) {
@@ -340,6 +426,46 @@ static inline void strip_quotes(char *s) {
     }
 }
 
+static void replace_green_red(RRD_ALERT_PROTOTYPE *ap, NETDATA_DOUBLE green, NETDATA_DOUBLE red) {
+    if(!isnan(green)) {
+        STRING *green_str = string_strdupz("green");
+        expression_hardcode_variable(ap->config.calculation, green_str, green);
+        expression_hardcode_variable(ap->config.warning, green_str, green);
+        expression_hardcode_variable(ap->config.critical, green_str, green);
+        string_freez(green_str);
+    }
+
+    if(!isnan(red)) {
+        STRING *red_str = string_strdupz("red");
+        expression_hardcode_variable(ap->config.calculation, red_str, red);
+        expression_hardcode_variable(ap->config.warning, red_str, red);
+        expression_hardcode_variable(ap->config.critical, red_str, red);
+        string_freez(red_str);
+    }
+}
+
+static void dims_grouping_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
+    if(ap->config.options & RRDR_OPTION_DIMS_MIN)
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_MIN;
+    else if(ap->config.options & RRDR_OPTION_DIMS_MAX)
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_MAX;
+    else if(ap->config.options & RRDR_OPTION_DIMS_MIN2MAX)
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_MIN2MAX;
+    else if(ap->config.options & RRDR_OPTION_DIMS_AVERAGE)
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_AVERAGE;
+    else
+        ap->config.dims_group = ALERT_LOOKUP_DIMS_SUM;
+}
+
+static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
+    if(ap->config.options & RRDR_OPTION_PERCENTAGE)
+        ap->config.data_source = ALERT_LOOKUP_DATA_SOURCE_PERCENTAGES;
+    else if(ap->config.options & RRDR_OPTION_ANOMALY_BIT)
+        ap->config.data_source = ALERT_LOOKUP_DATA_SOURCE_ANOMALIES;
+    else
+        ap->config.data_source = ALERT_LOOKUP_DATA_SOURCE_SAMPLES;
+}
+
 #define PARSE_HEALTH_CONFIG_LOG_DUPLICATE_STRING_MSG(ax, member) do {                               \
     if(strcmp(string2str(ax->member), value) != 0)                                                  \
         netdata_log_error(                                                                          \
@@ -390,8 +516,6 @@ static inline void strip_quotes(char *s) {
         ax->member = string_strdupz(_buf);                                                          \
     }                                                                                               \
 } while(0)
-
-
 
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
     netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
@@ -466,6 +590,8 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
     RRD_ALERT_PROTOTYPE *ap = NULL;
     struct rrd_alert_config *ac = NULL;
     struct rrd_alert_match *am = NULL;
+    NETDATA_DOUBLE green = NAN;
+    NETDATA_DOUBLE red = NAN;
 
     size_t line = 0, append = 0;
     char *s;
@@ -522,6 +648,9 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
 
         if((hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) || (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY))) {
             if(ap) {
+                lookup_data_source_from_rrdr_options(ap);
+                dims_grouping_from_rrdr_options(ap);
+                replace_green_red(ap, green, red);
                 health_prototype_add(ap);
                 freez(ap);
             }
@@ -544,8 +673,8 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             ap->match.is_template = (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY));
             ap->config.source = health_source_file(line, filename);
             ap->config.source_type = stock_config ? DYNCFG_SOURCE_TYPE_STOCK : DYNCFG_SOURCE_TYPE_USER;
-            ap->config.green = NAN;
-            ap->config.red = NAN;
+            green = NAN;
+            red = NAN;
             ap->config.delay_multiplier = 1;
             ap->config.warn_repeat_every = health_globals.config.default_warn_repeat_every;
             ap->config.crit_repeat_every = health_globals.config.default_crit_repeat_every;
@@ -593,11 +722,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, type);
         }
         else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-            ac->lookup = string_strdupz(value);
-            health_parse_db_lookup(line, filename, value,
-                                   &ac->group, &ac->after, &ac->before,
-                                   &ac->update_every, &ac->options,
-                                   &ac->dimensions);
+            health_parse_db_lookup(line, filename, value, ac);
         }
         else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
             if(!config_parse_duration(value, &ac->update_every))
@@ -608,7 +733,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         }
         else if(hash == hash_green && !strcasecmp(key, HEALTH_GREEN_KEY)) {
             char *e;
-            ac->green = str2ndd(value, &e);
+            green = str2ndd(value, &e);
             if(e && *e) {
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
@@ -618,7 +743,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         }
         else if(hash == hash_red && !strcasecmp(key, HEALTH_RED_KEY)) {
             char *e;
-            ac->red = str2ndd(value, &e);
+            red = str2ndd(value, &e);
             if(e && *e) {
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
@@ -705,6 +830,9 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
     }
 
     if(ap) {
+        lookup_data_source_from_rrdr_options(ap);
+        dims_grouping_from_rrdr_options(ap);
+        replace_green_red(ap, green, red);
         health_prototype_add(ap);
         freez(ap);
     }

@@ -340,8 +340,31 @@ static void health_event_loop(void) {
                     /* time_t old_db_timestamp = rc->db_before; */
                     int value_is_null = 0;
 
+                    char group_options_buf[100];
+                    const char *group_options = group_options_buf;
+                    switch(rc->config.time_group) {
+                        default:
+                            group_options = NULL;
+                            break;
+
+                        case RRDR_GROUPING_PERCENTILE:
+                        case RRDR_GROUPING_TRIMMED_MEAN:
+                        case RRDR_GROUPING_TRIMMED_MEDIAN:
+                            snprintfz(group_options_buf, sizeof(group_options_buf),
+                                      NETDATA_DOUBLE_FORMAT_AUTO,
+                                      rc->config.time_group_value);
+                            break;
+
+                        case RRDR_GROUPING_COUNTIF:
+                            snprintfz(group_options_buf, sizeof(group_options_buf),
+                                      "%s" NETDATA_DOUBLE_FORMAT_AUTO,
+                                      alerts_group_conditions_id2txt(rc->config.time_group_condition),
+                                      rc->config.time_group_value);
+                            break;
+                    }
+
                     int ret = rrdset2value_api_v1(rc->rrdset, NULL, &rc->value, rrdcalc_dimensions(rc), 1,
-                                                  rc->config.after, rc->config.before, rc->config.group, NULL,
+                                                  rc->config.after, rc->config.before, rc->config.time_group, group_options,
                                                   0, rc->config.options | RRDR_OPTION_SELECTED_TIER,
                                                   &rc->db_after,&rc->db_before,
                                                   NULL, NULL, NULL,

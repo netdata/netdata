@@ -9,6 +9,50 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap);
 // ---------------------------------------------------------------------------------------------------------------------
 // parse the json object of an alert definition
 
+static void dims_grouping_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
+    ap->config.options &= ~(RRDR_OPTIONS_DIMS_AGGREGATION);
+
+    switch(ap->config.dims_group) {
+        default:
+        case ALERT_LOOKUP_DIMS_SUM:
+            break;
+
+        case ALERT_LOOKUP_DIMS_AVERAGE:
+            ap->config.options |= RRDR_OPTION_DIMS_AVERAGE;
+            break;
+
+        case ALERT_LOOKUP_DIMS_MIN:
+            ap->config.options |= RRDR_OPTION_DIMS_MIN;
+            break;
+
+        case ALERT_LOOKUP_DIMS_MAX:
+            ap->config.options |= RRDR_OPTION_DIMS_MAX;
+            break;
+
+        case ALERT_LOOKUP_DIMS_MIN2MAX:
+            ap->config.options |= RRDR_OPTION_DIMS_MIN2MAX;
+            break;
+    }
+}
+
+static void data_source_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
+    ap->config.options &= ~(RRDR_OPTIONS_DATA_SOURCES);
+
+    switch(ap->config.data_source) {
+        default:
+        case ALERT_LOOKUP_DATA_SOURCE_SAMPLES:
+            break;
+
+        case ALERT_LOOKUP_DATA_SOURCE_PERCENTAGES:
+            ap->config.options |= RRDR_OPTION_PERCENTAGE;
+            break;
+
+        case ALERT_LOOKUP_DATA_SOURCE_ANOMALIES:
+            ap->config.options |= RRDR_OPTION_ANOMALY_BIT;
+            break;
+    }
+}
+
 static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_match *match, BUFFER *error) {
     STRING *on = NULL;
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "on", on, error, true);
@@ -26,7 +70,25 @@ static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_ma
 static bool parse_config_value_database_lookup(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
     JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "after", config->after, error);
     JSONC_PARSE_INT_OR_ERROR_AND_RETURN(jobj, path, "before", config->before, error);
-    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "grouping", time_grouping_txt2id, config->group, error);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group", time_grouping_txt2id, config->time_group, error);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error);
+    JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error);
+
+    switch(config->time_group) {
+        default:
+            break;
+
+        case RRDR_GROUPING_COUNTIF:
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group_condition", alerts_group_condition2id, config->time_group_condition, error);
+            // fall through
+
+        case RRDR_GROUPING_TRIMMED_MEAN:
+        case RRDR_GROUPING_TRIMMED_MEDIAN:
+        case RRDR_GROUPING_PERCENTILE:
+            JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "time_group_value", config->time_group_value, error);
+            break;
+    }
+
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "dimensions", config->dimensions, error, true);
     return true;
@@ -40,8 +102,6 @@ static bool parse_config_value(json_object *jobj, const char *path, struct rrd_a
 }
 
 static bool parse_config_conditions(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "green", config->green, error);
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "red", config->red, error);
     JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "warning_condition", config->warning, error);
     JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "critical_condition", config->critical, error);
     return true;
@@ -70,20 +130,21 @@ static bool parse_config_action(json_object *jobj, const char *path, struct rrd_
     return true;
 }
 
-static bool parse_config(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error) {
+static bool parse_config(json_object *jobj, const char *path, RRD_ALERT_PROTOTYPE *ap, BUFFER *error) {
     // we shouldn't parse these from the payload - they are given to us via the function call
-    // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, "source_type", dyncfg_source_type2id, config->source_type);
-    // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, "source", config->source);
+    // JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "source_type", dyncfg_source_type2id, ap->config.source_type, error);
+    // JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "source", ap->config.source, error, true);
 
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "summary", config->summary, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "info", config->info, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "type", config->type, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "component", config->component, error, true);
-    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "classification", config->classification, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "summary", ap->config.summary, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "info", ap->config.info, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "type", ap->config.type, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "component", ap->config.component, error, true);
+    JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "classification", ap->config.classification, error, true);
 
-    JSONC_PARSE_SUBOBJECT(jobj, path, "value", config, parse_config_value, error);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", config, parse_config_conditions, error);
-    JSONC_PARSE_SUBOBJECT(jobj, path, "action", config, parse_config_action, error);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "value", &ap->config, parse_config_value, error);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "conditions", &ap->config, parse_config_conditions, error);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "action", &ap->config, parse_config_action, error);
+    JSONC_PARSE_SUBOBJECT(jobj, path, "match", &ap->match, parse_match, error);
 
     return true;
 }
@@ -126,8 +187,7 @@ static bool parse_prototype(json_object *jobj, const char *path, RRD_ALERT_PROTO
                 return false;
             }
 
-            JSONC_PARSE_SUBOBJECT(rule, path, "match", &ap->match, parse_match, error);
-            JSONC_PARSE_SUBOBJECT(rule, path, "config", &ap->config, parse_config, error);
+            JSONC_PARSE_SUBOBJECT(rule, path, "config", ap, parse_config, error);
 
             ap = NULL; // so that we will create another one, if available
         }
@@ -177,6 +237,9 @@ static RRD_ALERT_PROTOTYPE *health_prototype_payload_parse(const char *payload, 
             goto cleanup;
         }
 
+        data_source_to_rrdr_options(ap);
+        dims_grouping_to_rrdr_options(ap);
+
         if(ap->match.enabled)
             base->_internal.enabled = true;
     }
@@ -204,18 +267,6 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
         buffer_json_member_add_boolean(wb, "enabled", ap->match.enabled);
         buffer_json_member_add_string(wb, "type", ap->match.is_template ? "template" : "instance");
 
-        buffer_json_member_add_object(wb, "match");
-        {
-            if(ap->match.is_template)
-                buffer_json_member_add_string(wb, "on", string2str(ap->match.on.context));
-            else
-                buffer_json_member_add_string(wb, "on", string2str(ap->match.on.chart));
-
-            buffer_json_member_add_string_or_empty(wb, "host_labels", ap->match.host_labels ? string2str(ap->match.host_labels) : "*");
-            buffer_json_member_add_string_or_empty(wb, "instance_labels", ap->match.chart_labels ? string2str(ap->match.chart_labels) : "*");
-        }
-        buffer_json_object_close(wb); // match
-
         buffer_json_member_add_object(wb, "config");
         {
             if(!for_hashing) {
@@ -223,6 +274,18 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
                 buffer_json_member_add_string(wb, "source_type", dyncfg_id2source_type(ap->config.source_type));
                 buffer_json_member_add_string(wb, "source", string2str(ap->config.source));
             }
+
+            buffer_json_member_add_object(wb, "match");
+            {
+                if(ap->match.is_template)
+                    buffer_json_member_add_string(wb, "on", string2str(ap->match.on.context));
+                else
+                    buffer_json_member_add_string(wb, "on", string2str(ap->match.on.chart));
+
+                buffer_json_member_add_string_or_empty(wb, "host_labels", ap->match.host_labels ? string2str(ap->match.host_labels) : "*");
+                buffer_json_member_add_string_or_empty(wb, "instance_labels", ap->match.chart_labels ? string2str(ap->match.chart_labels) : "*");
+            }
+            buffer_json_object_close(wb); // match
 
             buffer_json_member_add_string(wb, "summary", string2str(ap->config.summary));
             buffer_json_member_add_string(wb, "info", string2str(ap->config.info));
@@ -237,8 +300,12 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
                 {
                     buffer_json_member_add_int64(wb, "after", ap->config.after);
                     buffer_json_member_add_int64(wb, "before", ap->config.before);
-                    buffer_json_member_add_string(wb, "grouping", time_grouping_id2txt(ap->config.group));
-                    rrdr_options_to_buffer_json_array(wb, "options", ap->config.options);
+                    buffer_json_member_add_string(wb, "time_group", time_grouping_id2txt(ap->config.time_group));
+                    buffer_json_member_add_string(wb, "time_group_condition", alerts_group_conditions_id2txt(ap->config.time_group_condition));
+                    buffer_json_member_add_double(wb, "time_group_value", ap->config.time_group_value);
+                    buffer_json_member_add_string(wb, "dims_group", alerts_dims_grouping_id2group(ap->config.dims_group));
+                    buffer_json_member_add_string(wb, "data_source", alerts_data_source_id2source(ap->config.data_source));
+                    rrdr_options_to_buffer_json_array(wb, "options", RRDR_OPTIONS_REMOVE_OVERLAPPING(ap->config.options));
                     buffer_json_member_add_string(wb, "dimensions", string2str(ap->config.dimensions));
                 }
                 buffer_json_object_close(wb); // database lookup
@@ -251,8 +318,6 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
 
             buffer_json_member_add_object(wb, "conditions");
             {
-                buffer_json_member_add_double(wb, "green", ap->config.green);
-                buffer_json_member_add_double(wb, "red", ap->config.red);
                 buffer_json_member_add_string(wb, "warning_condition", expression_source(ap->config.warning));
                 buffer_json_member_add_string(wb, "critical_condition", expression_source(ap->config.critical));
             }
@@ -556,10 +621,10 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
                ap->_internal.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED, DYNCFG_TYPE_JOB,
                ap->config.source_type, string2str(ap->config.source),
                DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE |
-                   DYNCFG_CMD_UPDATE | DYNCFG_CMD_TEST |
+                   DYNCFG_CMD_UPDATE |
                    (ap->config.source_type == DYNCFG_SOURCE_TYPE_DYNCFG && !ap->_internal.is_on_disk ? DYNCFG_CMD_REMOVE : 0),
-               HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG,
-               HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_EDIT_AGENT_CONFIG,
+               HTTP_ACCESS_NONE,
+               HTTP_ACCESS_NONE,
                dyncfg_health_cb, NULL);
 
 #ifdef NETDATA_TEST_HEALTH_PROTOTYPES_JSON_AND_PARSING
@@ -589,9 +654,9 @@ void health_dyncfg_register_all_prototypes(void) {
                DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX, "/health/alerts/prototypes",
                DYNCFG_STATUS_ACCEPTED, DYNCFG_TYPE_TEMPLATE,
                DYNCFG_SOURCE_TYPE_INTERNAL, "internal",
-               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_TEST,
-               HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG,
-               HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_EDIT_AGENT_CONFIG,
+               DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE,
+               HTTP_ACCESS_NONE,
+               HTTP_ACCESS_NONE,
                dyncfg_health_cb, NULL);
 
     dfe_start_read(health_globals.prototypes.dict, ap) {

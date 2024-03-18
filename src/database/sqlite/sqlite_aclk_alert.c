@@ -610,7 +610,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
                 netdata_log_error("aclk_push_alert_config_event: Unexpected param number %d", param);
 
             BUFFER *tmp_buf = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
-            buffer_data_options2string(tmp_buf, sqlite3_column_int(res, 28));
+            rrdr_options_to_buffer(tmp_buf, sqlite3_column_int(res, 28));
             alarm_config.p_db_lookup_options = strdupz((char *)buffer_tostring(tmp_buf));
             buffer_free(tmp_buf);
 

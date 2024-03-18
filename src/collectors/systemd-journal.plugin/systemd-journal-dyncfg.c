@@ -156,8 +156,8 @@ void systemd_journal_dyncfg_init(struct functions_evloop_globals *wg) {
         DYNCFG_SOURCE_TYPE_INTERNAL,
         "internal",
         DYNCFG_CMD_SCHEMA | DYNCFG_CMD_GET | DYNCFG_CMD_UPDATE,
-        HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG,
-        HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_EDIT_AGENT_CONFIG,
+        HTTP_ACCESS_NONE,
+        HTTP_ACCESS_NONE,
         systemd_journal_directories_dyncfg_cb,
         NULL);
 }

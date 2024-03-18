@@ -11,11 +11,6 @@ struct eval_expression;
 typedef struct eval_expression EVAL_EXPRESSION;
 typedef bool (*eval_expression_variable_lookup_t)(STRING *variable, void *data, NETDATA_DOUBLE *result);
 
-#define EVAL_VALUE_INVALID    0
-#define EVAL_VALUE_NUMBER     1
-#define EVAL_VALUE_VARIABLE   2
-#define EVAL_VALUE_EXPRESSION 3
-
 // parsing and evaluation
 #define EVAL_ERROR_OK                             0
 
@@ -55,5 +50,7 @@ const char *expression_parsed_as(EVAL_EXPRESSION *expression);
 const char *expression_error_msg(EVAL_EXPRESSION *expression);
 NETDATA_DOUBLE expression_result(EVAL_EXPRESSION *expression);
 void expression_set_variable_lookup_callback(EVAL_EXPRESSION *expression, eval_expression_variable_lookup_t cb, void *data);
+
+void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable, NETDATA_DOUBLE value);
 
 #endif //NETDATA_EVAL_H

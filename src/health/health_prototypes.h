@@ -10,6 +10,35 @@ typedef enum __attribute__((packed)) {
     ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION = (1 << 0),
 } ALERT_ACTION_OPTIONS;
 
+typedef enum __attribute__((packed)) {
+    ALERT_LOOKUP_DATA_SOURCE_SAMPLES = 0,
+    ALERT_LOOKUP_DATA_SOURCE_PERCENTAGES,
+    ALERT_LOOKUP_DATA_SOURCE_ANOMALIES,
+} ALERT_LOOKUP_DATA_SOURCE;
+ALERT_LOOKUP_DATA_SOURCE alerts_data_sources2id(const char *source);
+const char *alerts_data_source_id2source(ALERT_LOOKUP_DATA_SOURCE source);
+
+typedef enum __attribute__((packed)) {
+    ALERT_LOOKUP_DIMS_SUM = 0,
+    ALERT_LOOKUP_DIMS_MIN,
+    ALERT_LOOKUP_DIMS_MAX,
+    ALERT_LOOKUP_DIMS_AVERAGE,
+    ALERT_LOOKUP_DIMS_MIN2MAX,
+} ALERT_LOOKUP_DIMS_GROUPING;
+ALERT_LOOKUP_DIMS_GROUPING alerts_dims_grouping2id(const char *group);
+const char *alerts_dims_grouping_id2group(ALERT_LOOKUP_DIMS_GROUPING grouping);
+
+typedef enum __attribute__((packed)) {
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL,
+    ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL,
+} ALERT_LOOKUP_TIME_GROUP_CONDITION;
+ALERT_LOOKUP_TIME_GROUP_CONDITION alerts_group_condition2id(const char *source);
+const char *alerts_group_conditions_id2txt(ALERT_LOOKUP_TIME_GROUP_CONDITION source);
+
 struct rrd_alert_match {
     bool enabled;
 
@@ -44,21 +73,20 @@ struct rrd_alert_config {
     STRING *units;                  // the units of the alarm
     STRING *summary;                // a short alert summary
     STRING *info;                   // a description of the alarm
-    STRING *lookup;                 // the lookup field
 
     int update_every;               // update frequency for the alarm
 
     ALERT_ACTION_OPTIONS alert_action_options;
 
-    // the red and green threshold of this alarm (to be set to the chart)
-    NETDATA_DOUBLE green;
-    NETDATA_DOUBLE red;
-
     // ------------------------------------------------------------------------
     // database lookup settings
 
     STRING *dimensions;             // the chart dimensions
-    RRDR_TIME_GROUPING group;       // grouping method: average, max, etc.
+    RRDR_TIME_GROUPING time_group;  // grouping method: average, max, etc.
+    ALERT_LOOKUP_TIME_GROUP_CONDITION time_group_condition;
+    NETDATA_DOUBLE time_group_value;
+    ALERT_LOOKUP_DIMS_GROUPING dims_group; // grouping method for dimensions
+    ALERT_LOOKUP_DATA_SOURCE data_source;
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
     RRDR_OPTIONS options;           // configuration options

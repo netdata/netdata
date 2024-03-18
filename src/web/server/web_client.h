@@ -250,8 +250,6 @@ ssize_t web_client_read_file(struct web_client *w);
 void web_client_process_request_from_web_server(struct web_client *w);
 void web_client_request_done(struct web_client *w);
 
-void buffer_data_options2string(BUFFER *wb, uint32_t options);
-
 void web_client_build_http_header(struct web_client *w);
 
 void web_client_reuse_from_cache(struct web_client *w);
