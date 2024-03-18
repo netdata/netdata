@@ -3,24 +3,47 @@
 # Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+macro(netdata_protobuf_21_tags)
+        set(PROTOBUF_TAG f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c) # v21.12
+        set(NEED_ABSL False)
+endmacro()
+
+macro(netdata_protobuf_25_tags)
+        set(PROTOBUF_TAG 4a2aef570deb2bfb8927426558701e8bfc26f2a4) # v25.3
+        set(NEED_ABSL True)
+        set(ABSL_TAG 2f9e432cce407ce0ae50676696666f33a77d42ac) # 20240116.1
+endmacro()
+
+# Determine what version of protobuf and abseil to bundle.
+#
+# This is unfortunately very complicated because we support systems
+# older than what Google officially supports for C++.
+macro(netdata_set_bundled_protobuf_tags)
+        netdata_protobuf_21_tags()
+
+        if(NOT USE_CXX_11)
+                if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
+                        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7.3.1)
+                                netdata_protobuf_25_tags()
+                        endif()
+                elseif(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
+                        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7.0.0)
+                                netdata_protobuf_25_tags()
+                        endif()
+                elseif(CMAKE_CXX_COMPILER_ID STREQUAL AppleClang)
+                        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
+                                netdata_protobuf_25_tags()
+                        endif()
+                endif()
+        endif()
+endmacro()
+
 # Prepare a vendored copy of Protobuf for use with Netdata.
 function(netdata_bundle_protobuf)
         include(FetchContent)
         include(NetdataFetchContentExtra)
 
-        if(USE_CXX_11)
-                # This version needs to stay as it is, as newer versions need C++14
-                # It can be dropped once we no longer support systems using GCC
-                # older than GCC 7.
-                set(PROTOBUF_TAG f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c) # v21.12
-                set(NEED_ABSL False)
-        else()
-                # These versions are what should be updated if bumping bundled
-                # version of protobuf
-                set(PROTOBUF_TAG 4a2aef570deb2bfb8927426558701e8bfc26f2a4) # v25.3
-                set(NEED_ABSL True)
-                set(ABSL_TAG 2f9e432cce407ce0ae50676696666f33a77d42ac) # 20240116.1
-        endif()
+        netdata_set_bundled_protobuf_tags()
 
         set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
 
