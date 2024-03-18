@@ -179,69 +179,12 @@ if(ENABLE_WEBRTC)
         FetchContent_MakeAvailable(libdatachannel)
 endif()
 
-if(ENABLE_BUNDLED_PROTOBUF AND NEED_PROTOBUF)
-        include(FetchContent)
-        include(NetdataFetchContentExtra)
+if(NEED_PROTOBUF)
+        include(NetdataProtobuf)
 
-        if(USE_CXX_11)
-            # This version needs to stay as it is, as newer versions need C++14
-            # It can be dropped once we no longer support systems using GCC
-            # older than GCC 7.
-            set(PROTOBUF_TAG f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c) # v21.12
-            set(NEED_ABSL False)
-        else()
-            # These versions are what should be updated if bumping bundled
-            # version of protobuf
-            set(PROTOBUF_TAG 4a2aef570deb2bfb8927426558701e8bfc26f2a4) # v25.3
-            set(NEED_ABSL True)
-            set(ABSL_TAG 2f9e432cce407ce0ae50676696666f33a77d42ac) # 20240116.1
+        if(ENABLE_BUNDLED_PROTOBUF)
+                netdata_bundle_protobuf()
         endif()
-
-        if(NOT FETCHCONTENT_TRY_FIND_PACKAGE_MODE)
-            # Codify the default behavior for this variable.
-            set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE OPT_IN)
-        endif()
-
-        set(NETDATA_FETCHCONTENT_TRY_FIND_PACKAGE_MODE "${FETCHCONTENT_TRY_FIND_PACKAGE_MODE}")
-        set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
-
-        set(NETDATA_CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
-        set(NETDATA_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-        string(REPLACE "-fsanitize=address" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-        string(REPLACE "-fsanitize=address" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-
-        # ignore debhelper
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
-
-        if(NEED_ABSL)
-                set(ABSL_PROPAGATE_CXX_STD On)
-                set(ABSL_ENABLE_INSTALL Off)
-
-                message(STATUS "Preparing bundled Abseil (required by bundled Protobuf)")
-                FetchContent_Declare(absl
-                        GIT_REPOSITORY https://github.com/abseil/abseil-cpp
-                        GIT_TAG ${ABSL_TAG}
-                )
-                FetchContent_MakeAvailable_NoInstall(absl)
-                message(STATUS "Finished preparing bundled Abseil")
-        endif()
-
-        set(protobuf_INSTALL Off)
-        set(protobuf_BUILD_LIBPROTOC Off)
-        set(protobuf_BUILD_TESTS Off)
-        set(protobuf_BUILD_SHARED_LIBS Off)
-
-        message(STATUS "Preparing bundled Protobuf")
-        FetchContent_Declare(protobuf
-                GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
-                GIT_TAG ${PROTOBUF_TAG}
-        )
-        FetchContent_MakeAvailable_NoInstall(protobuf)
-        message(STATUS "Finished preparing bundled Protobuf.")
-
-        set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE "${NETDATA_FETCHCONTENT_TRY_FIND_PACKAGE_MODE}")
-        set(CMAKE_C_FLAGS "${NETDATA_CMAKE_C_FLAGS}")
-        set(CMAKE_CXX_FLAGS "${NETDATA_CMAKE_CXX_FLAGS}")
 endif()
 
 #
@@ -563,44 +506,7 @@ endif()
 #
 
 if(NEED_PROTOBUF)
-        include(NetdataProtobufCompat)
-
-        if(NOT ENABLE_BUNDLED_PROTOBUF)
-                if (NOT BUILD_SHARED_LIBS)
-                        set(Protobuf_USE_STATIC_LIBS On)
-                endif()
-
-                # The FindProtobuf CMake module shipped by upstream CMake is
-                # broken for Protobuf version 22.0 and newer because it does
-                # not correctly pull in the new Abseil dependencies. Protobuf
-                # itself sometimes ships a CMake Package Configuration module
-                # that _does_ work correctly, so use that in preference to the
-                # Find module shipped with CMake.
-                #
-                # The code below works by first attempting to use find_package
-                # in config mode, and then checking for the existence of the
-                # target we actually use that gets defined by the protobuf
-                # CMake Package Configuration Module to determine if that
-                # worked. A bit of extra logic is required in the case of the
-                # config mode working, because some systems ship compatibility
-                # logic for the old FindProtobuf module while others do not.
-                #
-                # Upstream bug reference: https://gitlab.kitware.com/cmake/cmake/-/issues/24321
-                find_package(Protobuf CONFIG)
-
-                if(NOT TARGET protobuf::libprotobuf)
-                        message(STATUS "Could not find Protobuf using Config mode, falling back to Module mode")
-                        find_package(Protobuf REQUIRED)
-                endif()
-        endif()
-
-        set_netdata_protobuf_vars()
-
-        set(ENABLE_PROTOBUF True)
-        set(HAVE_PROTOBUF True)
-        if (ENABLE_BUNDLED_PROTOBUF)
-                set(BUNDLED_PROTOBUF True)
-        endif()
+        netdata_detect_protobuf()
 endif()
 
 #
@@ -1702,53 +1608,6 @@ if(MNL_FOUND)
 endif()
 
 #
-# helper function to build protos
-#
-
-function(protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
-        if(NOT ARGN)
-                message(SEND_ERROR "Error: protoc_generate_cpp() called without any proto files")
-                return()
-        endif()
-
-        set(${INC_DIR})
-        set(${OUT_DIR})
-        set(${SRCS})
-        set(${HDRS})
-
-        foreach(FIL ${ARGN})
-                get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
-                get_filename_component(DIR ${ABS_FIL} DIRECTORY)
-                get_filename_component(FIL_WE ${FIL} NAME_WE)
-
-                set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
-                list(APPEND ${SRCS} ${GENERATED_PB_CC})
-
-                set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
-                list(APPEND ${HDRS} ${GENERATED_PB_H})
-
-                list(APPEND _PROTOC_INCLUDE_DIRS ${INC_DIR})
-
-                if(ENABLE_BUNDLED_PROTOBUF)
-                        list(APPEND _PROTOC_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/_deps/protobuf-src/src/)
-                endif()
-
-                add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
-                                   COMMAND ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
-                                   ARGS "-I$<JOIN:${_PROTOC_INCLUDE_DIRS},;-I>" --cpp_out=${OUT_DIR} ${ABS_FIL}
-                                   DEPENDS ${ABS_FIL} ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
-                                   COMMENT "Running C++ protocol buffer compiler on ${FIL}"
-                                   COMMAND_EXPAND_LISTS)
-        endforeach()
-
-        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
-        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES COMPILE_OPTIONS -Wno-deprecated-declarations)
-
-        set(${SRCS} ${${SRCS}} PARENT_SCOPE)
-        set(${HDRS} ${${HDRS}} PARENT_SCOPE)
-endfunction()
-
-#
 # mqtt library
 #
 if (ENABLE_H2O OR ENABLE_ACLK)
@@ -1779,11 +1638,11 @@ if(ENABLE_ACLK)
         #
         # proto definitions
         #
-        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                            "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                            ACLK_PROTO_BUILT_SRCS
-                            ACLK_PROTO_BUILT_HDRS
-                            ${ACLK_PROTO_DEFS})
+        netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                                    "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                                    ACLK_PROTO_BUILT_SRCS
+                                    ACLK_PROTO_BUILT_HDRS
+                                    ${ACLK_PROTO_DEFS})
 
         list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
                                ${ACLK_PROTO_BUILT_HDRS})
@@ -2113,11 +1972,11 @@ if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                 endif()
         endif()
 
-        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
-                            "${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
-                            PROMETHEUS_REMOTE_WRITE_BUILT_SRCS
-                            PROMETHEUS_REMOTE_WRITE_BUILT_HDRS
-                            "src/exporting/prometheus/remote_write/remote_write.proto")
+        netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
+                                    "${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
+                                    PROMETHEUS_REMOTE_WRITE_BUILT_SRCS
+                                    PROMETHEUS_REMOTE_WRITE_BUILT_HDRS
+                                    "src/exporting/prometheus/remote_write/remote_write.proto")
 
         list(APPEND PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
                     ${PROMETHEUS_REMOTE_WRITE_BUILT_SRCS}
@@ -2139,14 +1998,12 @@ add_executable(netdata
 )
 
 target_compile_definitions(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_PROTOBUF}>:${NETDATA_PROTOBUF_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_ML}>:DLIB_NO_GUI_SUPPORT>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_CFLAGS_OTHER}>"
 )
 
 target_include_directories(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_PROTOBUF}>:${NETDATA_PROTOBUF_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
@@ -2157,7 +2014,6 @@ target_link_libraries(netdata PRIVATE
         libnetdata
         "$<$<BOOL:${LINUX}>:rt>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
-        "$<$<BOOL:${ENABLE_PROTOBUF}>:${NETDATA_PROTOBUF_LIBS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
@@ -2165,6 +2021,10 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
 )
+
+if(NEED_PROTOBUF)
+        netdata_add_protobuf(netdata)
+endif()
 
 #
 # build systemd-cat-native
