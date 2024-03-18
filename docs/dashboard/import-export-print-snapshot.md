@@ -14,6 +14,10 @@ learn_rel_path: "Operations"
 
 # Import, export, and print a snapshot
 
+>❗This feature is only available on v1 dashboards, it hasn't been port-forwarded to v2.
+>  For more information on accessing dashboards check [this documentation](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md).
+
+
 Netdata can export snapshots of the contents of your dashboard at a given time, which you can then import into any other
 node running Netdata. Or, you can create a print-ready version of your dashboard to save to PDF or actually print to
 paper.
