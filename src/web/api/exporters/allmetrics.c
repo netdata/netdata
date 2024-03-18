@@ -13,6 +13,7 @@ struct prometheus_output_options {
     { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
     { "oldunits",   PROMETHEUS_OUTPUT_OLDUNITS   },
     { "hideunits",  PROMETHEUS_OUTPUT_HIDEUNITS  },
+    { "comment",    PROMETHEUS_OUTPUT_COMMENT    },
     // terminator
     { NULL, PROMETHEUS_OUTPUT_NONE },
 };
