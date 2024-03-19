@@ -445,12 +445,11 @@ struct gen_parameters {
  */
 static inline void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p, int homogeneous)
 {
-    buffer_sprintf(wb, "# HELP %s_%s\n", p->prefix, p->context);
+    buffer_sprintf(wb, "# HELP ");
+    if (p->prefix)
+        buffer_sprintf(wb, "%s_", p->prefix);
 
-    if (!homogeneous)
-        buffer_sprintf(wb, "_%s", p->dimension);
-
-    buffer_sprintf(wb, "%s %s\n", p->suffix, rrdset_title(p->st));
+    buffer_sprintf(wb, "%s %s\n", p->context, rrdset_title(p->st));
 }
 
 /**
@@ -693,6 +692,13 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                         units, rrdset_units(st), PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
+            struct gen_parameters par;
+            par.prefix = prefix;
+            par.context = context;
+            par.st = st;
+
+            generate_as_collected_prom_help(wb, &par, prometheus_collector);
+
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
@@ -739,10 +745,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
 
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
-                                generate_as_collected_prom_help(wb, &p, prometheus_collector);
-                            }
-
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, p.type);
 
@@ -756,10 +758,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 dimension,
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
-
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
-                                generate_as_collected_prom_help(wb, &p, prometheus_collector);
-                            }
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(
@@ -788,17 +786,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             buffer_flush(plabels_buffer);
                             buffer_sprintf(plabels_buffer, "%1$schart=\"%2$s\",%1$sdimension=\"%3$s\",%1$sfamily=\"%4$s\"", plabels_prefix, chart, dimension, family);
                             rrdlabels_walkthrough_read(st->rrdlabels, format_prometheus_chart_label_callback, plabels_buffer);
-
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
-                                buffer_sprintf(
-                                    wb,
-                                    "# HELP %s_%s%s%s %s\n",
-                                    prefix,
-                                    context,
-                                    units,
-                                    suffix,
-                                    rrdset_title(st));
-                            }
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
                                 buffer_sprintf(wb, "# TYPE %s_%s%s%s gauge\n", prefix, context, units, suffix);
