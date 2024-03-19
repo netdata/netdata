@@ -48,6 +48,7 @@ apps:
       - login-session-observe
       - mount-observe
       - network-observe
+      - network-setup-observe
       - network
       - network-bind
       - system-observe
