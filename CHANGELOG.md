@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- add callout that snapshots only available on v1 [\#17189](https://github.com/netdata/netdata/pull/17189) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Bump github.com/vmware/govmomi from 0.36.0 to 0.36.1 in /src/go/collectors/go.d.plugin [\#17185](https://github.com/netdata/netdata/pull/17185) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump k8s.io/client-go from 0.29.2 to 0.29.3 in /src/go/collectors/go.d.plugin [\#17184](https://github.com/netdata/netdata/pull/17184) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/prometheus/common from 0.48.0 to 0.50.0 in /src/go/collectors/go.d.plugin [\#17182](https://github.com/netdata/netdata/pull/17182) ([dependabot[bot]](https://github.com/apps/dependabot))
+- split apps.plugin into multiple files and support MacOS [\#17180](https://github.com/netdata/netdata/pull/17180) ([ktsaou](https://github.com/ktsaou))
 - Update themes.md [\#17176](https://github.com/netdata/netdata/pull/17176) ([Ancairon](https://github.com/Ancairon))
 - go.d sd docker use well-known port for app identification too [\#17174](https://github.com/netdata/netdata/pull/17174) ([ilyam8](https://github.com/ilyam8))
 - go.d sd docker add mongodb-community-server [\#17173](https://github.com/netdata/netdata/pull/17173) ([ilyam8](https://github.com/ilyam8))
@@ -13,6 +18,7 @@
 - go.d sd config add "disabled" [\#17171](https://github.com/netdata/netdata/pull/17171) ([ilyam8](https://github.com/ilyam8))
 - docs: add "With NVIDIA GPUs monitoring" to docker install [\#17167](https://github.com/netdata/netdata/pull/17167) ([ilyam8](https://github.com/ilyam8))
 - go.d.plugin: jsonschema allow array/object to be null [\#17166](https://github.com/netdata/netdata/pull/17166) ([ilyam8](https://github.com/ilyam8))
+- DYNCFG: alerts improvements [\#17165](https://github.com/netdata/netdata/pull/17165) ([ktsaou](https://github.com/ktsaou))
 - go.d.plugin: update file path pattern in jsonschema [\#17164](https://github.com/netdata/netdata/pull/17164) ([ilyam8](https://github.com/ilyam8))
 - Announce dynamic configuration capability to the cloud [\#17162](https://github.com/netdata/netdata/pull/17162) ([stelfrag](https://github.com/stelfrag))
 - go.d.plugin: execute local-listeners periodically [\#17160](https://github.com/netdata/netdata/pull/17160) ([ilyam8](https://github.com/ilyam8))
@@ -380,12 +386,6 @@
 - Update categories.yaml to add Logs [\#16582](https://github.com/netdata/netdata/pull/16582) ([sashwathn](https://github.com/sashwathn))
 - Add Alpine Linux 3.19 to CI. [\#16579](https://github.com/netdata/netdata/pull/16579) ([Ferroin](https://github.com/Ferroin))
 - Queries Progress [\#16574](https://github.com/netdata/netdata/pull/16574) ([ktsaou](https://github.com/ktsaou))
-- disable cpu per core metrics by default [\#16572](https://github.com/netdata/netdata/pull/16572) ([ilyam8](https://github.com/ilyam8))
-- make debugfs exit on sigpipe [\#16569](https://github.com/netdata/netdata/pull/16569) ([ilyam8](https://github.com/ilyam8))
-- Fix memory leak during host chart label cleanup [\#16568](https://github.com/netdata/netdata/pull/16568) ([stelfrag](https://github.com/stelfrag))
-- fix cpu arch/ram/disk values in buildinfo [\#16567](https://github.com/netdata/netdata/pull/16567) ([ilyam8](https://github.com/ilyam8))
-- Remove Netdata packages from APT cache when attempting to install. [\#16566](https://github.com/netdata/netdata/pull/16566) ([Ferroin](https://github.com/Ferroin))
-- Resolve issue on startup in servers with 1 core [\#16565](https://github.com/netdata/netdata/pull/16565) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
