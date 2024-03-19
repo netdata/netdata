@@ -49,6 +49,7 @@ apps:
       - mount-observe
       - network
       - network-bind
+      - system-observe
   claim:
     command: opt/netdata/bin/netdata-claim.sh
     plugs:
