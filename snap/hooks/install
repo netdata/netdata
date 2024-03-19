@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+# Initialize configuration and var directory skeleton
+cp -rp "$SNAP/opt/netdata/etc" "$SNAP_COMMON/etc"
+cp -rp "$SNAP/opt/netdata/var" "$SNAP_DATA/var"

@@ -1,0 +1,59 @@
+name: netdata # you probably want to 'snapcraft register <name>'
+base: core22 # the base snap is the execution environment for this snap
+version: '0.1' # just for humans, typically '1.2+git' or '1.3.2'
+summary: Netdata Agent
+description: |
+  Netdata is distributed, real-time, performance and health monitoring for
+  systems and applications. It provides insights of everything happening on the
+  systems it runs using interactive web dashboards.
+
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: strict # use 'strict' once you have the right plugs and slots
+
+layout:
+  /opt/netdata/bin:
+    symlink: $SNAP/opt/netdata/bin
+  /opt/netdata/etc:
+    symlink: $SNAP_COMMON/etc
+  /opt/netdata/share:
+    symlink: $SNAP/opt/netdata/share
+  /opt/netdata/usr:
+    symlink: $SNAP/opt/netdata/usr
+  /opt/netdata/var:
+    symlink: $SNAP_DATA/var
+
+parts:
+  netdata:
+    plugin: nil
+    build-packages:
+      - wget
+    override-pull: |
+      wget https://get.netdata.cloud/kickstart.sh
+    override-build: |
+      sh ./kickstart.sh --static-only --dont-start-it
+      mkdir -p $SNAPCRAFT_PART_INSTALL/opt
+      mv /opt/netdata $SNAPCRAFT_PART_INSTALL/opt/netdata
+    stage-packages:
+      - wget
+    prime:
+      - -opt/netdata/var/cache/netdata/.keep
+      - -opt/netdata/var/lib/netdata/.keep
+      - -opt/netdata/var/log/netdata/.keep
+
+apps:
+  agent:
+    command: opt/netdata/bin/netdata -u root -P /opt/netdata/var/run/netdata.pid -D
+    daemon: simple
+    plugs:
+      - network
+      - network-bind
+  claim:
+    command: opt/netdata/bin/netdata-claim.sh
+    plugs:
+      - network
+  cli:
+    command: opt/netdata/bin/netdatacli
+  log2journal:
+    command: opt/netdata/bin/log2journal
+  systemd-cat-native:
+    command: opt/netdata/bin/systemd-cat-native
