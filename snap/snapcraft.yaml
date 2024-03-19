@@ -46,6 +46,7 @@ apps:
     daemon: simple
     plugs:
       - login-session-observe
+      - mount-observe
       - network
       - network-bind
   claim:
