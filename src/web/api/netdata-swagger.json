@@ -916,20 +916,6 @@
             }
           },
           {
-            "name": "comment",
-            "in": "query",
-            "description": "Enable or disable COMMENT lines in prometheus output.\n",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "yes",
-                "no"
-              ],
-              "default": "no"
-            }
-          },
-          {
             "name": "types",
             "in": "query",
             "description": "Enable or disable TYPE lines in prometheus output.\n",
