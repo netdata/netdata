@@ -45,6 +45,7 @@ apps:
     command: opt/netdata/bin/netdata -u root -P /opt/netdata/var/run/netdata.pid -D
     daemon: simple
     plugs:
+      - docker-support
       - login-session-observe
       - mount-observe
       - network-observe
