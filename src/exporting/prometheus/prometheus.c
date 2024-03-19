@@ -451,14 +451,14 @@ struct gen_parameters {
  * @param p parameters for generating the comment string.
  * @param homogeneous a flag for homogeneous charts.
  */
-static void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p, int homogeneous)
+static inline void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p, int homogeneous)
 {
-    buffer_sprintf(wb, "# HELP %s_%s", p->prefix, p->context);
+    buffer_sprintf(wb, "# HELP %s_%s\n", p->prefix, p->context);
 
-    if (!homogeneous && p->dimension)
+    if (!homogeneous)
         buffer_sprintf(wb, "_%s", p->dimension);
 
-    buffer_sprintf(wb, " %s\n", rrdset_title(p->st));
+    buffer_sprintf(wb, "%s %s\n", p->suffix, rrdset_title(p->st));
 }
 
 /**
@@ -720,7 +720,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             p.output_options = output_options;
             p.st = st;
             p.rd = NULL;
-            p.dimension = NULL;
 
             int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
@@ -754,24 +753,21 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     rrdset_units(st));
             }
 
-            if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
-                generate_as_collected_prom_help(wb, &p, prometheus_collector);
-            }
-
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
+                p.rd = rd;
+
                 if (rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     char *suffix = "";
 
+                    p.suffix = suffix;
+                    p.dimension = dimension;
+                    p.labels = labels;
+
                     if (as_collected) {
                         // we need as-collected / raw data
-
-                        p.suffix = suffix;
-                        p.dimension = dimension;
-                        p.labels = labels;
-                        p.rd = rd;
 
                         if (unlikely(rd->collector.last_collected_time.tv_sec < instance->after))
                             continue;
@@ -869,7 +865,14 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             }
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_HELP)) {
-                                generate_as_collected_prom_help(wb, &p, prometheus_collector);
+                                buffer_sprintf(
+                                    wb,
+                                    "# HELP %s_%s%s%s %s\n",
+                                    prefix,
+                                    context,
+                                    units,
+                                    suffix,
+                                    rrdset_title(st));
                             }
 
                             if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
