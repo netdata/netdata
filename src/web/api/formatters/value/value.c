@@ -9,7 +9,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
     NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
 
-    NETDATA_DOUBLE sum = NAN, min = NAN, max = NAN, v = NAN;
+    NETDATA_DOUBLE sum = 0, min = NAN, max = NAN, v = NAN;
     size_t dims = 0;
 
     NETDATA_DOUBLE total_anomaly_rate = 0;
