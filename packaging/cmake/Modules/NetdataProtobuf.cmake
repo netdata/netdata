@@ -149,11 +149,19 @@ macro(netdata_detect_protobuf)
                 set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
                 set(NETDATA_PROTOBUF_LIBS protobuf::libprotobuf)
                 get_target_property(NETDATA_PROTOBUF_CFLAGS_OTHER
-                                        protobuf::libprotobuf
-                                        INTERFACE_COMPILE_DEFINITIONS)
+                                    protobuf::libprotobuf
+                                    INTERFACE_COMPILE_DEFINITIONS)
                 get_target_property(NETDATA_PROTOBUF_INCLUDE_DIRS
-                                        protobuf::libprotobuf
-                                        INTERFACE_INCLUDE_DIRECTORIES)
+                                    protobuf::libprotobuf
+                                    INTERFACE_INCLUDE_DIRECTORIES)
+
+                if(NETDATA_PROTOBUF_CFLAGS_OTHER STREQUAL NETDATA_PROTOBUF_CFLAGS_OTHER-NOTFOUND)
+                        set(NETDATA_PROTOBUF_CFLAGS_OTHER "")
+                endif()
+
+                if(NETDATA_PROTOBUF_INCLUDE_DIRS STREQUAL NETDATA_PROTOBUF_INCLUDE_DIRS-NOTFOUND)
+                        set(NETDATA_PROTOBUF_INCLUDE_DIRS "")
+                endif()
         else()
                 set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${PROTOBUF_PROTOC_EXECUTABLE})
                 set(NETDATA_PROTOBUF_CFLAGS_OTHER ${PROTOBUF_CFLAGS_OTHER})
