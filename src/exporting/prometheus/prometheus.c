@@ -771,7 +771,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                     else {
                         // we need average or sum of the data
 
-                        time_t first_time = instance->after;
                         time_t last_time = instance->before;
                         NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_time);
 
@@ -857,11 +856,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 static inline time_t prometheus_preparation(
     struct instance *instance,
     RRDHOST *host,
-    BUFFER *wb,
-    EXPORTING_OPTIONS exporting_options,
     const char *server,
-    time_t now,
-    PROMETHEUS_OUTPUT_OPTIONS output_options)
+    time_t now)
 {
 #ifndef UNIT_TESTING
     analytics_log_prometheus();
@@ -871,10 +867,8 @@ static inline time_t prometheus_preparation(
 
     time_t after = prometheus_server_last_access(server, host, now);
 
-    int first_seen = 0;
     if (!after) {
         after = now - instance->config.update_every;
-        first_seen = 1;
     }
 
     if (after > now) {
@@ -914,11 +908,8 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     prometheus_exporter_instance->after = prometheus_preparation(
         prometheus_exporter_instance,
         host,
-        wb,
-        exporting_options,
         server,
-        prometheus_exporter_instance->before,
-        output_options);
+        prometheus_exporter_instance->before);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(
         prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options);
@@ -953,11 +944,8 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     prometheus_exporter_instance->after = prometheus_preparation(
         prometheus_exporter_instance,
         host,
-        wb,
-        exporting_options,
         server,
-        prometheus_exporter_instance->before,
-        output_options);
+        prometheus_exporter_instance->before);
 
     dfe_start_reentrant(rrdhost_root_index, host)
     {
