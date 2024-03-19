@@ -16,7 +16,7 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
-uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
+uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_CONSTANT_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
 
 #if defined(ENV32BIT)
 size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
@@ -24,14 +24,15 @@ size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
 size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
 #endif
 
-#if PAGE_TYPE_MAX != 2
-#error PAGE_TYPE_MAX is not 2 - you need to add allocations here
+#if PAGE_TYPE_MAX != 3
+#error PAGE_TYPE_MAX is not 3 - you need to add allocations here
 #endif
 
 size_t page_type_size[256] = {
-        [PAGE_METRICS] = sizeof(storage_number),
+        [PAGE_RAW_METRICS] = sizeof(storage_number),
         [PAGE_TIER] = sizeof(storage_number_tier1_t),
-        [PAGE_GORILLA_METRICS] = sizeof(storage_number)
+        [PAGE_GORILLA_METRICS] = sizeof(storage_number),
+        [PAGE_CONSTANT_METRICS] = sizeof(storage_number),
 };
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
@@ -457,7 +458,8 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, siz
     *data_size = size;
 
     switch (ctx->config.page_type) {
-        case PAGE_METRICS:
+        case PAGE_CONSTANT_METRICS:
+        case PAGE_RAW_METRICS:
         case PAGE_TIER:
             d = pgd_create(ctx->config.page_type, slots);
             break;

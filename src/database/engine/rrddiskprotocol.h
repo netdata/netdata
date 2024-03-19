@@ -36,10 +36,11 @@ struct rrdeng_df_sb {
 /*
  * Page types
  */
-#define PAGE_METRICS    (0)
+#define PAGE_RAW_METRICS    (0)
 #define PAGE_TIER       (1)
 #define PAGE_GORILLA_METRICS    (2)
-#define PAGE_TYPE_MAX   2   // Maximum page type (inclusive)
+#define PAGE_CONSTANT_METRICS    (3)
+#define PAGE_TYPE_MAX   3   // Maximum page type (inclusive)
 
 /*
  * Data file page descriptor
@@ -55,6 +56,11 @@ struct rrdeng_extent_page_descr {
             uint32_t entries;
             uint32_t delta_time_s;
         } gorilla  __attribute__((packed));
+
+        struct {
+            uint32_t entries;
+            uint32_t delta_time_s;
+        } constant  __attribute__((packed));
 
         uint64_t end_time_ut;
     };

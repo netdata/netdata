@@ -70,6 +70,9 @@ static struct global_statistics {
     uint64_t tier0_disk_compressed_bytes;
     uint64_t tier0_disk_uncompressed_bytes;
 
+    uint64_t tier0_raw_pages;
+    uint64_t tier0_constant_pages;
+
     uint64_t db_points_stored_per_tier[RRD_STORAGE_TIERS];
 
 } global_statistics = {
@@ -89,6 +92,9 @@ static struct global_statistics {
         .tier0_hot_gorilla_buffers = 0,
         .tier0_disk_compressed_bytes = 0,
         .tier0_disk_uncompressed_bytes = 0,
+
+        .tier0_raw_pages = 0,
+        .tier0_constant_pages = 0,
 };
 
 void global_statistics_rrdset_done_chart_collection_completed(size_t *points_read_per_tier_array) {
@@ -127,6 +133,18 @@ void global_statistics_tier0_disk_compressed_bytes(uint32_t size) {
 
 void global_statistics_tier0_disk_uncompressed_bytes(uint32_t size) {
     __atomic_fetch_add(&global_statistics.tier0_disk_uncompressed_bytes, size, __ATOMIC_RELAXED);
+}
+
+void global_statistic_raw_page_new() {
+    __atomic_fetch_add(&global_statistics.tier0_raw_pages, 1, __ATOMIC_RELAXED);
+}
+
+void global_statistic_constant_page_new() {
+    __atomic_fetch_add(&global_statistics.tier0_constant_pages, 1, __ATOMIC_RELAXED);
+}
+
+void global_statistic_constant_page_rm() {
+    __atomic_fetch_sub(&global_statistics.tier0_constant_pages, 1, __ATOMIC_RELAXED);
 }
 
 void global_statistics_rrdr_query_completed(size_t queries, uint64_t db_points_read, uint64_t result_points_generated, QUERY_SOURCE query_source) {
@@ -235,6 +253,9 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
 
     gs->tier0_disk_compressed_bytes = __atomic_load_n(&global_statistics.tier0_disk_compressed_bytes, __ATOMIC_RELAXED);
     gs->tier0_disk_uncompressed_bytes = __atomic_load_n(&global_statistics.tier0_disk_uncompressed_bytes, __ATOMIC_RELAXED);
+
+    gs->tier0_raw_pages = __atomic_load_n(&global_statistics.tier0_raw_pages, __ATOMIC_RELAXED);
+    gs->tier0_constant_pages = __atomic_load_n(&global_statistics.tier0_constant_pages, __ATOMIC_RELAXED);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++)
         gs->db_points_stored_per_tier[tier] = __atomic_load_n(&global_statistics.db_points_stored_per_tier[tier], __ATOMIC_RELAXED);
@@ -920,6 +941,38 @@ static void global_statistics_charts(void) {
         rrdset_done(st_tier0_compression_info);
     }
 #endif
+
+    {
+        static RRDSET *st_t0_page_type = NULL;
+
+        static RRDDIM *rd_raw_pages = NULL;
+        static RRDDIM *rd_constant_pages = NULL;
+
+        if (unlikely(!st_t0_page_type)) {
+            st_t0_page_type = rrdset_create_localhost(
+                    "netdata"
+                    , "tier0_page_type"
+                    , NULL
+                    , "tier0_page_type"
+                    , NULL
+                    , "Tier 0 page type"
+                    , "pages"
+                    , "netdata"
+                    , "stats"
+                    , 131006
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_LINE
+            );
+
+            rd_raw_pages = rrddim_add(st_t0_page_type, "raw", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_constant_pages = rrddim_add(st_t0_page_type, "constant", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_t0_page_type, rd_raw_pages, (collected_number) gs.tier0_raw_pages);
+        rrddim_set_by_pointer(st_t0_page_type, rd_constant_pages, (collected_number) gs.tier0_constant_pages);
+
+        rrdset_done(st_t0_page_type);
+    }
 }
 
 // ----------------------------------------------------------------------------
