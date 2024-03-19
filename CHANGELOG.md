@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Handle agents will wrong alert\_hash table definition [\#17197](https://github.com/netdata/netdata/pull/17197) ([stelfrag](https://github.com/stelfrag))
+- Fix alert hash table definition [\#17196](https://github.com/netdata/netdata/pull/17196) ([stelfrag](https://github.com/stelfrag))
+- health: unsilence cpu % alarm [\#17194](https://github.com/netdata/netdata/pull/17194) ([ilyam8](https://github.com/ilyam8))
+- Fix sum calculation in rrdr2value [\#17193](https://github.com/netdata/netdata/pull/17193) ([stelfrag](https://github.com/stelfrag))
 - add callout that snapshots only available on v1 [\#17189](https://github.com/netdata/netdata/pull/17189) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Bump github.com/vmware/govmomi from 0.36.0 to 0.36.1 in /src/go/collectors/go.d.plugin [\#17185](https://github.com/netdata/netdata/pull/17185) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump k8s.io/client-go from 0.29.2 to 0.29.3 in /src/go/collectors/go.d.plugin [\#17184](https://github.com/netdata/netdata/pull/17184) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -385,7 +389,6 @@
 - Handle coverity issues related to Y2K38\_SAFETY [\#16583](https://github.com/netdata/netdata/pull/16583) ([stelfrag](https://github.com/stelfrag))
 - Update categories.yaml to add Logs [\#16582](https://github.com/netdata/netdata/pull/16582) ([sashwathn](https://github.com/sashwathn))
 - Add Alpine Linux 3.19 to CI. [\#16579](https://github.com/netdata/netdata/pull/16579) ([Ferroin](https://github.com/Ferroin))
-- Queries Progress [\#16574](https://github.com/netdata/netdata/pull/16574) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
