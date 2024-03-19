@@ -2,6 +2,7 @@
 
 #include "page.h"
 
+#include "daemon/global_statistics.h"
 #include "libnetdata/libnetdata.h"
 
 typedef enum __attribute__((packed)) {
@@ -20,6 +21,10 @@ typedef struct {
     uint32_t size;
 } page_raw_t;
 
+typedef struct {
+    storage_number v;
+    uint32_t n;
+} page_constant_t;
 
 typedef struct {
     size_t num_buffers;
@@ -45,6 +50,7 @@ struct pgd {
     union {
         page_raw_t raw;
         page_gorilla_t gorilla;
+        page_constant_t constant;
     };
 };
 
@@ -165,7 +171,9 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
     pg->states = PGD_STATE_CREATED_FROM_COLLECTOR;
 
     switch (type) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
+            global_statistic_raw_page_new();
+            // intentional fall-through
         case PAGE_TIER: {
             uint32_t size = slots * page_type_size[type];
 
@@ -174,6 +182,16 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
 
             pg->raw.size = size;
             pg->raw.data = pgd_data_aral_alloc(size);
+            break;
+        }
+        case PAGE_CONSTANT_METRICS: {
+            global_statistic_constant_page_new();
+
+            internal_fatal(slots == 1,
+                      "DBENGINE: invalid number of slots (%u) or page type (%u)", slots, type);
+
+            pg->constant.v = SN_EMPTY_SLOT;
+            pg->constant.n = 0;
             break;
         }
         case PAGE_GORILLA_METRICS: {
@@ -222,7 +240,7 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
 
     switch (type)
     {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
         case PAGE_TIER:
             pg->raw.size = size;
             pg->used = size / page_type_size[type];
@@ -231,6 +249,12 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
             pg->raw.data = pgd_data_aral_alloc(size);
             memcpy(pg->raw.data, base, size);
             break;
+        case PAGE_CONSTANT_METRICS: {
+            memcpy(&pg->constant.v, base, sizeof(storage_number));
+            memcpy(&pg->constant.n, base + sizeof(storage_number), sizeof(uint32_t));
+            pg->used = pg->slots = pg->constant.n;
+            break;
+        }
         case PAGE_GORILLA_METRICS:
             internal_fatal(size == 0, "Asked to create page with 0 data!!!");
             internal_fatal(size % sizeof(uint32_t), "Unaligned gorilla buffer size");
@@ -268,9 +292,11 @@ void pgd_free(PGD *pg)
 
     switch (pg->type)
     {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
         case PAGE_TIER:
             pgd_data_aral_free(pg->raw.data, pg->raw.size);
+            break;
+        case PAGE_CONSTANT_METRICS:
             break;
         case PAGE_GORILLA_METRICS: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
@@ -365,9 +391,12 @@ uint32_t pgd_memory_footprint(PGD *pg)
 
     size_t footprint = 0;
     switch (pg->type) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
         case PAGE_TIER:
             footprint = sizeof(PGD) + pg->raw.size;
+            break;
+        case PAGE_CONSTANT_METRICS:
+            footprint = sizeof(PGD);
             break;
         case PAGE_GORILLA_METRICS: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
@@ -393,12 +422,16 @@ uint32_t pgd_disk_footprint(PGD *pg)
     size_t size = 0;
 
     switch (pg->type) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
         case PAGE_TIER: {
             uint32_t used_size = pg->used * page_type_size[pg->type];
             internal_fatal(used_size > pg->raw.size, "Wrong disk footprint page size");
             size = used_size;
 
+            break;
+        }
+        case PAGE_CONSTANT_METRICS: {
+            size = sizeof(storage_number) + sizeof(uint32_t);
             break;
         }
         case PAGE_GORILLA_METRICS: {
@@ -443,11 +476,21 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
                    pgd_disk_footprint(pg), dst_size);
 
     switch (pg->type) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
         case PAGE_TIER:
             memcpy(dst, pg->raw.data, dst_size);
             break;
-        case PAGE_GORILLA_METRICS: {
+        case PAGE_CONSTANT_METRICS:
+        {
+            memcpy(dst, &pg->constant.v, sizeof(storage_number));
+
+            pg->constant.n = pg->used;
+            memcpy(dst + sizeof(storage_number), &pg->constant.n, sizeof(uint32_t));
+
+            break;
+        }
+        case PAGE_GORILLA_METRICS:
+        {
             if ((pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING) == 0)
                 fatal("Copying to extent is supported only for PGDs that are scheduled for flushing.");
 
@@ -500,10 +543,47 @@ void pgd_append_point(PGD *pg,
         fatal("Data collection on page already scheduled for flushing");
 
     switch (pg->type) {
-        case PAGE_METRICS: {
+        case PAGE_RAW_METRICS: {
             storage_number *tier0_metric_data = (storage_number *)pg->raw.data;
             storage_number t = pack_storage_number(n, flags);
             tier0_metric_data[pg->used++] = t;
+
+            if ((pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) && does_storage_number_exist(t))
+                pg->options &= ~PAGE_OPTION_ALL_VALUES_EMPTY;
+
+            break;
+        }
+        case PAGE_CONSTANT_METRICS: {
+            storage_number t = pack_storage_number(n, flags);
+
+            if (pg->used == 0)
+            {
+                pg->constant.v = t;
+                pg->used = 1;
+            }
+            else if (pg->constant.v == t)
+            {
+                pg->used++;
+            }
+            else
+            {
+                storage_number v = pg->constant.v;
+
+                global_statistic_constant_page_rm();
+                global_statistic_raw_page_new();
+
+                pg->type = PAGE_RAW_METRICS;
+                uint32_t size = pg->slots * page_type_size[pg->type];
+                pg->raw.size = size;
+                pg->raw.data = pgd_data_aral_alloc(size);
+
+                storage_number *data = (storage_number *) pg->raw.data;
+                for (uint32_t i = 0; i != pg->used; i++)
+                    data[i] = v;
+
+                data[pg->used++] = t;
+                break;
+            }
 
             if ((pg->options & PAGE_OPTION_ALL_VALUES_EMPTY) && does_storage_number_exist(t))
                 pg->options &= ~PAGE_OPTION_ALL_VALUES_EMPTY;
@@ -560,8 +640,9 @@ static void pgdc_seek(PGDC *pgdc, uint32_t position)
     PGD *pg = pgdc->pgd;
 
     switch (pg->type) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
         case PAGE_TIER:
+        case PAGE_CONSTANT_METRICS:
             pgdc->slots = pgdc->pgd->used;
             break;
         case PAGE_GORILLA_METRICS: {
@@ -634,9 +715,19 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
 
     switch (pgdc->pgd->type)
     {
-        case PAGE_METRICS: {
+        case PAGE_RAW_METRICS: {
             storage_number *array = (storage_number *) pgdc->pgd->raw.data;
             storage_number n = array[pgdc->position++];
+
+            sp->min = sp->max = sp->sum = unpack_storage_number(n);
+            sp->flags = (SN_FLAGS)(n & SN_USER_FLAGS);
+            sp->count = 1;
+            sp->anomaly_count = is_storage_number_anomalous(n) ? 1 : 0;
+
+            return true;
+        }
+        case PAGE_CONSTANT_METRICS: {
+            storage_number n = pgdc->pgd->constant.v;
 
             sp->min = sp->max = sp->sum = unpack_storage_number(n);
             sp->flags = (SN_FLAGS)(n & SN_USER_FLAGS);

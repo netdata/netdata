@@ -1169,11 +1169,14 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page type
 
-    const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "raw");
+    const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "constant");
     if (strcmp(page_type, "gorilla") == 0) {
         tier_page_type[0] = PAGE_GORILLA_METRICS;
+    }
+    else if (strcmp(page_type, "constant") == 0) {
+        tier_page_type[0] = PAGE_CONSTANT_METRICS;
     } else if (strcmp(page_type, "raw") != 0) {
-        netdata_log_error("Invalid dbengine page type ''%s' given. Defaulting to 'raw'.", page_type);
+        netdata_log_error("Invalid dbengine page type '%s' (expected one of 'constant', 'gorilla', 'raw'). Defaulting to 'constant'.", page_type);
     }
 
     // ------------------------------------------------------------------------
