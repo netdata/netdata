@@ -47,6 +47,7 @@ apps:
     plugs:
       - login-session-observe
       - mount-observe
+      - network-observe
       - network
       - network-bind
       - system-observe
