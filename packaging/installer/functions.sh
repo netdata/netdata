@@ -934,6 +934,11 @@ portable_add_user() {
         echo >&2 "User '${username}' already exists."
         return 0
     fi
+  elif command -v dscl > /dev/null 2>&1; then
+    if dscl . read /Users/"${username}" >/dev/null 2>&1; then
+      echo >&2 "User '${username}' already exists."
+      return 0
+    fi
   else
     if cut -d ':' -f 1 < /etc/passwd | grep "^${username}$" 1> /dev/null 2>&1; then
         echo >&2 "User '${username}' already exists."
@@ -952,7 +957,13 @@ portable_add_user() {
   elif command -v adduser 1> /dev/null 2>&1; then
     run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
   elif command -v sysadminctl 1> /dev/null 2>&1; then
-    run sysadminctl -addUser "${username}" && return 0
+    gid=$(dscl . read /Groups/"${username}" 2>/dev/null | grep PrimaryGroupID | grep -Eo "[0-9]+")
+    if run sysadminctl -addUser "${username}" -shell /usr/bin/false -home /var/empty -GID "$gid"; then
+      # FIXME: I think the proper solution is to create a role account:
+      # -roleAccount + name starting with _ and UID in 200-400 range.
+      run dscl . create /Users/"${username}" IsHidden 1
+      return 0
+    fi
   fi
 
   warning "Failed to add ${username} user account!"

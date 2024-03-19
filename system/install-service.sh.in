@@ -630,6 +630,8 @@ install_darwin_service() {
     exit 4
   fi
 
+  launchctl unload /Library/LaunchDaemons/com.github.netdata.plist 2>/dev/null
+
   if ! launchctl load /Library/LaunchDaemons/com.github.netdata.plist; then
     error "Failed to load plist file."
     exit 4
