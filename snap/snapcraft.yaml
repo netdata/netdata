@@ -46,6 +46,7 @@ apps:
     daemon: simple
     plugs:
       - docker-support
+      - kubernetes-support
       - login-session-observe
       - mount-observe
       - network-observe
