@@ -440,16 +440,11 @@ struct gen_parameters {
  * Write an as-collected help comment to a buffer.
  *
  * @param wb the buffer to write the comment to.
- * @param p parameters for generating the comment string.
- * @param homogeneous a flag for homogeneous charts.
+ * @param context context name we are using
  */
-static inline void generate_as_collected_prom_help(BUFFER *wb, struct gen_parameters *p, int homogeneous)
+static inline void generate_as_collected_prom_help(BUFFER *wb, char *context, RRDSET *st)
 {
-    buffer_sprintf(wb, "# HELP ");
-    if (p->prefix)
-        buffer_sprintf(wb, "%s_", p->prefix);
-
-    buffer_sprintf(wb, "%s %s\n", p->context, rrdset_title(p->st));
+    buffer_sprintf(wb, "# HELP %s %s\n", context, rrdset_title(st));
 }
 
 /**
@@ -692,12 +687,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                         units, rrdset_units(st), PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
-            struct gen_parameters par;
-            par.prefix = prefix;
-            par.context = context;
-            par.st = st;
-
-            generate_as_collected_prom_help(wb, &par, prometheus_collector);
+            generate_as_collected_prom_help(wb, context, st);
             bool plot_type = true;
 
             // for each dimension
