@@ -306,7 +306,6 @@ prepare_cmake_options() {
   enable_feature ACLK "${ENABLE_CLOUD:-1}"
   enable_feature CLOUD "${ENABLE_CLOUD:-1}"
   enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C:-0}"
-  enable_feature BUNDLED_YAML "${BUNDLE_YAML:-0}"
   enable_feature DBENGINE "${ENABLE_DBENGINE:-1}"
   enable_feature H2O "${ENABLE_H2O:-1}"
   enable_feature ML "${NETDATA_ENABLE_ML:-1}"
