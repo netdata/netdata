@@ -538,6 +538,7 @@ func isReqMethodValid(method string) bool {
 		"PRI",
 		"PROPFIND",
 		"PROPPATCH",
+		"PURGE", // not a standardized HTTP method
 		"PUT",
 		"REBIND",
 		"REPORT",
