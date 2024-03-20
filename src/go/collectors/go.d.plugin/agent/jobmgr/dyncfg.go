@@ -197,11 +197,11 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 	defer job.Cleanup()
 
 	if err := job.Init(); err != nil {
-		m.dyncfgRespf(fn, 500, "Job initialization failed: %v", err)
+		m.dyncfgRespf(fn, 422, "Job initialization failed: %v", err)
 		return
 	}
 	if err := job.Check(); err != nil {
-		m.dyncfgRespf(fn, 503, "Job check failed: %v", err)
+		m.dyncfgRespf(fn, 422, "Job check failed: %v", err)
 		return
 	}
 
@@ -322,7 +322,7 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 	if err := job.AutoDetection(); err != nil {
 		job.Cleanup()
 		ecfg.status = dyncfgFailed
-		m.dyncfgRespf(fn, 503, "Job restart failed: %v", err)
+		m.dyncfgRespf(fn, 422, "Job restart failed: %v", err)
 		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
 		return
 	}
