@@ -687,8 +687,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                         units, rrdset_units(st), PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
-            generate_as_collected_prom_help(wb, context, st);
-            bool plot_type = true;
+            if (output_options & PROMETHEUS_OUTPUT_HELP)
+                generate_as_collected_prom_help(wb, context, st);
+
+            bool plot_type = (output_options & PROMETHEUS_OUTPUT_TYPES) ? true : false;
 
             // for each dimension
             RRDDIM *rd;

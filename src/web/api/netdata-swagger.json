@@ -912,7 +912,7 @@
                 "yes",
                 "no"
               ],
-              "default": "no"
+              "default": "yes"
             }
           },
           {
@@ -926,7 +926,7 @@
                 "yes",
                 "no"
               ],
-              "default": "no"
+              "default": "yes"
             }
           },
           {
