@@ -5,6 +5,7 @@ package netlisteners
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -103,29 +104,29 @@ func (sim *discoverySim) run(t *testing.T) {
 }
 
 func newMockLocalListenersExec() *mockLocalListenersExec {
-	return &mockLocalListenersExec{
-		listeners: make(map[string]bool),
-	}
+	return &mockLocalListenersExec{}
 }
 
 type mockLocalListenersExec struct {
 	errResponse bool
 	mux         sync.Mutex
-	listeners   map[string]bool
+	listeners   []string
 }
 
 func (m *mockLocalListenersExec) addListener(s string) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	m.listeners[s] = true
+	m.listeners = append(m.listeners, s)
 }
 
 func (m *mockLocalListenersExec) removeListener(s string) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	delete(m.listeners, s)
+	if i := slices.Index(m.listeners, s); i != -1 {
+		m.listeners = append(m.listeners[:i], m.listeners[i+1:]...)
+	}
 }
 
 func (m *mockLocalListenersExec) discover(context.Context) ([]byte, error) {
@@ -137,7 +138,7 @@ func (m *mockLocalListenersExec) discover(context.Context) ([]byte, error) {
 	defer m.mux.Unlock()
 
 	var buf strings.Builder
-	for s := range m.listeners {
+	for _, s := range m.listeners {
 		buf.WriteString(s)
 		buf.WriteByte('\n')
 	}
