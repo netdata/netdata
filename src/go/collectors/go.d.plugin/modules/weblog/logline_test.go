@@ -167,6 +167,7 @@ func TestLogLine_Assign(t *testing.T) {
 				{input: "PROPFIND", wantLine: logLine{web: web{reqMethod: "PROPFIND"}}},
 				{input: "MOVE", wantLine: logLine{web: web{reqMethod: "MOVE"}}},
 				{input: "SEARCH", wantLine: logLine{web: web{reqMethod: "SEARCH"}}},
+				{input: "PURGE", wantLine: logLine{web: web{reqMethod: "PURGE"}}},
 				{input: emptyStr, wantLine: emptyLogLine},
 				{input: hyphen, wantLine: emptyLogLine},
 				{input: "GET no_version", wantLine: emptyLogLine, wantErr: errBadReqMethod},
