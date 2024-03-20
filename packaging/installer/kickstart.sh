@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0516
+# Next unused error code: F0517
 
 # ======================================================================
 # Constants
@@ -595,6 +595,8 @@ check_for_remote_file() {
 
   if echo "${url}" | grep -Eq "^file:///"; then
     [ -e "${url#file://}" ] || return 1
+  elif [ -n "${NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT}" ]; then
+    return 0
   elif [ -n "${CURL}" ]; then
     "${CURL}" --output /dev/null --silent --head --fail "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
@@ -1509,15 +1511,21 @@ try_package_install() {
     deb)
       repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_DEB_VERSION}${pkg_suffix}.${pkg_type}"
       repoconfig_url="${REPOCONFIG_DEB_URL_PREFIX}/${repo_prefix}/${repoconfig_file}"
+      ref_check_url="${REPOCONFIG_DEB_URL_PREFIX}"
       ;;
     rpm)
       repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_RPM_VERSION}${pkg_suffix}.${pkg_type}"
       repoconfig_url="${REPOCONFIG_RPM_URL_PREFIX}/${repo_prefix}/${SYSARCH}/${repoconfig_file}"
+      ref_check_url="${REPOCONFIG_RPM_URL_PREFIX}"
       ;;
   esac
 
   if ! pkg_installed "${repoconfig_name}"; then
     progress "Checking for availability of repository configuration package."
+    if ! check_for_remote_file "${ref_check_url}"; then
+      NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
+    fi
+
     if ! check_for_remote_file "${repoconfig_url}"; then
       warning "No repository configuration package available for ${DISTRO} ${SYSVERSION}. Cannot install native packages on this system."
       return 2
@@ -1658,6 +1666,10 @@ try_static_install() {
     progress "Would attempt to install using static build..."
   else
     progress "Attempting to install using static build..."
+  fi
+
+  if ! check_for_remote_file "${NETDATA_TARBALL_BASEURL}"; then
+    NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
   fi
 
   # Check status code first, so that we can provide nicer fallback for dry runs.
@@ -1898,6 +1910,10 @@ prepare_offline_install_source() {
     static|'')
       set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
 
+      if ! check_for_remote_file "${NETDATA_TARBALL_BASEURL}"; then
+        NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
+      fi
+
       if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
         for arch in ${STATIC_INSTALL_ARCHES}; do
           set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
@@ -1920,6 +1936,10 @@ prepare_offline_install_source() {
         if ! download "${NETDATA_STATIC_ARCHIVE_OLD_URL}" "netdata-x86_64-latest.gz.run"; then
           warning "Failed to download static installer archive for x86_64. ${BADNET_MSG}."
         fi
+      fi
+
+      if ! find . -name '*.gz.run'; then
+        fatal "Did not actually download any static installer archives, cannot continue. ${BADNET_MSG}." F0516
       fi
 
       progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
