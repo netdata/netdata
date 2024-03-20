@@ -26,8 +26,6 @@ install_netdata() {
     --install-prefix "$HOME" \
     --dont-wait \
     --dont-start-it \
-    --enable-plugin-nfacct \
-    --enable-plugin-freeipmi \
     --disable-lto \
     --enable-logsmanagement-tests
 }

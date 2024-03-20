@@ -128,6 +128,12 @@ option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
 
+if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
+        set(NEED_PROTOBUF True)
+else()
+        set(NEED_PROTOBUF False)
+endif()
+
 if(ENABLE_PLUGIN_GO)
     include(NetdataGoTools)
 
@@ -171,6 +177,14 @@ if(ENABLE_WEBRTC)
             GIT_TAG v0.20.1
         )
         FetchContent_MakeAvailable(libdatachannel)
+endif()
+
+if(NEED_PROTOBUF)
+        include(NetdataProtobuf)
+
+        if(ENABLE_BUNDLED_PROTOBUF)
+                netdata_bundle_protobuf()
+        endif()
 endif()
 
 #
@@ -491,24 +505,8 @@ endif()
 # figure out if we need protoc/protobuf
 #
 
-if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
-        if(ENABLE_BUNDLED_PROTOBUF)
-                set(PROTOBUF_PROTOC_EXECUTABLE "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/protoc")
-                set(PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src")
-                set(PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/externaldeps/protobuf/src/.libs/libprotobuf.a")
-        else()
-                if (NOT BUILD_SHARED_LIBS)
-                        set(Protobuf_USE_STATIC_LIBS On)
-                endif()
-
-                find_package(Protobuf REQUIRED)
-        endif()
-
-        set(ENABLE_PROTOBUF True)
-        set(HAVE_PROTOBUF True)
-        if (ENABLE_BUNDLED_PROTOBUF)
-                set(BUNDLED_PROTOBUF True)
-        endif()
+if(NEED_PROTOBUF)
+        netdata_detect_protobuf()
 endif()
 
 #
@@ -1610,46 +1608,6 @@ if(MNL_FOUND)
 endif()
 
 #
-# helper function to build protos
-#
-
-function(protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
-        if(NOT ARGN)
-                message(SEND_ERROR "Error: protoc_generate_cpp() called without any proto files")
-                return()
-        endif()
-
-        set(${INC_DIR})
-        set(${OUT_DIR})
-        set(${SRCS})
-        set(${HDRS})
-
-        foreach(FIL ${ARGN})
-                get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
-                get_filename_component(DIR ${ABS_FIL} DIRECTORY)
-                get_filename_component(FIL_WE ${FIL} NAME_WE)
-
-                set(GENERATED_PB_CC "${DIR}/${FIL_WE}.pb.cc")
-                list(APPEND ${SRCS} ${GENERATED_PB_CC})
-
-                set(GENERATED_PB_H "${DIR}/${FIL_WE}.pb.h")
-                list(APPEND ${HDRS} ${GENERATED_PB_H})
-
-                add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
-                                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} ARGS -I=${INC_DIR} --cpp_out=${OUT_DIR} ${ABS_FIL}
-                                   DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
-                                   COMMENT "Running C++ protocol buffer compiler on ${FIL}"
-                                   VERBATIM)
-        endforeach()
-
-        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
-        set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES COMPILE_OPTIONS -Wno-deprecated-declarations)
-
-        set(${SRCS} ${${SRCS}} PARENT_SCOPE)
-        set(${HDRS} ${${HDRS}} PARENT_SCOPE)
-endfunction()
-
-#
 # mqtt library
 #
 if (ENABLE_H2O OR ENABLE_ACLK)
@@ -1680,11 +1638,11 @@ if(ENABLE_ACLK)
         #
         # proto definitions
         #
-        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                            "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
-                            ACLK_PROTO_BUILT_SRCS
-                            ACLK_PROTO_BUILT_HDRS
-                            ${ACLK_PROTO_DEFS})
+        netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                                    "${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas"
+                                    ACLK_PROTO_BUILT_SRCS
+                                    ACLK_PROTO_BUILT_HDRS
+                                    ${ACLK_PROTO_DEFS})
 
         list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
                                ${ACLK_PROTO_BUILT_HDRS})
@@ -2030,11 +1988,11 @@ if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
                 endif()
         endif()
 
-        protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
-                            "${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
-                            PROMETHEUS_REMOTE_WRITE_BUILT_SRCS
-                            PROMETHEUS_REMOTE_WRITE_BUILT_HDRS
-                            "src/exporting/prometheus/remote_write/remote_write.proto")
+        netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
+                                    "${CMAKE_SOURCE_DIR}/src/exporting/prometheus/remote_write"
+                                    PROMETHEUS_REMOTE_WRITE_BUILT_SRCS
+                                    PROMETHEUS_REMOTE_WRITE_BUILT_HDRS
+                                    "src/exporting/prometheus/remote_write/remote_write.proto")
 
         list(APPEND PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
                     ${PROMETHEUS_REMOTE_WRITE_BUILT_SRCS}
@@ -2056,14 +2014,12 @@ add_executable(netdata
 )
 
 target_compile_definitions(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_ML}>:DLIB_NO_GUI_SUPPORT>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_CFLAGS_OTHER}>"
 )
 
 target_include_directories(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
@@ -2074,7 +2030,6 @@ target_link_libraries(netdata PRIVATE
         libnetdata
         "$<$<BOOL:${LINUX}>:rt>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
-        "$<$<BOOL:${ENABLE_PROTOBUF}>:${PROTOBUF_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
         "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
@@ -2082,6 +2037,10 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
 )
+
+if(NEED_PROTOBUF)
+        netdata_add_protobuf(netdata)
+endif()
 
 #
 # build systemd-cat-native

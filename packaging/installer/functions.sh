@@ -263,7 +263,7 @@ prepare_cmake_options() {
     enable_feature PLUGIN_GO 0
   fi
 
-  if [ "${USE_SYSTEM_PROTOBUF:-1}" -eq 1 ]; then
+  if [ "${USE_SYSTEM_PROTOBUF:-0}" -eq 1 ]; then
     enable_feature BUNDLED_PROTOBUF 0
   else
     enable_feature BUNDLED_PROTOBUF 1
