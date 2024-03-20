@@ -698,10 +698,21 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
             par.st = st;
 
             generate_as_collected_prom_help(wb, &par, prometheus_collector);
+            bool plot_type = true;
 
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
+
+                if (plot_type) {
+                    plot_type = false;
+                    char *type = (!as_collected ||
+                        (rd->algorithm != RRD_ALGORITHM_INCREMENTAL && rd->algorithm != RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL)) ?
+                        "gauge" :
+                        "counter";
+
+                    buffer_sprintf(wb, "# TYPE %s %s\n", context, type);
+                }
 
                 if (rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
@@ -745,9 +756,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
 
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# TYPE %s_%s%s %s\n", prefix, context, suffix, p.type);
-
                             generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
                         }
                         else {
@@ -758,10 +766,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 dimension,
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
-
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(
-                                    wb, "# TYPE %s_%s_%s%s %s\n", prefix, context, dimension, suffix, p.type);
 
                             generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
                         }
@@ -786,9 +790,6 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             buffer_flush(plabels_buffer);
                             buffer_sprintf(plabels_buffer, "%1$schart=\"%2$s\",%1$sdimension=\"%3$s\",%1$sfamily=\"%4$s\"", plabels_prefix, chart, dimension, family);
                             rrdlabels_walkthrough_read(st->rrdlabels, format_prometheus_chart_label_callback, plabels_buffer);
-
-                            if (unlikely(output_options & PROMETHEUS_OUTPUT_TYPES))
-                                buffer_sprintf(wb, "# TYPE %s_%s%s%s gauge\n", prefix, context, units, suffix);
 
                             if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
                                 buffer_sprintf(
