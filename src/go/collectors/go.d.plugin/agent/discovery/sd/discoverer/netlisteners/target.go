@@ -24,11 +24,13 @@ type target struct {
 
 	hash uint64
 
-	Protocol string
-	Address  string
-	Port     string
-	Comm     string
-	Cmdline  string
+	Protocol  string
+	IPAddress string
+	Port      string
+	Comm      string
+	Cmdline   string
+
+	Address string // "IPAddress:Port"
 }
 
 func (t *target) TUID() string { return tuid(t) }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -183,27 +184,56 @@ func (d *Discoverer) processTargets(tgts []model.Target) []model.TargetGroup {
 
 func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 	var tgts []model.Target
-
+	set := make(map[string]bool)
 	sc := bufio.NewScanner(bytes.NewReader(bs))
+
 	for sc.Scan() {
 		text := strings.TrimSpace(sc.Text())
 		if text == "" {
 			continue
 		}
 
-		// Protocol|Address|Port|Cmdline
+		// Protocol|IPAddress|Port|Cmdline
 		parts := strings.SplitN(text, "|", 4)
 		if len(parts) != 4 {
 			return nil, fmt.Errorf("unexpected data: '%s'", text)
 		}
 
 		tgt := target{
-			Protocol: parts[0],
-			Address:  parts[1],
-			Port:     parts[2],
-			Comm:     extractComm(parts[3]),
-			Cmdline:  parts[3],
+			Protocol:  parts[0],
+			IPAddress: parts[1],
+			Port:      parts[2],
+			Comm:      extractComm(parts[3]),
+			Cmdline:   parts[3],
 		}
+
+		const (
+			local4 = "127.0.0.1"
+			local6 = "::1"
+		)
+
+		if tgt.IPAddress == "0.0.0.0" || strings.HasPrefix(tgt.IPAddress, "127") {
+			tgt.IPAddress = local4
+		} else if tgt.IPAddress == "::" {
+			tgt.IPAddress = local6
+		}
+
+		tgt.Address = net.JoinHostPort(tgt.IPAddress, tgt.Port)
+
+		key := fmt.Sprintf("%s:%s", tgt.Protocol, tgt.Address)
+		var keyLocal string
+		if strings.HasSuffix(tgt.Protocol, "6") {
+			keyLocal = fmt.Sprintf("%s:%s", tgt.Protocol, net.JoinHostPort(local6, tgt.Port))
+		} else {
+			keyLocal = fmt.Sprintf("%s:%s", tgt.Protocol, net.JoinHostPort(local4, tgt.Port))
+		}
+
+		// Filter targets that accept conns on any (0.0.0.0) and additionally on each individual network interface  (a.b.c.d).
+		// Create a target only for localhost. Assumption: any address always goes first.
+		if set[key] || set[keyLocal] {
+			continue
+		}
+		set[key] = true
 
 		hash, err := calcHash(tgt)
 		if err != nil {
