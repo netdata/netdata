@@ -218,6 +218,8 @@ foreach(FLAG function-sections data-sections)
         add_simple_extra_compiler_flag("${FLAG}" "-f${FLAG}" EXTRA_OPT)
 endforeach()
 
+add_simple_extra_compiler_flag("-Wbuiltin-macro-redefined" "-Wno-builtin-macro-redefined" EXTRA_OPT)
+
 foreach(RELTYP RELEASE DEBUG RELWITHDEBINFO MINSIZEREL)
         foreach(L C CXX)
                 set(CMAKE_${L}_FLAGS_${RELTYP} "${CMAKE_${L}_FLAGS_${RELTYP}} ${EXTRA_HARDENING_C_FLAGS} ${EXTRA_OPT_C_FLAGS}")
