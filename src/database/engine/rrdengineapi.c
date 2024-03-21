@@ -320,7 +320,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
             __atomic_add_fetch(&ctx->atomic.samples, add_samples, __ATOMIC_RELAXED);
         }
 
-        pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page);
+        pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page, false);
     }
 
     mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, 0);
