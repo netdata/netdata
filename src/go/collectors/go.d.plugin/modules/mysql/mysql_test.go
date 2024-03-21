@@ -24,6 +24,8 @@ var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
 
+	dataSessionVariables, _ = os.ReadFile("testdata/session_variables.txt")
+
 	dataMySQLVer8030Version, _                  = os.ReadFile("testdata/mysql/v8.0.30/version.txt")
 	dataMySQLVer8030GlobalStatus, _             = os.ReadFile("testdata/mysql/v8.0.30/global_status.txt")
 	dataMySQLVer8030GlobalVariables, _          = os.ReadFile("testdata/mysql/v8.0.30/global_variables.txt")
@@ -60,6 +62,7 @@ func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
 		"dataConfigJSON":                               dataConfigJSON,
 		"dataConfigYAML":                               dataConfigYAML,
+		"dataSessionVariables":                         dataSessionVariables,
 		"dataMySQLVer8030Version":                      dataMySQLVer8030Version,
 		"dataMySQLVer8030GlobalStatus":                 dataMySQLVer8030GlobalStatus,
 		"dataMySQLVer8030GlobalVariables":              dataMySQLVer8030GlobalVariables,
@@ -164,6 +167,9 @@ func TestMySQL_Check(t *testing.T) {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+				mockExpect(t, m, queryDisableSessionQueryLog, nil)
+				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
@@ -181,6 +187,9 @@ func TestMySQL_Check(t *testing.T) {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+				mockExpect(t, m, queryDisableSessionQueryLog, nil)
+				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpectErr(m, queryShowGlobalStatus)
 			},
 		},
@@ -188,6 +197,9 @@ func TestMySQL_Check(t *testing.T) {
 			wantFail: true,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+				mockExpect(t, m, queryDisableSessionQueryLog, nil)
+				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpectErr(m, queryShowGlobalStatus)
 			},
 		},
@@ -195,6 +207,9 @@ func TestMySQL_Check(t *testing.T) {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+				mockExpect(t, m, queryDisableSessionQueryLog, nil)
+				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 				mockExpectErr(m, queryShowAllSlavesStatus)
@@ -206,6 +221,9 @@ func TestMySQL_Check(t *testing.T) {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+				mockExpect(t, m, queryDisableSessionQueryLog, nil)
+				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
@@ -217,6 +235,9 @@ func TestMySQL_Check(t *testing.T) {
 			wantFail: false,
 			prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 				mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+				mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+				mockExpect(t, m, queryDisableSessionQueryLog, nil)
+				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
@@ -260,6 +281,9 @@ func TestMySQL_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer5564Version)
+					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+					mockExpect(t, m, queryDisableSessionQueryLog, nil)
+					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer5564GlobalStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer5564GlobalVariables)
 					mockExpect(t, m, queryShowSlaveStatus, nil)
@@ -391,6 +415,9 @@ func TestMySQL_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+					mockExpect(t, m, queryDisableSessionQueryLog, nil)
+					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, nil)
@@ -570,6 +597,9 @@ func TestMySQL_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+					mockExpect(t, m, queryDisableSessionQueryLog, nil)
+					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusSingleSource)
@@ -751,6 +781,9 @@ func TestMySQL_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+					mockExpect(t, m, queryDisableSessionQueryLog, nil)
+					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
@@ -935,6 +968,9 @@ func TestMySQL_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaVer1084Version)
+					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+					mockExpect(t, m, queryDisableSessionQueryLog, nil)
+					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpectErr(m, queryShowAllSlavesStatus)
@@ -1113,6 +1149,9 @@ func TestMySQL_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMariaGaleraClusterVer1084Version)
+					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+					mockExpect(t, m, queryDisableSessionQueryLog, nil)
+					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaGaleraClusterVer1084GlobalStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaGaleraClusterVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, nil)
@@ -1307,6 +1346,9 @@ func TestMySQL_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataMySQLVer8030Version)
+					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+					mockExpect(t, m, queryDisableSessionQueryLog, nil)
+					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMySQLVer8030GlobalStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMySQLVer8030GlobalVariables)
 					mockExpect(t, m, queryShowReplicaStatus, dataMySQLVer8030ReplicaStatusMultiSource)
@@ -1442,6 +1484,9 @@ func TestMySQL_Collect(t *testing.T) {
 			{
 				prepareMock: func(t *testing.T, m sqlmock.Sqlmock) {
 					mockExpect(t, m, queryShowVersion, dataPerconaVer8029Version)
+					mockExpect(t, m, queryShowSessionVariables, dataSessionVariables)
+					mockExpect(t, m, queryDisableSessionQueryLog, nil)
+					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataPerconaVer8029GlobalStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataPerconaVer8029GlobalVariables)
 					mockExpect(t, m, queryShowReplicaStatus, nil)
