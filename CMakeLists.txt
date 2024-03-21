@@ -1549,10 +1549,16 @@ endif()
 netdata_add_libyaml_to_target(libnetdata)
 
 # zlib
-pkg_check_modules(ZLIB REQUIRED zlib)
-target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
-target_compile_definitions(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
+if(MACOS)
+        find_package(ZLIB REQUIRED)
+        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
+        target_link_libraries(libnetdata PUBLIC ZLIB::ZLIB)
+else()
+        pkg_check_modules(ZLIB REQUIRED zlib)
+        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
+        target_compile_definitions(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
+endif()
 
 # lz4 - try to find a version that is compatible with streaming compression
 # otherwise pick whichever one we can find to support dbengine but don't set
