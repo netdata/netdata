@@ -1620,9 +1620,11 @@ target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
 
 # mnl
-pkg_check_modules(MNL libmnl)
-if(MNL_FOUND)
-    set(HAVE_LIBMNL True)
+if(NOT MACOS)
+    pkg_check_modules(MNL libmnl)
+    if(MNL_FOUND)
+        set(HAVE_LIBMNL True)
+    endif()
 endif()
 
 #
