@@ -28,6 +28,8 @@ func (m *MySQL) collect() (map[string]int64, error) {
 		m.doUserStatistics = m.isPercona || m.isMariaDB && m.version.GTE(semver.Version{Major: 10, Minor: 1, Patch: 1})
 	}
 
+	m.disableSessionQueryLog()
+
 	mx := make(map[string]int64)
 
 	if err := m.collectGlobalStatus(mx); err != nil {

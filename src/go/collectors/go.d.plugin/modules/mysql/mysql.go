@@ -43,6 +43,7 @@ func New() *MySQL {
 		addGaleraOnce:                  &sync.Once{},
 		addQCacheOnce:                  &sync.Once{},
 		addTableOpenCacheOverflowsOnce: &sync.Once{},
+		doDisableSessionQueryLog:       true,
 		doSlaveStatus:                  true,
 		doUserStatistics:               true,
 		collectedReplConns:             make(map[string]bool),
@@ -78,6 +79,8 @@ type MySQL struct {
 	version   *semver.Version
 	isMariaDB bool
 	isPercona bool
+
+	doDisableSessionQueryLog bool
 
 	doSlaveStatus      bool
 	collectedReplConns map[string]bool
