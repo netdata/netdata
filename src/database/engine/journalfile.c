@@ -148,10 +148,10 @@ struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STA
     return datafile;
 }
 
-static void njfv2idx_add(struct rrdengine_datafile *datafile) {
+static void njfv2idx_add_unsafe(struct rrdengine_datafile *datafile)
+{
     internal_fatal(datafile->journalfile->v2.last_time_s <= 0, "DBENGINE: NJFV2IDX trying to index a journal file with invalid first_time_s");
 
-    rw_spinlock_write_lock(&datafile->ctx->njfv2idx.spinlock);
     datafile->journalfile->njfv2idx.indexed_as = datafile->journalfile->v2.last_time_s;
 
     do {
@@ -170,8 +170,6 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
             break;
         }
     } while(1);
-
-    rw_spinlock_write_unlock(&datafile->ctx->njfv2idx.spinlock);
 }
 
 static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
@@ -402,6 +400,8 @@ size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile) {
 }
 
 void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size) {
+
+    rw_spinlock_write_lock(&journalfile->datafile->ctx->njfv2idx.spinlock);
     spinlock_lock(&journalfile->mmap.spinlock);
     spinlock_lock(&journalfile->v2.spinlock);
 
@@ -421,11 +421,11 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     journalfile->v2.size_of_directory = j2_header->metric_offset + j2_header->metric_count * sizeof(struct journal_metric_list);
 
     journalfile_v2_mounted_data_unmount(journalfile, true, true);
+    njfv2idx_add_unsafe(journalfile->datafile);
 
     spinlock_unlock(&journalfile->v2.spinlock);
     spinlock_unlock(&journalfile->mmap.spinlock);
-
-    njfv2idx_add(journalfile->datafile);
+    rw_spinlock_write_unlock(&journalfile->datafile->ctx->njfv2idx.spinlock);
 }
 
 static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *journalfile) {
