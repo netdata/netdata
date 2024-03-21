@@ -617,7 +617,7 @@ jobs:
     name: Consolidate and tag images for GHCR
     if: github.event_name == 'workflow_dispatch'
     needs:
-      - build-images-quay
+      - build-images-ghcr
       - gen-tags
     runs-on: ubuntu-latest
     steps:
