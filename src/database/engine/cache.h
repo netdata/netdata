@@ -192,7 +192,7 @@ PGC_PAGE *pgc_page_dup(PGC *cache, PGC_PAGE *page);
 void pgc_page_release(PGC *cache, PGC_PAGE *page);
 
 // mark a hot page dirty, and release it
-void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page);
+void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page, bool never_flush);
 
 // find a page from the cache
 typedef enum {
