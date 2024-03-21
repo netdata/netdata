@@ -1593,10 +1593,15 @@ if(LIBBROTLI_FOUND)
 endif()
 
 # uuid
-pkg_check_modules(UUID REQUIRED uuid)
-target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
-target_compile_definitions(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
+if(MACOS)
+        # UUID functionality is part of the system libraries here, so no extra
+        # stuff needed.
+else()
+        pkg_check_modules(UUID REQUIRED uuid)
+        target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
+        target_compile_definitions(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
+endif()
 
 # uv
 pkg_check_modules(LIBUV REQUIRED libuv)
