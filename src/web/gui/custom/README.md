@@ -1,19 +1,22 @@
-# Custom dashboards
+# Build new dashboards with HTML
 
-You can build custom Netdata dashboards just with some basic HTML knowledge.
+>❗This feature is only available on v1 dashboards and is not currently supported on v2.
+>  For more information on the new Custom Dashboards check [this documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).
 
-Custom dashboards allow you to  utilize any or all of the available chart libraries, on the same dashboard.
+You can build dashboards with Netdata charts just with some basic HTML knowledge.
+
+These dashboards allow you to utilize any or all of the available chart libraries, on the same dashboard.
 You can use data from one or more Netdata servers, on the same dashboard and host your dashboard HTML page on 
 any web server, anywhere. You can also add Netdata charts to existing web pages.
 
-Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**.
+Check this **[very simple working example of a dashboard](https://my-netdata.io/demo.html)**.
 
-You should also look at the [custom dashboard
+You should also look at the [dashboard
 template](https://my-netdata.io/dashboard.html), which contains samples of all
-supported charts. The code is [here](http://netdata.firehol.org/dashboard.html).
+supported charts. The code is [here](https://my-netdata.io/dashboard.html).
 
 If you plan to put the dashboard on TV, check out
-[tv.html](http://netdata.firehol.org/tv.html). Here's is a screenshot of it,
+[tv.html](https://my-netdata.io/tv.html). Here's is a screenshot of it,
 monitoring two servers on the same page:
 
 <img width="954" alt="image" src="https://user-images.githubusercontent.com/43294513/233790352-2780fd51-3293-49fe-8ad9-30ad9a362c60.png"/>
@@ -27,8 +30,7 @@ All of the mentioned examples are available on your local Netdata installation
 (e.g. `http://myhost:19999/dashboard.html`). The default web root directory with
 the HTML and JS code is `/usr/share/netdata/web`. The main dashboard is also in
 that directory and called `index.html`.\
-Note: index.html has a different syntax. Don't use it as a template for simple
-custom dashboards.
+Note: index.html has a different syntax. Don't use it as a template for simple dashboards.
 
 > Some operating systems will use `/opt/netdata/usr/share/netdata/web` as the web directory. If you're not sure where
 > yours is, navigate to `http://NODE:19999/netdata.conf` in your browser, replacing `NODE` with the IP address or hostname

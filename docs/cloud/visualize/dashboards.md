@@ -1,6 +1,6 @@
-# Build new dashboards
+# Build Custom Dashboards
 
-With Netdata Cloud, you can build new dashboards that target your infrastructure's unique needs. Put key metrics from
+With Netdata Cloud, you can build custom dashboards that target your infrastructure's unique needs. Put key metrics from
 any number of distributed systems in one place for a bird's eye view of your infrastructure.
 
 Click on the **Dashboards** tab in any War Room to get started.
@@ -12,7 +12,7 @@ From the Dashboards tab, click on the **+** button.
 <img width="98" alt=" Green plus button " src="https://github.com/netdata/netdata/assets/73346910/511e2b38-e751-4a88-bc7d-bcd49764b7f6"/>
 
 
-In the modal, give your new dashboard a name, and click **+ Add**.
+In the modal, give your custom dashboard a name, and click **+ Add**.
 
 - The **Add Chart** button on the top right of the interface adds your first chart card. From the dropdown, select either **All Nodes** or a specific
 node. Next, select the context. You'll see a preview of the chart before you finish adding it. In this modal you can also [interact with the chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md), meaning you can configure all the aspects of the [NIDL framework](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#nidl-framework) of the chart and more in detail, you can:
