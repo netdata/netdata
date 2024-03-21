@@ -1,11 +1,11 @@
 # Build new dashboards with HTML
 
->❗This feature is only available on v1 dashboards, it hasn't been port-forwarded to v2.
+>❗This feature is only available on v1 dashboards and is not currently supported on v2.
 >  For more information on the new Custom Dashboards check [this documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).
 
 You can build dashboards with Netdata charts just with some basic HTML knowledge.
 
-These dashboards allow you to  utilize any or all of the available chart libraries, on the same dashboard.
+These dashboards allow you to utilize any or all of the available chart libraries, on the same dashboard.
 You can use data from one or more Netdata servers, on the same dashboard and host your dashboard HTML page on 
 any web server, anywhere. You can also add Netdata charts to existing web pages.
 
