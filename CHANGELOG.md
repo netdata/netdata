@@ -1,11 +1,12 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.45.0](https://github.com/netdata/netdata/tree/v1.45.0) (2024-03-21)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.44.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.44.3...v1.45.0)
 
 **Merged pull requests:**
 
+- Dynamic configuration switch to version 2 [\#17212](https://github.com/netdata/netdata/pull/17212) ([stelfrag](https://github.com/stelfrag))
 - update bundled UI to v6.104.1 [\#17208](https://github.com/netdata/netdata/pull/17208) ([ilyam8](https://github.com/ilyam8))
 - go.d: adjust dyncfg return codes [\#17206](https://github.com/netdata/netdata/pull/17206) ([ilyam8](https://github.com/ilyam8))
 - go.d: local-listeners sd: trust known ports to identify an app [\#17205](https://github.com/netdata/netdata/pull/17205) ([ilyam8](https://github.com/ilyam8))
