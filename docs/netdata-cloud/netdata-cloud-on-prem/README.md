@@ -26,7 +26,7 @@ flowchart TD
     users --> ingress
     agents --> ingress
     ingress --> traefik
-    traefik ==>|agents<br/>websockets| emqx
+    ingress ==>|agents<br/>websockets| emqx
     traefik -.- auth
     traefik ==>|http| spaceroom
     traefik ==>|http| frontend
