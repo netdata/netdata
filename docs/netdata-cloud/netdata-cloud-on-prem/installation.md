@@ -34,7 +34,7 @@ aws configure
 Using `aws` command we will generate a token for helm to access the secured ECR repository:
 
 ```bash
-aws ecr get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin 362923047827.dkr.ecr.us-east-1.amazonaws.com/netdata-cloud-onprem
+aws ecr get-login-password --region us-east-1 | helm registry login --username AWS --password-stdin 362923047827.dkr.ecr.us-east-1.amazonaws.com
 ```
 
 After this step you should be able to add the repository to your helm or just pull the helm chart:
