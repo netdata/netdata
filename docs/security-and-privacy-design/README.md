@@ -215,8 +215,6 @@ consultant to ensure that their use of any product, including Netdata, aligns wi
 
 Service Organization Control 2 (SOC 2) is a framework for managing data to ensure the security, availability, processing integrity, confidentiality, and privacy of customer data. Developed by the American Institute of CPAs (AICPA), SOC 2 is specifically designed for service providers storing customer data in the cloud. It requires companies to establish and follow strict information security policies and procedures.
 
-### Netdata's Alignment with SOC 2 Principles
-
 While Netdata is not currently SOC 2 certified, our commitment to security and privacy aligns closely with the principles of SOC 2. Here’s how Netdata's practices resonate with the key components of SOC 2 compliance:
 
 ### Security
