@@ -155,7 +155,7 @@ jobs:
         run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
       - name: Build netdata
         if: needs.file-check.outputs.run == 'true'
-        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install-prefix /tmp/install --one-time-build ${{ needs.file-check.outputs.skipgo }}
+        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install-prefix /tmp/install --one-time-build ${{ needs.file-check.outputs.skip-go }}
       - name: Check that repo is clean
         if: needs.file-check.outputs.run == 'true'
         run: |
