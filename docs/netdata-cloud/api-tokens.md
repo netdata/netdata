@@ -20,7 +20,7 @@ The API Tokens are not going to expire and can be limited to a few scopes:
 
 * `scope:grafana-plugin`
 
-  this token is used for the [Netdata Grafana plugin](https://github.com/netdata/netdata-grafana-datasource-plugin)
+  this token is used for the [Netdata Grafana plugin](https://github.com/netdata/netdata-grafana-datasource-plugin/blob/master/README.md)
   to access Netdata charts
 
 Currently, the Netdata Cloud is not exposing stable API.
