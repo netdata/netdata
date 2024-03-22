@@ -8,7 +8,6 @@ in the Netdata UI under the user Settings:
 
 <img width="316" alt="image" src="https://github.com/netdata/netdata/assets/14999928/b0846076-afae-47ab-92df-c24967305ab9">
 
-
 The API Tokens are not going to expire and can be limited to a few scopes:
 
 * `scope:all`
