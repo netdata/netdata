@@ -727,6 +727,7 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
             return true;
         }
         case PAGE_CONSTANT_METRICS: {
+            pgdc->position++;
             storage_number n = pgdc->pgd->constant.v;
 
             sp->min = sp->max = sp->sum = unpack_storage_number(n);
