@@ -1,5 +1,19 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.0...HEAD)
+
+**Merged pull requests:**
+
+- Reduce flush operations during journal build [\#17220](https://github.com/netdata/netdata/pull/17220) ([stelfrag](https://github.com/stelfrag))
+- go.d: mysql: disable session query log and slow query log [\#17219](https://github.com/netdata/netdata/pull/17219) ([ilyam8](https://github.com/ilyam8))
+- go.d: local-listeners sd: fix mariadbd comm [\#17218](https://github.com/netdata/netdata/pull/17218) ([ilyam8](https://github.com/ilyam8))
+- Fix job depdendencies in Docker workflow. [\#17215](https://github.com/netdata/netdata/pull/17215) ([Ferroin](https://github.com/Ferroin))
+- add warning on old custom dashboards and rephrase existing page [\#17214](https://github.com/netdata/netdata/pull/17214) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Bump github.com/docker/docker from 25.0.4+incompatible to 25.0.5+incompatible in /src/go/collectors/go.d.plugin [\#17211](https://github.com/netdata/netdata/pull/17211) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Add -Wno-builtin-macro-redefined to compiler flags. [\#17209](https://github.com/netdata/netdata/pull/17209) ([Ferroin](https://github.com/Ferroin))
+
 ## [v1.45.0](https://github.com/netdata/netdata/tree/v1.45.0) (2024-03-21)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.44.3...v1.45.0)
@@ -382,14 +396,6 @@
 - Remove includes outside of libnetdata. [\#16607](https://github.com/netdata/netdata/pull/16607) ([vkalintiris](https://github.com/vkalintiris))
 - Fix \(and improve\) Coverity scanning. [\#16605](https://github.com/netdata/netdata/pull/16605) ([Ferroin](https://github.com/Ferroin))
 - Delete memory mode "map" and "save". [\#16604](https://github.com/netdata/netdata/pull/16604) ([vkalintiris](https://github.com/vkalintiris))
-- remove v1 dashboard version check from installer [\#16603](https://github.com/netdata/netdata/pull/16603) ([ilyam8](https://github.com/ilyam8))
-- fix not assigned proc\_count in installer [\#16602](https://github.com/netdata/netdata/pull/16602) ([ilyam8](https://github.com/ilyam8))
-- improve enable\_feature function in the installer [\#16601](https://github.com/netdata/netdata/pull/16601) ([ilyam8](https://github.com/ilyam8))
-- Remove build/ [\#16600](https://github.com/netdata/netdata/pull/16600) ([vkalintiris](https://github.com/vkalintiris))
-- Allow passing cmake options with NETDATA\_CMAKE\_OPTIONS. [\#16598](https://github.com/netdata/netdata/pull/16598) ([vkalintiris](https://github.com/vkalintiris))
-- Cleanup am files [\#16597](https://github.com/netdata/netdata/pull/16597) ([vkalintiris](https://github.com/vkalintiris))
-- Fix coverity issues [\#16596](https://github.com/netdata/netdata/pull/16596) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#16595](https://github.com/netdata/netdata/pull/16595) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
