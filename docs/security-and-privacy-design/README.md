@@ -211,6 +211,40 @@ Business Associate Agreement (BAA), it is ultimately the responsibility of the h
 compliance across all of their operations. Entities should always consult with a legal expert or a HIPAA compliance
 consultant to ensure that their use of any product, including Netdata, aligns with HIPAA regulations.
 
+## SOC 2 Compliance and Netdata
+
+### Understanding SOC 2 Compliance
+
+Service Organization Control 2 (SOC 2) is a framework for managing data to ensure the security, availability, processing integrity, confidentiality, and privacy of customer data. Developed by the American Institute of CPAs (AICPA), SOC 2 is specifically designed for service providers storing customer data in the cloud. It requires companies to establish and follow strict information security policies and procedures.
+
+### Netdata's Alignment with SOC 2 Principles
+
+While Netdata is not currently SOC 2 certified, our commitment to security and privacy aligns closely with the principles of SOC 2. Here’s how Netdata's practices resonate with the key components of SOC 2 compliance:
+
+### Security
+
+Netdata has implemented robust security measures, including infrastructure as code, TLS termination, DDoS protection, and a security-focused development process. These measures echo the SOC 2 principle of ensuring the security of customer data against unauthorized access and potential threats.
+
+### Availability
+
+Netdata's commitment to system monitoring and troubleshooting ensures the availability of our service, consistent with the availability principle of SOC 2. Our infrastructure is designed to be resilient and reliable, providing users with continuous access to our services.
+
+### Processing Integrity
+
+Although Netdata primarily focuses on system monitoring and does not typically process customer data in a way that alters it, our commitment to accurate, timely, and valid delivery of services aligns with the processing integrity principle of SOC 2.
+
+### Confidentiality
+
+Netdata's measures to protect data—such as data encryption, strict access controls, and data isolation—demonstrate our commitment to confidentiality, ensuring that customer data is accessed only by authorized personnel and for authorized reasons.
+
+### Privacy
+
+Aligning with the privacy principle of SOC 2, Netdata adheres to GDPR and CCPA regulations, ensuring the protection and proper handling of personal data. Our privacy policies and practices are transparent, giving users control over their data.
+
+### Continuous Improvement and Future Considerations
+
+Netdata is committed to continuous improvement in security and privacy. While we are not currently SOC 2 certified, we understand the importance of this framework and are continuously evaluating our processes and controls against industry best practices. As Netdata grows and evolves, we remain open to pursuing SOC 2 certification or other similar standards to further demonstrate our dedication to data security and privacy.
+
 ## Conclusion
 
 In conclusion, Netdata Cloud's commitment to data security and user privacy is paramount. From the careful design of the
