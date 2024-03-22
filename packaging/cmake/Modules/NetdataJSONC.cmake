@@ -20,12 +20,16 @@ function(netdata_bundle_jsonc)
 
         set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
-        set(DISABLE_BSYMBOLIC True)
-        set(DISABLE_WERROR True)
-        set(DISABLE_EXTRA_LIBS True)
-        set(BUILD_SHARED_LIBS False)
-        set(BUILD_STATIC_LIBS True)
-        set(BUILD_APPS False)
+        # JSON-C's build system does string comparisons against option
+        # values instead of treating them as booleans, so we need to use
+        # proper strings for option values instead of just setting them
+        # to true or false.
+        set(DISABLE_BSYMBOLIC OFF)
+        set(DISABLE_WERROR OFF)
+        set(DISABLE_EXTRA_LIBS OFF)
+        set(BUILD_SHARED_LIBS OFF)
+        set(BUILD_STATIC_LIBS ON)
+        set(BUILD_APPS OFF)
 
         FetchContent_Declare(json-c
                 GIT_REPOSITORY https://github.com/json-c/json-c
