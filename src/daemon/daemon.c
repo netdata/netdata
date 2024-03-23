@@ -26,6 +26,9 @@ void get_netdata_execution_path(void) {
     }
 
     netdata_exe_file[exepath_size] = '\0';
+#ifdef ENABLE_LIBBACKTRACE
+    bt_init(netdata_exe_file, netdata_configured_cache_dir);
+#endif
 
     // macOS's dirname(3) does not modify passed string
     char *tmpdir = strdupz(netdata_exe_file);

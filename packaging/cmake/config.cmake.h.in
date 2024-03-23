@@ -116,6 +116,11 @@
 #cmakedefine NETDATA_SENTRY_RELEASE "@NETDATA_SENTRY_RELEASE@"
 #cmakedefine NETDATA_SENTRY_DIST "@NETDATA_SENTRY_DIST@"
 #cmakedefine NETDATA_SENTRY_DSN "@NETDATA_SENTRY_DSN@"
+
+// enabled libbacktrace
+
+#cmakedefine ENABLE_LIBBACKTRACE
+
 // enabled bundling
 
 #cmakedefine ENABLE_BUNDLED_JSONC

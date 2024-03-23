@@ -38,6 +38,10 @@ void sentry_native_init(void)
     sentry_options_set_debug(options, 1);
 #endif
 
+#ifdef ENABLE_LIBBACKTRACE
+    sentry_options_add_attachment(options, bt_path);
+#endif
+
     sentry_init(options);
 }
 
