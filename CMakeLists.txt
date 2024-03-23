@@ -1049,6 +1049,8 @@ if(ENABLE_DBENGINE)
             src/database/engine/metric.h
             src/database/engine/pdc.c
             src/database/engine/pdc.h
+            src/database/engine/dbengine-unittest.c
+            src/database/engine/dbengine-stresstest.c
     )
 endif()
 
