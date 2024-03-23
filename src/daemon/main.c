@@ -1171,11 +1171,11 @@ static void get_netdata_configured_variables() {
 
     const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
     if (strcmp(page_type, "gorilla") == 0)
-        tier_page_type[0] = PAGE_GORILLA_METRICS;
+        tier_page_type[0] = RRDENG_PAGE_TYPE_GORILLA_32BIT;
     else if (strcmp(page_type, "raw") == 0)
-        tier_page_type[0] = PAGE_METRICS;
+        tier_page_type[0] = RRDENG_PAGE_TYPE_ARRAY_32BIT;
     else {
-        tier_page_type[0] = PAGE_METRICS;
+        tier_page_type[0] = RRDENG_PAGE_TYPE_ARRAY_32BIT;
         netdata_log_error("Invalid dbengine page type ''%s' given. Defaulting to 'raw'.", page_type);
     }
 

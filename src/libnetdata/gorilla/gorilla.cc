@@ -212,7 +212,7 @@ bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t
     do {
         const gorilla_buffer_t *next_gbuf = curr_gbuf->header.next;
 
-        size_t bytes = GORILLA_BUFFER_SIZE;
+        size_t bytes = RRDENG_GORILLA_32BIT_BUFFER_SIZE;
         if (bytes > dst_size)
             return false;   
 
@@ -232,7 +232,7 @@ uint32_t gorilla_buffer_patch(gorilla_buffer_t *gbuf) {
 
     while (curr_gbuf->header.next) {
         uint32_t *buf = reinterpret_cast<uint32_t *>(gbuf);
-        gbuf = reinterpret_cast<gorilla_buffer_t *>(&buf[GORILLA_BUFFER_SLOTS]);
+        gbuf = reinterpret_cast<gorilla_buffer_t *>(&buf[RRDENG_GORILLA_32BIT_BUFFER_SLOTS]);
 
         assert(((uintptr_t) (gbuf) % sizeof(uintptr_t)) == 0 &&
                "Gorilla buffer not aligned to uintptr_t");

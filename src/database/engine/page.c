@@ -111,9 +111,9 @@ void pgd_init_arals(void)
         // FIXME: add stats
         pgd_alloc_globals.aral_gorilla_buffer[i] = aral_create(
                 buf,
-                GORILLA_BUFFER_SIZE,
+            RRDENG_GORILLA_32BIT_BUFFER_SIZE,
                 64,
-                512 * GORILLA_BUFFER_SIZE,
+                512 * RRDENG_GORILLA_32BIT_BUFFER_SIZE,
                 pgc_aral_statistics(),
                 NULL, NULL, false, false);
     }
@@ -165,8 +165,8 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
     pg->states = PGD_STATE_CREATED_FROM_COLLECTOR;
 
     switch (type) {
-        case PAGE_METRICS:
-        case PAGE_TIER: {
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
             uint32_t size = slots * page_type_size[type];
 
             internal_fatal(!size || slots == 1,
@@ -176,11 +176,11 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
             pg->raw.data = pgd_data_aral_alloc(size);
             break;
         }
-        case PAGE_GORILLA_METRICS: {
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             internal_fatal(slots == 1,
                       "DBENGINE: invalid number of slots (%u) or page type (%u)", slots, type);
 
-            pg->slots = 8 * GORILLA_BUFFER_SLOTS;
+            pg->slots = 8 * RRDENG_GORILLA_32BIT_BUFFER_SLOTS;
 
             // allocate new gorilla writer
             pg->gorilla.aral_index = gettid() % 4;
@@ -188,10 +188,10 @@ PGD *pgd_create(uint8_t type, uint32_t slots)
 
             // allocate new gorilla buffer
             gorilla_buffer_t *gbuf = aral_mallocz(pgd_alloc_globals.aral_gorilla_buffer[pg->gorilla.aral_index]);
-            memset(gbuf, 0, GORILLA_BUFFER_SIZE);
+            memset(gbuf, 0, RRDENG_GORILLA_32BIT_BUFFER_SIZE);
             global_statistics_gorilla_buffer_add_hot();
 
-            *pg->gorilla.writer = gorilla_writer_init(gbuf, GORILLA_BUFFER_SLOTS);
+            *pg->gorilla.writer = gorilla_writer_init(gbuf, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
             pg->gorilla.num_buffers = 1;
 
             break;
@@ -222,8 +222,8 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
 
     switch (type)
     {
-        case PAGE_METRICS:
-        case PAGE_TIER:
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
             pg->raw.size = size;
             pg->used = size / page_type_size[type];
             pg->slots = pg->used;
@@ -231,10 +231,11 @@ PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size)
             pg->raw.data = pgd_data_aral_alloc(size);
             memcpy(pg->raw.data, base, size);
             break;
-        case PAGE_GORILLA_METRICS:
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT:
             internal_fatal(size == 0, "Asked to create page with 0 data!!!");
             internal_fatal(size % sizeof(uint32_t), "Unaligned gorilla buffer size");
-            internal_fatal(size % GORILLA_BUFFER_SIZE, "Expected size to be a multiple of %zu-bytes", GORILLA_BUFFER_SIZE);
+            internal_fatal(size % RRDENG_GORILLA_32BIT_BUFFER_SIZE, "Expected size to be a multiple of %zu-bytes",
+                RRDENG_GORILLA_32BIT_BUFFER_SIZE);
 
             pg->raw.data = mallocz(size);
             pg->raw.size = size;
@@ -268,11 +269,11 @@ void pgd_free(PGD *pg)
 
     switch (pg->type)
     {
-        case PAGE_METRICS:
-        case PAGE_TIER:
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
             pgd_data_aral_free(pg->raw.data, pg->raw.size);
             break;
-        case PAGE_GORILLA_METRICS: {
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
             {
                 internal_fatal(pg->raw.data == NULL, "Tried to free gorilla PGD loaded from disk with NULL data");
@@ -365,15 +366,15 @@ uint32_t pgd_memory_footprint(PGD *pg)
 
     size_t footprint = 0;
     switch (pg->type) {
-        case PAGE_METRICS:
-        case PAGE_TIER:
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
             footprint = sizeof(PGD) + pg->raw.size;
             break;
-        case PAGE_GORILLA_METRICS: {
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK)
                 footprint = sizeof(PGD) + pg->raw.size;
             else
-                footprint = sizeof(PGD) + sizeof(gorilla_writer_t) + (pg->gorilla.num_buffers * GORILLA_BUFFER_SIZE);
+                footprint = sizeof(PGD) + sizeof(gorilla_writer_t) + (pg->gorilla.num_buffers * RRDENG_GORILLA_32BIT_BUFFER_SIZE);
 
             break;
         }
@@ -393,15 +394,15 @@ uint32_t pgd_disk_footprint(PGD *pg)
     size_t size = 0;
 
     switch (pg->type) {
-        case PAGE_METRICS:
-        case PAGE_TIER: {
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
             uint32_t used_size = pg->used * page_type_size[pg->type];
             internal_fatal(used_size > pg->raw.size, "Wrong disk footprint page size");
             size = used_size;
 
             break;
         }
-        case PAGE_GORILLA_METRICS: {
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR ||
                 pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING ||
                 pg->states & PGD_STATE_FLUSHED_TO_DISK)
@@ -412,7 +413,7 @@ uint32_t pgd_disk_footprint(PGD *pg)
                 internal_fatal(pg->gorilla.num_buffers == 0,
                                "Gorilla writer does not have any buffers");
 
-                size = pg->gorilla.num_buffers * GORILLA_BUFFER_SIZE;
+                size = pg->gorilla.num_buffers * RRDENG_GORILLA_32BIT_BUFFER_SIZE;
 
                 if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR) {
                     global_statistics_tier0_disk_compressed_bytes(gorilla_writer_nbytes(pg->gorilla.writer));
@@ -443,11 +444,11 @@ void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
                    pgd_disk_footprint(pg), dst_size);
 
     switch (pg->type) {
-        case PAGE_METRICS:
-        case PAGE_TIER:
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
             memcpy(dst, pg->raw.data, dst_size);
             break;
-        case PAGE_GORILLA_METRICS: {
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if ((pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING) == 0)
                 fatal("Copying to extent is supported only for PGDs that are scheduled for flushing.");
 
@@ -500,7 +501,7 @@ void pgd_append_point(PGD *pg,
         fatal("Data collection on page already scheduled for flushing");
 
     switch (pg->type) {
-        case PAGE_METRICS: {
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT: {
             storage_number *tier0_metric_data = (storage_number *)pg->raw.data;
             storage_number t = pack_storage_number(n, flags);
             tier0_metric_data[pg->used++] = t;
@@ -510,7 +511,7 @@ void pgd_append_point(PGD *pg,
 
             break;
         }
-        case PAGE_TIER: {
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
             storage_number_tier1_t *tier12_metric_data = (storage_number_tier1_t *)pg->raw.data;
             storage_number_tier1_t t;
             t.sum_value = (float) n;
@@ -525,7 +526,7 @@ void pgd_append_point(PGD *pg,
 
             break;
         }
-        case PAGE_GORILLA_METRICS: {
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             pg->used++;
             storage_number t = pack_storage_number(n, flags);
 
@@ -535,9 +536,9 @@ void pgd_append_point(PGD *pg,
             bool ok = gorilla_writer_write(pg->gorilla.writer, t);
             if (!ok) {
                 gorilla_buffer_t *new_buffer = aral_mallocz(pgd_alloc_globals.aral_gorilla_buffer[pg->gorilla.aral_index]);
-                memset(new_buffer, 0, GORILLA_BUFFER_SIZE);
+                memset(new_buffer, 0, RRDENG_GORILLA_32BIT_BUFFER_SIZE);
 
-                gorilla_writer_add_buffer(pg->gorilla.writer, new_buffer, GORILLA_BUFFER_SLOTS);
+                gorilla_writer_add_buffer(pg->gorilla.writer, new_buffer, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
                 pg->gorilla.num_buffers += 1;
                 global_statistics_gorilla_buffer_add_hot();
 
@@ -560,11 +561,11 @@ static void pgdc_seek(PGDC *pgdc, uint32_t position)
     PGD *pg = pgdc->pgd;
 
     switch (pg->type) {
-        case PAGE_METRICS:
-        case PAGE_TIER:
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
             pgdc->slots = pgdc->pgd->used;
             break;
-        case PAGE_GORILLA_METRICS: {
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             if (pg->states & PGD_STATE_CREATED_FROM_DISK) {
                 pgdc->slots = pgdc->pgd->slots;
                 pgdc->gr = gorilla_reader_init((void *) pg->raw.data);
@@ -634,7 +635,7 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
 
     switch (pgdc->pgd->type)
     {
-        case PAGE_METRICS: {
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT: {
             storage_number *array = (storage_number *) pgdc->pgd->raw.data;
             storage_number n = array[pgdc->position++];
 
@@ -645,7 +646,7 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
 
             return true;
         }
-        case PAGE_TIER: {
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
             storage_number_tier1_t *array = (storage_number_tier1_t *) pgdc->pgd->raw.data;
             storage_number_tier1_t n = array[pgdc->position++];
 
@@ -658,7 +659,7 @@ bool pgdc_get_next_point(PGDC *pgdc, uint32_t expected_position __maybe_unused, 
 
             return true;
         }
-        case PAGE_GORILLA_METRICS: {
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT: {
             pgdc->position++;
 
             uint32_t n = 666666666;

@@ -672,7 +672,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         uuid_t *temp_id;
         uint8_t page_type = jf_metric_data->descr[i].type;
 
-        if (page_type > PAGE_TYPE_MAX) {
+        if (page_type > RRDENG_PAGE_TYPE_MAX) {
             if (!bitmap256_get_bit(&page_error_map, page_type)) {
                 netdata_log_error("DBENGINE: unknown page type %d encountered.", page_type);
                 bitmap256_set_bit(&page_error_map, page_type, 1);
