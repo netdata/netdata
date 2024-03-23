@@ -67,8 +67,8 @@ uint32_t gorilla_buffer_patch(gorilla_buffer_t *buf);
 gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *buf);
 bool gorilla_reader_read(gorilla_reader_t *gr, uint32_t *number);
 
-#define GORILLA_BUFFER_SLOTS 128
-#define GORILLA_BUFFER_SIZE (GORILLA_BUFFER_SLOTS * sizeof(uint32_t))
+#define RRDENG_GORILLA_32BIT_BUFFER_SLOTS 128
+#define RRDENG_GORILLA_32BIT_BUFFER_SIZE (RRDENG_GORILLA_32BIT_BUFFER_SLOTS * sizeof(uint32_t))
 
 #ifdef __cplusplus
 }
