@@ -38,7 +38,7 @@ static uint8_t page_type = PAGE_GORILLA_METRICS;
 
 static size_t slots_for_page(size_t n) {
     switch (page_type) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
             return 1024;
         case PAGE_GORILLA_METRICS:
             return n;
@@ -200,7 +200,7 @@ TEST(PGD, MemoryFootprint) {
 
     uint32_t footprint = 0;
     switch (pgd_type(pg)) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
             footprint = slots * sizeof(uint32_t);
             break;
         case PAGE_GORILLA_METRICS:
@@ -225,7 +225,7 @@ TEST(PGD, MemoryFootprint) {
 
     uint32_t abs_error = 0;
     switch (pgd_type(pg)) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
             abs_error = 128;
             break;
         case PAGE_GORILLA_METRICS:
@@ -256,7 +256,7 @@ TEST(PGD, DiskFootprint) {
 
     uint32_t footprint = 0;
     switch (pgd_type(pg)) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
             footprint = used_slots * sizeof(uint32_t);
             break;
         case PAGE_GORILLA_METRICS:
@@ -279,7 +279,7 @@ TEST(PGD, DiskFootprint) {
     }
 
     switch (pgd_type(pg)) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
             footprint = used_slots * sizeof(uint32_t);
             break;
         case PAGE_GORILLA_METRICS:

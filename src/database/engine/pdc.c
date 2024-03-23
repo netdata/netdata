@@ -635,7 +635,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
     size_t entries = 0;
 
     switch (descr->type) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
         case PAGE_TIER:
             end_time_s = descr->end_time_ut / USEC_PER_SEC;
             entries = 0;
@@ -643,6 +643,10 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
         case PAGE_GORILLA_METRICS:
             end_time_s = start_time_s + descr->gorilla.delta_time_s;
             entries = descr->gorilla.entries;
+            break;
+        case PAGE_CONSTANT_METRICS:
+            end_time_s = start_time_s + descr->constant.delta_time_s;
+            entries = descr->constant.entries;
             break;
         default:
             // Nothing to do. Validate page will notify the user.
@@ -689,7 +693,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 
     bool known_page_type = true;
     switch (page_type) {
-        case PAGE_METRICS:
+        case PAGE_RAW_METRICS:
         case PAGE_TIER:
             // always calculate entries by size
             vd.entries = page_entries_by_size(vd.page_length, vd.point_size);
@@ -700,6 +704,10 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
             break;
         case PAGE_GORILLA_METRICS:
             internal_fatal(entries == 0, "0 number of entries found on gorilla page");
+            vd.entries = entries;
+            break;
+        case PAGE_CONSTANT_METRICS:
+            internal_fatal(entries == 0, "0 number of entries found on constant page");
             vd.entries = entries;
             break;
         default:
@@ -873,12 +881,15 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
     if (descr) {
         start_time_s = (time_t)(descr->start_time_ut / USEC_PER_SEC);
         switch (descr->type) {
-            case PAGE_METRICS:
+            case PAGE_RAW_METRICS:
             case PAGE_TIER:
                 end_time_s = (time_t)(descr->end_time_ut / USEC_PER_SEC);
                 break;
             case PAGE_GORILLA_METRICS:
                 end_time_s = (time_t) start_time_s + (descr->gorilla.delta_time_s);
+                break;
+            case PAGE_CONSTANT_METRICS:
+                end_time_s = (time_t) start_time_s + (descr->constant.delta_time_s);
                 break;
         }
         uuid_unparse_lower(descr->uuid, uuid);
