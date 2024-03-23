@@ -442,9 +442,14 @@ struct gen_parameters {
  * @param wb the buffer to write the comment to.
  * @param context context name we are using
  */
-static inline void generate_as_collected_prom_help(BUFFER *wb, char *context, RRDSET *st)
+static inline void generate_as_collected_prom_help(BUFFER *wb,
+                                                   const char *prefix,
+                                                   char *context,
+                                                   char *units,
+                                                   char *suffix,
+                                                   RRDSET *st)
 {
-    buffer_sprintf(wb, "# HELP %s %s\n", context, rrdset_title(st));
+    buffer_sprintf(wb, "# HELP %s_%s%s%s %s\n", prefix, context, units, suffix, rrdset_title(st));
 }
 
 /**
@@ -743,6 +748,11 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 p.suffix = "_total";
                         }
 
+                        if (plot_help) {
+                            generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
+                            plot_help = false;
+                        }
+
                         if (plot_type) {
                             plot_type = false;
                             generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
@@ -789,7 +799,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 PROMETHEUS_ELEMENT_MAX);
 
                             if (plot_help) {
-                                generate_as_collected_prom_help(wb, context, st);
+                                generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
                                 plot_help = false;
                             }
 
