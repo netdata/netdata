@@ -1325,21 +1325,8 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     return page;
 }
 
-static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method) {
-    __atomic_add_fetch(&cache->stats.workers_search, 1, __ATOMIC_RELAXED);
-
-    size_t *stats_hit_ptr, *stats_miss_ptr;
-
-    if(method == PGC_SEARCH_CLOSEST) {
-        __atomic_add_fetch(&cache->stats.searches_closest, 1, __ATOMIC_RELAXED);
-        stats_hit_ptr = &cache->stats.searches_closest_hits;
-        stats_miss_ptr = &cache->stats.searches_closest_misses;
-    }
-    else {
-        __atomic_add_fetch(&cache->stats.searches_exact, 1, __ATOMIC_RELAXED);
-        stats_hit_ptr = &cache->stats.searches_exact_hits;
-        stats_miss_ptr = &cache->stats.searches_exact_misses;
-    }
+static PGC_PAGE *page_find_and_acquire_once(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method, bool *retry) {
+    *retry = false;
 
     PGC_PAGE *page = NULL;
     size_t partition = pgc_indexing_partition(cache, metric_id);
@@ -1462,22 +1449,13 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
 
         if(!page_acquire(cache, page)) {
             // this page is not good to use
+            *retry = true;
             page = NULL;
         }
     }
 
 cleanup:
     pgc_index_read_unlock(cache, partition);
-
-    if(page) {
-        __atomic_add_fetch(stats_hit_ptr, 1, __ATOMIC_RELAXED);
-        page_has_been_accessed(cache, page);
-    }
-    else
-        __atomic_add_fetch(stats_miss_ptr, 1, __ATOMIC_RELAXED);
-
-    __atomic_sub_fetch(&cache->stats.workers_search, 1, __ATOMIC_RELAXED);
-
     return page;
 }
 
@@ -2048,7 +2026,46 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
 }
 
 PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method) {
-    return page_find_and_acquire(cache, section, metric_id, start_time_s, method);
+    static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
+
+    PGC_PAGE *page = NULL;
+
+    __atomic_add_fetch(&cache->stats.workers_search, 1, __ATOMIC_RELAXED);
+
+    size_t *stats_hit_ptr, *stats_miss_ptr;
+
+    if(method == PGC_SEARCH_CLOSEST) {
+        __atomic_add_fetch(&cache->stats.searches_closest, 1, __ATOMIC_RELAXED);
+        stats_hit_ptr = &cache->stats.searches_closest_hits;
+        stats_miss_ptr = &cache->stats.searches_closest_misses;
+    }
+    else {
+        __atomic_add_fetch(&cache->stats.searches_exact, 1, __ATOMIC_RELAXED);
+        stats_hit_ptr = &cache->stats.searches_exact_hits;
+        stats_miss_ptr = &cache->stats.searches_exact_misses;
+    }
+
+    while(1) {
+        bool retry = false;
+
+        page = page_find_and_acquire_once(cache, section, metric_id, start_time_s, method, &retry);
+
+        if(page || !retry)
+            break;
+
+        nanosleep(&ns, NULL);
+    }
+
+    if(page) {
+        __atomic_add_fetch(stats_hit_ptr, 1, __ATOMIC_RELAXED);
+        page_has_been_accessed(cache, page);
+    }
+    else
+        __atomic_add_fetch(stats_miss_ptr, 1, __ATOMIC_RELAXED);
+
+    __atomic_sub_fetch(&cache->stats.workers_search, 1, __ATOMIC_RELAXED);
+
+    return page;
 }
 
 struct pgc_statistics pgc_get_statistics(PGC *cache) {
