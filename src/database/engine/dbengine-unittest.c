@@ -5,9 +5,9 @@
 #ifdef ENABLE_DBENGINE
 
 #define CHARTS 64
-#define DIMS 8 // CHARTS * DIMS dimensions
+#define DIMS 16 // CHARTS * DIMS dimensions
 #define REGIONS 11
-#define POINTS_PER_REGION 4096
+#define POINTS_PER_REGION 16384
 static const int REGION_UPDATE_EVERY[REGIONS] = {1, 15, 3, 20, 2, 6, 30, 12, 5, 4, 10};
 
 #define START_TIMESTAMP MAX(2 * API_RELATIVE_TIME_MAX, 200000000)
