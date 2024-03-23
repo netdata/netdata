@@ -448,6 +448,22 @@ static inline void generate_as_collected_prom_help(BUFFER *wb, char *context, RR
 }
 
 /**
+ * Write an as-collected help comment to a buffer.
+ *
+ * @param wb the buffer to write the comment to.
+ * @param context context name we are using
+ */
+static inline void generate_as_collected_prom_type(BUFFER *wb,
+                                                   const char *prefix,
+                                                   char *context,
+                                                   char *units,
+                                                   char *suffix,
+                                                   const char *type)
+{
+    buffer_sprintf(wb, "# TYPE %s_%s%s%s %s\n", prefix, context, units, suffix, type);
+}
+
+/**
  * Write an as-collected metric to a buffer.
  *
  * @param wb the buffer to write the metric to.
@@ -687,24 +703,12 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                         units, rrdset_units(st), PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
-            if (output_options & PROMETHEUS_OUTPUT_HELP)
-                generate_as_collected_prom_help(wb, context, st);
-
             bool plot_type = (output_options & PROMETHEUS_OUTPUT_TYPES) ? true : false;
+            bool plot_help = (output_options & PROMETHEUS_OUTPUT_HELP) ? true : false;
 
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-
-                if (plot_type) {
-                    plot_type = false;
-                    char *type = (!as_collected ||
-                        (rd->algorithm != RRD_ALGORITHM_INCREMENTAL && rd->algorithm != RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL)) ?
-                        "gauge" :
-                        "counter";
-
-                    buffer_sprintf(wb, "# TYPE %s %s\n", context, type);
-                }
 
                 if (rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
@@ -737,6 +741,11 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                             p.relation = "delta gives";
                             if (!prometheus_collector)
                                 p.suffix = "_total";
+                        }
+
+                        if (plot_type) {
+                            plot_type = false;
+                            generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
                         }
 
                         if (homogeneous) {
@@ -778,6 +787,16 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
                                 dimension,
                                 (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                                 PROMETHEUS_ELEMENT_MAX);
+
+                            if (plot_help) {
+                                generate_as_collected_prom_help(wb, context, st);
+                                plot_help = false;
+                            }
+
+                            if (plot_type) {
+                                plot_type = false;
+                                generate_as_collected_prom_type(wb, prefix, context, units, suffix, "gauge");
+                            }
 
                             buffer_flush(plabels_buffer);
                             buffer_sprintf(plabels_buffer, "%1$schart=\"%2$s\",%1$sdimension=\"%3$s\",%1$sfamily=\"%4$s\"", plabels_prefix, chart, dimension, family);
