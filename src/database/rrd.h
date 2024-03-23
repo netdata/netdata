@@ -1002,15 +1002,11 @@ typedef enum __attribute__ ((__packed__)) {
 
     // Streaming configuration
     RRDHOST_OPTION_SENDER_ENABLED           = (1 << 2), // set when the host is configured to send metrics to a parent
+    RRDHOST_OPTION_REPLICATION              = (1 << 3), // when set, we support replication for this host
 
-    // Configuration options
-    RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS   = (1 << 3), // delete files of obsolete charts
-    RRDHOST_OPTION_DELETE_ORPHAN_HOST       = (1 << 4), // delete the entire host when orphan
-
-    RRDHOST_OPTION_REPLICATION              = (1 << 5), // when set, we support replication for this host
-
-    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 6), // when set, this host is a virtual one
-    RRDHOST_OPTION_EPHEMERAL_HOST           = (1 << 7), // when set, this host is an ephemeral one
+    // Other options
+    RRDHOST_OPTION_VIRTUAL_HOST             = (1 << 4), // when set, this host is a virtual one
+    RRDHOST_OPTION_EPHEMERAL_HOST           = (1 << 5), // when set, this host is an ephemeral one
 } RRDHOST_OPTIONS;
 
 #define rrdhost_option_check(host, flag) ((host)->options & (flag))
