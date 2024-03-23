@@ -1054,12 +1054,6 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL,  "cleanup orphan hosts after seconds",
                 CONFIG_SECTION_DB,      "cleanup orphan hosts after secs");
 
-    config_move(CONFIG_SECTION_GLOBAL,  "delete obsolete charts files",
-                CONFIG_SECTION_DB,      "delete obsolete charts files");
-
-    config_move(CONFIG_SECTION_GLOBAL,  "delete orphan hosts files",
-                CONFIG_SECTION_DB,      "delete orphan hosts files");
-
     config_move(CONFIG_SECTION_GLOBAL,  "enable zero metrics",
                 CONFIG_SECTION_DB,      "enable zero metrics");
 
@@ -1171,11 +1165,11 @@ static void get_netdata_configured_variables() {
 
     const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
     if (strcmp(page_type, "gorilla") == 0)
-        tier_page_type[0] = PAGE_GORILLA_METRICS;
+        tier_page_type[0] = RRDENG_PAGE_TYPE_GORILLA_32BIT;
     else if (strcmp(page_type, "raw") == 0)
-        tier_page_type[0] = PAGE_METRICS;
+        tier_page_type[0] = RRDENG_PAGE_TYPE_ARRAY_32BIT;
     else {
-        tier_page_type[0] = PAGE_METRICS;
+        tier_page_type[0] = RRDENG_PAGE_TYPE_ARRAY_32BIT;
         netdata_log_error("Invalid dbengine page type ''%s' given. Defaulting to 'raw'.", page_type);
     }
 

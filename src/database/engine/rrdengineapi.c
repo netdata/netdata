@@ -16,7 +16,12 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
-uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_GORILLA_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
+uint8_t tier_page_type[RRD_STORAGE_TIERS] = {
+    RRDENG_PAGE_TYPE_GORILLA_32BIT,
+    RRDENG_PAGE_TYPE_ARRAY_TIER1,
+    RRDENG_PAGE_TYPE_ARRAY_TIER1,
+    RRDENG_PAGE_TYPE_ARRAY_TIER1,
+    RRDENG_PAGE_TYPE_ARRAY_TIER1};
 
 #if defined(ENV32BIT)
 size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
@@ -24,14 +29,14 @@ size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
 size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
 #endif
 
-#if PAGE_TYPE_MAX != 2
+#if RRDENG_PAGE_TYPE_MAX != 2
 #error PAGE_TYPE_MAX is not 2 - you need to add allocations here
 #endif
 
 size_t page_type_size[256] = {
-        [PAGE_METRICS] = sizeof(storage_number),
-        [PAGE_TIER] = sizeof(storage_number_tier1_t),
-        [PAGE_GORILLA_METRICS] = sizeof(storage_number)
+        [RRDENG_PAGE_TYPE_ARRAY_32BIT] = sizeof(storage_number),
+        [RRDENG_PAGE_TYPE_ARRAY_TIER1] = sizeof(storage_number_tier1_t),
+        [RRDENG_PAGE_TYPE_GORILLA_32BIT] = sizeof(storage_number)
 };
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
@@ -457,14 +462,14 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, siz
     *data_size = size;
 
     switch (ctx->config.page_type) {
-        case PAGE_METRICS:
-        case PAGE_TIER:
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
             d = pgd_create(ctx->config.page_type, slots);
             break;
-        case PAGE_GORILLA_METRICS:
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT:
             // ignore slots, and use the fixed number of slots per gorilla buffer.
             // gorilla will automatically add more buffers if needed.
-            d = pgd_create(ctx->config.page_type, GORILLA_BUFFER_SLOTS);
+            d = pgd_create(ctx->config.page_type, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
             break;
         default:
             fatal("Unknown page type: %uc\n", ctx->config.page_type);
@@ -1165,7 +1170,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
 
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tier_page_type[tier];
-    ctx->config.global_compress_alg = RRD_LZ4;
+    ctx->config.global_compress_alg = RRDENG_COMPRESSION_LZ4;
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
     ctx->config.max_disk_space = disk_space_mb * 1048576LLU;

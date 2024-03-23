@@ -808,7 +808,7 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     xt_io_descr->ctx = ctx;
     payload_offset = sizeof(*header) + count * sizeof(header->descr[0]);
     switch (compression_algorithm) {
-        case RRD_NO_COMPRESSION:
+        case RRDENG_COMPRESSION_NONE:
             size_bytes = payload_offset + uncompressed_payload_length + sizeof(*trailer);
             break;
 
@@ -844,11 +844,11 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
         header->descr[i].start_time_ut = descr->start_time_ut;
 
         switch (descr->type) {
-            case PAGE_METRICS:
-            case PAGE_TIER:
+            case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+            case RRDENG_PAGE_TYPE_ARRAY_TIER1:
                 header->descr[i].end_time_ut = descr->end_time_ut;
                 break;
-            case PAGE_GORILLA_METRICS:
+            case RRDENG_PAGE_TYPE_GORILLA_32BIT:
                 header->descr[i].gorilla.delta_time_s = (uint32_t) ((descr->end_time_ut - descr->start_time_ut) / USEC_PER_SEC);
                 header->descr[i].gorilla.entries = pgd_slots_used(descr->pgd);
                 break;
@@ -864,7 +864,7 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
         pos += descr->page_length;
     }
 
-    if(likely(compression_algorithm == RRD_LZ4)) {
+    if(likely(compression_algorithm == RRDENG_COMPRESSION_LZ4)) {
         compressed_size = LZ4_compress_default(
                 xt_io_descr->buf + payload_offset,
                 compressed_buf,

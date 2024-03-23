@@ -673,6 +673,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-hashtable.h
         src/libnetdata/dictionary/dictionary-item.h
         src/libnetdata/dictionary/dictionary-callbacks.h
+        src/libnetdata/linked-lists.h
+        src/libnetdata/storage-point.h
+        src/libnetdata/bitmap.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

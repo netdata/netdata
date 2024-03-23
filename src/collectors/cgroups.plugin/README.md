@@ -270,8 +270,6 @@ a few errors in error.log complaining about files it cannot find, but immediatel
 5. Existing dashboard sessions will continue to see them, but of course they will not refresh
 6. Obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable
    with `[global].cleanup obsolete charts after seconds = 3600` (at `netdata.conf`).
-7. When obsolete charts are removed from memory they are also deleted from disk (configurable
-   with `[global].delete obsolete charts files = yes`)
 
 ### Monitored container metrics
 

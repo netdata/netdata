@@ -858,7 +858,7 @@ static void global_statistics_charts(void) {
     // ----------------------------------------------------------------
 
 #ifdef ENABLE_DBENGINE
-    if (tier_page_type[0] == PAGE_GORILLA_METRICS)
+    if (tier_page_type[0] == RRDENG_PAGE_TYPE_GORILLA_32BIT)
     {
         static RRDSET *st_tier0_gorilla_pages = NULL;
         static RRDDIM *rd_num_gorilla_pages = NULL;
@@ -887,7 +887,7 @@ static void global_statistics_charts(void) {
         rrdset_done(st_tier0_gorilla_pages);
     }
 
-    if (tier_page_type[0] == PAGE_GORILLA_METRICS)
+    if (tier_page_type[0] == RRDENG_PAGE_TYPE_GORILLA_32BIT)
     {
         static RRDSET *st_tier0_compression_info = NULL;
 
