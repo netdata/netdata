@@ -1169,10 +1169,13 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page type
 
-    const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "raw");
-    if (strcmp(page_type, "gorilla") == 0) {
+    const char *page_type = config_get(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
+    if (strcmp(page_type, "gorilla") == 0)
         tier_page_type[0] = PAGE_GORILLA_METRICS;
-    } else if (strcmp(page_type, "raw") != 0) {
+    else if (strcmp(page_type, "raw") == 0)
+        tier_page_type[0] = PAGE_METRICS;
+    else {
+        tier_page_type[0] = PAGE_METRICS;
         netdata_log_error("Invalid dbengine page type ''%s' given. Defaulting to 'raw'.", page_type);
     }
 
@@ -1521,6 +1524,11 @@ int main(int argc, char **argv) {
 
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
+
+                            // set defaults for dbegnine unittest
+                            config_set(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
+                            default_rrdeng_disk_quota_mb = default_multidb_disk_quota_mb = 256;
+
                             if (sqlite_library_init())
                                 return 1;
 
