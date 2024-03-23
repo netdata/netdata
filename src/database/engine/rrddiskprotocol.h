@@ -19,13 +19,15 @@
 #define UUID_SZ (16)
 #define CHECKSUM_SZ (4) /* CRC32 */
 
-#define RRD_NO_COMPRESSION (0)
-#define RRD_LZ4 (1)
+#define RRDENG_COMPRESSION_NONE (0)
+#define RRDENG_COMPRESSION_LZ4  (1)
 
 #define RRDENG_DF_SB_PADDING_SZ (RRDENG_BLOCK_SIZE - (RRDENG_MAGIC_SZ + RRDENG_VER_SZ + sizeof(uint8_t)))
+
 /*
  * Data file persistent super-block
  */
+
 struct rrdeng_df_sb {
     char magic_number[RRDENG_MAGIC_SZ];
     char version[RRDENG_VER_SZ];
@@ -36,10 +38,11 @@ struct rrdeng_df_sb {
 /*
  * Page types
  */
-#define PAGE_METRICS    (0)
-#define PAGE_TIER       (1)
-#define PAGE_GORILLA_METRICS    (2)
-#define PAGE_TYPE_MAX   2   // Maximum page type (inclusive)
+
+#define RRDENG_PAGE_TYPE_ARRAY_32BIT    (0)
+#define RRDENG_PAGE_TYPE_ARRAY_TIER1    (1)
+#define RRDENG_PAGE_TYPE_GORILLA_32BIT  (2)
+#define RRDENG_PAGE_TYPE_MAX            (2) // Maximum page type (inclusive)
 
 /*
  * Data file page descriptor
