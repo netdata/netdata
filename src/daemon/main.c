@@ -1521,7 +1521,7 @@ int main(int argc, char **argv) {
 
                             // set defaults for dbegnine unittest
                             config_set(CONFIG_SECTION_DB, "dbengine page type", "gorilla");
-                            default_rrdeng_disk_quota_mb = default_multidb_disk_quota_mb = 256;
+                            default_rrdeng_disk_quota_mb = default_multidb_disk_quota_mb = 1024;
 
                             if (sqlite_library_init())
                                 return 1;

@@ -80,7 +80,11 @@ size_t dbengine_compress(void *payload, size_t uncompressed_size, uint8_t algori
             size_t compressed_size =
                 LZ4_compress_default(payload, compressed_buf, (int)uncompressed_size, (int)max_compressed_size);
 
-            memcpy(payload, compressed_buf, compressed_size);
+            if(compressed_size > 0 && compressed_size < uncompressed_size)
+                memcpy(payload, compressed_buf, compressed_size);
+            else
+                compressed_size = 0;
+
             extent_buffer_release(eb);
             return compressed_size;
         }
@@ -95,17 +99,23 @@ size_t dbengine_compress(void *payload, size_t uncompressed_size, uint8_t algori
             size_t compressed_size = ZSTD_compress(compressed_buf, max_compressed_size, payload, uncompressed_size,
                                                    DBENGINE_ZSTD_DEFAULT_COMPRESSION_LEVEL);
 
-            if (ZSTD_isError(compressed_size))
-                fatal("DBENGINE: ZSTD compression error %s", ZSTD_getErrorName(compressed_size));
+            if (ZSTD_isError(compressed_size)) {
+                internal_fatal(true, "DBENGINE: ZSTD compression error %s", ZSTD_getErrorName(compressed_size));
+                compressed_size = 0;
+            }
 
-            memcpy(payload, compressed_buf, compressed_size);
+            if(compressed_size > 0 && compressed_size < uncompressed_size)
+                memcpy(payload, compressed_buf, compressed_size);
+            else
+                compressed_size = 0;
+
             extent_buffer_release(eb);
             return compressed_size;
         }
 #endif
 
         case RRDENG_COMPRESSION_NONE:
-            return uncompressed_size;
+            return 0;
 
         default:
             fatal("DBENGINE: unknown compression algorithm %u", algorithm);
@@ -119,11 +129,11 @@ size_t dbengine_decompress(void *dst, void *src, size_t dst_size, size_t src_siz
         case RRDENG_COMPRESSION_LZ4: {
             int rc = LZ4_decompress_safe(src, dst, (int)src_size, (int)dst_size);
             if(rc < 0) {
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "DBENGINE: ZSTD decompression error %d", rc);
-
-                return 0;
+                nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: ZSTD decompression error %d", rc);
+                rc = 0;
             }
+
+            return rc;
         }
 #endif
 
@@ -132,11 +142,10 @@ size_t dbengine_decompress(void *dst, void *src, size_t dst_size, size_t src_siz
             size_t decompressed_size = ZSTD_decompress(dst, dst_size, src, src_size);
 
             if (ZSTD_isError(decompressed_size)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "DBENGINE: ZSTD decompression error %s",
+                nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: ZSTD decompression error %s",
                        ZSTD_getErrorName(decompressed_size));
 
-                return 0;
+                decompressed_size = 0;
             }
 
             return decompressed_size;

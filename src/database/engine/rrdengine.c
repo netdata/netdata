@@ -773,7 +773,6 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
  */
 static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_data *base, struct completion *completion) {
     int ret;
-    int compressed_size;
     unsigned i, count, size_bytes, pos, real_io_size;
     uint32_t uncompressed_payload_length, max_compressed_size, payload_offset;
     struct page_descr_with_data *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
@@ -819,7 +818,6 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
 
     pos = 0;
     header = xt_io_descr->buf;
-    header->compression_algorithm = compression_algorithm;
     header->number_of_pages = count;
     pos += sizeof(*header);
 
@@ -854,10 +852,24 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     }
 
     // compress the payload
-    header->payload_length = compressed_size =
+    size_t compressed_size =
         (int)dbengine_compress(xt_io_descr->buf + payload_offset,
                                uncompressed_payload_length,
                                compression_algorithm);
+
+    internal_fatal(compressed_size > max_compressed_size, "DBENGINE: compression returned more data than the max allowed");
+    internal_fatal(compressed_size > uncompressed_payload_length, "DBENGINE: compression returned more data than the uncompressed extent");
+
+    if(compressed_size) {
+        header->compression_algorithm = compression_algorithm;
+        header->payload_length = compressed_size;
+    }
+    else {
+       // compression failed, or generated bigger pages
+       // so it didn't touch our uncompressed buffer
+       header->compression_algorithm = RRDENG_COMPRESSION_NONE;
+       header->payload_length = compressed_size = uncompressed_payload_length;
+    }
 
     // set the correct size
     size_bytes = payload_offset + compressed_size + sizeof(*trailer);
