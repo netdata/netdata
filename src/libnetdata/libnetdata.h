@@ -395,6 +395,7 @@ extern char *netdata_configured_host_prefix;
 #include "inlined.h"
 #include "line_splitter/line_splitter.h"
 #include "clocks/clocks.h"
+#include "parsers/parsers.h"
 #include "datetime/iso8601.h"
 #include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"

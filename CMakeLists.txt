@@ -676,6 +676,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
         src/libnetdata/bitmap.h
+        src/libnetdata/parsers/parsers.h
+        src/libnetdata/parsers/time.c
 )
 
 if(ENABLE_PLUGIN_EBPF)
