@@ -167,10 +167,20 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 }
 
 bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rrdhost_hostname(rd->rrdset->rrdhost)),
+        ND_LOG_FIELD_TXT(NDF_NIDL_CONTEXT, rrdset_context(rd->rrdset)),
+        ND_LOG_FIELD_TXT(NDF_NIDL_INSTANCE, rrdset_name(rd->rrdset)),
+        ND_LOG_FIELD_TXT(NDF_NIDL_DIMENSION, rrddim_name(rd)),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     size_t tiers_available = 0, tiers_said_no_retention = 0;
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         spinlock_lock(&rd->tiers[tier].spinlock);
+
         if(rd->tiers[tier].sch) {
             tiers_available++;
 
@@ -179,6 +189,7 @@ bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
 
             rd->tiers[tier].sch = NULL;
         }
+
         spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 

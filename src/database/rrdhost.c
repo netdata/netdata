@@ -1523,6 +1523,12 @@ void reload_host_labels(void) {
 }
 
 void rrdhost_finalize_collection(RRDHOST *host) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rrdhost_hostname(host)),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "RRD: 'host:%s' stopping data collection...",
            rrdhost_hostname(host));
