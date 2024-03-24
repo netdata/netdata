@@ -116,25 +116,39 @@ size_t dbengine_decompress(void *dst, void *src, size_t dst_size, size_t src_siz
     switch(algorithm) {
 
 #ifdef ENABLE_LZ4
-        case RRDENG_COMPRESSION_LZ4:
-            return LZ4_decompress_safe(src, dst, (int)src_size, (int)dst_size);
+        case RRDENG_COMPRESSION_LZ4: {
+            int rc = LZ4_decompress_safe(src, dst, (int)src_size, (int)dst_size);
+            if(rc < 0) {
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "DBENGINE: ZSTD decompression error %d", rc);
+
+                return 0;
+            }
+        }
 #endif
 
 #ifdef ENABLE_ZSTD
         case RRDENG_COMPRESSION_ZSTD: {
             size_t decompressed_size = ZSTD_decompress(dst, dst_size, src, src_size);
 
-            if (ZSTD_isError(decompressed_size))
-                fatal("DBENGINE: ZSTD decompression error %s", ZSTD_getErrorName(decompressed_size));
+            if (ZSTD_isError(decompressed_size)) {
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "DBENGINE: ZSTD decompression error %s",
+                       ZSTD_getErrorName(decompressed_size));
+
+                return 0;
+            }
 
             return decompressed_size;
         }
 #endif
 
         case RRDENG_COMPRESSION_NONE:
-            fatal("DBENGINE: %s() should not be called for uncompressed pages", __FUNCTION__ );
+            internal_fatal(true, "DBENGINE: %s() should not be called for uncompressed pages", __FUNCTION__ );
+            return 0;
 
         default:
-            fatal("DBENGINE: unknown compression algorithm %u", algorithm);
+            internal_fatal(true, "DBENGINE: unknown compression algorithm %u", algorithm);
+            return 0;
     }
 }
