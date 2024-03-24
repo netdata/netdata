@@ -133,13 +133,38 @@ static inline time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, 
     return first_time_s;
 }
 
+static void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)metric->section;
+
+    char uuid[UUID_STR_LEN];
+    uuid_unparse_lower(metric->uuid, uuid);
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "METRIC: %s on %s at tier %d, refcount %d, partition %u, "
+           "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32", "
+           "writer pid %d "
+           "--- PLEASE OPEN A GITHUB ISSUE TO REPORT THIS LOG LINE TO NETDATA --- ",
+           msg,
+           uuid,
+           ctx->config.tier,
+           metric->refcount,
+           metric->partition,
+           metric->first_time_s,
+           metric->latest_time_s_hot,
+           metric->latest_time_s_clean,
+           metric->latest_update_every_s,
+           (int)metric->writer
+    );
+}
+
 static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric) {
     spinlock_lock(&metric->refcount_spinlock);
 
     if (metric->refcount >= 0)
         metric->refcount += 1;
-    else
+    else {
+        metric_log(mrg, metric, "refcount is negative during acquire");
         fatal("METRIC: refcount is %d (negative) during acquire", metric->refcount);
+    }
 
     REFCOUNT refcount = metric->refcount;
     spinlock_unlock(&metric->refcount_spinlock);
@@ -156,8 +181,17 @@ static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric) {
 static inline void metric_release(MRG *mrg __maybe_unused, METRIC *metric) {
     spinlock_lock(&metric->refcount_spinlock);
 
-    if (metric->refcount <= 0)
-        fatal("METRIC: refcount is %d (zero or negative) during release", metric->refcount);
+    if (metric->refcount <= 0) {
+
+        if(!netdata_exit) {
+            metric_log(mrg, metric, "refcount is zero or negative during release (not exiting)");
+            fatal("METRIC: refcount is %d (zero or negative) during release", metric->refcount);
+        }
+        else
+            metric_log(mrg, metric, "refcount is zero or negative during release (exiting)");
+
+        return;
+    }
 
     metric->refcount -= 1;
     REFCOUNT refcount = metric->refcount;
