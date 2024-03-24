@@ -12,6 +12,19 @@
 #define DBENGINE_ZSTD_DEFAULT_COMPRESSION_LEVEL 3
 #endif
 
+uint8_t dbengine_default_compression(void) {
+
+#ifdef ENABLE_ZSTD
+    return RRDENG_COMPRESSION_ZSTD;
+#endif
+
+#ifdef ENABLE_LZ4
+    return RRDENG_COMPRESSION_LZ4;
+#endif
+
+    return RRDENG_COMPRESSION_NONE;
+}
+
 bool dbengine_valid_compression_algorithm(uint8_t algorithm) {
     switch(algorithm) {
         case RRDENG_COMPRESSION_NONE:
