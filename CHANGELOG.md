@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Code cleanup [\#17237](https://github.com/netdata/netdata/pull/17237) ([ktsaou](https://github.com/ktsaou))
+- DBENGINE: use gorilla by default [\#17234](https://github.com/netdata/netdata/pull/17234) ([ktsaou](https://github.com/ktsaou))
+- updated dbengine unittest [\#17232](https://github.com/netdata/netdata/pull/17232) ([ktsaou](https://github.com/ktsaou))
+- dbengine: cache bug-fix when under pressure [\#17231](https://github.com/netdata/netdata/pull/17231) ([ktsaou](https://github.com/ktsaou))
 - fix html [\#17228](https://github.com/netdata/netdata/pull/17228) ([Ancairon](https://github.com/Ancairon))
 - update flowchart cloud-onprem [\#17227](https://github.com/netdata/netdata/pull/17227) ([M4itee](https://github.com/M4itee))
 - feat: add netdata cloud api-tokens docs [\#17225](https://github.com/netdata/netdata/pull/17225) ([witalisoft](https://github.com/witalisoft))
@@ -393,9 +397,6 @@
 - Fix coverity issues, logically dead code and error checking [\#16618](https://github.com/netdata/netdata/pull/16618) ([stelfrag](https://github.com/stelfrag))
 - Added energy efficiency img README.md [\#16617](https://github.com/netdata/netdata/pull/16617) ([Aliki92](https://github.com/Aliki92))
 - Fix small coverity issue [\#16616](https://github.com/netdata/netdata/pull/16616) ([stelfrag](https://github.com/stelfrag))
-- ndsudo - a helper to run privileged commands [\#16614](https://github.com/netdata/netdata/pull/16614) ([ktsaou](https://github.com/ktsaou))
-- Robustness improvements to netdata-updater.sh [\#16613](https://github.com/netdata/netdata/pull/16613) ([candlerb](https://github.com/candlerb))
-- Remove assert [\#16611](https://github.com/netdata/netdata/pull/16611) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
