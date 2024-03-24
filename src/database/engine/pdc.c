@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #define NETDATA_RRD_INTERNALS
 #include "pdc.h"
+#include "dbengine-compression.h"
 
 struct extent_page_details_list {
     uv_file file;
@@ -975,7 +976,7 @@ static bool epdl_populate_pages_from_extent_data(
     if( !can_use_data ||
         count < 1 ||
         count > MAX_PAGES_PER_EXTENT ||
-        (header->compression_algorithm != RRDENG_COMPRESSION_NONE && header->compression_algorithm != RRDENG_COMPRESSION_LZ4) ||
+        !dbengine_valid_compression_algorithm(header->compression_algorithm) ||
         (payload_length != trailer_offset - payload_offset) ||
         (data_length != payload_offset + payload_length + sizeof(*trailer))
         ) {
@@ -1018,8 +1019,9 @@ static bool epdl_populate_pages_from_extent_data(
             eb = extent_buffer_get(uncompressed_payload_length);
             uncompressed_buf = eb->data;
 
-            ret = LZ4_decompress_safe(data + payload_offset, uncompressed_buf,
-                                      (int) payload_length, (int) uncompressed_payload_length);
+            ret = (int)dbengine_decompress(uncompressed_buf, data + payload_offset,
+                                           uncompressed_payload_length, payload_length,
+                                           header->compression_algorithm);
 
             __atomic_add_fetch(&ctx->stats.before_decompress_bytes, payload_length, __ATOMIC_RELAXED);
             __atomic_add_fetch(&ctx->stats.after_decompress_bytes, ret, __ATOMIC_RELAXED);
