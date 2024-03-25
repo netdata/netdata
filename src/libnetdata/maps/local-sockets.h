@@ -828,15 +828,17 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_loa
     ebpf_nv_data_t stored = {};
 
     char path[FILENAME_MAX + 1];
+    snprintfz(path, sizeof(path) - 1, "%s/proc/", ls->config.host_prefix);
 
     if(ls->config.namespaces) {
-        snprintfz(path, sizeof(path), "%s/proc/self/ns/net", ls->config.host_prefix);
+        snprintfz(path, sizeof(path), "%sself/ns/net", path);
         local_sockets_read_proc_inode_link(ls, path, &ls->proc_self_net_ns_inode, "net");
     }
 
     int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
     uint64_t counter = 0;
     uint64_t removed = 0;
+    char filename[FILENAME_MAX + 1];
     bool cleanup = (action & NETWORK_VEIWER_EBPF_NV_CLEANUP);
     while (!bpf_map_get_next_key(fd, &key, &next_key)) {
         if (bpf_map_lookup_elem(fd, &key, &stored)) {
@@ -884,6 +886,15 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_loa
 
         strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
         local_sockets_add_socket(ls, &n);
+
+        if (ls->config.namespaces) {
+            uint64_t net_ns_inode = 0;
+            snprintfz(filename, sizeof(filename), "%s%u/ns/net", path, stored.pid);
+            if (local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
+                SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode, (uint64_t *)net_ns_inode, true);
+                simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
+            }
+        }
 
 end_socket_read_loop:
         key = next_key;
