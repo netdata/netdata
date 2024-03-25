@@ -577,7 +577,6 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step);
 int hash256_string(const unsigned char *string, size_t size, char *hash);
 
 extern bool unittest_running;
-#define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now);
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest);

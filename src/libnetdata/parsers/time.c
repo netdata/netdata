@@ -15,20 +15,20 @@ struct {
     const char *unit;
     nsec_t multiplier;
 } units[] = {
-    { .unit = "ns",             .multiplier = 1 },                                                      // UCUM
-    { .unit = "us",             .multiplier = 1 * NSEC_PER_USEC },                                      // UCUM
-    { .unit = "ms",             .multiplier = 1 * USEC_PER_MS * NSEC_PER_USEC },                        // UCUM
-    { .unit = "s",              .multiplier = 1 * USEC_PER_SEC * NSEC_PER_USEC },                       // UCUM
-    { .unit = "m",              .multiplier = MINUTE_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },       // -
-    { .unit = "min",            .multiplier = MINUTE_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },       // UCUM
-    { .unit = "h",              .multiplier = HOUR_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },         // UCUM
-    { .unit = "d",              .multiplier = DAY_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },          // UCUM
-    { .unit = "w",              .multiplier = WEEK_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },         // -
-    { .unit = "wk",              .multiplier = WEEK_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },        // UCUM
-    { .unit = "mo",             .multiplier = MONTH_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },        // UCUM
-    { .unit = "q",              .multiplier = QUARTER_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },      // -
-    { .unit = "y",              .multiplier = YEAR_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },         // -
-    { .unit = "a",              .multiplier = YEAR_IN_SECONDS * USEC_PER_SEC * NSEC_PER_USEC },         // UCUM
+    { .unit = "ns",             .multiplier = 1 },                                      // UCUM
+    { .unit = "us",             .multiplier = 1 * NSEC_PER_USEC },                      // UCUM
+    { .unit = "ms",             .multiplier = 1 * USEC_PER_MS * NSEC_PER_USEC },        // UCUM
+    { .unit = "s",              .multiplier = 1 * NSEC_PER_SEC },                       // UCUM
+    { .unit = "m",              .multiplier = MINUTE_IN_SECONDS * NSEC_PER_SEC },       // -
+    { .unit = "min",            .multiplier = MINUTE_IN_SECONDS * NSEC_PER_SEC },       // UCUM
+    { .unit = "h",              .multiplier = HOUR_IN_SECONDS * NSEC_PER_SEC },         // UCUM
+    { .unit = "d",              .multiplier = DAY_IN_SECONDS * NSEC_PER_SEC },          // UCUM
+    { .unit = "w",              .multiplier = WEEK_IN_SECONDS * NSEC_PER_SEC },         // -
+    { .unit = "wk",              .multiplier = WEEK_IN_SECONDS * NSEC_PER_SEC },        // UCUM
+    { .unit = "mo",             .multiplier = MONTH_IN_SECONDS * NSEC_PER_SEC },        // UCUM
+    { .unit = "q",              .multiplier = QUARTER_IN_SECONDS * NSEC_PER_SEC },      // -
+    { .unit = "y",              .multiplier = YEAR_IN_SECONDS * NSEC_PER_SEC },         // -
+    { .unit = "a",              .multiplier = YEAR_IN_SECONDS * NSEC_PER_SEC },         // UCUM
 };
 
 // -------------------------------------------------------------------------------------------------------------------
@@ -115,3 +115,128 @@ size_t duration_from_time_t(char *dst, size_t size, time_t value, const char *de
     if(!default_unit) default_unit = "s";
     return duration_from_nsec_t(dst, size, value * NSEC_PER_SEC, default_unit);
 }
+
+// --------------------------------------------------------------------------------------------------------------------
+// timeframe
+/*
+TIMEFRAME timeframe_parse(const char *txt) {
+    if(!txt || !*txt)
+        return TIMEFRAME_INVALID;
+
+    char buf[strlen(txt) + 1];
+    memcpy(buf, txt, strlen(txt) + 1);
+    char *s = trim_all(buf);
+    if(!s)
+        return TIMEFRAME_INVALID;
+
+    while(isspace(*s)) s++;
+
+    if(strcasecmp(s, "this minute") == 0) {
+        return (TIMEFRAME) {
+            .after = API_RELATIVE_TIME_THIS_MINUTE,
+            .before = 0,
+        };
+    }
+    if(strcasecmp(s, "this hour") == 0) {
+        return (TIMEFRAME) {
+            .after = API_RELATIVE_TIME_THIS_HOUR,
+            .before = 0,
+        };
+    }
+    if(strcasecmp(s, "today") == 0) {
+        return (TIMEFRAME) {
+            .after = API_RELATIVE_TIME_TODAY,
+            .before = 0,
+        };
+    }
+    if(strcasecmp(s, "this week") == 0) {
+        return (TIMEFRAME) {
+            .after = API_RELATIVE_TIME_THIS_WEEK,
+            .before = 0,
+        };
+    }
+    if(strcasecmp(s, "this month") == 0) {
+        return (TIMEFRAME) {
+            .after = API_RELATIVE_TIME_THIS_MONTH,
+            .before = 0,
+        };
+    }
+    if(strcasecmp(s, "this year") == 0) {
+        return (TIMEFRAME) {
+            .after = API_RELATIVE_TIME_THIS_YEAR,
+            .before = 0,
+        };
+    }
+
+    if(strcasecmp(s, "last minute") == 0) {
+        return (TIMEFRAME) {
+            .after = -60,
+            .before = API_RELATIVE_TIME_THIS_MINUTE,
+        };
+    }
+    if(strcasecmp(s, "last hour") == 0) {
+        return (TIMEFRAME) {
+            .after = -3600,
+            .before = API_RELATIVE_TIME_THIS_HOUR,
+        };
+    }
+    if(strcasecmp(s, "yesterday") == 0) {
+        return (TIMEFRAME) {
+            .after = -86400,
+            .before = API_RELATIVE_TIME_TODAY,
+        };
+    }
+    if(strcasecmp(s, "this week") == 0) {
+        return (TIMEFRAME) {
+            .after = -86400 * 7,
+            .before = API_RELATIVE_TIME_THIS_WEEK,
+        };
+    }
+    if(strcasecmp(s, "this month") == 0) {
+        return (TIMEFRAME) {
+            .after = API_RELATIVE_TIME_LAST_MONTH,
+            .before = API_RELATIVE_TIME_THIS_MONTH,
+        };
+    }
+    if(strcasecmp(s, "this year") == 0) {
+        return (TIMEFRAME) {
+            .after = API_RELATIVE_TIME_LAST_YEAR,
+            .before = API_RELATIVE_TIME_THIS_YEAR,
+        };
+    }
+
+    const char *end;
+    double after = strtondd(s, (char **)&end);
+
+    if(end == s)
+        return TIMEFRAME_INVALID;
+
+    s = end;
+    while(isspace(*s)) s++;
+
+    time_t multiplier = 1;
+    if(!isdigit(*s) && *s != '-') {
+        // after has units
+        bool found = false;
+
+        for (size_t i = 0; i < sizeof(units) / sizeof(units[0]); i++) {
+            size_t len = strlen(units[i].unit);
+
+            if (units[i].multiplier >= 1 * NSEC_PER_USEC &&
+                strncmp(s, units[i].unit, len) == 0 &&
+                (isspace(s[len]) || s[len] == '-')) {
+                multiplier = units[i].multiplier / NSEC_PER_SEC;
+                found = true;
+                s += len;
+            }
+        }
+
+        if(!found)
+            return TIMEFRAME_INVALID;
+    }
+
+    const char *dash = strchr(s, '-');
+    if(!dash) return TIMEFRAME_INVALID;
+
+}
+*/
