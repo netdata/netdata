@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix MRG Metric refcount issue [\#17239](https://github.com/netdata/netdata/pull/17239) ([ktsaou](https://github.com/ktsaou))
 - Code cleanup [\#17237](https://github.com/netdata/netdata/pull/17237) ([ktsaou](https://github.com/ktsaou))
 - DBENGINE: use gorilla by default [\#17234](https://github.com/netdata/netdata/pull/17234) ([ktsaou](https://github.com/ktsaou))
 - updated dbengine unittest [\#17232](https://github.com/netdata/netdata/pull/17232) ([ktsaou](https://github.com/ktsaou))
@@ -396,7 +397,6 @@
 - cgroups: filter lxcfs.service/.control [\#16620](https://github.com/netdata/netdata/pull/16620) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity issues, logically dead code and error checking [\#16618](https://github.com/netdata/netdata/pull/16618) ([stelfrag](https://github.com/stelfrag))
 - Added energy efficiency img README.md [\#16617](https://github.com/netdata/netdata/pull/16617) ([Aliki92](https://github.com/Aliki92))
-- Fix small coverity issue [\#16616](https://github.com/netdata/netdata/pull/16616) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
