@@ -88,14 +88,6 @@ func TestDiscoverer_Discover(t *testing.T) {
 						Cmdline:   "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
 					}),
 					withHash(&target{
-						Protocol:  "TCP6",
-						IPAddress: "::1",
-						Port:      "8125",
-						Address:   "[::1]:8125",
-						Comm:      "netdata",
-						Cmdline:   "/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
-					}),
-					withHash(&target{
 						Protocol:  "TCP",
 						IPAddress: "127.0.0.1",
 						Port:      "8125",
