@@ -3,6 +3,7 @@
 
 #include "rrdengine.h"
 #include "pdc.h"
+#include "dbengine-compression.h"
 
 rrdeng_stats_t global_io_errors = 0;
 rrdeng_stats_t global_fs_errors = 0;
@@ -772,13 +773,10 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
  */
 static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_data *base, struct completion *completion) {
     int ret;
-    int compressed_size, max_compressed_size = 0;
     unsigned i, count, size_bytes, pos, real_io_size;
-    uint32_t uncompressed_payload_length, payload_offset;
+    uint32_t uncompressed_payload_length, max_compressed_size, payload_offset;
     struct page_descr_with_data *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
-    struct extent_buffer *eb = NULL;
-    void *compressed_buf = NULL;
     Word_t Index;
     uint8_t compression_algorithm = ctx->config.global_compress_alg;
     struct rrdengine_datafile *datafile;
@@ -807,20 +805,8 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     xt_io_descr = extent_io_descriptor_get();
     xt_io_descr->ctx = ctx;
     payload_offset = sizeof(*header) + count * sizeof(header->descr[0]);
-    switch (compression_algorithm) {
-        case RRDENG_COMPRESSION_NONE:
-            size_bytes = payload_offset + uncompressed_payload_length + sizeof(*trailer);
-            break;
-
-        default: /* Compress */
-            fatal_assert(uncompressed_payload_length < LZ4_MAX_INPUT_SIZE);
-            max_compressed_size = LZ4_compressBound(uncompressed_payload_length);
-            eb = extent_buffer_get(max_compressed_size);
-            compressed_buf = eb->data;
-            size_bytes = payload_offset + MAX(uncompressed_payload_length, (unsigned)max_compressed_size) + sizeof(*trailer);
-            break;
-    }
-
+    max_compressed_size = dbengine_max_compressed_size(uncompressed_payload_length, compression_algorithm);
+    size_bytes = payload_offset + MAX(uncompressed_payload_length, max_compressed_size) + sizeof(*trailer);
     ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
     if (unlikely(ret)) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
@@ -832,7 +818,6 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
 
     pos = 0;
     header = xt_io_descr->buf;
-    header->compression_algorithm = compression_algorithm;
     header->number_of_pages = count;
     pos += sizeof(*header);
 
@@ -858,29 +843,40 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
 
         pos += sizeof(header->descr[i]);
     }
+
+    // build the extent payload
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
         pgd_copy_to_extent(descr->pgd, xt_io_descr->buf + pos, descr->page_length);
         pos += descr->page_length;
     }
 
-    if(likely(compression_algorithm == RRDENG_COMPRESSION_LZ4)) {
-        compressed_size = LZ4_compress_default(
-                xt_io_descr->buf + payload_offset,
-                compressed_buf,
-                (int)uncompressed_payload_length,
-                max_compressed_size);
+    // compress the payload
+    size_t compressed_size =
+        (int)dbengine_compress(xt_io_descr->buf + payload_offset,
+                               uncompressed_payload_length,
+                               compression_algorithm);
 
-        __atomic_add_fetch(&ctx->stats.before_compress_bytes, uncompressed_payload_length, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&ctx->stats.after_compress_bytes, compressed_size, __ATOMIC_RELAXED);
+    internal_fatal(compressed_size > max_compressed_size, "DBENGINE: compression returned more data than the max allowed");
+    internal_fatal(compressed_size > uncompressed_payload_length, "DBENGINE: compression returned more data than the uncompressed extent");
 
-        (void) memcpy(xt_io_descr->buf + payload_offset, compressed_buf, compressed_size);
-        extent_buffer_release(eb);
-        size_bytes = payload_offset + compressed_size + sizeof(*trailer);
+    if(compressed_size) {
+        header->compression_algorithm = compression_algorithm;
         header->payload_length = compressed_size;
     }
-    else { // RRD_NO_COMPRESSION
-        header->payload_length = uncompressed_payload_length;
+    else {
+       // compression failed, or generated bigger pages
+       // so it didn't touch our uncompressed buffer
+       header->compression_algorithm = RRDENG_COMPRESSION_NONE;
+       header->payload_length = compressed_size = uncompressed_payload_length;
+    }
+
+    // set the correct size
+    size_bytes = payload_offset + compressed_size + sizeof(*trailer);
+
+    if(compression_algorithm != RRDENG_COMPRESSION_NONE) {
+        __atomic_add_fetch(&ctx->stats.before_compress_bytes, uncompressed_payload_length, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->stats.after_compress_bytes, compressed_size, __ATOMIC_RELAXED);
     }
 
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);

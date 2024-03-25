@@ -2,6 +2,7 @@
 
 #include "database/engine/rrddiskprotocol.h"
 #include "rrdengine.h"
+#include "dbengine-compression.h"
 
 /* Default global database instance */
 struct rrdengine_instance multidb_ctx_storage_tier0;
@@ -1170,7 +1171,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
 
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tier_page_type[tier];
-    ctx->config.global_compress_alg = RRDENG_COMPRESSION_LZ4;
+    ctx->config.global_compress_alg = dbengine_default_compression();
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
     ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
