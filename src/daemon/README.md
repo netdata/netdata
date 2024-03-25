@@ -110,7 +110,6 @@ The command line options of the Netdata 1.10.0 version are the following:
  Signals netdata handles:
 
   - HUP                    Close and reopen log files.
-  - USR1                   Save internal DB to disk.
   - USR2                   Reload health configuration.
 ```
 

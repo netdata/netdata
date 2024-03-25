@@ -820,7 +820,6 @@ int help(int exitcode) {
 
     fprintf(stream, "\n Signals netdata handles:\n\n"
             "  - HUP                    Close and reopen log files.\n"
-            "  - USR1                   Save internal DB to disk.\n"
             "  - USR2                   Reload health configuration.\n"
             "\n"
     );
