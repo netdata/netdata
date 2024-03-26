@@ -57,6 +57,8 @@ Netdata monitors all the following:
 
 When Netdata runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
 
+Netdata provides full **enterprise hardware** coverage, monitoring all components that provide hardware error reporting, like PCI AER, RAM EDAC, IPMI, etc.
+
 <small> * Netdata runs on Linux, FreeBSD and macOS. For Windows we rely on Windows Exporter (so a Netdata running on Linux, FreeBSD or macOS is required, next to the monitored Windows servers).</small>
 
 **KEY CHARACTERISTICS**:<br/>
