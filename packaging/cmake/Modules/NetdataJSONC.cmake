@@ -20,6 +20,10 @@ function(netdata_bundle_jsonc)
 
         set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
+        # JSON-C supports older versions of CMake than we do, so set
+        # the correct values for the few policies we actually need.
+        set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
         # JSON-C's build system does string comparisons against option
         # values instead of treating them as booleans, so we need to use
         # proper strings for option values instead of just setting them
