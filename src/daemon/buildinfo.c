@@ -534,7 +534,7 @@ static struct {
                 .category = BIC_DATABASE,
                 .type = BIT_BOOLEAN,
                 .analytics = "dbengine",
-                .print = "dbengine",
+                .print = "dbengine (compression)",
                 .json = "dbengine",
                 .value = NULL,
         },
@@ -1098,6 +1098,12 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
 #ifdef ENABLE_DBENGINE
     build_info_set_status(BIB_DB_DBENGINE, true);
+#ifdef ENABLE_ZSTD
+    build_info_append_value(BIB_DB_DBENGINE, "zstd");
+#endif
+#ifdef ENABLE_LZ4
+    build_info_append_value(BIB_DB_DBENGINE, "lz4");
+#endif
 #endif
     build_info_set_status(BIB_DB_ALLOC, true);
     build_info_set_status(BIB_DB_RAM, true);

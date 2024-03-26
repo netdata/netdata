@@ -1,3 +1,4 @@
+
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
@@ -35,13 +36,38 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 
 It scales nicely from just a single server to thousands of servers, even in complex multi/mixed/hybrid cloud environments, and given enough disk space it can keep your metrics for years.
 
-**KEY FEATURES**:<br/>
+**WHAT CAN BE MONITORED WITH NETDATA**:<br/>
 
-- :boom: **Collects metrics from 800+ integrations**<br/>
+Netdata monitors all the following:
+|Component|Linux|FreeBSD|macOS|Windows*|
+|---:|:---:|:---:|:---:|:---:|
+|**System Resources**<small><br/>CPU, Memory and system shared resources</small>|Full|Yes|Yes|Yes|
+|**Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small>|Full|Basic|Basic|Basic|
+|**Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small>|Full|Basic|Basic|Basic|
+|**Hardware & Sensors**|Full|Some|Some|Some|
+|**O/S Services**<small><br/>Resources, Performance and Status</small>|Yes<small><br/>`systemd`-only</small>|-|-|-|
+|**Logs**|Yes<small><br/>`systemd`-journal|-|-|-|
+|**Processes**<small><br/>Resources, Performance, OOM, and more</small>|Yes|Yes|Yes|Yes|
+|**Network Connections**<small><br/>Live TCP and UDP sockets per PID</small>|Yes|-|-|-|
+|**Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small>|Yes|-|-|-|
+|**VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small>|Yes<small><br/>`cgroups`</small>|-|-|Yes<small><br/>`Hyper-V`</small>|
+|**Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small>|Yes|Yes|Yes|Yes|
+|**Packaged Applications**<small><br/>nginx, apache, prosgress, redis,<br/>and hundreds more</small>|Yes|Yes|Yes|Yes|
+|**Custom Applications**<small><br/>OpenMetrics, StatsD</small>|Yes|Yes|Yes|Yes|
+
+When Netdata runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
+
+Netdata provides full **enterprise hardware** coverage, monitoring all components that provide hardware error reporting, like PCI AER, RAM EDAC, IPMI, S.M.A.R.T., NVMe, Fans, Power, Voltages, and more.
+
+<small> * Netdata runs on Linux, FreeBSD and macOS. For Windows we rely on Windows Exporter (so a Netdata running on Linux, FreeBSD or macOS is required, next to the monitored Windows servers).</small>
+
+**KEY CHARACTERISTICS**:<br/>
+
+- :boom: **Collects data from 800+ integrations**<br/>
   Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
   
 - :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
-  All metrics are collected per second and are on the dashboard immediately after data collection.
+  All data are collected per second and are on the dashboard immediately after data collection.
 
 - :face_in_clouds: **Unsupervised Anomaly Detection**<br/>
   Trains multiple Machine-Learning (ML) models for each metric and uses AI to detect anomalies based on the past behavior of each metric.
@@ -51,9 +77,6 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
-
-- 📖 **systemd Journal Logs Explorer**<br/>
-  System and application logs of all servers are available in-real-time, for filtering and analysis, on both individual nodes and infrastructure-wide logs centralization servers.
 
 - :sunglasses: **Low Maintenance**<br/>
   Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
@@ -179,7 +202,8 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
 |                Okta SSO                 |        Faciliate the integration of Netdata into your organzations user management process.         |     soon      |                                               in progress                                                 |
 | Prometheus/OpenMetrics<br/>improvements |               Allow users to configure how metrics should be ingested and presented.                |     soon      |                                               in progress                                                 |
 |                Loki logs                |                     Another Logs integration, bring your Loki logs onto the UI!                     |     soon      |                                               in progress                                               |
-|         Dynamic Configurations          |                          Configure Alerts and Data Collectors from the UI!                          |     soon      | Beta release [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0#v1450-dynamic-configuration) - in progress |
+|               UCUM Units                |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon      |                                               in progress                                               |
+|         Dynamic Configurations          |                          Configure Alerts and Data Collectors from the UI!                          |     soon      | Beta release [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0#v1450-dynamic-configuration) - in progress |  
 |                 WebRTC                  |                             Browser to Agent communication via WebRTC.                              |     later     |                                               interrupted                                               |
 |        Advanced Troubleshooting         | Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor, and many more. |     later     |                                               interrupted                                               |
 |              Homelab plan               |                    Unlimited Netdata plan targetted for homelabbers or students.                    | Feb<br/>2024  | [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0#v1450-homelab-plan)                 |
