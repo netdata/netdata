@@ -184,6 +184,7 @@ func (a *Agent) run(ctx context.Context) {
 	jobMgr.PluginName = a.Name
 	jobMgr.Out = a.Out
 	jobMgr.Modules = enabledModules
+	jobMgr.ConfigDefaults = discCfg.Registry
 	jobMgr.FnReg = fnMgr
 
 	if reg := a.setupVnodeRegistry(); reg == nil || reg.Len() == 0 {
