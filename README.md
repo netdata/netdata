@@ -53,14 +53,14 @@ Netdata monitors all the following:
 |                       **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |                  Yes                  |    -    |   -   |                -                 |
 |                         **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> |   Yes<small><br/>`cgroups`</small>    |    -    |   -   | Yes<small><br/>`Hyper-V`</small> |
 |               **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
-| **Packaged Applications**<small><br/>nginx, apache, prosgress, redis,<br/>and hundreds more</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
+|  **Packaged Applications**<small><br/>nginx, apache, postgres, redis,<br/>and hundreds more</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
 |                                      **Custom Applications**<small><br/>OpenMetrics, StatsD</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
 
 When Netdata runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
 
 Netdata provides full **enterprise hardware** coverage, monitoring all components that provide hardware error reporting, like PCI AER, RAM EDAC, IPMI, S.M.A.R.T., NVMe, Fans, Power, Voltages, and more.
 
-<small> * Netdata runs on Linux, FreeBSD and macOS. For Windows we rely on Windows Exporter (so a Netdata running on Linux, FreeBSD or macOS is required, next to the monitored Windows servers).</small>
+<small> * Netdata runs on Linux, FreeBSD and macOS. For Windows, we rely on Windows Exporter (so a Netdata running on Linux, FreeBSD or macOS is required, next to the monitored Windows servers).</small>
 
 **KEY CHARACTERISTICS**:<br/>
 
@@ -126,7 +126,7 @@ Dec 11, 2023: [University of Amsterdam published a study](https://twitter.com/IM
 - 🚀 Netdata excels in energy efficiency: **"... Netdata being the most energy-efficient tool ..."**, as the study says.
 - 🚀 Netdata excels in CPU Usage, RAM Usage and Execution Time, and has a similar impact in Network Traffic as Prometheus.
 
-The study did not normalize the results based on the number of metrics collected. Given that Netdata usually collects singificantly more metrics than the other tools, Netdata managed to outperform the other tools, while ingesting a much higher number of metrics. [Read the full study here](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf).
+The study did not normalize the results based on the number of metrics collected. Given that Netdata usually collects significantly more metrics than the other tools, Netdata managed to outperform the other tools, while ingesting a much higher number of metrics. [Read the full study here](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf).
 
 ---
 
@@ -197,17 +197,17 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
 |:---------------------------------------:|:---------------------------------------------------------------------------------------------------:|:-------------:|:-----------------------------------------------------------------------------------------------------------------------:|
 |      **Netdata Cloud<br/>On-Prem**      |                        **Netdata Cloud available for On-Prem installation!**                        | **available** |                         [fill this form](https://www.netdata.cloud/contact-us/?subject=on-prem)                         |
 |          State manager monitor          |            Centralized and immediate visibility to the state of your apps and services.             |     soon      |                                                         planned                                                         |
-|          More Customizability           |                           Set default settings for all charts and views!                            |     soon      |                                                       in progress                                                       |
-|          AWS Integratd billing          |       Run Netdata our your AWS instances and get your billing integrated on your AWS account.       |     soon      |                                                       in progress                                                       |
+|            More Customizable            |                           Set default settings for all charts and views!                            |     soon      |                                                       in progress                                                       |
+|         AWS Integrated billing          |       Run Netdata our your AWS instances and get your billing integrated on your AWS account.       |     soon      |                                                       in progress                                                       |
 |        Alert Silence Manager R2         |           Improvements to the Alert Silencing Manager with recurring schedules and more!            |     soon      |                                                       in progress                                                       |
-|                Okta SSO                 |        Faciliate the integration of Netdata into your organzations user management process.         |     soon      |                                                       in progress                                                       |
+|                Okta SSO                 |        Facilitate the integration of Netdata into your organizations user management process.        |     soon      |                                                       in progress                                                       |
 | Prometheus/OpenMetrics<br/>improvements |               Allow users to configure how metrics should be ingested and presented.                |     soon      |                                                       in progress                                                       |
 |                Loki logs                |                     Another Logs integration, bring your Loki logs onto the UI!                     |     soon      |                                                       in progress                                                       |
 |               UCUM Units                |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon      |                                                       in progress                                                       |
 |         Dynamic Configurations          |                          Configure Alerts and Data Collectors from the UI!                          |     soon      | Beta release [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0#v1450-dynamic-configuration) - in progress |  
 |                 WebRTC                  |                             Browser to Agent communication via WebRTC.                              |     later     |                                                       interrupted                                                       |
 |        Advanced Troubleshooting         | Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor, and many more. |     later     |                                                       interrupted                                                       |
-|              Homelab plan               |                    Unlimited Netdata plan targetted for homelabbers or students.                    | Feb<br/>2024  |                   [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0#v1450-homelab-plan)                   |
+|              Homelab plan               |                    Unlimited Netdata plan targeted for homelabbers or students.                     | Feb<br/>2024  |                   [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0#v1450-homelab-plan)                   |
 |       Easy Custom<br/>Dashboards        |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         | Feb<br/>2024  |                [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0#v1450-custom-dashboards)                 |
 |  Netdata Notifications<br/>Mobile App   |    You can  receive and manage alert and reachability notifications from your subscribed spaces.    | Jan<br/>2024  |                    [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0#v1450-mobile-app)                    |
 |            `systemd` journal            |                  View the `systemd` journal logs of your systems on the dashboard.                  | Oct<br/>2023  |                            [v1.43](https://github.com/netdata/netdata/releases/tag/v1.43.0)                             |
@@ -391,10 +391,10 @@ The core of Netdata is developed in C. We have our own `libnetdata`, that provid
   A high-performance algorithm to maintain both indexed and ordered pools of structures Netdata needs. It uses JudyHS arrays for indexing, although it is modular: any hashtable or tree can be integrated into it. Despite being in C, dictionaries follow object-oriented programming principles, so there are constructors, destructors, automatic memory management, garbage collection, and more. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/dictionary).
   
 - **`ARAL`**<br/>
-  ARray ALlocator (ARAL) is used to minimize the system allocations made by Netdata. ARAL is optimized for peak performance when multi-threaded. It also allows all structures that use it to be allocated in memory-mapped files (shared memory) instead of RAM. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/aral).
+  ARray ALlocator (ARAL) is used to minimize the system allocations made by Netdata. ARAL is optimized for maximum multi-threaded performance. It also allows all structures that use it to be allocated in memory-mapped files (shared memory) instead of RAM. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/aral).
 
 - **`PROCFILE`**<br/>
-  A high-performance `/proc` (but also any) file parser and text tokenizer. It achieves its performance by keeping files open and adjustings its buffers to read the entire file in one call (which is also required by the Linux kernel). For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/procfile).
+  A high-performance `/proc` (but also any) file parser and text tokenizer. It achieves its performance by keeping files open and adjusting its buffers to read the entire file in one call (which is also required by the Linux kernel). For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/procfile).
 
 - **`STRING`**<br/>
   A string internet mechanism, for string deduplication and indexing (using JudyHS arrays), optimized for multi-threaded usage. For more see [here](https://github.com/netdata/netdata/tree/master/src/libnetdata/string).
@@ -530,7 +530,7 @@ Using the above, the Netdata Agent on your production system will not use a disk
 
 Netdata is a "ready to use" monitoring solution. Prometheus and Grafana are tools to build your own monitoring solution.
 
-Netdata is also a lot faster, requires singificantly less resources and puts almost no stress on the server it runs. For a performance comparison check [this blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
+Netdata is also a lot faster, requires significantly less resources and puts almost no stress on the server it runs. For a performance comparison check [this blog](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/).
 
 <details><summary>Click to see detailed answer ...</summary>
 &nbsp;<br/>&nbsp;<br/>
@@ -547,7 +547,7 @@ So, the biggest difference of Netdata to Prometheus, and Grafana, is that we dec
 
     Maintaining such an index is a challenge: first, because the raw metrics collected do not provide this information, so we have to add it, and second because we need to maintain this index for the lifetime of each metric, which with our current database retention, it is usually more than a year.
 
-    At the same time, Netdata provides better retention than Prometheus due to database tiering, scales easier than Prometheus due to streaming, supports anomaly detection and it has a mertrics scoring engine to find the needle in the haystack when needed.
+    At the same time, Netdata provides better retention than Prometheus due to database tiering, scales easier than Prometheus due to streaming, supports anomaly detection and it has a metrics scoring engine to find the needle in the haystack when needed.
 
   - When compared to Grafana, Netdata is fully automated. Grafana has more customization capabilities than Netdata, but Netdata presents fully functional dashboards by itself and most importantly it gives you the means to understand, analyze, filter, slice and dice the data without the need for you to edit queries or be aware of any peculiarities the underlying metrics may have.
 
@@ -654,7 +654,7 @@ The Netdata Agent dashboard and the Netdata Cloud dashboard are the same. Still,
 
   1. Access your infrastructure from anywhere.
   2. Have SSO to protect sensitive features. 
-  3. Customizability (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
+  3. Customizable (custom dashboards and other settings are persisted when you are signed in to Netdata Cloud)
   4. Configuration of Alerts and Data Collection from the UI (coming soon)
   5. Security (role-based access control - RBAC).
   6. Horizontal Scalability ("blend" multiple independent parents in one uniform infrastructure)
@@ -783,7 +783,7 @@ Our Open-Source Community and the free access to Netdata Cloud, contribute to Ne
 
 We don't monetize, directly or indirectly, users' or "device heuristics" data. Any data collected from community members are exclusively used for the purposes stated above.
 
-Netdata grows financially when tehnnology intensive organizations and operators, need - due to regulatory or business requirements - the entire Netdata suite (including Netdata Cloud) on-prem or private, bundled with top-tier support. It is a win-win case for all parties involved: these companies get a battle tested, robust and reliable solution, while the broader community that helps us build this product, enjoys it at no cost.
+Netdata grows financially when technology intensive organizations and operators, need - due to regulatory or business requirements - the entire Netdata suite (including Netdata Cloud) on-prem or private, bundled with top-tier support. It is a win-win case for all parties involved: these companies get a battle tested, robust and reliable solution, while the broader community that helps us build this product, enjoys it at no cost.
 
 &nbsp;<br/>&nbsp;<br/>
 </details>
