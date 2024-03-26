@@ -48,7 +48,7 @@ Netdata monitors all the following:
 |**O/S Services**<small><br/>Resources, Performance and Status</small>|Yes<small><br/>`systemd`-only</small>|-|-|-|
 |**Logs**|Yes<small><br/>`systemd`-journal|-|-|-|
 |**Processes**<small><br/>Resources, Performance, OOM, and more</small>|Yes|Yes|Yes|Yes|
-|**Network Connections**<small><br/>TCP and UDP sockets per PID</small>|Yes|-|-|-|
+|**Network Connections**<small><br/>Live TCP and UDP sockets per PID</small>|Yes|-|-|-|
 |**Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small>|Yes|-|-|-|
 |**VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small>|Yes<small><br/>`cgroups`</small>|-|-|Yes<small><br/>`Hyper-V`</small>|
 |**Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small>|Yes|Yes|Yes|Yes|
