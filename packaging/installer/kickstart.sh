@@ -534,11 +534,15 @@ run_script() {
   # shellcheck disable=SC2086
   run ${ROOTCMD} "${@}"
 
+  ret="$?"
+
   if [ -r "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
     # shellcheck disable=SC1090
     . "${NETDATA_SCRIPT_STATUS_PATH}"
     rm -f "${NETDATA_SCRIPT_STATUS_PATH}"
   fi
+
+  return "${ret}"
 }
 
 warning() {
