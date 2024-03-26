@@ -36,7 +36,7 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 
 It scales nicely from just a single server to thousands of servers, even in complex multi/mixed/hybrid cloud environments, and given enough disk space it can keep your metrics for years.
 
-**WHAT CAN BE MONITORED WITH IT**:<br/>
+**WHAT CAN BE MONITORED WITH NETDATA**:<br/>
 
 Netdata monitors all the following:
 |Component|Linux|FreeBSD|macOS|Windows*|
