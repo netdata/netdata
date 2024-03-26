@@ -155,7 +155,6 @@ include:
   - <<: *debian
     version: "11"
     base_image: debian:bullseye
-    bundle_sentry: true
     packages:
       <<: *debian_packages
       repo_distro: debian/bullseye
@@ -164,7 +163,6 @@ include:
   - <<: *debian
     version: "10"
     base_image: debian:buster
-    bundle_sentry: true
     packages:
       <<: *debian_packages
       repo_distro: debian/buster
