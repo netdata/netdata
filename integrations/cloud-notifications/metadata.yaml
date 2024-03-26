@@ -101,7 +101,7 @@
 
       1. Create a service to receive events from your services directory page on PagerDuty
       2. At step 3, select `Events API V2` Integration or **View Webhooks** if you already have some defined
-      3. Once the service is created you will be redirected to its configuration page, where you can copy the **integration key**, that you will need need to add to your notification configuration on Netdata UI.
+      3. Once the service is created, you will be redirected to its configuration page, where you can copy the **Integration Key** and **Integration URL (Alert Events)** fields to add them to your notification configuration in the Netdata UI.
 
       ### Netdata Configuration Steps
 
@@ -116,6 +116,7 @@
           - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
         * **Integration configuration** are the specific notification integration required settings, which vary by notification method. For PagerDuty:
           - Integration Key - is a 32 character key provided by PagerDuty to receive events on your service.
+          - Integration URL (Alert Events) - is the URL provided by PagerDuty where we will send notifications.
 
 - id: 'notify-cloud-slack'
   meta:
