@@ -50,9 +50,9 @@ Netdata monitors all the following:
 |**Processes**<small><br/>Resources, Performance, OOM, and more</small>|Yes|Yes|Yes|Yes|
 |**Network Connections**<small><br/>TCP and UDP sockets per PID</small>|Yes|-|-|-|
 |**Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small>|Yes|-|-|-|
-|**VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small>|Yes<small><br/>`cgroups`</small>|-|-|Some<small><br/>`Hyper-V`</small>|
+|**VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small>|Yes<small><br/>`cgroups`</small>|-|-|Yes<small><br/>`Hyper-V`</small>|
 |**Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small>|Yes|Yes|Yes|Yes|
-|**Packaged Applications**<small><br/>nginx, apache, prosgress, redis, and hundreds more</small>|Yes|Yes|Yes|Yes|
+|**Packaged Applications**<small><br/>nginx, apache, prosgress, redis,<br/>and hundreds more</small>|Yes|Yes|Yes|Yes|
 |**Custom Applications**<small><br/>OpenMetrics, StatsD</small>|Yes|Yes|Yes|Yes|
 
 When Netdata runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
