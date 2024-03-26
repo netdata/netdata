@@ -17,9 +17,13 @@ extern int default_rrdeng_extent_cache_mb;
 extern int db_engine_journal_check;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
+extern bool new_dbengine_defaults;
+extern RRD_BACKFILL default_backfill;
+
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];
 extern size_t tier_page_size[];
+extern size_t tier_quota_mb[];
 extern uint8_t tier_page_type[];
 
 #define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
@@ -54,8 +58,12 @@ time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *s
 void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
 /* must call once before using anything */
-int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
-                       unsigned disk_space_mb, size_t tier);
+int rrdeng_init(
+    struct rrdengine_instance **ctxp,
+    const char *dbfiles_path,
+    unsigned disk_space_mb,
+    size_t tier,
+    time_t max_retention_s);
 
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
 void rrdeng_exit_mode(struct rrdengine_instance *ctx);

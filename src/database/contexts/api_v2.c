@@ -1124,6 +1124,19 @@ void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings
 
 void build_info_to_json_object(BUFFER *b);
 
+static void convert_seconds_to_dhms(time_t seconds, char *result, int result_size) {
+    int days, hours, minutes;
+
+    days = (int) seconds / (24 * 3600);
+    seconds = (int) seconds % (24 * 3600);
+    hours = (int) seconds / 3600;
+    seconds %= 3600;
+    minutes = (int) seconds / 60;
+
+    // Format the result into the provided string buffer
+    snprintfz(result, result_size, "%d days, %d hours, %d minutes", days, hours, minutes);
+}
+
 void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array) {
     if(!now_s)
         now_s = now_realtime_sec();
@@ -1151,10 +1164,12 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
         buffer_json_cloud_status(wb, now_s);
 
         buffer_json_member_add_array(wb, "db_size");
+        size_t group_seconds = localhost->rrd_update_every;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             STORAGE_ENGINE *eng = localhost->db[tier].eng;
             if (!eng) continue;
 
+            group_seconds *= storage_tiers_grouping_iterations[tier];
             uint64_t max = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
             uint64_t used = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
             time_t first_time_s = storage_engine_global_first_time_s(eng->seb, localhost->db[tier].si);
@@ -1168,6 +1183,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier);
+            buffer_json_member_add_uint64(wb, "point_every", group_seconds);
             buffer_json_member_add_uint64(wb, "metrics", storage_engine_metrics(eng->seb, localhost->db[tier].si));
             buffer_json_member_add_uint64(wb, "samples", storage_engine_samples(eng->seb, localhost->db[tier].si));
 
@@ -1178,13 +1194,23 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             }
 
             if(first_time_s) {
+                char human_retention[128];
+                time_t retention = now_s - first_time_s;
+
                 buffer_json_member_add_time_t(wb, "from", first_time_s);
                 buffer_json_member_add_time_t(wb, "to", now_s);
-                buffer_json_member_add_time_t(wb, "retention", now_s - first_time_s);
+                buffer_json_member_add_time_t(wb, "retention", retention);
 
-                if(used || max) // we have disk space information
-                    buffer_json_member_add_time_t(wb, "expected_retention",
-                                                  (time_t) ((NETDATA_DOUBLE) (now_s - first_time_s) * 100.0 / percent));
+                convert_seconds_to_dhms(retention, human_retention, sizeof(human_retention) - 1);
+                buffer_json_member_add_string(wb, "retention_human", human_retention);
+
+                if(used || max) { // we have disk space information
+                    retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
+
+                    convert_seconds_to_dhms(retention, human_retention, sizeof(human_retention) - 1);
+                    buffer_json_member_add_time_t(wb, "expected_retention", retention);
+                    buffer_json_member_add_string(wb, "expected_retention_human", human_retention);
+                }
             }
 
             if(currently_collected_metrics)

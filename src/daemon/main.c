@@ -1043,6 +1043,9 @@ static void backwards_compatible_config() {
     config_move(CONFIG_SECTION_GLOBAL,  "dbengine multihost disk space",
                 CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
 
+    config_move(CONFIG_SECTION_DB,      "dbengine multihost disk space MB",
+                CONFIG_SECTION_DB,      "dbengine tier 0 MB");
+
     config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
                 CONFIG_SECTION_DB,      "memory deduplication (ksm)");
 
@@ -1099,7 +1102,23 @@ static int get_hostname(char *buf, size_t buf_size) {
     return gethostname(buf, buf_size);
 }
 
-static void get_netdata_configured_variables() {
+static int get_valid_update_every(int update_every) {
+    int valid_update_every[] = {1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30};
+    int num_valid_values = sizeof(valid_update_every) / sizeof(valid_update_every[0]);
+    int best_match = -1;
+
+    for (int i = 0; i < num_valid_values; i++) {
+        if (valid_update_every[i] < update_every && valid_update_every[i] > best_match) {
+            best_match = valid_update_every[i];
+        }
+    }
+
+    return best_match;
+}
+
+
+static void get_netdata_configured_variables()
+{
     backwards_compatible_config();
 
     // ------------------------------------------------------------------------
@@ -1118,12 +1137,24 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default database update frequency
 
-    default_rrd_update_every = (int) config_get_number(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
-    if(default_rrd_update_every < 1 || default_rrd_update_every > 600) {
-        netdata_log_error("Invalid data collection frequency (update every) %d given. Defaulting to %d.", default_rrd_update_every, UPDATE_EVERY);
+    default_rrd_update_every = (int)config_get_number(CONFIG_SECTION_DB, "update every", UPDATE_EVERY);
+    bool update_section = false;
+    if (default_rrd_update_every < 1 || default_rrd_update_every >= 60) {
         default_rrd_update_every = UPDATE_EVERY;
-        config_set_number(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
+        update_section = true;
     }
+    else {
+        int remain = 60 % default_rrd_update_every;
+        if (remain) {
+            update_section = true;
+            int new_update_every = get_valid_update_every(default_rrd_update_every);
+            netdata_log_error("Invalid data collection frequency (update every) %d given. It must be a divisor of 60. Using %d instead",
+                default_rrd_update_every, new_update_every);
+            default_rrd_update_every = new_update_every;
+        }
+    }
+    if (update_section)
+        config_set_number(CONFIG_SECTION_DB, "update every", default_rrd_update_every);
 
     // ------------------------------------------------------------------------
     // get default memory mode for the database
@@ -1201,20 +1232,23 @@ static void get_netdata_configured_variables() {
 
     // ------------------------------------------------------------------------
     // get default Database Engine disk space quota in MiB
+//
+//    //    if (!config_exists(CONFIG_SECTION_DB, "dbengine disk space MB") && !config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB"))
+//
+//    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
+//    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+//        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+//        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+//        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
+//    }
+//
+//    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
+//    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+//        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
+//        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
+//        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
+//    }
 
-    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
-        config_set_number(CONFIG_SECTION_DB, "dbengine disk space MB", default_rrdeng_disk_quota_mb);
-    }
-
-    default_multidb_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", compute_multidb_diskspace());
-    if(default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid multidb disk space %d given. Defaulting to %d.", default_multidb_disk_quota_mb, default_rrdeng_disk_quota_mb);
-        default_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
-        config_set_number(CONFIG_SECTION_DB, "dbengine multihost disk space MB", default_multidb_disk_quota_mb);
-    }
 #else
     if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
        error_report("RRD_MEMORY_MODE_DBENGINE is not supported in this platform. The agent will use db mode 'save' instead.");
