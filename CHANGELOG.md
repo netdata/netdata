@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- go.d: sd local-listeners: discover /proc/net/tcp6 only apps [\#17252](https://github.com/netdata/netdata/pull/17252) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/docker/docker from 25.0.5+incompatible to 26.0.0+incompatible in /src/go/collectors/go.d.plugin [\#17248](https://github.com/netdata/netdata/pull/17248) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/prometheus/common from 0.50.0 to 0.51.1 in /src/go/collectors/go.d.plugin [\#17247](https://github.com/netdata/netdata/pull/17247) ([dependabot[bot]](https://github.com/apps/dependabot))
+- DBENGINE: support ZSTD compression [\#17244](https://github.com/netdata/netdata/pull/17244) ([ktsaou](https://github.com/ktsaou))
 - Fix MRG Metric refcount issue [\#17239](https://github.com/netdata/netdata/pull/17239) ([ktsaou](https://github.com/ktsaou))
 - Code cleanup [\#17237](https://github.com/netdata/netdata/pull/17237) ([ktsaou](https://github.com/ktsaou))
 - DBENGINE: use gorilla by default [\#17234](https://github.com/netdata/netdata/pull/17234) ([ktsaou](https://github.com/ktsaou))
@@ -394,9 +398,6 @@
 - eBPF cgroup update [\#16630](https://github.com/netdata/netdata/pull/16630) ([thiagoftsm](https://github.com/thiagoftsm))
 - Correctly handle basic permissions for most scripts on install. [\#16629](https://github.com/netdata/netdata/pull/16629) ([Ferroin](https://github.com/Ferroin))
 - Fix UB of unaligned loads/stores and signed shifts. [\#16628](https://github.com/netdata/netdata/pull/16628) ([vkalintiris](https://github.com/vkalintiris))
-- cgroups: filter lxcfs.service/.control [\#16620](https://github.com/netdata/netdata/pull/16620) ([ilyam8](https://github.com/ilyam8))
-- Fix coverity issues, logically dead code and error checking [\#16618](https://github.com/netdata/netdata/pull/16618) ([stelfrag](https://github.com/stelfrag))
-- Added energy efficiency img README.md [\#16617](https://github.com/netdata/netdata/pull/16617) ([Aliki92](https://github.com/Aliki92))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
