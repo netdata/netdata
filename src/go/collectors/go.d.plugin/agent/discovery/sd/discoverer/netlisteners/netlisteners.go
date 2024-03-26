@@ -213,6 +213,10 @@ func (d *Discoverer) parseLocalListeners(bs []byte) ([]model.Target, error) {
 			Cmdline:   parts[3],
 		}
 
+		if tgt.Comm == "docker-proxy" {
+			continue
+		}
+
 		if tgt.IPAddress == "0.0.0.0" || strings.HasPrefix(tgt.IPAddress, "127") {
 			tgt.IPAddress = local4
 		} else if tgt.IPAddress == "::" {
