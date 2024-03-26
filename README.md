@@ -39,22 +39,21 @@ It scales nicely from just a single server to thousands of servers, even in comp
 **WHAT CAN BE MONITORED WITH IT**:<br/>
 
 Netdata monitors all the following:
-
 |Component|Linux|FreeBSD|macOS|Windows*|
 |---:|:---:|:---:|:---:|:---:|
-|System Resources<small><br/>CPU, Memory, shared resources</small>|Full|Yes|Yes|Yes|
-|Storage<small><br/>Disks, Mounts, Filesystems, RAID</small>|Full|Basic|Basic|Basic|
-|Network<small><br/>Interfaces, Protocols, Firewall, etc</small>|Full|Basic|Basic|Basic|
-|Hardware & Sensors|Full|Some|Some|Some|
-|O/S Services|Yes<small><br/>`systemd`-only</small>|-|-|-|
-|Logs|Yes<small><br/>`systemd`-journal|-|-|-|
-|Processes|Yes|Yes|Yes|Yes|
-|Network Connections<small><br/>TCP and UDP sockets per PID</small>|Yes|-|-|-|
-|Containers<small><br/>Docker, LXC, Kubernetes, etc</small>|Yes|-|-|-|
-|VMs (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small>|Yes<small><br/>`cgroups`</small>|-|-|Some<small><br/>`Hyper-V`</small>|
-|Synthetic Checks<small><br/>Test APIs, TCP ports, Ping, etc</small>|Yes|Yes|Yes|Yes|
-|Packaged Applications<small><br/>nginx, apache, prosgress, redis,<br/>and hundreds more</small>|Yes|Yes|Yes|Yes|
-|Custom Applications<small><br/>OpenMetrics, StatsD</small>|Yes|Yes|Yes|Yes|
+|**System Resources**<small><br/>CPU, Memory and system shared resources</small>|Full|Yes|Yes|Yes|
+|**Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small>|Full|Basic|Basic|Basic|
+|**Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small>|Full|Basic|Basic|Basic|
+|**Hardware & Sensors**|Full|Some|Some|Some|
+|**O/S Services**<small><br/>Resources, Performance and Status</small>|Yes<small><br/>`systemd`-only</small>|-|-|-|
+|**Logs**|Yes<small><br/>`systemd`-journal|-|-|-|
+|**Processes**<small><br/>Resources, Performance, OOM, and more</small>|Yes|Yes|Yes|Yes|
+|**Network Connections**<small><br/>TCP and UDP sockets per PID</small>|Yes|-|-|-|
+|**Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small>|Yes|-|-|-|
+|**VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small>|Yes<small><br/>`cgroups`</small>|-|-|Some<small><br/>`Hyper-V`</small>|
+|**Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small>|Yes|Yes|Yes|Yes|
+|**Packaged Applications**<small><br/>nginx, apache, prosgress, redis, and hundreds more</small>|Yes|Yes|Yes|Yes|
+|**Custom Applications**<small><br/>OpenMetrics, StatsD</small>|Yes|Yes|Yes|Yes|
 
 When Netdata runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
 
