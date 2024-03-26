@@ -1,0 +1,11 @@
+# dinit service description for Netdata
+#
+# Currently only properly tested on Chimera Linux.
+
+type = bgprocess
+command = @sbindir_POST@/netdata -P @localstatedir_POST@/run/netdata.pid -D
+pid-file = @localstatedir_POST@/run/netdata.pid
+options = signal-process-only
+load-options = export-passwd-vars
+depends-on = early-fs-local.target
+after = network.target
