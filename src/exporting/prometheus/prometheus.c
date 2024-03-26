@@ -360,6 +360,7 @@ struct host_variables_callback_options {
     time_t now;
     int host_header_printed;
     char name[PROMETHEUS_VARIABLE_MAX + 1];
+    SIMPLE_PATTERN *pattern;
 };
 
 /**
@@ -594,6 +595,7 @@ static void prometheus_print_os_info(
 
     fclose(fp);
 }
+
 /**
  * Write metrics in Prometheus format to a buffer.
  *
@@ -650,23 +652,30 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     if (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS)
         prometheus_print_os_info(wb, host, output_options);
 
+    struct host_variables_callback_options opts = {
+        .host = host,
+        .wb = wb,
+        .labels = (labels[0] == ',') ? &labels[1] : labels,
+        .exporting_options = exporting_options,
+        .output_options = output_options,
+        .prefix = prefix,
+        .now = now_realtime_sec(),
+        .host_header_printed = 0,
+        .pattern = filter
+    };
+
     // send custom variables set for the host
     if (output_options & PROMETHEUS_OUTPUT_VARIABLES) {
-
-        struct host_variables_callback_options opts = {
-            .host = host,
-            .wb = wb,
-            .labels = (labels[0] == ',') ? &labels[1] : labels,
-            .exporting_options = exporting_options,
-            .output_options = output_options,
-            .prefix = prefix,
-            .now = now_realtime_sec(),
-            .host_header_printed = 0
-        };
-
         rrdvar_walkthrough_read(host->rrdvars, print_host_variables_callback, &opts);
     }
 
+    // for each context
+    if (!host->rrdctx.contexts) {
+        netdata_log_error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
+        goto allmetrics_cleanup;
+    }
+
+    /*
     // for each chart
     RRDSET *st;
 
@@ -847,6 +856,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     rrdset_foreach_done(st);
 
     buffer_free(plabels_buffer);
+     */
+allmetrics_cleanup:
     simple_pattern_free(filter);
 }
 
