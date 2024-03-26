@@ -1,3 +1,4 @@
+
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
@@ -35,7 +36,31 @@ Netdata collects metrics per second and presents them in beautiful low-latency d
 
 It scales nicely from just a single server to thousands of servers, even in complex multi/mixed/hybrid cloud environments, and given enough disk space it can keep your metrics for years.
 
-**KEY FEATURES**:<br/>
+**WHAT CAN BE MONITORED WITH IT**:<br/>
+
+Netdata monitors all the following:
+
+|Component|Linux|FreeBSD|macOS|Windows*|
+|---:|:---:|:---:|:---:|:---:|
+|System Resources<small><br/>CPU, Memory, shared resources</small>|Full|Yes|Yes|Yes|
+|Storage<small><br/>Disks, Mounts, Filesystems, RAID</small>|Full|Basic|Basic|Basic|
+|Network<small><br/>Interfaces, Protocols, Firewall, etc</small>|Full|Basic|Basic|Basic|
+|Hardware & Sensors|Full|Some|Some|Some|
+|O/S Services|Yes<small><br/>`systemd`-only</small>|-|-|-|
+|Logs|Yes<small><br/>`systemd`-journal|-|-|-|
+|Processes|Yes|Yes|Yes|Yes|
+|Network Connections<small><br/>TCP and UDP sockets per PID</small>|Yes|-|-|-|
+|Containers<small><br/>Docker, LXC, Kubernetes, etc</small>|Yes|-|-|-|
+|VMs (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small>|Yes<small><br/>`cgroups`</small>|-|-|Some<small><br/>`Hyper-V`</small>|
+|Synthetic Checks<small><br/>Test APIs, TCP ports, Ping, etc</small>|Yes|Yes|Yes|Yes|
+|Packaged Applications<small><br/>nginx, apache, prosgress, redis,<br/>and hundreds more</small>|Yes|Yes|Yes|Yes|
+|Custom Applications<small><br/>OpenMetrics, StatsD</small>|Yes|Yes|Yes|Yes|
+
+When Netdata runs on Linux, it monitors every kernel feature available, providing full coverage of all kernel technologies that can be monitored.
+
+<small> * Netdata runs on Linux, FreeBSD and macOS. For Windows we rely on Windows Exporter (so a Netdata running on Linux, FreeBSD or macOS is required, next to the monitored Windows servers).</small>
+
+**KEY CHARACTERISTICS**:<br/>
 
 - :boom: **Collects metrics from 800+ integrations**<br/>
   Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
@@ -51,9 +76,6 @@ It scales nicely from just a single server to thousands of servers, even in comp
 
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
-
-- 📖 **systemd Journal Logs Explorer**<br/>
-  System and application logs of all servers are available in-real-time, for filtering and analysis, on both individual nodes and infrastructure-wide logs centralization servers.
 
 - :sunglasses: **Low Maintenance**<br/>
   Fully automated in every aspect: automated dashboards, out-of-the-box alerts, auto-detection and auto-discovery of metrics, zero-touch machine-learning, easy scalability and high availability, and CI/CD friendly.
@@ -179,13 +201,13 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
 |                Okta SSO                 |        Faciliate the integration of Netdata into your organzations user management process.         |     soon      |                                                 planned                                                 |
 | Prometheus/OpenMetrics<br/>improvements |               Allow users to configure how metrics should be ingested and presented.                |     soon      |                                                 planned                                                 |
 |                Loki logs                |                     Another Logs integration, bring your Loki logs onto the UI!                     |     soon      |                                               in progress                                               |
-|              Homelab plan               |                    Unlimited Netdata plan targetted for homelabbers or students.                    |     soon      |                                               in progress                                               |
-|       Easy Custom<br/>Dashboards        |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         |     soon      |                                               in progress                                               |
 |               UCUM Units                |                    Migrate all metrics to the Unified Code for Units of Measure.                    |     soon      |                                               in progress                                               |
-|            Click to Activate            |                          Configure Alerts and Data Collectors from the UI!                          |     soon      |                                               in progress                                               |
 |                 WebRTC                  |                             Browser to Agent communication via WebRTC.                              |     later     |                                               interrupted                                               |
 |        Advanced Troubleshooting         | Expanded view of dashboard charts integrating Metrics Correlations, Anomaly Advisor, and many more. |     later     |                                               interrupted                                               |
-|  Netdata Notifications<br/>Mobile App   |    You can  receive and manage alert and reachability notifications from your subscribed spaces.    | Jan<br/>2024  |                                                                                                         |
+|       Easy Custom<br/>Dashboards        |         Drag and drop charts to create custom dashboards on the fly, while troubleshooting!         |     soon      |                                               [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0)                                               |
+|            Dynamic Configuration            |                          Configure Alerts and Data Collectors from the UI!                          |     soon      |                                               [v1.45](https://github.com/netdata/netdata/releases/tag/v1.45.0)                                              |
+|              Homelab plan               |                    Unlimited Netdata plan targetted for homelabbers or students.                    |     soon      |                                               Released                                               |
+|  Netdata Notifications<br/>Mobile App   |    You can  receive and manage alert and reachability notifications from your subscribed spaces.    | Jan<br/>2024  |                      Released                                                                                   |
 |            `systemd` journal            |                  View the `systemd` journal logs of your systems on the dashboard.                  | Oct<br/>2023  |                    [v1.43](https://github.com/netdata/netdata/releases/tag/v1.43.0)                     |
 |              Integrations               |                                  Netdata Integrations Marketplace!                                  | Aug<br/>2023  |           [v1.42](https://github.com/netdata/netdata/releases#v1420-integrations-marketplace)           |
 |              New Agent UI               |                    Now Netdata Cloud and Netdata Agent share the same dashboard!                    | Jul<br/>2023  |          [v1.41](https://github.com/netdata/netdata/releases/tag/v1.41.0#v1410-one-dashboard)           |
