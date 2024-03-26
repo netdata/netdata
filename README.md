@@ -50,7 +50,7 @@ Netdata monitors all the following:
 |**Processes**<small><br/>Resources, Performance, OOM, and more</small>|Yes|Yes|Yes|Yes|
 |**Network Connections**<small><br/>Live TCP and UDP sockets per PID</small>|Yes|-|-|-|
 |**Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small>|Yes|-|-|-|
-|**VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small>|Yes<small><br/>`cgroups`</small>|-|-|Yes<small><br/>`Hyper-V`</small>|
+|**VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small>|Yes<small><br/>`cgroups` v1 & v2</small>|-|-|Yes<small><br/>`Hyper-V`</small>|
 |**Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small>|Yes|Yes|Yes|Yes|
 |**Packaged Applications**<small><br/>nginx, apache, prosgress, redis,<br/>and hundreds more</small>|Yes|Yes|Yes|Yes|
 |**Custom Applications**<small><br/>OpenMetrics, StatsD</small>|Yes|Yes|Yes|Yes|
