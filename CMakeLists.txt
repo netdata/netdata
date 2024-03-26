@@ -479,40 +479,30 @@ endif()
 
 # openssl/crypto
 set(ENABLE_OPENSSL True)
-if(NOT MACOS)
-        pkg_check_modules(CRYPTO libcrypto)
-        pkg_check_modules(OPENSSL REQUIRED openssl)
-else()
-        # I think this is moot because we can only use openssl 3.x
-        execute_process(COMMAND
-                        brew --prefix --installed openssl
-                        RESULT_VARIABLE BREW_OPENSSL
-                        OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
-                        OUTPUT_STRIP_TRAILING_WHITESPACE)
+pkg_check_modules(OPENSSL openssl)
 
-        if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
+if(NOT OPENSSL_FOUND)
+        if(MACOS)
                 execute_process(COMMAND
-                                brew --prefix --installed openssl@3
+                                brew --prefix --installed openssl
                                 RESULT_VARIABLE BREW_OPENSSL
                                 OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
                                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
                 if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
-                        execute_process(COMMAND
-                                        brew --prefix --installed openssl@1.1
-                                        RESULT_VARIABLE BREW_OPENSSL
-                                        OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
-                                        OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-                        if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
-                                message(FATAL_ERROR "Could not find openssl prefix with brew")
-                        endif()
+                        message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
                 endif()
-        endif()
 
-        set(OPENSSL_INCLUDE_DIRS "${BREW_OPENSSL_PREFIX}/include")
-        set(OPENSSL_CFLAGS_OTHER "")
-        set(OPENSSL_LDFLAGS "-L${BREW_OPENSSL_PREFIX}/lib;-lssl;-lcrypto")
+                set(OPENSSL_INCLUDE_DIRS "${BREW_OPENSSL_PREFIX}/include")
+                set(OPENSSL_CFLAGS_OTHER "")
+                set(OPENSSL_LDFLAGS "-L${BREW_OPENSSL_PREFIX}/lib;-lssl;-lcrypto")
+        else()
+            message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
+        endif()
+endif()
+
+if(NOT MACOS)
+        pkg_check_modules(CRYPTO libcrypto)
 endif()
 
 #
