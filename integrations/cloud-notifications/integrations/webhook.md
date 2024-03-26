@@ -55,9 +55,9 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 
   A webhook integration is a way for one service to notify another service about events that occur within it. This is done by sending an HTTP POST request to a specified URL (known as the "webhook URL") when an event occurs.
 
-  Netdata webhook integration service will send alert notifications to the destination service as soon as they are detected.
+  Netdata webhook integration service will send alert and reachability notifications to the destination service as soon as they are detected.
 
-  The notification content sent to the destination service will be a JSON object having these properties:
+  For alert notifications, the content sent to the destination service contains a JSON object with the following properties:
 
   | field   | type   | description |
   | :--     | :--    | :--         |
@@ -76,6 +76,13 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
   | additional_active_critical_alerts | integer | Number of additional critical alerts currently existing on the same node. |
   | additional_active_warning_alerts | integer | Number of additional warning alerts currently existing on the same node. |
   | alarm_url | string | Netdata Cloud URL for this alarm. |
+
+  For reachability notifications, the JSON object will contain the following properties:
+
+  | field   | type   | description |
+  | :--     | :--    | :--         |
+  | message | string | A summary message of the reachability alert. |
+  | url     | string | Netdata Cloud URL for the host experiencing the reachability alert. |
 
   #### Extra headers
 
