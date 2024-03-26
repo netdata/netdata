@@ -63,11 +63,11 @@ Netdata provides full **enterprise hardware** coverage, monitoring all component
 
 **KEY CHARACTERISTICS**:<br/>
 
-- :boom: **Collects metrics from 800+ integrations**<br/>
+- :boom: **Collects data from 800+ integrations**<br/>
   Operating system metrics, container metrics, virtual machines, hardware sensors, applications metrics, OpenMetrics exporters, StatsD, and logs.
   
 - :muscle: **Real-Time, Low-Latency, High-Resolution**<br/>
-  All metrics are collected per second and are on the dashboard immediately after data collection.
+  All data are collected per second and are on the dashboard immediately after data collection.
 
 - :face_in_clouds: **Unsupervised Anomaly Detection**<br/>
   Trains multiple Machine-Learning (ML) models for each metric and uses AI to detect anomalies based on the past behavior of each metric.
