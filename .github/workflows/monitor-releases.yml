@@ -1,5 +1,5 @@
 ---
-name: Monitor-releases
+name: Monitor releases
 
 on:
   release:
@@ -12,13 +12,13 @@ on:
         default: 'stable'
 
 
-concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
+concurrency:
   group: monitor-{{ github.event.inputs.channel }}-releases-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
-  update-stable-agents-metadata:
-    name: update-stable-agents-metadata
+  update-agents-metadata:
+    name: update-agents-metadata
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,7 +26,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
-      - name: Init python environment
+      - name: Overwrite defaults
+        id: ow-defaults
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "RELEASE_CHANNEL=${{ github.event.inputs.channel }}" >> "${GITHUB_ENV}"
+          else:
+            echo "RELEASE_CHANNEL=stable" >> "${GITHUB_ENV}"
+          fi
+      - name: Init Python environment
         uses: actions/setup-python@v5
         id: init-python
         with:
@@ -38,7 +46,7 @@ jobs:
       - name: Check for newer versions
         id: check-newer-releases
         run: |
-          python .github/scripts/check_latest_versions_per_channel.py "${{ github.event.inputs.channel }}"
+          python .github/scripts/check_latest_versions_per_channel.py "${{ env.RELEASE_CHANNEL }}"
       - name: SSH setup
         id: ssh-setup
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-newer-releases.outputs.versions_needs_update == 'true'
@@ -63,6 +71,7 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to update stable Agent's metadata.
               Checkout: ${{ steps.checkout.outcome }}
+              Overwrite inputs: ${{ steps.ow-defaults.outcome }}
               Init python: ${{ steps.init-python.outcome }}
               Setup python: ${{ steps.setup-python.outcome }}
               Check for newer stable releaes: ${{ steps.check-newer-releases.outcome }}
