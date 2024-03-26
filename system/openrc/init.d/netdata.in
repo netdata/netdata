@@ -6,10 +6,9 @@ NETDATA_PIDFILE="@localstatedir_POST@/run/netdata/netdata.pid"
 
 description="Run the Netdata system monitoring agent."
 
-extra_started_commands="reload rotate save"
+extra_started_commands="reload rotate"
 description_reload="Reload health configuration."
 description_rotate="Reopen log files."
-description_save="Force sync of database to disk."
 
 command_prefix="@sbindir_POST@"
 command="${command_prefix}/netdata"
@@ -69,11 +68,4 @@ rotate() {
             "Reopening Netdata log files" \
             "Failed to reopen Netdata log files" \
             SIGHUP
-}
-
-save() {
-    run_cmd save-database \
-            "Saving Netdata database" \
-            "Failed to save Netdata database" \
-            SIGUSR1
 }
