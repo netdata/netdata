@@ -498,14 +498,14 @@ if(NOT OPENSSL_FOUND)
                                   /usr/local/openssl
                                   /usr/local/openssl@3
                         )
-                        find_path(OPENSSL_LIB_DIRS libssl.dylib HINTS
+                        find_path(OPENSSL_LIB_DIR libssl.dylib HINTS
                                   /opt/homebrew/opt/openssl
                                   /opt/homebrew/opt/openssl@3
                                   /usr/local/openssl
                                   /usr/local/openssl@3
                         )
 
-                        if(OPENSSL_INCLUDE_DIRS STREQUAL "OPENSSL_INCLUDE_DIRS-NOTFOUND" OR
+                        if(OPENSSL_INCLUDE_DIR STREQUAL "OPENSSL_INCLUDE_DIRS-NOTFOUND" OR
                            OPENSSL_LIB_DIRS STREQUAL "OPENSSL_LIB_DIRS-NOTFOUND")
                                 message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
                         endif()
