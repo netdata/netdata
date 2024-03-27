@@ -56,7 +56,8 @@
     "required": [
       "leases_path",
       "pools"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

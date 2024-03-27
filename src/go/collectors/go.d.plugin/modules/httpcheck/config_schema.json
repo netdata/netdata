@@ -155,7 +155,8 @@
     "required": [
       "url",
       "accepted_statuses"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "ui:flavour": "tabs",

@@ -286,7 +286,8 @@
       "community",
       "options",
       "charts"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

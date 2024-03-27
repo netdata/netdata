@@ -36,7 +36,8 @@
     "required": [
       "leases_path",
       "conf_path"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

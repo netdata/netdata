@@ -168,7 +168,8 @@
     },
     "required": [
       "url"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

@@ -38,6 +38,7 @@
     "required": [
       "address"
     ],
+    "additionalProperties": false,
     "dependencies": {
       "username": [
         "password"
