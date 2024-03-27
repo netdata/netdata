@@ -361,6 +361,7 @@ struct host_variables_callback_options {
     int host_header_printed;
     char name[PROMETHEUS_VARIABLE_MAX + 1];
     SIMPLE_PATTERN *pattern;
+    struct instance *instance;
 };
 
 /**
@@ -596,6 +597,213 @@ static void prometheus_print_os_info(
     fclose(fp);
 }
 
+static int prometheus_rrdset_to_json(RRDSET *st, void *data)
+{
+    struct host_variables_callback_options *opts = data;
+
+    if (likely(can_send_rrdset(opts->instance, st, opts->pattern))) {
+        PROMETHEUS_OUTPUT_OPTIONS output_options = opts->output_options;
+        BUFFER *wb = opts->wb;
+        const char *prefix = opts->prefix;
+
+        BUFFER *plabels_buffer = buffer_create(0, NULL);
+        const char *plabels_prefix = opts->instance->config.label_prefix;
+
+        STRING *prometheus = string_strdupz("prometheus");
+
+        char chart[PROMETHEUS_ELEMENT_MAX + 1];
+        char context[PROMETHEUS_ELEMENT_MAX + 1];
+        char family[PROMETHEUS_ELEMENT_MAX + 1];
+        char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
+
+        prometheus_label_copy(chart,
+                              (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ?
+                               rrdset_name(st) : rrdset_id(st), PROMETHEUS_ELEMENT_MAX);
+        prometheus_label_copy(family, rrdset_family(st), PROMETHEUS_ELEMENT_MAX);
+        prometheus_name_copy(context, rrdset_context(st), PROMETHEUS_ELEMENT_MAX);
+
+        int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(opts->exporting_options)
+                            == EXPORTING_SOURCE_DATA_AS_COLLECTED);
+        int homogeneous = 1;
+        int prometheus_collector = 0;
+        RRDSET_FLAGS flags = rrdset_flag_get(st);
+        if (as_collected) {
+            if (flags & RRDSET_FLAG_HOMOGENEOUS_CHECK)
+                rrdset_update_heterogeneous_flag(st);
+
+            if (flags & RRDSET_FLAG_HETEROGENEOUS)
+                homogeneous = 0;
+
+            if (st->module_name == prometheus)
+                prometheus_collector = 1;
+        }
+        else {
+            if (EXPORTING_OPTIONS_DATA_SOURCE(opts->exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE &&
+                !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
+                prometheus_units_copy(units,
+                                      rrdset_units(st),
+                                      PROMETHEUS_ELEMENT_MAX,
+                                      output_options & PROMETHEUS_OUTPUT_OLDUNITS);
+        }
+
+        bool plot_type = (output_options & PROMETHEUS_OUTPUT_TYPES) ? true : false;
+        bool plot_help = (output_options & PROMETHEUS_OUTPUT_HELP) ? true : false;
+
+        // for each dimension
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+
+            if (rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+                char dimension[PROMETHEUS_ELEMENT_MAX + 1];
+                char *suffix = "";
+
+                struct gen_parameters p;
+                p.prefix = prefix;
+                p.labels_prefix = plabels_prefix;
+                p.context = context;
+                p.suffix = suffix;
+                p.chart = chart;
+                p.dimension = dimension;
+                p.family = family;
+                p.labels = (char *)opts->labels;
+                p.output_options = output_options;
+                p.st = st;
+                p.rd = rd;
+
+                if (as_collected) {
+                    // we need as-collected / raw data
+
+                    if (unlikely(rd->collector.last_collected_time.tv_sec < opts->instance->after))
+                        continue;
+
+                    p.type = "gauge";
+                    p.relation = "gives";
+                    if (rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
+                        rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
+                        p.type = "counter";
+                        p.relation = "delta gives";
+                        if (!prometheus_collector)
+                            p.suffix = "_total";
+                    }
+
+                    if (plot_help) {
+                        generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
+                        plot_help = false;
+                    }
+
+                    if (plot_type) {
+                        plot_type = false;
+                        generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
+                    }
+
+                    if (homogeneous) {
+                        // all the dimensions of the chart, has the same algorithm, multiplier and divisor
+                        // we add all dimensions as labels
+
+                        prometheus_label_copy(
+                            dimension,
+                            (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
+                            PROMETHEUS_ELEMENT_MAX);
+
+                        generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
+                    }
+                    else {
+                        // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
+                        // we create a metric per dimension
+
+                        prometheus_name_copy(
+                            dimension,
+                            (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
+                            PROMETHEUS_ELEMENT_MAX);
+
+                        generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
+                    }
+                }
+                else {
+                    // we need average or sum of the data
+
+                    time_t last_time = opts->instance->before;
+                    NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(opts->instance, rd, &last_time);
+
+                    if (!isnan(value) && !isinf(value)) {
+                        if (EXPORTING_OPTIONS_DATA_SOURCE(opts->exporting_options)
+                            == EXPORTING_SOURCE_DATA_AVERAGE)
+                            suffix = "_average";
+                        else if (EXPORTING_OPTIONS_DATA_SOURCE(opts->exporting_options)
+                                 == EXPORTING_SOURCE_DATA_SUM)
+                            suffix = "_sum";
+
+                        prometheus_label_copy(
+                            dimension,
+                            (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
+                            PROMETHEUS_ELEMENT_MAX);
+
+                        if (plot_help) {
+                            generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
+                            plot_help = false;
+                        }
+
+                        if (plot_type) {
+                            plot_type = false;
+                            generate_as_collected_prom_type(wb, prefix, context, units, suffix, "gauge");
+                        }
+
+                        buffer_flush(plabels_buffer);
+                        buffer_sprintf(plabels_buffer,
+                                       "%1$schart=\"%2$s\",%1$sdimension=\"%3$s\",%1$sfamily=\"%4$s\"",
+                                       plabels_prefix,
+                                       chart,
+                                       dimension,
+                                       family);
+                        rrdlabels_walkthrough_read(st->rrdlabels,
+                                                   format_prometheus_chart_label_callback,
+                                                   plabels_buffer);
+
+                        if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
+                            buffer_sprintf(wb,
+                                           "%s_%s%s%s{%s%s} " NETDATA_DOUBLE_FORMAT " %llu\n",
+                                           prefix,
+                                           context,
+                                           units,
+                                           suffix,
+                                           buffer_tostring(plabels_buffer),
+                                           opts->labels,
+                                           value,
+                                           last_time * MSEC_PER_SEC);
+                        else
+                        buffer_sprintf(wb, "%s_%s%s%s{%s%s} " NETDATA_DOUBLE_FORMAT "\n",
+                                           prefix,
+                                           context,
+                                           units,
+                                           suffix,
+                                           buffer_tostring(plabels_buffer),
+                                           opts->labels,
+                                           value);
+                    }
+                }
+            }
+        }
+        rrddim_foreach_done(rd);
+
+        buffer_free(plabels_buffer);
+
+        return 1;
+    }
+
+    return 0;
+}
+
+static inline int prometheus_rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void *value, void *data)
+{
+    const char *context_name = dictionary_acquired_item_name(item);
+    struct host_variables_callback_options *opts = data;
+    (void)value;
+
+    (void)rrdcontext_foreach_instance_with_rrdset_in_context(opts->host, context_name, prometheus_rrdset_to_json, data);
+
+    return HTTP_RESP_OK;
+}
+
 /**
  * Write metrics in Prometheus format to a buffer.
  *
@@ -661,7 +869,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         .prefix = prefix,
         .now = now_realtime_sec(),
         .host_header_printed = 0,
-        .pattern = filter
+        .pattern = filter,
+        .instance = instance
     };
 
     // send custom variables set for the host
@@ -675,187 +884,18 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         goto allmetrics_cleanup;
     }
 
+    dictionary_walkthrough_read(host->rrdctx.contexts, prometheus_rrdcontext_to_json_callback, &opts);
+
     /*
     // for each chart
     RRDSET *st;
 
-    BUFFER *plabels_buffer = buffer_create(0, NULL);
-    const char *plabels_prefix = instance->config.label_prefix;
-
-    STRING *prometheus = string_strdupz("prometheus");
     rrdset_foreach_read(st, host) {
 
         if (likely(can_send_rrdset(instance, st, filter))) {
-            char chart[PROMETHEUS_ELEMENT_MAX + 1];
-            char context[PROMETHEUS_ELEMENT_MAX + 1];
-            char family[PROMETHEUS_ELEMENT_MAX + 1];
-            char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
-
-            prometheus_label_copy(chart, (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? rrdset_name(st) : rrdset_id(st), PROMETHEUS_ELEMENT_MAX);
-            prometheus_label_copy(family, rrdset_family(st), PROMETHEUS_ELEMENT_MAX);
-            prometheus_name_copy(context, rrdset_context(st), PROMETHEUS_ELEMENT_MAX);
-
-
-            int as_collected = (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AS_COLLECTED);
-            int homogeneous = 1;
-            int prometheus_collector = 0;
-            RRDSET_FLAGS flags = rrdset_flag_get(st);
-            if (as_collected) {
-                if (flags & RRDSET_FLAG_HOMOGENEOUS_CHECK)
-                    rrdset_update_heterogeneous_flag(st);
-
-                if (flags & RRDSET_FLAG_HETEROGENEOUS)
-                    homogeneous = 0;
-
-                if (st->module_name == prometheus)
-                    prometheus_collector = 1;
-            }
-            else {
-                if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE &&
-                    !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
-                    prometheus_units_copy(
-                        units, rrdset_units(st), PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
-            }
-
-            bool plot_type = (output_options & PROMETHEUS_OUTPUT_TYPES) ? true : false;
-            bool plot_help = (output_options & PROMETHEUS_OUTPUT_HELP) ? true : false;
-
-            // for each dimension
-            RRDDIM *rd;
-            rrddim_foreach_read(rd, st) {
-
-                if (rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
-                    char dimension[PROMETHEUS_ELEMENT_MAX + 1];
-                    char *suffix = "";
-
-                    struct gen_parameters p;
-                    p.prefix = prefix;
-                    p.labels_prefix = plabels_prefix;
-                    p.context = context;
-                    p.suffix = suffix;
-                    p.chart = chart;
-                    p.dimension = dimension;
-                    p.family = family;
-                    p.labels = labels;
-                    p.output_options = output_options;
-                    p.st = st;
-                    p.rd = rd;
-
-                    if (as_collected) {
-                        // we need as-collected / raw data
-
-                        if (unlikely(rd->collector.last_collected_time.tv_sec < instance->after))
-                            continue;
-
-                        p.type = "gauge";
-                        p.relation = "gives";
-                        if (rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
-                            rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
-                            p.type = "counter";
-                            p.relation = "delta gives";
-                            if (!prometheus_collector)
-                                p.suffix = "_total";
-                        }
-
-                        if (plot_help) {
-                            generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
-                            plot_help = false;
-                        }
-
-                        if (plot_type) {
-                            plot_type = false;
-                            generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
-                        }
-
-                        if (homogeneous) {
-                            // all the dimensions of the chart, has the same algorithm, multiplier and divisor
-                            // we add all dimensions as labels
-
-                            prometheus_label_copy(
-                                dimension,
-                                (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                                PROMETHEUS_ELEMENT_MAX);
-
-                            generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
-                        }
-                        else {
-                            // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
-                            // we create a metric per dimension
-
-                            prometheus_name_copy(
-                                dimension,
-                                (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                                PROMETHEUS_ELEMENT_MAX);
-
-                            generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
-                        }
-                    }
-                    else {
-                        // we need average or sum of the data
-
-                        time_t last_time = instance->before;
-                        NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_time);
-
-                        if (!isnan(value) && !isinf(value)) {
-                            if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_AVERAGE)
-                                suffix = "_average";
-                            else if (EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) == EXPORTING_SOURCE_DATA_SUM)
-                                suffix = "_sum";
-
-                            prometheus_label_copy(
-                                dimension,
-                                (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
-                                PROMETHEUS_ELEMENT_MAX);
-
-                            if (plot_help) {
-                                generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
-                                plot_help = false;
-                            }
-
-                            if (plot_type) {
-                                plot_type = false;
-                                generate_as_collected_prom_type(wb, prefix, context, units, suffix, "gauge");
-                            }
-
-                            buffer_flush(plabels_buffer);
-                            buffer_sprintf(plabels_buffer, "%1$schart=\"%2$s\",%1$sdimension=\"%3$s\",%1$sfamily=\"%4$s\"", plabels_prefix, chart, dimension, family);
-                            rrdlabels_walkthrough_read(st->rrdlabels, format_prometheus_chart_label_callback, plabels_buffer);
-
-                            if (output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s%s%s{%s%s} " NETDATA_DOUBLE_FORMAT
-                                    " %llu\n",
-                                    prefix,
-                                    context,
-                                    units,
-                                    suffix,
-                                    buffer_tostring(plabels_buffer),
-                                    labels,
-                                    value,
-                                    last_time * MSEC_PER_SEC);
-                            else
-                                buffer_sprintf(
-                                    wb,
-                                    "%s_%s%s%s{%s%s} " NETDATA_DOUBLE_FORMAT
-                                    "\n",
-                                    prefix,
-                                    context,
-                                    units,
-                                    suffix,
-                                    buffer_tostring(plabels_buffer),
-                                    labels,
-                                    value);
-                        }
-                    }
-                }
-            }
-            rrddim_foreach_done(rd);
         }
     }
     rrdset_foreach_done(st);
-
-    buffer_free(plabels_buffer);
      */
 allmetrics_cleanup:
     simple_pattern_free(filter);
