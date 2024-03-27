@@ -64,9 +64,9 @@ jobs:
         id: golangci-lint
         run: |
           if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/golangci-lint') }}" = "true" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "run=true" >> "${GITHUB_OUTPUT}"
           elif git diff --name-only origin/"${{ github.base_ref }}" HEAD -- | grep -Eq '.*\.go'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'Go code has changed, need to run golangci-lint.'
           else
             echo "run=false" >> "${GITHUB_OUTPUT}"
