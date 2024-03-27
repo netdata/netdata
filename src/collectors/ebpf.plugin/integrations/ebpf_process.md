@@ -71,10 +71,6 @@ Metrics:
 | netdata.ebpf_load_methods | legacy, co-re | methods |
 | netdata.ebpf_kernel_memory | memory_locked | bytes |
 | netdata.ebpf_hash_tables_count | hash_table | hash tables |
-| netdata.ebpf_aral_stat_size | memory | bytes |
-| netdata.ebpf_aral_stat_alloc | aral | calls |
-| netdata.ebpf_aral_stat_size | memory | bytes |
-| netdata.ebpf_aral_stat_alloc | aral | calls |
 | netdata.ebpf_hash_tables_insert_pid_elements | thread | rows |
 | netdata.ebpf_hash_tables_remove_pid_elements | thread | rows |
 

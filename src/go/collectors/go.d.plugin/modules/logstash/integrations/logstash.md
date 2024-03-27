@@ -92,7 +92,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | logstash.pipeline_event | in, filtered, out | events/s |
-| logstash.pipeline_event | event, queue | seconds |
+| logstash.pipeline_event_duration | event, queue | seconds |
 
 
 

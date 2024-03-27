@@ -78,7 +78,7 @@ Metrics:
 | ip.tcphandshake | EstabResets, OutRsts, AttemptFails, SynRetrans | events/s |
 | ipv4.packets | received, sent, forwarded, delivered | packets/s |
 | ipv4.errors | InDiscards, OutDiscards, InNoRoutes, OutNoRoutes, InHdrErrors, InAddrErrors, InTruncatedPkts, InCsumErrors | packets/s |
-| ipc4.bcast | received, sent | kilobits/s |
+| ipv4.bcast | received, sent | kilobits/s |
 | ipv4.bcastpkts | received, sent | packets/s |
 | ipv4.mcast | received, sent | kilobits/s |
 | ipv4.mcastpkts | received, sent | packets/s |
@@ -111,7 +111,6 @@ Metrics:
 | ipv6.icmpneighbor | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
 | ipv6.icmpmldv2 | received, sent | reports/s |
 | ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
-| ipv6.ect | InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts | packets/s |
 | ipv6.ect | InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts | packets/s |
 | ipv6.fragsin | ok, failed, timeout, all | packets/s |
 | ipv6.fragsout | ok, failed, all | packets/s |
