@@ -368,7 +368,11 @@ int sqlite_library_init(void)
     return (SQLITE_OK != rc);
 }
 
+SPINLOCK sqlite_spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
 void sqlite_library_shutdown(void)
 {
+    spinlock_lock(&sqlite_spinlock);
     (void) sqlite3_shutdown();
+    spinlock_unlock(&sqlite_spinlock);
 }
