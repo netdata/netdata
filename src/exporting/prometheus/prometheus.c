@@ -353,6 +353,7 @@ static int format_prometheus_chart_label_callback(const char *name, const char *
 struct host_variables_callback_options {
     RRDHOST *host;
     BUFFER *wb;
+    BUFFER *plabels_buffer;
     EXPORTING_OPTIONS exporting_options;
     PROMETHEUS_OUTPUT_OPTIONS output_options;
     const char *prefix;
@@ -606,7 +607,7 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
         BUFFER *wb = opts->wb;
         const char *prefix = opts->prefix;
 
-        BUFFER *plabels_buffer = buffer_create(0, NULL);
+        BUFFER *plabels_buffer = opts->plabels_buffer;
         const char *plabels_prefix = opts->instance->config.label_prefix;
 
         STRING *prometheus = string_strdupz("prometheus");
@@ -789,8 +790,6 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
         }
         rrddim_foreach_done(rd);
 
-        buffer_free(plabels_buffer);
-
         return 1;
     }
 
@@ -867,9 +866,13 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     if (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS)
         prometheus_print_os_info(wb, host, output_options);
 
+
+    BUFFER *plabels_buffer = buffer_create(0, NULL);
+
     struct host_variables_callback_options opts = {
         .host = host,
         .wb = wb,
+        .plabels_buffer = plabels_buffer,
         .labels = (labels[0] == ',') ? &labels[1] : labels,
         .exporting_options = exporting_options,
         .output_options = output_options,
@@ -893,19 +896,9 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     dictionary_walkthrough_read(host->rrdctx.contexts, prometheus_rrdcontext_to_json_callback, &opts);
 
-    /*
-    // for each chart
-    RRDSET *st;
-
-    rrdset_foreach_read(st, host) {
-
-        if (likely(can_send_rrdset(instance, st, filter))) {
-        }
-    }
-    rrdset_foreach_done(st);
-     */
 allmetrics_cleanup:
     simple_pattern_free(filter);
+    buffer_free(plabels_buffer);
 }
 
 /**
