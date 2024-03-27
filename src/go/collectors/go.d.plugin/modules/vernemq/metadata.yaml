@@ -536,7 +536,7 @@ modules:
               dimensions:
                 - name: unsubscribe
                 - name: unsuback
-            - name: vernemq.mqtt_unsubscribe
+            - name: vernemq.mqtt_unsubscribe_error
               description: v3/v5 Failed UNSUBSCRIBE Operations due to a Netsplit
               unit: ops/s
               chart_type: line
