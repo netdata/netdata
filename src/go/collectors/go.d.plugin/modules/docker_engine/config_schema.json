@@ -97,7 +97,10 @@
     "required": [
       "url"
     ],
-    "additionalProperties": false
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

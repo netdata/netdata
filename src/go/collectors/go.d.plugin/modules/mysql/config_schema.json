@@ -33,7 +33,10 @@
     "required": [
       "dsn"
     ],
-    "additionalProperties": false
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

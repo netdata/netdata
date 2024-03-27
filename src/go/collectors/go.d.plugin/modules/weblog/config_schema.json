@@ -249,6 +249,9 @@
       "log_type"
     ],
     "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    },
     "dependencies": {
       "log_type": {
         "oneOf": [

@@ -41,7 +41,10 @@
       "port",
       "secret"
     ],
-    "additionalProperties": false
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

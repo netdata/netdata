@@ -132,7 +132,10 @@
       "url",
       "webadmin"
     ],
-    "additionalProperties": false
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "ui:flavour": "tabs",
