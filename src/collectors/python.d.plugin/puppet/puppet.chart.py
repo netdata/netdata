@@ -30,7 +30,7 @@ ORDER = [
 
 CHARTS = {
     'jvm_heap': {
-        'options': [None, 'JVM Heap', 'MiB', 'resources', 'puppet.jvm', 'area'],
+        'options': [None, 'JVM Heap', 'MiB', 'resources', 'puppet.jvm_heap', 'area'],
         'lines': [
             ['jvm_heap_committed', 'committed', 'absolute', 1, MiB],
             ['jvm_heap_used', 'used', 'absolute', 1, MiB],
@@ -41,7 +41,7 @@ CHARTS = {
         ],
     },
     'jvm_nonheap': {
-        'options': [None, 'JVM Non-Heap', 'MiB', 'resources', 'puppet.jvm', 'area'],
+        'options': [None, 'JVM Non-Heap', 'MiB', 'resources', 'puppet.jvm_nonheap', 'area'],
         'lines': [
             ['jvm_nonheap_committed', 'committed', 'absolute', 1, MiB],
             ['jvm_nonheap_used', 'used', 'absolute', 1, MiB],

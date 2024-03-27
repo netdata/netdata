@@ -36,7 +36,7 @@ CHARTS = {
     },
     'net_throughput_https': {
         'options': [None, 'Network Throughput HTTPS', 'kilobits/s', 'net throughput',
-                    'litespeed.net_throughput', 'area'],
+                    'litespeed.net_ssl_throughput', 'area'],
         'lines': [
             ['ssl_bps_in', 'in', 'absolute'],
             ['ssl_bps_out', 'out', 'absolute', -1]
@@ -50,7 +50,7 @@ CHARTS = {
         ]
     },
     'connections_https': {
-        'options': [None, 'Connections HTTPS', 'conns', 'connections', 'litespeed.connections', 'stacked'],
+        'options': [None, 'Connections HTTPS', 'conns', 'connections', 'litespeed.ssl_connections', 'stacked'],
         'lines': [
             ['ssl_conn_free', 'free', 'absolute'],
             ['ssl_conn_used', 'used', 'absolute']
@@ -69,13 +69,13 @@ CHARTS = {
         ]
     },
     'pub_cache_hits': {
-        'options': [None, 'Public Cache Hits', 'hits/s', 'cache', 'litespeed.cache', 'line'],
+        'options': [None, 'Public Cache Hits', 'hits/s', 'cache', 'litespeed.public_cache', 'line'],
         'lines': [
             ['pub_cache_hits', 'hits', 'absolute', 1, 100]
         ]
     },
     'private_cache_hits': {
-        'options': [None, 'Private Cache Hits', 'hits/s', 'cache', 'litespeed.cache', 'line'],
+        'options': [None, 'Private Cache Hits', 'hits/s', 'cache', 'litespeed.private_cache', 'line'],
         'lines': [
             ['private_cache_hits', 'hits', 'absolute', 1, 100]
         ]

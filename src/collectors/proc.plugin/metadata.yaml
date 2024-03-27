@@ -3299,7 +3299,7 @@ modules:
                 - name: InAddrErrors
                 - name: InTruncatedPkts
                 - name: InCsumErrors
-            - name: ipc4.bcast
+            - name: ipv4.bcast
               description: IP Broadcast Bandwidth
               unit: "kilobits/s"
               chart_type: area
@@ -3604,15 +3604,6 @@ modules:
                 - name: OutType133
                 - name: OutType135
                 - name: OutType143
-            - name: ipv6.ect
-              description: IPv6 ECT Packets
-              unit: "packets/s"
-              chart_type: line
-              dimensions:
-                - name: InNoECTPkts
-                - name: InECT1Pkts
-                - name: InECT0Pkts
-                - name: InCEPkts
             - name: ipv6.ect
               description: IPv6 ECT Packets
               unit: "packets/s"

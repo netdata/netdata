@@ -115,7 +115,7 @@ modules:
               dimensions:
                 - name: in
                 - name: out
-            - name: litespeed.net_throughput
+            - name: litespeed.net_ssl_throughput
               description: Network Throughput HTTPS
               unit: "kilobits/s"
               chart_type: area
@@ -129,7 +129,7 @@ modules:
               dimensions:
                 - name: free
                 - name: used
-            - name: litespeed.connections
+            - name: litespeed.ssl_connections
               description: Connections HTTPS
               unit: "conns"
               chart_type: stacked
@@ -148,13 +148,13 @@ modules:
               chart_type: line
               dimensions:
                 - name: processing
-            - name: litespeed.cache
+            - name: litespeed.public_cache
               description: Public Cache Hits
               unit: "hits/s"
               chart_type: line
               dimensions:
                 - name: hits
-            - name: litespeed.cache
+            - name: litespeed.private_cache
               description: Private Cache Hits
               unit: "hits/s"
               chart_type: line
