@@ -74,7 +74,7 @@ Netdata provides full **enterprise hardware** coverage, monitoring all component
   Trains multiple Machine-Learning (ML) models for each metric and uses AI to detect anomalies based on the past behavior of each metric.
 
 - :fire: **Powerful Visualization**<br/>
-  Clear and precise visualization allowing you to understand any dataset at first sight, but also to filter, slice and dice the data directly on the dashboard, without the need to learn a query language.
+  Fully automated dashboard providing corellated visualization of all metrics, allowing you to understand any dataset at first sight, but also to filter, slice and dice the data directly on the dashboards, without the need to learn a query language.
 
 - :bell: **Out of box Alerts**<br/>
   Comes with hundreds of alerts out of the box to detect common issues and pitfalls, revealing issues that can easily go unnoticed. It supports several notification methods to let you know when your attention is needed.
