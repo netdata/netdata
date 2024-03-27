@@ -6,7 +6,16 @@
 
 **Merged pull requests:**
 
+- docs: update pagerduty meta [\#17264](https://github.com/netdata/netdata/pull/17264) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17261](https://github.com/netdata/netdata/pull/17261) ([netdatabot](https://github.com/netdatabot))
+- include reachability alert fields [\#17258](https://github.com/netdata/netdata/pull/17258) ([juacker](https://github.com/juacker))
+- Add dbengine compression info in -W buildinfo [\#17257](https://github.com/netdata/netdata/pull/17257) ([stelfrag](https://github.com/stelfrag))
+- go.d: job manager: set config defaults [\#17255](https://github.com/netdata/netdata/pull/17255) ([ilyam8](https://github.com/ilyam8))
+- go.d: sd local-listeners: drop docker-proxy targets [\#17254](https://github.com/netdata/netdata/pull/17254) ([ilyam8](https://github.com/ilyam8))
 - go.d: sd local-listeners: discover /proc/net/tcp6 only apps [\#17252](https://github.com/netdata/netdata/pull/17252) ([ilyam8](https://github.com/ilyam8))
+- update whats new [\#17251](https://github.com/netdata/netdata/pull/17251) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Try finding OpenSSL using pkg-config first on macOS. [\#17250](https://github.com/netdata/netdata/pull/17250) ([Ferroin](https://github.com/Ferroin))
+- remove USR1 "Save internal DB to disk" [\#17249](https://github.com/netdata/netdata/pull/17249) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/docker/docker from 25.0.5+incompatible to 26.0.0+incompatible in /src/go/collectors/go.d.plugin [\#17248](https://github.com/netdata/netdata/pull/17248) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus/common from 0.50.0 to 0.51.1 in /src/go/collectors/go.d.plugin [\#17247](https://github.com/netdata/netdata/pull/17247) ([dependabot[bot]](https://github.com/apps/dependabot))
 - DBENGINE: support ZSTD compression [\#17244](https://github.com/netdata/netdata/pull/17244) ([ktsaou](https://github.com/ktsaou))
@@ -22,6 +31,7 @@
 - Reduce flush operations during journal build [\#17220](https://github.com/netdata/netdata/pull/17220) ([stelfrag](https://github.com/stelfrag))
 - go.d: mysql: disable session query log and slow query log [\#17219](https://github.com/netdata/netdata/pull/17219) ([ilyam8](https://github.com/ilyam8))
 - go.d: local-listeners sd: fix mariadbd comm [\#17218](https://github.com/netdata/netdata/pull/17218) ([ilyam8](https://github.com/ilyam8))
+- Assorted macOS build fixes. [\#17216](https://github.com/netdata/netdata/pull/17216) ([Ferroin](https://github.com/Ferroin))
 - Fix job depdendencies in Docker workflow. [\#17215](https://github.com/netdata/netdata/pull/17215) ([Ferroin](https://github.com/Ferroin))
 - add warning on old custom dashboards and rephrase existing page [\#17214](https://github.com/netdata/netdata/pull/17214) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Bump github.com/docker/docker from 25.0.4+incompatible to 25.0.5+incompatible in /src/go/collectors/go.d.plugin [\#17211](https://github.com/netdata/netdata/pull/17211) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -388,16 +398,6 @@
 - rename bundle dashboard scripts [\#16648](https://github.com/netdata/netdata/pull/16648) ([ilyam8](https://github.com/ilyam8))
 - update bundled UI to v6.72.0 [\#16647](https://github.com/netdata/netdata/pull/16647) ([ilyam8](https://github.com/ilyam8))
 - Fix compilation error when using --disable-dbengine [\#16645](https://github.com/netdata/netdata/pull/16645) ([stelfrag](https://github.com/stelfrag))
-- Create alerts-configuration-manager.md [\#16642](https://github.com/netdata/netdata/pull/16642) ([sashwathn](https://github.com/sashwathn))
-- Add extra build flags to CMakeLists.txt. [\#16641](https://github.com/netdata/netdata/pull/16641) ([Ferroin](https://github.com/Ferroin))
-- Assorted cleanup of native packaging code. [\#16640](https://github.com/netdata/netdata/pull/16640) ([Ferroin](https://github.com/Ferroin))
-- Update artifact-handling actions to latest version. [\#16639](https://github.com/netdata/netdata/pull/16639) ([Ferroin](https://github.com/Ferroin))
-- cmake: make WEB\_DIR configurable [\#16638](https://github.com/netdata/netdata/pull/16638) ([ilyam8](https://github.com/ilyam8))
-- Remove code relying on autotools. [\#16634](https://github.com/netdata/netdata/pull/16634) ([vkalintiris](https://github.com/vkalintiris))
-- docs: add "Rootless mode" to Docker install guide [\#16632](https://github.com/netdata/netdata/pull/16632) ([ilyam8](https://github.com/ilyam8))
-- eBPF cgroup update [\#16630](https://github.com/netdata/netdata/pull/16630) ([thiagoftsm](https://github.com/thiagoftsm))
-- Correctly handle basic permissions for most scripts on install. [\#16629](https://github.com/netdata/netdata/pull/16629) ([Ferroin](https://github.com/Ferroin))
-- Fix UB of unaligned loads/stores and signed shifts. [\#16628](https://github.com/netdata/netdata/pull/16628) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
