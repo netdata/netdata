@@ -144,7 +144,8 @@
       "password",
       "host_include",
       "vm_include"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

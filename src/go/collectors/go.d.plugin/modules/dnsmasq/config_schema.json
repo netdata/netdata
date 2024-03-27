@@ -38,7 +38,8 @@
     "required": [
       "address",
       "protocol"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {
