@@ -568,10 +568,15 @@
 
         For reachability notifications, the JSON object will contain the following properties:
 
-        | field   | type   | description |
-        | :--     | :--    | :--         |
-        | message | string | A summary message of the reachability alert. |
-        | url     | string | Netdata Cloud URL for the host experiencing the reachability alert. |
+        | field        | type   | description |
+        | :--          | :--    | :--         |
+        | message      | string | A summary message of the reachability alert. |
+        | url          | string | Netdata Cloud URL for the host experiencing the reachability alert. |
+        | host         | string | the host experiencing the reachability alert. |
+        | severity     | string | severity for this notification. If host is reachable, severity will be 'info', if host is unreachable, it will be 'critical'. |
+        | status       | object | an object with the status information. |
+        | status.reachable  | boolean | true if host is reachable, false otherwise |
+        | status.text       | string  | can be 'reachable' or 'unreachable'  |
 
         #### Extra headers
 
