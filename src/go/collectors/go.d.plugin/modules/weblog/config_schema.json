@@ -248,6 +248,7 @@
       "path",
       "log_type"
     ],
+    "additionalProperties": false,
     "dependencies": {
       "log_type": {
         "oneOf": [

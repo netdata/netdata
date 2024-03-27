@@ -59,7 +59,8 @@
     },
     "required": [
       "hosts"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

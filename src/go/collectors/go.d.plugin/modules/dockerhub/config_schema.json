@@ -112,7 +112,8 @@
     "required": [
       "url",
       "repositories"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "ui:flavour": "tabs",

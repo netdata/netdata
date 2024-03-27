@@ -63,7 +63,8 @@
     },
     "required": [
       "uri"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

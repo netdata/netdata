@@ -40,7 +40,8 @@
       "address",
       "port",
       "secret"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

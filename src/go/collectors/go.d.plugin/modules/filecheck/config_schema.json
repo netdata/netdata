@@ -99,7 +99,8 @@
           "include"
         ]
       }
-    }
+    },
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {
