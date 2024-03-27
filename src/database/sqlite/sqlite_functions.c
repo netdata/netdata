@@ -346,6 +346,7 @@ void sql_close_database(sqlite3 *database, const char *database_name)
     rc = sqlite3_close_v2(database);
     if (unlikely(rc != SQLITE_OK))
         error_report("%s: Error while closing the sqlite database: rc %d, error \"%s\"", database_name, rc, sqlite3_errstr(rc));
+    database = NULL;
 }
 
 extern sqlite3 *db_context_meta;
