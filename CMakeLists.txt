@@ -483,6 +483,7 @@ pkg_check_modules(OPENSSL openssl)
 
 if(NOT OPENSSL_FOUND)
         if(MACOS)
+                message(CHECK_START "Searching for openssl using Homebrew")
                 execute_process(COMMAND
                                 brew --prefix --installed openssl
                                 RESULT_VARIABLE BREW_OPENSSL
@@ -490,12 +491,33 @@ if(NOT OPENSSL_FOUND)
                                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
                 if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
-                        message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
-                endif()
+                        message(CHECK_FAIL "not found")
+                        find_path(OPENSSL_INCLUDE_DIRS openssl/opensslconf.h HINTS
+                                  /opt/homebrew/opt/openssl
+                                  /opt/homebrew/opt/openssl@3
+                                  /usr/local/openssl
+                                  /usr/local/openssl@3
+                        )
+                        find_path(OPENSSL_LIB_DIRS libssl.dylib HINTS
+                                  /opt/homebrew/opt/openssl
+                                  /opt/homebrew/opt/openssl@3
+                                  /usr/local/openssl
+                                  /usr/local/openssl@3
+                        )
 
-                set(OPENSSL_INCLUDE_DIRS "${BREW_OPENSSL_PREFIX}/include")
-                set(OPENSSL_CFLAGS_OTHER "")
-                set(OPENSSL_LDFLAGS "-L${BREW_OPENSSL_PREFIX}/lib;-lssl;-lcrypto")
+                        if(OPENSSL_INCLUDE_DIRS STREQUAL "OPENSSL_INCLUDE_DIRS-NOTFOUND" OR
+                           OPENSSL_LIB_DIRS STREQUAL "OPENSSL_LIB_DIRS-NOTROUND")
+                                message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
+                        endif()
+
+                        set(OPENSSL_CFLAGS_OTHER "")
+                        set(OPENSSL_LDFLAGS "-L${OPENSSL_LIB_DIR};-lssl;-lcrypto")
+                else()
+                        message(CHECK_PASS "found")
+                        set(OPENSSL_INCLUDE_DIRS "${BREW_OPENSSL_PREFIX}/include")
+                        set(OPENSSL_CFLAGS_OTHER "")
+                        set(OPENSSL_LDFLAGS "-L${BREW_OPENSSL_PREFIX}/lib;-lssl;-lcrypto")
+                endif()
         else()
             message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
         endif()
