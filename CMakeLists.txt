@@ -505,8 +505,8 @@ if(NOT OPENSSL_FOUND)
                                   /usr/local/openssl@3
                         )
 
-                        if(OPENSSL_INCLUDE_DIR STREQUAL "OPENSSL_INCLUDE_DIRS-NOTFOUND" OR
-                           OPENSSL_LIB_DIRS STREQUAL "OPENSSL_LIB_DIRS-NOTFOUND")
+                        if(OPENSSL_INCLUDE_DIRS STREQUAL "OPENSSL_INCLUDE_DIRS-NOTFOUND" OR
+                           OPENSSL_LIB_DIR STREQUAL "OPENSSL_LIB_DIR-NOTFOUND")
                                 message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
                         endif()
 
