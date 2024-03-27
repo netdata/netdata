@@ -100,6 +100,11 @@
         "type": "string",
         "sensitive": true
       },
+      "cookie_file": {
+        "title": "Cookie file",
+        "description": "Specifies the path to the file containing cookies. For more information about the cookie file format, see [cookie file format](https://everything.curl.dev/http/cookies/fileformat).",
+        "type": "string"
+      },
       "proxy_url": {
         "title": "Proxy URL",
         "description": "The URL of the proxy server.",
@@ -156,7 +161,10 @@
       "url",
       "accepted_statuses"
     ],
-    "additionalProperties": false
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "ui:flavour": "tabs",
@@ -183,7 +191,8 @@
           "title": "Auth",
           "fields": [
             "username",
-            "password"
+            "password",
+            "cookie_file"
           ]
         },
         {
