@@ -667,3 +667,58 @@ jobs:
             failure()
             && github.repository == 'netdata/netdata'
           }}
+
+  trigger-subsequent-workflows:
+    if: github.event_name == 'workflow_dispatch'
+    name: Trigger subsquent workflows for newly added versions
+    needs:
+      - publish-docker-hub
+      - gen-tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Trigger Helmchart PR
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
+        id: trigger-helmchart
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: netdata/helmchart
+          workflow: Agent Version PR
+          ref: refs/heads/master
+          inputs: '{"agent_version": "${{ needs.gen-tags.outputs.tags }}"}'
+      - name: Trigger MSI build
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
+        id: trigger-msi
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          repo: netdata/msi-installer
+          workflow: Build
+          ref: refs/heads/master
+          inputs: '{"tag": "${{ needs.gen-tags.outputs.tags }}", "pwd": "${{ secrets.MSI_CODE_SIGNING_PASSWORD }}"}'
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: ':'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Version cascade failed
+              Checkout: ${{ steps.checkout.outcome }}
+              Trigger Helmchart PR: ${{ steps.trigger-helmchart.outcome }}
+              Trigger MSI build: ${{ steps.trigger-msi.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+          }}
