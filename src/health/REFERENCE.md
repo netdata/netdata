@@ -416,7 +416,7 @@ The full [database query API](https://github.com/netdata/netdata/blob/master/src
   - `average` after time-aggregation of each dimension, return the average of all dimensions.
   - `sum` after time-aggregation of each dimension, return the sum of all dimensions (this is the default).
   - `min2max` after time-aggregation of each dimension, return the delta between the min and the max of the dimensions.
-  - `unligned` prevents shifting the query window to multiples of the query duration.
+  - `unaligned` prevents shifting the query window to multiples of the query duration.
   - `match-ids` matches the dimensions based on their IDs (the default is enabled, give `match-names` to disable).
   - `match-names` matches the dimension based on their names (the default is enabled, give `match-ids` to disable).
 
