@@ -91,7 +91,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | app.ebpf_call_tcp_v4_connection | connections | connections/s |
-| app.app.ebpf_call_tcp_v6_connection | connections | connections/s |
+| app.ebpf_call_tcp_v6_connection | connections | connections/s |
 | app.ebpf_sock_bytes_sent | bandwidth | kilobits/s |
 | app.ebpf_sock_bytes_received | bandwidth | kilobits/s |
 | app.ebpf_call_tcp_sendmsg | calls | calls/s |

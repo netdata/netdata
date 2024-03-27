@@ -65,8 +65,8 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| puppet.jvm | committed, used | MiB |
-| puppet.jvm | committed, used | MiB |
+| puppet.jvm_heap | committed, used | MiB |
+| puppet.jvm_nonheap | committed, used | MiB |
 | puppet.cpu | execution, GC | percentage |
 | puppet.fdopen | used | descriptors |
 
