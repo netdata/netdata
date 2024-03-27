@@ -63,13 +63,13 @@ jobs:
       - name: Check files for golangci-lint
         id: golangci-lint
         run: |
-          if [ "$(echo "${github.event.pull_request.labels[*].name}" | grep -o 'run-ci/golangci-lint')" = "run-ci/golangci-lint" ]; then
+          if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/golangci-lint') }}" = "true" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only origin/"${github.base_ref}" HEAD -- | grep -Eq '.*\.go'; then
+          elif git diff --name-only origin/"${{ github.base_ref }}" HEAD -- | grep -Eq '.*\.go'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo 'Go code has changed, need to run golangci-lint.'
           else
-            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "run=false" >> "${GITHUB_OUTPUT}"
           fi
       - name: Check files for hadolint
         id: hadolint
