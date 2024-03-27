@@ -155,7 +155,6 @@ include:
   - <<: *debian
     version: "11"
     base_image: debian:bullseye
-    bundle_sentry: false
     packages:
       <<: *debian_packages
       repo_distro: debian/bullseye
@@ -164,7 +163,6 @@ include:
   - <<: *debian
     version: "10"
     base_image: debian:buster
-    bundle_sentry: false
     packages:
       <<: *debian_packages
       repo_distro: debian/buster
@@ -275,7 +273,7 @@ include:
     support_type: Core
     notes: ''
     eol_check: true
-    bundle_sentry: false
+    bundle_sentry: true
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
     jsonc_removal: |
