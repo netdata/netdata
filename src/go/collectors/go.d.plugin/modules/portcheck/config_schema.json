@@ -43,7 +43,8 @@
     "required": [
       "host",
       "ports"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

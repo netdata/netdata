@@ -18,7 +18,8 @@
         "minimum": 0.5,
         "default": 1
       }
-    }
+    },
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

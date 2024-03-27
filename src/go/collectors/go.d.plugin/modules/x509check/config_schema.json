@@ -68,7 +68,8 @@
     },
     "required": [
       "source"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

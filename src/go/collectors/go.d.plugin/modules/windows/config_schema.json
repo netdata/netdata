@@ -94,7 +94,8 @@
     },
     "required": [
       "url"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "ui:flavour": "tabs",

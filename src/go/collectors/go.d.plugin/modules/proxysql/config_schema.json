@@ -27,7 +27,8 @@
     },
     "required": [
       "dsn"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

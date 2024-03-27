@@ -57,7 +57,8 @@
     },
     "required": [
       "address"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {

@@ -104,7 +104,8 @@
       "domains",
       "servers",
       "network"
-    ]
+    ],
+    "additionalProperties": false
   },
   "uiSchema": {
     "uiOptions": {
