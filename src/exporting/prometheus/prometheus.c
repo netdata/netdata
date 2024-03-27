@@ -689,11 +689,13 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                     if (plot_help) {
                         generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
                         plot_help = false;
+                        opts->output_options &= ~PROMETHEUS_OUTPUT_HELP;
                     }
 
                     if (plot_type) {
-                        plot_type = false;
                         generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
+                        plot_type = false;
+                        opts->output_options &= ~PROMETHEUS_OUTPUT_TYPES;
                     }
 
                     if (homogeneous) {
@@ -741,11 +743,13 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                         if (plot_help) {
                             generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
                             plot_help = false;
+                            opts->output_options &= ~PROMETHEUS_OUTPUT_HELP;
                         }
 
                         if (plot_type) {
-                            plot_type = false;
                             generate_as_collected_prom_type(wb, prefix, context, units, suffix, "gauge");
+                            plot_type = false;
+                            opts->output_options &= ~PROMETHEUS_OUTPUT_TYPES;
                         }
 
                         buffer_flush(plabels_buffer);
@@ -799,7 +803,10 @@ static inline int prometheus_rrdcontext_to_json_callback(const DICTIONARY_ITEM *
     struct host_variables_callback_options *opts = data;
     (void)value;
 
+    PROMETHEUS_OUTPUT_OPTIONS output_options = opts->output_options;
     (void)rrdcontext_foreach_instance_with_rrdset_in_context(opts->host, context_name, prometheus_rrdset_to_json, data);
+
+    opts->output_options = output_options;
 
     return HTTP_RESP_OK;
 }
