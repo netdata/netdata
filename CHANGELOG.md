@@ -2,14 +2,26 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.1...HEAD)
 
 **Merged pull requests:**
 
+- Revert "Enable sentry on all Debian and Ubuntu versions." [\#17279](https://github.com/netdata/netdata/pull/17279) ([tkatsoulas](https://github.com/tkatsoulas))
+- REFERENCE - Fix small unligned typo [\#17274](https://github.com/netdata/netdata/pull/17274) ([sepek](https://github.com/sepek))
+- Regenerate integrations.js [\#17273](https://github.com/netdata/netdata/pull/17273) ([netdatabot](https://github.com/netdatabot))
+- go.d: dyncfg: allow "name" additional property [\#17272](https://github.com/netdata/netdata/pull/17272) ([ilyam8](https://github.com/ilyam8))
+- add additional fields to webhook reachability notifications [\#17271](https://github.com/netdata/netdata/pull/17271) ([juacker](https://github.com/juacker))
+- go.d: config schemas update: prohibit additional properties [\#17269](https://github.com/netdata/netdata/pull/17269) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17268](https://github.com/netdata/netdata/pull/17268) ([netdatabot](https://github.com/netdatabot))
+- fix duplicate chart context [\#17267](https://github.com/netdata/netdata/pull/17267) ([ilyam8](https://github.com/ilyam8))
+- Reset database connection handle on close [\#17266](https://github.com/netdata/netdata/pull/17266) ([stelfrag](https://github.com/stelfrag))
 - docs: update pagerduty meta [\#17264](https://github.com/netdata/netdata/pull/17264) ([ilyam8](https://github.com/ilyam8))
+- Correctly propagate errors from child scripts in kickstart.sh. [\#17263](https://github.com/netdata/netdata/pull/17263) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17261](https://github.com/netdata/netdata/pull/17261) ([netdatabot](https://github.com/netdatabot))
+- Enable sentry on all Debian and Ubuntu versions. [\#17259](https://github.com/netdata/netdata/pull/17259) ([vkalintiris](https://github.com/vkalintiris))
 - include reachability alert fields [\#17258](https://github.com/netdata/netdata/pull/17258) ([juacker](https://github.com/juacker))
 - Add dbengine compression info in -W buildinfo [\#17257](https://github.com/netdata/netdata/pull/17257) ([stelfrag](https://github.com/stelfrag))
+- minor fix in monitor releases workflow [\#17256](https://github.com/netdata/netdata/pull/17256) ([tkatsoulas](https://github.com/tkatsoulas))
 - go.d: job manager: set config defaults [\#17255](https://github.com/netdata/netdata/pull/17255) ([ilyam8](https://github.com/ilyam8))
 - go.d: sd local-listeners: drop docker-proxy targets [\#17254](https://github.com/netdata/netdata/pull/17254) ([ilyam8](https://github.com/ilyam8))
 - go.d: sd local-listeners: discover /proc/net/tcp6 only apps [\#17252](https://github.com/netdata/netdata/pull/17252) ([ilyam8](https://github.com/ilyam8))
@@ -19,6 +31,7 @@
 - Bump github.com/docker/docker from 25.0.5+incompatible to 26.0.0+incompatible in /src/go/collectors/go.d.plugin [\#17248](https://github.com/netdata/netdata/pull/17248) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus/common from 0.50.0 to 0.51.1 in /src/go/collectors/go.d.plugin [\#17247](https://github.com/netdata/netdata/pull/17247) ([dependabot[bot]](https://github.com/apps/dependabot))
 - DBENGINE: support ZSTD compression [\#17244](https://github.com/netdata/netdata/pull/17244) ([ktsaou](https://github.com/ktsaou))
+- apps\_proc\_pid\_fd: ignore kf\_sock\_inpcb on modern FreeBSD [\#17243](https://github.com/netdata/netdata/pull/17243) ([glebius](https://github.com/glebius))
 - Fix MRG Metric refcount issue [\#17239](https://github.com/netdata/netdata/pull/17239) ([ktsaou](https://github.com/ktsaou))
 - Code cleanup [\#17237](https://github.com/netdata/netdata/pull/17237) ([ktsaou](https://github.com/ktsaou))
 - DBENGINE: use gorilla by default [\#17234](https://github.com/netdata/netdata/pull/17234) ([ktsaou](https://github.com/ktsaou))
@@ -27,6 +40,7 @@
 - fix html [\#17228](https://github.com/netdata/netdata/pull/17228) ([Ancairon](https://github.com/Ancairon))
 - update flowchart cloud-onprem [\#17227](https://github.com/netdata/netdata/pull/17227) ([M4itee](https://github.com/M4itee))
 - feat: add netdata cloud api-tokens docs [\#17225](https://github.com/netdata/netdata/pull/17225) ([witalisoft](https://github.com/witalisoft))
+- Trigger subsequent workflows for Helmchart and MSI [\#17224](https://github.com/netdata/netdata/pull/17224) ([tkatsoulas](https://github.com/tkatsoulas))
 - fixing the helm login command for the onprem installation [\#17222](https://github.com/netdata/netdata/pull/17222) ([M4itee](https://github.com/M4itee))
 - Reduce flush operations during journal build [\#17220](https://github.com/netdata/netdata/pull/17220) ([stelfrag](https://github.com/stelfrag))
 - go.d: mysql: disable session query log and slow query log [\#17219](https://github.com/netdata/netdata/pull/17219) ([ilyam8](https://github.com/ilyam8))
@@ -36,6 +50,10 @@
 - add warning on old custom dashboards and rephrase existing page [\#17214](https://github.com/netdata/netdata/pull/17214) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Bump github.com/docker/docker from 25.0.4+incompatible to 25.0.5+incompatible in /src/go/collectors/go.d.plugin [\#17211](https://github.com/netdata/netdata/pull/17211) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Add -Wno-builtin-macro-redefined to compiler flags. [\#17209](https://github.com/netdata/netdata/pull/17209) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.45.1](https://github.com/netdata/netdata/tree/v1.45.1) (2024-03-27)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.0...v1.45.1)
 
 ## [v1.45.0](https://github.com/netdata/netdata/tree/v1.45.0) (2024-03-21)
 
@@ -385,19 +403,6 @@
 - Update binaries \(eBPF\) [\#16671](https://github.com/netdata/netdata/pull/16671) ([thiagoftsm](https://github.com/thiagoftsm))
 - eBPF socket \(eBPF\) [\#16669](https://github.com/netdata/netdata/pull/16669) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix compiler warnings [\#16665](https://github.com/netdata/netdata/pull/16665) ([ktsaou](https://github.com/ktsaou))
-- dont exceed buffer boundaries, when the buffer is empty [\#16664](https://github.com/netdata/netdata/pull/16664) ([ktsaou](https://github.com/ktsaou))
-- set log level of too-old-data message to debug  [\#16663](https://github.com/netdata/netdata/pull/16663) ([ilyam8](https://github.com/ilyam8))
-- Improve context load  [\#16659](https://github.com/netdata/netdata/pull/16659) ([stelfrag](https://github.com/stelfrag))
-- Shutdown dbengine event loop properly [\#16658](https://github.com/netdata/netdata/pull/16658) ([stelfrag](https://github.com/stelfrag))
-- docs: Correct chart\_labels summary [\#16656](https://github.com/netdata/netdata/pull/16656) ([sepek](https://github.com/sepek))
-- Fix coverity issues [\#16655](https://github.com/netdata/netdata/pull/16655) ([stelfrag](https://github.com/stelfrag))
-- Fix overrun in crc32set [\#16654](https://github.com/netdata/netdata/pull/16654) ([stelfrag](https://github.com/stelfrag))
-- Necessary changes for Learn [\#16651](https://github.com/netdata/netdata/pull/16651) ([Ancairon](https://github.com/Ancairon))
-- docs: add a few examples how to query Netdata logs using journalctl [\#16650](https://github.com/netdata/netdata/pull/16650) ([ilyam8](https://github.com/ilyam8))
-- increase max response size to 100MiB [\#16649](https://github.com/netdata/netdata/pull/16649) ([ktsaou](https://github.com/ktsaou))
-- rename bundle dashboard scripts [\#16648](https://github.com/netdata/netdata/pull/16648) ([ilyam8](https://github.com/ilyam8))
-- update bundled UI to v6.72.0 [\#16647](https://github.com/netdata/netdata/pull/16647) ([ilyam8](https://github.com/ilyam8))
-- Fix compilation error when using --disable-dbengine [\#16645](https://github.com/netdata/netdata/pull/16645) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
