@@ -95,6 +95,7 @@ set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
 option(ENABLE_CLOUD "enable cloud" True)
+option(ENABLE_DASHBOARD_V2 "enable dashboard v2" True)
 option(ENABLE_ACLK "enable aclk" True)
 option(ENABLE_ML "enable machine learning" True)
 option(ENABLE_H2O "enable h2o" True)
@@ -2674,7 +2675,9 @@ endif()
 #
 
 include(src/web/gui/v1/dashboard_v1.cmake)
-include(src/web/gui/v2/dashboard_v2.cmake)
+if(ENABLE_DASHBOARD_V2)
+        include(src/web/gui/v2/dashboard_v2.cmake)
+endif()
 include(src/web/gui/gui.cmake)
 
 function(cat IN_FILE OUT_FILE)
