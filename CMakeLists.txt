@@ -2096,14 +2096,7 @@ if(PCRE2_FOUND)
         target_compile_definitions(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
         target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
 
-        if(ENABLE_BUNDLED_YAML)
-                target_include_directories(log2journal BEFORE PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/libyaml")
-                target_link_libraries(log2journal PUBLIC yaml)
-        else()
-                target_include_directories(log2journal BEFORE PUBLIC ${YAML_INCLUDE_DIRS})
-                target_compile_definitions(log2journal PUBLIC ${YAML_CFLAGS_OTHER})
-                target_link_libraries(log2journal PUBLIC ${YAML_LDFLAGS})
-        endif()
+        netdata_add_libyaml_to_target(log2journal)
 
         install(TARGETS log2journal
                 COMPONENT log2journal
