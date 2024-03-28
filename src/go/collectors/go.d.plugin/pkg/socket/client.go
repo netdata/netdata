@@ -31,16 +31,25 @@ type Socket struct {
 // If the address is a domain name it will also perform the DNS resolution.
 // Address like :80 will attempt to connect to the localhost.
 // The config timeout and TLS config will be used.
-func (s *Socket) Connect() (err error) {
+func (s *Socket) Connect() error {
 	network, address := networkType(s.Address)
+	var conn net.Conn
+	var err error
+
 	if s.TLSConf == nil {
-		s.conn, err = net.DialTimeout(network, address, s.ConnectTimeout)
+		conn, err = net.DialTimeout(network, address, s.ConnectTimeout)
 	} else {
 		var d net.Dialer
 		d.Timeout = s.ConnectTimeout
-		s.conn, err = tls.DialWithDialer(&d, network, address, s.TLSConf)
+		conn, err = tls.DialWithDialer(&d, network, address, s.TLSConf)
 	}
-	return err
+	if err != nil {
+		return err
+	}
+
+	s.conn = conn
+
+	return nil
 }
 
 // Disconnect closes the connection.
