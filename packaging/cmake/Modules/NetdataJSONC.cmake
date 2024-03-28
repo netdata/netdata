@@ -14,6 +14,8 @@ function(netdata_bundle_jsonc)
         include(FetchContent)
         include(NetdataFetchContentExtra)
 
+        message(STATUS "Preparing vendored copy of JSON-C")
+
         if(ENABLE_BUNDLED_JSONC)
                 set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
         endif()
@@ -28,9 +30,9 @@ function(netdata_bundle_jsonc)
         # values instead of treating them as booleans, so we need to use
         # proper strings for option values instead of just setting them
         # to true or false.
-        set(DISABLE_BSYMBOLIC OFF)
-        set(DISABLE_WERROR OFF)
-        set(DISABLE_EXTRA_LIBS OFF)
+        set(DISABLE_BSYMBOLIC ON)
+        set(DISABLE_WERROR ON)
+        set(DISABLE_EXTRA_LIBS ON)
         set(BUILD_SHARED_LIBS OFF)
         set(BUILD_STATIC_LIBS ON)
         set(BUILD_APPS OFF)
@@ -41,6 +43,8 @@ function(netdata_bundle_jsonc)
         )
 
         FetchContent_MakeAvailable_NoInstall(json-c)
+
+        message(STATUS "Finished preparing vendored copy of JSON-C")
 endfunction()
 
 # Handle setup of json-c for the build.
@@ -58,16 +62,25 @@ macro(netdata_detect_jsonc)
         if(ENABLE_BUNDLED_JSONC OR NOT JSONC_FOUND)
                 netdata_bundle_jsonc()
                 set(NETDATA_JSONC_LDFLAGS json-c)
-                get_target_property(NETDATA_JSONC_INCLUDE_DIRS json-c INTERFACE_INCLUDE_DIRECTORIES)
+                set(NETDATA_JSONC_INCLUDE_DIRS ${json-c_BINARY_DIR})
                 get_target_property(NETDATA_JSONC_CFLAGS_OTHER json-c INTERFACE_COMPILE_DEFINITIONS)
 
                 if(NETDATA_JSONC_CFLAGS_OTHER STREQUAL NETDATA_JSONC_CFLAGS_OTHER-NOTFOUND)
                         set(NETDATA_JSONC_CFLAGS_OTHER "")
                 endif()
 
-                if(NETDATA_JSONC_INCLUDE_DIRS STREQUAL NETDATA_JSONC_INCLUDE_DIRS-NOTFOUND)
-                        set(NETDATA_JSONC_INCLUDE_DIRS "")
-                endif()
+                set(USING_BUNDLED_JSONC True)
+
+                add_custom_command(
+                        OUTPUT ${json-c_BINARY_DIR}/json-c
+                        COMMAND ${CMAKE_COMMAND} -E create_symlink ${json-c_BINARY_DIR} ${json-c_BINARY_DIR}/json-c
+                        COMMENT "Create compatibility symlink for vendored JSON-C headers"
+                        DEPENDS json-c
+                )
+                add_custom_target(
+                        json-c-compat-link
+                        DEPENDS ${json-c_BINARY_DIR}/json-c
+                )
         else()
                 set(NETDATA_JSONC_LDFLAGS ${JSONC_LDFLAGS})
                 set(NETDATA_JSONC_CFLAGS_OTHER ${JSONC_CFLAGS_OTHER})
@@ -83,4 +96,8 @@ function(netdata_add_jsonc_to_target _target)
         target_include_directories(${_target} BEFORE PUBLIC ${NETDATA_JSONC_INCLUDE_DIRS})
         target_compile_definitions(${_target} PUBLIC ${NETDATA_JSONC_CFLAGS_OTHER})
         target_link_libraries(${_target} PUBLIC ${NETDATA_JSONC_LDFLAGS})
+
+        if(USING_BUNDLED_JSONC)
+                add_dependencies(${_target} json-c-compat-link)
+        endif()
 endfunction()
