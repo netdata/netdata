@@ -5,9 +5,9 @@
 # SPDX-License-Identifier: GPL
 
 if(CMAKE_BUILD_TYPE STREQUAL Debug OR CMAKE_BUILD_TYPE STREQUAL RelWithDebInfo)
-    set(GO_LDFLAGS "-X main.version=${NETDATA_VERSION}")
+    set(GO_LDFLAGS "-X github.com/netdata/netdata/go/go.d.plugin/pkg/buildinfo.Version=${NETDATA_VERSION}")
 else()
-    set(GO_LDFLAGS "-w -s -X main.version=${NETDATA_VERSION}")
+    set(GO_LDFLAGS "-w -s -X github.com/netdata/netdata/go/go.d.plugin/pkg/buildinfo.Version=${NETDATA_VERSION}")
 endif()
 
 # add_go_target: Add a new target that needs to be built using the Go toolchain.

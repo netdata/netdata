@@ -42,8 +42,7 @@ type (
 )
 
 const (
-	acceptHeader    = `text/plain;version=0.0.4;q=1,*/*;q=0.1`
-	userAgentHeader = `netdata/go.d.plugin`
+	acceptHeader = `text/plain;version=0.0.4;q=1,*/*;q=0.1`
 )
 
 // New creates a Prometheus instance.
@@ -118,7 +117,6 @@ func (p *prometheus) fetch(w io.Writer) error {
 
 	req.Header.Add("Accept", acceptHeader)
 	req.Header.Add("Accept-Encoding", "gzip")
-	req.Header.Set("User-Agent", userAgentHeader)
 
 	resp, err := p.client.Do(req)
 	if err != nil {

@@ -36,7 +36,7 @@ WHICH="$1"
 VERSION="${TRAVIS_TAG:-$(git describe --tags --always --dirty)}"
 
 GOLDFLAGS=${GLDFLAGS:-}
-GOLDFLAGS="$GOLDFLAGS -w -s -X main.version=$VERSION"
+GOLDFLAGS="$GOLDFLAGS -w -s -X github.com/netdata/netdata/go/go.d.plugin/pkg/buildinfo.Version=$VERSION"
 
 build() {
   echo "Building ${GOOS}/${GOARCH}"
