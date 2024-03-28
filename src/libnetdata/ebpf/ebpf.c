@@ -619,6 +619,30 @@ void ebpf_update_kernel_memory_with_vector(ebpf_plugin_stats_t *report,
 
 //----------------------------------------------------------------------------------------------------------------------
 
+/**
+ * Unload legacy code
+ *
+ * @param objects       objects loaded from eBPF programs
+ * @param probe_links   links from loader
+ */
+void ebpf_unload_legacy_code(struct bpf_object *objects, struct bpf_link **probe_links)
+{
+    if (!probe_links || !objects)
+        return;
+
+    struct bpf_program *prog;
+    size_t j = 0 ;
+    bpf_object__for_each_program(prog, objects) {
+        bpf_link__destroy(probe_links[j]);
+        j++;
+    }
+
+    freez(probe_links);
+    bpf_object__close(objects);
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
 void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em)
 {
     pid->user_input = em->pid_map_size;

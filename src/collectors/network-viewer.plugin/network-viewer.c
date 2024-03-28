@@ -4,6 +4,54 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+ebpf_module_t ebpf_nv_module;
+
+static ebpf_local_maps_t nv_maps[] = {{.name = "tbl_nv_socket",
+                                       .internal_input = 65536,
+                                       .user_input = 65536, .type = NETDATA_EBPF_MAP_RESIZABLE,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                       .map_type = BPF_MAP_TYPE_PERCPU_HASH
+#endif
+                                      },
+                                      {.name = "nv_ctrl", .internal_input = NETDATA_CONTROLLER_END,
+                                       .user_input = NETDATA_CONTROLLER_END,
+                                       .type = NETDATA_EBPF_MAP_CONTROLLER,
+                                       .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
+#ifdef LIBBPF_MAJOR_VERSION
+                                       .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                      },
+                                      {.name = NULL, .internal_input = 0, .user_input = 0,
+#ifdef LIBBPF_MAJOR_VERSION
+                                       .map_type = BPF_MAP_TYPE_PERCPU_ARRAY
+#endif
+                                      }};
+
+netdata_ebpf_targets_t nv_targets[] = { {.name = "inet_csk_accept", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "tcp_retransmit_skb", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "tcp_cleanup_rbuf", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "tcp_close", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "udp_recvmsg", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "tcp_sendmsg", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "udp_sendmsg", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "tcp_v4_connect", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "tcp_v6_connect", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = "tcp_set_state", .mode = EBPF_LOAD_TRAMPOLINE},
+                                        {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+
+#ifdef LIBBPF_MAJOR_VERSION // BTF code
+#include "libnetdata/ebpf/includes/networkviewer.skel.h"
+struct networkviewer_bpf *networkviewer_bpf_obj = NULL;
+struct btf *common_btf = NULL;
+#else
+void *common_btf = NULL;
+#endif
+
+#endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+
 #define ENABLE_DETAILED_VIEW
 
 #define LOCAL_SOCKETS_EXTENDED_MEMBERS struct { \
@@ -56,6 +104,12 @@ ENUM_STR_MAP_DEFINE(TCP_STATE) = {
     { . id = 0, .name = NULL }
 };
 ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
+
+typedef struct networkviewer_opt {
+    bool debug;
+    bool ebpf;
+    int  level;
+} networkviewer_opt_t;
 
 static void local_socket_to_json_array(BUFFER *wb, LOCAL_SOCKET *n, uint64_t proc_self_net_ns_inode, bool aggregated) {
     char local_address[INET6_ADDRSTRLEN];
@@ -332,6 +386,10 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
                 .max_errors = 10,
             },
             .stats = { 0 },
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+            .use_ebpf = false,
+            .ebpf_module = &ebpf_nv_module,
+#endif
             .sockets_hashtable = { 0 },
             .local_ips_hashtable = { 0 },
             .listening_ports_hashtable = { 0 },
@@ -734,6 +792,359 @@ close_and_send:
     netdata_mutex_unlock(&stdout_mutex);
 }
 
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+// ----------------------------------------------------------------------------------------------------------------
+// eBPF
+
+#ifdef LIBBPF_MAJOR_VERSION
+static inline void ebpf_networkviewer_disable_probes(struct networkviewer_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_nv_inet_csk_accept_kretprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_v4_connect_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_v6_connect_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_retransmit_skb_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_cleanup_rbuf_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_close_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_udp_recvmsg_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_sendmsg_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_udp_sendmsg_kprobe, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_set_state_kprobe, false);
+}
+
+static inline void ebpf_networkviewer_disable_trampoline(struct networkviewer_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_nv_inet_csk_accept_fexit, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_v4_connect_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_v6_connect_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_retransmit_skb_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_cleanup_rbuf_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_close_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_udp_recvmsg_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_sendmsg_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_udp_sendmsg_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_nv_tcp_set_state_fentry, false);
+}
+
+static void ebpf_networkviewer_set_trampoline_target(struct networkviewer_bpf *obj, netdata_ebpf_targets_t *targets)
+{
+    bpf_program__set_attach_target(obj->progs.netdata_nv_inet_csk_accept_fexit, 0,
+                                   targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_tcp_v4_connect_fentry, 0,
+                                   targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_tcp_v6_connect_fentry, 0,
+                                   targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_tcp_retransmit_skb_fentry, 0,
+                                   targets[NETDATA_FCNT_TCP_RETRANSMIT].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_tcp_cleanup_rbuf_fentry, 0,
+                                   targets[NETDATA_FCNT_CLEANUP_RBUF].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_tcp_close_fentry, 0,
+                                   targets[NETDATA_FCNT_TCP_CLOSE].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_udp_recvmsg_fentry, 0,
+                                   targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_tcp_sendmsg_fentry, 0,
+                                   targets[NETDATA_FCNT_TCP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_udp_sendmsg_fentry, 0,
+                                   targets[NETDATA_FCNT_UDP_SENDMSG].name);
+
+    bpf_program__set_attach_target(obj->progs.netdata_nv_tcp_set_state_fentry, 0,
+                                   targets[NETDATA_FCNT_TCP_SET_STATE].name);
+}
+
+static int ebpf_networkviewer_attach_probes(struct networkviewer_bpf *obj, netdata_ebpf_targets_t *targets)
+{
+    obj->links.netdata_nv_inet_csk_accept_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_inet_csk_accept_kretprobe,
+                                                                                 true,
+                                                                                 targets[NETDATA_FCNT_INET_CSK_ACCEPT].name);
+    int ret = libbpf_get_error(obj->links.netdata_nv_inet_csk_accept_kretprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_tcp_v4_connect_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_v4_connect_kprobe,
+                                                                             false,
+                                                                             targets[NETDATA_FCNT_TCP_V4_CONNECT].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_tcp_v4_connect_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_tcp_v6_connect_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_v6_connect_kprobe,
+                                                                             false,
+                                                                             targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_tcp_v6_connect_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_tcp_retransmit_skb_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_retransmit_skb_kprobe,
+                                                                                 false,
+                                                                                 targets[NETDATA_FCNT_TCP_RETRANSMIT].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_tcp_retransmit_skb_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_tcp_cleanup_rbuf_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_cleanup_rbuf_kprobe,
+                                                                               false,
+                                                                               targets[NETDATA_FCNT_CLEANUP_RBUF].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_tcp_cleanup_rbuf_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_tcp_close_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_close_kprobe,
+                                                                        false,
+                                                                        targets[NETDATA_FCNT_TCP_CLOSE].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_tcp_close_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_udp_recvmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_udp_recvmsg_kprobe,
+                                                                          false,
+                                                                          targets[NETDATA_FCNT_UDP_RECEVMSG].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_udp_recvmsg_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_tcp_sendmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_sendmsg_kprobe,
+                                                                          false,
+                                                                          targets[NETDATA_FCNT_TCP_SENDMSG].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_tcp_sendmsg_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_udp_sendmsg_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_udp_sendmsg_kprobe,
+                                                                          false,
+                                                                          targets[NETDATA_FCNT_UDP_SENDMSG].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_udp_sendmsg_kprobe);
+    if (ret)
+        return -1;
+
+    obj->links.netdata_nv_tcp_set_state_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_set_state_kprobe,
+                                                                            false,
+                                                                            targets[NETDATA_FCNT_TCP_SET_STATE].name);
+    ret = libbpf_get_error(obj->links.netdata_nv_tcp_set_state_kprobe);
+    if (ret)
+        return -1;
+
+    return 0;
+}
+
+static inline int ebpf_networkviewer_load_and_attach(struct networkviewer_bpf *obj, ebpf_module_t *em)
+{
+    if (!em->maps_per_core) {
+        // Added to be compatible with all kernels
+        bpf_map__set_type(obj->maps.tbl_nv_socket, BPF_MAP_TYPE_HASH);
+        bpf_map__set_type(obj->maps.nv_ctrl, BPF_MAP_TYPE_ARRAY);
+    }
+
+    int ret;
+    if (em->targets[0].mode == EBPF_LOAD_TRAMPOLINE) { // trampoline
+        ebpf_networkviewer_disable_probes(obj);
+
+        ebpf_networkviewer_set_trampoline_target(obj, em->targets);
+
+        ret = networkviewer_bpf__load(obj);
+        if (!ret)
+            ret = networkviewer_bpf__attach(obj);
+    } else { // kprobe
+        ebpf_networkviewer_disable_trampoline(obj);
+
+        ret = networkviewer_bpf__load(obj);
+        if (!ret)
+            ret = ebpf_networkviewer_attach_probes(obj, em->targets);
+    }
+
+    return ret;
+}
+#endif
+
+static inline void network_viwer_set_module(ebpf_module_t *em, networkviewer_opt_t *args)
+{
+    static char *binary_name = {"network_viewer"};
+
+    em->info.thread_name = em->info.config_name = binary_name;
+    em->maps = nv_maps;
+    em->probe_links = NULL;
+    em->objects = NULL;
+    em->kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14;
+    em->maps_per_core = 0;
+    em->mode = MODE_ENTRY;
+    em->targets = nv_targets;
+    em->apps_charts = NETDATA_EBPF_APPS_FLAG_YES;
+    em->apps_level = args->level;
+
+#ifdef LIBBPF_MAJOR_VERSION
+    em->load |= EBPF_LOAD_CORE; // Prefer CO-RE avoiding kprobes
+    ebpf_adjust_thread_load(em, common_btf);
+#else
+    em->load |= EBPF_LOAD_LEGACY;
+#endif
+}
+
+static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver)
+{
+    int isrh = get_redhat_release();
+
+    int ret = 0;
+    if (em->load & EBPF_LOAD_LEGACY) {
+        em->probe_links = ebpf_load_program(PLUGINS_DIR, em, kver, isrh, &em->objects);
+        if (!em->probe_links)
+            ret = -1;
+        else {
+            struct bpf_map *map;
+            bpf_object__for_each_map(map, em->objects)
+            {
+                const char *name = bpf_map__name(map);
+                int fd = bpf_map__fd(map);
+                if (!strcmp(name, nv_maps[0].name))
+                    em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd = fd;
+                else
+                    em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd = fd;
+            }
+        }
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    else {
+        ebpf_define_map_type(em->maps, em->maps_per_core, kver);
+        networkviewer_bpf_obj = networkviewer_bpf__open();
+        ret = (!networkviewer_bpf_obj) ? -1 : ebpf_networkviewer_load_and_attach(networkviewer_bpf_obj, em);
+        if (!ret) {
+            em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd = bpf_map__fd(networkviewer_bpf_obj->maps.tbl_nv_socket);
+            em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd = bpf_map__fd(networkviewer_bpf_obj->maps.nv_ctrl);
+        }
+    }
+#endif
+
+    if (!ret) {
+        ebpf_update_controller(nv_maps[1].map_fd, em);
+        // We are going to use the optional value to determine when data is loaded in kernel
+        ebpf_nv_module.optional = NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
+        ebpf_nv_module.running_time = now_realtime_sec();
+
+        rw_spinlock_init(&ebpf_nv_module.rw_spinlock);
+    }
+
+    return ret;
+}
+
+static inline void network_viewer_unload_ebpf()
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    if (common_btf) {
+        btf__free(common_btf);
+        common_btf = NULL;
+    }
+
+    if (networkviewer_bpf_obj) {
+        networkviewer_bpf__destroy(networkviewer_bpf_obj);
+        networkviewer_bpf_obj = NULL;
+    }
+#else
+    if (ebpf_nv_module.objects)
+        ebpf_unload_legacy_code(ebpf_nv_module.objects, ebpf_nv_module.probe_links);
+#endif
+    ebpf_local_maps_t *maps = ebpf_nv_module.maps;
+    if (maps)
+        maps[0].map_fd = maps[1].map_fd = -1;
+}
+
+static inline void network_viewer_load_ebpf(networkviewer_opt_t *args)
+{
+    memset(&ebpf_nv_module, 0, sizeof(ebpf_module_t));
+
+    if (ebpf_can_plugin_load_code(ebpf_get_kernel_version(), "networkviewer.plugin"))
+        return;
+
+    if (ebpf_adjust_memory_limit())
+        return;
+
+#ifdef LIBBPF_MAJOR_VERSION
+    common_btf = ebpf_load_btf_file(EBPF_DEFAULT_BTF_PATH, EBPF_DEFAULT_BTF_FILE);
+#endif
+
+    int kver = ebpf_get_kernel_version();
+    network_viwer_set_module(&ebpf_nv_module, args);
+
+    if (network_viewer_load_ebpf_to_kernel(&ebpf_nv_module, kver))
+        network_viewer_unload_ebpf();
+}
+
+void *network_viewer_ebpf_worker(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    uint32_t max = 5 * NETWORK_VIEWER_EBPF_ACTION_LIMIT;
+    uint64_t removed = 0;
+    while (!plugin_should_exit) {
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
+
+        rw_spinlock_write_lock(&em->rw_spinlock);
+        uint32_t curr = now_realtime_sec() - em->running_time;
+        if (em->optional != NETWORK_VIEWER_EBPF_NV_NOT_RUNNING || curr < max) {
+            rw_spinlock_write_unlock(&em->rw_spinlock);
+            continue;
+        }
+        em->running_time = now_realtime_sec();
+        em->optional = NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
+        rw_spinlock_write_unlock(&em->rw_spinlock);
+
+        ebpf_nv_idx_t key = {};
+        ebpf_nv_idx_t next_key = {};
+        ebpf_nv_data_t stored = {};
+        int fd = em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
+        while (!bpf_map_get_next_key(fd, &key, &next_key)) {
+            if (!bpf_map_lookup_elem(fd, &key, &stored)) {
+                if (stored.closed) {
+                    bpf_map_delete_elem(fd, &key);
+                    removed++;
+                }
+            }
+
+            stored.closed = 0;
+            key = next_key;
+        }
+    }
+
+    if (removed)
+        local_sockets_reset_ebpf_value(em, removed);
+
+    return NULL;
+}
+#endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+
+// ----------------------------------------------------------------------------------------------------------------
+// Parse Args
+
+static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char **argv)
+{
+    int i;
+    for(i = 1; i < argc; i++) {
+        if (strcmp("debug", argv[i]) == 0)
+            args->debug = true;
+        else if (strcmp("ebpf", argv[i]) == 0) {
+            args->ebpf = true;
+            args->level = NETDATA_APPS_LEVEL_PARENT;
+        }
+        else if (strcmp("apps-level", argv[i]) == 0) {
+            if(argc <= i + 1) {
+                nd_log(NDLS_COLLECTORS, NDLP_INFO, "Parameter 'apps-level' requires a number between %u and %u as argument.",
+                       NETDATA_APPS_LEVEL_REAL_PARENT, NETDATA_APPS_LEVEL_ALL);
+                exit(1);
+            }
+
+            i++;
+            args->level = str2i(argv[i]);
+            if (args->level < NETDATA_APPS_LEVEL_REAL_PARENT || args->level > NETDATA_APPS_LEVEL_ALL)
+                args->level = NETDATA_APPS_LEVEL_PARENT;
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------------------------------------------
 // main
 
@@ -749,7 +1160,18 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    if(argc == 2 && strcmp(argv[1], "debug") == 0) {
+    networkviewer_opt_t args =  {};
+    networkviewer_parse_args(&args, argc, argv);
+    if(args.debug) {
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+        if(args.ebpf)
+            network_viewer_load_ebpf(&args);
+
+        if (ebpf_nv_module.maps && ebpf_nv_module.maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd > 0)
+            nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGIN: the plugin will use eBPF %s to monitor sockets.",
+                   (nv_targets[0].mode == EBPF_LOAD_TRAMPOLINE) ? "trampoline" : "kprobe");
+#endif
+
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
         char buf[] = "network-connections sockets:aggregated";
@@ -759,8 +1181,29 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         char buf2[] = "network-connections sockets:detailed";
         network_viewer_function("123", buf2, &stop_monotonic_ut, &cancelled,
                                 NULL, HTTP_ACCESS_ALL, NULL, NULL);
+
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+        if (args.ebpf)
+            network_viewer_unload_ebpf();
+#endif
         exit(1);
     }
+
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    static netdata_thread_t *nv_clean_thread = NULL;
+    if(args.ebpf) {
+        network_viewer_load_ebpf(&args);
+
+        if (ebpf_nv_module.maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd > 0) {
+            nv_clean_thread = mallocz(sizeof(netdata_thread_t));
+            netdata_thread_create(nv_clean_thread,
+                                  "P[networkviewer ebpf]",
+                                  NETDATA_THREAD_OPTION_JOINABLE,
+                                  network_viewer_ebpf_worker,
+                                  &ebpf_nv_module);
+        }
+    }
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
 
@@ -798,6 +1241,15 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
             send_newline_ut = 0;
         }
     }
+
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    if (nv_clean_thread) {
+        netdata_thread_join(*nv_clean_thread, NULL);
+        freez(nv_clean_thread);
+    }
+    if (args.ebpf)
+        network_viewer_unload_ebpf();
+#endif
 
     return 0;
 }
