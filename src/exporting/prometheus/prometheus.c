@@ -598,6 +598,16 @@ static void prometheus_print_os_info(
     fclose(fp);
 }
 
+/**
+ * RRDSET to JSON
+ *
+ * From RRDSET extract content necessary to write JSON output.
+ *
+ * @param st   netdata chart structure
+ * @param data structure with necessary data and to build expected result.
+ *
+ * @return I returns 1 when content was used and 0 otherwise.
+ */
 static int prometheus_rrdset_to_json(RRDSET *st, void *data)
 {
     struct host_variables_callback_options *opts = data;
@@ -796,7 +806,18 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
     return 0;
 }
 
-static inline int prometheus_rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void *value, void *data)
+/**
+ * RRDCONTEXT callback
+ *
+ * Callback used to parse dictionary
+ *
+ * @param item  the dictionary structure
+ * @param value unused element
+ * @param data  structure used to store data.
+ *
+ * @return It always returns HTTP_RESP_OK
+ */
+static inline int prometheus_rrdcontext_callback(const DICTIONARY_ITEM *item, void *value, void *data)
 {
     const char *context_name = dictionary_acquired_item_name(item);
     struct host_variables_callback_options *opts = data;
@@ -894,7 +915,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         goto allmetrics_cleanup;
     }
 
-    dictionary_walkthrough_read(host->rrdctx.contexts, prometheus_rrdcontext_to_json_callback, &opts);
+    dictionary_walkthrough_read(host->rrdctx.contexts, prometheus_rrdcontext_callback, &opts);
 
 allmetrics_cleanup:
     simple_pattern_free(filter);
