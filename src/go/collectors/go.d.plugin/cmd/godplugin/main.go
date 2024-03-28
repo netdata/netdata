@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/executable"
 	"github.com/netdata/netdata/go/go.d.plugin/cli"
 	"github.com/netdata/netdata/go/go.d.plugin/logger"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/buildinfo"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/multipath"
 
 	"github.com/jessevdk/go-flags"
@@ -32,8 +33,6 @@ var (
 	lockDir     = os.Getenv("NETDATA_LOCK_DIR")
 	watchPath   = os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH")
 	envLogLevel = os.Getenv("NETDATA_LOG_LEVEL")
-
-	version = "unknown"
 )
 
 func confDir(opts *cli.Option) multipath.MultiPath {
@@ -115,7 +114,7 @@ func main() {
 	opts := parseCLI()
 
 	if opts.Version {
-		fmt.Printf("go.d.plugin, version: %s\n", version)
+		fmt.Printf("go.d.plugin, version: %s\n", buildinfo.Version)
 		return
 	}
 
@@ -142,7 +141,7 @@ func main() {
 		MinUpdateEvery:       opts.UpdateEvery,
 	})
 
-	a.Debugf("plugin: name=%s, version=%s", a.Name, version)
+	a.Debugf("plugin: name=%s, version=%s", a.Name, buildinfo.Version)
 	if u, err := user.Current(); err == nil {
 		a.Debugf("current user: name=%s, uid=%s", u.Username, u.Uid)
 	}
