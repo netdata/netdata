@@ -564,7 +564,7 @@ paths:
             enum:
               - yes
               - no
-            default: no
+            default: yes
         - name: types
           in: query
           description: |
@@ -575,7 +575,7 @@ paths:
             enum:
               - yes
               - no
-            default: no
+            default: yes
         - name: timestamps
           in: query
           description: |
