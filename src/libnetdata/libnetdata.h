@@ -395,6 +395,7 @@ extern char *netdata_configured_host_prefix;
 #include "inlined.h"
 #include "line_splitter/line_splitter.h"
 #include "clocks/clocks.h"
+#include "parsers/parsers.h"
 #include "datetime/iso8601.h"
 #include "datetime/rfc3339.h"
 #include "datetime/rfc7231.h"
@@ -576,7 +577,6 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step);
 int hash256_string(const unsigned char *string, size_t size, char *hash);
 
 extern bool unittest_running;
-#define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now);
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest);
