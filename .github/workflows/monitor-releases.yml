@@ -31,7 +31,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "RELEASE_CHANNEL=${{ github.event.inputs.channel }}" >> "${GITHUB_ENV}"
-          else:
+          else
             echo "RELEASE_CHANNEL=stable" >> "${GITHUB_ENV}"
           fi
       - name: Init Python environment

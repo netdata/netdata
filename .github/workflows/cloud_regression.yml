@@ -22,21 +22,24 @@ jobs:
           PR_COMMIT_HASH: ${{ github.event.pull_request.head.sha }}
         id: output-workflow-dispatch-params
         run: |
-          if [ ${{ github.event_name }} == 'pull_request_target' ]; then
+          if [ "${{ github.event_name }}" == 'pull_request_target' ]; then
             NETDATA_CUSTOM_REPO="$PR_REPO_NAME"
             NETDATA_CUSTOM_BRANCH="$PR_BRANCH_NAME"
             NETDATA_CUSTOM_PR_NUMBER="${{ github.event.number }}"
             NETDATA_CUSTOM_COMMIT_HASH="$PR_COMMIT_HASH"
-          elif [ ${{ github.event_name }} == 'push' ]; then
+          elif [ "${{ github.event_name }}" == 'push' ]; then
             NETDATA_CUSTOM_REPO="netdata/netdata"
             NETDATA_CUSTOM_BRANCH="master"
             NETDATA_CUSTOM_PR_NUMBER=""
             NETDATA_CUSTOM_COMMIT_HASH="${{ github.sha }}"
           fi
-          echo "netdata_repo=${NETDATA_CUSTOM_REPO}" >> $GITHUB_OUTPUT
-          echo "netdata_branch=${NETDATA_CUSTOM_BRANCH}" >> $GITHUB_OUTPUT
-          echo "netdata_pr_number=${NETDATA_CUSTOM_PR_NUMBER}" >> $GITHUB_OUTPUT
-          echo "netdata_commit_hash=${NETDATA_CUSTOM_COMMIT_HASH}" >> $GITHUB_OUTPUT
+
+          {
+            echo "netdata_repo=${NETDATA_CUSTOM_REPO}"
+            echo "netdata_branch=${NETDATA_CUSTOM_BRANCH}"
+            echo "netdata_pr_number=${NETDATA_CUSTOM_PR_NUMBER}"
+            echo "netdata_commit_hash=${NETDATA_CUSTOM_COMMIT_HASH}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Trigger Full Cloud Regression
         uses: aurelien-baudet/workflow-dispatch@v2
