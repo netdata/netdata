@@ -103,13 +103,33 @@ check_for_curl() {
 
 get() {
   url="${1}"
+  checked=0
+  succeeded=0
 
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    "${curl}" -q -o - -sSL --connect-timeout 10 --retry 3 "${url}"
-  elif command -v wget > /dev/null 2>&1; then
-    wget -T 15 -O - "${url}"
+    checked=1
+
+    if "${curl}" -q -o - -sSL --connect-timeout 10 --retry 3 "${url}"; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if wget -T 15 -O - "${url}"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "I need curl or wget to proceed, but neither is available on this system." "L0002"
   fi
@@ -124,9 +144,29 @@ download_file() {
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    run "${curl}" -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
-  elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O "${dest}" "${url}"
+    checked=1
+
+    if run "${curl}" -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"; then
+      succeeded=1
+    else
+      rm -f "${dest}"
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if run wget -T 15 -O "${dest}" "${url}"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     echo >&2
     echo >&2 "Downloading ${name} from '${url}' failed because of missing mandatory packages."
