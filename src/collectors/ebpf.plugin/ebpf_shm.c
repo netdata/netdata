@@ -735,6 +735,7 @@ static void ebpf_shm_sum_cgroup_pids(netdata_publish_shm_t *shm, struct pid_on_t
  */
 static void ebpf_create_specific_shm_charts(char *type, int update_every)
 {
+    char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_SHMGET_CHART,
                       "Calls to syscall shmget(2).",
                       EBPF_COMMON_DIMENSION_CALL,
@@ -747,6 +748,8 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
                       1,
                       update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SHMAT_CHART,
                       "Calls to syscall shmat(2).",
@@ -760,6 +763,8 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
                       1,
                       update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SHMDT_CHART,
                       "Calls to syscall shmdt(2).",
@@ -773,6 +778,8 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
                       1,
                       update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SHMCTL_CHART,
                       "Calls to syscall shmctl(2).",
@@ -786,6 +793,8 @@ static void ebpf_create_specific_shm_charts(char *type, int update_every)
                       1,
                       update_every,
                       NETDATA_EBPF_MODULE_NAME_SHM);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 }
 
 /**
@@ -1168,7 +1177,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20191,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SHM);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1183,7 +1192,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20192,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SHM);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1198,7 +1207,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20193,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SHM);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1213,7 +1222,7 @@ void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20194,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SHM);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
