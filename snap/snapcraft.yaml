@@ -1,0 +1,109 @@
+name: netdata # you probably want to 'snapcraft register <name>'
+base: core24 # the base snap is the execution environment for this snap
+build-base: devel
+version: '0.1' # just for humans, typically '1.2+git' or '1.3.2'
+summary: Netdata Agent
+description: |
+  Netdata is distributed, real-time, performance and health monitoring for
+  systems and applications. It provides insights of everything happening on the
+  systems it runs using interactive web dashboards.
+
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: strict # use 'strict' once you have the right plugs and slots
+
+layout:
+#  /etc/netdata:
+#    symlink: $SNAP_COMMON/etc/netdata
+#  /usr/lib/netdata:
+#    symlink: $SNAP/usr/lib/netdata
+#  /usr/libexec/netdata:
+#    symlink: $SNAP/usr/libexec/netdata
+#  /usr/share/netdata:
+#    symlink: $SNAP/usr/share/netdata
+#  /var/cache/netdata:
+#    symlink: $SNAP_DATA/var/cache/netdata
+#  /var/lib/netdata:
+#    symlink: $SNAP_DATA/var/lib/netdata
+#  /var/log/netdata:
+#    symlink: $SNAP_DATA/var/log/netdata
+  /etc/sensors3.conf:
+    symlink: $SNAP/etc/sensors3.conf
+  /usr/bin/lsns:
+    bind-file: $SNAP/usr/bin/lsns
+
+parts:
+  deps:
+    plugin: nil
+    source: .
+    source-type: local
+    override-build: |
+      bash ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive -i netdata-all
+
+  netdata:
+    plugin: nil
+    source: .
+    source-type: local
+    build-packages:
+      - libpcre2-dev
+    override-build: |
+      sh ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build
+      mkdir -p $SNAPCRAFT_PART_INSTALL/usr/sbin/ \
+               $SNAPCRAFT_PART_INSTALL/usr/share \
+               $SNAPCRAFT_PART_INSTALL/usr/libexec \
+               $SNAPCRAFT_PART_INSTALL/usr/local \
+               $SNAPCRAFT_PART_INSTALL/usr/lib \
+               $SNAPCRAFT_PART_INSTALL/var/cache \
+               $SNAPCRAFT_PART_INSTALL/var/lib \
+               $SNAPCRAFT_PART_INSTALL/etc
+      rm -rf $SNAPCRAFT_PART_INSTALL/var/{cache,lib}/netdata
+      rm -rf $SNAPCRAFT_PART_INSTALL/usr/{share,lib,libexec}/netdata
+      mv /usr/share/netdata            $SNAPCRAFT_PART_INSTALL/usr/share/
+      mv /usr/libexec/netdata          $SNAPCRAFT_PART_INSTALL/usr/libexec/
+      mv /usr/lib/netdata              $SNAPCRAFT_PART_INSTALL/usr/lib/
+      mv /var/cache/netdata            $SNAPCRAFT_PART_INSTALL/var/cache/
+      mv /var/lib/netdata              $SNAPCRAFT_PART_INSTALL/var/lib/
+      mv /etc/netdata                  $SNAPCRAFT_PART_INSTALL/etc/
+      mv /usr/sbin/log2journal         $SNAPCRAFT_PART_INSTALL/usr/sbin/
+      mv /usr/sbin/netdata             $SNAPCRAFT_PART_INSTALL/usr/sbin/
+      mv /usr/sbin/netdata-claim.sh    $SNAPCRAFT_PART_INSTALL/usr/sbin/
+      mv /usr/sbin/netdatacli          $SNAPCRAFT_PART_INSTALL/usr/sbin/
+      mv /usr/sbin/systemd-cat-native  $SNAPCRAFT_PART_INSTALL/usr/sbin/
+      cp -p "$SNAPCRAFT_PROJECT_DIR/snap/local/netdata.conf" "$SNAPCRAFT_PART_INSTALL/etc/netdata/netdata.conf"
+    stage-packages:
+      - curl
+      - iproute2
+      - libuv1
+      - lm-sensors
+      - util-linux
+    prime:
+      - -opt/netdata/var/cache/netdata/.keep
+      - -opt/netdata/var/lib/netdata/.keep
+      - -opt/netdata/var/log/netdata/.keep
+
+apps:
+  agent:
+    command: usr/sbin/netdata -u root -D -P $SNAP_DATA/var/run/netdata/netdata.pid -c $SNAP_COMMON/etc/netdata/netdata.conf
+    daemon: simple
+    plugs:
+      - docker-support  # Allows access to /prod/[0-9]*/limits
+      - hardware-observe
+      - kubernetes-support  # cgroups (incl. systemd services)
+      - log-observe
+      - login-session-observe
+      - mount-observe
+      - network
+      - network-bind
+      - network-observe  # network connections function
+      - network-setup-observe  # ip{,4,6}.*, wireless.*, netfilter.conntrack_sockets
+      - system-observe  # many disk.*, cpu and memory pressure, system.io
+      - time-control # needed for timex to call clock_adjtime to measure jitter
+  claim:
+    command: usr/sbin/netdata-claim.sh
+    plugs:
+      - network
+  cli:
+    command: usr/sbin/netdatacli
+  log2journal:
+    command: usr/sbin/log2journal
+  systemd-cat-native:
+    command: usr/sbin/systemd-cat-native
