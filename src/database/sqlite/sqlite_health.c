@@ -860,21 +860,10 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->match.chart_labels));
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ap->config.summary));
 
-    rc = sqlite3_bind_int(res, ++param, ap->config.time_group_condition);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_double(res, ++param, ap->config.time_group_value);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, ap->config.dims_group);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, ap->config.data_source);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.time_group_condition));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_double(res, ++param, ap->config.time_group_value));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.dims_group));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.data_source));
 
     param = 0;
     rc = execute_insert(res);
