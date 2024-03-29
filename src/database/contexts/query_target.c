@@ -732,12 +732,12 @@ static inline bool query_instance_matches_labels(
     SIMPLE_PATTERN *labels_sp)
 {
 
-    if (chart_label_key_sp && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, chart_label_key_sp, '\0', NULL))
+    if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
         return false;
 
     if (labels_sp) {
         struct pattern_array *pa = pattern_array_add_simple_pattern(NULL, labels_sp, ':');
-        bool found = pattern_array_label_match(pa, ri->rrdlabels, ':', NULL, rrdlabels_match_simple_pattern_parsed);
+        bool found = pattern_array_label_match(pa, ri->rrdlabels, ':', NULL);
         pattern_array_free(pa);
         return found;
     }

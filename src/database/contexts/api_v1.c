@@ -131,13 +131,13 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     if(before && (!ri->first_time_s || before < ri->first_time_s))
         return 0;
 
-    if(t_parent->chart_label_key && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, t_parent->chart_label_key,
-                                                                           '\0', NULL))
+    if(t_parent->chart_label_key && rrdlabels_match_simple_pattern_parsed(ri->rrdlabels, t_parent->chart_label_key,
+                                                                           '\0', NULL) != SP_MATCHED_POSITIVE)
         return 0;
 
-    if(t_parent->chart_labels_filter && !rrdlabels_match_simple_pattern_parsed(ri->rrdlabels,
+    if(t_parent->chart_labels_filter && rrdlabels_match_simple_pattern_parsed(ri->rrdlabels,
                                                                                t_parent->chart_labels_filter, ':',
-                                                                               NULL))
+                                                                               NULL) != SP_MATCHED_POSITIVE)
         return 0;
 
     time_t first_time_s = ri->first_time_s;

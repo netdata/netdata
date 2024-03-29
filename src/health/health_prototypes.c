@@ -483,7 +483,7 @@ static bool prototype_matches_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
         return false;
 
     if (host->rrdlabels && ap->match.host_labels_pattern &&
-        !pattern_array_label_match(ap->match.host_labels_pattern, host->rrdlabels, '=', NULL, rrdlabels_match_simple_pattern_parsed))
+        !pattern_array_label_match(ap->match.host_labels_pattern, host->rrdlabels, '=', NULL))
         return false;
 
     return true;
@@ -501,7 +501,7 @@ static bool prototype_matches_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
         return false;
 
     if (st->rrdlabels && ap->match.chart_labels_pattern &&
-        !pattern_array_label_match(ap->match.chart_labels_pattern, st->rrdlabels, '=', NULL, rrdlabels_match_simple_pattern_parsed))
+        !pattern_array_label_match(ap->match.chart_labels_pattern, st->rrdlabels, '=', NULL))
         return false;
 
     return true;

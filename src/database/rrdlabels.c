@@ -1154,13 +1154,15 @@ static int simple_pattern_match_name_and_value_callback(const char *name, const 
     *dst = '\0';
 
     t->searches++;
-    if(simple_pattern_matches_length_extract(t->pattern, tmp, dst - tmp, NULL, 0) == SP_MATCHED_POSITIVE)
+    SIMPLE_PATTERN_RESULT rc = simple_pattern_matches_length_extract(t->pattern, tmp, dst - tmp, NULL, 0);
+
+    if(rc == SP_MATCHED_NEGATIVE)
         return -1;
 
-    return 0;
+    return rc == SP_MATCHED_POSITIVE ? 1 : 0;
 }
 
-bool rrdlabels_match_simple_pattern_parsed(RRDLABELS *labels, SIMPLE_PATTERN *pattern, char equal, size_t *searches) {
+SIMPLE_PATTERN_RESULT rrdlabels_match_simple_pattern_parsed(RRDLABELS *labels, SIMPLE_PATTERN *pattern, char equal, size_t *searches) {
     if (!labels) return false;
 
     struct simple_pattern_match_name_value t = {
@@ -1174,7 +1176,10 @@ bool rrdlabels_match_simple_pattern_parsed(RRDLABELS *labels, SIMPLE_PATTERN *pa
     if(searches)
         *searches = t.searches;
 
-    return (ret == -1)?true:false;
+    if(ret < 0)
+        return SP_MATCHED_NEGATIVE;
+
+    return (ret > 0)?SP_MATCHED_POSITIVE:SP_NOT_MATCHED;
 }
 
 bool rrdlabels_match_simple_pattern(RRDLABELS *labels, const char *simple_pattern_txt) {
@@ -1191,11 +1196,11 @@ bool rrdlabels_match_simple_pattern(RRDLABELS *labels, const char *simple_patter
         }
     }
 
-    bool ret = rrdlabels_match_simple_pattern_parsed(labels, pattern, equal, NULL);
+    SIMPLE_PATTERN_RESULT ret = rrdlabels_match_simple_pattern_parsed(labels, pattern, equal, NULL);
 
     simple_pattern_free(pattern);
 
-    return ret;
+    return ret == SP_MATCHED_POSITIVE;
 }
 
 
@@ -1389,7 +1394,6 @@ bool pattern_array_label_match(
     RRDLABELS *labels,
     char eq,
     size_t *searches,
-    bool (*callback_function)(RRDLABELS *, SIMPLE_PATTERN *, char, size_t *))
 {
     if (!pa || !labels)
         return true;
@@ -1398,14 +1402,23 @@ bool pattern_array_label_match(
     Word_t Index = 0;
     bool first_then_next = true;
     while ((Pvalue = JudyLFirstThenNext(pa->JudyL, &Index, &first_then_next))) {
+        // for each label key in the patterns array
+
         struct pattern_array_item *pai = *Pvalue;
-        bool match = false;
-        for (Word_t i = 1; !match && i <= pai->size; i++) {
+        SIMPLE_PATTERN_RESULT match = SP_NOT_MATCHED ;
+        for (Word_t i = 1; i <= pai->size; i++) {
+            // for each pattern in the label key pattern list
+
             if (!(Pvalue = JudyLGet(pai->JudyL, i, PJE0)) || !*Pvalue)
                 continue;
-            match = callback_function(labels, (SIMPLE_PATTERN *)(*Pvalue), eq, searches);
+
+            match = rrdlabels_match_simple_pattern_parsed(labels, (SIMPLE_PATTERN *)(*Pvalue), eq, searches);
+
+            if(match != SP_NOT_MATCHED)
+                break;
         }
-        if (!match)
+
+        if (match != SP_MATCHED_POSITIVE)
             return false;
     }
     return true;
@@ -1705,25 +1718,25 @@ static int rrdlabels_unittest_pattern_check()
 
     bool match;
     struct pattern_array *pa = pattern_array_add_key_value(NULL, "_module", "wrong_module", '=');
-    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    match = pattern_array_label_match(pa, labels, '=', NULL);
     // This should not match:  _module in ("wrong_module")
     if (match)
         rc++;
 
     pattern_array_add_key_value(pa, "_module", "disk_detection", '=');
-    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    match = pattern_array_label_match(pa, labels, '=', NULL);
     // This should match: _module in ("wrong_module","disk_detection")
     if (!match)
         rc++;
 
     pattern_array_add_key_value(pa, "key1", "wrong_key1_value", '=');
-    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    match = pattern_array_label_match(pa, labels, '=', NULL);
     // This should not match: _module in ("wrong_module","disk_detection") AND key1 in ("wrong_key1_value")
     if (match)
         rc++;
 
     pattern_array_add_key_value(pa, "key1", "value1", '=');
-    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    match = pattern_array_label_match(pa, labels, '=', NULL);
     // This should match: _module in ("wrong_module","disk_detection") AND key1 in ("wrong_key1_value", "value1")
     if (!match)
         rc++;
@@ -1734,13 +1747,13 @@ static int rrdlabels_unittest_pattern_check()
     sp = simple_pattern_create("key3=*phant", SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true);
     pattern_array_add_lblkey_with_sp(pa, "key3", sp);
 
-    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    match = pattern_array_label_match(pa, labels, '=', NULL);
     // This should match: _module in ("wrong_module","disk_detection") AND key1 in ("wrong_key1_value", "value1") AND key2 in ("cat* !d*") AND key3 in ("*phant")
     if (!match)
         rc++;
 
     rrdlabels_add(labels, "key3", "now_fail", RRDLABEL_SRC_CONFIG);
-    match = pattern_array_label_match(pa, labels, '=', NULL, rrdlabels_match_simple_pattern_parsed);
+    match = pattern_array_label_match(pa, labels, '=', NULL);
     // This should not match: _module in ("wrong_module","disk_detection") AND key1 in ("wrong_key1_value", "value1") AND key2 in ("cat* !d*") AND key3 in ("*phant")
     if (match)
         rc++;
