@@ -695,8 +695,11 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                             p.suffix = "_total";
                     }
 
-                    generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
-                    generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
+                    if (opts->output_options & PROMETHEUS_OUTPUT_HELP_TYPE) {
+                        generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
+                        generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
+                        opts->output_options &= ~PROMETHEUS_OUTPUT_HELP_TYPE;
+                    }
 
                     if (homogeneous) {
                         // all the dimensions of the chart, has the same algorithm, multiplier and divisor
@@ -737,8 +740,11 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                             (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                             PROMETHEUS_ELEMENT_MAX);
 
-                        generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
-                        generate_as_collected_prom_type(wb, prefix, context, units, suffix, "gauge");
+                        if (opts->output_options & PROMETHEUS_OUTPUT_HELP_TYPE) {
+                            generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
+                            generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, "gauge");
+                            opts->output_options &= ~PROMETHEUS_OUTPUT_HELP_TYPE;
+                        }
 
                         buffer_flush(plabels_buffer);
                         buffer_sprintf(plabels_buffer,
@@ -800,6 +806,7 @@ static inline int prometheus_rrdcontext_callback(const DICTIONARY_ITEM *item, vo
     struct host_variables_callback_options *opts = data;
     (void)value;
 
+    opts->output_options |= PROMETHEUS_OUTPUT_HELP_TYPE;
     (void)rrdcontext_foreach_instance_with_rrdset_in_context(opts->host, context_name, prometheus_rrdset_to_json, data);
 
     return HTTP_RESP_OK;
