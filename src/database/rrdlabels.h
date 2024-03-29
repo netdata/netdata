@@ -51,7 +51,7 @@ int rrdlabels_walkthrough_read(RRDLABELS *labels, int (*callback)(const char *na
 void rrdlabels_log_to_buffer(RRDLABELS *labels, BUFFER *wb);
 bool rrdlabels_match_simple_pattern(RRDLABELS *labels, const char *simple_pattern_txt);
 
-bool rrdlabels_match_simple_pattern_parsed(RRDLABELS *labels, SIMPLE_PATTERN *pattern, char equal, size_t *searches);
+SIMPLE_PATTERN_RESULT rrdlabels_match_simple_pattern_parsed(RRDLABELS *labels, SIMPLE_PATTERN *pattern, char equal, size_t *searches);
 int rrdlabels_to_buffer(RRDLABELS *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them,
                         bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data,
                         void (*name_sanitizer)(char *dst, const char *src, size_t dst_size),
@@ -69,8 +69,7 @@ bool pattern_array_label_match(
     struct pattern_array *pa,
     RRDLABELS *labels,
     char eq,
-    size_t *searches,
-    bool (*callback_function)(RRDLABELS *, SIMPLE_PATTERN *, char, size_t *));
+    size_t *searches);
 struct pattern_array *pattern_array_add_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep);
 struct pattern_array *
 pattern_array_add_key_simple_pattern(struct pattern_array *pa, const char *key, SIMPLE_PATTERN *pattern);
