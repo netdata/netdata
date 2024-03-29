@@ -152,7 +152,7 @@ func (m *Manager) run() {
 }
 
 func (m *Manager) addConfig(cfg confgroup.Config) {
-	if cfg.Module() == "" {
+	if _, ok := m.Modules.Lookup(cfg.Module()); !ok {
 		return
 	}
 
