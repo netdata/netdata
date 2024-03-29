@@ -363,6 +363,7 @@ struct host_variables_callback_options {
     char name[PROMETHEUS_VARIABLE_MAX + 1];
     SIMPLE_PATTERN *pattern;
     struct instance *instance;
+    STRING *prometheus;
 };
 
 /**
@@ -620,7 +621,7 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
         BUFFER *plabels_buffer = opts->plabels_buffer;
         const char *plabels_prefix = opts->instance->config.label_prefix;
 
-        STRING *prometheus = string_strdupz("prometheus");
+        STRING *prometheus = opts->prometheus;
 
         char chart[PROMETHEUS_ELEMENT_MAX + 1];
         char context[PROMETHEUS_ELEMENT_MAX + 1];
@@ -901,7 +902,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         .now = now_realtime_sec(),
         .host_header_printed = 0,
         .pattern = filter,
-        .instance = instance
+        .instance = instance,
+        .prometheus = string_strdupz("prometheus")
     };
 
     // send custom variables set for the host
@@ -920,6 +922,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 allmetrics_cleanup:
     simple_pattern_free(filter);
     buffer_free(plabels_buffer);
+    string_freez(opts.prometheus);
 }
 
 /**
