@@ -1393,7 +1393,7 @@ bool pattern_array_label_match(
     struct pattern_array *pa,
     RRDLABELS *labels,
     char eq,
-    size_t *searches,
+    size_t *searches)
 {
     if (!pa || !labels)
         return true;
