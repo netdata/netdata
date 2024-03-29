@@ -350,7 +350,7 @@ static char *simple_pattern_trim_around_equal(const char *src) {
     return store;
 }
 
-static struct pattern_array *trim_and_add_key_to_values(struct pattern_array *pa, const char *key, STRING *input) {
+struct pattern_array *trim_and_add_key_to_values(struct pattern_array *pa, const char *key, STRING *input) {
     char *tmp = simple_pattern_trim_around_equal(string2str(input));
     pa = health_config_add_key_to_values(pa, key, tmp);
     freez(tmp);
@@ -483,7 +483,7 @@ static bool prototype_matches_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
         return false;
 
     if (host->rrdlabels && ap->match.host_labels_pattern &&
-        !pattern_array_label_match(ap->match.host_labels_pattern, host->rrdlabels, '=', NULL, rrdlabels_match_simple_pattern_parsed))
+        !pattern_array_label_match(ap->match.host_labels_pattern, host->rrdlabels, '=', NULL))
         return false;
 
     return true;
@@ -501,7 +501,7 @@ static bool prototype_matches_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
         return false;
 
     if (st->rrdlabels && ap->match.chart_labels_pattern &&
-        !pattern_array_label_match(ap->match.chart_labels_pattern, st->rrdlabels, '=', NULL, rrdlabels_match_simple_pattern_parsed))
+        !pattern_array_label_match(ap->match.chart_labels_pattern, st->rrdlabels, '=', NULL))
         return false;
 
     return true;
