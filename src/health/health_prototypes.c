@@ -350,7 +350,7 @@ static char *simple_pattern_trim_around_equal(const char *src) {
     return store;
 }
 
-static struct pattern_array *trim_and_add_key_to_values(struct pattern_array *pa, const char *key, STRING *input) {
+struct pattern_array *trim_and_add_key_to_values(struct pattern_array *pa, const char *key, STRING *input) {
     char *tmp = simple_pattern_trim_around_equal(string2str(input));
     pa = health_config_add_key_to_values(pa, key, tmp);
     freez(tmp);

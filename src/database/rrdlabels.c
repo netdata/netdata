@@ -1497,6 +1497,7 @@ void pattern_array_free(struct pattern_array *pa)
 
         string_freez((STRING *)Index);
         (void) JudyLDel(&(pa->JudyL), Index, PJE0);
+        freez(pai);
         Index = 0;
     }
     freez(pa);
@@ -1848,6 +1849,69 @@ static int rrdlabels_unittest_migrate_check()
     return rc;
 }
 
+struct pattern_array *trim_and_add_key_to_values(struct pattern_array *pa, const char *key, STRING *input);
+static int rrdlabels_unittest_check_pattern_list(RRDLABELS *labels, const char *pattern, bool expected) {
+    fprintf(stderr, "rrdlabels_match_simple_pattern(labels, \"%s\") ... ", pattern);
+
+    STRING *str = string_strdupz(pattern);
+    struct pattern_array *pa = trim_and_add_key_to_values(NULL, NULL, str);
+
+    bool ret = pattern_array_label_match(pa, labels, '=', NULL);
+
+    fprintf(stderr, "%s, got %s expected %s\n", (ret == expected)?"OK":"FAILED", ret?"true":"false", expected?"true":"false");
+
+    string_freez(str);
+    pattern_array_free(pa);
+
+    return (ret == expected)?0:1;
+}
+
+static int rrdlabels_unittest_host_chart_labels() {
+    fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
+
+    int errors = 0;
+
+    RRDLABELS *labels = rrdlabels_create();
+    rrdlabels_add(labels, "_hostname", "hostname1", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "_os", "linux", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "_distro", "ubuntu", RRDLABEL_SRC_CONFIG);
+
+    // match a single key
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=*", true);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=!*", false);
+
+    // conflicting keys (some positive, some negative)
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=* _os=!*", false);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=!* _os=*", false);
+
+    // the user uses a key that is not there
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_not_a_key=*", false);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_not_a_key=!*", false);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_not_a_key=* _hostname=* _os=*", false);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_not_a_key=!* _hostname=* _os=*", false);
+
+    // positive and negative matches on the same key
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=!*invalid* !*bad* *name*", true);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=*name* !*invalid* !*bad*", true);
+
+    // positive and negative matches on the same key with catch all
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=!*invalid* !*bad* *", true);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=* !*invalid* !*bad*", true);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=!*invalid* !*name* *", false);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=* !*invalid* !*name*", true);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=*name* !*", true);
+
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=!*name* _os=l*", false);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_os=l* hostname=!*name*", false);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=*name* _hostname=*", true);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=*name* _os=l*", true);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_os=l* _hostname=*name*", true);
+
+    rrdlabels_destroy(labels);
+
+    return errors;
+}
+
 static int rrdlabels_unittest_check_simple_pattern(RRDLABELS *labels, const char *pattern, bool expected) {
     fprintf(stderr, "rrdlabels_match_simple_pattern(labels, \"%s\") ... ", pattern);
 
@@ -1940,6 +2004,7 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_sanitization();
     errors += rrdlabels_unittest_add_pairs();
     errors += rrdlabels_unittest_simple_pattern();
+    errors += rrdlabels_unittest_host_chart_labels();
     errors += rrdlabels_unittest_double_check();
     errors += rrdlabels_unittest_migrate_check();
     errors += rrdlabels_unittest_pattern_check();
