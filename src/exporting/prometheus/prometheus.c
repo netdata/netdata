@@ -718,8 +718,6 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                             dimension,
                             (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                             PROMETHEUS_ELEMENT_MAX);
-
-                        generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
                     }
                     else {
                         // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
@@ -729,9 +727,8 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                             dimension,
                             (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                             PROMETHEUS_ELEMENT_MAX);
-
-                        generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
                     }
+                    generate_as_collected_from_metric(wb, &p, homogeneous, prometheus_collector, st->rrdlabels);
                 }
                 else {
                     // we need average or sum of the data
