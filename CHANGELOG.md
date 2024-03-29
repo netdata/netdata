@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- go.d: sd docker: create multiple nginx configs [\#17285](https://github.com/netdata/netdata/pull/17285) ([ilyam8](https://github.com/ilyam8))
+- go.d: socket package: don't set client on connect\(\) err [\#17283](https://github.com/netdata/netdata/pull/17283) ([ilyam8](https://github.com/ilyam8))
 - Revert "Enable sentry on all Debian and Ubuntu versions." [\#17279](https://github.com/netdata/netdata/pull/17279) ([tkatsoulas](https://github.com/tkatsoulas))
+- Correctly handle libyaml linking for log2journal. [\#17276](https://github.com/netdata/netdata/pull/17276) ([Ferroin](https://github.com/Ferroin))
 - REFERENCE - Fix small unligned typo [\#17274](https://github.com/netdata/netdata/pull/17274) ([sepek](https://github.com/sepek))
 - Regenerate integrations.js [\#17273](https://github.com/netdata/netdata/pull/17273) ([netdatabot](https://github.com/netdatabot))
 - go.d: dyncfg: allow "name" additional property [\#17272](https://github.com/netdata/netdata/pull/17272) ([ilyam8](https://github.com/ilyam8))
@@ -401,8 +404,6 @@
 - kickstart: add a note on how to access the UI to the success banner [\#16673](https://github.com/netdata/netdata/pull/16673) ([ilyam8](https://github.com/ilyam8))
 - remove contrib/rhel [\#16672](https://github.com/netdata/netdata/pull/16672) ([ilyam8](https://github.com/ilyam8))
 - Update binaries \(eBPF\) [\#16671](https://github.com/netdata/netdata/pull/16671) ([thiagoftsm](https://github.com/thiagoftsm))
-- eBPF socket \(eBPF\) [\#16669](https://github.com/netdata/netdata/pull/16669) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix compiler warnings [\#16665](https://github.com/netdata/netdata/pull/16665) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
