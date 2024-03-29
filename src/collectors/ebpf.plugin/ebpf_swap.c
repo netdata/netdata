@@ -695,6 +695,7 @@ static void ebpf_send_systemd_swap_charts()
  */
 static void ebpf_create_specific_swap_charts(char *type, int update_every)
 {
+    char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_MEM_SWAP_READ_CHART,
                       "Calls to function swap_readpage.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_SYSTEM_SWAP_SUBMENU,
@@ -702,6 +703,8 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5100,
                       ebpf_create_global_dimension,
                       swap_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_MEM_SWAP_WRITE_CHART,
                       "Calls to function swap_writepage.",
@@ -711,6 +714,8 @@ static void ebpf_create_specific_swap_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &swap_publish_aggregated[NETDATA_KEY_SWAP_WRITEPAGE_CALL], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SWAP);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 }
 
 /**
@@ -933,7 +938,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20070,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SWAP);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -948,7 +953,7 @@ void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20071,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SWAP);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 

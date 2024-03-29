@@ -357,7 +357,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20161,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -372,7 +372,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20162,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -387,7 +387,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20163,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -402,7 +402,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20164,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_PROCESS);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -418,7 +418,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  20165,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_PROCESS);
-            ebpf_create_chart_labels("app_group", w->name, 1);
+            ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
             ebpf_commit_label();
             fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
         }
@@ -820,12 +820,15 @@ static void ebpf_send_specific_process_data(char *type, ebpf_process_stat_t *val
  */
 static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
 {
+    char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_PROCESS, "Process started",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP,
                       NETDATA_CGROUP_PROCESS_CREATE_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5000,
                       ebpf_create_global_dimension, &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_FORK],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_THREAD, "Threads started",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP,
@@ -834,6 +837,8 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_CLONE],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_EXIT, "Tasks starts exit process.",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP,
@@ -842,6 +847,8 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_CLOSE, "Tasks closed",
                       EBPF_COMMON_DIMENSION_CALL, NETDATA_PROCESS_GROUP,
@@ -850,6 +857,8 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                       ebpf_create_global_dimension,
                       &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_RELEASE_TASK],
                       1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     if (em->mode < MODE_ENTRY) {
         ebpf_create_chart(type, NETDATA_SYSCALL_APPS_TASK_ERROR, "Errors to create process or threads.",
@@ -859,6 +868,8 @@ static void ebpf_create_specific_process_charts(char *type, ebpf_module_t *em)
                           ebpf_create_global_dimension,
                           &process_publish_aggregated[NETDATA_KEY_PUBLISH_PROCESS_EXIT],
                           1, em->update_every, NETDATA_EBPF_MODULE_NAME_PROCESS);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+        ebpf_commit_label();
     }
 }
 

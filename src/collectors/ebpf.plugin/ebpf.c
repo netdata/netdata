@@ -943,14 +943,19 @@ void ebpf_stop_threads(int sig)
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
+    for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
+        if (ebpf_threads[i].thread)
+            netdata_thread_join(*ebpf_threads[i].thread, NULL);
+    }
+
+    ebpf_plugin_exit = true;
+
     pthread_mutex_lock(&mutex_cgroup_shm);
     netdata_thread_cancel(*cgroup_integration_thread.thread);
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("Sending cancel for thread %s", cgroup_integration_thread.name);
 #endif
     pthread_mutex_unlock(&mutex_cgroup_shm);
-
-    ebpf_plugin_exit = true;
 
     ebpf_check_before2go();
 
@@ -4022,7 +4027,7 @@ int main(int argc, char **argv)
             st->thread = mallocz(sizeof(netdata_thread_t));
             em->enabled = NETDATA_THREAD_EBPF_RUNNING;
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
-            netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
+            netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
         } else {
             em->lifetime = EBPF_DEFAULT_LIFETIME;
         }
