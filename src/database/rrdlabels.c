@@ -977,7 +977,7 @@ int rrdlabels_walkthrough_read(RRDLABELS *labels, int (*callback)(const char *na
     lfe_start_read(labels, lb, ls)
     {
         ret = callback(string2str(lb->index.key), string2str(lb->index.value), ls, data);
-        if (ret < 0)
+        if (ret != 0)
             break;
     }
     lfe_done(labels);
@@ -1125,9 +1125,12 @@ static int simple_pattern_match_name_only_callback(const char *name, const char 
 
     // we return -1 to stop the walkthrough on first match
     t->searches++;
-    if(simple_pattern_matches(t->pattern, name)) return -1;
+    SIMPLE_PATTERN_RESULT rc = simple_pattern_matches_extract(t->pattern, name, NULL, 0);
 
-    return 0;
+    if(rc == SP_MATCHED_NEGATIVE)
+        return -1;
+
+    return rc == SP_MATCHED_POSITIVE;
 }
 
 static int simple_pattern_match_name_and_value_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
@@ -1682,7 +1685,7 @@ static int rrdlabels_walkthrough_index_read(RRDLABELS *labels, int (*callback)(c
     lfe_start_read(labels, lb, ls)
     {
         ret = callback(string2str(lb->index.key), string2str(lb->index.value), ls, index, data);
-        if (ret < 0)
+        if (ret != 0)
             break;
         index++;
     }
