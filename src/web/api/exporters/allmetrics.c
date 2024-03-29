@@ -6,8 +6,6 @@ struct prometheus_output_options {
     char *name;
     PROMETHEUS_OUTPUT_OPTIONS flag;
 } prometheus_output_flags_root[] = {
-    { "help",       PROMETHEUS_OUTPUT_HELP       },
-    { "types",      PROMETHEUS_OUTPUT_TYPES      },
     { "names",      PROMETHEUS_OUTPUT_NAMES      },
     { "timestamps", PROMETHEUS_OUTPUT_TIMESTAMPS },
     { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
@@ -76,8 +74,9 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
                 if(!strcmp(name, prometheus_output_flags_root[i].name)) {
                     if(!strcmp(value, "yes") || !strcmp(value, "1") || !strcmp(value, "true"))
                         prometheus_output_options |= prometheus_output_flags_root[i].flag;
-                    else
+                    else {
                         prometheus_output_options &= ~prometheus_output_flags_root[i].flag;
+                    }
 
                     break;
                 }

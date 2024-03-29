@@ -902,34 +902,6 @@
             }
           },
           {
-            "name": "help",
-            "in": "query",
-            "description": "Enable or disable HELP lines in prometheus output.\n",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "yes",
-                "no"
-              ],
-              "default": "no"
-            }
-          },
-          {
-            "name": "types",
-            "in": "query",
-            "description": "Enable or disable TYPE lines in prometheus output.\n",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "yes",
-                "no"
-              ],
-              "default": "no"
-            }
-          },
-          {
             "name": "timestamps",
             "in": "query",
             "description": "Enable or disable timestamps in prometheus output.\n",
