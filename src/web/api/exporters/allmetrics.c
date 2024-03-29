@@ -6,8 +6,6 @@ struct prometheus_output_options {
     char *name;
     PROMETHEUS_OUTPUT_OPTIONS flag;
 } prometheus_output_flags_root[] = {
-    { "help",       PROMETHEUS_OUTPUT_HELP       },
-    { "types",      PROMETHEUS_OUTPUT_TYPES      },
     { "names",      PROMETHEUS_OUTPUT_NAMES      },
     { "timestamps", PROMETHEUS_OUTPUT_TIMESTAMPS },
     { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
@@ -38,7 +36,6 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     else
         prometheus_prefix = global_exporting_prefix;
 
-    PROMETHEUS_OUTPUT_OPTIONS set_prometheus = PROMETHEUS_OUTPUT_HELP | PROMETHEUS_OUTPUT_TYPES;
     while(url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
         if (!value || !*value) continue;
@@ -79,7 +76,6 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
                         prometheus_output_options |= prometheus_output_flags_root[i].flag;
                     else {
                         prometheus_output_options &= ~prometheus_output_flags_root[i].flag;
-                        set_prometheus &= ~prometheus_output_flags_root[i].flag;
                     }
 
                     break;
@@ -87,8 +83,6 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
             }
         }
     }
-
-    prometheus_output_options |= set_prometheus;
 
     buffer_flush(w->response.data);
     buffer_no_cacheable(w->response.data);

@@ -658,9 +658,6 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                                       output_options & PROMETHEUS_OUTPUT_OLDUNITS);
         }
 
-        bool plot_type = (output_options & PROMETHEUS_OUTPUT_TYPES) ? true : false;
-        bool plot_help = (output_options & PROMETHEUS_OUTPUT_HELP) ? true : false;
-
         // for each dimension
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
@@ -698,17 +695,8 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                             p.suffix = "_total";
                     }
 
-                    if (plot_help) {
-                        generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
-                        plot_help = false;
-                        opts->output_options &= ~PROMETHEUS_OUTPUT_HELP;
-                    }
-
-                    if (plot_type) {
-                        generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
-                        plot_type = false;
-                        opts->output_options &= ~PROMETHEUS_OUTPUT_TYPES;
-                    }
+                    generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
+                    generate_as_collected_prom_type(wb, prefix, context, units, p.suffix, p.type);
 
                     if (homogeneous) {
                         // all the dimensions of the chart, has the same algorithm, multiplier and divisor
@@ -749,17 +737,8 @@ static int prometheus_rrdset_to_json(RRDSET *st, void *data)
                             (output_options & PROMETHEUS_OUTPUT_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
                             PROMETHEUS_ELEMENT_MAX);
 
-                        if (plot_help) {
-                            generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
-                            plot_help = false;
-                            opts->output_options &= ~PROMETHEUS_OUTPUT_HELP;
-                        }
-
-                        if (plot_type) {
-                            generate_as_collected_prom_type(wb, prefix, context, units, suffix, "gauge");
-                            plot_type = false;
-                            opts->output_options &= ~PROMETHEUS_OUTPUT_TYPES;
-                        }
+                        generate_as_collected_prom_help(wb, prefix, context, units, suffix, st);
+                        generate_as_collected_prom_type(wb, prefix, context, units, suffix, "gauge");
 
                         buffer_flush(plabels_buffer);
                         buffer_sprintf(plabels_buffer,
@@ -821,10 +800,7 @@ static inline int prometheus_rrdcontext_callback(const DICTIONARY_ITEM *item, vo
     struct host_variables_callback_options *opts = data;
     (void)value;
 
-    PROMETHEUS_OUTPUT_OPTIONS output_options = opts->output_options;
     (void)rrdcontext_foreach_instance_with_rrdset_in_context(opts->host, context_name, prometheus_rrdset_to_json, data);
-
-    opts->output_options = output_options;
 
     return HTTP_RESP_OK;
 }
