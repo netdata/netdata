@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- fix rrdlabels traversal [\#17292](https://github.com/netdata/netdata/pull/17292) ([ktsaou](https://github.com/ktsaou))
+- fix positive and negative matches on labels [\#17290](https://github.com/netdata/netdata/pull/17290) ([ktsaou](https://github.com/ktsaou))
+- go.d: don't create jobs with unknown module [\#17289](https://github.com/netdata/netdata/pull/17289) ([ilyam8](https://github.com/ilyam8))
+- go.d: set User-Agent automatically when creating HTTP req [\#17286](https://github.com/netdata/netdata/pull/17286) ([ilyam8](https://github.com/ilyam8))
 - go.d: sd docker: create multiple nginx configs [\#17285](https://github.com/netdata/netdata/pull/17285) ([ilyam8](https://github.com/ilyam8))
 - go.d: socket package: don't set client on connect\(\) err [\#17283](https://github.com/netdata/netdata/pull/17283) ([ilyam8](https://github.com/ilyam8))
 - Revert "Enable sentry on all Debian and Ubuntu versions." [\#17279](https://github.com/netdata/netdata/pull/17279) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -14,6 +18,7 @@
 - Regenerate integrations.js [\#17273](https://github.com/netdata/netdata/pull/17273) ([netdatabot](https://github.com/netdatabot))
 - go.d: dyncfg: allow "name" additional property [\#17272](https://github.com/netdata/netdata/pull/17272) ([ilyam8](https://github.com/ilyam8))
 - add additional fields to webhook reachability notifications [\#17271](https://github.com/netdata/netdata/pull/17271) ([juacker](https://github.com/juacker))
+- Update Codeowners [\#17270](https://github.com/netdata/netdata/pull/17270) ([tkatsoulas](https://github.com/tkatsoulas))
 - go.d: config schemas update: prohibit additional properties [\#17269](https://github.com/netdata/netdata/pull/17269) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17268](https://github.com/netdata/netdata/pull/17268) ([netdatabot](https://github.com/netdatabot))
 - fix duplicate chart context [\#17267](https://github.com/netdata/netdata/pull/17267) ([ilyam8](https://github.com/ilyam8))
@@ -53,6 +58,10 @@
 - add warning on old custom dashboards and rephrase existing page [\#17214](https://github.com/netdata/netdata/pull/17214) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Bump github.com/docker/docker from 25.0.4+incompatible to 25.0.5+incompatible in /src/go/collectors/go.d.plugin [\#17211](https://github.com/netdata/netdata/pull/17211) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Add -Wno-builtin-macro-redefined to compiler flags. [\#17209](https://github.com/netdata/netdata/pull/17209) ([Ferroin](https://github.com/Ferroin))
+- Compatibility with Prometheus HELP [\#17191](https://github.com/netdata/netdata/pull/17191) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add label for cgroup [\#17156](https://github.com/netdata/netdata/pull/17156) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix action lints [\#17120](https://github.com/netdata/netdata/pull/17120) ([tkatsoulas](https://github.com/tkatsoulas))
+- Fix conditional for Amazon Linux 2023 in repoconfig spec file. [\#17056](https://github.com/netdata/netdata/pull/17056) ([PaulSzymanski](https://github.com/PaulSzymanski))
 
 ## [v1.45.1](https://github.com/netdata/netdata/tree/v1.45.1) (2024-03-27)
 
@@ -395,15 +404,6 @@
 - fix claiming on macOS [\#16686](https://github.com/netdata/netdata/pull/16686) ([ilyam8](https://github.com/ilyam8))
 - add --disable-logsmanagement when building static [\#16684](https://github.com/netdata/netdata/pull/16684) ([ilyam8](https://github.com/ilyam8))
 - fix exporting internal charts context and family [\#16683](https://github.com/netdata/netdata/pull/16683) ([ilyam8](https://github.com/ilyam8))
-- Fatal relaxation of unknown page types. [\#16682](https://github.com/netdata/netdata/pull/16682) ([vkalintiris](https://github.com/vkalintiris))
-- docs: add "Require Cloud" column to functions table [\#16681](https://github.com/netdata/netdata/pull/16681) ([ilyam8](https://github.com/ilyam8))
-- cmake missing defines [\#16680](https://github.com/netdata/netdata/pull/16680) ([ktsaou](https://github.com/ktsaou))
-- Fix alerts-configuration-manager.md [\#16679](https://github.com/netdata/netdata/pull/16679) ([Ancairon](https://github.com/Ancairon))
-- kickstart: dont run install-required-packages.sh as root on macOS [\#16675](https://github.com/netdata/netdata/pull/16675) ([ilyam8](https://github.com/ilyam8))
-- update bundled UI to v6.75.2 [\#16674](https://github.com/netdata/netdata/pull/16674) ([ilyam8](https://github.com/ilyam8))
-- kickstart: add a note on how to access the UI to the success banner [\#16673](https://github.com/netdata/netdata/pull/16673) ([ilyam8](https://github.com/ilyam8))
-- remove contrib/rhel [\#16672](https://github.com/netdata/netdata/pull/16672) ([ilyam8](https://github.com/ilyam8))
-- Update binaries \(eBPF\) [\#16671](https://github.com/netdata/netdata/pull/16671) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
