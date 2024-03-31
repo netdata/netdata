@@ -86,7 +86,7 @@ ignored_sections_regex = re.compile(
         Physical[ ]Drives
         | None[ ]attached
         | (?:Expander|Enclosure|SEP|Port[ ]Name:)[ ].+
-        | .+[ ]at[ ]Port[ ]\S+,[ ]Box[ ]\d+,[ ].+
+        | .+[ ]at[ ]Port[ ]\S+,[ ]Box[ ]\d+(\s\(Index[ ]\d+\))?,[ ].+
         | Mirror[ ]Group[ ]\d+:
     $
     ''',
