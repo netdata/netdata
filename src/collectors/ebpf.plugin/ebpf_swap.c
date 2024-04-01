@@ -48,9 +48,12 @@ static ebpf_local_maps_t swap_maps[] = {{.name = "tbl_pid_swap", .internal_input
 #endif
                                         }};
 
-netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF_LOAD_TRAMPOLINE},
+netdata_ebpf_targets_t swap_targets[] = { {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
+
+static char *swap_read[] ={ "swap_readpage", "swap_read_folio", NULL };
+
 
 struct netdata_static_thread ebpf_read_swap = {
     .name = "EBPF_READ_SWAP",
@@ -74,7 +77,25 @@ struct netdata_static_thread ebpf_read_swap = {
 static void ebpf_swap_disable_probe(struct swap_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_swap_readpage_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_swap_writepage_probe, false);
+}
+
+/**
+ * Disable specific probe
+ *
+ * Disable specific probes according to available functions
+ *
+ * @param obj is the main structure for bpf objects
+ */
+static inline void ebpf_swap_disable_specific_probe(struct swap_bpf *obj)
+{
+    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
+                swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
+        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_probe, false);
+    } else  {
+        bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_probe, false);
+    }
 }
 
 /*
@@ -87,7 +108,25 @@ static void ebpf_swap_disable_probe(struct swap_bpf *obj)
 static void ebpf_swap_disable_trampoline(struct swap_bpf *obj)
 {
     bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_fentry, false);
     bpf_program__set_autoload(obj->progs.netdata_swap_writepage_fentry, false);
+}
+
+/**
+ * Disable specific trampoline
+ *
+ * Disable specific trampolines according to available functions
+ *
+ * @param obj is the main structure for bpf objects
+ */
+static inline void ebpf_swap_disable_specific_trampoline(struct swap_bpf *obj)
+{
+    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
+                swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
+        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, false);
+    } else  {
+        bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_fentry, false);
+    }
 }
 
 /**
@@ -117,10 +156,19 @@ static void ebpf_swap_set_trampoline_target(struct swap_bpf *obj)
  */
 static int ebpf_swap_attach_kprobe(struct swap_bpf *obj)
 {
-    obj->links.netdata_swap_readpage_probe = bpf_program__attach_kprobe(obj->progs.netdata_swap_readpage_probe,
-                                                                        false,
-                                                                        swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name);
-    int ret = libbpf_get_error(obj->links.netdata_swap_readpage_probe);
+    int ret;
+    if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
+                swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
+        obj->links.netdata_swap_readpage_probe = bpf_program__attach_kprobe(obj->progs.netdata_swap_readpage_probe,
+                                                                            false,
+                                                                            swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name);
+        ret = libbpf_get_error(obj->links.netdata_swap_readpage_probe);
+    } else {
+        obj->links.netdata_swap_read_folio_probe = bpf_program__attach_kprobe(obj->progs.netdata_swap_read_folio_probe,
+                                                                            false,
+                                                                            swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name);
+        ret = libbpf_get_error(obj->links.netdata_swap_read_folio_probe);
+    }
     if (ret)
         return -1;
 
@@ -183,10 +231,12 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
 
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_swap_disable_probe(obj);
+	ebpf_swap_disable_specific_trampoline(obj);
 
         ebpf_swap_set_trampoline_target(obj);
     } else {
         ebpf_swap_disable_trampoline(obj);
+	ebpf_swap_disable_specific_probe(obj);
     }
 
     ebpf_swap_adjust_map(obj, em);
@@ -1043,6 +1093,34 @@ static int ebpf_swap_load_bpf(ebpf_module_t *em)
 }
 
 /**
+ * Update Internal value
+ *
+ * Update values used during runtime.
+ *
+ * @return It returns 0 when one of the functions is present and -1 otherwise.
+ */
+static int ebpf_swap_set_internal_value()
+{
+    ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
+    int i;
+    for (i = 0; swap_read[i] ; i++) {
+        address.function = swap_read[i];
+        ebpf_load_addresses(&address, -1);
+        if (address.addr)
+            break;
+    }
+
+    if (!address.addr) {
+        netdata_log_error("%s swap.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
+        return -1;
+    }
+
+    swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name = address.function;
+
+    return 0;
+}
+
+/**
  * SWAP thread
  *
  * Thread used to make swap thread
@@ -1059,6 +1137,10 @@ void *ebpf_swap_thread(void *ptr)
     em->maps = swap_maps;
 
     ebpf_update_pid_table(&swap_maps[NETDATA_PID_SWAP_TABLE], em);
+
+    if (ebpf_swap_set_internal_value()) {
+        goto endswap;
+    }
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
