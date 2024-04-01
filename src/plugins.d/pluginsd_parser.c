@@ -1234,10 +1234,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     ND_LOG_STACK_PUSH(lgs);
 
     CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) cleanup_parser = parser;
-    buffered_reader_init(&parser->reader);
+    parser->reader = buffered_reader_new();
     CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
     while(likely(service_running(SERVICE_COLLECTORS))) {
-
         if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
             buffered_reader_ret_t ret = buffered_reader_read_timeout(
                     &parser->reader,

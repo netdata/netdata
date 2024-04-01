@@ -242,6 +242,25 @@ if(ENABLE_WEBRTC)
         FetchContent_MakeAvailable(libdatachannel)
 endif()
 
+
+#
+# Just for OTEL make this conditional
+#
+include(FetchContent)
+
+FetchContent_Declare(
+  yaml-cpp
+  GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+  GIT_TAG f7320141120f720aecc4c32be25586e7da9eb978 # 0.8.0
+)
+FetchContent_GetProperties(yaml-cpp)
+
+if(NOT yaml-cpp_POPULATED)
+  message(STATUS "Fetching yaml-cpp...")
+  FetchContent_Populate(yaml-cpp)
+  add_subdirectory(${yaml-cpp_SOURCE_DIR} ${yaml-cpp_BINARY_DIR})
+endif()
+
 if(NEED_PROTOBUF)
         include(NetdataProtobuf)
 
@@ -620,6 +639,11 @@ set(LIBNETDATA_FILES
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
         src/libnetdata/avl/avl.h
+        src/libnetdata/blake3/blake3.c
+        src/libnetdata/blake3/blake3.h
+        src/libnetdata/blake3/blake3_portable.c
+        src/libnetdata/blake3/blake3_dispatch.c
+        src/libnetdata/blake3/blake3_impl.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
         src/libnetdata/circular_buffer/circular_buffer.c
@@ -1039,18 +1063,18 @@ set(INTERNAL_COLLECTORS_FILES
 )
 
 set(PLUGINSD_PLUGIN_FILES
-        src/collectors/plugins.d/plugins_d.c
-        src/collectors/plugins.d/plugins_d.h
-        src/collectors/plugins.d/pluginsd_dyncfg.c
-        src/collectors/plugins.d/pluginsd_dyncfg.h
-        src/collectors/plugins.d/pluginsd_functions.c
-        src/collectors/plugins.d/pluginsd_functions.h
-        src/collectors/plugins.d/pluginsd_internals.c
-        src/collectors/plugins.d/pluginsd_internals.h
-        src/collectors/plugins.d/pluginsd_parser.c
-        src/collectors/plugins.d/pluginsd_parser.h
-        src/collectors/plugins.d/pluginsd_replication.c
-        src/collectors/plugins.d/pluginsd_replication.h
+        src/plugins.d/plugins_d.c
+        src/plugins.d/plugins_d.h
+        src/plugins.d/pluginsd_dyncfg.c
+        src/plugins.d/pluginsd_dyncfg.h
+        src/plugins.d/pluginsd_functions.c
+        src/plugins.d/pluginsd_functions.h
+        src/plugins.d/pluginsd_internals.c
+        src/plugins.d/pluginsd_internals.h
+        src/plugins.d/pluginsd_parser.c
+        src/plugins.d/pluginsd_parser.h
+        src/plugins.d/pluginsd_replication.c
+        src/plugins.d/pluginsd_replication.h
 )
 
 set(RRD_PLUGIN_FILES
@@ -1412,7 +1436,46 @@ set(NETDATA_FILES
         ${SPAWN_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
         ${PROFILE_PLUGIN_FILES}
+        src/otel/otel.cc
+        src/otel/otel_chart.cc
+        src/otel/otel_chart.hpp
+        src/otel/otel_config.cc
+        src/otel/otel_config.hpp
+        src/otel/otel_flatten.cc
+        src/otel/otel_flatten.hpp
+        src/otel/otel_hash.cc
+        src/otel/otel_hash.hpp
+        src/otel/otel_ingest.cc
+        src/otel/otel_ingest.hpp
+        src/otel/otel_iterator.hpp
+        src/otel/otel_process.cc
+        src/otel/otel_process.hpp
+        src/otel/otel_sort.cc
+        src/otel/otel_sort.hpp
+        src/otel/otel_utils.cc
+        src/otel/otel_utils.hpp
+        src/otel/otel_transform.cc
+        src/otel/otel_transform.hpp
 )
+
+set(OPENTELEMETRY_PROTO_FILES src/otel/opentelemetry/proto/collector/logs/v1/logs_service.proto
+                              src/otel/opentelemetry/proto/collector/metrics/v1/metrics_service.proto
+                              src/otel/opentelemetry/proto/collector/trace/v1/trace_service.proto
+                              src/otel/opentelemetry/proto/common/v1/common.proto
+                              src/otel/opentelemetry/proto/logs/v1/logs.proto
+                              src/otel/opentelemetry/proto/metrics/v1/metrics.proto
+                              src/otel/opentelemetry/proto/resource/v1/resource.proto
+                              src/otel/opentelemetry/proto/trace/v1/trace.proto
+)
+
+netdata_protoc_generate_cpp("${CMAKE_SOURCE_DIR}/src/otel"
+                            "${CMAKE_SOURCE_DIR}/src/otel"
+                            OTEL_BUILT_SRCS
+                            OTEL_BUILT_HDRS
+                            ${OPENTELEMETRY_PROTO_FILES})
+
+
+list(APPEND NETDATA_FILES ${OTEL_BUILT_SRCS} ${OTEL_BUILT_HDRS})
 
 if(OS_LINUX)
         list(APPEND NETDATA_FILES
@@ -1622,6 +1685,9 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 
 # add_executable(test test.cpp)
 # target_link_libraries(test Threads::Threads)
+
+target_compile_options(libnetdata PRIVATE
+        -DBLAKE3_NO_SSE2 -DBLAKE3_NO_SSE41 -DBLAKE3_NO_AVX2 -DBLAKE3_NO_AVX512)
 
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
@@ -2016,7 +2082,7 @@ if(ENABLE_PLUGIN_CUPS)
     endif()
 endif()
 
-set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
+set(NDSUDO_FILES src/plugins.d/ndsudo.c)
 
 add_executable(ndsudo ${NDSUDO_FILES})
 
@@ -2150,7 +2216,7 @@ endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         set(LOCAL_LISTENERS_FILES
-                src/collectors/plugins.d/local_listeners.c
+                src/plugins.d/local_listeners.c
                 src/libnetdata/maps/local-sockets.h
         )
 
@@ -2260,6 +2326,7 @@ target_compile_options(netdata PRIVATE
 )
 
 target_include_directories(netdata PRIVATE
+        "${CMAKE_SOURCE_DIR}/src/otel"
         "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
@@ -2277,6 +2344,8 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
 )
+
+target_link_libraries(netdata PRIVATE absl::strings yaml-cpp::yaml-cpp)
 
 if(NEED_PROTOBUF)
         netdata_add_protobuf(netdata)
@@ -2466,6 +2535,22 @@ install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-name.sh
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
+
+#
+# otel
+#
+configure_file(src/otel/otel-config.yaml.in
+               src/otel/otel-config.yaml
+               @ONLY)
+install(FILES
+        ${CMAKE_BINARY_DIR}/src/otel/otel-config.yaml
+        COMPONENT netdata
+        DESTINATION etc/netdata)
+
+install(FILES
+        src/otel/otel-receivers-config.yaml
+        COMPONENT netdata
+        DESTINATION etc/netdata)
 
 #
 # statsd

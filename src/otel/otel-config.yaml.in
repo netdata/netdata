@@ -1,0 +1,19 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: localhost:20001
+
+exporters:
+  file:
+    path: @cachedir_POST@/otel-metrics.fifo
+    format: proto
+
+service:
+  telemetry:
+    metrics:
+      level: none
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [file]

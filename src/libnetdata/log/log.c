@@ -2231,6 +2231,10 @@ static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
 // ----------------------------------------------------------------------------
 // public API for loggers
 
+int netdata_logger_fd(ND_LOG_SOURCES log_source) {
+    return nd_log.sources[log_source].fd;
+}
+
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... )
 {
     int saved_errno = errno;

@@ -199,8 +199,7 @@ static void *rrd_functions_worker_globals_reader_main(void *arg) {
         char *content_type;
     } deferred = { 0 };
 
-    struct buffered_reader reader = { 0 };
-    buffered_reader_init(&reader);
+    struct buffered_reader reader = buffered_reader_new();
     BUFFER *buffer = buffer_create(sizeof(reader.read_buffer) + 2, NULL);
 
     while(!(*wg->plugin_should_exit)) {
