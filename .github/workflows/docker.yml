@@ -690,7 +690,7 @@ jobs:
           repo: netdata/helmchart
           workflow: Agent Version PR
           ref: refs/heads/master
-          inputs: '{"agent_version": "${{ needs.gen-tags.outputs.tags }}"}'
+          inputs: '{"agent_version": "${{ inputs.version }}"}'
       - name: Trigger MSI build
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
         id: trigger-msi
@@ -700,7 +700,7 @@ jobs:
           repo: netdata/msi-installer
           workflow: Build
           ref: refs/heads/master
-          inputs: '{"tag": "${{ needs.gen-tags.outputs.tags }}", "pwd": "${{ secrets.MSI_CODE_SIGNING_PASSWORD }}"}'
+          inputs: '{"tag": "stable", "pwd": "${{ secrets.MSI_CODE_SIGNING_PASSWORD }}"}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
