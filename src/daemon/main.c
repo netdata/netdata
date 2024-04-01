@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+extern void otel_init(void);
+extern void otel_shutdown(void);
+
 #include "common.h"
 #include "buildinfo.h"
 #include "daemon/watcher.h"
@@ -348,6 +351,9 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
     watcher_step_complete(WATCHER_STEP_ID_CREATE_SHUTDOWN_FILE);
 
+    otel_shutdown();
+    watcher_step_complete(WATCHER_STEP_ID_OTEL_SHUTDOWN);
+
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {
         for (size_t tier = 0; tier < storage_tiers; tier++)
@@ -508,6 +514,9 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
         exit(ret);
     }
 #else
+    if (ret) {
+        abort();
+    }
     exit(ret);
 #endif
 }
@@ -2306,6 +2315,8 @@ int netdata_main(int argc, char **argv)
 
     web_server_config_options();
 
+    otel_init();
+
     set_late_global_environment(system_info);
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
@@ -2317,6 +2328,7 @@ int netdata_main(int argc, char **argv)
         else
             netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+
     ml_start_threads();
 
     // ------------------------------------------------------------------------

@@ -11,10 +11,12 @@ struct buffered_reader {
     char read_buffer[PLUGINSD_LINE_MAX + 1];
 };
 
-static inline void buffered_reader_init(struct buffered_reader *reader) {
-    reader->read_buffer[0] = '\0';
-    reader->read_len = 0;
-    reader->pos = 0;
+WARNUNUSED static inline struct buffered_reader buffered_reader_new(void) {
+    struct buffered_reader reader;
+    reader.read_buffer[0] = '\0';
+    reader.read_len = 0;
+    reader.pos = 0;
+    return reader;
 }
 
 typedef enum {

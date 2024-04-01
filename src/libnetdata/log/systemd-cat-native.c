@@ -328,8 +328,7 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
     if(!curl)
         return LOG_TO_JOURNAL_REMOTE_CANNOT_INITIALIZE;
 
-    struct buffered_reader reader;
-    buffered_reader_init(&reader);
+    struct buffered_reader reader = buffered_reader_new();
     CLEAN_BUFFER *line = buffer_create(sizeof(reader.read_buffer), NULL);
     CLEAN_BUFFER *msg = buffer_create(sizeof(reader.read_buffer), NULL);
 
@@ -577,8 +576,7 @@ static const char *strdupz_replacing_newlines(const char *src, const char *newli
 }
 
 static int log_input_as_netdata(const char *newline, int timeout_ms) {
-    struct buffered_reader reader;
-    buffered_reader_init(&reader);
+    struct buffered_reader reader = buffered_reader_new();
     CLEAN_BUFFER *line = buffer_create(sizeof(reader.read_buffer), NULL);
 
     ND_LOG_STACK lgs[_NDF_MAX + 1] = { 0 };
@@ -684,8 +682,7 @@ static int log_input_to_journal(const char *socket, const char *namespace, const
         return 1;
     }
 
-    struct buffered_reader reader;
-    buffered_reader_init(&reader);
+    struct buffered_reader reader = buffered_reader_new();
     CLEAN_BUFFER *line = buffer_create(sizeof(reader.read_buffer), NULL);
     CLEAN_BUFFER *msg = buffer_create(sizeof(reader.read_buffer), NULL);
 

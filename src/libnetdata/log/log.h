@@ -265,6 +265,8 @@ void nd_log_limits_unlimited(void);
 // ----------------------------------------------------------------------------
 // normal logging
 
+int netdata_logger_fd(ND_LOG_SOURCES log_source);
+
 void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) PRINTFLIKE(6, 7);
 #define nd_log(NDLS, NDLP, args...) netdata_logger(NDLS, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
 #define nd_log_daemon(NDLP, args...) netdata_logger(NDLS_DAEMON, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
