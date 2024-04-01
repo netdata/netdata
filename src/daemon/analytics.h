@@ -9,7 +9,7 @@
 #define ANALYTICS_INIT_SLEEP_SEC 120
 
 /* Send a META event every X seconds */
-#define ANALYTICS_HEARTBEAT 7200
+#define ANALYTICS_HEARTBEAT (6 * 3600)
 
 /* Maximum number of hits to log */
 #define ANALYTICS_MAX_PROMETHEUS_HITS 255
