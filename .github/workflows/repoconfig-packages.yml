@@ -104,12 +104,6 @@ jobs:
         run: |
           printf "Packages to upload:\n%s" "$(ls artifacts/*.${{ matrix.format }})"
           for pkgfile in artifacts/*.${{ matrix.format }} ; do
-            .github/scripts/package_cloud_wrapper.sh yank "${REPO_PREFIX}/${{ matrix.pkgclouddistro }}" \
-                "$(basename "${pkgfile}")" || true
-            .github/scripts/package_cloud_wrapper.sh push "${REPO_PREFIX}/${{ matrix.pkgclouddistro }}" "${pkgfile}"
-            .github/scripts/package_cloud_wrapper.sh yank "${REPO_PREFIX}-edge/${{ matrix.pkgclouddistro }}" \
-                "$(basename "${pkgfile}")" || true
-            .github/scripts/package_cloud_wrapper.sh push "${REPO_PREFIX}-edge/${{ matrix.pkgclouddistro }}" "${pkgfile}"
             .github/scripts/package_cloud_wrapper.sh yank "${REPO_PREFIX}-repoconfig/${{ matrix.pkgclouddistro }}" \
                 "$(basename "${pkgfile}")" || true
             .github/scripts/package_cloud_wrapper.sh push "${REPO_PREFIX}-repoconfig/${{ matrix.pkgclouddistro }}" "${pkgfile}"
@@ -127,14 +121,12 @@ jobs:
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2043
-          for arch in "${{ matrix.arches }}"; do
-            for suffix in '' -edge -repoconfig; do
+          for arch in ${{ matrix.arches }}; do
               .github/scripts/package-upload.sh \
               "${{ matrix.pkgclouddistro }}" \
               "${arch}" \
               "${{ matrix.format }}" \
-              netdata/netdata"${suffix}"
-            done
+              netdata/netdata-repoconfig
           done
       - name: Failure Notification
         if: ${{ failure() && github.repository == 'netdata/netdata' }}
