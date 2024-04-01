@@ -94,7 +94,8 @@ enum netdata_ebpf_kernel_versions {
     NETDATA_EBPF_KERNEL_5_11 = 330496,  //  330240 = 5 * 65536 + 11 * 256
     NETDATA_EBPF_KERNEL_5_14 = 331264,  //  331264 = 5 * 65536 + 14 * 256
     NETDATA_EBPF_KERNEL_5_15 = 331520,  //  331520 = 5 * 65536 + 15 * 256
-    NETDATA_EBPF_KERNEL_5_16 = 331776   //  331776 = 5 * 65536 + 16 * 256
+    NETDATA_EBPF_KERNEL_5_16 = 331776,  //  331776 = 5 * 65536 + 16 * 256
+    NETDATA_EBPF_KERNEL_6_8  = 395264   //  395264 = 5 * 65536 +  8 * 256
 };
 
 enum netdata_kernel_flag {
@@ -107,7 +108,8 @@ enum netdata_kernel_flag {
     NETDATA_V5_11 = 1 << 6,
     NETDATA_V5_14 = 1 << 7,
     NETDATA_V5_15 = 1 << 8,
-    NETDATA_V5_16 = 1 << 9
+    NETDATA_V5_16 = 1 << 9,
+    NETDATA_V6_8  = 1 << 10
 };
 
 enum netdata_kernel_idx {
@@ -120,7 +122,8 @@ enum netdata_kernel_idx {
     NETDATA_IDX_V5_11,
     NETDATA_IDX_V5_14,
     NETDATA_IDX_V5_15,
-    NETDATA_IDX_V5_16
+    NETDATA_IDX_V5_16,
+    NETDATA_IDX_V6_8
 };
 
 #define NETDATA_IDX_STR_V3_10 "3.10"
@@ -133,6 +136,7 @@ enum netdata_kernel_idx {
 #define NETDATA_IDX_STR_V5_14 "5.14"
 #define NETDATA_IDX_STR_V5_15 "5.15"
 #define NETDATA_IDX_STR_V5_16 "5.16"
+#define NETDATA_IDX_STR_V6_8  "6.8"
 
 /**
  * Minimum value has relationship with libbpf support.

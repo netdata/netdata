@@ -344,7 +344,7 @@ static char *ebpf_select_kernel_name(uint32_t selector)
     static char *kernel_names[] = { NETDATA_IDX_STR_V3_10, NETDATA_IDX_STR_V4_14, NETDATA_IDX_STR_V4_16,
                                     NETDATA_IDX_STR_V4_18, NETDATA_IDX_STR_V5_4,  NETDATA_IDX_STR_V5_10,
                                     NETDATA_IDX_STR_V5_11, NETDATA_IDX_STR_V5_14, NETDATA_IDX_STR_V5_15,
-                                    NETDATA_IDX_STR_V5_16
+                                    NETDATA_IDX_STR_V5_16, NETDATA_IDX_STR_V6_8
                                   };
 
     return kernel_names[selector];
@@ -370,7 +370,9 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
         else if (kver >= NETDATA_EBPF_KERNEL_4_11)
             return NETDATA_IDX_V4_18;
     } else { // Kernels from kernel.org
-        if (kver >= NETDATA_EBPF_KERNEL_5_16)
+        if (kver >= NETDATA_EBPF_KERNEL_6_8)
+            return NETDATA_IDX_V6_8;
+	else if (kver >= NETDATA_EBPF_KERNEL_5_16)
             return NETDATA_IDX_V5_16;
         else if (kver >= NETDATA_EBPF_KERNEL_5_15)
             return NETDATA_IDX_V5_15;
