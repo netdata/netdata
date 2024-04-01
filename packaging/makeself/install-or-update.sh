@@ -13,6 +13,7 @@ renice 19 $$ > /dev/null 2> /dev/null
 
 NETDATA_PREFIX="/opt/netdata"
 NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
+NETDATA_OLD_USR_PATH="${NETDATA_PREFIX}/usr"
 
 # -----------------------------------------------------------------------------
 if [ -d /opt/netdata/etc/netdata.old ]; then
@@ -149,13 +150,13 @@ dir_should_be_link usr ../bin sbin
 dir_should_be_link usr . local
 
 dir_should_be_link . etc/netdata netdata-configs
-dir_should_be_link . usr/share/netdata/web netdata-web-files
-dir_should_be_link . usr/libexec/netdata netdata-plugins
+dir_should_be_link . share/netdata/web netdata-web-files
+dir_should_be_link . libexec/netdata netdata-plugins
 dir_should_be_link . var/lib/netdata netdata-dbs
 dir_should_be_link . var/cache/netdata netdata-metrics
 dir_should_be_link . var/log/netdata netdata-logs
 
-dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
+dir_should_be_link etc/netdata ../../lib/netdata/conf.d orig
 
 # -----------------------------------------------------------------------------
 progress "fix permissions"
@@ -164,8 +165,8 @@ run chmod g+rx,o+rx /opt
 run find /opt/netdata -type d -exec chmod go+rx '{}' \+
 run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata/var
 
-if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
-  run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
+if [ -d /opt/netdata/libexec/netdata/plugins.d/ebpf.d ]; then
+  run chown -R root:${NETDATA_GROUP} /opt/netdata/libexec/netdata/plugins.d/ebpf.d
 fi
 
 # -----------------------------------------------------------------------------
