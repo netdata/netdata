@@ -20,7 +20,7 @@ require (
 	github.com/facebook/time v0.0.0-20240301144314-9afaa3836e98
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/go-sql-driver/mysql v1.8.0
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gofrs/flock v0.8.1
 	github.com/golang/mock v1.6.0
