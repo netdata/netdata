@@ -13,7 +13,6 @@ renice 19 $$ > /dev/null 2> /dev/null
 
 NETDATA_PREFIX="/opt/netdata"
 NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
-NETDATA_OLD_USR_PATH="${NETDATA_PREFIX}/usr"
 
 # -----------------------------------------------------------------------------
 if [ -d /opt/netdata/etc/netdata.old ]; then
