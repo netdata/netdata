@@ -372,7 +372,7 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
     } else { // Kernels from kernel.org
         if (kver >= NETDATA_EBPF_KERNEL_6_8)
             return NETDATA_IDX_V6_8;
-	else if (kver >= NETDATA_EBPF_KERNEL_5_16)
+        else if (kver >= NETDATA_EBPF_KERNEL_5_16)
             return NETDATA_IDX_V5_16;
         else if (kver >= NETDATA_EBPF_KERNEL_5_15)
             return NETDATA_IDX_V5_15;
