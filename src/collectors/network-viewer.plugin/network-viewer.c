@@ -874,12 +874,14 @@ static int ebpf_networkviewer_attach_probes(struct networkviewer_bpf *obj, netda
     if (ret)
         return -1;
 
+    /*
     obj->links.netdata_nv_tcp_v6_connect_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_v6_connect_kprobe,
                                                                              false,
                                                                              targets[NETDATA_FCNT_TCP_V6_CONNECT].name);
     ret = libbpf_get_error(obj->links.netdata_nv_tcp_v6_connect_kprobe);
     if (ret)
         return -1;
+        */
 
     obj->links.netdata_nv_tcp_retransmit_skb_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_nv_tcp_retransmit_skb_kprobe,
                                                                                  false,
@@ -939,6 +941,8 @@ static inline int ebpf_networkviewer_load_and_attach(struct networkviewer_bpf *o
         // Added to be compatible with all kernels
         bpf_map__set_type(obj->maps.tbl_nv_socket, BPF_MAP_TYPE_HASH);
         bpf_map__set_type(obj->maps.nv_ctrl, BPF_MAP_TYPE_ARRAY);
+        bpf_program__set_autoload(obj->progs.netdata_nv_tcp_v6_connect_kprobe, false);
+        bpf_program__set_autoload(obj->progs.netdata_nv_tcp_v6_connect_fentry, false);
     }
 
     int ret;
