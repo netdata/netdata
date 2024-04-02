@@ -40,45 +40,93 @@ parts:
       bash ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive -i netdata-all
 
   netdata:
-    plugin: nil
+    plugin: cmake
     source: .
     source-type: local
+    build-environment:
+      - CFLAGS: ${CFLAGS:-"-O2 pipe"}
+      - DESTDIR: $CRAFT_PART_INSTALL
     build-packages:
+      - golang
+      - libbrotli-dev
+      - libcap-dev
+      - libcups2-dev
+      - libipmimonitoring-dev
+      - libmongoc-dev
+      - libnetfilter-acct-dev
       - libpcre2-dev
+      - libprotobuf-dev
+      - libsnappy-dev
+      - libxen-dev
+      - protobuf-compiler
+    cmake-generator: Ninja
+    cmake-parameters:
+      - -DCMAKE_INSTALL_PREFIX=/snap/netdata/current
+      - -DENABLE_ACLK=On
+      - -DENABLE_CLOUD=On
+      - -DENABLE_DBENGINE=On
+      - -DENABLE_H2O=On
+      - -DENABLE_ML=On
+      - -DENABLE_PLUGIN_APPS=On
+      - -DENABLE_PLUGIN_CGROUP_NETWORK=On
+      - -DENABLE_PLUGIN_DEBUGFS=On
+      - -DENABLE_PLUGIN_EBPF=On
+      - -DENABLE_PLUGIN_FREEIPMI=On
+      - -DENABLE_PLUGIN_GO=On
+      - -DENABLE_PLUGIN_LOCAL_LISTENERS=On
+      - -DENABLE_PLUGIN_LOGS_MANAGEMENT=On
+      - -DENABLE_PLUGIN_NFACCT=On
+      - -DENABLE_PLUGIN_PERF=On
+      - -DENABLE_PLUGIN_SLABINFO=On
+      - -DENABLE_PLUGIN_SYSTEMD_JOURNAL=On
+      - -DENABLE_PLUGIN_XENSTAT=On
+      - -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On
+      - -DENABLE_EXPORTER_MONGODB=On
+      - -DENABLE_BUNDLED_PROTOBUF=Off
+      - -DENABLE_BUNDLED_JSONC=Off
+      # - ${SENTRY_CONFIG}
+      - -DENABLE_BUNDLED_YAML=Off
     override-build: |
-      sh ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build
-      mkdir -p $SNAPCRAFT_PART_INSTALL/usr/sbin/ \
-               $SNAPCRAFT_PART_INSTALL/usr/share \
-               $SNAPCRAFT_PART_INSTALL/usr/libexec \
-               $SNAPCRAFT_PART_INSTALL/usr/local \
-               $SNAPCRAFT_PART_INSTALL/usr/lib \
-               $SNAPCRAFT_PART_INSTALL/var/cache \
-               $SNAPCRAFT_PART_INSTALL/var/lib \
-               $SNAPCRAFT_PART_INSTALL/etc
-      rm -rf $SNAPCRAFT_PART_INSTALL/var/{cache,lib}/netdata
-      rm -rf $SNAPCRAFT_PART_INSTALL/usr/{share,lib,libexec}/netdata
-      mv /usr/share/netdata            $SNAPCRAFT_PART_INSTALL/usr/share/
-      mv /usr/libexec/netdata          $SNAPCRAFT_PART_INSTALL/usr/libexec/
-      mv /usr/lib/netdata              $SNAPCRAFT_PART_INSTALL/usr/lib/
-      mv /var/cache/netdata            $SNAPCRAFT_PART_INSTALL/var/cache/
-      mv /var/lib/netdata              $SNAPCRAFT_PART_INSTALL/var/lib/
-      mv /etc/netdata                  $SNAPCRAFT_PART_INSTALL/etc/
-      mv /usr/sbin/log2journal         $SNAPCRAFT_PART_INSTALL/usr/sbin/
-      mv /usr/sbin/netdata             $SNAPCRAFT_PART_INSTALL/usr/sbin/
-      mv /usr/sbin/netdata-claim.sh    $SNAPCRAFT_PART_INSTALL/usr/sbin/
-      mv /usr/sbin/netdatacli          $SNAPCRAFT_PART_INSTALL/usr/sbin/
-      mv /usr/sbin/systemd-cat-native  $SNAPCRAFT_PART_INSTALL/usr/sbin/
-      cp -p "$SNAPCRAFT_PROJECT_DIR/snap/local/netdata.conf" "$SNAPCRAFT_PART_INSTALL/etc/netdata/netdata.conf"
+      craftctl default
+      mkdir -p $CRAFT_PART_INSTALL/etc/netdata
+      cp -p "$CRAFT_PROJECT_DIR/snap/local/netdata.conf" "$CRAFT_PART_INSTALL/etc/netdata/netdata.conf"
+    organize:
+      "snap/netdata/current": "/"
     stage-packages:
+      - apcupsd
       - curl
       - iproute2
+      - iw
+      - libatm1
+      - libavahi-client3
+      - libavahi-common3
+      - libbson-1.0-0
+      - libcups2
+      - libfreeipmi17
+      - libipmimonitoring6
+      - libmongoc-1.0-0
+      - libmongocrypt0
+      - libnetfilter-acct1
+      - libsnappy1v5
+      - libutf8proc3
       - libuv1
+      - libxencall1
+      - libxendevicemodel1
+      - libxenevtchn1
+      - libxenforeignmemory1
+      - libxengnttab1
+      - libxenhypfs1
+      - libxenmisc4.17
+      - libxenstore4
+      - libxentoolcore1
+      - libxentoollog1
+      - libyajl2
       - lm-sensors
+      - nvme-cli
       - util-linux
     prime:
-      - -opt/netdata/var/cache/netdata/.keep
-      - -opt/netdata/var/lib/netdata/.keep
-      - -opt/netdata/var/log/netdata/.keep
+      - -snap/netdata
+
 
 apps:
   agent:
