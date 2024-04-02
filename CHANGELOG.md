@@ -2,16 +2,26 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.2...HEAD)
 
 **Merged pull requests:**
 
+- Update metadata frequency [\#17307](https://github.com/netdata/netdata/pull/17307) ([stelfrag](https://github.com/stelfrag))
+- Fix handling of post-release workflows triggered by Docker workflow. [\#17306](https://github.com/netdata/netdata/pull/17306) ([Ferroin](https://github.com/Ferroin))
+- go.d: sd ll: add mysql socket jobs [\#17305](https://github.com/netdata/netdata/pull/17305) ([ilyam8](https://github.com/ilyam8))
+- go.d: sd local listeners: add unix socket job [\#17304](https://github.com/netdata/netdata/pull/17304) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/vmware/govmomi from 0.36.1 to 0.36.2 in /src/go/collectors/go.d.plugin [\#17300](https://github.com/netdata/netdata/pull/17300) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/go-sql-driver/mysql from 1.8.0 to 1.8.1 in /src/go/collectors/go.d.plugin [\#17299](https://github.com/netdata/netdata/pull/17299) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Fix SWAP pages [\#17295](https://github.com/netdata/netdata/pull/17295) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update hpssa.chart.py [\#17294](https://github.com/netdata/netdata/pull/17294) ([Metric-Void](https://github.com/Metric-Void))
 - fix rrdlabels traversal [\#17292](https://github.com/netdata/netdata/pull/17292) ([ktsaou](https://github.com/ktsaou))
 - fix positive and negative matches on labels [\#17290](https://github.com/netdata/netdata/pull/17290) ([ktsaou](https://github.com/ktsaou))
 - go.d: don't create jobs with unknown module [\#17289](https://github.com/netdata/netdata/pull/17289) ([ilyam8](https://github.com/ilyam8))
+- Fix repoconfig publishing. [\#17288](https://github.com/netdata/netdata/pull/17288) ([Ferroin](https://github.com/Ferroin))
 - go.d: set User-Agent automatically when creating HTTP req [\#17286](https://github.com/netdata/netdata/pull/17286) ([ilyam8](https://github.com/ilyam8))
 - go.d: sd docker: create multiple nginx configs [\#17285](https://github.com/netdata/netdata/pull/17285) ([ilyam8](https://github.com/ilyam8))
 - go.d: socket package: don't set client on connect\(\) err [\#17283](https://github.com/netdata/netdata/pull/17283) ([ilyam8](https://github.com/ilyam8))
+- Add Fedora 40 to CI, packages, and support policy. [\#17282](https://github.com/netdata/netdata/pull/17282) ([Ferroin](https://github.com/Ferroin))
 - Revert "Enable sentry on all Debian and Ubuntu versions." [\#17279](https://github.com/netdata/netdata/pull/17279) ([tkatsoulas](https://github.com/tkatsoulas))
 - Correctly handle libyaml linking for log2journal. [\#17276](https://github.com/netdata/netdata/pull/17276) ([Ferroin](https://github.com/Ferroin))
 - REFERENCE - Fix small unligned typo [\#17274](https://github.com/netdata/netdata/pull/17274) ([sepek](https://github.com/sepek))
@@ -62,6 +72,10 @@
 - Add label for cgroup [\#17156](https://github.com/netdata/netdata/pull/17156) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix action lints [\#17120](https://github.com/netdata/netdata/pull/17120) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix conditional for Amazon Linux 2023 in repoconfig spec file. [\#17056](https://github.com/netdata/netdata/pull/17056) ([PaulSzymanski](https://github.com/PaulSzymanski))
+
+## [v1.45.2](https://github.com/netdata/netdata/tree/v1.45.2) (2024-04-01)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.1...v1.45.2)
 
 ## [v1.45.1](https://github.com/netdata/netdata/tree/v1.45.1) (2024-03-27)
 
@@ -389,21 +403,6 @@
 - Update GHA steps that handle artifacts to use latest versions of upload/download actions. [\#16714](https://github.com/netdata/netdata/pull/16714) ([Ferroin](https://github.com/Ferroin))
 - CI runtime check cleanup [\#16713](https://github.com/netdata/netdata/pull/16713) ([Ferroin](https://github.com/Ferroin))
 - disable logsmanagement when installing on macOS [\#16708](https://github.com/netdata/netdata/pull/16708) ([ilyam8](https://github.com/ilyam8))
-- dyncfg v2 [\#16702](https://github.com/netdata/netdata/pull/16702) ([ktsaou](https://github.com/ktsaou))
-- delay collecting double linked network interfaces [\#16701](https://github.com/netdata/netdata/pull/16701) ([ilyam8](https://github.com/ilyam8))
-- fix quota calculation when the the db is empty [\#16699](https://github.com/netdata/netdata/pull/16699) ([ktsaou](https://github.com/ktsaou))
-- disable logsmanagement when installing on macOS [\#16697](https://github.com/netdata/netdata/pull/16697) ([ilyam8](https://github.com/ilyam8))
-- Remove Ubuntu 23.04 from the CI [\#16694](https://github.com/netdata/netdata/pull/16694) ([tkatsoulas](https://github.com/tkatsoulas))
-- fix installing service file and start/stop ND using `launchctl` on macOS [\#16693](https://github.com/netdata/netdata/pull/16693) ([ilyam8](https://github.com/ilyam8))
-- improve the error message when accessing functions [\#16692](https://github.com/netdata/netdata/pull/16692) ([ktsaou](https://github.com/ktsaou))
-- cups exit on sigpipe [\#16691](https://github.com/netdata/netdata/pull/16691) ([ilyam8](https://github.com/ilyam8))
-- fix minor omission on netdata-installers arguments [\#16690](https://github.com/netdata/netdata/pull/16690) ([tkatsoulas](https://github.com/tkatsoulas))
-- Revert "Update artifact-handling actions to latest version." [\#16689](https://github.com/netdata/netdata/pull/16689) ([tkatsoulas](https://github.com/tkatsoulas))
-- cmake log2journal netdatacli [\#16688](https://github.com/netdata/netdata/pull/16688) ([ktsaou](https://github.com/ktsaou))
-- atomically load the metric reference count [\#16687](https://github.com/netdata/netdata/pull/16687) ([ktsaou](https://github.com/ktsaou))
-- fix claiming on macOS [\#16686](https://github.com/netdata/netdata/pull/16686) ([ilyam8](https://github.com/ilyam8))
-- add --disable-logsmanagement when building static [\#16684](https://github.com/netdata/netdata/pull/16684) ([ilyam8](https://github.com/ilyam8))
-- fix exporting internal charts context and family [\#16683](https://github.com/netdata/netdata/pull/16683) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
