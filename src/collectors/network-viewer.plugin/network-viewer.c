@@ -1132,7 +1132,7 @@ static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char *
             args->debug = true;
         else if (strcmp("ebpf", argv[i]) == 0) {
             args->ebpf = true;
-            args->level = NETDATA_APPS_LEVEL_PARENT;
+            args->level = NETDATA_APPS_LEVEL_REAL_PARENT;
         }
         else if (strcmp("apps-level", argv[i]) == 0) {
             if(argc <= i + 1) {
@@ -1144,7 +1144,7 @@ static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char *
             i++;
             args->level = str2i(argv[i]);
             if (args->level < NETDATA_APPS_LEVEL_REAL_PARENT || args->level > NETDATA_APPS_LEVEL_ALL)
-                args->level = NETDATA_APPS_LEVEL_PARENT;
+                args->level = NETDATA_APPS_LEVEL_REAL_PARENT;
         }
     }
 }
