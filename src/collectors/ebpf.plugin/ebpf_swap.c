@@ -92,9 +92,9 @@ static inline void ebpf_swap_disable_specific_probe(struct swap_bpf *obj)
 {
     if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
                 swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
-        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_probe, false);
-    } else  {
         bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_probe, false);
+    } else  {
+        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_probe, false);
     }
 }
 
@@ -123,9 +123,9 @@ static inline void ebpf_swap_disable_specific_trampoline(struct swap_bpf *obj)
 {
     if (!strcmp(swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name,
                 swap_read[NETDATA_KEY_SWAP_READPAGE_CALL])) {
-        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, false);
-    } else  {
         bpf_program__set_autoload(obj->progs.netdata_swap_read_folio_fentry, false);
+    } else  {
+        bpf_program__set_autoload(obj->progs.netdata_swap_readpage_fentry, false);
     }
 }
 
