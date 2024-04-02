@@ -31,4 +31,6 @@ match version:
             )
         ])
 
+        tags = tags + tuple([f'{r}:stable' for r in REPOS])
+
 print(','.join(tags))
