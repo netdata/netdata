@@ -1,0 +1,80 @@
+{
+  "period": {
+    "duration": 1055.794145,
+    "unit": "ms"
+  },
+  "frequency": {
+    "requested": 1449.146131,
+    "actual": 1253.085184,
+    "unit": "MHz"
+  },
+  "interrupts": {
+    "count": 1757.918443,
+    "unit": "irq/s"
+  },
+  "rc6": {
+    "value": 0.000000,
+    "unit": "%"
+  },
+  "power": {
+    "GPU": 3.233528,
+    "Package": 16.658620,
+    "unit": "W"
+  },
+  "engines": {
+    "Render/3D/0": {
+      "busy": 96.092944,
+      "sema": 0.000000,
+      "wait": 0.000000,
+      "unit": "%"
+    },
+    "Blitter/0": {
+      "busy": 0.000000,
+      "sema": 0.000000,
+      "wait": 0.000000,
+      "unit": "%"
+    },
+    "Video/0": {
+      "busy": 72.950675,
+      "sema": 0.000000,
+      "wait": 0.000000,
+      "unit": "%"
+    },
+    "Video/1": {
+      "busy": 77.402254,
+      "sema": 0.000000,
+      "wait": 0.000000,
+      "unit": "%"
+    },
+    "VideoEnhance/0": {
+      "busy": 0.000000,
+      "sema": 0.000000,
+      "wait": 0.000000,
+      "unit": "%"
+    }
+  },
+  "clients": {
+    "4292239459": {
+      "name": "ffmpeg",
+      "pid": "2727837",
+      "engine-classes": {
+        "Render/3D": {
+          "busy": "101.396726",
+          "unit": "%"
+        },
+        "Blitter": {
+          "busy": "0.000000",
+          "unit": "%"
+        },
+        "Video": {
+          "busy": "159.292435",
+          "unit": "%"
+        },
+        "VideoEnhance": {
+          "busy": "0.000000",
+          "unit": "%"
+        }
+      }
+    }
+  }
+}

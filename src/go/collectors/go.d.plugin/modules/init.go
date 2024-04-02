@@ -30,6 +30,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/haproxy"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/hdfs"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/httpcheck"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/intelgpu"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/isc_dhcpd"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/k8s_kubelet"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/k8s_kubeproxy"

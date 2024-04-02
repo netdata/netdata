@@ -1,0 +1,115 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-intelgpu
+      plugin_name: go.d.plugin
+      module_name: intelgpu
+      monitored_instance:
+        name: Intel GPU
+        link: https://www.intel.com/
+        icon_filename: intel.svg
+        categories:
+          - data-collection.hardware-devices-and-sensors
+      keywords:
+        - intel
+        - gpu
+        - hardware
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Intel integrated GPUs performance metrics using
+          the [intel_gpu_top](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html) CLI tool.
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/intelgpu.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: binary_path
+              description: Path to the intel_gpu_top binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
+              default_value: /usr/bin/intel_gpu_top
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom binary path
+              description: The executable is not in the directories specified in the PATH environment variable.
+              config: |
+                jobs:
+                  - name: nvidia_smi
+                    binary_path: /usr/local/sbin/intel_gpu_top
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the Intel GPU.
+          labels: []
+          metrics:
+            - name: intelgpu.frequency
+              description: Intel GPU frequency
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: intelgpu.power
+              description: Intel GPU power
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: gpu
+                - name: package
+        - name: engine
+          description: These metrics refer to the GPU hardware engine.
+          labels:
+            - name: engine
+              description: Engine name (Render/3D, Blitter, VideoEnhance, Video, Compute).
+            - name: engine_instance
+              description: Engine instance (e.g. Render/3D/0, Video/0, Video/1).
+          metrics:
+            - name: intelgpu.engine_busy_perc
+              description: Intel GPU engine busy time percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: busy
