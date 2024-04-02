@@ -333,7 +333,7 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create "$(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ needs.gen-tags.outputs.tags }}")"
+        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ needs.gen-tags.outputs.tags }}")
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -489,7 +489,7 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create "$(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ needs.gen-tags.outputs.tags }}")"
+        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ needs.gen-tags.outputs.tags }}")
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -645,7 +645,7 @@ jobs:
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
-        run: docker buildx imagetools create "$(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ needs.gen-tags.outputs.tags }}")"
+        run: docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ needs.gen-tags.outputs.tags }}")
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -690,7 +690,7 @@ jobs:
           repo: netdata/helmchart
           workflow: Agent Version PR
           ref: refs/heads/master
-          inputs: '{"agent_version": "${{ inputs.version }}"}'
+          inputs: '{"agent_version": "v${{ inputs.version }}"}'
       - name: Trigger MSI build
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
         id: trigger-msi
