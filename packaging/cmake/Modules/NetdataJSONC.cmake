@@ -93,7 +93,7 @@ endmacro()
 # The specified target must already exist, and the netdata_detect_json-c
 # macro must have already been run at least once for this to work correctly.
 function(netdata_add_jsonc_to_target _target)
-        target_include_directories(${_target} BEFORE PUBLIC ${NETDATA_JSONC_INCLUDE_DIRS})
+        target_include_directories(${_target} PUBLIC ${NETDATA_JSONC_INCLUDE_DIRS})
         target_compile_definitions(${_target} PUBLIC ${NETDATA_JSONC_CFLAGS_OTHER})
         target_link_libraries(${_target} PUBLIC ${NETDATA_JSONC_LDFLAGS})
 
