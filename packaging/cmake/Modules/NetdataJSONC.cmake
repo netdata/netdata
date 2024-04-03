@@ -57,34 +57,36 @@ endfunction()
 # include directories, and compile definitions will be specified in the
 # NETDATA_JSONC_* variables for later use.
 macro(netdata_detect_jsonc)
-        pkg_check_modules(JSONC json-c)
+        if(NOT ENABLE_BUNDLED_JSONC)
+                pkg_check_modules(JSONC json-c)
+        endif()
 
-        if(ENABLE_BUNDLED_JSONC OR NOT JSONC_FOUND)
+        if(NOT JSONC_FOUND)
                 netdata_bundle_jsonc()
                 set(NETDATA_JSONC_LDFLAGS json-c)
-                set(NETDATA_JSONC_INCLUDE_DIRS ${json-c_BINARY_DIR})
+                set(NETDATA_JSONC_INCLUDE_DIRS ${PROJECT_BINARY_DIR}/include)
                 get_target_property(NETDATA_JSONC_CFLAGS_OTHER json-c INTERFACE_COMPILE_DEFINITIONS)
 
                 if(NETDATA_JSONC_CFLAGS_OTHER STREQUAL NETDATA_JSONC_CFLAGS_OTHER-NOTFOUND)
                         set(NETDATA_JSONC_CFLAGS_OTHER "")
                 endif()
 
-                set(USING_BUNDLED_JSONC True)
-
                 add_custom_command(
-                        OUTPUT ${json-c_BINARY_DIR}/json-c
-                        COMMAND ${CMAKE_COMMAND} -E create_symlink ${json-c_BINARY_DIR} ${json-c_BINARY_DIR}/json-c
+                        OUTPUT ${PROJECT_BINARY_DIR}/include/json-c
+                        COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/include
+                        COMMAND ${CMAKE_COMMAND} -E create_symlink ${json-c_BINARY_DIR} ${PROJECT_BINARY_DIR}/include/json-c
                         COMMENT "Create compatibility symlink for vendored JSON-C headers"
                         DEPENDS json-c
                 )
                 add_custom_target(
                         json-c-compat-link
-                        DEPENDS ${json-c_BINARY_DIR}/json-c
+                        DEPENDS ${PROJECT_BINARY_DIR}/include/json-c
                 )
         else()
                 set(NETDATA_JSONC_LDFLAGS ${JSONC_LDFLAGS})
                 set(NETDATA_JSONC_CFLAGS_OTHER ${JSONC_CFLAGS_OTHER})
                 set(NETDATA_JSONC_INCLUDE_DIRS ${JSONC_INCLUDE_DIRS})
+                add_custom_target(json-c-compat-link)
         endif()
 endmacro()
 
@@ -96,8 +98,5 @@ function(netdata_add_jsonc_to_target _target)
         target_include_directories(${_target} PUBLIC ${NETDATA_JSONC_INCLUDE_DIRS})
         target_compile_definitions(${_target} PUBLIC ${NETDATA_JSONC_CFLAGS_OTHER})
         target_link_libraries(${_target} PUBLIC ${NETDATA_JSONC_LDFLAGS})
-
-        if(USING_BUNDLED_JSONC)
-                add_dependencies(${_target} json-c-compat-link)
-        endif()
+        add_dependencies(${_target} json-c-compat-link)
 endfunction()
