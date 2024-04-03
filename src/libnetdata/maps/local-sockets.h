@@ -769,6 +769,7 @@ typedef struct ebpf_nv_data {
     int state;
 
     uint32_t pid;
+    uint32_t tgid;
     uint32_t uid;
     uint64_t ts;
 
