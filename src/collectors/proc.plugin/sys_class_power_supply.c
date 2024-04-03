@@ -36,7 +36,7 @@ struct ps_property {
     struct ps_property *next;
 };
 
-struct capacity {
+struct simple_property {
     char *filename;
     int fd;
 
@@ -50,7 +50,7 @@ struct power_supply {
     uint32_t hash;
     int found;
 
-    struct capacity *capacity;
+    struct simple_property *capacity, *power;
 
     struct ps_property *property_root;
 
@@ -60,17 +60,22 @@ struct power_supply {
 static struct power_supply *power_supply_root = NULL;
 static int files_num = 0;
 
+static void free_simple_prop(struct simple_property *prop) {
+    if(likely(prop)) {
+        if(likely(prop->st)) rrdset_is_obsolete___safe_from_collector_thread(prop->st);
+        freez(prop->filename);
+        if(likely(prop->fd != -1)) close(prop->fd);
+        files_num--;
+        freez(prop);
+    }
+}
+
 void power_supply_free(struct power_supply *ps) {
     if(likely(ps)) {
 
         // free capacity structure
-        if(likely(ps->capacity)) {
-            if(likely(ps->capacity->st)) rrdset_is_obsolete___safe_from_collector_thread(ps->capacity->st);
-            freez(ps->capacity->filename);
-            if(likely(ps->capacity->fd != -1)) close(ps->capacity->fd);
-            files_num--;
-            freez(ps->capacity);
-        }
+        free_simple_prop(ps->capacity);
+        free_simple_prop(ps->power);
         freez(ps->name);
 
         struct ps_property *pr = ps->property_root;
@@ -116,14 +121,82 @@ static void add_labels_to_power_supply(struct power_supply *ps, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "device", ps->name, RRDLABEL_SRC_AUTO);
 }
 
+static void read_simple_property(struct power_supply *ps, struct simple_property *prop, bool keep_fds_open) {
+    char buffer[30 + 1];
+
+    if(unlikely(prop->fd == -1)) {
+        prop->fd = open(prop->filename, O_RDONLY | O_CLOEXEC, 0666);
+        if(unlikely(prop->fd == -1)) {
+            collector_error("Cannot open file '%s'", prop->filename);
+            power_supply_free(ps);
+            ps = NULL;
+        }
+    }
+
+    if (ps)
+    {
+        ssize_t r = read(prop->fd, buffer, 30);
+        if(unlikely(r < 1)) {
+            collector_error("Cannot read file '%s'", prop->filename);
+            power_supply_free(ps);
+            ps = NULL;
+        }
+        else {
+            buffer[r] = '\0';
+            prop->value = str2ull(buffer, NULL);
+
+            if(unlikely(!keep_fds_open)) {
+                close(prop->fd);
+                prop->fd = -1;
+            }
+            else if(unlikely(lseek(prop->fd, 0, SEEK_SET) == -1)) {
+                collector_error("Cannot seek in file '%s'", prop->filename);
+                close(prop->fd);
+                prop->fd = -1;
+            }
+        }
+    }
+}
+
+static void rrdset_create_simple_prop(struct power_supply *ps, struct simple_property *prop, char *title, char *dim, collected_number divisor, char *units, int update_every) {
+    if(unlikely(!prop->st)) {
+        char id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "powersupply_%s", dim);
+        snprintfz(context, RRD_ID_LENGTH_MAX, "powersupply.%s", dim);
+
+        prop->st = rrdset_create_localhost(
+                id
+                , ps->name
+                , NULL
+                , ps->name
+                , context
+                , title
+                , units
+                , PLUGIN_PROC_NAME
+                , PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME
+                , NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY
+                , update_every
+                , RRDSET_TYPE_LINE
+        );
+
+        add_labels_to_power_supply(ps, prop->st);
+    }
+
+    if(unlikely(!prop->rd)) prop->rd = rrddim_add(prop->st, dim, NULL, 1, divisor, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_set_by_pointer(prop->st, prop->rd, prop->value);
+
+    rrdset_done(prop->st);
+}
+
 int do_sys_class_power_supply(int update_every, usec_t dt) {
     (void)dt;
-    static int do_capacity = -1, do_property[3] = {-1};
+    static int do_capacity = -1, do_power = -1, do_property[3] = {-1};
     static int keep_fds_open = CONFIG_BOOLEAN_NO, keep_fds_open_config = -1;
     static char *dirname = NULL;
 
     if(unlikely(do_capacity == -1)) {
         do_capacity    = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);
+        do_power       = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery power", CONFIG_BOOLEAN_YES);
         do_property[0] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery charge", CONFIG_BOOLEAN_NO);
         do_property[1] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery energy", CONFIG_BOOLEAN_NO);
         do_property[2] = config_get_boolean("plugin:proc:/sys/class/power_supply", "power supply voltage", CONFIG_BOOLEAN_NO);
@@ -175,9 +248,20 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     char filename[FILENAME_MAX + 1];
                     snprintfz(filename, FILENAME_MAX, "%s/%s/%s", dirname, de->d_name, "capacity");
                     if (stat(filename, &stbuf) == 0) {
-                        ps->capacity = callocz(sizeof(struct capacity), 1);
+                        ps->capacity = callocz(sizeof(struct simple_property), 1);
                         ps->capacity->filename = strdupz(filename);
                         ps->capacity->fd = -1;
+                        files_num++;
+                    }
+                }
+
+                if(likely(do_power != CONFIG_BOOLEAN_NO)) {
+                    char filename[FILENAME_MAX + 1];
+                    snprintfz(filename, FILENAME_MAX, "%s/%s/%s", dirname, de->d_name, "power_now");
+                    if (stat(filename, &stbuf) == 0) {
+                        ps->power = callocz(sizeof(struct simple_property), 1);
+                        ps->power->filename = strdupz(filename);
+                        ps->power->fd = -1;
                         files_num++;
                     }
                 }
@@ -242,40 +326,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
             // read capacity file
             if(likely(ps->capacity)) {
-                char buffer[30 + 1];
+                read_simple_property(ps, ps->capacity, keep_fds_open);
+            }
 
-                if(unlikely(ps->capacity->fd == -1)) {
-                    ps->capacity->fd = open(ps->capacity->filename, O_RDONLY | O_CLOEXEC, 0666);
-                    if(unlikely(ps->capacity->fd == -1)) {
-                        collector_error("Cannot open file '%s'", ps->capacity->filename);
-                        power_supply_free(ps);
-                        ps = NULL;
-                    }
-                }
-
-                if (ps)
-                {
-                    ssize_t r = read(ps->capacity->fd, buffer, 30);
-                    if(unlikely(r < 1)) {
-                        collector_error("Cannot read file '%s'", ps->capacity->filename);
-                        power_supply_free(ps);
-                        ps = NULL;
-                    }
-                    else {
-                        buffer[r] = '\0';
-                        ps->capacity->value = str2ull(buffer, NULL);
-
-                        if(unlikely(!keep_fds_open)) {
-                            close(ps->capacity->fd);
-                            ps->capacity->fd = -1;
-                        }
-                        else if(unlikely(lseek(ps->capacity->fd, 0, SEEK_SET) == -1)) {
-                            collector_error("Cannot seek in file '%s'", ps->capacity->filename);
-                            close(ps->capacity->fd);
-                            ps->capacity->fd = -1;
-                        }
-                    }
-                }
+            if(likely(ps->power)) {
+                read_simple_property(ps, ps->power, keep_fds_open);
             }
 
             // read property files
@@ -347,29 +402,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
         }
 
         if(likely(ps->capacity)) {
-            if(unlikely(!ps->capacity->st)) {
-                ps->capacity->st = rrdset_create_localhost(
-                        "powersupply_capacity"
-                        , ps->name
-                        , NULL
-                        , "capacity"
-                        , "powersupply.capacity"
-                        , "Battery capacity"
-                        , "percentage"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME
-                        , NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY
-                        , update_every
-                        , RRDSET_TYPE_LINE
-                );
+            rrdset_create_simple_prop(ps, ps->capacity, "Battery capacity", "capacity", 1, "percentage", update_every);
+        }
 
-                add_labels_to_power_supply(ps, ps->capacity->st);
-            }
-
-            if(unlikely(!ps->capacity->rd)) ps->capacity->rd = rrddim_add(ps->capacity->st, "capacity", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_set_by_pointer(ps->capacity->st, ps->capacity->rd, ps->capacity->value);
-
-            rrdset_done(ps->capacity->st);
+        if(likely(ps->power)) {
+            rrdset_create_simple_prop(ps, ps->power, "Battery power", "power", 1000000, "W", update_every);
         }
 
         struct ps_property *pr;
