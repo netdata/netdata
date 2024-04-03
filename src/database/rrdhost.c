@@ -33,15 +33,6 @@ time_t rrdset_free_obsolete_time_s = 3600;
 time_t rrdhost_free_orphan_time_s = 3600;
 time_t rrdhost_free_ephemeral_time_s = 86400;
 
-bool is_storage_engine_shared(STORAGE_INSTANCE *si __maybe_unused) {
-#ifdef ENABLE_DBENGINE
-    if(!rrdeng_is_legacy(si))
-        return true;
-#endif
-
-    return false;
-}
-
 RRDHOST *find_host_by_node_id(char *node_id) {
 
     uuid_t node_uuid;
@@ -269,6 +260,70 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
         rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
 }
 
+//
+//  true on success
+//
+static bool create_dbengine_directory(RRDHOST *host, const char *dbenginepath)
+{
+    int ret = mkdir(dbenginepath, 0775);
+    if (ret != 0 && errno != EEXIST) {
+        nd_log(NDLS_DAEMON, NDLP_CRIT, "Host '%s': cannot create directory '%s'", rrdhost_hostname(host), dbenginepath);
+        return false;
+    }
+    return true;
+}
+
+static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
+{
+    char dbenginepath[FILENAME_MAX + 1];
+
+    if (host->cache_dir)
+        freez(host->cache_dir);
+
+    snprintfz(dbenginepath, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
+    host->cache_dir = strdupz(dbenginepath);
+
+    int ret = 0;
+
+    bool initialized;
+    if ((initialized = create_dbengine_directory(host, dbenginepath))) {
+        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
+
+        if ((initialized = create_dbengine_directory(host, dbenginepath))) {
+            host->db[0].mode = RRD_MEMORY_MODE_DBENGINE;
+            host->db[0].eng = storage_engine_get(host->db[0].mode);
+            host->db[0].tier_grouping = get_tier_grouping(0);
+
+            ret = rrdeng_init(
+                (struct rrdengine_instance **)&host->db[0].si,
+                dbenginepath,
+                default_rrdeng_disk_quota_mb,
+                0); // may fail here for legacy dbengine initialization
+
+            initialized = (ret == 0);
+
+            if (initialized)
+                rrdeng_readiness_wait((struct rrdengine_instance *)host->db[0].si);
+        }
+    }
+
+    if (!initialized) {
+        nd_log(
+            NDLS_DAEMON,
+            NDLP_CRIT,
+            "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
+            rrdhost_hostname(host),
+            host->machine_guid,
+            host->cache_dir);
+
+        rrd_wrlock();
+        rrdhost_free___while_having_rrd_wrlock(host, true);
+        rrd_unlock();
+        return NULL;
+    }
+    return host;
+}
+
 static RRDHOST *rrdhost_create(
         const char *hostname,
         const char *registry_hostname,
@@ -302,20 +357,20 @@ static RRDHOST *rrdhost_create(
         memory_mode = RRD_MEMORY_MODE_ALLOC;
     }
 
-#ifdef ENABLE_DBENGINE
-    int is_legacy = (memory_mode == RRD_MEMORY_MODE_DBENGINE) && is_legacy_child(guid);
-#else
-int is_legacy = 1;
-#endif
-
-    int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
     strncpyz(host->machine_guid, guid, GUID_LEN + 1);
 
-    set_host_properties(host, (update_every > 0)?update_every:1, memory_mode, registry_hostname, os,
-                        timezone, abbrev_timezone, utc_offset,
+    set_host_properties(
+        host,
+        (update_every > 0) ? update_every : 1,
+        memory_mode,
+        registry_hostname,
+        os,
+        timezone,
+        abbrev_timezone,
+        utc_offset,
         prog_name,
         prog_version);
 
@@ -360,28 +415,8 @@ int is_legacy = 1;
 
     rrdset_index_init(host);
 
-    char filename[FILENAME_MAX + 1];
     if(is_localhost)
         host->cache_dir  = strdupz(netdata_configured_cache_dir);
-    else {
-        // this is not localhost - append our GUID to localhost path
-        if (is_in_multihost) { // don't append to cache dir in multihost
-            host->cache_dir  = strdupz(netdata_configured_cache_dir);
-        }
-        else {
-            snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
-            host->cache_dir = strdupz(filename);
-        }
-
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE && is_legacy)
-        {
-            int r = mkdir(host->cache_dir, 0775);
-            if(r != 0 && errno != EEXIST)
-                nd_log(NDLS_DAEMON, NDLP_CRIT,
-                       "Host '%s': cannot create directory '%s'",
-                       rrdhost_hostname(host), host->cache_dir);
-        }
-    }
 
     // this is also needed for custom host variables - not only health
     if(!host->rrdvars)
@@ -396,45 +431,10 @@ int is_legacy = 1;
 
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
-        char dbenginepath[FILENAME_MAX + 1];
-        int ret;
-
-        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
-        ret = mkdir(dbenginepath, 0775);
-
-        if (ret != 0 && errno != EEXIST)
-            nd_log(NDLS_DAEMON, NDLP_CRIT,
-                   "Host '%s': cannot create directory '%s'",
-                   rrdhost_hostname(host), dbenginepath);
-        else
-            ret = 0; // succeed
-
-        if (is_legacy) {
-            // initialize legacy dbengine instance as needed
-
-            host->db[0].mode = RRD_MEMORY_MODE_DBENGINE;
-            host->db[0].eng = storage_engine_get(host->db[0].mode);
-            host->db[0].tier_grouping = get_tier_grouping(0);
-
-            ret = rrdeng_init(
-                (struct rrdengine_instance **)&host->db[0].si,
-                dbenginepath,
-                default_rrdeng_disk_quota_mb,
-                0); // may fail here for legacy dbengine initialization
-
-            if(ret == 0) {
-                rrdeng_readiness_wait((struct rrdengine_instance *)host->db[0].si);
-
-                // assign the rest of the shared storage instances to it
-                // to allow them collect its metrics too
-
-                for(size_t tier = 1; tier < storage_tiers ; tier++) {
-                    host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
-                    host->db[tier].eng = storage_engine_get(host->db[tier].mode);
-                    host->db[tier].si = (STORAGE_INSTANCE *) multidb_ctx[tier];
-                    host->db[tier].tier_grouping = get_tier_grouping(tier);
-                }
-            }
+        if (unittest_running) {
+            host = prepare_host_for_unittest(host);
+            if (!host)
+                return NULL;
         }
         else {
             for(size_t tier = 0; tier < storage_tiers ; tier++) {
@@ -444,19 +444,6 @@ int is_legacy = 1;
                 host->db[tier].tier_grouping = get_tier_grouping(tier);
             }
         }
-
-        if (ret) { // check legacy or multihost initialization success
-            nd_log(NDLS_DAEMON, NDLP_CRIT,
-                   "Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
-                   rrdhost_hostname(host), host->machine_guid, host->cache_dir);
-
-            rrd_wrlock();
-            rrdhost_free___while_having_rrd_wrlock(host, true);
-            rrd_unlock();
-
-            return NULL;
-        }
-
 #else
         fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
 #endif
@@ -1234,18 +1221,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
 
     rrdcalc_delete_all(host);
 
-    // ------------------------------------------------------------------------
-    // release its children resources
-
-#ifdef ENABLE_DBENGINE
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(host->db[tier].mode == RRD_MEMORY_MODE_DBENGINE
-            && host->db[tier].si
-            && !is_storage_engine_shared(host->db[tier].si))
-            rrdeng_prepare_exit((struct rrdengine_instance *)host->db[tier].si);
-    }
-#endif
-
     // delete all the RRDSETs of the host
     rrdset_index_destroy(host);
     rrdcalc_rrdhost_index_destroy(host);
@@ -1256,15 +1231,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     freez(host->exporting_flags);
 
     health_alarm_log_free(host);
-
-#ifdef ENABLE_DBENGINE
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(host->db[tier].mode == RRD_MEMORY_MODE_DBENGINE
-            && host->db[tier].si
-            && !is_storage_engine_shared(host->db[tier].si))
-            rrdeng_exit((struct rrdengine_instance *)host->db[tier].si);
-    }
-#endif
 
     if (!netdata_exit && !force) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,

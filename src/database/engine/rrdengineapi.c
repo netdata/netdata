@@ -98,26 +98,18 @@ void rrdeng_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_M
 // metric handle for legacy dbs
 
 /* This UUID is not unique across hosts */
-void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid)
+void rrdeng_generate_unittest_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid)
 {
-    EVP_MD_CTX *evpctx;
-    unsigned char hash_value[EVP_MAX_MD_SIZE];
-    unsigned int hash_len;
-
-    evpctx = EVP_MD_CTX_create();
-    EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
-    EVP_DigestUpdate(evpctx, dim_id, strlen(dim_id));
-    EVP_DigestUpdate(evpctx, chart_id, strlen(chart_id));
-    EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
-    EVP_MD_CTX_destroy(evpctx);
-    fatal_assert(hash_len > sizeof(uuid_t));
-    memcpy(ret_uuid, hash_value, sizeof(uuid_t));
+    CLEAN_BUFFER *wb = buffer_create(100, NULL);
+    buffer_sprintf(wb,"%s.%s", dim_id, chart_id);
+    UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
+    uuid_copy(*ret_uuid, uuid.uuid);
 }
 
-static METRIC *rrdeng_metric_get_legacy(STORAGE_INSTANCE *si, const char *rd_id, const char *st_id) {
+static METRIC *rrdeng_metric_unittest(STORAGE_INSTANCE *si, const char *rd_id, const char *st_id) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     uuid_t legacy_uuid;
-    rrdeng_generate_legacy_uuid(rd_id, st_id, &legacy_uuid);
+    rrdeng_generate_unittest_uuid(rd_id, st_id, &legacy_uuid);
     return mrg_metric_get_and_acquire(main_mrg, &legacy_uuid, (Word_t) ctx);
 }
 
@@ -165,11 +157,8 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     metric = mrg_metric_get_and_acquire(main_mrg, &rd->metric_uuid, (Word_t) ctx);
 
     if(unlikely(!metric)) {
-        if(unlikely(ctx->config.legacy)) {
-            // this is a single host database
-            // generate uuid from the chart and dimensions ids
-            // and overwrite the one supplied by rrddim
-            metric = rrdeng_metric_get_legacy(si, rrddim_id(rd), rrdset_id(rd->rrdset));
+        if(unlikely(unittest_running)) {
+            metric = rrdeng_metric_unittest(si, rrddim_id(rd), rrdset_id(rd->rrdset));
             if (metric)
                 uuid_copy(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric));
         }
@@ -1128,11 +1117,6 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     netdata_log_info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 
-bool rrdeng_is_legacy(STORAGE_INSTANCE *si) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    return ctx->config.legacy;
-}
-
 void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
     __atomic_store_n(&ctx->quiesce.exit_mode, true, __ATOMIC_RELAXED);
 }
@@ -1159,14 +1143,11 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
         return UV_EMFILE;
     }
 
-    if(NULL == ctxp) {
+    if(ctxp)
+        *ctxp = ctx = callocz(1, sizeof(*ctx));
+    else {
         ctx = multidb_ctx[tier];
         memset(ctx, 0, sizeof(*ctx));
-        ctx->config.legacy = false;
-    }
-    else {
-        *ctxp = ctx = callocz(1, sizeof(*ctx));
-        ctx->config.legacy = true;
     }
 
     ctx->config.tier = (int)tier;
@@ -1192,7 +1173,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
         return 0;
     }
 
-    if (ctx->config.legacy) {
+    if (unittest_running) {
         freez(ctx);
         if (ctxp)
             *ctxp = NULL;
@@ -1223,17 +1204,17 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     size_t count = 10;
     while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && count && !unittest_running) {
         if(!logged) {
-            netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", (ctx->config.legacy) ? -1 : ctx->config.tier);
+            netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", ctx->config.tier);
             logged = true;
         }
         sleep_usec(100 * USEC_PER_MS);
         count--;
     }
 
-    netdata_log_info("DBENGINE: flushing main cache for tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
+    netdata_log_info("DBENGINE: flushing main cache for tier %d", ctx->config.tier);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
-    netdata_log_info("DBENGINE: shutting down tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
+    netdata_log_info("DBENGINE: shutting down tier %d", ctx->config.tier);
     struct completion completion = {};
     completion_init(&completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
@@ -1242,7 +1223,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     finalize_rrd_files(ctx);
 
-    if(ctx->config.legacy)
+    if (unittest_running) //(ctx->config.unittest)
         freez(ctx);
 
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
