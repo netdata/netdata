@@ -2023,6 +2023,9 @@ int main(int argc, char **argv) {
 
         // setup threads configs
         default_stacksize = netdata_threads_init();
+        // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
+        if (default_stacksize < 1 * 1024 * 1024)
+            default_stacksize = 1 * 1024 * 1024;
 
 #ifdef NETDATA_INTERNAL_CHECKS
         config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring", true);
