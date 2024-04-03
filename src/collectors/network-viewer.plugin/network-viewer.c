@@ -1132,12 +1132,12 @@ static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char *
             args->debug = true;
         else if (strcmp("ebpf", argv[i]) == 0) {
             args->ebpf = true;
-            args->level = NETDATA_APPS_LEVEL_REAL_PARENT;
+            args->level = NETDATA_APPS_LEVEL_PARENT;
         }
         else if (strcmp("apps-level", argv[i]) == 0) {
             if(argc <= i + 1) {
-                nd_log(NDLS_COLLECTORS, NDLP_INFO, "Parameter 'apps-level' requires a number between %u and %u as argument.",
-                       NETDATA_APPS_LEVEL_REAL_PARENT, NETDATA_APPS_LEVEL_ALL);
+                nd_log(NDLS_COLLECTORS, NDLP_INFO, "Parameter 'apps-level' requires either %u or %u as argument.",
+                       NETDATA_APPS_LEVEL_REAL_PARENT, NETDATA_APPS_LEVEL_PARENT);
                 exit(1);
             }
 
@@ -1145,7 +1145,7 @@ static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char *
             args->level = str2i(argv[i]);
             // We avoid the highest level (NETDATA_APPS_LEVEL_ALL), because charts can become unreadable
             if (args->level < NETDATA_APPS_LEVEL_REAL_PARENT || args->level > NETDATA_APPS_LEVEL_PARENT)
-                args->level = NETDATA_APPS_LEVEL_REAL_PARENT;
+                args->level = NETDATA_APPS_LEVEL_PARENT;
         }
     }
 }
