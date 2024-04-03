@@ -621,6 +621,8 @@ static void health_event_loop(void) {
                     rc->last_updated = now;
                     rc->next_update = now + rc->config.update_every;
 
+                    rrdcalc_history_chart_update(rc);
+
                     if (next_run > rc->next_update)
                         next_run = rc->next_update;
                 }
