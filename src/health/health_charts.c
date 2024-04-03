@@ -33,10 +33,10 @@ static void rrdcalc_history_chart_create(RRDCALC *rc) {
             RRDSET_TYPE_LINE
             );
 
-        rrdlabels_add(rc->history.rrdset->rrdlabels, "alert", string2str(rc->config.name), RRDLABEL_SRC_AUTO);
-        rrdlabels_add(rc->history.rrdset->rrdlabels, "context", string2str(rc->rrdset->context), RRDLABEL_SRC_AUTO);
-        rrdlabels_add(rc->history.rrdset->rrdlabels, "instance", string2str(rc->rrdset->id), RRDLABEL_SRC_AUTO);
-        rrdlabels_add(rc->history.rrdset->rrdlabels, "host", string2str(rc->rrdset->rrdhost->hostname), RRDLABEL_SRC_AUTO);
+        rrdlabels_add(rc->history.rrdset->rrdlabels, "__alert", string2str(rc->config.name), RRDLABEL_SRC_AUTO);
+        rrdlabels_add(rc->history.rrdset->rrdlabels, "__context", string2str(rc->rrdset->context), RRDLABEL_SRC_AUTO);
+        rrdlabels_add(rc->history.rrdset->rrdlabels, "__instance", string2str(rc->rrdset->id), RRDLABEL_SRC_AUTO);
+        rrdlabels_add(rc->history.rrdset->rrdlabels, "__host", string2str(rc->rrdset->rrdhost->hostname), RRDLABEL_SRC_AUTO);
 
         rrdset_flag_set(rc->history.rrdset, RRDSET_FLAG_EXPORTING_IGNORE|RRDSET_FLAG_UPSTREAM_IGNORE|RRDSET_FLAG_STORE_FIRST|RRDSET_FLAG_HIDDEN);
     }
@@ -55,13 +55,17 @@ static void rrdcalc_history_chart_create(RRDCALC *rc) {
     if(!rc->history.clear)
         rc->history.clear = rrddim_add(rc->history.rrdset, "clear", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-    rc->history.warning = rrddim_find(rc->history.rrdset, "warning");
-    if(!rc->history.warning)
-        rc->history.warning = rrddim_add(rc->history.rrdset, "warning", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if(rc->config.warning) {
+        rc->history.warning = rrddim_find(rc->history.rrdset, "warning");
+        if (!rc->history.warning)
+            rc->history.warning = rrddim_add(rc->history.rrdset, "warning", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
 
-    rc->history.critical = rrddim_find(rc->history.rrdset, "critical");
-    if(!rc->history.critical)
-        rc->history.critical = rrddim_add(rc->history.rrdset, "critical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if(rc->config.critical) {
+        rc->history.critical = rrddim_find(rc->history.rrdset, "critical");
+        if (!rc->history.critical)
+            rc->history.critical = rrddim_add(rc->history.rrdset, "critical", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
 }
 
 void rrdcalc_history_chart_update(RRDCALC *rc) {
@@ -97,11 +101,17 @@ void rrdcalc_history_chart_update(RRDCALC *rc) {
 
     rrdset_next(rc->history.rrdset);
 
-    rrddim_set_by_pointer(rc->history.rrdset, rc->history.value, (collected_number)(rc->value * HEALTH_HISTORY_VALUE_RESOLUTION));
+    if(!isnan(rc->value) && !isinf(rc->value))
+        rrddim_set_by_pointer(rc->history.rrdset, rc->history.value, (collected_number)(rc->value * HEALTH_HISTORY_VALUE_RESOLUTION));
+
     rrddim_set_by_pointer(rc->history.rrdset, rc->history.undefined, undefined);
     rrddim_set_by_pointer(rc->history.rrdset, rc->history.clear, clear);
-    rrddim_set_by_pointer(rc->history.rrdset, rc->history.warning, warning);
-    rrddim_set_by_pointer(rc->history.rrdset, rc->history.critical, critical);
+
+    if(rc->config.warning)
+        rrddim_set_by_pointer(rc->history.rrdset, rc->history.warning, warning);
+
+    if(rc->config.critical)
+        rrddim_set_by_pointer(rc->history.rrdset, rc->history.critical, critical);
 
     rrdset_done(rc->history.rrdset);
 }
