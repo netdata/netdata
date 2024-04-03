@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix assorted issues in the Docker build process. [\#17312](https://github.com/netdata/netdata/pull/17312) ([Ferroin](https://github.com/Ferroin))
+- dyncfg function on parents should not require any access rights [\#17310](https://github.com/netdata/netdata/pull/17310) ([ktsaou](https://github.com/ktsaou))
 - Update metadata frequency [\#17307](https://github.com/netdata/netdata/pull/17307) ([stelfrag](https://github.com/stelfrag))
 - Fix handling of post-release workflows triggered by Docker workflow. [\#17306](https://github.com/netdata/netdata/pull/17306) ([Ferroin](https://github.com/Ferroin))
 - go.d: sd ll: add mysql socket jobs [\#17305](https://github.com/netdata/netdata/pull/17305) ([ilyam8](https://github.com/ilyam8))
