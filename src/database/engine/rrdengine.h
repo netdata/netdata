@@ -350,8 +350,6 @@ extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of dele
 
 struct rrdengine_instance {
     struct {
-        bool legacy;                                // true when the db is autonomous for a single host
-
         int tier;                                   // the tier of this ctx
         uint8_t page_type;                          // default page type for this context
 

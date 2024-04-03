@@ -1369,7 +1369,6 @@ extern netdata_rwlock_t rrd_rwlock;
 
 // ----------------------------------------------------------------------------
 
-bool is_storage_engine_shared(STORAGE_INSTANCE *si);
 void rrdset_index_init(RRDHOST *host);
 void rrdset_index_destroy(RRDHOST *host);
 

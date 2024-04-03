@@ -2562,12 +2562,10 @@ static void dbengine2_statistics_charts(void) {
                     if(host->db[tier].mode != RRD_MEMORY_MODE_DBENGINE) continue;
                     if(!host->db[tier].si) continue;
 
-                    if(is_storage_engine_shared(host->db[tier].si)) {
-                        if(counted_multihost_db[tier])
-                            continue;
-                        else
-                            counted_multihost_db[tier] = 1;
-                    }
+                    if(counted_multihost_db[tier])
+                        continue;
+                    else
+                        counted_multihost_db[tier] = 1;
 
                     ++dbengine_contexts;
                     rrdeng_get_37_statistics((struct rrdengine_instance *)host->db[tier].si, local_stats_array);

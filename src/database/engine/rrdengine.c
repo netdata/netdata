@@ -1366,8 +1366,7 @@ static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
         if(!logged) {
             logged = true;
             netdata_log_info("DBENGINE: waiting for %zu inflight queries to finish to shutdown tier %d...",
-                 __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED),
-                 (ctx->config.legacy) ? -1 : ctx->config.tier);
+                 __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED), ctx->config.tier);
         }
         sleep_usec(1 * USEC_PER_MS);
     }

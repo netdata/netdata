@@ -24,8 +24,6 @@ extern uint8_t tier_page_type[];
 
 #define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
 
-void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
-
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, uuid_t *uuid);
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *smh);
@@ -221,6 +219,5 @@ struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
-bool rrdeng_is_legacy(STORAGE_INSTANCE *si);
 
 #endif /* NETDATA_RRDENGINEAPI_H */
