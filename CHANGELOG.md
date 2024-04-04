@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- set min thread stack size to 1 MB [\#17317](https://github.com/netdata/netdata/pull/17317) ([ilyam8](https://github.com/ilyam8))
+- Drop legacy dbengine support [\#17315](https://github.com/netdata/netdata/pull/17315) ([stelfrag](https://github.com/stelfrag))
 - Fix assorted issues in the Docker build process. [\#17312](https://github.com/netdata/netdata/pull/17312) ([Ferroin](https://github.com/Ferroin))
 - dyncfg function on parents should not require any access rights [\#17310](https://github.com/netdata/netdata/pull/17310) ([ktsaou](https://github.com/ktsaou))
 - Update metadata frequency [\#17307](https://github.com/netdata/netdata/pull/17307) ([stelfrag](https://github.com/stelfrag))
@@ -404,7 +406,6 @@
 - Add the Mobile App notification Integration [\#16715](https://github.com/netdata/netdata/pull/16715) ([sashwathn](https://github.com/sashwathn))
 - Update GHA steps that handle artifacts to use latest versions of upload/download actions. [\#16714](https://github.com/netdata/netdata/pull/16714) ([Ferroin](https://github.com/Ferroin))
 - CI runtime check cleanup [\#16713](https://github.com/netdata/netdata/pull/16713) ([Ferroin](https://github.com/Ferroin))
-- disable logsmanagement when installing on macOS [\#16708](https://github.com/netdata/netdata/pull/16708) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
