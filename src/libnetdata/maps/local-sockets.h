@@ -789,138 +789,6 @@ typedef struct ebpf_nv_data {
     uint16_t protocol;
 } ebpf_nv_data_t;
 
-static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
-    ebpf_module_t *em = ls->ebpf_module;
-    // We loaded with success eBPF codes
-    if (em->maps && em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
-        ls->use_ebpf = true;
-
-    if (em->optional & NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) {
-        em->optional = (em->optional & ~NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) | NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
-    }
-
-    em->running_time = now_realtime_sec();
-}
-
-static inline bool local_sockets_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t *data) {
-    if (data->protocol == IPPROTO_TCP && (ls->config.tcp4 || ls->config.tcp6))
-        return  true;
-    else if (data->protocol == IPPROTO_UDP && (ls->config.udp4 || ls->config.udp6))
-        return  true;
-
-    return false;
-}
-
-static inline void local_sockets_reset_ebpf_value(ebpf_module_t *em, uint64_t removed)
-{
-    int ctrl_fd = em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd;
-    uint32_t control = NETDATA_CONTROLLER_PID_TABLE_ADD;
-    uint64_t current_value = 0;
-    if (!bpf_map_lookup_elem(ctrl_fd, &control, &current_value)) {
-        current_value -= removed;
-        if (bpf_map_update_elem(ctrl_fd, &control, &current_value, 0))
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "PLUGIN: cannot reset value inside table.");
-    }
-}
-
-static inline void local_sockets_read_sockets_from_proc(LS_STATE *ls);
-
-static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_load_data action) {
-    ebpf_nv_idx_t key =  { };
-    ebpf_nv_idx_t next_key = { };
-    ebpf_nv_data_t stored = {};
-
-    char path[FILENAME_MAX + 1];
-    snprintfz(path, sizeof(path) - 1, "%s/proc/", ls->config.host_prefix);
-
-    if(ls->config.namespaces) {
-        snprintfz(path, sizeof(path), "%sself/ns/net", path);
-        local_sockets_read_proc_inode_link(ls, path, &ls->proc_self_net_ns_inode, "net");
-    }
-
-    int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
-    uint64_t counter = 0;
-    uint64_t removed = 0;
-    char filename[FILENAME_MAX + 1];
-    bool cleanup = (action & NETWORK_VEIWER_EBPF_NV_CLEANUP);
-    bool use_pid = (action & NETWORK_VEIWER_EBPF_NV_USE_PID);
-    while (!bpf_map_get_next_key(fd, &key, &next_key)) {
-        if (bpf_map_lookup_elem(fd, &key, &stored)) {
-            goto end_socket_read_loop;
-        }
-
-        if (!local_sockets_ebpf_use_protocol(ls, &stored)) {
-            // Socket not allowed, let us remove it
-            bpf_map_delete_elem(fd, &key);
-            goto end_socket_read_loop;
-        }
-
-        counter++;
-        LOCAL_SOCKET n = {
-            .inode = stored.ts,
-            .direction = stored.direction,
-            .state = stored.state,
-            .local = {
-                .family = stored.family,
-                .protocol = stored.protocol,
-                .port = key.sport,
-            },
-            .remote = {
-                .family = stored.family,
-                .protocol = stored.protocol,
-                .port = key.dport,
-            },
-            .timer = stored.timer,
-            .retransmits = stored.retransmits,
-            .expires = stored.expires,
-            .rqueue = stored.rqueue,
-            .wqueue = stored.wqueue,
-            .pid = (use_pid) ? stored.pid : stored.tgid,
-            .uid = stored.uid,
-        };
-
-        if (stored.family == AF_INET) {
-            memcpy(&n.local.ip.ipv4, &key.saddr.ipv4, sizeof(n.local.ip.ipv4));
-            memcpy(&n.remote.ip.ipv4, &key.daddr.ipv4, sizeof(n.remote.ip.ipv4));
-        }
-        else if (stored.family == AF_INET6) {
-            memcpy(&n.local.ip.ipv6, &key.saddr.ipv6, sizeof(n.local.ip.ipv6));
-            memcpy(&n.remote.ip.ipv6, &key.daddr.ipv6, sizeof(n.remote.ip.ipv6));
-        }
-
-        strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
-        local_sockets_add_socket(ls, &n);
-
-        if (ls->config.namespaces) {
-            uint64_t net_ns_inode = 0;
-            snprintfz(filename, sizeof(filename), "%s%u/ns/net", path, n.pid);
-            if (local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
-                SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode, (uint64_t *)net_ns_inode, true);
-                simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
-            }
-        }
-
-end_socket_read_loop:
-        key = next_key;
-        if (cleanup && stored.closed) {
-            removed++;
-            bpf_map_delete_elem(fd, &key);
-        }
-    }
-
-    if (removed) {
-        local_sockets_reset_ebpf_value(ls->ebpf_module, removed);
-    }
-
-    // We did not have any call to functions, let us use proc
-    if (!counter) {
-        local_sockets_read_sockets_from_proc(ls);
-        return false;
-    }
-
-    return true;
-}
-
 static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *n) {
     ebpf_nv_idx_t key =  { };
     ebpf_nv_data_t data = {};
@@ -1412,23 +1280,13 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
             exit(EXIT_FAILURE);
         }
 
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        local_sockets_ebpf_selector(ls);
-#endif
-
 #ifdef HAVE_LIBMNL
         local_sockets_netlink_cleanup(ls);
         local_sockets_netlink_init(ls);
 #endif
 
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        if (ls->use_ebpf && (ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_ONLY_READ)) {
-            ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VEIWER_EBPF_NV_CLEANUP
-                                                               | (ls->ebpf_module->optional & NETWORK_VEIWER_EBPF_NV_USE_PID));
-        } else
-#endif
-            // read all sockets from /proc
-            local_sockets_read_sockets_from_proc(ls);
+        // read all sockets from /proc
+        local_sockets_read_sockets_from_proc(ls);
 
         // send all sockets to parent
         local_sockets_foreach_local_socket_call_cb(ls);
@@ -1555,10 +1413,6 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
 
 static inline void local_sockets_process(LS_STATE *ls) {
 
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    local_sockets_ebpf_selector(ls);
-#endif
-
 #ifdef HAVE_LIBMNL
     local_sockets_netlink_init(ls);
 #endif
@@ -1568,14 +1422,8 @@ static inline void local_sockets_process(LS_STATE *ls) {
     // initialize our hashtables
     local_sockets_init(ls);
 
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    if (ls->use_ebpf && ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
-        ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VIEWER_EBPF_NV_LOAD_DATA
-                                                          | (ls->ebpf_module->optional & NETWORK_VEIWER_EBPF_NV_USE_PID));
-    } else
-#endif
-        // read all sockets from /proc
-        local_sockets_read_sockets_from_proc(ls);
+    // read all sockets from /proc
+    local_sockets_read_sockets_from_proc(ls);
 
     // check all socket namespaces
     if(ls->config.namespaces)
@@ -1595,23 +1443,6 @@ static inline void local_sockets_process(LS_STATE *ls) {
     local_sockets_netlink_cleanup(ls);
 #endif
 
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    static int load_again = 0;
-    rw_spinlock_write_lock(&ls->ebpf_module->rw_spinlock);
-    if (ls->use_ebpf && ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_LOAD_DATA) {
-        ls->ebpf_module->optional = (NETWORK_VIEWER_EBPF_NV_ONLY_READ |
-                                      (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_LOAD_DATA));
-    }
-    else if (load_again == NETWORK_VIEWER_EBPF_ACTION_LIMIT) {
-        ls->ebpf_module->optional = (NETWORK_VIEWER_EBPF_NV_LOAD_DATA |
-                                      (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_ONLY_READ));
-        load_again = 0;
-    }
-    ls->ebpf_module->running_time = now_realtime_sec();
-    rw_spinlock_write_unlock(&ls->ebpf_module->rw_spinlock);
-
-    load_again++;
-#endif
 }
 
 static inline void ipv6_address_to_txt(struct in6_addr *in6_addr, char *dst) {
