@@ -750,10 +750,11 @@ enum ebpf_nv_tables_list {
 };
 
 enum ebpf_nv_load_data {
-    NETWORK_VIEWER_EBPF_NV_NOT_RUNNING = 0,
-    NETWORK_VIEWER_EBPF_NV_LOAD_DATA = 1<<0,
-    NETWORK_VIEWER_EBPF_NV_ONLY_READ = 1<<1,
-    NETWORK_VEIWER_EBPF_NV_CLEANUP = 1<<2
+    NETWORK_VIEWER_EBPF_NV_NOT_RUNNING = 1<<0,
+    NETWORK_VIEWER_EBPF_NV_LOAD_DATA = 1<<1,
+    NETWORK_VIEWER_EBPF_NV_ONLY_READ = 1<<2,
+    NETWORK_VEIWER_EBPF_NV_CLEANUP = 1<<3,
+    NETWORK_VEIWER_EBPF_NV_USE_PID = 1<<4
 };
 
 #define NETWORK_VIEWER_EBPF_ACTION_LIMIT 5
@@ -794,8 +795,9 @@ static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
     if (em->maps && em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
         ls->use_ebpf = true;
 
-    if (em->optional == NETWORK_VIEWER_EBPF_NV_NOT_RUNNING)
-        em->optional = NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
+    if (em->optional & NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) {
+        em->optional = (em->optional & ~NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) | NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
+    }
 
     em->running_time = now_realtime_sec();
 }
@@ -1419,7 +1421,7 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
 #endif
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        if (ls->use_ebpf && ls->ebpf_module->optional == NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
+        if (ls->use_ebpf && (ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_ONLY_READ)) {
             ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VEIWER_EBPF_NV_CLEANUP);
         } else
 #endif
@@ -1594,11 +1596,11 @@ static inline void local_sockets_process(LS_STATE *ls) {
     static int load_again = 0;
     rw_spinlock_write_lock(&ls->ebpf_module->rw_spinlock);
     if (ls->use_ebpf && ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_LOAD_DATA) {
-        ls->ebpf_module->optional |= (NETWORK_VIEWER_EBPF_NV_ONLY_READ |
+        ls->ebpf_module->optional = (NETWORK_VIEWER_EBPF_NV_ONLY_READ |
                                       (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_LOAD_DATA));
     }
     else if (load_again == NETWORK_VIEWER_EBPF_ACTION_LIMIT) {
-        ls->ebpf_module->optional |= (NETWORK_VIEWER_EBPF_NV_LOAD_DATA |
+        ls->ebpf_module->optional = (NETWORK_VIEWER_EBPF_NV_LOAD_DATA |
                                       (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_ONLY_READ));
         load_again = 0;
     }
