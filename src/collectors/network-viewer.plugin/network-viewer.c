@@ -108,6 +108,7 @@ ENUM_STR_DEFINE_FUNCTIONS(TCP_STATE, 0, "unknown");
 typedef struct networkviewer_opt {
     bool debug;
     bool ebpf;
+    bool usepid;
     int  level;
 } networkviewer_opt_t;
 
@@ -980,6 +981,8 @@ static inline void network_viwer_set_module(ebpf_module_t *em, networkviewer_opt
     em->targets = nv_targets;
     em->apps_charts = NETDATA_EBPF_APPS_FLAG_YES;
     em->apps_level = args->level;
+    if (args->usepid)
+        em->optional |= NETWORK_VEIWER_EBPF_NV_USE_PID;
 
 #ifdef LIBBPF_MAJOR_VERSION
     em->load |= EBPF_LOAD_CORE; // Prefer CO-RE avoiding kprobes
@@ -1026,7 +1029,7 @@ static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver
     if (!ret) {
         ebpf_update_controller(nv_maps[1].map_fd, em);
         // We are going to use the optional value to determine when data is loaded in kernel
-        ebpf_nv_module.optional = NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
+        ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
         ebpf_nv_module.running_time = now_realtime_sec();
 
         rw_spinlock_init(&ebpf_nv_module.rw_spinlock);
@@ -1089,12 +1092,12 @@ void *network_viewer_ebpf_worker(void *ptr)
 
         rw_spinlock_write_lock(&em->rw_spinlock);
         uint32_t curr = now_realtime_sec() - em->running_time;
-        if (em->optional != NETWORK_VIEWER_EBPF_NV_NOT_RUNNING || curr < max) {
+        if (!(em->optional & NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) || curr < max) {
             rw_spinlock_write_unlock(&em->rw_spinlock);
             continue;
         }
         em->running_time = now_realtime_sec();
-        em->optional = NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
+        em->optional |= NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
         rw_spinlock_write_unlock(&em->rw_spinlock);
 
         ebpf_nv_idx_t key = {};
@@ -1123,6 +1126,13 @@ void *network_viewer_ebpf_worker(void *ptr)
 
 // ----------------------------------------------------------------------------------------------------------------
 // Parse Args
+static inline void networkviewer_set_ebpf_variables(networkviewer_opt_t *args, bool use_pid)
+{
+    args->ebpf = true;
+    if (!args->level)
+        args->level = NETDATA_APPS_LEVEL_PARENT;
+    args->usepid = use_pid;
+}
 
 static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char **argv)
 {
@@ -1130,13 +1140,13 @@ static void networkviewer_parse_args(networkviewer_opt_t *args, int argc, char *
     for(i = 1; i < argc; i++) {
         if (strcmp("debug", argv[i]) == 0)
             args->debug = true;
-        else if (strcmp("ebpf", argv[i]) == 0) {
-            args->ebpf = true;
-            args->level = NETDATA_APPS_LEVEL_PARENT;
-        }
+        else if (strcmp("ebpf", argv[i]) == 0)
+            networkviewer_set_ebpf_variables(args, false);
+        else if (strcmp("use-pid", argv[i]) == 0)
+            networkviewer_set_ebpf_variables(args, true);
         else if (strcmp("apps-level", argv[i]) == 0) {
             if(argc <= i + 1) {
-                nd_log(NDLS_COLLECTORS, NDLP_INFO, "Parameter 'apps-level' requires either %u or %u as argument.",
+                nd_log(NDLS_COLLECTORS, NDLP_INFO, "Parameter 'apps-level' requires either %d or %d as argument.",
                        NETDATA_APPS_LEVEL_REAL_PARENT, NETDATA_APPS_LEVEL_PARENT);
                 exit(1);
             }
