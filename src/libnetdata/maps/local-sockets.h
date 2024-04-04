@@ -843,6 +843,7 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_loa
     uint64_t removed = 0;
     char filename[FILENAME_MAX + 1];
     bool cleanup = (action & NETWORK_VEIWER_EBPF_NV_CLEANUP);
+    bool use_pid = (action & NETWORK_VEIWER_EBPF_NV_USE_PID);
     while (!bpf_map_get_next_key(fd, &key, &next_key)) {
         if (bpf_map_lookup_elem(fd, &key, &stored)) {
             goto end_socket_read_loop;
@@ -874,7 +875,7 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_loa
             .expires = stored.expires,
             .rqueue = stored.rqueue,
             .wqueue = stored.wqueue,
-            .pid = stored.pid,
+            .pid = (use_pid) ? stored.pid : stored.tgid,
             .uid = stored.uid,
         };
 
@@ -892,7 +893,7 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_loa
 
         if (ls->config.namespaces) {
             uint64_t net_ns_inode = 0;
-            snprintfz(filename, sizeof(filename), "%s%u/ns/net", path, stored.pid);
+            snprintfz(filename, sizeof(filename), "%s%u/ns/net", path, n.pid);
             if (local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
                 SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode, (uint64_t *)net_ns_inode, true);
                 simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
@@ -1422,7 +1423,8 @@ static inline bool local_sockets_get_namespace_sockets(LS_STATE *ls, struct pid_
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
         if (ls->use_ebpf && (ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_ONLY_READ)) {
-            ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VEIWER_EBPF_NV_CLEANUP);
+            ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VEIWER_EBPF_NV_CLEANUP
+                                                               | (ls->ebpf_module->optional & NETWORK_VEIWER_EBPF_NV_USE_PID));
         } else
 #endif
             // read all sockets from /proc
@@ -1568,7 +1570,8 @@ static inline void local_sockets_process(LS_STATE *ls) {
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     if (ls->use_ebpf && ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
-        ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VIEWER_EBPF_NV_LOAD_DATA);
+        ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VIEWER_EBPF_NV_LOAD_DATA
+                                                          | (ls->ebpf_module->optional & NETWORK_VEIWER_EBPF_NV_USE_PID));
     } else
 #endif
         // read all sockets from /proc
