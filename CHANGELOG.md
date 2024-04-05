@@ -76,6 +76,7 @@
 - Add label for cgroup [\#17156](https://github.com/netdata/netdata/pull/17156) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix action lints [\#17120](https://github.com/netdata/netdata/pull/17120) ([tkatsoulas](https://github.com/tkatsoulas))
 - Fix conditional for Amazon Linux 2023 in repoconfig spec file. [\#17056](https://github.com/netdata/netdata/pull/17056) ([PaulSzymanski](https://github.com/PaulSzymanski))
+- Add basic support for dinit in our system service handling code. [\#16836](https://github.com/netdata/netdata/pull/16836) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.2](https://github.com/netdata/netdata/tree/v1.45.2) (2024-04-01)
 
@@ -404,8 +405,6 @@
 - Add info to distros.yml for handling of legacy platforms. [\#16718](https://github.com/netdata/netdata/pull/16718) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#16716](https://github.com/netdata/netdata/pull/16716) ([netdatabot](https://github.com/netdatabot))
 - Add the Mobile App notification Integration [\#16715](https://github.com/netdata/netdata/pull/16715) ([sashwathn](https://github.com/sashwathn))
-- Update GHA steps that handle artifacts to use latest versions of upload/download actions. [\#16714](https://github.com/netdata/netdata/pull/16714) ([Ferroin](https://github.com/Ferroin))
-- CI runtime check cleanup [\#16713](https://github.com/netdata/netdata/pull/16713) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
