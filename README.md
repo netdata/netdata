@@ -46,7 +46,7 @@ Netdata monitors all the following:
 |                        **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |                 Full                  |  Basic  | Basic |              Basic               |
 |                         **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |                 Full                  |  Basic  | Basic |              Basic               |
 |                **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |                 Full                  |  Some   | Some  |               Some               |
-|                               **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`-only</small> |    -    |   -   |              Basic               |
+|                               **O/S Services**<small><br/>Resources, Performance and Status</small> |    Yes<small><br/>`systemd`</small>   |    -    |   -   |              Basic               |
 |                                                                                            **Logs** |   Yes<small><br/>`systemd`-journal    |    -    |   -   |                -                 |
 |                              **Processes**<small><br/>Resources, Performance, OOM, and more</small> |                  Yes                  |   Yes   |  Yes  |               Yes                |
 |                         **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |                  Yes                  |    -    |   -   |                -                 |

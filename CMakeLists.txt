@@ -665,7 +665,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-callbacks.h
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
-        src/libnetdata/bitmap.h
+        src/libnetdata/bitmap64.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -2333,6 +2333,11 @@ configure_file(system/runit/run.in system/runit/run @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/system/runit/run
         DESTINATION usr/lib/netdata/system/runit)
+
+configure_file(system/dinit/netdata.in system/dinit/netdata @ONLY)
+install(FILES
+        ${CMAKE_BINARY_DIR}/system/dinit/netdata
+        DESTINATION usr/lib/netdata/system/dinit)
 
 configure_file(system/systemd/netdata.service.in system/systemd/netdata.service @ONLY)
 install(FILES

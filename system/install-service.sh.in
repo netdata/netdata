@@ -29,7 +29,7 @@ DUMP_CMDS=0
 ENABLE="auto"
 EXPORT_CMDS=0
 INSTALL=1
-LINUX_INIT_TYPES="systemd openrc lsb initd runit"
+LINUX_INIT_TYPES="systemd openrc lsb initd runit dinit"
 PLATFORM="$(uname -s)"
 SHOW_SVC_TYPE=0
 SVC_SOURCE="@libsysdir_POST@"
@@ -560,6 +560,65 @@ install_runit_service() {
 runit_cmds() {
   NETDATA_START_CMD="sv start netdata"
   NETDATA_STOP_CMD="sv stop netdata"
+}
+
+# =====================================================================
+# dinit support functions
+
+_check_dinit() {
+  # if /etc/dinit.d does not exist, it’s not dinit
+  [ ! -d /etc/dinit.d ] && echo "NO" && return 0
+
+  # if PID 1 is dinit, it’s dinit
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "dinit" ] && echo "YES" && return 0
+
+  # if /run/dinitctl exists and is a socket, it’s dinit
+  [ -S /run/dinitctl ] && echo "YES" && return 0
+
+  # if the dinitctl command exists despite getting to this point, it’s dinit, but not booted as such
+  [ -n "$(command -v dinitctl 2>/dev/null || true)" ] && echo "OFFLINE" && return 0
+
+  echo "NO" && return 0
+}
+
+check_dinit() {
+  if [ -z "${IS_DINIT}" ]; then
+    IS_DINIT="$(_check_dinit)"
+  fi
+
+  echo "${IS_DINIT}"
+}
+
+_run_dinitctl() {
+  opts=''
+
+  if [ "$(check_dinit)" = "OFFLINE" ]; then
+    opts="-o"
+  fi
+
+  # shellcheck disable=SC2086
+  dinitctl ${opts} "${@}"
+}
+
+enable_dinit() {
+  _run_dinitctl enable netdata
+}
+
+enable_dinit() {
+  _run_dinitctl disable netdata
+}
+
+install_dinit_service() {
+  install_generic_service dinit/netdata "dinit" /etc/dinit.d enable_dinit disable_dinit
+}
+
+dinit_cmds() {
+  if [ "$(check_dinit)" = "YES" ]; then
+    NETDATA_START_CMD='dinitctl start netdata'
+    NETDATA_STOP_CMD='dinitct stop netdata'
+  else # Not booted using dinit, use external defaults by not providing commands.
+    warning "Detected dinit, but the system is not booted using dinit. Unable to provide commands to start or stop Netdata using the service manager."
+  fi
 }
 
 # =====================================================================

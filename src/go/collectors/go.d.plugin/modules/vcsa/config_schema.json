@@ -91,6 +91,14 @@
         "description": "The path to the client key file for TLS authentication.",
         "type": "string",
         "pattern": "^$|^/"
+      },
+      "body": {
+        "title": "Body",
+        "type": "string"
+      },
+      "method": {
+        "title": "Method",
+        "type": "string"
       }
     },
     "required": [
@@ -148,6 +156,12 @@
     },
     "uiOptions": {
       "fullPage": true
+    },
+    "body": {
+      "ui:widget": "hidden"
+    },
+    "method": {
+      "ui:widget": "hidden"
     },
     "url": {
       "ui:placeholder": "https://203.0.113.0"

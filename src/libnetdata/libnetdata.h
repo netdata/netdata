@@ -352,7 +352,7 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 // Taken from linux kernel
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
-#include "bitmap.h"
+#include "bitmap64.h"
 
 #define COMPRESSION_MAX_CHUNK 0x4000
 #define COMPRESSION_MAX_OVERHEAD 128

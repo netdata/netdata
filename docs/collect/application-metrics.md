@@ -78,6 +78,6 @@ collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d
 
 Collecting all the available metrics on your nodes, and across your entire infrastructure, is just one piece of the
 puzzle. Next, learn more about Netdata's famous real-time visualizations by [seeing an overview of your
-infrastructure](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) using Netdata Cloud.
+infrastructure](https://github.com/netdata/netdata/blob/master/docs/dashboard/home-tab.md) using Netdata Cloud.
 
 

@@ -92,6 +92,14 @@
         "description": "The path to the client key file for TLS authentication.",
         "type": "string",
         "pattern": "^$|^/"
+      },
+      "body": {
+        "title": "Body",
+        "type": "string"
+      },
+      "method": {
+        "title": "Method",
+        "type": "string"
       }
     },
     "required": [
@@ -105,6 +113,12 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
+    },
+    "body": {
+      "ui:widget": "hidden"
+    },
+    "method": {
+      "ui:widget": "hidden"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
