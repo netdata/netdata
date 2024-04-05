@@ -18,6 +18,8 @@ Source6:        netdata.repo.ol
 Source7:        netdata-edge.repo.ol
 Source8:        netdata.repo.al
 Source9:        netdata-edge.repo.al
+Source10:       netdata.repo.al2023
+Source11:       netdata-edge.repo.al2023
 
 BuildArch:      noarch
 
@@ -61,6 +63,11 @@ install -pm 644 %{SOURCE7} ./netdata-edge.repo
 %if 0%{?amzn}
 install -pm 644 %{SOURCE8} ./netdata.repo
 install -pm 644 %{SOURCE9} ./netdata-edge.repo
+%endif
+
+%if 0%{?amzn2023}
+install -pm 644 %{SOURCE10} ./netdata.repo
+install -pm 644 %{SOURCE11} ./netdata-edge.repo
 %endif
 
 %build
