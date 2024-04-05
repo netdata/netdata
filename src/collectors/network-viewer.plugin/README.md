@@ -52,10 +52,9 @@ You can further customize the collection level by specifying the desired option
 ```
 [plugin:network-viewer]
 	# update every = 1
-	command options = ebpf apps-level 2
+	command options = ebpf apps-level 1
 ```
 
 The accepted values are as follows:
     - 0: Group data under the real parent
     - 1: Group data under the parent.
-    - 2: Collect data per PID.
