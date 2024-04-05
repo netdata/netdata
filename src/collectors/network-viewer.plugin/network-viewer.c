@@ -1248,42 +1248,132 @@ static inline void network_viewer_load_ebpf(networkviewer_opt_t *args)
 void *network_viewer_ebpf_worker(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    LS_STATE ebpf_ls = {
+        .config = {
+                .listening = true,
+                .inbound = true,
+                .outbound = true,
+                .local = true,
+                .tcp4 = true,
+                .tcp6 = true,
+                .udp4 = true,
+                .udp6 = true,
+                .pid = true,
+                .uid = true,
+                .cmdline = true,
+                .comm = true,
+                .namespaces = true,
+
+                .max_errors = 10,
+            },
+            .stats = { 0 },
+            .use_ebpf = false,
+            .ebpf_module = &ebpf_nv_module,
+            .sockets_hashtable = { 0 },
+            .local_ips_hashtable = { 0 },
+            .listening_ports_hashtable = { 0 },
+    };
+
+    ebpf_ls.config.host_prefix = netdata_configured_host_prefix;
+
+    char path[FILENAME_MAX + 1];
+    snprintfz(path, sizeof(path) - 1, "%s/proc/", netdata_configured_host_prefix);
+
+    // initialize our hashtables
+    local_sockets_init(&ebpf_ls);
+
     heartbeat_t hb;
     heartbeat_init(&hb);
-    uint32_t max = 5 * NETWORK_VIEWER_EBPF_ACTION_LIMIT;
-    uint64_t removed = 0;
+    char filename[FILENAME_MAX + 1];
+    bool use_pid = (ebpf_nv_module.optional & NETWORK_VEIWER_EBPF_NV_USE_PID);
     while (!plugin_should_exit) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-
-        rw_spinlock_write_lock(&em->rw_spinlock);
-        uint32_t curr = now_realtime_sec() - em->running_time;
-        if (!(em->optional & NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) || curr < max) {
-            rw_spinlock_write_unlock(&em->rw_spinlock);
-            continue;
-        }
-        em->running_time = now_realtime_sec();
-        em->optional |= NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
-        rw_spinlock_write_unlock(&em->rw_spinlock);
 
         ebpf_nv_idx_t key = {};
         ebpf_nv_idx_t next_key = {};
         ebpf_nv_data_t stored = {};
         int fd = em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
         while (!bpf_map_get_next_key(fd, &key, &next_key)) {
-            if (!bpf_map_lookup_elem(fd, &key, &stored)) {
-                if (stored.closed) {
-                    bpf_map_delete_elem(fd, &key);
-                    removed++;
+            if (bpf_map_lookup_elem(fd, &key, &stored)) {
+                goto end_ebpf_nv_worker;
+            }
+
+            if (!network_viewer_ebpf_use_protocol(&ebpf_ls, &stored)) {
+                // Socket not allowed, let us remove it
+                bpf_map_delete_elem(fd, &key);
+                goto end_ebpf_nv_worker;
+            }
+
+            uint32_t pid = (use_pid) ? stored.pid : stored.tgid;
+            uint64_t inode = stored.ts;
+            LOCAL_SOCKET n = {
+                .inode = stored.ts,
+                .direction = stored.direction,
+                .state = stored.state,
+                .local = {
+                        .family = stored.family,
+                        .protocol = stored.protocol,
+                        .port = key.sport,
+                    },
+                    .remote = {
+                        .family = stored.family,
+                        .protocol = stored.protocol,
+                        .port = key.dport,
+                    },
+                    .timer = stored.timer,
+                    .retransmits = stored.retransmits,
+                    .expires = stored.expires,
+                    .rqueue = stored.rqueue,
+                    .wqueue = stored.wqueue,
+                    .pid = pid,
+                    .uid = stored.uid,
+             };
+
+            if (stored.family == AF_INET) {
+                memcpy(&n.local.ip.ipv4, &key.saddr.ipv4, sizeof(n.local.ip.ipv4));
+                memcpy(&n.remote.ip.ipv4, &key.daddr.ipv4, sizeof(n.remote.ip.ipv4));
+            }
+            else if (stored.family == AF_INET6) {
+                memcpy(&n.local.ip.ipv6, &key.saddr.ipv6, sizeof(n.local.ip.ipv6));
+                memcpy(&n.remote.ip.ipv6, &key.daddr.ipv6, sizeof(n.remote.ip.ipv6));
+            }
+
+            strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
+
+            SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ebpf_ls.sockets_hashtable,
+                                                                                            inode, &inode, true);
+            LOCAL_SOCKET *o = SIMPLE_HASHTABLE_SLOT_DATA(sl);
+            if(o) {
+                o->retransmits = n.retransmits;
+                o->expires = n.expires;
+                o->rqueue = n.rqueue;
+                o->wqueue = n.wqueue;
+                goto end_ebpf_nv_worker;
+            }
+            local_sockets_add_socket(&ebpf_ls, &n);
+
+            if (ebpf_ls.config.namespaces) {
+                uint64_t net_ns_inode = 0;
+                snprintfz(filename, sizeof(filename), "%s%u/ns/net", path, pid);
+                if (local_sockets_read_proc_inode_link(&ebpf_ls, filename, &net_ns_inode, "net")) {
+                    SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ebpf_ls.ns_hashtable,
+                                                                                           net_ns_inode,
+                                                                                           (uint64_t *)net_ns_inode,
+                                                                                           true);
+                    simple_hashtable_set_slot_NET_NS(&ebpf_ls.ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
                 }
             }
 
-            stored.closed = 0;
-            key = next_key;
+end_ebpf_nv_worker:
+            if (stored.closed) {
+                stored.closed = 0;
+                bpf_map_delete_elem(fd, &key);
+            }
+
+            memcpy(&next_key, &key, sizeof(key));
         }
     }
-
-    if (removed)
-        network_viewer_reset_ebpf_value(em, removed);
 
     return NULL;
 }
