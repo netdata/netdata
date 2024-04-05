@@ -19,10 +19,10 @@ The map classification can be altered, allowing the categorization of nodes by:
 - Status (e.g. Live)
 - OS (e.g. Ubuntu)
 - Technology (e.g. Container)
-- Agent version (e.g. X.XX.X)
+- Agent version (e.g. v1.45.2)
 - Replication factor (e.g. Single, Multi)
 - Cloud provider (e.g AWS)
-- Cloud region (e.g. Europe)
+- Cloud region (e.g. us-east-1)
 - Instance type (e.g. c6a.xlarge)
 
 Color-coding can also be configured between:
