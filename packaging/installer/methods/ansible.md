@@ -103,8 +103,8 @@ two different SSH keys supplied by AWS.
 
 ### Edit the `vars/main.yml` file
 
-In order to connect your node(s) to your Space in Netdata Cloud, and see all their metrics in real-time in [composite
-charts](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) or perform [Metric
+In order to connect your node(s) to your Space in Netdata Cloud, and see all their metrics in real-time in composite
+charts or perform [Metric
 Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md), you need to set the `claim_token`
 and `claim_room` variables.
 

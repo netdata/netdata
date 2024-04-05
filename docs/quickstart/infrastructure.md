@@ -99,8 +99,7 @@ Both the Overview and the Nodes tab offer easy access to **single-node dashboard
 single-node dashboards in Netdata Cloud to drill down on specific issues, scrub backward in time to investigate
 historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
 
-Read about the process in the [infrastructure
-overview](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md#drill-down-with-single-node-dashboards) doc, then learn about [interacting with
+Learn more about [interacting with
 dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) to get the most from all of Netdata's real-time
 metrics.
 

@@ -1,0 +1,60 @@
+# Home Tab
+
+The Home tab allows users to see an overview of their Space.
+
+## Total nodes
+
+The total amount of nodes is presented, dissected also by their state, Live, Offline or Stale.
+
+## Active alerts
+
+The number of the active alerts are presented in a donut chart, while also having counters for both Critical and Warning alerts.
+
+## Nodes map
+
+A map consisting of node entries allows for quick hoverable information about each node, while also presenting node status in a color-coded way.
+
+The map classification can be altered, allowing the categorization of nodes by:
+
+- Status (e.g. Live)
+- OS (e.g. Ubuntu)
+- Technology (e.g. Container)
+- Agent version (e.g. X.XX.X)
+- Replication factor (e.g. Single, Multi)
+- Cloud provider (e.g AWS)
+- Cloud region (e.g. Europe)
+- Instance type (e.g. c6a.xlarge)
+
+Color-coding can also be configured between:
+
+- Status (e.g. Live, Offline)
+- Connection stability (e.g. Stable, Unstable)
+- Replication factor (e.g. None, Single)
+
+## Data replication
+
+There are two views about data replication in the Home tab:
+
+The first bar chart presents the amount of **Parents**, **Children** and **Standalone** nodes.
+
+The second bar chart presents the amount of nodes depending on their Replication factor, **None**, **Single** and **Multi**.
+
+## Alerts overview over the last 24h
+
+There are two views that displays information about nodes that produced the most alerts and top alerts in the last 24h.
+
+The first bar chart presents the nodes that produced the most alerts in a time window of the last 24 hours.
+
+The second table contains the top alerts in the last 24 hours, along with their instance, the occurrences and their duration in seconds.
+
+## Netdata Assistant shortcut
+
+In the Home tab there is a shortcut button in order to start an instant conversation with the [Netdata Assistant](https://github.com/netdata/netdata/edit/master/docs/cloud/netdata-assistant.md).
+
+## Space metrics
+
+There are three key metrics that are displayed in the Home tab, **Metrics collected**, **Charts visualized** and **Alerts configured**.
+
+## Data retention per Nodes
+
+This bar chart presents the amount of nodes in relation to their retention period.

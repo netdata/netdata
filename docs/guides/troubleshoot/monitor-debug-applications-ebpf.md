@@ -241,8 +241,8 @@ findings with someone else on your team.
 If you don't already have a Netdata Cloud account, go [sign in](https://app.netdata.cloud) and get started for free.
 You can also read how to [monitor your infrastructure with Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) to understand the key features that it has to offer.
 
-Once you've added one or more nodes to a Space in Netdata Cloud, you can see aggregated eBPF metrics in the [Overview
-dashboard](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) under the same **Applications** or **eBPF** sections that you
+Once you've added one or more nodes to a Space in Netdata Cloud, you can see aggregated eBPF metrics in the Overview
+dashboard under the same **Applications** or **eBPF** sections that you
 find on the local Agent dashboard. Or, [create new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md) using eBPF metrics
 from any number of distributed nodes to see how your application interacts with multiple Linux kernels on multiple Linux
 systems. 

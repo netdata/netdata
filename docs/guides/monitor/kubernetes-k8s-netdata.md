@@ -118,9 +118,6 @@ cluster](https://user-images.githubusercontent.com/1153921/109042169-19c8fa00-76
 For example, the chart above shows a spike in the CPU utilization from `rabbitmq` every minute or so, along with a
 baseline CPU utilization of 10-15% across the cluster.
 
-Read about the [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) and some best practices on [viewing
-an overview of your infrastructure](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) for details on using composite charts to
-drill down into per-node performance metrics.
 
 ## Pod and container metrics
 
