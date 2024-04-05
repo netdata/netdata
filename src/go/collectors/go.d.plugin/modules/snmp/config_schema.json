@@ -286,7 +286,11 @@
       "community",
       "options",
       "charts"
-    ]
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

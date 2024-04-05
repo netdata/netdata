@@ -38,6 +38,10 @@
     "required": [
       "address"
     ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    },
     "dependencies": {
       "username": [
         "password"

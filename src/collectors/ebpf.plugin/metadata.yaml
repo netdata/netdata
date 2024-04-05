@@ -1733,7 +1733,7 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: connections
-            - name: app.app.ebpf_call_tcp_v6_connection
+            - name: app.ebpf_call_tcp_v6_connection
               description: Calls to tcp_v6_connection
               unit: "connections/s"
               chart_type: stacked
@@ -3282,30 +3282,6 @@ modules:
               chart_type: line
               dimensions:
                 - name: hash_table
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL
-              unit: "bytes"
-              chart_type: stacked
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: "calls"
-              chart_type: stacked
-              dimensions:
-                - name: aral
-            - name: netdata.ebpf_aral_stat_size
-              description: Bytes allocated for ARAL.
-              unit: "bytes"
-              chart_type: stacked
-              dimensions:
-                - name: memory
-            - name: netdata.ebpf_aral_stat_alloc
-              description: Calls to allocate memory
-              unit: "calls"
-              chart_type: stacked
-              dimensions:
-                - name: aral
             - name: netdata.ebpf_hash_tables_insert_pid_elements
               description: Number of times an element was inserted in a hash table.
               unit: "rows"

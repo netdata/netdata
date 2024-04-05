@@ -104,7 +104,11 @@
       "domains",
       "servers",
       "network"
-    ]
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

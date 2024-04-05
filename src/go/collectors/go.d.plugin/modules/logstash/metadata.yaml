@@ -265,7 +265,7 @@ modules:
                 - name: in
                 - name: filtered
                 - name: out
-            - name: logstash.pipeline_event
+            - name: logstash.pipeline_event_duration
               description: Pipeline Events Duration
               unit: seconds
               chart_type: line

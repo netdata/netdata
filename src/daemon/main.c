@@ -820,7 +820,6 @@ int help(int exitcode) {
 
     fprintf(stream, "\n Signals netdata handles:\n\n"
             "  - HUP                    Close and reopen log files.\n"
-            "  - USR1                   Save internal DB to disk.\n"
             "  - USR2                   Reload health configuration.\n"
             "\n"
     );
@@ -1531,7 +1530,6 @@ int main(int argc, char **argv) {
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
-                            if (unit_test_bitmaps()) return 1;
 
                             // No call to load the config file on this code-path
                             if (unittest_prepare_rrd(&user)) return 1;
@@ -2024,6 +2022,9 @@ int main(int argc, char **argv) {
 
         // setup threads configs
         default_stacksize = netdata_threads_init();
+        // musl default thread stack size is 128k, let's set it to a higher value to avoid random crashes
+        if (default_stacksize < 1 * 1024 * 1024)
+            default_stacksize = 1 * 1024 * 1024;
 
 #ifdef NETDATA_INTERNAL_CHECKS
         config_set_boolean(CONFIG_SECTION_PLUGINS, "netdata monitoring", true);

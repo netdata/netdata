@@ -156,14 +156,14 @@ modules:
           description: "These metrics refer to the entire monitored application."
           labels: []
           metrics:
-            - name: puppet.jvm
+            - name: puppet.jvm_heap
               description: JVM Heap
               unit: "MiB"
               chart_type: area
               dimensions:
                 - name: committed
                 - name: used
-            - name: puppet.jvm
+            - name: puppet.jvm_nonheap
               description: JVM Non-Heap
               unit: "MiB"
               chart_type: area

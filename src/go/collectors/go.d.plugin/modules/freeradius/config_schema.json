@@ -40,7 +40,11 @@
       "address",
       "port",
       "secret"
-    ]
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

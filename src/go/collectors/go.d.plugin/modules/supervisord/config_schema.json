@@ -48,7 +48,11 @@
     },
     "required": [
       "url"
-    ]
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

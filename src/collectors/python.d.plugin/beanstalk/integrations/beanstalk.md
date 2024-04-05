@@ -67,7 +67,7 @@ Metrics:
 | beanstalk.jobs_rate | total, timeouts | jobs/s |
 | beanstalk.connections_rate | connections | connections/s |
 | beanstalk.commands_rate | put, peek, peek-ready, peek-delayed, peek-buried, reserve, use, watch, ignore, delete, bury, kick, stats, stats-job, stats-tube, list-tubes, list-tube-used, list-tubes-watched, pause-tube | commands/s |
-| beanstalk.connections_rate | tubes | tubes |
+| beanstalk.current_tubes | tubes | tubes |
 | beanstalk.current_jobs | urgent, ready, reserved, delayed, buried | jobs |
 | beanstalk.current_connections | written, producers, workers, waiting | connections |
 | beanstalk.binlog | written, migrated | records/s |

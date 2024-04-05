@@ -181,7 +181,7 @@ modules:
                 - name: list-tube-used
                 - name: list-tubes-watched
                 - name: pause-tube
-            - name: beanstalk.connections_rate
+            - name: beanstalk.current_tubes
               description: Current Tubes
               unit: "tubes"
               chart_type: area

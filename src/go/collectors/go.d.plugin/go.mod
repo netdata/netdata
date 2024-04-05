@@ -16,11 +16,11 @@ require (
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/docker/docker v25.0.5+incompatible
+	github.com/docker/docker v26.0.0+incompatible
 	github.com/facebook/time v0.0.0-20240301144314-9afaa3836e98
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/go-sql-driver/mysql v1.8.0
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gofrs/flock v0.8.1
 	github.com/golang/mock v1.6.0
@@ -37,12 +37,12 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/muesli/cancelreader v0.2.2
 	github.com/prometheus-community/pro-bing v0.4.0
-	github.com/prometheus/common v0.50.0
+	github.com/prometheus/common v0.51.1
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/stretchr/testify v1.9.0
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/valyala/fastjson v1.6.4
-	github.com/vmware/govmomi v0.36.1
+	github.com/vmware/govmomi v0.36.2
 	go.mongodb.org/mongo-driver v1.14.0
 	golang.org/x/net v0.22.0
 	golang.org/x/text v0.14.0
@@ -105,6 +105,7 @@ require (
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.1 // indirect
+	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect

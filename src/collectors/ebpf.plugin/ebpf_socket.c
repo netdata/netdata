@@ -1236,7 +1236,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION connections '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1252,7 +1252,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                                  order++,
                                  update_every,
                                  NETDATA_EBPF_MODULE_NAME_SOCKET);
-            ebpf_create_chart_labels("app_group", w->name, 1);
+            ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
             ebpf_commit_label();
             fprintf(stdout, "DIMENSION connections '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
         }
@@ -1268,7 +1268,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION bandwidth '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1283,7 +1283,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION bandwidth '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1298,7 +1298,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1313,7 +1313,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1328,7 +1328,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1343,7 +1343,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                              order++,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -1358,7 +1358,7 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
                              order,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_SOCKET);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION calls '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_INCREMENTAL_IDX]);
 
@@ -2108,6 +2108,7 @@ static void ebpf_socket_sum_cgroup_pids(ebpf_socket_publish_apps_t *socket, stru
 static void ebpf_create_specific_socket_charts(char *type, int update_every)
 {
     int order_basis = 5300;
+    char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_NET_APPS_CONNECTION_TCP_V4,
                       "Calls to tcp_v4_connection",
                       EBPF_COMMON_DIMENSION_CONNECTIONS, NETDATA_CGROUP_NET_GROUP,
@@ -2117,6 +2118,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CONNECTION_V4], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     if (tcp_v6_connect_address.type == 'T') {
         ebpf_create_chart(type,
@@ -2132,6 +2135,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                           1,
                           update_every,
                           NETDATA_EBPF_MODULE_NAME_SOCKET);
+        ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+        ebpf_commit_label();
     }
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_RECV,
@@ -2143,6 +2148,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_SENT,
                       "Bytes sent",
@@ -2153,6 +2160,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       socket_publish_aggregated, 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RECV_CALLS,
                       "Calls to tcp_cleanup_rbuf.",
@@ -2163,6 +2172,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_CLEANUP_RBUF], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_SEND_CALLS,
                       "Calls to tcp_sendmsg.",
@@ -2173,6 +2184,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       socket_publish_aggregated, 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_TCP_RETRANSMIT,
                       "Calls to tcp_retransmit.",
@@ -2183,6 +2196,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_TCP_RETRANSMIT], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_SEND_CALLS,
                       "Calls to udp_sendmsg",
@@ -2193,6 +2208,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_SENDMSG], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_NET_APPS_BANDWIDTH_UDP_RECV_CALLS,
                       "Calls to udp_recvmsg",
@@ -2203,6 +2220,8 @@ static void ebpf_create_specific_socket_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &socket_publish_aggregated[NETDATA_IDX_UDP_RECVBUF], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_SOCKET);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 }
 
 /**

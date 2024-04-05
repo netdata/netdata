@@ -99,6 +99,10 @@
           "include"
         ]
       }
+    },
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
     }
   },
   "uiSchema": {

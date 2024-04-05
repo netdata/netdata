@@ -38,7 +38,11 @@
     "required": [
       "address",
       "protocol"
-    ]
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

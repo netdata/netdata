@@ -551,9 +551,11 @@ static bool read_pid_file_descriptors_per_os(struct pid_stat *p, void *ptr) {
                     switch (fds->kf_sock_domain) {
                         case AF_INET:
                         case AF_INET6:
+#if __FreeBSD_version < 1400074
                             if (fds->kf_sock_protocol == IPPROTO_TCP)
                                 sprintf(fdsname, "socket: %d %lx", fds->kf_sock_protocol, fds->kf_un.kf_sock.kf_sock_inpcb);
                             else
+#endif
                                 sprintf(fdsname, "socket: %d %lx", fds->kf_sock_protocol, fds->kf_un.kf_sock.kf_sock_pcb);
                             break;
                         case AF_UNIX:

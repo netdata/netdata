@@ -106,7 +106,7 @@ Metrics:
 | vernemq.mqtt_subscribe_error | failed | ops/s |
 | vernemq.mqtt_subscribe_auth_error | unauth | attempts/s |
 | vernemq.mqtt_unsubscribe | unsubscribe, unsuback | packets/s |
-| vernemq.mqtt_unsubscribe | mqtt_unsubscribe_error | ops/s |
+| vernemq.mqtt_unsubscribe_error | mqtt_unsubscribe_error | ops/s |
 | vernemq.mqtt_publish | received, sent | packets/s |
 | vernemq.mqtt_publish_errors | failed | ops/s |
 | vernemq.mqtt_publish_auth_errors | unauth | attempts/s |

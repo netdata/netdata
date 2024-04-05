@@ -34,7 +34,7 @@ jobs:
           submodules: recursive
       - name: Check files
         id: check-files
-        uses: tj-actions/changed-files@v43
+        uses: tj-actions/changed-files@v44
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -415,7 +415,7 @@ jobs:
       - name: Fetch test environment
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v1
+        uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -503,7 +503,7 @@ jobs:
       - name: Fetch dist tarball artifacts
         id: fetch-tarball
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v1
+        uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -529,7 +529,7 @@ jobs:
       - name: Fetch test environment
         id: fetch-test-environment
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v1
+        uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -596,7 +596,7 @@ jobs:
       - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v1
+        uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -634,10 +634,9 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to prepare release artifacts for upload.
-              CHeckout: ${{ steps.checkout.outcome }}
+              Checkout: ${{ steps.checkout.outcome }}
               Prepare environment: ${{ steps.prepare.outcome }}
               Fetch dist tarball: ${{ steps.fetch-dist.outcome }}
-              Fetch static builds: ${{ steps.fetch-static.outcome }}
               Consolidate artifacts: ${{ steps.consolidate.outcome }}
               Store: ${{ steps.store.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -675,7 +674,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v1
+        uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -744,7 +743,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: Wandalen/wretry.action@v1
+        uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -798,7 +797,7 @@ jobs:
     steps:
       - name: Retrieve Artifacts
         id: fetch
-        uses: Wandalen/wretry.action@v1
+        uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -867,7 +866,7 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: Wandalen/wretry.action@v1
+        uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
           with: |
@@ -985,7 +984,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Retrieve Artifacts
         id: fetch
-        uses: Wandalen/wretry.action@v1
+        uses: Wandalen/wretry.action@v3
         with:
           action: actions/download-artifact@v4
           with: |

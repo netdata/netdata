@@ -27,7 +27,11 @@
     },
     "required": [
       "binary_path"
-    ]
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

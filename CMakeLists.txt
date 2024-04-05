@@ -479,40 +479,30 @@ endif()
 
 # openssl/crypto
 set(ENABLE_OPENSSL True)
-if(NOT MACOS)
-        pkg_check_modules(CRYPTO libcrypto)
-        pkg_check_modules(OPENSSL REQUIRED openssl)
-else()
-        # I think this is moot because we can only use openssl 3.x
-        execute_process(COMMAND
-                        brew --prefix --installed openssl
-                        RESULT_VARIABLE BREW_OPENSSL
-                        OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
-                        OUTPUT_STRIP_TRAILING_WHITESPACE)
+pkg_check_modules(OPENSSL openssl)
 
-        if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
+if(NOT OPENSSL_FOUND)
+        if(MACOS)
                 execute_process(COMMAND
-                                brew --prefix --installed openssl@3
+                                brew --prefix --installed openssl
                                 RESULT_VARIABLE BREW_OPENSSL
                                 OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
                                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
                 if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
-                        execute_process(COMMAND
-                                        brew --prefix --installed openssl@1.1
-                                        RESULT_VARIABLE BREW_OPENSSL
-                                        OUTPUT_VARIABLE BREW_OPENSSL_PREFIX
-                                        OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-                        if((BREW_OPENSSL NOT EQUAL 0) OR (NOT EXISTS "${BREW_OPENSSL_PREFIX}"))
-                                message(FATAL_ERROR "Could not find openssl prefix with brew")
-                        endif()
+                        message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
                 endif()
-        endif()
 
-        set(OPENSSL_INCLUDE_DIRS "${BREW_OPENSSL_PREFIX}/include")
-        set(OPENSSL_CFLAGS_OTHER "")
-        set(OPENSSL_LDFLAGS "-L${BREW_OPENSSL_PREFIX}/lib;-lssl;-lcrypto")
+                set(OPENSSL_INCLUDE_DIRS "${BREW_OPENSSL_PREFIX}/include")
+                set(OPENSSL_CFLAGS_OTHER "")
+                set(OPENSSL_LDFLAGS "-L${BREW_OPENSSL_PREFIX}/lib;-lssl;-lcrypto")
+        else()
+            message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
+        endif()
+endif()
+
+if(NOT MACOS)
+        pkg_check_modules(CRYPTO libcrypto)
 endif()
 
 #
@@ -1056,6 +1046,8 @@ if(ENABLE_DBENGINE)
             src/database/engine/pdc.h
             src/database/engine/dbengine-unittest.c
             src/database/engine/dbengine-stresstest.c
+            src/database/engine/dbengine-compression.c
+            src/database/engine/dbengine-compression.h
     )
 endif()
 
@@ -1489,8 +1481,10 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
-include(NetdataDetectSystemd)
-detect_systemd()
+if(LINUX)
+        include(NetdataDetectSystemd)
+        detect_systemd()
+endif()
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
@@ -1549,10 +1543,16 @@ endif()
 netdata_add_libyaml_to_target(libnetdata)
 
 # zlib
-pkg_check_modules(ZLIB REQUIRED zlib)
-target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
-target_compile_definitions(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
+if(MACOS)
+        find_package(ZLIB REQUIRED)
+        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
+        target_link_libraries(libnetdata PUBLIC ZLIB::ZLIB)
+else()
+        pkg_check_modules(ZLIB REQUIRED zlib)
+        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
+        target_compile_definitions(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
+endif()
 
 # lz4 - try to find a version that is compatible with streaming compression
 # otherwise pick whichever one we can find to support dbengine but don't set
@@ -1581,16 +1581,21 @@ endif()
 pkg_check_modules(LIBBROTLI libbrotlidec libbrotlienc libbrotlicommon)
 if(LIBBROTLI_FOUND)
         set(ENABLE_BROTLI On)
-        target_include_directories(libnetdata BEFORE PUBLIC ${LIBBROTLI_INCLUDE_DIRS})
+        target_include_directories(libnetdata PUBLIC ${LIBBROTLI_INCLUDE_DIRS})
         target_compile_definitions(libnetdata PUBLIC ${LIBBROTLI_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${LIBBROTLI_LDFLAGS})
 endif()
 
 # uuid
-pkg_check_modules(UUID REQUIRED uuid)
-target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
-target_compile_definitions(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
+if(MACOS)
+        # UUID functionality is part of the system libraries here, so no extra
+        # stuff needed.
+else()
+        pkg_check_modules(UUID REQUIRED uuid)
+        target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
+        target_compile_definitions(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
+endif()
 
 # uv
 pkg_check_modules(LIBUV REQUIRED libuv)
@@ -1609,9 +1614,11 @@ target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
 
 # mnl
-pkg_check_modules(MNL libmnl)
-if(MNL_FOUND)
-    set(HAVE_LIBMNL True)
+if(NOT MACOS)
+    pkg_check_modules(MNL libmnl)
+    if(MNL_FOUND)
+        set(HAVE_LIBMNL True)
+    endif()
 endif()
 
 #
@@ -2091,14 +2098,7 @@ if(PCRE2_FOUND)
         target_compile_definitions(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
         target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
 
-        if(ENABLE_BUNDLED_YAML)
-                target_include_directories(log2journal BEFORE PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/libyaml")
-                target_link_libraries(log2journal PUBLIC yaml)
-        else()
-                target_include_directories(log2journal BEFORE PUBLIC ${YAML_INCLUDE_DIRS})
-                target_compile_definitions(log2journal PUBLIC ${YAML_CFLAGS_OTHER})
-                target_link_libraries(log2journal PUBLIC ${YAML_LDFLAGS})
-        endif()
+        netdata_add_libyaml_to_target(log2journal)
 
         install(TARGETS log2journal
                 COMPONENT log2journal
@@ -2334,6 +2334,11 @@ configure_file(system/runit/run.in system/runit/run @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/system/runit/run
         DESTINATION usr/lib/netdata/system/runit)
+
+configure_file(system/dinit/netdata.in system/dinit/netdata @ONLY)
+install(FILES
+        ${CMAKE_BINARY_DIR}/system/dinit/netdata
+        DESTINATION usr/lib/netdata/system/dinit)
 
 configure_file(system/systemd/netdata.service.in system/systemd/netdata.service @ONLY)
 install(FILES

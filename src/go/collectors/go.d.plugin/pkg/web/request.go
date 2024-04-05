@@ -4,9 +4,13 @@ package web
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/executable"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/buildinfo"
 )
 
 // Request is the configuration of the HTTP request.
@@ -50,6 +54,8 @@ func (r Request) Copy() Request {
 	return r
 }
 
+var userAgent = fmt.Sprintf("Netdata %s.plugin/%s", executable.Name, buildinfo.Version)
+
 // NewHTTPRequest returns a new *http.Requests given a Request configuration and an error if any.
 func NewHTTPRequest(cfg Request) (*http.Request, error) {
 	var body io.Reader
@@ -61,6 +67,8 @@ func NewHTTPRequest(cfg Request) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	req.Header.Set("User-Agent", userAgent)
 
 	if cfg.Username != "" || cfg.Password != "" {
 		req.SetBasicAuth(cfg.Username, cfg.Password)

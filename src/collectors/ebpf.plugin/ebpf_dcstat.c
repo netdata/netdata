@@ -696,7 +696,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20265,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION ratio '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
@@ -711,7 +711,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20266,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION files '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
@@ -726,7 +726,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20267,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION files '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
@@ -741,7 +741,7 @@ void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
                              20268,
                              update_every,
                              NETDATA_EBPF_MODULE_NAME_DCSTAT);
-        ebpf_create_chart_labels("app_group", w->name, 1);
+        ebpf_create_chart_labels("app_group", w->name, RRDLABEL_SRC_AUTO);
         ebpf_commit_label();
         fprintf(stdout, "DIMENSION files '' %s 1 1\n", ebpf_algorithms[NETDATA_EBPF_ABSOLUTE_IDX]);
 
@@ -910,12 +910,15 @@ static void dcstat_send_global(netdata_publish_dcstat_t *publish)
  */
 static void ebpf_create_specific_dc_charts(char *type, int update_every)
 {
+    char *label = (!strncmp(type, "cgroup_", 7)) ? &type[7] : type;
     ebpf_create_chart(type, NETDATA_DC_HIT_CHART, "Percentage of files inside directory cache",
                       EBPF_COMMON_DIMENSION_PERCENTAGE, NETDATA_DIRECTORY_CACHE_SUBMENU,
                       NETDATA_CGROUP_DC_HIT_RATIO_CONTEXT, NETDATA_EBPF_CHART_TYPE_LINE,
                       NETDATA_CHART_PRIO_CGROUPS_CONTAINERS + 5700,
                       ebpf_create_global_dimension,
                       dcstat_counter_publish_aggregated, 1, update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_DC_REFERENCE_CHART, "Count file access",
                       EBPF_COMMON_DIMENSION_FILES, NETDATA_DIRECTORY_CACHE_SUBMENU,
@@ -924,6 +927,8 @@ static void ebpf_create_specific_dc_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_REFERENCE], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_DC_REQUEST_NOT_CACHE_CHART,
                       "Files not present inside directory cache",
@@ -933,6 +938,8 @@ static void ebpf_create_specific_dc_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_SLOW], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 
     ebpf_create_chart(type, NETDATA_DC_REQUEST_NOT_FOUND_CHART,
                       "Files not found",
@@ -942,6 +949,8 @@ static void ebpf_create_specific_dc_charts(char *type, int update_every)
                       ebpf_create_global_dimension,
                       &dcstat_counter_publish_aggregated[NETDATA_DCSTAT_IDX_MISS], 1,
                       update_every, NETDATA_EBPF_MODULE_NAME_DCSTAT);
+    ebpf_create_chart_labels("cgroup_name", label, RRDLABEL_SRC_AUTO);
+    ebpf_commit_label();
 }
 
 /**

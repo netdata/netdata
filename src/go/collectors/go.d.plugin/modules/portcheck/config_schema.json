@@ -43,7 +43,11 @@
     "required": [
       "host",
       "ports"
-    ]
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
   },
   "uiSchema": {
     "uiOptions": {

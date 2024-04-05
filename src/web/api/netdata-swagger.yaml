@@ -554,28 +554,6 @@ paths:
               - yes
               - no
             default: no
-        - name: help
-          in: query
-          description: |
-            Enable or disable HELP lines in prometheus output.
-          required: false
-          schema:
-            type: string
-            enum:
-              - yes
-              - no
-            default: no
-        - name: types
-          in: query
-          description: |
-            Enable or disable TYPE lines in prometheus output.
-          required: false
-          schema:
-            type: string
-            enum:
-              - yes
-              - no
-            default: no
         - name: timestamps
           in: query
           description: |

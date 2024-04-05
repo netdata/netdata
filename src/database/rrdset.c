@@ -296,6 +296,14 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 }
 
 void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
+    ND_LOG_STACK lgs[] = {
+        ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rrdhost_hostname(st->rrdhost)),
+        ND_LOG_FIELD_TXT(NDF_NIDL_CONTEXT, rrdset_context(st)),
+        ND_LOG_FIELD_TXT(NDF_NIDL_INSTANCE, rrdset_name(st)),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
+
     RRDHOST *host = st->rrdhost;
 
     rrdset_flag_set(st, RRDSET_FLAG_COLLECTION_FINISHED);

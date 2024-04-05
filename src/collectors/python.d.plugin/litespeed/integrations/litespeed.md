@@ -64,13 +64,13 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | litespeed.net_throughput | in, out | kilobits/s |
-| litespeed.net_throughput | in, out | kilobits/s |
+| litespeed.net_ssl_throughput | in, out | kilobits/s |
 | litespeed.connections | free, used | conns |
-| litespeed.connections | free, used | conns |
+| litespeed.ssl_connections | free, used | conns |
 | litespeed.requests | requests | requests/s |
 | litespeed.requests_processing | processing | requests |
-| litespeed.cache | hits | hits/s |
-| litespeed.cache | hits | hits/s |
+| litespeed.public_cache | hits | hits/s |
+| litespeed.private_cache | hits | hits/s |
 | litespeed.static | hits | hits/s |
 
 
