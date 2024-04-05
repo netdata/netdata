@@ -37,7 +37,8 @@ parts:
     source: .
     source-type: local
     override-build: |
-      bash ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive -i netdata-all
+      packaging/installer/install-required-packages.sh --dont-wait --non-interactive -i netdata-all
+
 
   netdata:
     plugin: cmake
@@ -47,7 +48,7 @@ parts:
       - CFLAGS: ${CFLAGS:-"-O2 pipe"}
       - DESTDIR: $CRAFT_PART_INSTALL
     build-packages:
-      - golang
+      - golang-1.21-go
       - libbrotli-dev
       - libcap-dev
       - libcups2-dev
@@ -87,9 +88,13 @@ parts:
       # - ${SENTRY_CONFIG}
       - -DENABLE_BUNDLED_YAML=Off
     override-build: |
+      "${CRAFT_PART_SRC}/packaging/bundle-libbpf.sh" "${CRAFT_PART_SRC}" "${CRAFT_PART_INSTALL}/usr/libexec/netdata/plugins.d"
+      "${CRAFT_PART_SRC}/packaging/bundle-ebpf-co-re.sh" "${CRAFT_PART_SRC}" "${CRAFT_PART_INSTALL}/usr/libexec/netdata/plugins.d"
+      update-alternatives --install /usr/bin/go go /usr/lib/go-1.21/bin/go 3
+      update-alternatives --install /usr/bin/gofmt gofmt /usr/lib/go-1.21/bin/gofmt 3
       craftctl default
-      mkdir -p $CRAFT_PART_INSTALL/etc/netdata
-      cp -p "$CRAFT_PROJECT_DIR/snap/local/netdata.conf" "$CRAFT_PART_INSTALL/etc/netdata/netdata.conf"
+      mkdir -p "$CRAFT_PART_INSTALL/etc/netdata"
+      cp -p "$CRAFT_PART_SRC/snap/local/netdata.conf" "$CRAFT_PART_INSTALL/etc/netdata/netdata.conf"
     organize:
       "snap/netdata/current": "/"
     stage-packages:
@@ -127,6 +132,15 @@ parts:
     prime:
       - -snap/netdata
 
+  ebpf-kernel-collector:
+    plugin: nil
+    source: .
+    source-type: local
+    override-pull: |
+      craftctl default
+      NETDATA_PLUGINDIR=$CRAFT_PART_INSTALL/usr/libexec/netdata/plugins.d
+      mkdir -p "${NETDATA_PLUGINDIR}"
+      sh -x "${CRAFT_PART_SRC}/packaging/bundle-ebpf.sh" "${CRAFT_PART_SRC}" "${NETDATA_PLUGINDIR}" force
 
 apps:
   agent:
