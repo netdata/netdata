@@ -113,7 +113,7 @@ typedef struct networkviewer_opt {
 } networkviewer_opt_t;
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-static inline bool local_sockets_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t *data) {
+static inline bool network_viewer_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t *data) {
     if (data->protocol == IPPROTO_TCP && (ls->config.tcp4 || ls->config.tcp6))
         return  true;
     else if (data->protocol == IPPROTO_UDP && (ls->config.udp4 || ls->config.udp6))
@@ -122,7 +122,7 @@ static inline bool local_sockets_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t 
     return false;
 }
 
-static inline void local_sockets_reset_ebpf_value(ebpf_module_t *em, uint64_t removed)
+static inline void network_viewer_reset_ebpf_value(ebpf_module_t *em, uint64_t removed)
 {
     int ctrl_fd = em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd;
     uint32_t control = NETDATA_CONTROLLER_PID_TABLE_ADD;
@@ -134,7 +134,7 @@ static inline void local_sockets_reset_ebpf_value(ebpf_module_t *em, uint64_t re
     }
 }
 
-static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_load_data action) {
+static inline bool network_viewer_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_load_data action) {
     ebpf_nv_idx_t key =  { };
     ebpf_nv_idx_t next_key = { };
     ebpf_nv_data_t stored = {};
@@ -158,7 +158,7 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_loa
             goto end_socket_read_loop;
         }
 
-        if (!local_sockets_ebpf_use_protocol(ls, &stored)) {
+        if (!network_viewer_ebpf_use_protocol(ls, &stored)) {
             // Socket not allowed, let us remove it
             bpf_map_delete_elem(fd, &key);
             goto end_socket_read_loop;
@@ -218,7 +218,7 @@ static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_loa
     }
 
     if (removed) {
-        local_sockets_reset_ebpf_value(ls->ebpf_module, removed);
+        network_viewer_reset_ebpf_value(ls->ebpf_module, removed);
     }
 
     // We did not have any call to functions, let us use proc
@@ -250,7 +250,7 @@ static inline void ebpf_sockets_process(LS_STATE *ls) {
     if (!ls->use_ebpf)
         return;
 
-    ls->use_ebpf =  local_sockets_ebpf_get_sockets(ls, NETWORK_VIEWER_EBPF_NV_LOAD_DATA
+    ls->use_ebpf =  network_viewer_ebpf_get_sockets(ls, NETWORK_VIEWER_EBPF_NV_LOAD_DATA
                                                       | (ls->ebpf_module->optional & NETWORK_VEIWER_EBPF_NV_USE_PID));
     if (!ls->use_ebpf)
         return;
@@ -1283,7 +1283,7 @@ void *network_viewer_ebpf_worker(void *ptr)
     }
 
     if (removed)
-        local_sockets_reset_ebpf_value(em, removed);
+        network_viewer_reset_ebpf_value(em, removed);
 
     return NULL;
 }
