@@ -15,8 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - uses: snapcore/action-build@v1
       id: snapcraft
+      with:
+        snapcraft-args: --verbosity debug
     - uses: actions/upload-artifact@v4
       with:
         name: snap
