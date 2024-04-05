@@ -192,6 +192,14 @@
         "description": "The path to the client key file for TLS authentication.",
         "type": "string",
         "pattern": "^$|^/"
+      },
+      "body": {
+        "title": "Body",
+        "type": "string"
+      },
+      "method": {
+        "title": "Method",
+        "type": "string"
       }
     },
     "required": [
@@ -286,6 +294,12 @@
     },
     "proxy_password": {
       "ui:widget": "password"
+    },
+    "body": {
+      "ui:widget": "hidden"
+    },
+    "method": {
+      "ui:widget": "hidden"
     }
   }
 }

@@ -29,7 +29,24 @@
         "description": "If set, the client will not follow HTTP redirects automatically.",
         "type": "boolean"
       },
-      "accepted_statuses": {
+      "method": {
+        "title": "Method",
+        "description": "The [HTTP method](https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods) to use for the request. An empty string means `GET`.",
+        "type": "string",
+        "default": "GET",
+        "examples": [
+          "GET",
+          "POST",
+          "PUT",
+          "PATCH"
+        ]
+      },
+      "body": {
+        "title": "Body",
+        "description": "The body content to send along with the HTTP request (if applicable).",
+        "type": "string"
+      },
+      "status_accepted": {
         "title": "Status code check",
         "description": "Specifies the list of **HTTP response status codes** that are considered **acceptable**. Responses with status codes not included in this list will be categorized as 'bad status' in the status chart.",
         "type": [
@@ -159,7 +176,7 @@
     },
     "required": [
       "url",
-      "accepted_statuses"
+      "status_accepted"
     ],
     "additionalProperties": false,
     "patternProperties": {
@@ -176,13 +193,15 @@
             "update_every",
             "url",
             "timeout",
-            "not_follow_redirects"
+            "not_follow_redirects",
+            "method",
+            "body"
           ]
         },
         {
           "title": "Checks",
           "fields": [
-            "accepted_statuses",
+            "status_accepted",
             "response_match",
             "header_match"
           ]
@@ -228,6 +247,12 @@
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "method": {
+      "ui:placeholder": "GET"
+    },
+    "body": {
+      "ui:widget": "textarea"
     }
   }
 }
