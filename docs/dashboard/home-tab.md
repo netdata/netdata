@@ -1,6 +1,6 @@
 # Home Tab
 
-The Home tab allows users to see an overview of their Space.
+The Home tab allows users to see an overview of their Room.
 
 ## Total nodes
 
