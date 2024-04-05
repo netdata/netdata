@@ -1,5 +1,8 @@
 name: Snap
 on:
+  push:
+    branches:
+      - "snap-build"
   workflow_dispatch:
     inputs:
       retention:
