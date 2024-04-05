@@ -113,6 +113,8 @@ typedef struct networkviewer_opt {
 } networkviewer_opt_t;
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+LS_STATE *ebpf_ls = NULL;
+
 static inline bool network_viewer_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t *data) {
     if (data->protocol == IPPROTO_TCP && (ls->config.tcp4 || ls->config.tcp6))
         return  true;
@@ -1245,11 +1247,11 @@ static inline void network_viewer_load_ebpf(networkviewer_opt_t *args)
         network_viewer_unload_ebpf();
 }
 
-void *network_viewer_ebpf_worker(void *ptr)
+static void *network_viewer_ebpf_worker(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
-    LS_STATE ebpf_ls = {
+    static LS_STATE lebpf_ls = {
         .config = {
                 .listening = true,
                 .inbound = true,
@@ -1275,13 +1277,15 @@ void *network_viewer_ebpf_worker(void *ptr)
             .listening_ports_hashtable = { 0 },
     };
 
-    ebpf_ls.config.host_prefix = netdata_configured_host_prefix;
+    ebpf_ls = &lebpf_ls;
+
+    ebpf_ls->config.host_prefix = netdata_configured_host_prefix;
 
     char path[FILENAME_MAX + 1];
     snprintfz(path, sizeof(path) - 1, "%s/proc/", netdata_configured_host_prefix);
 
     // initialize our hashtables
-    local_sockets_init(&ebpf_ls);
+    local_sockets_init(ebpf_ls);
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -1299,7 +1303,7 @@ void *network_viewer_ebpf_worker(void *ptr)
                 goto end_ebpf_nv_worker;
             }
 
-            if (!network_viewer_ebpf_use_protocol(&ebpf_ls, &stored)) {
+            if (!network_viewer_ebpf_use_protocol(ebpf_ls, &stored)) {
                 // Socket not allowed, let us remove it
                 bpf_map_delete_elem(fd, &key);
                 goto end_ebpf_nv_worker;
@@ -1341,7 +1345,7 @@ void *network_viewer_ebpf_worker(void *ptr)
 
             strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
 
-            SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ebpf_ls.sockets_hashtable,
+            SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ebpf_ls->sockets_hashtable,
                                                                                             inode, &inode, true);
             LOCAL_SOCKET *o = SIMPLE_HASHTABLE_SLOT_DATA(sl);
             if(o) {
@@ -1351,17 +1355,17 @@ void *network_viewer_ebpf_worker(void *ptr)
                 o->wqueue = n.wqueue;
                 goto end_ebpf_nv_worker;
             }
-            local_sockets_add_socket(&ebpf_ls, &n);
+            local_sockets_add_socket(ebpf_ls, &n);
 
-            if (ebpf_ls.config.namespaces) {
+            if (ebpf_ls->config.namespaces) {
                 uint64_t net_ns_inode = 0;
                 snprintfz(filename, sizeof(filename), "%s%u/ns/net", path, pid);
-                if (local_sockets_read_proc_inode_link(&ebpf_ls, filename, &net_ns_inode, "net")) {
-                    SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ebpf_ls.ns_hashtable,
+                if (local_sockets_read_proc_inode_link(ebpf_ls, filename, &net_ns_inode, "net")) {
+                    SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ebpf_ls->ns_hashtable,
                                                                                            net_ns_inode,
                                                                                            (uint64_t *)net_ns_inode,
                                                                                            true);
-                    simple_hashtable_set_slot_NET_NS(&ebpf_ls.ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
+                    simple_hashtable_set_slot_NET_NS(&ebpf_ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
                 }
             }
 
