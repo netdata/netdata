@@ -4,11 +4,11 @@ The Home tab allows users to see an overview of their Space.
 
 ## Total nodes
 
-The total amount of nodes is presented, dissected also by their state, Live, Offline or Stale.
+The total number of nodes is presented and dissected by their state, Live, Offline or Stale.
 
 ## Active alerts
 
-The number of the active alerts are presented in a donut chart, while also having counters for both Critical and Warning alerts.
+The number of active alerts is presented in a donut chart, while also having counters for both Critical and Warning alerts.
 
 ## Nodes map
 
@@ -37,11 +37,11 @@ There are two views about data replication in the Home tab:
 
 The first bar chart presents the amount of **Parents**, **Children** and **Standalone** nodes.
 
-The second bar chart presents the amount of nodes depending on their Replication factor, **None**, **Single** and **Multi**.
+The second bar chart presents the number of nodes depending on their Replication factor, **None**, **Single** and **Multi**.
 
 ## Alerts overview over the last 24h
 
-There are two views that displays information about nodes that produced the most alerts and top alerts in the last 24h.
+There are two views that display information about nodes that produced the most alerts and top alerts in the last 24 hours.
 
 The first bar chart presents the nodes that produced the most alerts in a time window of the last 24 hours.
 
@@ -57,4 +57,4 @@ There are three key metrics that are displayed in the Home tab, **Metrics collec
 
 ## Data retention per Nodes
 
-This bar chart presents the amount of nodes in relation to their retention period.
+This bar chart shows the number of nodes based on their retention period.
