@@ -665,7 +665,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/dictionary/dictionary-callbacks.h
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
-        src/libnetdata/bitmap.h
+        src/libnetdata/bitmap64.h
 )
 
 if(ENABLE_PLUGIN_EBPF)

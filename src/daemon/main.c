@@ -1530,7 +1530,6 @@ int main(int argc, char **argv) {
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
-                            if (unit_test_bitmaps()) return 1;
 
                             // No call to load the config file on this code-path
                             if (unittest_prepare_rrd(&user)) return 1;

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "libnetdata/bitmap64.h"
 #include "rrdengine.h"
 
 static void after_extent_write_journalfile_v1_io(uv_fs_t* req)
@@ -654,7 +655,7 @@ static int journalfile_check_superblock(uv_file file)
 
 static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, void *buf, unsigned max_size)
 {
-    static BITMAP256 page_error_map = BITMAP256_INITIALIZER;
+    static bitmap64_t page_error_map = BITMAP64_INITIALIZER;
     unsigned i, count, payload_length, descr_size;
     struct rrdeng_jf_store_data *jf_metric_data;
 
@@ -673,9 +674,9 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         uint8_t page_type = jf_metric_data->descr[i].type;
 
         if (page_type > RRDENG_PAGE_TYPE_MAX) {
-            if (!bitmap256_get_bit(&page_error_map, page_type)) {
+            if (!bitmap64_get(&page_error_map, page_type)) {
                 netdata_log_error("DBENGINE: unknown page type %d encountered.", page_type);
-                bitmap256_set_bit(&page_error_map, page_type, 1);
+                bitmap64_set(&page_error_map, page_type);
             }
             continue;
         }
