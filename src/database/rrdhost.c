@@ -827,8 +827,8 @@ void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
     use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", use_direct_io);
 
-    unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
-    if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
+    unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", DEFAULT_PAGES_PER_EXTENT);
+    if (read_num > 0 && read_num <= DEFAULT_PAGES_PER_EXTENT)
         rrdeng_pages_per_extent = read_num;
     else {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
