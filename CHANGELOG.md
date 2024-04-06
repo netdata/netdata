@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- go.d: schemas: add missing "body" and "method" [\#17325](https://github.com/netdata/netdata/pull/17325) ([ilyam8](https://github.com/ilyam8))
+- remove old overview infrastructure and add home tab doc [\#17323](https://github.com/netdata/netdata/pull/17323) ([Ancairon](https://github.com/Ancairon))
+- Drop generic bitmap implementation. [\#17322](https://github.com/netdata/netdata/pull/17322) ([vkalintiris](https://github.com/vkalintiris))
 - set min thread stack size to 1 MB [\#17317](https://github.com/netdata/netdata/pull/17317) ([ilyam8](https://github.com/ilyam8))
 - Drop legacy dbengine support [\#17315](https://github.com/netdata/netdata/pull/17315) ([stelfrag](https://github.com/stelfrag))
 - Fix assorted issues in the Docker build process. [\#17312](https://github.com/netdata/netdata/pull/17312) ([Ferroin](https://github.com/Ferroin))
@@ -402,9 +405,6 @@
 - Add Netdata Mobile App to issue template config [\#16723](https://github.com/netdata/netdata/pull/16723) ([ilyam8](https://github.com/ilyam8))
 - fix clock resolution detection [\#16720](https://github.com/netdata/netdata/pull/16720) ([ktsaou](https://github.com/ktsaou))
 - cgroups: don't multiply cgroup\_check\_for\_new\_every by update\_every [\#16719](https://github.com/netdata/netdata/pull/16719) ([ilyam8](https://github.com/ilyam8))
-- Add info to distros.yml for handling of legacy platforms. [\#16718](https://github.com/netdata/netdata/pull/16718) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#16716](https://github.com/netdata/netdata/pull/16716) ([netdatabot](https://github.com/netdatabot))
-- Add the Mobile App notification Integration [\#16715](https://github.com/netdata/netdata/pull/16715) ([sashwathn](https://github.com/sashwathn))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
