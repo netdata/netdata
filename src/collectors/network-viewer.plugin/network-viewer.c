@@ -1278,14 +1278,12 @@ static void *network_viewer_ebpf_worker(void *ptr)
     };
 
     ebpf_ls = &lebpf_ls;
+    ebpf_ls->local_socket_aral = NULL;
 
     ebpf_ls->config.host_prefix = netdata_configured_host_prefix;
 
     char path[FILENAME_MAX + 1];
     snprintfz(path, sizeof(path) - 1, "%s/proc/", netdata_configured_host_prefix);
-
-    // initialize our hashtables
-    local_sockets_init(ebpf_ls);
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -1293,6 +1291,25 @@ static void *network_viewer_ebpf_worker(void *ptr)
     bool use_pid = (ebpf_nv_module.optional & NETWORK_VEIWER_EBPF_NV_USE_PID);
     while (!plugin_should_exit) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
+
+        rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
+        if (ebpf_nv_module.optional & NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
+            rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
+            continue;
+        }
+        ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
+        rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
+
+        if (ebpf_ls->local_socket_aral)
+            local_sockets_cleanup(ebpf_ls);
+
+        memset(&lebpf_ls.stats, 0, sizeof(lebpf_ls.stats));
+        memset(&lebpf_ls.sockets_hashtable, 0, sizeof(lebpf_ls.sockets_hashtable));
+        memset(&lebpf_ls.local_ips_hashtable, 0, sizeof(lebpf_ls.local_ips_hashtable));
+        memset(&lebpf_ls.listening_ports_hashtable, 0, sizeof(lebpf_ls.listening_ports_hashtable));
+
+        // initialize our hashtables
+        local_sockets_init(ebpf_ls);
 
         ebpf_nv_idx_t key = {};
         ebpf_nv_idx_t next_key = {};
@@ -1310,7 +1327,6 @@ static void *network_viewer_ebpf_worker(void *ptr)
             }
 
             uint32_t pid = (use_pid) ? stored.pid : stored.tgid;
-            uint64_t inode = stored.ts;
             LOCAL_SOCKET n = {
                 .inode = stored.ts,
                 .direction = stored.direction,
@@ -1344,17 +1360,6 @@ static void *network_viewer_ebpf_worker(void *ptr)
             }
 
             strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
-
-            SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_get_slot_LOCAL_SOCKET(&ebpf_ls->sockets_hashtable,
-                                                                                            inode, &inode, true);
-            LOCAL_SOCKET *o = SIMPLE_HASHTABLE_SLOT_DATA(sl);
-            if(o) {
-                o->retransmits = n.retransmits;
-                o->expires = n.expires;
-                o->rqueue = n.rqueue;
-                o->wqueue = n.wqueue;
-                goto end_ebpf_nv_worker;
-            }
             local_sockets_add_socket(ebpf_ls, &n);
 
             if (ebpf_ls->config.namespaces) {
@@ -1377,6 +1382,9 @@ end_ebpf_nv_worker:
 
             memcpy(&next_key, &key, sizeof(key));
         }
+        rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
+        ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
+        rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
     }
 
     return NULL;
