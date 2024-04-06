@@ -124,87 +124,23 @@ static inline bool network_viewer_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t
     return false;
 }
 
-static inline bool network_viewer_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_load_data action) {
-    ebpf_nv_idx_t key =  { };
-    ebpf_nv_idx_t next_key = { };
-    ebpf_nv_data_t stored = {};
-
-    char path[FILENAME_MAX + 1];
-    snprintfz(path, sizeof(path) - 1, "%s/proc/", ls->config.host_prefix);
-
-    if(ls->config.namespaces) {
-        snprintfz(path, sizeof(path), "%sself/ns/net", path);
-        local_sockets_read_proc_inode_link(ls, path, &ls->proc_self_net_ns_inode, "net");
-    }
-
-    int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
+static inline bool network_viewer_ebpf_get_sockets(LS_STATE *ls) {
     uint64_t counter = 0;
-    char filename[FILENAME_MAX + 1];
-    bool cleanup = (action & NETWORK_VEIWER_EBPF_NV_CLEANUP);
-    bool use_pid = (action & NETWORK_VEIWER_EBPF_NV_USE_PID);
-    while (!bpf_map_get_next_key(fd, &key, &next_key)) {
-        if (bpf_map_lookup_elem(fd, &key, &stored)) {
-            goto end_socket_read_loop;
-        }
 
-        if (!network_viewer_ebpf_use_protocol(ls, &stored)) {
-            // Socket not allowed, let us remove it
-            bpf_map_delete_elem(fd, &key);
-            goto end_socket_read_loop;
-        }
-
-        counter++;
-        LOCAL_SOCKET n = {
-            .inode = stored.ts,
-            .direction = stored.direction,
-            .state = stored.state,
-            .local = {
-                .family = stored.family,
-                .protocol = stored.protocol,
-                .port = key.sport,
-                },
-                .remote = {
-                .family = stored.family,
-                .protocol = stored.protocol,
-                .port = key.dport,
-                },
-                .timer = stored.timer,
-                .retransmits = stored.retransmits,
-                .expires = stored.expires,
-                .rqueue = stored.rqueue,
-                .wqueue = stored.wqueue,
-                .pid = (use_pid) ? stored.pid : stored.tgid,
-                .uid = stored.uid,
-                };
-
-        if (stored.family == AF_INET) {
-            memcpy(&n.local.ip.ipv4, &key.saddr.ipv4, sizeof(n.local.ip.ipv4));
-            memcpy(&n.remote.ip.ipv4, &key.daddr.ipv4, sizeof(n.remote.ip.ipv4));
-        }
-        else if (stored.family == AF_INET6) {
-            memcpy(&n.local.ip.ipv6, &key.saddr.ipv6, sizeof(n.local.ip.ipv6));
-            memcpy(&n.remote.ip.ipv6, &key.daddr.ipv6, sizeof(n.remote.ip.ipv6));
-        }
-
-        strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
-        local_sockets_add_socket(ls, &n);
-
-        if (ls->config.namespaces) {
-            uint64_t net_ns_inode = 0;
-            snprintfz(filename, sizeof(filename), "%s%d/ns/net", path, n.pid);
-            if (local_sockets_read_proc_inode_link(ls, filename, &net_ns_inode, "net")) {
-                SIMPLE_HASHTABLE_SLOT_NET_NS *sl_ns = simple_hashtable_get_slot_NET_NS(&ls->ns_hashtable, net_ns_inode, (uint64_t *)net_ns_inode, true);
-                simple_hashtable_set_slot_NET_NS(&ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
-            }
-        }
-
-        end_socket_read_loop:
-        key = next_key;
-        if (cleanup && stored.closed) {
-            bpf_map_delete_elem(fd, &key);
-        }
+    rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
+    if (ebpf_nv_module.optional & NETWORK_VIEWER_EBPF_NV_LOAD_DATA) {
+        rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
+        return;
     }
+    ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_ONLY_READ;
+    rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
 
+
+    rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
+    ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_ONLY_READ;
+    rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
+
+    rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
     // We did not have any call to functions, let us use proc
     if (!counter) {
         local_sockets_read_sockets_from_proc(ls);
@@ -234,26 +170,9 @@ static inline void ebpf_sockets_process(LS_STATE *ls) {
     if (!ls->use_ebpf)
         return;
 
-    ls->use_ebpf =  network_viewer_ebpf_get_sockets(ls, NETWORK_VIEWER_EBPF_NV_LOAD_DATA
-                                                      | (ls->ebpf_module->optional & NETWORK_VEIWER_EBPF_NV_USE_PID));
+    ls->use_ebpf =  network_viewer_ebpf_get_sockets(ls);
     if (!ls->use_ebpf)
         return;
-
-    static int load_again = 0;
-    rw_spinlock_write_lock(&ls->ebpf_module->rw_spinlock);
-    if (ls->use_ebpf && ls->ebpf_module->optional & NETWORK_VIEWER_EBPF_NV_LOAD_DATA) {
-        ls->ebpf_module->optional = (NETWORK_VIEWER_EBPF_NV_ONLY_READ |
-                                     (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_LOAD_DATA));
-    }
-    else if (load_again == NETWORK_VIEWER_EBPF_ACTION_LIMIT) {
-        ls->ebpf_module->optional = (NETWORK_VIEWER_EBPF_NV_LOAD_DATA |
-                                     (ls->ebpf_module->optional & ~NETWORK_VIEWER_EBPF_NV_ONLY_READ));
-        load_again = 0;
-    }
-    ls->ebpf_module->running_time = now_realtime_sec();
-    rw_spinlock_write_unlock(&ls->ebpf_module->rw_spinlock);
-
-    load_again++;
 }
 #endif
 
