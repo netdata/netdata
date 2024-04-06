@@ -124,18 +124,6 @@ static inline bool network_viewer_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t
     return false;
 }
 
-static inline void network_viewer_reset_ebpf_value(ebpf_module_t *em, uint64_t removed)
-{
-    int ctrl_fd = em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd;
-    uint32_t control = NETDATA_CONTROLLER_PID_TABLE_ADD;
-    uint64_t current_value = 0;
-    if (!bpf_map_lookup_elem(ctrl_fd, &control, &current_value)) {
-        current_value -= removed;
-        if (bpf_map_update_elem(ctrl_fd, &control, &current_value, 0))
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "PLUGIN: cannot reset value inside table.");
-    }
-}
-
 static inline bool network_viewer_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_load_data action) {
     ebpf_nv_idx_t key =  { };
     ebpf_nv_idx_t next_key = { };
@@ -151,7 +139,6 @@ static inline bool network_viewer_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_lo
 
     int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
     uint64_t counter = 0;
-    uint64_t removed = 0;
     char filename[FILENAME_MAX + 1];
     bool cleanup = (action & NETWORK_VEIWER_EBPF_NV_CLEANUP);
     bool use_pid = (action & NETWORK_VEIWER_EBPF_NV_USE_PID);
@@ -214,13 +201,8 @@ static inline bool network_viewer_ebpf_get_sockets(LS_STATE *ls, enum ebpf_nv_lo
         end_socket_read_loop:
         key = next_key;
         if (cleanup && stored.closed) {
-            removed++;
             bpf_map_delete_elem(fd, &key);
         }
-    }
-
-    if (removed) {
-        network_viewer_reset_ebpf_value(ls->ebpf_module, removed);
     }
 
     // We did not have any call to functions, let us use proc
