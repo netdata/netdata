@@ -124,55 +124,40 @@ static inline bool network_viewer_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t
     return false;
 }
 
-static inline bool network_viewer_ebpf_get_sockets(LS_STATE *ls) {
+static inline void network_viewer_ebpf_get_sockets(LS_STATE *ls) {
     uint64_t counter = 0;
-
     rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
-    if (ebpf_nv_module.optional & NETWORK_VIEWER_EBPF_NV_LOAD_DATA) {
+    if (ebpf_nv_module.optional & (NETWORK_VIEWER_EBPF_NV_LOAD_DATA|NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) || !ebpf_ls) {
         rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
-        return;
+        goto end_ebpf_get_sockets;
     }
     ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_ONLY_READ;
     rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
 
+    if (!ebpf_ls->local_socket_aral)
+        goto end_ebpf_get_sockets;
 
     rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
     ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_ONLY_READ;
     rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
 
-    rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
+end_ebpf_get_sockets:
     // We did not have any call to functions, let us use proc
     if (!counter) {
         local_sockets_read_sockets_from_proc(ls);
-        return false;
+        ls->use_ebpf = false;
     }
-
-    return true;
 }
 
-static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
+static inline void network_viewer_ebpf_selector(LS_STATE *ls) {
     ebpf_module_t *em = ls->ebpf_module;
     // We loaded with success eBPF codes
-    if (em->maps && em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
-        ls->use_ebpf = true;
-    else
+    if (!em->maps || em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd == ND_EBPF_MAP_FD_NOT_INITIALIZED)
         return;
 
-    if (em->optional & NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) {
-        em->optional = (em->optional & ~NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) | NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
-    }
-
+    ls->use_ebpf = true;
+    em->optional |= NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
     em->running_time = now_realtime_sec();
-}
-
-static inline void ebpf_sockets_process(LS_STATE *ls) {
-    local_sockets_ebpf_selector(ls);
-    if (!ls->use_ebpf)
-        return;
-
-    ls->use_ebpf =  network_viewer_ebpf_get_sockets(ls);
-    if (!ls->use_ebpf)
-        return;
 }
 #endif
 
@@ -472,8 +457,10 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
         }
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        ebpf_sockets_process(&ls);
-        if (!ls.use_ebpf)
+        network_viewer_ebpf_selector(&ls);
+        if (ls.use_ebpf)
+            network_viewer_ebpf_get_sockets(&ls);
+        else
 #endif
             local_sockets_process(&ls);
 
@@ -1075,7 +1062,7 @@ static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver
             {
                 const char *name = bpf_map__name(map);
                 int fd = bpf_map__fd(map);
-                if (!strcmp(name, nv_maps[0].name))
+                if (!strcmp(name, nv_maps[NETWORK_VIEWER_EBPF_NV_SOCKET].name))
                     em->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd = fd;
                 else
                     em->maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd = fd;
@@ -1097,7 +1084,7 @@ static inline int network_viewer_load_ebpf_to_kernel(ebpf_module_t *em, int kver
     if (!ret) {
         ebpf_update_controller(nv_maps[1].map_fd, em);
         // We are going to use the optional value to determine when data is loaded in kernel
-        ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_NOT_RUNNING;
+        ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
         ebpf_nv_module.running_time = now_realtime_sec();
 
         rw_spinlock_init(&ebpf_nv_module.rw_spinlock);
@@ -1124,7 +1111,8 @@ static inline void network_viewer_unload_ebpf()
 #endif
     ebpf_local_maps_t *maps = ebpf_nv_module.maps;
     if (maps)
-        maps[0].map_fd = maps[1].map_fd = -1;
+        maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd =
+        maps[NETWORK_VIEWER_EBPF_NV_CONTROL].map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED;
 }
 
 static inline void network_viewer_load_ebpf(networkviewer_opt_t *args)
