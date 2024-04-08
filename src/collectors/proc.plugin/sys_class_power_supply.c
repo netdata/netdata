@@ -8,6 +8,13 @@ const char *ps_property_names[]  = {        "charge",         "energy",         
 const char *ps_property_titles[] = {"Battery charge", "Battery energy", "Power supply voltage"};
 const char *ps_property_units[]  = {            "Ah",             "Wh",                    "V"};
 
+const long ps_property_priorities[] = {
+    NETDATA_CHART_PRIO_POWER_SUPPLY_CHARGE,
+    NETDATA_CHART_PRIO_POWER_SUPPLY_ENERGY,
+    NETDATA_CHART_PRIO_POWER_SUPPLY_VOLTAGE
+};
+
+
 const char *ps_property_dim_names[] = {"empty_design", "empty", "now", "full", "full_design",
                                        "empty_design", "empty", "now", "full", "full_design",
                                          "min_design",   "min", "now",  "max",  "max_design"};
@@ -28,6 +35,8 @@ struct ps_property {
     char *name;
     char *title;
     char *units;
+
+    long priority;
 
     RRDSET *st;
 
@@ -294,6 +303,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                     pr->name = strdupz(ps_property_names[pr_idx]);
                                     pr->title = strdupz(ps_property_titles[pr_idx]);
                                     pr->units = strdupz(ps_property_units[pr_idx]);
+                                    pr->priority = ps_property_priorities[pr_idx];
                                     prev_idx = pr_idx;
                                     pr->next = ps->property_root;
                                     ps->property_root = pr;
@@ -426,7 +436,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         , pr->units
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME
-                        , NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY
+                        , pr->priority
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
