@@ -1922,7 +1922,7 @@ prepare_offline_install_source() {
         for arch in ${STATIC_INSTALL_ARCHES}; do
           set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
-          if check_for_remote_file "${NETDATA_STATIC_ARCH_URL}"; then
+          if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
             progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
             if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
                 warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
