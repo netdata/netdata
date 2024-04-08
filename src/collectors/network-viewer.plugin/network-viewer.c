@@ -124,29 +124,21 @@ static inline bool network_viewer_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t
     return false;
 }
 
-static inline void network_viewer_ebpf_get_sockets(LS_STATE *ls) {
-    uint64_t counter = 0;
+static inline LS_STATE  *network_viewer_ebpf_get_sockets(LS_STATE *ls) {
     rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
     if (ebpf_nv_module.optional & (NETWORK_VIEWER_EBPF_NV_LOAD_DATA|NETWORK_VIEWER_EBPF_NV_NOT_RUNNING) || !ebpf_ls) {
         rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
-        goto end_ebpf_get_sockets;
+        local_sockets_read_sockets_from_proc(ls);
+        ls->use_ebpf = false;
+        return ls;
     }
     ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_ONLY_READ;
     rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
 
-    if (!ebpf_ls->local_socket_aral)
-        goto end_ebpf_get_sockets;
+    ebpf_ls->config.cb = ls->config.cb;
+    ebpf_ls->config.data = ls->config.data;
 
-    rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
-    ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_ONLY_READ;
-    rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
-
-end_ebpf_get_sockets:
-    // We did not have any call to functions, let us use proc
-    if (!counter) {
-        local_sockets_read_sockets_from_proc(ls);
-        ls->use_ebpf = false;
-    }
+    return ebpf_ls;
 }
 
 static inline void network_viewer_ebpf_selector(LS_STATE *ls) {
@@ -1275,6 +1267,12 @@ end_ebpf_nv_worker:
         ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
         rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
     }
+
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
+    ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_ONLY_READ;
+    rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
+#endif
 
     return NULL;
 }
