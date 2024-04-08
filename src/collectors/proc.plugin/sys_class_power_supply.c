@@ -158,7 +158,7 @@ static void read_simple_property(struct power_supply *ps, struct simple_property
     }
 }
 
-static void rrdset_create_simple_prop(struct power_supply *ps, struct simple_property *prop, char *title, char *dim, collected_number divisor, char *units, int update_every) {
+static void rrdset_create_simple_prop(struct power_supply *ps, struct simple_property *prop, char *title, char *dim, collected_number divisor, char *units, long priority, int update_every) {
     if(unlikely(!prop->st)) {
         char id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "powersupply_%s", dim);
@@ -168,13 +168,13 @@ static void rrdset_create_simple_prop(struct power_supply *ps, struct simple_pro
                 id
                 , ps->name
                 , NULL
-                , ps->name
+                , dim
                 , context
                 , title
                 , units
                 , PLUGIN_PROC_NAME
                 , PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME
-                , NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY
+                , priority
                 , update_every
                 , RRDSET_TYPE_LINE
         );
@@ -402,11 +402,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
         }
 
         if(likely(ps->capacity)) {
-            rrdset_create_simple_prop(ps, ps->capacity, "Battery capacity", "capacity", 1, "percentage", update_every);
+            rrdset_create_simple_prop(ps, ps->capacity, "Battery capacity", "capacity", 1, "percentage", NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY, update_every);
         }
 
         if(likely(ps->power)) {
-            rrdset_create_simple_prop(ps, ps->power, "Battery power", "power", 1000000, "W", update_every);
+            rrdset_create_simple_prop(ps, ps->power, "Battery power", "power", 1000000, "W", NETDATA_CHART_PRIO_POWER_SUPPLY_POWER, update_every);
         }
 
         struct ps_property *pr;
