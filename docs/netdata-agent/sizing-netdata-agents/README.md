@@ -20,11 +20,11 @@ This is a map of how Netdata **features impact resources utilization**:
 
    Lowering the data collection frequency from every-second to every-2-seconds, will make Netdata use half the CPU utilization. So, CPU utilization is proportional to the data collection frequency.
 
-3. **Database Mode and Tiers**:  By default Netdata stores metrics in 3 database tiers: high-resolution, mid-resolution, low-resolution. All database tiers are updated in parallel during data collection, and depending on the query duration Netdata may consult one or more tiers to optimize the resources required to satisfy it.
+3. **Database Mode and Tiers**:  By default Netdata stores metrics in 3 database tiers: high-resolution, mid-resolution, and low-resolution. All database tiers are updated in parallel during data collection, and depending on the query duration Netdata may consult one or more tiers to optimize the resources required to satisfy it.
 
    The number of database tiers affects the memory requirements of Netdata. Going from 3-tiers to 1-tier, will make Netdata use half the memory. Of course metrics retention will also be limited to 1 tier.
 
-4. **Machine Learning**: Byt default Netdata trains multiple machine learning models for every metric collected, to learn its behavior and detect anomalies. Machine Learning is a CPU intensive process and affects the overall CPU utilization of Netdata.
+4. **Machine Learning**: By default Netdata trains multiple machine learning models for every metric collected, to learn its behavior and detect anomalies. Machine Learning is a CPU intensive process and affects the overall CPU utilization of Netdata.
 
 5. **Streaming Compression**: When using Netdata in Parent-Child configurations to create Metrics Centralization Points, the compression algorithm used greatly affects CPU utilization and bandwidth consumption.
 
