@@ -95,7 +95,7 @@ static inline DICTIONARY_ITEM *hashtable_get_hashtable(DICTIONARY *dict, const c
     key[name_len] = '\0';
 
     XXH64_hash_t hash = XXH3_64bits(name, name_len);
-    SIMPLE_HASHTABLE_SLOT_DICTIONARY *sl = simple_hashtable_get_slot_DICTIONARY(ht, hash, key, false);
+    SIMPLE_HASHTABLE_SLOT_DICTIONARY *sl = simple_hashtable_get_slot_DICTIONARY(ht, hash, key, true);
     return SIMPLE_HASHTABLE_SLOT_DATA(sl);
 }
 
