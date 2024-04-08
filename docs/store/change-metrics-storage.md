@@ -49,7 +49,7 @@ the `update every iterations` of the tiers, to stay under the limit.
 
 The exact retention that can be achieved by each tier depends on the number of metrics collected. The more 
 the metrics, the smaller the retention that will fit in a given size. The general rule is that Netdata needs 
-about **1 byte per data point on disk for tier 0**, and **4 bytes per data point on disk for tier 1 and above**.
+about **1 byte per data point on disk for tier 0**, and **6 bytes per data point on disk for tier 1** and **18 bytes per data point on disk for tier 2 and above**.
 
 So, for 1000 metrics collected per second and 256 MB for tier 0, Netdata will store about:
 
@@ -60,13 +60,13 @@ So, for 1000 metrics collected per second and 256 MB for tier 0, Netdata will st
 At tier 1 (per minute):
 
 ```
-128MB on disk / 4 bytes per point / 1000 metrics => 32k points per metric / (24 hr * 60 min) ~= 22 days
+128MB on disk / 6 bytes per point / 1000 metrics => 21k points per metric / (24 hr * 60 min) ~= 15 days
 ```
 
 At tier 2 (per hour):
 
 ```
-64MB on disk / 4 bytes per point / 1000 metrics => 16k points per metric / 24 hr per day ~= 2 years 
+64MB on disk / 16 bytes per point / 1000 metrics => 4k points per metric / 24 hr per day ~= 0.5 years 
 ```
 
 Of course double the metrics, half the retention. There are more factors that affect retention. The number 
