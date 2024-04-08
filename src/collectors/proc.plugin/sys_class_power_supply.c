@@ -130,41 +130,42 @@ static void add_labels_to_power_supply(struct power_supply *ps, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "device", ps->name, RRDLABEL_SRC_AUTO);
 }
 
-static void read_simple_property(struct power_supply *ps, struct simple_property *prop, bool keep_fds_open) {
+static bool read_simple_property(struct simple_property *prop, bool keep_fds_open) {
     char buffer[30 + 1];
 
     if(unlikely(prop->fd == -1)) {
         prop->fd = open(prop->filename, O_RDONLY | O_CLOEXEC, 0666);
         if(unlikely(prop->fd == -1)) {
             collector_error("Cannot open file '%s'", prop->filename);
-            power_supply_free(ps);
-            ps = NULL;
+            return false;
         }
     }
 
-    if (ps)
+    if (likely(prop->fd != -1))
     {
         ssize_t r = read(prop->fd, buffer, 30);
         if(unlikely(r < 1)) {
             collector_error("Cannot read file '%s'", prop->filename);
-            power_supply_free(ps);
-            ps = NULL;
+            close(prop->fd);
+            prop->fd = -1;
+            return false;
         }
         else {
             buffer[r] = '\0';
             prop->value = str2ull(buffer, NULL);
+        }
 
-            if(unlikely(!keep_fds_open)) {
-                close(prop->fd);
-                prop->fd = -1;
-            }
-            else if(unlikely(lseek(prop->fd, 0, SEEK_SET) == -1)) {
-                collector_error("Cannot seek in file '%s'", prop->filename);
-                close(prop->fd);
-                prop->fd = -1;
-            }
+        if(unlikely(!keep_fds_open)) {
+            close(prop->fd);
+            prop->fd = -1;
+        }
+        else if(unlikely(lseek(prop->fd, 0, SEEK_SET) == -1)) {
+            collector_error("Cannot seek in file '%s'", prop->filename);
+            close(prop->fd);
+            prop->fd = -1;
         }
     }
+    return true;
 }
 
 static void rrdset_create_simple_prop(struct power_supply *ps, struct simple_property *prop, char *title, char *dim, collected_number divisor, char *units, long priority, int update_every) {
@@ -334,19 +335,27 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 }
             }
 
+            bool capacity_ok = false, power_ok = false;
+
             // read capacity file
             if(likely(ps->capacity)) {
-                read_simple_property(ps, ps->capacity, keep_fds_open);
+                capacity_ok = read_simple_property(ps->capacity, keep_fds_open);
             }
 
+            // read power file
             if(likely(ps->power)) {
-                read_simple_property(ps, ps->power, keep_fds_open);
+                power_ok = read_simple_property(ps->power, keep_fds_open);
+            }
+
+            if(unlikely(!power_ok && !capacity_ok)) {
+                power_supply_free(ps);
+                ps = NULL;
             }
 
             // read property files
             int read_error = 0;
             struct ps_property *pr;
-            if (ps)
+            if (likely(ps))
             {
                 for(pr = ps->property_root; pr && !read_error; pr = pr->next) {
                     struct ps_property_dim *pd;
