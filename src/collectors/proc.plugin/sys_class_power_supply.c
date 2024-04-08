@@ -51,6 +51,7 @@ struct simple_property {
 
     RRDSET *st;
     RRDDIM *rd;
+    bool ok;
     unsigned long long value;
 };
 
@@ -130,14 +131,15 @@ static void add_labels_to_power_supply(struct power_supply *ps, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "device", ps->name, RRDLABEL_SRC_AUTO);
 }
 
-static bool read_simple_property(struct simple_property *prop, bool keep_fds_open) {
+static void read_simple_property(struct simple_property *prop, bool keep_fds_open) {
     char buffer[30 + 1];
 
+    prop->ok = false;
     if(unlikely(prop->fd == -1)) {
         prop->fd = open(prop->filename, O_RDONLY | O_CLOEXEC, 0666);
         if(unlikely(prop->fd == -1)) {
             collector_error("Cannot open file '%s'", prop->filename);
-            return false;
+            return;
         }
     }
 
@@ -148,11 +150,12 @@ static bool read_simple_property(struct simple_property *prop, bool keep_fds_ope
             collector_error("Cannot read file '%s'", prop->filename);
             close(prop->fd);
             prop->fd = -1;
-            return false;
+            return;
         }
         else {
             buffer[r] = '\0';
             prop->value = str2ull(buffer, NULL);
+            prop->ok = true;
         }
 
         if(unlikely(!keep_fds_open)) {
@@ -165,7 +168,7 @@ static bool read_simple_property(struct simple_property *prop, bool keep_fds_ope
             prop->fd = -1;
         }
     }
-    return true;
+    return;
 }
 
 static void rrdset_create_simple_prop(struct power_supply *ps, struct simple_property *prop, char *title, char *dim, collected_number divisor, char *units, long priority, int update_every) {
@@ -335,19 +338,17 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 }
             }
 
-            bool capacity_ok = false, power_ok = false;
-
             // read capacity file
             if(likely(ps->capacity)) {
-                capacity_ok = read_simple_property(ps->capacity, keep_fds_open);
+                read_simple_property(ps->capacity, keep_fds_open);
             }
 
             // read power file
             if(likely(ps->power)) {
-                power_ok = read_simple_property(ps->power, keep_fds_open);
+                read_simple_property(ps->power, keep_fds_open);
             }
 
-            if(unlikely(!power_ok && !capacity_ok)) {
+            if(unlikely(!ps->power->ok && !ps->capacity->ok)) {
                 power_supply_free(ps);
                 ps = NULL;
             }
@@ -420,11 +421,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
             continue;
         }
 
-        if(likely(ps->capacity)) {
+        if(likely(ps->capacity && ps->capacity->ok)) {
             rrdset_create_simple_prop(ps, ps->capacity, "Battery capacity", "capacity", 1, "percentage", NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY, update_every);
         }
 
-        if(likely(ps->power)) {
+        if(likely(ps->power && ps->power->ok)) {
             rrdset_create_simple_prop(ps, ps->power, "Battery power", "power", 1000000, "W", NETDATA_CHART_PRIO_POWER_SUPPLY_POWER, update_every);
         }
 
