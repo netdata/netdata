@@ -448,18 +448,19 @@ void network_viewer_function(const char *transaction, char *function __maybe_unu
             ls.config.data = wb;
         }
 
+        LS_STATE *pls = &ls;
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-        network_viewer_ebpf_selector(&ls);
+        network_viewer_ebpf_selector(pls);
         if (ls.use_ebpf)
-            network_viewer_ebpf_get_sockets(&ls);
+            pls = network_viewer_ebpf_get_sockets(&ls);
         else
 #endif
-            local_sockets_process(&ls);
+            local_sockets_process(pls);
 
         if(aggregated) {
             LOCAL_SOCKET *array[ht.used];
             size_t added = 0;
-            uint64_t proc_self_net_ns_inode = ls.proc_self_net_ns_inode;
+            uint64_t proc_self_net_ns_inode = pls->proc_self_net_ns_inode;
             for(SIMPLE_HASHTABLE_SLOT_AGGREGATED_SOCKETS *sl = simple_hashtable_first_read_only_AGGREGATED_SOCKETS(&ht);
                  sl;
                  sl = simple_hashtable_next_read_only_AGGREGATED_SOCKETS(&ht, sl)) {
