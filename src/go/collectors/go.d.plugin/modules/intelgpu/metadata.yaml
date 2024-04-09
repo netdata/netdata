@@ -41,7 +41,9 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Install intel-gpu-tools
+            description: Install `intel-gpu-tools` using your distribution's package manager.
       configuration:
         file:
           name: go.d/intelgpu.conf
