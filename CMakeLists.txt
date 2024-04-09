@@ -276,11 +276,19 @@ endif()
 
 include(NetdataYAML)
 
+if(ENABLE_SENTRY)
+        include(NetdataSentry)
+endif()
+
 #
 # Checks from custom modules
 #
 
 netdata_detect_libyaml()
+
+if(ENABLE_SENTRY)
+        netdata_bundle_sentry()
+endif()
 
 #
 # check include files
