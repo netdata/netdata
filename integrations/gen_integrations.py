@@ -45,6 +45,10 @@ NOTIFICATION_SOURCES = [
     (AGENT_REPO, INTEGRATIONS_PATH / 'cloud-notifications' / 'metadata.yaml', False),
 ]
 
+AUTHENTICATION_SOURCES = [
+    (AGENT_REPO, INTEGRATIONS_PATH / 'cloud-authentication' / 'metadata.yaml', False),
+]
+
 COLLECTOR_RENDER_KEYS = [
     'alerts',
     'metrics',
@@ -61,6 +65,12 @@ EXPORTER_RENDER_KEYS = [
 ]
 
 NOTIFICATION_RENDER_KEYS = [
+    'overview',
+    'setup',
+    'troubleshooting',
+]
+
+AUTHENTICATION_RENDER_KEYS = [
     'overview',
     'setup',
     'troubleshooting',
@@ -114,6 +124,11 @@ EXPORTER_VALIDATOR = Draft7Validator(
 
 NOTIFICATION_VALIDATOR = Draft7Validator(
     {'$ref': './notification.json#'},
+    registry=registry,
+)
+
+AUTHENTICATION_VALIDATOR = Draft7Validator(
+    {'$ref': './authentication.json#'},
     registry=registry,
 )
 
@@ -381,6 +396,51 @@ def load_notifications():
                 ret.extend(_load_notification_file(file, repo))
         elif not match and path.exists() and path.is_file():
             ret.extend(_load_notification_file(path, repo))
+
+    return ret
+
+def _load_authentication_file(file, repo):
+    debug(f'Loading { file }.')
+    data = load_yaml(file)
+
+    if not data:
+        return []
+
+    try:
+        AUTHENTICATION_VALIDATOR.validate(data)
+    except ValidationError:
+        warn(f'Failed to validate { file } against the schema.', file)
+        return []
+
+    if 'id' in data:
+        data['integration_type'] = 'authentication'
+        data['_src_path'] = file
+        data['_repo'] = repo
+        data['_index'] = 0
+
+        return [data]
+    else:
+        ret = []
+
+        for idx, item in enumerate(data):
+            item['integration_type'] = 'authentication'
+            item['_src_path'] = file
+            item['_repo'] = repo
+            item['_index'] = idx
+            ret.append(item)
+
+        return ret
+
+
+def load_authentications():
+    ret = []
+
+    for repo, path, match in AUTHENTICATION_SOURCES:
+        if match and path.exists() and path.is_dir():
+            for file in path.glob(METADATA_PATTERN):
+                ret.extend(_load_authentication_file(file, repo))
+        elif not match and path.exists() and path.is_file():
+            ret.extend(_load_authentication_file(path, repo))
 
     return ret
 
@@ -652,6 +712,49 @@ def render_notifications(categories, notifications, ids):
     return notifications, clean_notifications, ids
 
 
+def render_authentications(categories, authentications, ids):
+    debug('Sorting authentications.')
+
+    sort_integrations(authentications)
+
+    debug('Checking authentication ids.')
+
+    authentications, ids = dedupe_integrations(authentications, ids)
+
+    clean_authentications = []
+
+    for item in authentications:
+        item['edit_link'] = make_edit_link(item)
+
+        clean_item = deepcopy(item)
+
+        for key in AUTHENTICATION_RENDER_KEYS:
+            
+            if key in item.keys():
+                template = get_jinja_env().get_template(f'{ key }.md')
+                data = template.render(entry=item, clean=False)
+                clean_data = template.render(entry=item, clean=True)
+
+                if 'variables' in item['meta']:
+                    template = get_jinja_env().from_string(data)
+                    data = template.render(variables=item['meta']['variables'], clean=False)
+                    template = get_jinja_env().from_string(clean_data)
+                    clean_data = template.render(variables=item['meta']['variables'], clean=True)
+            else:
+                data = ''
+                clean_data = ''
+
+            item[key] = data
+            clean_item[key] = clean_data
+            
+        for k in ['_src_path', '_repo', '_index']:
+            del item[k], clean_item[k]
+
+        clean_authentications.append(clean_item)
+
+    return authentications, clean_authentications, ids
+
+
 def render_integrations(categories, integrations):
     template = get_jinja_env().get_template('integrations.js')
     data = template.render(
@@ -675,16 +778,19 @@ def main():
     deploy = load_deploy()
     exporters = load_exporters()
     notifications = load_notifications()
+    authentications = load_authentications()
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
     exporters, clean_exporters, ids = render_exporters(categories, exporters, ids)
     notifications, clean_notifications, ids = render_notifications(categories, notifications, ids)
+    authentications, clean_authentications, ids = render_authentications(categories, authentications, ids)
 
-    integrations = collectors + deploy + exporters + notifications
+
+    integrations = collectors + deploy + exporters + notifications + authentications
     render_integrations(categories, integrations)
 
-    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_notifications
+    clean_integrations = clean_collectors + clean_deploy + clean_exporters + clean_notifications + clean_authentications
     render_json(categories, clean_integrations)
 
 
