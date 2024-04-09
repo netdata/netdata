@@ -6,10 +6,19 @@
 
 **Merged pull requests:**
 
+- Increase number of pages per extent in dbengine [\#17343](https://github.com/netdata/netdata/pull/17343) ([stelfrag](https://github.com/stelfrag))
+- fix invalid var in prepare\_offline\_install\_source\(\) [\#17342](https://github.com/netdata/netdata/pull/17342) ([ilyam8](https://github.com/ilyam8))
+- remove unused install\_go.sh [\#17339](https://github.com/netdata/netdata/pull/17339) ([ilyam8](https://github.com/ilyam8))
+- fix proc-power-supply charts family [\#17338](https://github.com/netdata/netdata/pull/17338) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/likexian/whois from 1.15.1 to 1.15.2 in /src/go/collectors/go.d.plugin [\#17337](https://github.com/netdata/netdata/pull/17337) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/vmware/govmomi from 0.36.2 to 0.36.3 in /src/go/collectors/go.d.plugin [\#17336](https://github.com/netdata/netdata/pull/17336) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/prometheus/common from 0.51.1 to 0.52.2 in /src/go/collectors/go.d.plugin [\#17335](https://github.com/netdata/netdata/pull/17335) ([dependabot[bot]](https://github.com/apps/dependabot))
+- go.d: schema windows: fix url placeholder scheme [\#17326](https://github.com/netdata/netdata/pull/17326) ([ilyam8](https://github.com/ilyam8))
 - go.d: schemas: add missing "body" and "method" [\#17325](https://github.com/netdata/netdata/pull/17325) ([ilyam8](https://github.com/ilyam8))
 - remove old overview infrastructure and add home tab doc [\#17323](https://github.com/netdata/netdata/pull/17323) ([Ancairon](https://github.com/Ancairon))
 - Drop generic bitmap implementation. [\#17322](https://github.com/netdata/netdata/pull/17322) ([vkalintiris](https://github.com/vkalintiris))
 - set min thread stack size to 1 MB [\#17317](https://github.com/netdata/netdata/pull/17317) ([ilyam8](https://github.com/ilyam8))
+- Call with resize true when dictionary has DICT\_OPTION\_INDEX\_HASHTABLE [\#17316](https://github.com/netdata/netdata/pull/17316) ([stelfrag](https://github.com/stelfrag))
 - Drop legacy dbengine support [\#17315](https://github.com/netdata/netdata/pull/17315) ([stelfrag](https://github.com/stelfrag))
 - Fix assorted issues in the Docker build process. [\#17312](https://github.com/netdata/netdata/pull/17312) ([Ferroin](https://github.com/Ferroin))
 - dyncfg function on parents should not require any access rights [\#17310](https://github.com/netdata/netdata/pull/17310) ([ktsaou](https://github.com/ktsaou))
@@ -395,16 +404,6 @@
 - health: add httpcheck bad header alert [\#16736](https://github.com/netdata/netdata/pull/16736) ([ilyam8](https://github.com/ilyam8))
 - update default netdata.conf used for native packages [\#16734](https://github.com/netdata/netdata/pull/16734) ([ilyam8](https://github.com/ilyam8))
 - fix missing CPU frequency [\#16732](https://github.com/netdata/netdata/pull/16732) ([ilyam8](https://github.com/ilyam8))
-- Fix handling of hardening flags with Clang [\#16731](https://github.com/netdata/netdata/pull/16731) ([Ferroin](https://github.com/Ferroin))
-- fix excessive "maximum number of cgroups reached" log messages [\#16730](https://github.com/netdata/netdata/pull/16730) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#16728](https://github.com/netdata/netdata/pull/16728) ([netdatabot](https://github.com/netdatabot))
-- update ebpf-socket function name and columns [\#16727](https://github.com/netdata/netdata/pull/16727) ([ilyam8](https://github.com/ilyam8))
-- Fix --distro-override parameter name in docs [\#16726](https://github.com/netdata/netdata/pull/16726) ([moschlar](https://github.com/moschlar))
-- update go.d.plugin to v0.58.0 [\#16725](https://github.com/netdata/netdata/pull/16725) ([ilyam8](https://github.com/ilyam8))
-- Add GHA workflow to upload kickstart script to our repo server. [\#16724](https://github.com/netdata/netdata/pull/16724) ([Ferroin](https://github.com/Ferroin))
-- Add Netdata Mobile App to issue template config [\#16723](https://github.com/netdata/netdata/pull/16723) ([ilyam8](https://github.com/ilyam8))
-- fix clock resolution detection [\#16720](https://github.com/netdata/netdata/pull/16720) ([ktsaou](https://github.com/ktsaou))
-- cgroups: don't multiply cgroup\_check\_for\_new\_every by update\_every [\#16719](https://github.com/netdata/netdata/pull/16719) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
