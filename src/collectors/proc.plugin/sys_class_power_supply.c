@@ -3,6 +3,7 @@
 #include "plugin_proc.h"
 
 #define PLUGIN_PROC_MODULE_POWER_SUPPLY_NAME "/sys/class/power_supply"
+#define PROP_VALUE_LENGTH_MAX 30
 
 const char *ps_property_names[]  = {        "charge",         "energy",              "voltage"};
 const char *ps_property_titles[] = {"Battery charge", "Battery energy", "Power supply voltage"};
@@ -132,7 +133,7 @@ static void add_labels_to_power_supply(struct power_supply *ps, RRDSET *st) {
 }
 
 static void read_simple_property(struct simple_property *prop, bool keep_fds_open) {
-    char buffer[30 + 1];
+    char buffer[PROP_VALUE_LENGTH_MAX + 1];
 
     prop->ok = false;
     if(unlikely(prop->fd == -1)) {
@@ -142,31 +143,24 @@ static void read_simple_property(struct simple_property *prop, bool keep_fds_ope
             return;
         }
     }
+    ssize_t r = read(prop->fd, buffer, PROP_VALUE_LENGTH_MAX);
+    if(unlikely(r < 1)) {
+        collector_error("Cannot read file '%s'", prop->filename);
+    }
+    else {
+        buffer[r] = '\0';
+        prop->value = str2ull(buffer, NULL);
+        prop->ok = true;
+    }
 
-    if (likely(prop->fd != -1))
-    {
-        ssize_t r = read(prop->fd, buffer, 30);
-        if(unlikely(r < 1)) {
-            collector_error("Cannot read file '%s'", prop->filename);
-            close(prop->fd);
-            prop->fd = -1;
-            return;
-        }
-        else {
-            buffer[r] = '\0';
-            prop->value = str2ull(buffer, NULL);
-            prop->ok = true;
-        }
-
-        if(unlikely(!keep_fds_open)) {
-            close(prop->fd);
-            prop->fd = -1;
-        }
-        else if(unlikely(lseek(prop->fd, 0, SEEK_SET) == -1)) {
-            collector_error("Cannot seek in file '%s'", prop->filename);
-            close(prop->fd);
-            prop->fd = -1;
-        }
+    if(unlikely(!keep_fds_open)) {
+        close(prop->fd);
+        prop->fd = -1;
+    }
+    else if(unlikely(prop->ok && lseek(prop->fd, 0, SEEK_SET) == -1)) {
+        collector_error("Cannot seek in file '%s'", prop->filename);
+        close(prop->fd);
+        prop->fd = -1;
     }
     return;
 }
@@ -362,7 +356,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     struct ps_property_dim *pd;
                     for(pd = pr->property_dim_root; pd; pd = pd->next) {
                         if(likely(!pd->always_zero)) {
-                            char buffer[30 + 1];
+                            char buffer[PROP_VALUE_LENGTH_MAX + 1];
 
                             if(unlikely(pd->fd == -1)) {
                                 pd->fd = open(pd->filename, O_RDONLY | O_CLOEXEC, 0666);
@@ -374,7 +368,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                 }
                             }
 
-                            ssize_t r = read(pd->fd, buffer, 30);
+                            ssize_t r = read(pd->fd, buffer, PROP_VALUE_LENGTH_MAX);
                             if(unlikely(r < 1)) {
                                 collector_error("Cannot read file '%s'", pd->filename);
                                 read_error = 1;
