@@ -501,6 +501,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [IPMI (By SoundCloud)](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/ipmi_by_soundcloud.md)
 
+- [Intel GPU](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/intelgpu/integrations/intel_gpu.md)
+
 - [Intelligent Platform Management Interface (IPMI)](https://github.com/netdata/netdata/blob/master/src/collectors/freeipmi.plugin/integrations/intelligent_platform_management_interface_ipmi.md)
 
 - [Linux Sensors (lm-sensors)](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/sensors/integrations/linux_sensors_lm-sensors.md)
