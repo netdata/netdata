@@ -96,7 +96,10 @@ There are no alerts configured by default for this integration.
 
 ### Prerequisites
 
-No action required.
+#### Install intel-gpu-tools
+
+Install `intel-gpu-tools` using your distribution's package manager.
+
 
 ### Configuration
 
