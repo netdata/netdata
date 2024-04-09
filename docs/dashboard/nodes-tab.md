@@ -4,7 +4,7 @@ The nodes tab provides a summarized view of your [War Room](https://github.com/n
 
 > **Tip**  
 >
-> Keep in mind that all of the configurations mentioned below are persistent and visible across all users.
+> Keep in mind that all configurations mentioned below are persistent and visible across all users.
 
 ## Center information view
 
@@ -12,7 +12,7 @@ The center information view consists of one row per node, and can be configured 
 
 ### Filtering and adjusting the view
 
-In the top right hand corner you can:
+In the top right-hand corner, you can:
 
 - Order the nodes per status or per alert status
 - Select which charts you want to be displayed as quick reference points
@@ -23,7 +23,7 @@ Each node row allows you to:
 
 - View the node's status
 - Go to a single node dashboard, by clicking the node name
-- View information about the node, along with a button to display more in the right hand side bar
+- View information about the node, along with a button to display more in the right-hand sidebar
 - View active alerts for the node
 - View Machine Learning status
 - View Functions capability status
@@ -33,7 +33,7 @@ Each node row allows you to:
 
 ## Right bar
 
-The bar on the right hand side provides additional information about the nodes in the War Room and also allows to filter what is displayed in the [center information view](#center-information-view).
+The bar on the right-hand side provides additional information about the nodes in the War Room and allows you to filter what is displayed in the [center information view](#center-information-view).
 
 ### Node hierarchy
 
@@ -50,8 +50,8 @@ The second tab allows you to filter which nodes are displayed, you can filter by
 
 ### Alerts sub-tab
 
-The third tab presents the room alerts, and allows you to see more info about each alert.
+The third tab displays room alerts and allows you to see additional information about each alert.
 
 ### Info sub-tab
 
-The last tab presents information about a node, by clicking the `i` icon from a node's row, right next to it's name.
+The last tab presents information about a node, by clicking the `i` icon from a node's row, right next to its name.
