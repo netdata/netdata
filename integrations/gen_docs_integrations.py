@@ -335,8 +335,11 @@ def make_symlinks(symlink_dict):
     takes a dictionary with directories that have a 1:1 relationship between their README and the integration (only one) inside the "integrations" folder.
     """
     for element in symlink_dict:
-        # Remove the README to prevent it being a normal file
-        Path(f'{element}/README.md').unlink()
+        try:
+            # Remove the README to prevent it being a normal file
+            Path(f'{element}/README.md').unlink()
+        except FileNotFoundError:
+            continue
         # and then make a symlink to the actual markdown
         Path(f'{element}/README.md').symlink_to(symlink_dict[element])
 
