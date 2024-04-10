@@ -886,13 +886,15 @@ detect_existing_install() {
   while [ -n "${searchpath}" ]; do
     _ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
 
-    if [ -z "${ndpath}" ]; then
+    if [ -z "${ndpath}" ] && [ -n "${_ndpath}" ]; then
       ndpath="${_ndpath}"
-    elif [ -n "${_ndpath}" ]; then
+    elif [ -n "${_ndpath}" ] && [ "${ndpath}" != "${_ndpath}" ]; then
       fatal "Multiple installs of Netdata agent detected (located at '${ndpath}' and '${_ndpath}'). Such a setup is not generally supported. If you are certain you want to operate on one of them despite this, use the '--install-prefix' option to specifiy the install you want to operate on." F0517
     fi
 
     if [ -n "${INSTALL_PREFIX}" ] && [ -n "${ndpath}" ]; then
+      break
+    elif [ -z "${_ndpath}" ]; then
       break
     elif echo "${searchpath}" | grep -v ':'; then
       searchpath=""
