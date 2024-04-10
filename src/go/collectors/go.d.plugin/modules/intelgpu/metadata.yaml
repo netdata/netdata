@@ -48,7 +48,7 @@ modules:
             description: |
               When running as a normal user CAP_PERFMON is required to access performance monitoring.
               See [capabilities(7)](https://man7.org/linux/man-pages/man7/capabilities.7.html) and [setcap(8)](https://man7.org/linux/man-pages/man8/setcap.8.html).
-              
+
               ```bash
               sudo setcap cap_perfmon=eip /usr/bin/intel_gpu_top
               ```
