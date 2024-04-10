@@ -342,7 +342,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 read_simple_property(ps->power, keep_fds_open);
             }
 
-            if(unlikely(!ps->power->ok && !ps->capacity->ok)) {
+            if(unlikely((!ps->power || !ps->power->ok) && (!ps->capacity || !ps->capacity->ok))) {
                 power_supply_free(ps);
                 ps = NULL;
             }
