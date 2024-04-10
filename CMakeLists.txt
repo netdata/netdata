@@ -142,24 +142,6 @@ if(ENABLE_PLUGIN_GO)
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
 endif()
 
-if(ENABLE_SENTRY)
-        include(FetchContent)
-
-        # ignore debhelper
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
-
-        set(SENTRY_VERSION 0.6.6)
-        set(SENTRY_BACKEND "breakpad")
-        set(SENTRY_BUILD_SHARED_LIBS OFF)
-
-        FetchContent_Declare(
-                sentry
-                URL https://github.com/getsentry/sentry-native/releases/download/${SENTRY_VERSION}/sentry-native.zip
-                URL_HASH SHA256=7a98467c0b2571380a3afc5e681cb13aa406a709529be12d74610b0015ccde0c
-        )
-        FetchContent_MakeAvailable(sentry)
-endif()
-
 if(ENABLE_WEBRTC)
         include(FetchContent)
 
@@ -277,12 +259,20 @@ endif()
 include(NetdataJSONC)
 include(NetdataYAML)
 
+if(ENABLE_SENTRY)
+        include(NetdataSentry)
+endif()
+
 #
 # Checks from custom modules
 #
 
 netdata_detect_jsonc()
 netdata_detect_libyaml()
+
+if(ENABLE_SENTRY)
+        netdata_bundle_sentry()
+endif()
 
 #
 # check include files
