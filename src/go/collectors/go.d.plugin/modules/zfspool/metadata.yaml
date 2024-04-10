@@ -80,10 +80,18 @@ modules:
       problems:
         list: []
     alerts:
-      - name: nvme_device_critical_warnings_state
-        metric: nvme.device_critical_warnings_state
-        info: "NVMe device ${label:device} has critical warnings"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nvme.conf
+      - name: zfs_pool_space_utilization
+        metric: zfspool.pool_space_utilization
+        info: "ZFS pool **${label:pool}** is nearing capacity. Current space usage is above the threshold."
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
+      - name: zfs_pool_health_state_warn
+        metric: zfspool.pool_health_state
+        info: "ZFS pool ${label:pool} state is degraded"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
+      - name: zfs_pool_health_state_crit
+        metric: zfspool.pool_health_state
+        info: "ZFS pool ${label:pool} state is faulted or unavail"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
     metrics:
       folding:
         title: Metrics
