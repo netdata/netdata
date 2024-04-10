@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17356](https://github.com/netdata/netdata/pull/17356) ([netdatabot](https://github.com/netdatabot))
+- add prerequisites to go.d/intelgpu meta [\#17355](https://github.com/netdata/netdata/pull/17355) ([ilyam8](https://github.com/ilyam8))
+- add intel\_gpu\_top to apps\_groups.conf [\#17354](https://github.com/netdata/netdata/pull/17354) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17353](https://github.com/netdata/netdata/pull/17353) ([netdatabot](https://github.com/netdatabot))
+- add try except [\#17352](https://github.com/netdata/netdata/pull/17352) ([Ancairon](https://github.com/Ancairon))
+- add intel\_gpu\_top collector [\#17344](https://github.com/netdata/netdata/pull/17344) ([ilyam8](https://github.com/ilyam8))
 - Increase number of pages per extent in dbengine [\#17343](https://github.com/netdata/netdata/pull/17343) ([stelfrag](https://github.com/stelfrag))
 - fix invalid var in prepare\_offline\_install\_source\(\) [\#17342](https://github.com/netdata/netdata/pull/17342) ([ilyam8](https://github.com/ilyam8))
 - remove unused install\_go.sh [\#17339](https://github.com/netdata/netdata/pull/17339) ([ilyam8](https://github.com/ilyam8))
@@ -13,10 +19,12 @@
 - Bump github.com/likexian/whois from 1.15.1 to 1.15.2 in /src/go/collectors/go.d.plugin [\#17337](https://github.com/netdata/netdata/pull/17337) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/vmware/govmomi from 0.36.2 to 0.36.3 in /src/go/collectors/go.d.plugin [\#17336](https://github.com/netdata/netdata/pull/17336) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/prometheus/common from 0.51.1 to 0.52.2 in /src/go/collectors/go.d.plugin [\#17335](https://github.com/netdata/netdata/pull/17335) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Enable Sentry for Ubuntu and Debian native packages. [\#17327](https://github.com/netdata/netdata/pull/17327) ([Ferroin](https://github.com/Ferroin))
 - go.d: schema windows: fix url placeholder scheme [\#17326](https://github.com/netdata/netdata/pull/17326) ([ilyam8](https://github.com/ilyam8))
 - go.d: schemas: add missing "body" and "method" [\#17325](https://github.com/netdata/netdata/pull/17325) ([ilyam8](https://github.com/ilyam8))
 - remove old overview infrastructure and add home tab doc [\#17323](https://github.com/netdata/netdata/pull/17323) ([Ancairon](https://github.com/Ancairon))
 - Drop generic bitmap implementation. [\#17322](https://github.com/netdata/netdata/pull/17322) ([vkalintiris](https://github.com/vkalintiris))
+- Check for Snappy only when required. [\#17319](https://github.com/netdata/netdata/pull/17319) ([Ferroin](https://github.com/Ferroin))
 - set min thread stack size to 1 MB [\#17317](https://github.com/netdata/netdata/pull/17317) ([ilyam8](https://github.com/ilyam8))
 - Call with resize true when dictionary has DICT\_OPTION\_INDEX\_HASHTABLE [\#17316](https://github.com/netdata/netdata/pull/17316) ([stelfrag](https://github.com/stelfrag))
 - Drop legacy dbengine support [\#17315](https://github.com/netdata/netdata/pull/17315) ([stelfrag](https://github.com/stelfrag))
@@ -397,13 +405,6 @@
 - fix cpu per core charts priority [\#16749](https://github.com/netdata/netdata/pull/16749) ([ilyam8](https://github.com/ilyam8))
 - Address sanitizer through CMake and use it for unit tests. [\#16748](https://github.com/netdata/netdata/pull/16748) ([vkalintiris](https://github.com/vkalintiris))
 - Remove unused file [\#16747](https://github.com/netdata/netdata/pull/16747) ([stelfrag](https://github.com/stelfrag))
-- cleanup proc net-dev renames [\#16745](https://github.com/netdata/netdata/pull/16745) ([ktsaou](https://github.com/ktsaou))
-- uninstaller: improve removing `netdata` from groups [\#16742](https://github.com/netdata/netdata/pull/16742) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#16739](https://github.com/netdata/netdata/pull/16739) ([netdatabot](https://github.com/netdatabot))
-- change get kickstart url to https://get.netdata.cloud/kickstart.sh [\#16738](https://github.com/netdata/netdata/pull/16738) ([ilyam8](https://github.com/ilyam8))
-- health: add httpcheck bad header alert [\#16736](https://github.com/netdata/netdata/pull/16736) ([ilyam8](https://github.com/ilyam8))
-- update default netdata.conf used for native packages [\#16734](https://github.com/netdata/netdata/pull/16734) ([ilyam8](https://github.com/ilyam8))
-- fix missing CPU frequency [\#16732](https://github.com/netdata/netdata/pull/16732) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
