@@ -76,7 +76,7 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| engine | Engine name (Render/3D, Blitter, VideoEnhance, Video, Compute). |
+| engine_class | Engine class (Render/3D, Blitter, VideoEnhance, Video, Compute). |
 | engine_instance | Engine instance (e.g. Render/3D/0, Video/0, Video/1). |
 
 Metrics:
