@@ -104,8 +104,8 @@ modules:
         - name: engine
           description: These metrics refer to the GPU hardware engine.
           labels:
-            - name: engine
-              description: Engine name (Render/3D, Blitter, VideoEnhance, Video, Compute).
+            - name: engine_class
+              description: Engine class (Render/3D, Blitter, VideoEnhance, Video, Compute).
             - name: engine_instance
               description: Engine instance (e.g. Render/3D/0, Video/0, Video/1).
           metrics:
