@@ -271,15 +271,17 @@ if(NOT HAVE_LOG10)
 endif()
 
 #
-# Custom modules
+# Custom Modules
 #
 
+include(NetdataJSONC)
 include(NetdataYAML)
 
 #
 # Checks from custom modules
 #
 
+netdata_detect_jsonc()
 netdata_detect_libyaml()
 
 #
@@ -1511,23 +1513,7 @@ endif()
 # judy
 target_link_libraries(libnetdata PUBLIC judy)
 
-# json-c
-if(ENABLE_BUNDLED_JSONC)
-        add_library(jsonc STATIC IMPORTED)
-        set_property(TARGET jsonc PROPERTY
-                     IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/externaldeps/jsonc/libjson-c.a")
-
-        target_include_directories(libnetdata BEFORE PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/jsonc")
-        target_link_libraries(libnetdata PUBLIC jsonc)
-else()
-        pkg_check_modules(JSONC REQUIRED json-c)
-        target_include_directories(libnetdata BEFORE PUBLIC ${JSONC_INCLUDE_DIRS})
-        target_compile_definitions(libnetdata PUBLIC ${JSONC_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${JSONC_LDFLAGS})
-endif()
-
-# message(FATAL_ERROR "jsonc libraries: ${JSONC_LIBRARIES}")
-# message(FATAL_ERROR "jsonc ldflags: ${JSONC_LDFLAGS}")
+netdata_add_jsonc_to_target(libnetdata)
 
 netdata_add_libyaml_to_target(libnetdata)
 
