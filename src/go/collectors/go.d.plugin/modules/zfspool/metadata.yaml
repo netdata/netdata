@@ -82,7 +82,7 @@ modules:
     alerts:
       - name: zfs_pool_space_utilization
         metric: zfspool.pool_space_utilization
-        info: "ZFS pool **${label:pool}** is nearing capacity. Current space usage is above the threshold."
+        info: "ZFS pool ${label:pool} is nearing capacity. Current space usage is above the threshold."
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
       - name: zfs_pool_health_state_warn
         metric: zfspool.pool_health_state
