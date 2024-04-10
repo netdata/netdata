@@ -68,7 +68,7 @@ func (ig *IntelGPU) addEngineCharts(engine string) {
 
 	chart.ID = fmt.Sprintf(chart.ID, s)
 	chart.Labels = []module.Label{
-		{Key: "engine", Value: engineDisplayName(engine)},
+		{Key: "engine_class", Value: engineClassName(engine)},
 		{Key: "engine_instance", Value: engine},
 	}
 	for _, dim := range chart.Dims {
@@ -80,7 +80,7 @@ func (ig *IntelGPU) addEngineCharts(engine string) {
 	}
 }
 
-func engineDisplayName(engine string) string {
+func engineClassName(engine string) string {
 	// https://gitlab.freedesktop.org/drm/igt-gpu-tools/-/blob/master/tools/intel_gpu_top.c#L431
 	engines := []string{"Render/3D", "Blitter", "VideoEnhance", "Video", "Compute"}
 	for _, name := range engines {
