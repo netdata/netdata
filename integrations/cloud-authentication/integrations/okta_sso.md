@@ -30,11 +30,11 @@ Integrate your organization's Okta account with Netdata to better manage your te
 Steps needed to be done on Okta Admin Portal:
 1. Click on **Applications** tab and choose to **Browse App Catalogue**
 2. Find Netdata's preconfigured app for easy setup and click **Add Integration**
-3. Give the app, that will be in your apps dashboard, the prefered **Application label**
-and click **Next** to move to the Sign-On options tab
-4. In the **Sign-On Options** all the values we expect are already filled and no additional data is required
-5. Click **Done**. You are be able to go back and edit any fields later if need be
-6. Go to the **Assignments** tab and enter the People or Group assignments as per your organization’s policies
+3. Give the app the preferred **Application label**, for when it is displayed in your apps dashboard,
+and click Next to move to the Sign-On options tab
+5. In the **Sign-On Options** all the values we expect are already filled and no additional data is required
+6. Click **Done**. You are be able to go back and edit any fields later if need be
+7. Go to the **Assignments** tab and enter the People or Group assignments as per your organization’s policies
 
 ### Netdata Configuration Steps
 1. Click on the Space settings cog (located above your profile icon)
