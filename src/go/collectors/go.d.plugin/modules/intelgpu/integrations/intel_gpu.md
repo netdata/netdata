@@ -1,5 +1,5 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/intelgpu/integrations/intel_gpu.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/intelgpu/README.md"
 meta_yaml: "https://github.com/netdata/netdata/edit/master/src/go/collectors/go.d.plugin/modules/intelgpu/metadata.yaml"
 sidebar_label: "Intel GPU"
 learn_status: "Published"
