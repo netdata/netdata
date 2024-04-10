@@ -10,8 +10,7 @@ learn_rel_path: "Operations/Visualizations"
 
 # Kubernetes visualizations
 
-Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in
-the default [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) dashboard.
+Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) dashboard.
 
 These visualizations include a health map for viewing the status of k8s pods/containers, in addition to composite charts
 for viewing per-second CPU, memory, disk, and networking metrics from k8s nodes.
@@ -112,8 +111,7 @@ problematic behavior to investigate further, troubleshoot, and remediate with `k
 The Kubernetes composite charts show real-time and historical resource utilization metrics from nodes, pods, or
 containers within your Kubernetes deployment.
 
-See the [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#definition-bar) doc for details on how composite charts work. These
-work similarly, but in addition to visualizing _by dimension_ and _by node_, Kubernetes composite charts can also be
+Kubernetes composite charts can also be
 grouped by the following labels:
 
 - `k8s_cluster_id`
@@ -125,9 +123,6 @@ grouped by the following labels:
 - `k8s_node_name`
 - `k8s_pod_name`
 - `k8s_pod_uid`
-
-![Composite charts of Kubernetes metrics in Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/106964370-3a8dd780-66ff-11eb-8858-05b2253b25c6.png)
 
 In addition, when you hover over a composite chart, the colors in the heat map changes as well, so you can see how
 certain pod/container-level metrics change over time.

@@ -19,7 +19,7 @@ These charts provide a lot of useful information, so that you can:
 - View individual metric collection status about a chart
 
 These charts are available on Netdata Cloud's
-[Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md), Single Node tab and
+[Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md), [single sode tabs](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) and
 on your [Custom Dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).
 
 ## Overview
