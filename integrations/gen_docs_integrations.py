@@ -335,6 +335,8 @@ def make_symlinks(symlink_dict):
     takes a dictionary with directories that have a 1:1 relationship between their README and the integration (only one) inside the "integrations" folder.
     """
     for element in symlink_dict:
+        if not Path(f'{element}/README.md').exists():
+            Path(f'{element}/README.md').touch()
         try:
             # Remove the README to prevent it being a normal file
             Path(f'{element}/README.md').unlink()
