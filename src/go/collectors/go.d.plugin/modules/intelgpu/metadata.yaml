@@ -61,7 +61,7 @@ modules:
             - name: binary_path
               description: Path to the intel_gpu_top binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
               default_value: /usr/bin/intel_gpu_top
-              required: false
+              required: true
         examples:
           folding:
             title: Config

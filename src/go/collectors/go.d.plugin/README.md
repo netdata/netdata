@@ -128,6 +128,7 @@ see the appropriate collector readme.
 | [whoisquery](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/whoisquery)                 |         Domain Expiry         |
 | [windows](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/windows)                       |            Windows            |
 | [x509check](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/x509check)                   |     Digital Certificates      |
+| [zfspool](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/zfspool)                       |           ZFS Pools           |
 | [zookeeper](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/zookeeper)                   |           ZooKeeper           |
 
 ## Configuration
