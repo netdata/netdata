@@ -73,7 +73,7 @@ These tabs can be separated into "static", meaning they are by default presented
 
 - The second and most important tab is the [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view) which uses composite charts to display real-time metrics from every available node in a given War Room.
 
-- The [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) gives you the ability to see the status (offline or online), host details, alert status and also a short overview of some key metrics from all your nodes at a glance.
+- The [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md) gives you the ability to see the status (offline or online), host details, alert status and also a short overview of some key metrics from all your nodes at a glance.
 
 - [Kubernetes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) is a logical grouping of charts regarding your Kubernetes clusters. It contains a subset of the charts available in the **Overview tab**.
 
@@ -172,7 +172,7 @@ collect from across your infrastructure with Netdata.
     title="Dashboards">
     <BoxList>
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md)" title="Overview" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)" title="Nodes tab" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md)" title="Nodes tab" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)" title="Kubernetes" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)" title="Create new dashboards" />
     </BoxList>
@@ -207,7 +207,7 @@ collect from across your infrastructure with Netdata.
   - [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms)
 - Dashboards
   - [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md)
-  - [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
+  - [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md)
   - [Kubernetes](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
   - [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)
 - Alerts and notifications
