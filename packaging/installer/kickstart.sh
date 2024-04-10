@@ -368,7 +368,7 @@ trap 'trap_handler 15 0' TERM
 # ======================================================================
 # Utility functions
 
-cannonical_path() {
+canonical_path() {
   cd "$(dirname "${1}")" || exit 1
   case "$(basename "${1}")" in
     ..) dirname "$(pwd -P)" ;;
