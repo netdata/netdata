@@ -80,5 +80,6 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/windows"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/wireguard"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/x509check"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/zfspool"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/zookeeper"
 )
