@@ -60,7 +60,7 @@ install -pm 644 %{SOURCE6} ./netdata.repo
 install -pm 644 %{SOURCE7} ./netdata-edge.repo
 %endif
 
-%if 0%{?amzn}
+%if 0%{?amzn2}
 install -pm 644 %{SOURCE8} ./netdata.repo
 install -pm 644 %{SOURCE9} ./netdata-edge.repo
 %endif
