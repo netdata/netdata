@@ -2183,11 +2183,12 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     if(saved_errno != 0 && !thread_log_fields[NDF_ERRNO].entry.set)
         thread_log_fields[NDF_ERRNO].entry = ND_LOG_FIELD_I64(NDF_ERRNO, saved_errno);
 
-    CLEAN_BUFFER *wb = NULL;
+    BUFFER *wb = NULL;
     if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {
         wb = buffer_create(1024, NULL);
         buffer_vsprintf(wb, fmt, ap);
         thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
+        buffer_free(wb);
     }
 
     nd_logger_log_fields(spinlock, fp, limit, priority, output, &nd_log.sources[source],
