@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
+      skip-go: ${{ steps.check-go.outputs.skip-go }}
     steps:
       - name: Checkout
         id: checkout
@@ -23,8 +24,8 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - name: Check files
-        id: check-files
+      - name: Check source files
+        id: check-source-files
         uses: tj-actions/changed-files@v44
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
@@ -35,18 +36,6 @@ jobs:
             **/*.hh
             **/*.in
             **/*.patch
-            **/*.cmake
-            CMakeLists.txt
-            .gitignore
-            .github/data/distros.yml
-            .github/workflows/build.yml
-            .github/scripts/build-static.sh
-            .github/scripts/get-static-cache-key.sh
-            .github/scripts/gen-matrix-build.py
-            .github/scripts/run-updater-check.sh
-            packaging/cmake/
-            packaging/*.version
-            packaging/*.checksums
             src/aclk/aclk-schemas/
             src/ml/dlib/
             src/fluent-bit/
@@ -54,21 +43,52 @@ jobs:
           files_ignore: |
             netdata.spec.in
             **/*.md
+      - name: Check build files
+        id: check-build-files
+        uses: tj-actions/changed-files@v43
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            **/*.cmake
+            CMakeLists.txt
+            .gitignore
+            .github/data/distros.yml
+            .github/workflows/build.yml
+            packaging/cmake/
+            packaging/*.version
+            packaging/*.checksums
+          files_ignore: |
+            **/*.md
       - name: List all changed files in pattern
         continue-on-error: true
         env:
-          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
+          CHANGED_SOURCE_FILES: ${{ steps.check-source-files.outputs.all_changed_files }}
+          CHANGED_BUILD_FILES: ${{ steps.check-build-files.outputs.all_changed_files }}
         run: |
-          for file in ${ALL_CHANGED_FILES}; do
+          for file in ${CHANGED_SOURCE_FILES} ${CHANGED_BUILD_FILES} ; do
             echo "$file was changed"
           done
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.check-source-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check Go
+        id: check-go
+        env:
+          OTHER_CHANGED_FILES: ${{ steps.check-source-files.outputs.other_changed_files }}
+        run: |
+          if [ '${{ github.event_name }}' == 'pull_request' ]; then
+            if echo "${OTHER_CHANGED_FILES}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+              echo 'skip-go=' >> "${GITHUB_OUTPUT}"
+            else
+              echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            echo 'skip-go=' >> "${GITHUB_OUTPUT}"
           fi
 
   libressl-checks:
@@ -94,7 +114,8 @@ jobs:
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata;
           apk del openssl openssl-dev;
           apk add libressl libressl-dev protobuf-dev;
-          ./netdata-installer.sh --disable-telemetry --dont-start-it --dont-wait --one-time-build;'
+          ./netdata-installer.sh --disable-telemetry --dont-start-it --dont-wait --one-time-build --disable-go;'
+
   clang-checks:
     name: Clang
     needs:
@@ -134,7 +155,7 @@ jobs:
         run: ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata
       - name: Build netdata
         if: needs.file-check.outputs.run == 'true'
-        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install-prefix /tmp/install --one-time-build
+        run: ./netdata-installer.sh --dont-start-it --disable-telemetry --dont-wait --install-prefix /tmp/install --one-time-build ${{ needs.file-check.outputs.skip-go }}
       - name: Check that repo is clean
         if: needs.file-check.outputs.run == 'true'
         run: |
