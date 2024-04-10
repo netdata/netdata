@@ -368,6 +368,15 @@ trap 'trap_handler 15 0' TERM
 # ======================================================================
 # Utility functions
 
+cannonical_path() {
+  cd "$(dirname "${1}")" || exit 1
+  case "$(basename "${1}")" in
+    ..) dirname "$(pwd -P)" ;;
+    .) pwd -P ;;
+    *) echo "$(pwd -P)/$(basename "${1}")" ;;
+  esac
+}
+
 setup_terminal() {
   TPUT_RESET=""
   TPUT_WHITE=""
@@ -885,6 +894,10 @@ detect_existing_install() {
 
   while [ -n "${searchpath}" ]; do
     _ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
+
+    if [ -n "${_ndpath}" ]; then
+      _ndpath="$(canonical_path "$(ndpath)")"
+    fi
 
     if [ -z "${ndpath}" ] && [ -n "${_ndpath}" ]; then
       ndpath="${_ndpath}"
