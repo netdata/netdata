@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0517
+# Next unused error code: F0518
 
 # ======================================================================
 # Constants
@@ -874,31 +874,41 @@ detect_existing_install() {
   set_tmpdir
 
   progress "Checking for existing installations of Netdata..."
+  EXISTING_INSTALL_IS_NATIVE="0"
+
+  if [ -n "${INSTALL_PREFIX}" ]; then
+    searchpath="/opt/netdata/bin:${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
+    searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
+  else
+    searchpath="/opt/netdata/bin:${PATH}"
+  fi
+
+  while [ -n "${searchpath}" ]; do
+    _ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
+
+    if [ -z "${ndpath}" ]; then
+      ndpath="${_ndpath}"
+    elif [ -n "${_ndpath}" ]; then
+      fatal "Multiple installs of Netdata agent detected (located at '${ndpath}' and '${_ndpath}'). Such a setup is not generally supported. If you are certain you want to operate on one of them despite this, use the '--install-prefix' option to specifiy the install you want to operate on." F0517
+    fi
+
+    if [ -n "${INSTALL_PREFIX}" ] && [ -n "${ndpath}" ]; then
+      break
+    elif echo "${searchpath}" | grep -v ':'; then
+      searchpath=""
+    else
+      searchpath="$(echo "${searchpath}" | cut -f 2- -d ':')"
+    fi
+  done
 
   if pkg_installed netdata; then
     ndprefix="/"
     EXISTING_INSTALL_IS_NATIVE="1"
-  else
-    EXISTING_INSTALL_IS_NATIVE="0"
-    if [ -n "${INSTALL_PREFIX}" ]; then
-      searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
-      searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
-    else
-      searchpath="${PATH}"
-    fi
-
-    ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
-
-    if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
-      ndpath="/opt/netdata/bin/netdata"
-    fi
-
-    if [ -n "${ndpath}" ]; then
-      case "${ndpath}" in
-        */usr/bin/netdata|*/usr/sbin/netdata) ndprefix="$(dirname "$(dirname "$(dirname "${ndpath}")")")" ;;
-        *) ndprefix="$(dirname "$(dirname "${ndpath}")")" ;;
-      esac
-    fi
+  elif [ -n "${ndpath}" ]; then
+    case "${ndpath}" in
+      */usr/bin/netdata|*/usr/sbin/netdata) ndprefix="$(dirname "$(dirname "$(dirname "${ndpath}")")")" ;;
+      *) ndprefix="$(dirname "$(dirname "${ndpath}")")" ;;
+    esac
 
     if echo "${ndprefix}" | grep -Eq '^/usr$'; then
       ndprefix="$(dirname "${ndprefix}")"
