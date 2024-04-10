@@ -44,6 +44,14 @@ modules:
         list:
           - title: Install intel-gpu-tools
             description: Install `intel-gpu-tools` using your distribution's package manager.
+          - title: Add CAP_PERFMON to `intel_gpu_top`
+            description: |
+              When running as a normal user CAP_PERFMON is required to access performance monitoring.
+              See [capabilities(7)](https://man7.org/linux/man-pages/man7/capabilities.7.html) and [setcap(8)](https://man7.org/linux/man-pages/man8/setcap.8.html).
+
+              ```bash
+              sudo setcap cap_perfmon=eip /usr/bin/intel_gpu_top
+              ```
       configuration:
         file:
           name: go.d/intelgpu.conf
@@ -59,9 +67,9 @@ modules:
               default_value: 1
               required: false
             - name: binary_path
-              description: Path to the intel_gpu_top binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
+              description: Path to the `intel_gpu_top` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable.
               default_value: /usr/bin/intel_gpu_top
-              required: false
+              required: true
         examples:
           folding:
             title: Config
