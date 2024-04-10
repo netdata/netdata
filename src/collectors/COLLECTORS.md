@@ -1041,6 +1041,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Synology ActiveBackup](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/synology_activebackup.md)
 
+- [ZFS Pools](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/zfspool/integrations/zfs_pools.md)
+
 ### Synthetic Checks
 
 - [Blackbox](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/blackbox.md)
