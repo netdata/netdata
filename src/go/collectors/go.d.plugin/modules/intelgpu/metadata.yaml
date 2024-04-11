@@ -64,7 +64,13 @@ modules:
           folding:
             title: Config
             enabled: true
-          list: []
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: intelgpu
+                    update_every: 5  # Collect Intel iGPU metrics every 5 seconds
     troubleshooting:
       problems:
         list: []
