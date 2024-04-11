@@ -21,7 +21,7 @@ Module: nvme
 
 ## Overview
 
-This collector monitors the health of NVMe devices using the command line tool [nvme](https://github.com/linux-nvme/nvme-cli#nvme-cli), which can only be run by the root user. It uses `sudo` and assumes it is set up so that the netdata user can execute `nvme` as root without a password.
+This collector monitors the health of NVMe devices. It relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli) CLI tool but avoids directly executing the binary. Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment. This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
 
 
 
@@ -141,23 +141,22 @@ The following options can be defined globally: update_every, autodetection_retry
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| binary_path | Path to nvme binary. The default is "nvme" and the executable is looked for in the directories specified in the PATH environment variable. | nvme | no |
 | timeout | nvme binary execution timeout. | 2 | no |
 
 </details>
 
 #### Examples
 
-##### Custom binary path
+##### Custom update_every
 
-The executable is not in the directories specified in the PATH environment variable.
+Allows you to override the default data collection interval.
 
 <details><summary>Config</summary>
 
 ```yaml
 jobs:
   - name: nvme
-    binary_path: /usr/local/sbin/nvme
+    update_every: 5  # Collect NVMe metrics every 5 seconds
 
 ```
 </details>
