@@ -1,0 +1,37 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Intel GPU collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "binary_path": {
+        "title": "Binary path",
+        "description": "Path to the `intel_gpu_top` binary.",
+        "type": "string",
+        "default": "/usr/bin/intel_gpu_top"
+      }
+    },
+    "required": [
+      "binary_path"
+    ],
+    "additionalProperties": false,
+    "patternProperties": {
+      "^name$": {}
+    }
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "binary_path": {
+      "ui:help": "If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable."
+    }
+  }
+}

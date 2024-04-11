@@ -1,7 +1,7 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "NVMe Collector Configuration",
+    "title": "NVMe collector configuration",
     "type": "object",
     "properties": {
       "update_every": {

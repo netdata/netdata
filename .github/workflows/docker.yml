@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
+      skip-go: ${{ steps.check-go.outputs.skip-go }}
     steps:
       - name: Checkout
         id: checkout
@@ -39,8 +40,8 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - name: Check files
-        id: check-files
+      - name: Check source files
+        id: check-source-files
         if: github.event_name != 'workflow_dispatch'
         uses: tj-actions/changed-files@v44
         with:
@@ -52,7 +53,20 @@ jobs:
             **/*.hh
             **/*.in
             **/*.patch
-            **/*.cmake
+            src/aclk/aclk-schemas/
+            src/ml/dlib/
+            src/fluent-bit/
+            src/web/server/h2o/libh2o/
+          files_ignore: |
+            netdata.spec.in
+            **/*.md
+      - name: Check build system files
+        id: check-build-files
+        if: github.event_name != 'workflow_dispatch'
+        uses: tj-actions/changed-files@v42
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
             .dockerignore
             CMakeLists.txt
             netdata-installer.sh
@@ -66,29 +80,39 @@ jobs:
             packaging/runtime-check.sh
             packaging/*.version
             packaging/*.checksums
-            src/aclk/aclk-schemas/
-            src/ml/dlib/
-            src/fluent-bit/
-            src/web/server/h2o/libh2o/
           files_ignore: |
-            netdata.spec.in
             **/*.md
       - name: List all changed files in pattern
         continue-on-error: true
         if: github.event_name != 'workflow_dispatch'
         env:
-          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
+          CHANGED_SOURCE_FILES: ${{ steps.check-source-files.outputs.all_changed_files }}
+          CHANGED_BUILD_FILES: ${{ steps.check-build-files.outputs.all_changed_files }}
         run: |
-          for file in ${ALL_CHANGED_FILES}; do
+          for file in ${CHANGED_SOURCE_FILES} ${CHANGED_BUILD_FILES} ; do
             echo "$file was changed"
           done
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.check-source-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check Go
+        id: check-go
+        env:
+          OTHER_CHANGED_FILES: ${{ steps.check-source-files.outputs.other_changed_files }}
+        run: |
+          if [ '${{ github.event_name }}' == 'pull_request' ]; then
+            if echo "${OTHER_CHANGED_FILES}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+              echo 'skip-go=' >> "${GITHUB_OUTPUT}"
+            else
+              echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            echo 'skip-go=' >> "${GITHUB_OUTPUT}"
           fi
 
   build-images:
@@ -143,7 +167,9 @@ jobs:
           tags: netdata/netdata:test
           load: true
           cache-to: type=local,dest=/tmp/build-cache,mode=max
-          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+          build-args: |
+            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+            EXTRA_INSTALL_OPTS=${{ needs.file-check.outputs.skip-go }}
       - name: Test Image
         id: test
         if: needs.file-check.outputs.run == 'true' && matrix.platform == 'linux/amd64'
@@ -257,24 +283,8 @@ jobs:
         with:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
-          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
           outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
-      - name: Export Digest
-        id: export-digest
-        if: github.repository == 'netdata/netdata'
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-      - name: Upload digest
-        id: upload-digest
-        if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-digests-${{ steps.artifact-name.outputs.platform }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
+          build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
