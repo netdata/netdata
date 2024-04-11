@@ -82,7 +82,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ zfs_pool_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.pool_space_utilization | ZFS pool **${label:pool}** is nearing capacity. Current space usage is above the threshold. |
+| [ zfs_pool_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.pool_space_utilization | ZFS pool ${label:pool} is nearing capacity. Current space usage is above the threshold. |
 | [ zfs_pool_health_state_warn ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.pool_health_state | ZFS pool ${label:pool} state is degraded |
 | [ zfs_pool_health_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.pool_health_state | ZFS pool ${label:pool} state is faulted or unavail |
 
