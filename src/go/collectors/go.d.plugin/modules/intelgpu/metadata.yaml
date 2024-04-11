@@ -7,7 +7,7 @@ modules:
       monitored_instance:
         name: Intel GPU
         link: https://www.intel.com/
-        icon_filename: intel.svg
+        icon_filename: microchip.svg
         categories:
           - data-collection.hardware-devices-and-sensors
       keywords:
