@@ -11,7 +11,7 @@ endmeta-->
 # Intel GPU
 
 
-<img src="https://netdata.cloud/img/intel.svg" width="150"/>
+<img src="https://netdata.cloud/img/microchip.svg" width="150"/>
 
 
 Plugin: go.d.plugin
