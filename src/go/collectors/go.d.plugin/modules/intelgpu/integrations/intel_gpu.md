@@ -21,8 +21,10 @@ Module: intelgpu
 
 ## Overview
 
-This collector monitors Intel integrated GPUs performance metrics using
-the [intel_gpu_top](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html) CLI tool.
+This collector gathers performance metrics for Intel integrated GPUs.
+It relies on the [`intel_gpu_top`](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html) CLI tool but avoids directly executing the binary.
+Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+This approach eliminates the need to grant the CAP_PERFMON capability to `intel_gpu_top`, improving security and potentially simplifying permission management.
 
 
 
@@ -100,16 +102,6 @@ There are no alerts configured by default for this integration.
 
 Install `intel-gpu-tools` using your distribution's package manager.
 
-#### Add CAP_PERFMON to `intel_gpu_top`
-
-When running as a normal user CAP_PERFMON is required to access performance monitoring.
-See [capabilities(7)](https://man7.org/linux/man-pages/man7/capabilities.7.html) and [setcap(8)](https://man7.org/linux/man-pages/man8/setcap.8.html).
-
-```bash
-sudo setcap cap_perfmon=eip /usr/bin/intel_gpu_top
-```
-
-
 
 ### Configuration
 
@@ -135,25 +127,11 @@ The following options can be defined globally: update_every.
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 1 | no |
-| binary_path | Path to the `intel_gpu_top` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable. | /usr/bin/intel_gpu_top | yes |
 
 </details>
 
 #### Examples
-
-##### Custom binary path
-
-The executable is not in the directories specified in the PATH environment variable.
-
-<details><summary>Config</summary>
-
-```yaml
-jobs:
-  - name: nvidia_smi
-    binary_path: /usr/local/sbin/intel_gpu_top
-
-```
-</details>
+There are no configuration examples.
 
 
 
