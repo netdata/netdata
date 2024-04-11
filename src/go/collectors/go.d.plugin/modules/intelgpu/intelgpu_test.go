@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,6 +28,10 @@ func Test_testDataIsValid(t *testing.T) {
 	} {
 		require.NotNil(t, data, name)
 	}
+}
+
+func TestIntelGPU_ConfigurationSerialize(t *testing.T) {
+	module.TestConfigurationSerialize(t, &IntelGPU{}, dataConfigJSON, dataConfigYAML)
 }
 
 func TestIntelGPU_Init(t *testing.T) {
