@@ -13,6 +13,14 @@ struct command {
     const char *params;
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
+        {
+        .name = "igt-json",
+        .params = "-J -s {{interval}}",
+        .search = {
+            [0] = "intel_gpu_top",
+            [1] = NULL,
+        },
+    },
     {
         .name = "nvme-list",
         .params = "list --output-format=json",
