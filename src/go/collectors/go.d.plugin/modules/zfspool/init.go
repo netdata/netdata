@@ -32,6 +32,7 @@ func (z *ZFSPool) initZPoolCLIExec() (zpoolCLI, error) {
 	}
 
 	zpoolExec := newZpoolCLIExec(binPath, z.Timeout.Duration())
+	zpoolExec.Logger = z.Logger
 
 	return zpoolExec, nil
 }

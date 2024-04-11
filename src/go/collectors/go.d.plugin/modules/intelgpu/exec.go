@@ -10,11 +10,14 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/netdata/netdata/go/go.d.plugin/logger"
 )
 
-func newIntelGpuTopExec(binPath string, updateEvery int) (*intelGpuTopExec, error) {
+func newIntelGpuTopExec(ndsudoPath string, updateEvery int, log *logger.Logger) (*intelGpuTopExec, error) {
 	topExec := &intelGpuTopExec{
-		binPath:     binPath,
+		Logger:      log,
+		ndsudoPath:  ndsudoPath,
 		updateEvery: updateEvery,
 	}
 
@@ -26,7 +29,9 @@ func newIntelGpuTopExec(binPath string, updateEvery int) (*intelGpuTopExec, erro
 }
 
 type intelGpuTopExec struct {
-	binPath     string
+	*logger.Logger
+
+	ndsudoPath  string
 	updateEvery int
 
 	cmd  *exec.Cmd
@@ -42,7 +47,9 @@ func (e *intelGpuTopExec) run() error {
 		refresh = e.updateEvery*1000 - 500 // milliseconds
 	}
 
-	cmd := exec.Command(e.binPath, "-J", "-s", strconv.Itoa(refresh))
+	cmd := exec.Command(e.ndsudoPath, "igt-json", "--interval", strconv.Itoa(refresh))
+
+	e.Debugf("executing '%s'", cmd)
 
 	r, err := cmd.StdoutPipe()
 	if err != nil {

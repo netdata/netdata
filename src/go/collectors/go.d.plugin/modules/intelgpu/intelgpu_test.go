@@ -39,10 +39,10 @@ func TestIntelGPU_Init(t *testing.T) {
 		prepare  func(igt *IntelGPU)
 		wantFail bool
 	}{
-		"fails if can't find intel_gpu_top": {
+		"fails if can't locate ndsudo": {
 			wantFail: true,
 			prepare: func(igt *IntelGPU) {
-				igt.binName += "!!!"
+				igt.ndsudoName += "!!!"
 			},
 		},
 	}

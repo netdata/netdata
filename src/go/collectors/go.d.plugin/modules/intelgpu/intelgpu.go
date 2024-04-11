@@ -21,18 +21,14 @@ func init() {
 
 func New() *IntelGPU {
 	return &IntelGPU{
-		Config: Config{
-			BinaryPath: "/usr/bin/intel_gpu_top",
-		},
-		binName: "intel_gpu_top",
-		charts:  charts.Copy(),
-		engines: make(map[string]bool),
+		ndsudoName: "ndsudo",
+		charts:     charts.Copy(),
+		engines:    make(map[string]bool),
 	}
 }
 
 type Config struct {
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
-	BinaryPath  string `yaml:"binary_path" json:"binary_path"`
+	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type (
@@ -42,8 +38,8 @@ type (
 
 		charts *module.Charts
 
-		exec    intelGpuTop
-		binName string
+		exec       intelGpuTop
+		ndsudoName string
 
 		engines map[string]bool
 	}
