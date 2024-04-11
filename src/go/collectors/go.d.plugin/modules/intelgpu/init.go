@@ -5,18 +5,17 @@ package intelgpu
 import (
 	"fmt"
 	"os"
-	"os/exec"
+	"path/filepath"
+
+	"github.com/netdata/netdata/go/go.d.plugin/agent/executable"
 )
 
 func (ig *IntelGPU) initIntelGPUTopExec() (intelGpuTop, error) {
-	binPath := ig.BinaryPath
-	if _, err := os.Stat(binPath); os.IsNotExist(err) {
-		path, err := exec.LookPath(ig.binName)
-		if err != nil {
-			return nil, fmt.Errorf("error on lookup '%s': %v", ig.binName, err)
-		}
-		binPath = path
+	ndsudoPath := filepath.Join(executable.Directory, ig.ndsudoName)
+	if _, err := os.Stat(ndsudoPath); err != nil {
+		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
+
 	}
 
-	return newIntelGpuTopExec(binPath, ig.UpdateEvery)
+	return newIntelGpuTopExec(ndsudoPath, ig.UpdateEvery, ig.Logger)
 }
