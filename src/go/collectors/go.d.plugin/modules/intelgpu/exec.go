@@ -135,7 +135,7 @@ func (e *intelGpuTopExec) stop() error {
 	}
 
 	_ = e.cmd.Process.Kill()
-	_, _ = e.cmd.Process.Wait()
+	_ = e.cmd.Wait()
 	e.cmd = nil
 
 	select {
