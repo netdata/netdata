@@ -277,7 +277,7 @@ include:
 
   - &ubuntu
     distro: ubuntu
-    version: "22.04"
+    version: "24.04"
     support_type: Core
     notes: ''
     eol_check: true
@@ -288,7 +288,7 @@ include:
       apt-get remove -y libjson-c-dev
     packages: &ubuntu_packages
       type: deb
-      repo_distro: ubuntu/jammy
+      repo_distro: ubuntu/noble
       arches:
         - amd64
         - armhf
@@ -297,6 +297,11 @@ include:
       ebpf-core: true
   - <<: *ubuntu
     version: "23.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/jammy
+  - <<: *ubuntu
+    version: "22.04"
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/mantic
