@@ -131,7 +131,20 @@ The following options can be defined globally: update_every.
 </details>
 
 #### Examples
-There are no configuration examples.
+
+##### Custom update_every
+
+Allows you to override the default data collection interval.
+
+<details><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: intelgpu
+    update_every: 5  # Collect Intel iGPU metrics every 5 seconds
+
+```
+</details>
 
 
 
