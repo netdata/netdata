@@ -26,7 +26,17 @@ A function is a  `key`  -  `value`  pair. The  `key`  uniquely identifies the fu
 
 For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes functions - [plugins.d](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#function).
 
+<<<<<<< HEAD
 >>>>>>> e0d8fc29c (review the file and make certain edits)
+=======
+## Prerequisites
+
+The following is required to be able to run Functions from Netdata Cloud.
+
+- At least one of the nodes claimed to your Space should be on a Netdata agent version higher than `v1.37.1`
+- Ensure that the node has the collector that exposes the function you want enabled
+
+>>>>>>> 50dc021a3 (edits on the function documentation)
 ## What functions are currently available?
 
 | Function           | Description                                                                                                                                                    | Alternative to CLI tools        | Require Cloud | plugin - module                                                                                            |
@@ -57,6 +67,7 @@ With the communication between the Netdata Agent and Netdata Cloud being through
 If you have ideas or requests for other functions:
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 - Participate in the relevant [GitHub discussion](https://github.com/netdata/netdata/discussions/14412)
 - Open a [feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
 - Join the Netdata community on [Discord](https://discord.com/invite/2mEmfW735j) and let us know.
@@ -65,3 +76,8 @@ If you have ideas or requests for other functions:
 * Open a [feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
 * Join the Netdata community on [Discord](https://discord.com/invite/mPZ6WZKKG2) and let us know.
 >>>>>>> e0d8fc29c (review the file and make certain edits)
+=======
+- Participate in the relevant [GitHub discussion](https://github.com/netdata/netdata/discussions/14412)
+- Open a [feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
+- Join the Netdata community on [Discord](https://discord.com/invite/2mEmfW735j) and let us know.
+>>>>>>> 50dc021a3 (edits on the function documentation)
