@@ -1021,6 +1021,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [IPFS](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/ipfs/integrations/ipfs.md)
 
+- [LVM logical volumes](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/lvm/integrations/lvm_logical_volumes.md)
+
 - [Lagerist Disk latency](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/lagerist_disk_latency.md)
 
 - [MegaCLI](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/megacli/integrations/megacli.md)
