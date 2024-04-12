@@ -106,15 +106,6 @@ The following alerts are available:
 See [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support). Install `nvme-cli` using your distribution's package manager.
 
 
-#### Allow netdata to execute nvme
-
-Add the netdata user to `/etc/sudoers` (use `which nvme` to find the full path to the binary):
-
-```bash
-netdata ALL=(root) NOPASSWD: /usr/sbin/nvme
-```
-
-
 
 ### Configuration
 
