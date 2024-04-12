@@ -285,6 +285,22 @@ jobs:
           cache-from: type=local,src=/tmp/build-cache
           outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
           build-args: OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
+      - name: Export Digest
+        id: export-digest
+        if: github.repository == 'netdata/netdata'
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      - name: Upload digest
+        id: upload-digest
+        if: github.repository == 'netdata/netdata'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-digests-${{ steps.artifact-name.outputs.platform }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
