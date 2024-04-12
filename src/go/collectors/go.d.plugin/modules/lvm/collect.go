@@ -39,14 +39,10 @@ func (l *LVM) collect() (map[string]int64, error) {
 			if lv.VGName == "" || lv.LVName == "" {
 				continue
 			}
-			if !isThinPool(lv.LVAttr) {
-				l.Debugf("skipping lv '%s' vg '%s': not a thin pool", lv.LVName, lv.VGName)
-				continue
-			}
 
 			key := fmt.Sprintf("lv_%s_vg_%s", lv.LVName, lv.VGName)
 			if !l.lvmThinPools[key] {
-				l.addLVMThinPoolCharts(lv.VGName, lv.LVName)
+				l.addLVMThinPoolCharts(lv.LVName, lv.VGName)
 				l.lvmThinPools[key] = true
 			}
 			if v, ok := parseFloat(lv.DataPercent); ok {

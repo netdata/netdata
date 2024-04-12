@@ -20,7 +20,7 @@ var lvThinPoolChartsTmpl = module.Charts{
 
 var (
 	lvDataSpaceUtilizationChartTmpl = module.Chart{
-		ID:       "lvm_lv_%s_vg_%s_lv_data_space_utilization",
+		ID:       "lv_%s_vg_%s_lv_data_space_utilization",
 		Title:    "Logical volume space allocated for data",
 		Units:    "percentage",
 		Fam:      "lv space usage",
@@ -28,19 +28,19 @@ var (
 		Type:     module.Area,
 		Priority: prioLVDataPercent,
 		Dims: module.Dims{
-			{ID: "lv_%s_pg_%s_data_percent", Name: "utilization", Div: 100},
+			{ID: "lv_%s_vg_%s_data_percent", Name: "utilization", Div: 100},
 		},
 	}
 	lvMetadataSpaceUtilizationChartTmpl = module.Chart{
-		ID:       "lvm_lv_%s_vg_%s_lv_metadata_space_utilization",
-		Title:    "Logical Volume Space Allocated for Metadata",
+		ID:       "lv_%s_vg_%s_lv_metadata_space_utilization",
+		Title:    "Logical volume space allocated for metadata",
 		Units:    "percentage",
 		Fam:      "lv space usage",
 		Ctx:      "lvm.lv_metadata_space_utilization",
 		Type:     module.Area,
 		Priority: prioLVMetadataPercent,
 		Dims: module.Dims{
-			{ID: "lv_%s_pg_%s_metadata_percent", Name: "utilization", Div: 100},
+			{ID: "lv_%s_vg_%s_metadata_percent", Name: "utilization", Div: 100},
 		},
 	}
 )
