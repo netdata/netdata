@@ -45,13 +45,6 @@ modules:
           - title: Install nvme-cli
             description: |
               See [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support). Install `nvme-cli` using your distribution's package manager.
-          - title: Allow netdata to execute nvme
-            description: |
-              Add the netdata user to `/etc/sudoers` (use `which nvme` to find the full path to the binary):
-
-              ```bash
-              netdata ALL=(root) NOPASSWD: /usr/sbin/nvme
-              ```
       configuration:
         file:
           name: go.d/nvme.conf
