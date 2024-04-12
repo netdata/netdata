@@ -40,6 +40,11 @@ func (l *LVM) collect() (map[string]int64, error) {
 				continue
 			}
 
+			if !isThinPool(lv.LVAttr) {
+				l.Debugf("skipping lv '%s' vg '%s': not a thin pool", lv.LVName, lv.VGName)
+				continue
+			}
+
 			key := fmt.Sprintf("lv_%s_vg_%s", lv.LVName, lv.VGName)
 			if !l.lvmThinPools[key] {
 				l.addLVMThinPoolCharts(lv.LVName, lv.VGName)
