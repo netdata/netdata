@@ -1,0 +1,16 @@
+{
+  "report": [
+    {
+      "lv": [
+        {
+          "vg_name": "cm-vg",
+          "lv_name": "root",
+          "lv_size": "214232465408",
+          "data_percent": "78.89",
+          "metadata_percent": "19.25",
+          "lv_attr": "twi-ao----"
+        }
+      ]
+    }
+  ]
+}
