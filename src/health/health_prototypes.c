@@ -540,9 +540,15 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
 
     dst->update_every = src->update_every;
 
+    dst->alert_action_options = src->alert_action_options;
+
     dst->dimensions = string_dup(src->dimensions);
 
     dst->time_group = src->time_group;
+    dst->time_group_condition = src->time_group_condition;
+    dst->time_group_value = src->time_group_value;
+    dst->dims_group = src->dims_group;
+    dst->data_source = src->data_source;
     dst->before = src->before;
     dst->after = src->after;
     dst->options = src->options;
