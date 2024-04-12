@@ -140,6 +140,17 @@ static inline LS_STATE  *network_viewer_ebpf_get_sockets(LS_STATE *ls) {
     ebpf_ls->config.cb = ls->config.cb;
     ebpf_ls->config.data = ls->config.data;
 
+    // check all socket namespaces
+    if(ebpf_ls->config.namespaces)
+        local_sockets_namespaces(ebpf_ls);
+
+    // detect the directions of the sockets
+    if(ebpf_ls->config.inbound || ebpf_ls->config.outbound || ebpf_ls->config.local)
+        local_sockets_detect_directions(ebpf_ls);
+
+    // call the callback for each socket
+    local_sockets_foreach_local_socket_call_cb(ebpf_ls);
+
     return ebpf_ls;
 }
 
@@ -842,6 +853,12 @@ close_and_send:
     netdata_mutex_lock(&stdout_mutex);
     pluginsd_function_result_to_stdout(transaction, HTTP_RESP_OK, "application/json", now_s + 1, wb);
     netdata_mutex_unlock(&stdout_mutex);
+
+#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+    rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
+    ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_ONLY_READ;
+    rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
+#endif
 }
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
@@ -1178,14 +1195,6 @@ static void *network_viewer_ebpf_worker(void *ptr)
     while (!plugin_should_exit) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
-        rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
-        if (ebpf_nv_module.optional & NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
-            rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
-            continue;
-        }
-        ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
-        rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
-
         if (ebpf_ls->local_socket_aral)
             local_sockets_cleanup(ebpf_ls);
 
@@ -1212,7 +1221,15 @@ static void *network_viewer_ebpf_worker(void *ptr)
                 goto end_ebpf_nv_worker;
             }
 
+            rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
+            if (ebpf_nv_module.optional & NETWORK_VIEWER_EBPF_NV_ONLY_READ) {
+                rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
+                continue;
+            }
+            ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
+            rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
             uint32_t pid = (use_pid) ? stored.pid : stored.tgid;
+
             LOCAL_SOCKET n = {
                 .inode = stored.ts,
                 .direction = stored.direction,
@@ -1234,7 +1251,7 @@ static void *network_viewer_ebpf_worker(void *ptr)
                     .wqueue = stored.wqueue,
                     .pid = pid,
                     .uid = stored.uid,
-             };
+                    };
 
             if (stored.family == AF_INET) {
                 memcpy(&n.local.ip.ipv4, &key.saddr.ipv4, sizeof(n.local.ip.ipv4));
@@ -1246,6 +1263,7 @@ static void *network_viewer_ebpf_worker(void *ptr)
             }
 
             strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
+            // TODO: Send to plugins.d the socket to be stored
             local_sockets_add_socket(ebpf_ls, &n);
 
             if (ebpf_ls->config.namespaces) {
@@ -1256,28 +1274,25 @@ static void *network_viewer_ebpf_worker(void *ptr)
                                                                                            net_ns_inode,
                                                                                            (uint64_t *)net_ns_inode,
                                                                                            true);
-                    simple_hashtable_set_slot_NET_NS(&ebpf_ls->ns_hashtable, sl_ns, net_ns_inode, (uint64_t *)net_ns_inode);
+                    simple_hashtable_set_slot_NET_NS(&ebpf_ls->ns_hashtable,
+                                                     sl_ns, net_ns_inode,
+                                                     (uint64_t *)net_ns_inode);
                 }
             }
 
-end_ebpf_nv_worker:
+            end_ebpf_nv_worker:
             if (stored.closed) {
                 stored.closed = 0;
                 bpf_map_delete_elem(fd, &key);
             }
 
-            memcpy(&next_key, &key, sizeof(key));
+            memcpy(&key, &next_key, sizeof(key));
         }
+
         rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
         ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_LOAD_DATA;
         rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
     }
-
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
-    ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_ONLY_READ;
-    rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
-#endif
 
     return NULL;
 }
