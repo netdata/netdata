@@ -85,6 +85,7 @@ see the appropriate collector readme.
 | [lighttpd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/lighttpd)                     |           Lighttpd            |
 | [logind](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logind)                         |        systemd-logind         |
 | [logstash](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logstash)                     |           Logstash            |
+| [lvm](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/lvm)                               |      LVM logical volumes      |
 | [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/mongodb)                       |            MongoDB            |
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/mysql)                           |             MySQL             |
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/nginx)                           |             NGINX             |
