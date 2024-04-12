@@ -299,12 +299,12 @@ include:
     version: "23.10"
     packages:
       <<: *ubuntu_packages
-      repo_distro: ubuntu/jammy
+      repo_distro: ubuntu/mantic
   - <<: *ubuntu
     version: "22.04"
     packages:
       <<: *ubuntu_packages
-      repo_distro: ubuntu/mantic
+      repo_distro: ubuntu/jammy
   - <<: *ubuntu
     version: "20.04"
     packages:
