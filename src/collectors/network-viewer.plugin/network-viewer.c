@@ -125,16 +125,22 @@ static inline bool network_viewer_ebpf_use_protocol(LS_STATE *ls, ebpf_nv_data_t
 }
 
 static inline LS_STATE  *network_viewer_ebpf_get_sockets(LS_STATE *ls) {
+// WE READ PROC AGAIN, TO BE SURE WE ARE NOT MISSING SPECIFIC LISTEN SOCKET
+#define NV_READ_PROC 60
+    static int counter = 60;
     rw_spinlock_write_lock(&ebpf_nv_module.rw_spinlock);
-    if (ebpf_nv_module.optional & (NETWORK_VIEWER_EBPF_NV_LOAD_DATA|NETWORK_VIEWER_EBPF_NV_USE_PROC|NETWORK_VIEWER_EBPF_NV_NOT_RUNNING)) {
+    if ((ebpf_nv_module.optional &
+        (NETWORK_VIEWER_EBPF_NV_LOAD_DATA|NETWORK_VIEWER_EBPF_NV_NOT_RUNNING)) ||
+        (counter == NV_READ_PROC)) {
         rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
         local_sockets_process(ls);
-        ebpf_nv_module.optional &= ~NETWORK_VIEWER_EBPF_NV_USE_PROC;
+        counter = 0;
 
         return ls;
     }
     ebpf_nv_module.optional |= NETWORK_VIEWER_EBPF_NV_ONLY_READ;
     rw_spinlock_write_unlock(&ebpf_nv_module.rw_spinlock);
+    counter++;
 
     ebpf_ls->use_ebpf = true;
     ebpf_ls->config.cb = ls->config.cb;
@@ -1049,8 +1055,6 @@ static inline void network_viwer_set_module(ebpf_module_t *em, networkviewer_opt
     em->targets = nv_targets;
     em->apps_charts = NETDATA_EBPF_APPS_FLAG_YES;
     em->apps_level = args->level;
-    // We force the usage of NETWORK_VIEWER_EBPF_NV_USE_PROC to store inside our hash table listening sockets
-    em->optional |= NETWORK_VIEWER_EBPF_NV_USE_PROC;
     if (args->usepid)
         em->optional |= NETWORK_VIEWER_EBPF_NV_USE_PID;
 #ifdef LIBBPF_MAJOR_VERSION
