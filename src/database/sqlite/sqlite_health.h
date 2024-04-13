@@ -36,4 +36,5 @@ int sql_get_alert_configuration(
     bool debug __maybe_unused);
 
 bool sql_find_alert_transition(const char *transition, void (*cb)(const char *machine_guid, const char *context, time_t alert_id, void *data), void *data);
+void sql_alert_cleanup(bool cli);
 #endif //NETDATA_SQLITE_HEALTH_H

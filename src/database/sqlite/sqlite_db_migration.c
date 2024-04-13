@@ -530,6 +530,7 @@ static int migrate_database(sqlite3 *database, int target_version, char *db_name
     }
 
     if (likely(user_version == target_version)) {
+        errno = 0;
         netdata_log_info("%s database version is %d (no migration needed)", db_name, target_version);
         return target_version;
     }
