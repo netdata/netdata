@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-run.outputs.run }}
+      skip-go: ${{ steps.check-go.outputs.skip-go }}
     steps:
       - name: Checkout
         id: checkout
@@ -32,8 +33,8 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - name: Check files
-        id: check-files
+      - name: Check source files
+        id: check-source-files
         uses: tj-actions/changed-files@v44
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
@@ -44,6 +45,19 @@ jobs:
             **/*.hh
             **/*.in
             **/*.patch
+            src/aclk/aclk-schemas/
+            src/ml/dlib/
+            src/fluent-bit/
+            src/web/server/h2o/libh2o/
+          files_ignore: |
+            netdata.spec.in
+            **/*.md
+      - name: Check build files
+        id: check-build-files
+        uses: tj-actions/changed-files@v43
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
             **/*.cmake
             CMakeLists.txt
             netdata-installer.sh
@@ -59,28 +73,38 @@ jobs:
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
-            src/aclk/aclk-schemas/
-            src/ml/dlib/
-            src/fluent-bit/
-            src/web/server/h2o/libh2o/
           files_ignore: |
-            netdata.spec.in
             **/*.md
       - name: List all changed files in pattern
         continue-on-error: true
         env:
-          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
+          CHANGED_SOURCE_FILES: ${{ steps.check-source-files.outputs.all_changed_files }}
+          CHANGED_BUILD_FILES: ${{ steps.check-build-files.outputs.all_changed_files }}
         run: |
-          for file in ${ALL_CHANGED_FILES}; do
+          for file in ${CHANGED_SOURCE_FILES} ${CHANGED_BUILD_FILES} ; do
             echo "$file was changed"
           done
       - name: Check Run
         id: check-run
         run: |
-          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "${{ steps.check-source-files.outputs.any_modified }}" == "true" ] || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo 'run=true' >> "${GITHUB_OUTPUT}"
           else
             echo 'run=false' >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Check Go
+        id: check-go
+        env:
+          OTHER_CHANGED_FILES: ${{ steps.check-source-files.outputs.other_changed_files }}
+        run: |
+          if [ '${{ github.event_name }}' == 'pull_request' ]; then
+            if echo "${OTHER_CHANGED_FILES}" | grep -q '.*/(.*\.go|go\.mod|go\.sum)$' || [ "${{ steps.check-build-files.outputs.any_modified }}" == "true" ]; then
+              echo 'skip-go=' >> "${GITHUB_OUTPUT}"
+            else
+              echo 'skip-go=--disable-go' >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            echo 'skip-go=' >> "${GITHUB_OUTPUT}"
           fi
 
   build-dist: # Build the distribution tarball and store it as an artifact.
@@ -204,7 +228,9 @@ jobs:
           key: ${{ steps.cache-key.outputs.key }}
       - name: Build
         if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.run == 'true' # Don’t use retries on PRs.
-        run: .github/scripts/build-static.sh ${{ matrix.arch }}
+        run: |
+          export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
+          .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Build
         if: github.event_name == 'workflow_dispatch' && needs.file-check.outputs.run == 'true'
         id: build
@@ -212,7 +238,9 @@ jobs:
         with:
           timeout_minutes: 180
           max_attempts: 3
-          command: .github/scripts/build-static.sh ${{ matrix.arch }}
+          command: |
+            export EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }}
+            .github/scripts/build-static.sh ${{ matrix.arch }}
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
@@ -432,19 +460,19 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud --one-time-build'
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud
         id: build-cloud
         if: needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
+              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
         id: build-no-jsonc
         if: matrix.jsonc_removal != '' && needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
-              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
+              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -545,8 +573,9 @@ jobs:
         id: updater-check
         if: needs.file-check.outputs.run == 'true'
         run: |
-          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata test:${{ matrix.artifact_key }} \
-                /netdata/.github/scripts/run-updater-check.sh
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata \
+                 -e EXTRA_INSTALL_FLAGS=${{ needs.file-check.outputs.skip-go }} \
+                 test:${{ matrix.artifact_key }} /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:

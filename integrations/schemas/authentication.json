@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Netdata authentication mechanism metadata.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/entry"
+    },
+    {
+      "type": "array",
+      "minLength": 1,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  ],
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "description": "Data for a single authentication method.",
+      "properties": {
+        "id": {
+          "$ref": "./shared.json#/$defs/id"
+        },
+        "meta": {
+          "$ref": "./shared.json#/$defs/instance"
+        },
+        "keywords": {
+          "$ref": "./shared.json#/$defs/keywords"
+        },
+        "overview": {
+          "type": "object",
+          "description": "General information about the authentication method.",
+          "properties": {
+            "authentication_description": {
+              "type": "string",
+              "description": "General description of what the authentication method does."
+            },
+            "authentication_limitations": {
+              "type": "string",
+              "description": "Explanation of any limitations of the authentication method."
+            }
+          },
+          "required": [
+            "authentication_description",
+            "authentication_limitations"
+          ]
+        },
+        "setup": {
+          "oneOf": [
+            {
+              "$ref": "./shared.json#/$defs/short_setup"
+            },
+            {
+              "$ref": "./shared.json#/$defs/full_setup"
+            }
+          ]
+        },
+        "troubleshooting": {
+          "$ref": "./shared.json#/$defs/troubleshooting"
+        }
+      },
+      "required": [
+        "id",
+        "meta",
+        "keywords",
+        "overview",
+        "setup"
+      ]
+    }
+  }
+}

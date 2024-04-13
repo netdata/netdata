@@ -723,6 +723,10 @@ trap quit_msg EXIT
 info "Stopping a possibly running netdata..."
 stop_all_netdata
 
+if [ "$(uname -s)" = "Darwin" ]; then
+  launchctl unload /Library/LaunchDaemons/com.github.netdata.plist 2>/dev/null
+fi
+
 #### REMOVE NETDATA FILES
 rm_file /etc/logrotate.d/netdata
 rm_file /etc/systemd/system/netdata.service
@@ -741,6 +745,7 @@ rm_file /etc/periodic/daily/netdata-updater
 rm_file /etc/cron.daily/netdata-updater
 rm_file /etc/cron.d/netdata-updater
 rm_file /etc/cron.d/netdata-updater-daily
+rm_file /Library/LaunchDaemons/com.github.netdata.plist
 
 
 if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ] && [ "netdata" = "$(basename "$NETDATA_PREFIX")" ] ; then

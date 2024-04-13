@@ -367,12 +367,6 @@ struct nd_log_source {
     struct nd_log_limit limits;
 };
 
-static __thread ND_LOG_SOURCES overwrite_thread_source = 0;
-
-void nd_log_set_thread_source(ND_LOG_SOURCES source) {
-    overwrite_thread_source = source;
-}
-
 static struct {
     uuid_t invocation_id;
 
@@ -2236,9 +2230,6 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 static ND_LOG_SOURCES nd_log_validate_source(ND_LOG_SOURCES source) {
     if(source >= _NDLS_MAX)
         source = NDLS_DAEMON;
-
-    if(overwrite_thread_source)
-        source = overwrite_thread_source;
 
     if(nd_log.overwrite_process_source)
         source = nd_log.overwrite_process_source;

@@ -22,7 +22,7 @@ prepare_build() {
 build_static() {
   progress "Building static ${BUILDARCH}"
   (
-    USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
+    EXTRA_INSTALL_FLAGS="${EXTRA_INSTALL_FLAGS}" USER="" ./packaging/makeself/build-static.sh "${BUILDARCH}"
   ) >&2
 }
 

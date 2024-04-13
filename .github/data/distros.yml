@@ -155,7 +155,6 @@ include:
   - <<: *debian
     version: "11"
     base_image: debian:bullseye
-    bundle_sentry: false
     packages:
       <<: *debian_packages
       repo_distro: debian/bullseye
@@ -278,18 +277,18 @@ include:
 
   - &ubuntu
     distro: ubuntu
-    version: "22.04"
+    version: "24.04"
     support_type: Core
     notes: ''
     eol_check: true
-    bundle_sentry: false
+    bundle_sentry: true
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
     jsonc_removal: |
       apt-get remove -y libjson-c-dev
     packages: &ubuntu_packages
       type: deb
-      repo_distro: ubuntu/jammy
+      repo_distro: ubuntu/noble
       arches:
         - amd64
         - armhf
@@ -301,6 +300,11 @@ include:
     packages:
       <<: *ubuntu_packages
       repo_distro: ubuntu/mantic
+  - <<: *ubuntu
+    version: "22.04"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/jammy
   - <<: *ubuntu
     version: "20.04"
     packages:

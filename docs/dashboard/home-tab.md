@@ -1,4 +1,4 @@
-# Home Tab
+# Home tab
 
 The Home tab allows users to see an overview of their Room.
 
