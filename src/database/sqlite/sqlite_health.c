@@ -704,6 +704,76 @@ void sql_check_removed_alerts_state(RRDHOST *host)
         error_report("Failed to finalize the statement");
 }
 
+#define SQL_DELETE_MISSING_CHART_ALERT                                                                                 \
+    "DELETE FROM health_log WHERE host_id = @host_id AND chart NOT IN "                                                \
+    "(SELECT type||'.'||id FROM chart WHERE host_id = @host_id)"
+
+static void sql_remove_alerts_from_deleted_charts(RRDHOST *host, uuid_t *host_id)
+{
+    sqlite3_stmt *res = NULL;
+    int ret;
+
+    ret = sqlite3_prepare_v2(db_meta, SQL_DELETE_MISSING_CHART_ALERT, -1, &res, 0);
+    if (unlikely(ret != SQLITE_OK)) {
+        error_report("HEALTH [%s]: Failed to prepare sql statement to sql_remove_alerts_from_deleted_charts", rrdhost_hostname(host));
+        return;
+    }
+
+    if (host)
+        ret = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    else
+        ret = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
+
+    if (unlikely(ret != SQLITE_OK)) {
+        error_report("Failed to bind host_id parameter for sql_remove_alerts_from_deleted_charts.");
+        sqlite3_finalize(res);
+        return;
+    }
+
+    ret = execute_insert(res);
+    if (ret != SQLITE_DONE)
+        error_report("Failed to execute command to delete missing charts from health_log");
+
+    ret = sqlite3_finalize(res);
+    if (unlikely(ret != SQLITE_OK))
+        error_report("Failed to finalize statement when deleting missing charts from health_log");
+}
+
+static int clean_host_alerts(void *data, int argc, char **argv, char **column)
+{
+    UNUSED(argc);
+    UNUSED(data);
+    UNUSED(column);
+
+    char guid[UUID_STR_LEN];
+    uuid_unparse_lower(*(uuid_t *)argv[0], guid);
+
+    netdata_log_info("Checking host %s (%s)", guid, (const char *) argv[1]);
+    sql_remove_alerts_from_deleted_charts(NULL, (uuid_t *)argv[0]);
+
+    return 0;
+}
+
+
+#define SQL_HEALTH_CHECK_ALL_HOSTS "SELECT host_id, hostname FROM host"
+
+void sql_alert_cleanup(bool cli)
+{
+    UNUSED(cli);
+
+    errno = 0;
+    if (sql_init_meta_database(DB_CHECK_NONE, 0)) {
+        netdata_log_error("Failed to open database");
+        return;
+    }
+    netdata_log_info("Alert cleanup running ...");
+    int rc = sqlite3_exec_monitored(db_meta, SQL_HEALTH_CHECK_ALL_HOSTS, clean_host_alerts, NULL, NULL);
+    if (rc != SQLITE_OK)
+        netdata_log_error("Failed to check host alerts");
+    else
+        netdata_log_info("Alert cleanup done");
+
+}
 /* Health related SQL queries
    Load from the health log table
 */

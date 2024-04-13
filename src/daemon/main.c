@@ -795,6 +795,7 @@ int help(int exitcode) {
             "  -W sqlite-meta-recover   Run recovery on the metadata database and exit.\n\n"
             "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
             "  -W sqlite-analyze        Run update statistics and exit.\n\n"
+            "  -W sqlite-alert-cleanup  Perform maintenance on the alerts table.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W stresstest=A,B,C,D,E,F,G\n"
@@ -1512,6 +1513,11 @@ int main(int argc, char **argv) {
 
                         if(strcmp(optarg, "sqlite-analyze") == 0) {
                             sql_init_meta_database(DB_CHECK_ANALYZE, 0);
+                            return 0;
+                        }
+
+                        if(strcmp(optarg, "sqlite-alert-cleanup") == 0) {
+                            sql_alert_cleanup(true);
                             return 0;
                         }
 
