@@ -1266,7 +1266,20 @@ static void *network_viewer_ebpf_worker(void *ptr)
                 memcpy(&n.remote.ip.ipv6, &key.daddr.ipv6, sizeof(n.remote.ip.ipv6));
             }
 
-            strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
+            if (stored.pid == stored.tgid) {
+                strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
+            } else {
+                char comm[TASK_COMM_LEN];
+                comm[0] = '\0';
+                snprintfz(filename, sizeof(filename), "%s/%d/comm", path, stored.tgid);
+                if (!read_txt_file(filename, comm, sizeof(comm))) {
+                    size_t clen = strlen(comm);
+                    if(comm[clen - 1] == '\n')
+                        comm[clen - 1] = '\0';
+                }
+
+                strncpyz(n.comm, (comm[0]) ? comm : stored.name, sizeof(n.comm) - 1);
+            }
             // TODO: Send to plugins.d the socket to be stored
             local_sockets_add_socket(ebpf_ls, &n);
 
