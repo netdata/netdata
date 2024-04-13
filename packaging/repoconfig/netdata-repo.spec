@@ -2,7 +2,7 @@
 
 Name:           netdata-repo
 Version:        2
-Release:        2
+Release:        3
 Summary:        Netdata stable repositories configuration.
 
 Group:          System Environment/Base
@@ -18,6 +18,8 @@ Source6:        netdata.repo.ol
 Source7:        netdata-edge.repo.ol
 Source8:        netdata.repo.al
 Source9:        netdata-edge.repo.al
+Source10:       netdata.repo.al2023
+Source11:       netdata-edge.repo.al2023
 
 BuildArch:      noarch
 
@@ -58,9 +60,14 @@ install -pm 644 %{SOURCE6} ./netdata.repo
 install -pm 644 %{SOURCE7} ./netdata-edge.repo
 %endif
 
-%if 0%{?amzn}
+%if 0%{?amzn2}
 install -pm 644 %{SOURCE8} ./netdata.repo
 install -pm 644 %{SOURCE9} ./netdata-edge.repo
+%endif
+
+%if 0%{?amzn2023}
+install -pm 644 %{SOURCE10} ./netdata.repo
+install -pm 644 %{SOURCE11} ./netdata-edge.repo
 %endif
 
 %build
@@ -107,6 +114,8 @@ This package contains the official Netdata package repository configuration for 
 %endif
 
 %changelog
+* Wed Apr 10 2024 Paul Szymanski <mail@pszy.de> 2-3
+- Fix repo specification for Amazon Linux 2023.
 * Mon Nov 13 2023 Austin Hemmelgarn <austin@netdata.cloud> 2-2
 - Add EPEL requirement for RHEL packages.
 * Wed Dec 7 2022 Austin Hemmelgarn <austin@netdata.cloud> 2-1

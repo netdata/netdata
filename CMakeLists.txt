@@ -142,24 +142,6 @@ if(ENABLE_PLUGIN_GO)
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
 endif()
 
-if(ENABLE_SENTRY)
-        include(FetchContent)
-
-        # ignore debhelper
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
-
-        set(SENTRY_VERSION 0.6.6)
-        set(SENTRY_BACKEND "breakpad")
-        set(SENTRY_BUILD_SHARED_LIBS OFF)
-
-        FetchContent_Declare(
-                sentry
-                URL https://github.com/getsentry/sentry-native/releases/download/${SENTRY_VERSION}/sentry-native.zip
-                URL_HASH SHA256=7a98467c0b2571380a3afc5e681cb13aa406a709529be12d74610b0015ccde0c
-        )
-        FetchContent_MakeAvailable(sentry)
-endif()
-
 if(ENABLE_WEBRTC)
         include(FetchContent)
 
@@ -271,16 +253,26 @@ if(NOT HAVE_LOG10)
 endif()
 
 #
-# Custom modules
+# Custom Modules
 #
 
+include(NetdataJSONC)
 include(NetdataYAML)
+
+if(ENABLE_SENTRY)
+        include(NetdataSentry)
+endif()
 
 #
 # Checks from custom modules
 #
 
+netdata_detect_jsonc()
 netdata_detect_libyaml()
+
+if(ENABLE_SENTRY)
+        netdata_bundle_sentry()
+endif()
 
 #
 # check include files
@@ -301,15 +293,6 @@ check_include_file("sys/statvfs.h" HAVE_SYS_STATVFS_H)
 check_include_file("inttypes.h" HAVE_INTTYPES_H)
 check_include_file("stdint.h" HAVE_STDINT_H)
 check_include_file("sys/capability.h" HAVE_SYS_CAPABILITY_H)
-
-#
-# check libraries we need
-#
-
-include(CheckLibraryExists)
-
-check_library_exists(snappy snappy_compress "" HAVE_SNAPPY_LIB)
-#check_include_file("snappy.h" HAVE_SNAPPY_H)
 
 #
 # check symbols
@@ -1521,23 +1504,7 @@ endif()
 # judy
 target_link_libraries(libnetdata PUBLIC judy)
 
-# json-c
-if(ENABLE_BUNDLED_JSONC)
-        add_library(jsonc STATIC IMPORTED)
-        set_property(TARGET jsonc PROPERTY
-                     IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/externaldeps/jsonc/libjson-c.a")
-
-        target_include_directories(libnetdata BEFORE PUBLIC "${CMAKE_SOURCE_DIR}/externaldeps/jsonc")
-        target_link_libraries(libnetdata PUBLIC jsonc)
-else()
-        pkg_check_modules(JSONC REQUIRED json-c)
-        target_include_directories(libnetdata BEFORE PUBLIC ${JSONC_INCLUDE_DIRS})
-        target_compile_definitions(libnetdata PUBLIC ${JSONC_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${JSONC_LDFLAGS})
-endif()
-
-# message(FATAL_ERROR "jsonc libraries: ${JSONC_LIBRARIES}")
-# message(FATAL_ERROR "jsonc ldflags: ${JSONC_LDFLAGS}")
+netdata_add_jsonc_to_target(libnetdata)
 
 netdata_add_libyaml_to_target(libnetdata)
 
@@ -1992,6 +1959,9 @@ endif()
 if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         pkg_check_modules(SNAPPY snappy)
         if (NOT SNAPPY_FOUND)
+                include(CheckLibraryExists)
+                check_library_exists(snappy snappy_compress "" HAVE_SNAPPY_LIB)
+
                 if(HAVE_SNAPPY_LIB)
                         set(SNAPPY_INCLUDE_DIRS "")
                         set(SNAPPY_CFLAGS_OTHER "")

@@ -540,9 +540,15 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
 
     dst->update_every = src->update_every;
 
+    dst->alert_action_options = src->alert_action_options;
+
     dst->dimensions = string_dup(src->dimensions);
 
     dst->time_group = src->time_group;
+    dst->time_group_condition = src->time_group_condition;
+    dst->time_group_value = src->time_group_value;
+    dst->dims_group = src->dims_group;
+    dst->data_source = src->data_source;
     dst->before = src->before;
     dst->after = src->after;
     dst->options = src->options;
@@ -569,18 +575,27 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
         return;
 
     spinlock_lock(&ap->_internal.spinlock);
-    for(RRD_ALERT_PROTOTYPE *t = ap; t ; t = t->_internal.next) {
-        if(!t->match.enabled)
-            continue;
+    for(size_t template = 0; template < 2; template++) {
+        bool want_template = template ? true : false;
 
-        if(!prototype_matches_host(st->rrdhost, t))
-            continue;
+        for (RRD_ALERT_PROTOTYPE *t = ap; t; t = t->_internal.next) {
+            if (!t->match.enabled)
+                continue;
 
-        if(!prototype_matches_rrdset(st, t))
-            continue;
+            bool is_template = t->match.is_template ? true : false;
 
-        if(rrdcalc_add_from_prototype(st->rrdhost, st, t))
-            ap->_internal.uses++;
+            if (is_template != want_template)
+                continue;
+
+            if (!prototype_matches_host(st->rrdhost, t))
+                continue;
+
+            if (!prototype_matches_rrdset(st, t))
+                continue;
+
+            if (rrdcalc_add_from_prototype(st->rrdhost, st, t))
+                ap->_internal.uses++;
+        }
     }
     spinlock_unlock(&ap->_internal.spinlock);
 }

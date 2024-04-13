@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0517
+# Next unused error code: F0518
 
 # ======================================================================
 # Constants
@@ -367,6 +367,15 @@ trap 'trap_handler 15 0' TERM
 
 # ======================================================================
 # Utility functions
+
+canonical_path() {
+  cd "$(dirname "${1}")" || exit 1
+  case "$(basename "${1}")" in
+    ..) dirname "$(pwd -P)" ;;
+    .) pwd -P ;;
+    *) echo "$(pwd -P)/$(basename "${1}")" ;;
+  esac
+}
 
 setup_terminal() {
   TPUT_RESET=""
@@ -874,31 +883,47 @@ detect_existing_install() {
   set_tmpdir
 
   progress "Checking for existing installations of Netdata..."
+  EXISTING_INSTALL_IS_NATIVE="0"
+
+  if [ -n "${INSTALL_PREFIX}" ]; then
+    searchpath="/opt/netdata/bin:${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
+    searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
+  else
+    searchpath="/opt/netdata/bin:${PATH}"
+  fi
+
+  while [ -n "${searchpath}" ]; do
+    _ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
+
+    if [ -n "${_ndpath}" ]; then
+      _ndpath="$(canonical_path "$(ndpath)")"
+    fi
+
+    if [ -z "${ndpath}" ] && [ -n "${_ndpath}" ]; then
+      ndpath="${_ndpath}"
+    elif [ -n "${_ndpath}" ] && [ "${ndpath}" != "${_ndpath}" ]; then
+      fatal "Multiple installs of Netdata agent detected (located at '${ndpath}' and '${_ndpath}'). Such a setup is not generally supported. If you are certain you want to operate on one of them despite this, use the '--install-prefix' option to specifiy the install you want to operate on." F0517
+    fi
+
+    if [ -n "${INSTALL_PREFIX}" ] && [ -n "${ndpath}" ]; then
+      break
+    elif [ -z "${_ndpath}" ]; then
+      break
+    elif echo "${searchpath}" | grep -v ':'; then
+      searchpath=""
+    else
+      searchpath="$(echo "${searchpath}" | cut -f 2- -d ':')"
+    fi
+  done
 
   if pkg_installed netdata; then
     ndprefix="/"
     EXISTING_INSTALL_IS_NATIVE="1"
-  else
-    EXISTING_INSTALL_IS_NATIVE="0"
-    if [ -n "${INSTALL_PREFIX}" ]; then
-      searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
-      searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
-    else
-      searchpath="${PATH}"
-    fi
-
-    ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
-
-    if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
-      ndpath="/opt/netdata/bin/netdata"
-    fi
-
-    if [ -n "${ndpath}" ]; then
-      case "${ndpath}" in
-        */usr/bin/netdata|*/usr/sbin/netdata) ndprefix="$(dirname "$(dirname "$(dirname "${ndpath}")")")" ;;
-        *) ndprefix="$(dirname "$(dirname "${ndpath}")")" ;;
-      esac
-    fi
+  elif [ -n "${ndpath}" ]; then
+    case "${ndpath}" in
+      */usr/bin/netdata|*/usr/sbin/netdata) ndprefix="$(dirname "$(dirname "$(dirname "${ndpath}")")")" ;;
+      *) ndprefix="$(dirname "$(dirname "${ndpath}")")" ;;
+    esac
 
     if echo "${ndprefix}" | grep -Eq '^/usr$'; then
       ndprefix="$(dirname "${ndprefix}")"
@@ -1922,7 +1947,7 @@ prepare_offline_install_source() {
         for arch in ${STATIC_INSTALL_ARCHES}; do
           set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
-          if check_for_remote_file "${NETDATA_STATIC_ARCH_URL}"; then
+          if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
             progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
             if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
                 warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."

@@ -4,4 +4,6 @@
 [% include 'overview/exporter.md' %]
 [% elif entry.integration_type == 'notification' %]
 [% include 'overview/notification.md' %]
+[% elif entry.integration_type == 'authentication' %]
+[% include 'overview/authentication.md' %]
 [% endif %]

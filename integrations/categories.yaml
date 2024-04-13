@@ -418,7 +418,7 @@
   name: exporters
   description: "Exporter Integrations"
   most_popular: true
-  priority: 5
+  priority: 6
   children: []
 - id: notify
   name: notifications
@@ -438,3 +438,9 @@
       most_popular: true
       priority: 1
       children: []
+- id: auth
+  name: authentication
+  description: "Authentication & Authorization"
+  most_popular: true
+  priority: 5
+  children: []

@@ -352,7 +352,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         "powersupply_capacity"
                         , ps->name
                         , NULL
-                        , ps->name
+                        , "capacity"
                         , "powersupply.capacity"
                         , "Battery capacity"
                         , "percentage"
@@ -383,7 +383,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         id
                         , ps->name
                         , NULL
-                        , ps->name
+                        , pr->name
                         , context
                         , pr->title
                         , pr->units

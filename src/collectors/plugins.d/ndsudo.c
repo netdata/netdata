@@ -14,6 +14,22 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "lvs-report-json",
+        .params = "--reportformat json --units b --nosuffix -o {{options}}",
+        .search = {
+            [0] = "lvs",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "igt-json",
+        .params = "-J -s {{interval}}",
+        .search = {
+            [0] = "intel_gpu_top",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "nvme-list",
         .params = "list --output-format=json",
         .search = {
@@ -109,7 +125,7 @@ bool check_string(const char *str, size_t index, char *err, size_t err_size) {
         if(!((c >= 'A' && c <= 'Z') ||
              (c >= 'a' && c <= 'z') ||
              (c >= '0' && c <= '9') ||
-              c == ' ' || c == '_' || c == '-' || c == '/' || c == '.')) {
+              c == ' ' || c == '_' || c == '-' || c == '/' || c == '.' || c == ',')) {
             snprintf(err, err_size, "command line argument No %zu includes invalid character '%c'", index, c);
             return false;
         }
@@ -259,6 +275,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "command not recognized: %s\n", cmd);
         return 3;
     }
+
+    char new_path[] = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+    setenv("PATH", new_path, 1);
 
     bool found = false;
     char filename[FILENAME_MAX];

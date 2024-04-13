@@ -30,6 +30,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/haproxy"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/hdfs"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/httpcheck"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/intelgpu"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/isc_dhcpd"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/k8s_kubelet"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/k8s_kubeproxy"
@@ -37,6 +38,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/lighttpd"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/logind"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/logstash"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/lvm"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/mongodb"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/mysql"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/nginx"
@@ -79,5 +81,6 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/windows"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/wireguard"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/x509check"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/zfspool"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/zookeeper"
 )

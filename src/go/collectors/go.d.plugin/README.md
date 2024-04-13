@@ -77,6 +77,7 @@ see the appropriate collector readme.
 | [haproxy](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/haproxy)                       |            HAProxy            |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hdfs)                             |             HDFS              |
 | [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/httpcheck)                   |       Any HTTP Endpoint       |
+| [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/intelgpu)                     |     Intel integrated GPU      |
 | [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/isc_dhcpd)                   |           ISC DHCP            |
 | [k8s_kubelet](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/k8s_kubelet)               |            Kubelet            |
 | [k8s_kubeproxy](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/k8s_kubeproxy)           |          Kube-proxy           |
@@ -84,6 +85,7 @@ see the appropriate collector readme.
 | [lighttpd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/lighttpd)                     |           Lighttpd            |
 | [logind](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logind)                         |        systemd-logind         |
 | [logstash](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logstash)                     |           Logstash            |
+| [lvm](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/lvm)                               |      LVM logical volumes      |
 | [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/mongodb)                       |            MongoDB            |
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/mysql)                           |             MySQL             |
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/nginx)                           |             NGINX             |
@@ -127,6 +129,7 @@ see the appropriate collector readme.
 | [whoisquery](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/whoisquery)                 |         Domain Expiry         |
 | [windows](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/windows)                       |            Windows            |
 | [x509check](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/x509check)                   |     Digital Certificates      |
+| [zfspool](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/zfspool)                       |           ZFS Pools           |
 | [zookeeper](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/zookeeper)                   |           ZooKeeper           |
 
 ## Configuration
