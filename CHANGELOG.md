@@ -2,10 +2,16 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.3...HEAD)
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17399](https://github.com/netdata/netdata/pull/17399) ([netdatabot](https://github.com/netdatabot))
+- Fix publishing Docker images to Docker Hub. [\#17397](https://github.com/netdata/netdata/pull/17397) ([Ferroin](https://github.com/Ferroin))
+- Regenerate integrations.js [\#17396](https://github.com/netdata/netdata/pull/17396) ([netdatabot](https://github.com/netdatabot))
+- go.d nvme meta: remove sudoers prereq [\#17395](https://github.com/netdata/netdata/pull/17395) ([ilyam8](https://github.com/ilyam8))
+- add simple collector to monitor lvm thin volumes space usage [\#17394](https://github.com/netdata/netdata/pull/17394) ([ilyam8](https://github.com/ilyam8))
+- fix percentages on alerts [\#17391](https://github.com/netdata/netdata/pull/17391) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#17387](https://github.com/netdata/netdata/pull/17387) ([netdatabot](https://github.com/netdatabot))
 - go.d nvme: drop using `nvme` directly [\#17386](https://github.com/netdata/netdata/pull/17386) ([ilyam8](https://github.com/ilyam8))
 - go.d intelgpu: use cmd.Wait instead of process.Wait [\#17384](https://github.com/netdata/netdata/pull/17384) ([ilyam8](https://github.com/ilyam8))
@@ -130,6 +136,10 @@
 - Skip Go code in CI if it hasn’t changed. [\#17077](https://github.com/netdata/netdata/pull/17077) ([Ferroin](https://github.com/Ferroin))
 - Fix conditional for Amazon Linux 2023 in repoconfig spec file. [\#17056](https://github.com/netdata/netdata/pull/17056) ([PaulSzymanski](https://github.com/PaulSzymanski))
 - Add basic support for dinit in our system service handling code. [\#16836](https://github.com/netdata/netdata/pull/16836) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.45.3](https://github.com/netdata/netdata/tree/v1.45.3) (2024-04-12)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.2...v1.45.3)
 
 ## [v1.45.2](https://github.com/netdata/netdata/tree/v1.45.2) (2024-04-01)
 
@@ -401,11 +411,6 @@
 - Fix incorrect major version check in updater. [\#16803](https://github.com/netdata/netdata/pull/16803) ([Ferroin](https://github.com/Ferroin))
 - cgroups: containers-vms add CPU throttling % [\#16800](https://github.com/netdata/netdata/pull/16800) ([ilyam8](https://github.com/ilyam8))
 - Setup sentry-native SDK. [\#16798](https://github.com/netdata/netdata/pull/16798) ([vkalintiris](https://github.com/vkalintiris))
-- Add additional fail reason and source during database initialization [\#16794](https://github.com/netdata/netdata/pull/16794) ([stelfrag](https://github.com/stelfrag))
-- Use original summary for alert transition [\#16793](https://github.com/netdata/netdata/pull/16793) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#16792](https://github.com/netdata/netdata/pull/16792) ([netdatabot](https://github.com/netdatabot))
-- Update role-based-access.md [\#16791](https://github.com/netdata/netdata/pull/16791) ([vkuznecovas](https://github.com/vkuznecovas))
-- Free key and search, replace patterns [\#16789](https://github.com/netdata/netdata/pull/16789) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
