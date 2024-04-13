@@ -575,18 +575,27 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
         return;
 
     spinlock_lock(&ap->_internal.spinlock);
-    for(RRD_ALERT_PROTOTYPE *t = ap; t ; t = t->_internal.next) {
-        if(!t->match.enabled)
-            continue;
+    for(size_t template = 0; template < 2; template++) {
+        bool want_template = template ? true : false;
 
-        if(!prototype_matches_host(st->rrdhost, t))
-            continue;
+        for (RRD_ALERT_PROTOTYPE *t = ap; t; t = t->_internal.next) {
+            if (!t->match.enabled)
+                continue;
 
-        if(!prototype_matches_rrdset(st, t))
-            continue;
+            bool is_template = t->match.is_template ? true : false;
 
-        if(rrdcalc_add_from_prototype(st->rrdhost, st, t))
-            ap->_internal.uses++;
+            if (is_template != want_template)
+                continue;
+
+            if (!prototype_matches_host(st->rrdhost, t))
+                continue;
+
+            if (!prototype_matches_rrdset(st, t))
+                continue;
+
+            if (rrdcalc_add_from_prototype(st->rrdhost, st, t))
+                ap->_internal.uses++;
+        }
     }
     spinlock_unlock(&ap->_internal.spinlock);
 }
