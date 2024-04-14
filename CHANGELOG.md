@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- Bump go.mongodb.org/mongo-driver from 1.14.0 to 1.15.0 in /src/go/collectors/go.d.plugin [\#17406](https://github.com/netdata/netdata/pull/17406) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/prometheus/common from 0.52.2 to 0.52.3 in /src/go/collectors/go.d.plugin [\#17405](https://github.com/netdata/netdata/pull/17405) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/vmware/govmomi from 0.36.3 to 0.37.0 in /src/go/collectors/go.d.plugin [\#17404](https://github.com/netdata/netdata/pull/17404) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/docker/docker from 26.0.0+incompatible to 26.0.1+incompatible in /src/go/collectors/go.d.plugin [\#17403](https://github.com/netdata/netdata/pull/17403) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#17399](https://github.com/netdata/netdata/pull/17399) ([netdatabot](https://github.com/netdatabot))
+- apply first alarms, then alarm templates [\#17398](https://github.com/netdata/netdata/pull/17398) ([ktsaou](https://github.com/ktsaou))
 - Fix publishing Docker images to Docker Hub. [\#17397](https://github.com/netdata/netdata/pull/17397) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17396](https://github.com/netdata/netdata/pull/17396) ([netdatabot](https://github.com/netdatabot))
 - go.d nvme meta: remove sudoers prereq [\#17395](https://github.com/netdata/netdata/pull/17395) ([ilyam8](https://github.com/ilyam8))
@@ -14,6 +19,7 @@
 - fix percentages on alerts [\#17391](https://github.com/netdata/netdata/pull/17391) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations.js [\#17387](https://github.com/netdata/netdata/pull/17387) ([netdatabot](https://github.com/netdatabot))
 - go.d nvme: drop using `nvme` directly [\#17386](https://github.com/netdata/netdata/pull/17386) ([ilyam8](https://github.com/ilyam8))
+- Add option to cleanup health\_log table  [\#17385](https://github.com/netdata/netdata/pull/17385) ([stelfrag](https://github.com/stelfrag))
 - go.d intelgpu: use cmd.Wait instead of process.Wait [\#17384](https://github.com/netdata/netdata/pull/17384) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17382](https://github.com/netdata/netdata/pull/17382) ([netdatabot](https://github.com/netdatabot))
 - lowercase word [\#17381](https://github.com/netdata/netdata/pull/17381) ([Ancairon](https://github.com/Ancairon))
@@ -405,12 +411,6 @@
 - use fs type to veryfiy procfs/sysfs [\#16813](https://github.com/netdata/netdata/pull/16813) ([ilyam8](https://github.com/ilyam8))
 - updates to light onprem docs [\#16811](https://github.com/netdata/netdata/pull/16811) ([M4itee](https://github.com/M4itee))
 - set app\_group label automatically [\#16810](https://github.com/netdata/netdata/pull/16810) ([boxjan](https://github.com/boxjan))
-- Apply ASCII-based comparisons to commands in kickstart script that rely on a particular language setting [\#16806](https://github.com/netdata/netdata/pull/16806) ([tkatsoulas](https://github.com/tkatsoulas))
-- Remove help text that no longer applies. [\#16805](https://github.com/netdata/netdata/pull/16805) ([vkalintiris](https://github.com/vkalintiris))
-- Move mqtt\_websockets under aclk/ [\#16804](https://github.com/netdata/netdata/pull/16804) ([vkalintiris](https://github.com/vkalintiris))
-- Fix incorrect major version check in updater. [\#16803](https://github.com/netdata/netdata/pull/16803) ([Ferroin](https://github.com/Ferroin))
-- cgroups: containers-vms add CPU throttling % [\#16800](https://github.com/netdata/netdata/pull/16800) ([ilyam8](https://github.com/ilyam8))
-- Setup sentry-native SDK. [\#16798](https://github.com/netdata/netdata/pull/16798) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
