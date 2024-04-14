@@ -1266,7 +1266,7 @@ static void *network_viewer_ebpf_worker(void *ptr)
                 memcpy(&n.remote.ip.ipv6, &key.daddr.ipv6, sizeof(n.remote.ip.ipv6));
             }
 
-            if (stored.pid == stored.tgid) {
+            if (stored.pid == stored.tgid || use_pid) {
                 strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
             } else {
                 char comm[TASK_COMM_LEN];
