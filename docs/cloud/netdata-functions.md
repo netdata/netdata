@@ -1,4 +1,4 @@
-# Netdata Functions
+# Top Monitoring (Netdata Functions)
 
 Netdata Agent collectors are able to expose functions that can be executed in run-time and on-demand. These will be
 executed on the node/host where the function is made available.
