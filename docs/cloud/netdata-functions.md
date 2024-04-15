@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Top Monitoring (Netdata Functions)
-=======
-# Netdata Functions
->>>>>>> e0d8fc29c (review the file and make certain edits)
 
 Netdata Agent collectors are able to expose functions that can be executed in run-time and on-demand. These will be
 executed on the node/host where the function is made available.
@@ -11,7 +7,6 @@ executed on the node/host where the function is made available.
 
 Collectors besides the metric collection, storing, and/or streaming work are capable of executing specific routines on request. These routines will bring additional information to help you troubleshoot or even trigger some action to happen on the node itself.
 
-<<<<<<< HEAD
 For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes functions - [plugins.d](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#function).
 
 ## Prerequisites
@@ -21,22 +16,6 @@ The following is required to be able to run Functions from Netdata Cloud.
 - At least one of the nodes claimed to your Space should be on a Netdata agent version higher than `v1.37.1`
 - Ensure that the node has the collector that exposes the function you want enabled
 
-=======
-A function is a  `key`  -  `value`  pair. The  `key`  uniquely identifies the function within a node. The  `value`  is a function (i.e. code) to be run by a data collector when the function is invoked.
-
-For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes functions - [plugins.d](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#function).
-
-<<<<<<< HEAD
->>>>>>> e0d8fc29c (review the file and make certain edits)
-=======
-## Prerequisites
-
-The following is required to be able to run Functions from Netdata Cloud.
-
-- At least one of the nodes claimed to your Space should be on a Netdata agent version higher than `v1.37.1`
-- Ensure that the node has the collector that exposes the function you want enabled
-
->>>>>>> 50dc021a3 (edits on the function documentation)
 ## What functions are currently available?
 
 | Function           | Description                                                                                                                                                    | Alternative to CLI tools        | Require Cloud | plugin - module                                                                                            |
@@ -66,18 +45,6 @@ With the communication between the Netdata Agent and Netdata Cloud being through
 
 If you have ideas or requests for other functions:
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 - Participate in the relevant [GitHub discussion](https://github.com/netdata/netdata/discussions/14412)
 - Open a [feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
 - Join the Netdata community on [Discord](https://discord.com/invite/2mEmfW735j) and let us know.
-=======
-* Participate in the relevant [GitHub discussion](https://github.com/netdata/netdata/discussions/14412)
-* Open a [feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
-* Join the Netdata community on [Discord](https://discord.com/invite/mPZ6WZKKG2) and let us know.
->>>>>>> e0d8fc29c (review the file and make certain edits)
-=======
-- Participate in the relevant [GitHub discussion](https://github.com/netdata/netdata/discussions/14412)
-- Open a [feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
-- Join the Netdata community on [Discord](https://discord.com/invite/2mEmfW735j) and let us know.
->>>>>>> 50dc021a3 (edits on the function documentation)
