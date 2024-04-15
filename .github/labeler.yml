@@ -137,7 +137,7 @@ collectors/freeipmi:
           - any-glob-to-any-file:
               - src/collectors/freeipmi.plugin/**
 
-collectors/go.d.plugin:
+collectors/go.d:
   - any:
       - changed-files:
           - any-glob-to-any-file:
