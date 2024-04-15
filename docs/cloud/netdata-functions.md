@@ -7,8 +7,6 @@ executed on the node/host where the function is made available.
 
 Collectors besides the metric collection, storing, and/or streaming work are capable of executing specific routines on request. These routines will bring additional information to help you troubleshoot or even trigger some action to happen on the node itself.
 
-A function is a  `key`  -  `value`  pair. The  `key`  uniquely identifies the function within a node. The  `value`  is a function (i.e. code) to be run by a data collector when the function is invoked.
-
 For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes functions - [plugins.d](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#function).
 
 ## Prerequisites
