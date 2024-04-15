@@ -39,6 +39,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/logind"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/logstash"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/lvm"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/megacli"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/mongodb"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/mysql"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/nginx"
