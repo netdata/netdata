@@ -42,7 +42,6 @@ required:
 
 ```
 [plugin:network-viewer]
-	# update every = 1
 	command options = ebpf
 ```
 
@@ -51,10 +50,17 @@ You can further customize the collection level by specifying the desired option
 
 ```
 [plugin:network-viewer]
-	# update every = 1
 	command options = ebpf apps-level 1
 ```
 
 The accepted values are as follows:
     - 0: Group data under the real parent
     - 1: Group data under the parent.
+
+Lastly, you have the option to personalize whether the plugin will display data per parent PID,
+which is the default behavior, or utilize per-thread information by enabling the `use-pid` option:
+
+```
+[plugin:network-viewer]
+	command options = ebpf apps-level 1 use-pid
+```
