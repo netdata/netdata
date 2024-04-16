@@ -48,3 +48,10 @@ void nd_sentry_fini(void)
 
     sentry_close();
 }
+
+void nd_sentry_set_user(const char *guid)
+{
+    sentry_value_t user = sentry_value_new_object();
+    sentry_value_set_by_key(user, "id", sentry_value_new_string(guid));
+    sentry_set_user(user);
+}

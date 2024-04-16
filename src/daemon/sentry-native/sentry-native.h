@@ -6,4 +6,6 @@
 void nd_sentry_init(void);
 void nd_sentry_fini(void);
 
+void nd_sentry_set_user(const char *guid);
+
 #endif /* SENTRY_NATIVE_H */
