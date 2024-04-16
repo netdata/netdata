@@ -14,7 +14,7 @@ type megaBBU struct {
 	batteryType           string
 	temperature           string
 	relativeStateOfCharge string
-	absoluteStateOfCharge string
+	absoluteStateOfCharge string // apparently can be 0 while relative > 0 (e.g. relative 91%, absolute 0%)
 	cycleCount            string
 }
 

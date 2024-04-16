@@ -15,7 +15,6 @@ const (
 	prioPhysDrivePredictiveFailuresRate
 
 	prioBBURelativeCharge
-	prioBBUAbsoluteCharge
 	prioBBURechargeCycles
 	prioBBUTemperature
 )
@@ -76,7 +75,6 @@ var (
 
 var bbuChartsTmpl = module.Charts{
 	bbuRelativeChargeChartsTmpl.Copy(),
-	bbuAbsoluteChargeChartsTmpl.Copy(),
 	bbuRechargeCyclesChartsTmpl.Copy(),
 	bbuTemperatureChartsTmpl.Copy(),
 }
@@ -92,18 +90,6 @@ var (
 		Priority: prioBBURelativeCharge,
 		Dims: module.Dims{
 			{ID: "bbu_adapter_%s_relative_state_of_charge", Name: "charge"},
-		},
-	}
-	bbuAbsoluteChargeChartsTmpl = module.Chart{
-		ID:       "bbu_adapter_%s_absolute_charge",
-		Title:    "BBU absolute charge",
-		Units:    "percentage",
-		Fam:      "bbu charge",
-		Ctx:      "megacli.bbu_absolute_charge",
-		Type:     module.Area,
-		Priority: prioBBUAbsoluteCharge,
-		Dims: module.Dims{
-			{ID: "bbu_adapter_%s_absolute_state_of_charge", Name: "charge"},
 		},
 	}
 	bbuRechargeCyclesChartsTmpl = module.Chart{
