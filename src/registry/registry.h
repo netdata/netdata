@@ -74,7 +74,7 @@ void registry_update_cloud_base_url();
 // update the registry monitoring charts
 void registry_statistics(void);
 
-char *registry_get_this_machine_guid(void);
+const char *registry_get_this_machine_guid(void);
 char *registry_get_mgmt_api_key(void);
 char *registry_get_this_machine_hostname(void);
 

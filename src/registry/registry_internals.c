@@ -270,7 +270,7 @@ char *registry_get_this_machine_hostname(void) {
     return registry.hostname;
 }
 
-char *registry_get_this_machine_guid(void) {
+const char *registry_get_this_machine_guid(void) {
     static char guid[GUID_LEN + 1] = "";
 
     if(likely(guid[0]))
