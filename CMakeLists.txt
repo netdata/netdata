@@ -652,13 +652,16 @@ set(LIBNETDATA_FILES
 )
 
 if(ENABLE_PLUGIN_EBPF)
-        if (EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a" AND EXISTS "src/libnetdata/ebpf/includes/dc.skel.h")
+        message(CHECK_START "Checking for vendored libbpf for eBPF plugin")
+        if (EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a" AND EXISTS "${CMAKE_SOURCE_DIR}/src/libnetdata/ebpf/includes/dc.skel.h")
+                message(CHECK_PASS "found")
                 list(APPEND LIBNETDATA_FILES
                      src/libnetdata/ebpf/ebpf.c
                      src/libnetdata/ebpf/ebpf.h
                 )
         else()
-                set(ENABLE_PLUGIN_EBPF NO)
+                message(CHECK_FAIL "not found")
+                message(FATAL_ERROR "eBPF plugin requires a vendored copy of libbpf.")
         endif()
 endif()
 
