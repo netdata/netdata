@@ -86,6 +86,7 @@ see the appropriate collector readme.
 | [logind](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logind)                         |        systemd-logind         |
 | [logstash](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logstash)                     |           Logstash            |
 | [lvm](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/lvm)                               |      LVM logical volumes      |
+| [megacli](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/megacli)                       |     MegaCli Hardware Raid     |
 | [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/mongodb)                       |            MongoDB            |
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/mysql)                           |             MySQL             |
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/nginx)                           |             NGINX             |

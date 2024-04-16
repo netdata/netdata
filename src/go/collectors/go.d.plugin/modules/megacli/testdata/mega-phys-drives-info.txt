@@ -1,0 +1,433 @@
+Adapter #0
+
+Number of Virtual Disks: 1
+Virtual Drive: 0 (Target Id: 0)
+Name                :Virtual Disk 0
+RAID Level          : Primary-1, Secondary-0, RAID Level Qualifier-0
+Size                : 3.491 TB
+Sector Size         : 512
+Is VD emulated      : No
+Mirror Data         : 3.491 TB
+State               : Optimal
+Strip Size          : 64 KB
+Number Of Drives    : 8
+Span Depth          : 1
+Default Cache Policy: WriteBack, ReadAhead, Direct, No Write Cache if Bad BBU
+Current Cache Policy: WriteBack, ReadAhead, Direct, No Write Cache if Bad BBU
+Default Access Policy: Read/Write
+Current Access Policy: Read/Write
+Disk Cache Policy   : Disk's Default
+Encryption Type     : None
+Default Power Savings Policy: Controller Defined
+Current Power Savings Policy: None
+Can spin up in 1 minute: No
+LD has drives that support T10 power conditions: No
+LD's IO profile supports MAX power savings with cached writes: No
+Bad Blocks Exist: No
+PI type: No PI
+
+Is VD Cached: No
+Number of Spans: 1
+Span: 0 - Number of PDs: 8
+
+PD: 0 Information
+Enclosure Device ID: 32
+Slot Number: 0
+Drive's position: DiskGroup: 0, Span: 0, Arm: 0
+Enclosure position: 1
+Device Id: 0
+WWN: 5002538c4002e713
+Sequence Number: 2
+Media Error Count: 0
+Other Error Count: 0
+Predictive Failure Count: 0
+Last Predictive Failure Event Seq Number: 0
+PD Type: SATA
+
+Raw Size: 894.252 GB [0x6fc81ab0 Sectors]
+Non Coerced Size: 893.752 GB [0x6fb81ab0 Sectors]
+Coerced Size: 893.75 GB [0x6fb80000 Sectors]
+Sector Size:  512
+Logical Sector Size:  512
+Physical Sector Size:  512
+Firmware state: Online, Spun Up
+Device Firmware Level: 003Q
+Shield Counter: 0
+Successful diagnostics completion on :  N/A
+SAS Address(0): 0x4433221104000000
+Connected Port Number: 4(path0)
+Inquiry Data: S1YHNXAG804005      SAMSUNG MZ7LM960HCHP-00003              GXT3003Q
+FDE Capable: Not Capable
+FDE Enable: Disable
+Secured: Unsecured
+Locked: Unlocked
+Needs EKM Attention: No
+Foreign State: None
+Device Speed: 6.0Gb/s
+Link Speed: 6.0Gb/s
+Media Type: Solid State Device
+Drive:  Not Certified
+Drive Temperature :33C (91.40 F)
+PI Eligibility:  No
+Drive is formatted for PI information:  No
+PI: No PI
+Drive's NCQ setting : N/A
+Port-0 :
+Port status: Active
+Port's Linkspeed: 6.0Gb/s
+Drive has flagged a S.M.A.R.T alert : No
+
+
+
+
+PD: 1 Information
+Enclosure Device ID: 32
+Slot Number: 2
+Drive's position: DiskGroup: 0, Span: 0, Arm: 1
+Enclosure position: 1
+Device Id: 2
+WWN: 5002538c00019b96
+Sequence Number: 2
+Media Error Count: 0
+Other Error Count: 0
+Predictive Failure Count: 0
+Last Predictive Failure Event Seq Number: 0
+PD Type: SATA
+
+Raw Size: 894.252 GB [0x6fc81ab0 Sectors]
+Non Coerced Size: 893.752 GB [0x6fb81ab0 Sectors]
+Coerced Size: 893.75 GB [0x6fb80000 Sectors]
+Sector Size:  512
+Logical Sector Size:  512
+Physical Sector Size:  512
+Firmware state: Online, Spun Up
+Device Firmware Level: 003Q
+Shield Counter: 0
+Successful diagnostics completion on :  N/A
+SAS Address(0): 0x4433221106000000
+Connected Port Number: 6(path0)
+Inquiry Data: S1YHNYAG600061      SAMSUNG MZ7LM960HCHP-00003              GXT3003Q
+FDE Capable: Not Capable
+FDE Enable: Disable
+Secured: Unsecured
+Locked: Unlocked
+Needs EKM Attention: No
+Foreign State: None
+Device Speed: 6.0Gb/s
+Link Speed: 6.0Gb/s
+Media Type: Solid State Device
+Drive:  Not Certified
+Drive Temperature :33C (91.40 F)
+PI Eligibility:  No
+Drive is formatted for PI information:  No
+PI: No PI
+Drive's NCQ setting : N/A
+Port-0 :
+Port status: Active
+Port's Linkspeed: 6.0Gb/s
+Drive has flagged a S.M.A.R.T alert : No
+
+
+
+
+PD: 2 Information
+Enclosure Device ID: 32
+Slot Number: 1
+Drive's position: DiskGroup: 0, Span: 0, Arm: 2
+Enclosure position: 1
+Device Id: 1
+WWN: 5002538c4002e707
+Sequence Number: 2
+Media Error Count: 0
+Other Error Count: 0
+Predictive Failure Count: 0
+Last Predictive Failure Event Seq Number: 0
+PD Type: SATA
+
+Raw Size: 894.252 GB [0x6fc81ab0 Sectors]
+Non Coerced Size: 893.752 GB [0x6fb81ab0 Sectors]
+Coerced Size: 893.75 GB [0x6fb80000 Sectors]
+Sector Size:  512
+Logical Sector Size:  512
+Physical Sector Size:  512
+Firmware state: Online, Spun Up
+Device Firmware Level: 003Q
+Shield Counter: 0
+Successful diagnostics completion on :  N/A
+SAS Address(0): 0x4433221100000000
+Connected Port Number: 0(path0)
+Inquiry Data: S1YHNXAG803993      SAMSUNG MZ7LM960HCHP-00003              GXT3003Q
+FDE Capable: Not Capable
+FDE Enable: Disable
+Secured: Unsecured
+Locked: Unlocked
+Needs EKM Attention: No
+Foreign State: None
+Device Speed: 6.0Gb/s
+Link Speed: 6.0Gb/s
+Media Type: Solid State Device
+Drive:  Not Certified
+Drive Temperature :34C (93.20 F)
+PI Eligibility:  No
+Drive is formatted for PI information:  No
+PI: No PI
+Drive's NCQ setting : N/A
+Port-0 :
+Port status: Active
+Port's Linkspeed: 6.0Gb/s
+Drive has flagged a S.M.A.R.T alert : No
+
+
+
+
+PD: 3 Information
+Enclosure Device ID: 32
+Slot Number: 3
+Drive's position: DiskGroup: 0, Span: 0, Arm: 3
+Enclosure position: 1
+Device Id: 3
+WWN: 5002538c4002e70f
+Sequence Number: 2
+Media Error Count: 0
+Other Error Count: 0
+Predictive Failure Count: 0
+Last Predictive Failure Event Seq Number: 0
+PD Type: SATA
+
+Raw Size: 894.252 GB [0x6fc81ab0 Sectors]
+Non Coerced Size: 893.752 GB [0x6fb81ab0 Sectors]
+Coerced Size: 893.75 GB [0x6fb80000 Sectors]
+Sector Size:  512
+Logical Sector Size:  512
+Physical Sector Size:  512
+Firmware state: Online, Spun Up
+Device Firmware Level: 003Q
+Shield Counter: 0
+Successful diagnostics completion on :  N/A
+SAS Address(0): 0x4433221102000000
+Connected Port Number: 2(path0)
+Inquiry Data: S1YHNXAG804001      SAMSUNG MZ7LM960HCHP-00003              GXT3003Q
+FDE Capable: Not Capable
+FDE Enable: Disable
+Secured: Unsecured
+Locked: Unlocked
+Needs EKM Attention: No
+Foreign State: None
+Device Speed: 6.0Gb/s
+Link Speed: 6.0Gb/s
+Media Type: Solid State Device
+Drive:  Not Certified
+Drive Temperature :34C (93.20 F)
+PI Eligibility:  No
+Drive is formatted for PI information:  No
+PI: No PI
+Drive's NCQ setting : N/A
+Port-0 :
+Port status: Active
+Port's Linkspeed: 6.0Gb/s
+Drive has flagged a S.M.A.R.T alert : No
+
+
+
+
+PD: 4 Information
+Enclosure Device ID: 32
+Slot Number: 5
+Drive's position: DiskGroup: 0, Span: 0, Arm: 4
+Enclosure position: 1
+Device Id: 5
+WWN: 5002538c4002e712
+Sequence Number: 2
+Media Error Count: 0
+Other Error Count: 0
+Predictive Failure Count: 0
+Last Predictive Failure Event Seq Number: 0
+PD Type: SATA
+
+Raw Size: 894.252 GB [0x6fc81ab0 Sectors]
+Non Coerced Size: 893.752 GB [0x6fb81ab0 Sectors]
+Coerced Size: 893.75 GB [0x6fb80000 Sectors]
+Sector Size:  512
+Logical Sector Size:  512
+Physical Sector Size:  512
+Firmware state: Online, Spun Up
+Device Firmware Level: 003Q
+Shield Counter: 0
+Successful diagnostics completion on :  N/A
+SAS Address(0): 0x4433221101000000
+Connected Port Number: 1(path0)
+Inquiry Data: S1YHNXAG804004      SAMSUNG MZ7LM960HCHP-00003              GXT3003Q
+FDE Capable: Not Capable
+FDE Enable: Disable
+Secured: Unsecured
+Locked: Unlocked
+Needs EKM Attention: No
+Foreign State: None
+Device Speed: 6.0Gb/s
+Link Speed: 6.0Gb/s
+Media Type: Solid State Device
+Drive:  Not Certified
+Drive Temperature :34C (93.20 F)
+PI Eligibility:  No
+Drive is formatted for PI information:  No
+PI: No PI
+Drive's NCQ setting : N/A
+Port-0 :
+Port status: Active
+Port's Linkspeed: 6.0Gb/s
+Drive has flagged a S.M.A.R.T alert : No
+
+
+
+
+PD: 5 Information
+Enclosure Device ID: 32
+Slot Number: 4
+Drive's position: DiskGroup: 0, Span: 0, Arm: 5
+Enclosure position: 1
+Device Id: 4
+WWN: 5002538c4002e6e9
+Sequence Number: 2
+Media Error Count: 0
+Other Error Count: 0
+Predictive Failure Count: 0
+Last Predictive Failure Event Seq Number: 0
+PD Type: SATA
+
+Raw Size: 894.252 GB [0x6fc81ab0 Sectors]
+Non Coerced Size: 893.752 GB [0x6fb81ab0 Sectors]
+Coerced Size: 893.75 GB [0x6fb80000 Sectors]
+Sector Size:  512
+Logical Sector Size:  512
+Physical Sector Size:  512
+Firmware state: Online, Spun Up
+Device Firmware Level: 003Q
+Shield Counter: 0
+Successful diagnostics completion on :  N/A
+SAS Address(0): 0x4433221105000000
+Connected Port Number: 5(path0)
+Inquiry Data: S1YHNXAG803963      SAMSUNG MZ7LM960HCHP-00003              GXT3003Q
+FDE Capable: Not Capable
+FDE Enable: Disable
+Secured: Unsecured
+Locked: Unlocked
+Needs EKM Attention: No
+Foreign State: None
+Device Speed: 6.0Gb/s
+Link Speed: 6.0Gb/s
+Media Type: Solid State Device
+Drive:  Not Certified
+Drive Temperature :33C (91.40 F)
+PI Eligibility:  No
+Drive is formatted for PI information:  No
+PI: No PI
+Drive's NCQ setting : N/A
+Port-0 :
+Port status: Active
+Port's Linkspeed: 6.0Gb/s
+Drive has flagged a S.M.A.R.T alert : No
+
+
+
+
+PD: 6 Information
+Enclosure Device ID: 32
+Slot Number: 6
+Drive's position: DiskGroup: 0, Span: 0, Arm: 6
+Enclosure position: 1
+Device Id: 6
+WWN: 5002538c4002da83
+Sequence Number: 2
+Media Error Count: 0
+Other Error Count: 0
+Predictive Failure Count: 0
+Last Predictive Failure Event Seq Number: 0
+PD Type: SATA
+
+Raw Size: 894.252 GB [0x6fc81ab0 Sectors]
+Non Coerced Size: 893.752 GB [0x6fb81ab0 Sectors]
+Coerced Size: 893.75 GB [0x6fb80000 Sectors]
+Sector Size:  512
+Logical Sector Size:  512
+Physical Sector Size:  512
+Firmware state: Online, Spun Up
+Device Firmware Level: 003Q
+Shield Counter: 0
+Successful diagnostics completion on :  N/A
+SAS Address(0): 0x4433221107000000
+Connected Port Number: 7(path0)
+Inquiry Data: S1YHNXAG801029      SAMSUNG MZ7LM960HCHP-00003              GXT3003Q
+FDE Capable: Not Capable
+FDE Enable: Disable
+Secured: Unsecured
+Locked: Unlocked
+Needs EKM Attention: No
+Foreign State: None
+Device Speed: 6.0Gb/s
+Link Speed: 6.0Gb/s
+Media Type: Solid State Device
+Drive:  Not Certified
+Drive Temperature :33C (91.40 F)
+PI Eligibility:  No
+Drive is formatted for PI information:  No
+PI: No PI
+Drive's NCQ setting : N/A
+Port-0 :
+Port status: Active
+Port's Linkspeed: 6.0Gb/s
+Drive has flagged a S.M.A.R.T alert : No
+
+
+
+
+PD: 7 Information
+Enclosure Device ID: 32
+Slot Number: 7
+Drive's position: DiskGroup: 0, Span: 0, Arm: 7
+Enclosure position: 1
+Device Id: 7
+WWN: 5002538c4002dade
+Sequence Number: 2
+Media Error Count: 0
+Other Error Count: 0
+Predictive Failure Count: 0
+Last Predictive Failure Event Seq Number: 0
+PD Type: SATA
+
+Raw Size: 894.252 GB [0x6fc81ab0 Sectors]
+Non Coerced Size: 893.752 GB [0x6fb81ab0 Sectors]
+Coerced Size: 893.75 GB [0x6fb80000 Sectors]
+Sector Size:  512
+Logical Sector Size:  512
+Physical Sector Size:  512
+Firmware state: Online, Spun Up
+Device Firmware Level: 003Q
+Shield Counter: 0
+Successful diagnostics completion on :  N/A
+SAS Address(0): 0x4433221103000000
+Connected Port Number: 3(path0)
+Inquiry Data: S1YHNXAG801120      SAMSUNG MZ7LM960HCHP-00003              GXT3003Q
+FDE Capable: Not Capable
+FDE Enable: Disable
+Secured: Unsecured
+Locked: Unlocked
+Needs EKM Attention: No
+Foreign State: None
+Device Speed: 6.0Gb/s
+Link Speed: 6.0Gb/s
+Media Type: Solid State Device
+Drive:  Not Certified
+Drive Temperature :34C (93.20 F)
+PI Eligibility:  No
+Drive is formatted for PI information:  No
+PI: No PI
+Drive's NCQ setting : N/A
+Port-0 :
+Port status: Active
+Port's Linkspeed: 6.0Gb/s
+Drive has flagged a S.M.A.R.T alert : No
+
+
+
+
+Exit Code: 0x00

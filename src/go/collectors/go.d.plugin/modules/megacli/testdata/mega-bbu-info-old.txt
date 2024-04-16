@@ -1,0 +1,84 @@
+BBU status for Adapter: 0
+
+BatteryType: BBU
+Voltage: 4073 mV
+Current: 0 mA
+Temperature: 31 C
+Battery State: Optimal
+BBU Firmware Status:
+
+  Charging Status              : None
+  Voltage                                 : OK
+  Temperature                             : OK
+  Learn Cycle Requested                   : No
+  Learn Cycle Active                      : No
+  Learn Cycle Status                      : OK
+  Learn Cycle Timeout                     : No
+  I2c Errors Detected                     : No
+  Battery Pack Missing                    : No
+  Battery Replacement required            : No
+  Remaining Capacity Low                  : No
+  Periodic Learn Required                 : No
+  Transparent Learn                       : No
+  No space to cache offload               : No
+  Pack is about to fail & should be replaced : No
+  Cache Offload premium feature required  : No
+  Module microcode update required        : No
+
+
+GasGuageStatus:
+  Fully Discharged        : No
+  Fully Charged           : Yes
+  Discharging             : Yes
+  Initialized             : Yes
+  Remaining Time Alarm    : No
+  Discharge Terminated    : No
+  Over Temperature        : No
+  Charging Terminated     : Yes
+  Over Charged            : No
+Relative State of Charge: 100 %
+Charger Status: Complete
+Remaining Capacity: 1477 mAh
+Full Charge Capacity: 1477 mAh
+isSOHGood: Yes
+  Battery backup charge time : 0 hours
+
+BBU Capacity Info for Adapter: 0
+
+  Relative State of Charge: 100 %
+  Absolute State of charge: 83 %
+  Remaining Capacity: 1477 mAh
+  Full Charge Capacity: 1477 mAh
+  Run time to empty: Battery is not being charged.
+  Average time to empty: Battery is not being charged.
+  Estimated Time to full recharge: Battery is not being charged.
+  Cycle Count: 61
+Max Error = 2 %
+Remaining Capacity Alarm = 180 mAh
+Remining Time Alarm = 10 Min
+
+BBU Design Info for Adapter: 0
+
+  Date of Manufacture: 07/08, 2010
+  Design Capacity: 1800 mAh
+  Design Voltage: 3700 mV
+  Specification Info: 49
+  Serial Number: 4069
+  Pack Stat Configuration: 0x0014
+  Manufacture Name: SMP-PA1.9
+  Firmware Version   : �
+  Device Name: DLFR463
+  Device Chemistry: LION
+  Battery FRU: N/A
+Module Version = �
+  Transparent Learn = 0
+  App Data = 0
+
+BBU Properties for Adapter: 0
+
+  Auto Learn Period: 90 Days
+  Next Learn time: Fri Jan 28 13:07:56 2022
+  Learn Delay Interval:0 Hours
+  Auto-Learn Mode: Enabled
+
+Exit Code: 0x00
