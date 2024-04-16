@@ -22,7 +22,7 @@ modules:
       most_popular: false
     overview:
       data_collection:
-        metrics_description: >
+        metrics_description: |
           Monitors the health of MegaCLI Hardware RAID by tracking the status of RAID adapters, physical drives, and backup batteries in your storage system.
           It relies on the `megacli` CLI tool but avoids directly executing the binary.
           Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
