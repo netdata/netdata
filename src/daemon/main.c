@@ -475,7 +475,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     if (ret)
         abort();
     else {
-        sentry_native_fini();
+        nd_sentry_fini();
         exit(ret);
     }
 #else
@@ -2112,7 +2112,7 @@ int main(int argc, char **argv) {
 
     // init sentry
 #ifdef ENABLE_SENTRY
-        sentry_native_init();
+        nd_sentry_init();
 #endif
 
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
