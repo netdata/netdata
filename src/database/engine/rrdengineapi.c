@@ -1168,9 +1168,25 @@ int rrdeng_init(
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tier_page_type[tier];
     ctx->config.global_compress_alg = dbengine_default_compression();
+
+    strncpyz(ctx->config.dbfiles_path, dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
+    ctx->config.dbfiles_path[sizeof(ctx->config.dbfiles_path) - 1] = '\0';
+
     if (disk_space_mb && disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
-    ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
+
+    if (!disk_space_mb) {
+        struct statvfs buff_statvfs;
+        if (statvfs(ctx->config.dbfiles_path, &buff_statvfs) == 0) {
+            ctx->config.max_disk_space = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
+            ctx->config.max_disk_space = ctx->config.max_disk_space - (uint64_t ) (ctx->config.max_disk_space * 10 / 100);
+        }
+        else
+            ctx->config.max_disk_space = 0;
+    }
+    else
+        ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
+
     ctx->config.max_retention_s = max_retention_s;
     strncpyz(ctx->config.dbfiles_path, dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
     ctx->config.dbfiles_path[sizeof(ctx->config.dbfiles_path) - 1] = '\0';

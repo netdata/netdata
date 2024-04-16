@@ -1134,7 +1134,15 @@ static void convert_seconds_to_dhms(time_t seconds, char *result, int result_siz
     minutes = (int) seconds / 60;
 
     // Format the result into the provided string buffer
-    snprintfz(result, result_size, "%d days, %d hours, %d minutes", days, hours, minutes);
+    BUFFER *buf = buffer_create(128, NULL);
+    if (days)
+        buffer_sprintf(buf,"%d day%c%s", days, days==1 ? ' ' : 's', hours || minutes ? ", " : "");
+    if (hours)
+        buffer_sprintf(buf,"%d hour%c%s", hours, hours==1 ? ' ' : 's', minutes ? ", " : "");
+    if (minutes)
+        buffer_sprintf(buf,"%d minute%c", minutes, minutes==1 ? ' ' : 's');
+    strncpyz(result, buffer_tostring(buf), result_size);
+    buffer_free(buf);
 }
 
 void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array) {
@@ -1205,13 +1213,12 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_string(wb, "retention_human", human_retention);
 
                 if(used || max) { // we have disk space information
-                    if (!max)
-                        retention =  multidb_ctx[tier]->config.max_retention_s;
-                    else
-                        retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
+                    time_t time_retention =  multidb_ctx[tier]->config.max_retention_s;
+                    time_t space_retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
+                    time_t actual_retention = MIN(space_retention, time_retention);
 
-                    convert_seconds_to_dhms(retention, human_retention, sizeof(human_retention) - 1);
-                    buffer_json_member_add_time_t(wb, "expected_retention", retention);
+                    convert_seconds_to_dhms(actual_retention, human_retention, sizeof(human_retention) - 1);
+                    buffer_json_member_add_time_t(wb, "expected_retention", actual_retention);
                     buffer_json_member_add_string(wb, "expected_retention_human", human_retention);
                 }
             }
