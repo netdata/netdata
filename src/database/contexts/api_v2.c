@@ -1205,7 +1205,10 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                 buffer_json_member_add_string(wb, "retention_human", human_retention);
 
                 if(used || max) { // we have disk space information
-                    retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
+                    if (!max)
+                        retention =  multidb_ctx[tier]->config.max_retention_s;
+                    else
+                        retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
 
                     convert_seconds_to_dhms(retention, human_retention, sizeof(human_retention) - 1);
                     buffer_json_member_add_time_t(wb, "expected_retention", retention);
