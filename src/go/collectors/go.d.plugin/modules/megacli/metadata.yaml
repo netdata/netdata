@@ -27,7 +27,7 @@ modules:
           It relies on the `megacli` CLI tool but avoids directly executing the binary.
           Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
           This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
-          
+
           Executed commands:
           -  `megacli -LDPDInfo -aAll -NoLog`
           -  `megacli -AdpBbuCmd -aAll -NoLog`
