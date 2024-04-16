@@ -652,7 +652,7 @@ set(LIBNETDATA_FILES
 )
 
 if(ENABLE_PLUGIN_EBPF)
-        if (EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
+        if (EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a" AND EXISTS "src/libnetdata/ebpf/includes/dc.skel.h")
                 list(APPEND LIBNETDATA_FILES
                      src/libnetdata/ebpf/ebpf.c
                      src/libnetdata/ebpf/ebpf.h
