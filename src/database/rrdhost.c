@@ -20,6 +20,7 @@ double storage_tiers_retention_days[RRD_STORAGE_TIERS] = {14, 90, 2 * 365, 0, 0}
 static void calculate_tier_grouping_iterations(int update_every)
 {
     size_t grouping = update_every;
+    storage_tiers_grouping_iterations[0] = update_every;
     for(size_t i = 1; i < RRD_STORAGE_TIERS ;i++) {
         storage_tiers_grouping_iterations[i] = storage_tiers_collection_per_sec[i] / grouping;
         grouping *= storage_tiers_grouping_iterations[i];
@@ -945,8 +946,11 @@ void dbengine_init(char *hostname) {
         int disk_space_mb;
 
         if (new_dbengine_defaults) {
-            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu MB", tier);
+            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu disk space MB", tier);
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, tier_quota_mb[tier]);
+
+            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention days", tier);
+            storage_tiers_retention_days[tier] = config_get_float(CONFIG_SECTION_DB, dbengineconfig, storage_tiers_retention_days[tier]);
         }
         else {
             if (tier > 0)
@@ -964,8 +968,8 @@ void dbengine_init(char *hostname) {
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig_new, tier_quota_mb[tier]);
         }
 
-        size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
-        storage_tiers_grouping_iterations[tier] = grouping_iterations;
+//        size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
+//        storage_tiers_grouping_iterations[tier] = grouping_iterations;
 
         if(tier == 0)
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);

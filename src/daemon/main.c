@@ -1044,7 +1044,7 @@ static void backwards_compatible_config() {
                 CONFIG_SECTION_DB,      "dbengine multihost disk space MB");
 
     config_move(CONFIG_SECTION_DB,      "dbengine multihost disk space MB",
-                CONFIG_SECTION_DB,      "dbengine tier 0 MB");
+                CONFIG_SECTION_DB,      "dbengine tier 0 disk space MB");
 
     config_move(CONFIG_SECTION_GLOBAL,  "memory deduplication (ksm)",
                 CONFIG_SECTION_DB,      "memory deduplication (ksm)");
