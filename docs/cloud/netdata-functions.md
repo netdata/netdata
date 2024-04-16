@@ -30,6 +30,7 @@ The following is required to be able to run Functions from Netdata Cloud.
 | Systemd-list-units | Information about all systemd units, including their active state, description, whether or not they are enabled, and more.                                     | `systemctl list-units`          | yes           | [systemd-journal](https://github.com/netdata/netdata/tree/master/src/collectors/systemd-journal.plugin#readme) |
 | Systemd-services   | System resource utilization for all running systemd services: CPU, memory, and disk IO.                                                                        | `systemd-cgtop`                 | no            | [cgroups](https://github.com/netdata/netdata/tree/master/src/collectors/cgroups.plugin#readme)                 |
 | Streaming          | Comprehensive overview of all Netdata children instances, offering detailed information about their status, replication completion time, and many more.        |                                 | yes           |                                                                                                            |
+| Netdata-api-calls | Real-time tracing of API calls made to the Netdata Agent. It provides information on query, source, status, elapsed time, and more. |                               | no |   |
 
 ## How do functions work with streaming?
 
