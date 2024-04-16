@@ -652,10 +652,14 @@ set(LIBNETDATA_FILES
 )
 
 if(ENABLE_PLUGIN_EBPF)
-    list(APPEND LIBNETDATA_FILES
-            src/libnetdata/ebpf/ebpf.c
-            src/libnetdata/ebpf/ebpf.h
-    )
+        if (EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a")
+                list(APPEND LIBNETDATA_FILES
+                     src/libnetdata/ebpf/ebpf.c
+                     src/libnetdata/ebpf/ebpf.h
+                )
+        else()
+                set(ENABLE_PLUGIN_EBPF NO)
+        endif()
 endif()
 
 set(LIBH2O_FILES
