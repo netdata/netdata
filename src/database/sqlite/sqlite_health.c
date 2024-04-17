@@ -1423,6 +1423,7 @@ void sql_alert_transitions(
     if (unlikely(!nodes))
         return;
 
+    int param = 0;
     if (transition) {
         if (uuid_parse(transition, transition_uuid)) {
             error_report("Invalid transition given %s", transition);
@@ -1430,12 +1431,12 @@ void sql_alert_transitions(
         }
 
         rc = sqlite3_prepare_v2(db_meta, SQL_SEARCH_ALERT_TRANSITION_DIRECT, -1, &res, 0);
-
-        rc = sqlite3_bind_blob(res, 1, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC);
         if (unlikely(rc != SQLITE_OK)) {
-            error_report("Failed to bind transition_id parameter");
-            goto done;
+            error_report("Failed to prepare statement to search transition");
+            goto done_only_drop;
         }
+
+        SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &transition_uuid, sizeof(transition_uuid), SQLITE_STATIC));
         goto run_query;
     }
 
@@ -1496,7 +1497,6 @@ void sql_alert_transitions(
         goto done_only_drop;
     }
 
-    int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)(after * USEC_PER_SEC)));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)(before * USEC_PER_SEC)));
 
