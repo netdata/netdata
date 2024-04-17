@@ -657,10 +657,17 @@ set(LIBNETDATA_FILES
 )
 
 if(ENABLE_PLUGIN_EBPF)
-    list(APPEND LIBNETDATA_FILES
-            src/libnetdata/ebpf/ebpf.c
-            src/libnetdata/ebpf/ebpf.h
-    )
+        message(CHECK_START "Checking for vendored libbpf for eBPF plugin")
+        if (EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a" AND EXISTS "${CMAKE_SOURCE_DIR}/src/libnetdata/ebpf/includes/dc.skel.h")
+                message(CHECK_PASS "found")
+                list(APPEND LIBNETDATA_FILES
+                     src/libnetdata/ebpf/ebpf.c
+                     src/libnetdata/ebpf/ebpf.h
+                )
+        else()
+                message(CHECK_FAIL "not found")
+                message(FATAL_ERROR "eBPF plugin requires a vendored copy of libbpf.")
+        endif()
 endif()
 
 set(LIBH2O_FILES
@@ -1898,6 +1905,22 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_unittest.h
             src/collectors/ebpf.plugin/ebpf_functions.c
             src/collectors/ebpf.plugin/ebpf_functions.h
+            src/libnetdata/ebpf/includes/cachestat.skel.h
+            src/libnetdata/ebpf/includes/dc.skel.h
+            src/libnetdata/ebpf/includes/disk.skel.h
+            src/libnetdata/ebpf/includes/fd.skel.h
+            src/libnetdata/ebpf/includes/filesystem.skel.h
+            src/libnetdata/ebpf/includes/hardirq.skel.h
+            src/libnetdata/ebpf/includes/mdflush.skel.h
+            src/libnetdata/ebpf/includes/mount.skel.h
+            src/libnetdata/ebpf/includes/oomkill.skel.h
+            src/libnetdata/ebpf/includes/process.skel.h
+            src/libnetdata/ebpf/includes/shm.skel.h
+            src/libnetdata/ebpf/includes/socket.skel.h
+            src/libnetdata/ebpf/includes/softirq.skel.h
+            src/libnetdata/ebpf/includes/swap.skel.h
+            src/libnetdata/ebpf/includes/sync.skel.h
+            src/libnetdata/ebpf/includes/vfs.skel.h
     )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})
