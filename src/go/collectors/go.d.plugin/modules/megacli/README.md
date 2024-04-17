@@ -1,1 +1,1 @@
-integrations/megacli_hardware_raid.md
+integrations/megacli_megaraid.md
