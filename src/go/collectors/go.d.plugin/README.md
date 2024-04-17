@@ -50,6 +50,7 @@ see the appropriate collector readme.
 
 | Name                                                                                                                          |           Monitors            |
 |:------------------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
+| [adaptec_raid](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/adaptecraid)              |     Adaptec Hardware RAID     |
 | [activemq](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/activemq)                     |           ActiveMQ            |
 | [apache](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/apache)                         |            Apache             |
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/bind)                             |           ISC Bind            |
