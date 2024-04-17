@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- go.d megacli health fix megacli\_phys\_drive\_media\_errors [\#17419](https://github.com/netdata/netdata/pull/17419) ([ilyam8](https://github.com/ilyam8))
+- go.d megacli fix meta metrics\_description [\#17418](https://github.com/netdata/netdata/pull/17418) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/megacli [\#17417](https://github.com/netdata/netdata/pull/17417) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17416](https://github.com/netdata/netdata/pull/17416) ([netdatabot](https://github.com/netdatabot))
+- go.d sd ll set max\_time\_series for prometheus/clickhouse [\#17415](https://github.com/netdata/netdata/pull/17415) ([ilyam8](https://github.com/ilyam8))
+- rewrite megacli in go [\#17410](https://github.com/netdata/netdata/pull/17410) ([ilyam8](https://github.com/ilyam8))
 - Logs tab docs in dashboard section [\#17408](https://github.com/netdata/netdata/pull/17408) ([Ancairon](https://github.com/Ancairon))
 - gh labeler: go.d.plugin rm suffix [\#17407](https://github.com/netdata/netdata/pull/17407) ([ilyam8](https://github.com/ilyam8))
 - Bump go.mongodb.org/mongo-driver from 1.14.0 to 1.15.0 in /src/go/collectors/go.d.plugin [\#17406](https://github.com/netdata/netdata/pull/17406) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -19,6 +25,7 @@
 - go.d nvme meta: remove sudoers prereq [\#17395](https://github.com/netdata/netdata/pull/17395) ([ilyam8](https://github.com/ilyam8))
 - add simple collector to monitor lvm thin volumes space usage [\#17394](https://github.com/netdata/netdata/pull/17394) ([ilyam8](https://github.com/ilyam8))
 - fix percentages on alerts [\#17391](https://github.com/netdata/netdata/pull/17391) ([ktsaou](https://github.com/ktsaou))
+- Function docs edits [\#17390](https://github.com/netdata/netdata/pull/17390) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#17387](https://github.com/netdata/netdata/pull/17387) ([netdatabot](https://github.com/netdatabot))
 - go.d nvme: drop using `nvme` directly [\#17386](https://github.com/netdata/netdata/pull/17386) ([ilyam8](https://github.com/ilyam8))
 - Add option to cleanup health\_log table  [\#17385](https://github.com/netdata/netdata/pull/17385) ([stelfrag](https://github.com/stelfrag))
@@ -142,8 +149,10 @@
 - Compatibility with Prometheus HELP [\#17191](https://github.com/netdata/netdata/pull/17191) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add label for cgroup [\#17156](https://github.com/netdata/netdata/pull/17156) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix action lints [\#17120](https://github.com/netdata/netdata/pull/17120) ([tkatsoulas](https://github.com/tkatsoulas))
+- Alert transitions code cleanup [\#17103](https://github.com/netdata/netdata/pull/17103) ([stelfrag](https://github.com/stelfrag))
 - Skip Go code in CI if it hasn’t changed. [\#17077](https://github.com/netdata/netdata/pull/17077) ([Ferroin](https://github.com/Ferroin))
 - Fix conditional for Amazon Linux 2023 in repoconfig spec file. [\#17056](https://github.com/netdata/netdata/pull/17056) ([PaulSzymanski](https://github.com/PaulSzymanski))
+- Add fallback logic in installer for fetching files. [\#17045](https://github.com/netdata/netdata/pull/17045) ([Ferroin](https://github.com/Ferroin))
 - Add basic support for dinit in our system service handling code. [\#16836](https://github.com/netdata/netdata/pull/16836) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.3](https://github.com/netdata/netdata/tree/v1.45.3) (2024-04-12)
@@ -406,12 +415,6 @@
 - Fix directory handling in Go toolchain handling script. [\#16828](https://github.com/netdata/netdata/pull/16828) ([Ferroin](https://github.com/Ferroin))
 - Change query label matching logic [\#16827](https://github.com/netdata/netdata/pull/16827) ([stelfrag](https://github.com/stelfrag))
 - Improve container detection logic for edit-config. [\#16825](https://github.com/netdata/netdata/pull/16825) ([Ferroin](https://github.com/Ferroin))
-- Preserve label source during migration [\#16821](https://github.com/netdata/netdata/pull/16821) ([stelfrag](https://github.com/stelfrag))
-- Add explicit callback types for readability. [\#16820](https://github.com/netdata/netdata/pull/16820) ([vkalintiris](https://github.com/vkalintiris))
-- Update documentation \(Replication DB\) [\#16816](https://github.com/netdata/netdata/pull/16816) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add script to ensure a usable Go toolchain is installed. [\#16815](https://github.com/netdata/netdata/pull/16815) ([Ferroin](https://github.com/Ferroin))
-- fix verify\_netdata\_host\_prefix log spam [\#16814](https://github.com/netdata/netdata/pull/16814) ([ilyam8](https://github.com/ilyam8))
-- use fs type to veryfiy procfs/sysfs [\#16813](https://github.com/netdata/netdata/pull/16813) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
