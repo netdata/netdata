@@ -63,7 +63,7 @@ modules:
               default_value: 10
               required: false
             - name: timeout
-              description: `arcconf` binary execution timeout.
+              description: arcconf binary execution timeout.
               default_value: 2
               required: false
         examples:
