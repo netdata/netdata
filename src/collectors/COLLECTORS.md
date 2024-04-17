@@ -987,6 +987,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### Storage, Mount Points and Filesystems
 
+- [Adaptec Hardware Raid](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/adaptecraid/integrations/adaptec_hardware_raid.md)
+
 - [AdaptecRAID](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/adaptec_raid/integrations/adaptecraid.md)
 
 - [Altaro Backup](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/altaro_backup.md)
