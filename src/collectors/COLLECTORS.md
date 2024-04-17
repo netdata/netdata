@@ -1025,8 +1025,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Lagerist Disk latency](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/lagerist_disk_latency.md)
 
-- [MegaCLI](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/megacli/integrations/megacli.md)
-
 - [MegaCli Hardware Raid](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/megacli/integrations/megacli_hardware_raid.md)
 
 - [MogileFS](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/mogilefs.md)
