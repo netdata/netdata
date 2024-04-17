@@ -1,0 +1,1 @@
+integrations/adaptec_hardware_raid.md
