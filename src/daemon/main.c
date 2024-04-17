@@ -1889,9 +1889,6 @@ int main(int argc, char **argv) {
         load_cloud_conf(0);
     }
 
-    // @stelfrag: Where is the right place to call this?
-    watcher_thread_start();
-
     // ------------------------------------------------------------------------
     // initialize netdata
     {
@@ -2109,6 +2106,8 @@ int main(int argc, char **argv) {
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
+
+    watcher_thread_start();
 
     // init sentry
 #ifdef ENABLE_SENTRY
