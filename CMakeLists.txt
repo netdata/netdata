@@ -1842,6 +1842,10 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
+        if(NOT SYSTEMD_FOUND)
+                message(FATAL_ERROR "Systemd journal plugin requires systemd, but systemd was not found.")
+        endif()
+
         add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
         target_link_libraries(systemd-journal.plugin libnetdata)
 
