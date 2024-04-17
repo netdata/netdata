@@ -192,16 +192,16 @@ static int is_host_available(uuid_t *host_id)
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to check host existence");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
+
+    param = 0;
     rc = sqlite3_step_monitored(res);
 
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when checking host existence");
+done:
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_FINALIZE(res);
 
     return (rc == SQLITE_ROW);
 }
@@ -245,9 +245,7 @@ static void sql_delete_aclk_table_list(char *host_guid)
     while (sqlite3_step_monitored(res) == SQLITE_ROW)
         buffer_strcat(sql, (char *) sqlite3_column_text(res, 0));
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement to clean up aclk tables, rc = %d", rc);
+    SQLITE_FINALIZE(res);
 
     rc = db_execute(db_meta, buffer_tostring(sql));
     if (unlikely(rc))
@@ -281,11 +279,10 @@ static void sql_unregister_node(char *machine_guid)
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to remove host node id");
-        goto skip;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host_uuid, sizeof(host_uuid), SQLITE_STATIC));
+    param = 0;
+
     rc = sqlite3_step_monitored(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute command to remove host node id");
@@ -295,9 +292,10 @@ static void sql_unregister_node(char *machine_guid)
        machine_guid = NULL;
     }
 
-skip:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize statement to remove host node id");
+done:
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_FINALIZE(res);
     freez(machine_guid);
 }
 

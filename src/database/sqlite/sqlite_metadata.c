@@ -286,27 +286,19 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res, 1, node_id, sizeof(*node_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to store node instance information");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, node_id, sizeof(*node_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
-    rc = sqlite3_bind_blob(res, 2, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to store node instance information");
-        goto failed;
-    }
-
+    param = 0;
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store node instance information, rc = %d", rc);
     rc = sqlite3_changes(db_meta);
 
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when storing node instance information");
-
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
     return rc - 1;
 }
 
@@ -329,19 +321,18 @@ int get_node_id(uuid_t *host_id, uuid_t *node_id)
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to select node instance information");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
+
+    param = 0;
     rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW && node_id))
         uuid_copy(*node_id, *((uuid_t *) sqlite3_column_blob(res, 0)));
 
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when selecting node instance information");
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
 
     return (rc == SQLITE_ROW) ? 0 : -1;
 }
@@ -367,29 +358,22 @@ void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to invalidate node instance information");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
     if (claim_id)
-        rc = sqlite3_bind_blob(res, 2, claim_id, sizeof(*claim_id), SQLITE_STATIC);
+        SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, claim_id, sizeof(*claim_id), SQLITE_STATIC));
     else
-        rc = sqlite3_bind_null(res, 2);
+        SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
 
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind claim_id parameter to invalidate node instance information");
-        goto failed;
-    }
-
+    param = 0;
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to invalidate node instance information, rc = %d", rc);
 
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when invalidating node instance information");
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_GET_NODE_INSTANCE_LIST                                                                                     \
@@ -437,15 +421,18 @@ struct node_instance_list *get_node_list(void)
             RRDHOST *host = rrdhost_find_by_guid(host_guid);
             if (!host)
                 continue;
+
             if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
-                netdata_log_info("ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
+                netdata_log_info(
+                    "ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
                 continue;
             }
+
             uuid_copy(node_list[row].host_id, *host_id);
             node_list[row].queryable = 1;
-            node_list[row].live = (host && (host == localhost || host->receiver
-                                            || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)))) ? 1 : 0;
-            node_list[row].hops = (host && host->system_info) ? host->system_info->hops :
+            node_list[row].live =
+                (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
+            node_list[row].hops = host->system_info ? host->system_info->hops :
                                   uuid_memcmp(host_id, &localhost->host_uuid) ? 1 : 0;
             node_list[row].hostname =
                 sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
@@ -457,8 +444,7 @@ struct node_instance_list *get_node_list(void)
     rrd_unlock();
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when fetching node instance information");
+    SQLITE_FINALIZE(res);
 
     return node_list;
 }
@@ -482,12 +468,10 @@ void sql_load_node_id(RRDHOST *host)
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to load node instance information");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
 
+    param = 0;
     rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW)) {
         if (likely(sqlite3_column_bytes(res, 0) == sizeof(uuid_t)))
@@ -496,9 +480,9 @@ void sql_load_node_id(RRDHOST *host)
             set_host_node_id(host, NULL);
     }
 
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when loading node instance information");
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
 }
 
 #define SELECT_HOST_INFO "SELECT system_key, system_value FROM host_info WHERE host_id = @host_id"
@@ -515,20 +499,18 @@ void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *sys
         return;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host parameter host information");
-        goto skip;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
+    param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        rrdhost_set_system_info_variable(system_info, (char *) sqlite3_column_text(res, 0),
-                                         (char *) sqlite3_column_text(res, 1));
+        rrdhost_set_system_info_variable(
+            system_info, (char *)sqlite3_column_text(res, 0), (char *)sqlite3_column_text(res, 1));
     }
 
-skip:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when reading host information");
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
 }
 
 #define SELECT_HOST_LABELS "SELECT label_key, label_value, source_type FROM host_label WHERE host_id = @host_id " \
@@ -547,21 +529,23 @@ RRDLABELS *sql_load_host_labels(uuid_t *host_id)
         return NULL;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host parameter host information");
-        goto skip;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
+    param = 0;
     labels = rrdlabels_create();
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        rrdlabels_add(labels, (const char *)sqlite3_column_text(res, 0), (const char *)sqlite3_column_text(res, 1), sqlite3_column_int(res, 2));
+        rrdlabels_add(
+            labels,
+            (const char *)sqlite3_column_text(res, 0),
+            (const char *)sqlite3_column_text(res, 1),
+            sqlite3_column_int(res, 2));
     }
 
-skip:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when reading host information");
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
     return labels;
 }
 
@@ -576,22 +560,19 @@ static int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind UUID parameter to %s, rc = %d", sql, rc);
-        goto skip;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, uuid, sizeof(*uuid), SQLITE_STATIC));
 
+    param = 0;
     rc = execute_insert(res);
     if (likely(rc == SQLITE_DONE))
         result = SQLITE_OK;
     else
         error_report("Failed to execute %s, rc = %d", sql, rc);
 
-skip:
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement %s, rc = %d", sql, rc);
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
     return result;
 }
 
@@ -812,8 +793,7 @@ static void delete_host_chart_labels(uuid_t *host_uuid)
         error_report("Failed to execute command to remove host chart labels");
 
 failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize statement to remove host chart labels");
+    SQLITE_FINALIZE(res);
 }
 
 static int host_label_store_to_sql_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
@@ -907,28 +887,22 @@ static int store_claim_id(uuid_t *host_id, uuid_t *claim_id)
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to store claim id");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
     if (claim_id)
-        rc = sqlite3_bind_blob(res, 2, claim_id, sizeof(*claim_id), SQLITE_STATIC);
+        SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param,claim_id, sizeof(*claim_id), SQLITE_STATIC));
     else
-        rc = sqlite3_bind_null(res, 2);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind claim_id parameter to host claim id");
-        goto failed;
-    }
+        SQLITE_BIND_FAIL(done, sqlite3_bind_null(res, ++param));
 
+    param = 0;
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store host claim id rc = %d", rc);
 
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when storing a host claim id");
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
 
     return rc != SQLITE_DONE;
 }
@@ -955,9 +929,7 @@ static void delete_dimension_uuid(uuid_t *dimension_uuid, sqlite3_stmt **action_
         error_report("Failed to delete dimension uuid, rc = %d", rc);
 
 skip_execution:
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement when deleting dimension UUID, rc = %d", rc);
+    SQLITE_RESET(res);
 }
 
 //
@@ -975,85 +947,36 @@ static int store_host_metadata(RRDHOST *host)
         }
     }
 
-    rc = sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = bind_text_null(res, ++param, rrdhost_hostname(host), 0);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = bind_text_null(res, ++param, rrdhost_registry_hostname(host), 1);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, host->rrd_update_every);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = bind_text_null(res, ++param, rrdhost_os(host), 1);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = bind_text_null(res, ++param, rrdhost_timezone(host), 1);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    // TODO: remove/migrate
-    rc = bind_text_null(res, ++param, "", 1);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, host->system_info ? host->system_info->hops : 0);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, host->rrd_memory_mode);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = bind_text_null(res, ++param, rrdhost_abbrev_timezone(host), 1);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, host->utc_offset);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = bind_text_null(res, ++param, rrdhost_program_name(host), 1);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = bind_text_null(res, ++param, rrdhost_program_version(host), 1);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int64(res, ++param, host->rrd_history_entries);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, (int ) host->health.health_enabled);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int64(res, ++param, (sqlite3_int64) host->last_connected);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_hostname(host), 0));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_registry_hostname(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_update_every));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_os(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_timezone(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, "", 1));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->system_info ? host->system_info->hops : 0));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_memory_mode));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_abbrev_timezone(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->utc_offset));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_name(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_version(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, host->rrd_history_entries));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, (int ) host->health.health_enabled));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, (sqlite3_int64) host->last_connected));
 
     int store_rc = sqlite3_step_monitored(res);
+
     if (unlikely(store_rc != SQLITE_DONE))
         error_report("Failed to store host %s, rc = %d", rrdhost_hostname(host), rc);
 
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to store host %s, rc = %d", rrdhost_hostname(host), rc);
+    SQLITE_RESET(res);
 
     return store_rc != SQLITE_DONE;
+
 bind_fail:
-    error_report("Failed to bind %d parameter to store host %s, rc = %d", param, rrdhost_hostname(host), rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to store host %s, rc = %d", rrdhost_hostname(host), rc);
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_RESET(res);
     return 1;
 }
 
@@ -1077,32 +1000,22 @@ static int add_host_sysinfo_key_value(const char *name, const char *value, uuid_
         }
     }
 
-    rc = sqlite3_bind_blob(res, ++param, uuid, sizeof(*uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = bind_text_null(res, ++param, name, 0);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = bind_text_null(res, ++param, value ? value : "unknown", 0);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, uuid, sizeof(*uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, name, 0));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, value ? value : "unknown", 0));
 
     int store_rc = sqlite3_step_monitored(res);
     if (unlikely(store_rc != SQLITE_DONE))
         error_report("Failed to store host info value %s, rc = %d", name, rc);
 
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to store host info value %s, rc = %d", name, rc);
+    SQLITE_RESET(res);
 
     return store_rc == SQLITE_DONE;
+
 bind_fail:
-    error_report("Failed to bind %d parameter to store host info values %s, rc = %d", param, name, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement to store host info values %s, rc = %d", name, rc);
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_RESET(res);
     return 0;
 }
 
@@ -1161,89 +1074,41 @@ static int store_chart_metadata(RRDSET *st)
         }
     }
 
-    rc = sqlite3_bind_blob(res, ++param, &st->chart_uuid, sizeof(st->chart_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_blob(res, ++param, &st->rrdhost->host_uuid, sizeof(st->rrdhost->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_text(res, ++param, string2str(st->parts.type), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_text(res, ++param, string2str(st->parts.id), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &st->chart_uuid, sizeof(st->chart_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &st->rrdhost->host_uuid, sizeof(st->rrdhost->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, string2str(st->parts.type), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, string2str(st->parts.id), -1, SQLITE_STATIC));
 
     const char *name = string2str(st->parts.name);
     if (name && *name)
-        rc = sqlite3_bind_text(res, ++param, name, -1, SQLITE_STATIC);
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, name, -1, SQLITE_STATIC));
     else
-        rc = sqlite3_bind_null(res, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_null(res, ++param));
 
-    rc = sqlite3_bind_text(res, ++param, rrdset_family(st), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_text(res, ++param, rrdset_context(st), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_text(res, ++param, rrdset_title(st), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_text(res, ++param, rrdset_units(st), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_text(res, ++param, rrdset_plugin_name(st), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_text(res, ++param, rrdset_module_name(st), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, (int) st->priority);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, st->update_every);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, st->chart_type);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, st->rrd_memory_mode);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, (int) st->db.entries);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, rrdset_family(st), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, rrdset_context(st), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, rrdset_title(st), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, rrdset_units(st), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, rrdset_plugin_name(st), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, rrdset_module_name(st), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, (int) st->priority));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, st->update_every));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, st->chart_type));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, st->rrd_memory_mode));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, (int) st->db.entries));
 
     store_rc = execute_insert(res);
     if (unlikely(store_rc != SQLITE_DONE))
         error_report("Failed to store chart, rc = %d", store_rc);
 
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement in chart store function, rc = %d", rc);
+    SQLITE_RESET(res);
 
     return store_rc != SQLITE_DONE;
 
 bind_fail:
-    error_report("Failed to bind parameter %d to store chart, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement in chart store function, rc = %d", rc);
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_RESET(res);
     return 1;
 }
 
@@ -1263,55 +1128,29 @@ static int store_dimension_metadata(RRDDIM *rd)
         }
     }
 
-    rc = sqlite3_bind_blob(res, ++param, &rd->metric_uuid, sizeof(rd->metric_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_blob(res, ++param, &rd->rrdset->chart_uuid, sizeof(rd->rrdset->chart_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_text(res, ++param, string2str(rd->id), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_text(res, ++param, string2str(rd->name), -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, (int) rd->multiplier);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, (int ) rd->divisor);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
-    rc = sqlite3_bind_int(res, ++param, rd->algorithm);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
-
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &rd->metric_uuid, sizeof(rd->metric_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &rd->rrdset->chart_uuid, sizeof(rd->rrdset->chart_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, string2str(rd->id), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, string2str(rd->name), -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, (int) rd->multiplier));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, (int ) rd->divisor));
+    SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, rd->algorithm));
     if (rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN))
-        rc = sqlite3_bind_text(res, ++param, "hidden", -1, SQLITE_STATIC);
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(res, ++param, "hidden", -1, SQLITE_STATIC));
     else
-        rc = sqlite3_bind_null(res, ++param);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_null(res, ++param));
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to store dimension, rc = %d", rc);
 
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement in store dimension, rc = %d", rc);
+    SQLITE_RESET(res);
     return 0;
 
 bind_fail:
-    error_report("Failed to bind parameter %d to store dimension, rc = %d", param, rc);
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset statement in store dimension, rc = %d", rc);
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_RESET(res);
     return 1;
 }
 
@@ -1415,12 +1254,10 @@ static bool chart_can_be_deleted(uuid_t *chart_uuid, sqlite3_stmt **check_res, b
 
 skip:
     if (check_res)
-        rc = sqlite3_reset(res);
+        SQLITE_RESET(res);
     else
-        rc = sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
 
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to %s statement that checks chart uuid existence rc = %d", check_res ? "reset" : "finalize", rc);
     return result == 0;
 }
 
@@ -1457,12 +1294,9 @@ static void delete_chart_uuid(uuid_t *chart_uuid, sqlite3_stmt **action_res, boo
 
 skip:
     if (action_res)
-        rc = sqlite3_reset(res);
+        SQLITE_RESET(res);
     else
-        rc = sqlite3_finalize(res);
-
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to %s statement that deletes a chart uuid rc = %d", action_res ? "reset" : "finalize", rc);
+        SQLITE_FINALIZE(res);
 }
 
 static void check_dimension_metadata(struct metadata_wc *wc)
@@ -1522,9 +1356,7 @@ static void check_dimension_metadata(struct metadata_wc *wc)
         last_row_id ? "resume" : "restart",
         (long long)(next_execution_t - now));
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement to check dimensions");
+    SQLITE_FINALIZE(res);
 }
 
 static void check_chart_metadata(struct metadata_wc *wc)
@@ -1568,11 +1400,8 @@ static void check_chart_metadata(struct metadata_wc *wc)
         true,
         false);
 
-    if (check_res)
-        sqlite3_finalize(check_res);
-
-    if (action_res)
-        sqlite3_finalize(action_res);
+    SQLITE_FINALIZE(check_res);
+    SQLITE_FINALIZE(action_res);
 
     now = now_realtime_sec();
     if (more_to_do)
@@ -1591,9 +1420,7 @@ static void check_chart_metadata(struct metadata_wc *wc)
         last_row_id ? "resume" : "restart",
         (long long)(next_execution_t - now));
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when reading charts");
+    SQLITE_FINALIZE(res);
 }
 
 static void check_label_metadata(struct metadata_wc *wc)
@@ -1639,11 +1466,8 @@ static void check_label_metadata(struct metadata_wc *wc)
         false,
         true);
 
-    if (check_res)
-        sqlite3_finalize(check_res);
-
-    if (action_res)
-        sqlite3_finalize(action_res);
+    SQLITE_FINALIZE(check_res);
+    SQLITE_FINALIZE(action_res);
 
     now = now_realtime_sec();
     if (more_to_do)
@@ -1662,9 +1486,7 @@ static void check_label_metadata(struct metadata_wc *wc)
         last_row_id ? "resume" : "restart",
         (long long)(next_execution_t - now));
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when checking charts");
+    SQLITE_FINALIZE(res);
 }
 
 
@@ -2053,10 +1875,8 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, bool use_trans
     if (use_transaction)
         (void)db_execute(db_meta, "COMMIT TRANSACTION");
 
-    if (ml_load_stmt) {
-        sqlite3_finalize(ml_load_stmt);
-        ml_load_stmt = NULL;
-    }
+    SQLITE_FINALIZE(ml_load_stmt);
+    ml_load_stmt = NULL;
 
     return more_to_do;
 }
