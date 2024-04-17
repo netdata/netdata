@@ -1889,9 +1889,6 @@ int main(int argc, char **argv) {
         load_cloud_conf(0);
     }
 
-    // @stelfrag: Where is the right place to call this?
-    watcher_thread_start();
-
     // ------------------------------------------------------------------------
     // initialize netdata
     {
