@@ -1904,7 +1904,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/libnetdata/ebpf/includes/hardirq.skel.h
             src/libnetdata/ebpf/includes/mdflush.skel.h
             src/libnetdata/ebpf/includes/mount.skel.h
-            src/libnetdata/ebpf/includes/networkviewer.skel.h
             src/libnetdata/ebpf/includes/oomkill.skel.h
             src/libnetdata/ebpf/includes/process.skel.h
             src/libnetdata/ebpf/includes/shm.skel.h
