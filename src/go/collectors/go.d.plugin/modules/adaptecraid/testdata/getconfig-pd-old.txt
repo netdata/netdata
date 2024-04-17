@@ -1,0 +1,107 @@
+Controllers found: 1
+----------------------------------------------------------------------
+Physical Device information
+----------------------------------------------------------------------
+      Device #0
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,0(0:0)
+         Reported Location                  : Connector 0, Device 0
+         Vendor                             : ATA
+         Model                              : XF1230-1A0480
+         Firmware                           : ST200354
+         Serial number                      : 7CS009RP
+         World-wide name                    : 5000C500813BF05B
+         Reserved Size                      : 138008 KB
+         Used Size                          : 457728 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 457862 MB
+         Write Cache                        : Disabled (write-through)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full power,Powered off
+         SSD                                : Yes
+         NCQ status                         : Enabled
+      Device #1
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,1(1:0)
+         Reported Location                  : Connector 0, Device 1
+         Vendor                             : ATA
+         Model                              : XF1230-1A0480
+         Firmware                           : ST200354
+         Serial number                      : 7CS009RQ
+         World-wide name                    : 5000C500813BF05C
+         Reserved Size                      : 138008 KB
+         Used Size                          : 457728 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 457862 MB
+         Write Cache                        : Disabled (write-through)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full power,Powered off
+         SSD                                : Yes
+         NCQ status                         : Enabled
+      Device #2
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,2(2:0)
+         Reported Location                  : Connector 0, Device 2
+         Vendor                             : ATA
+         Model                              : XF1230-1A0480
+         Firmware                           : ST200354
+         Serial number                      : 7CS00AAD
+         World-wide name                    : 5000C500813BF320
+         Reserved Size                      : 138008 KB
+         Used Size                          : 457728 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 457862 MB
+         Write Cache                        : Disabled (write-through)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full power,Powered off
+         SSD                                : Yes
+         NCQ status                         : Enabled
+      Device #3
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SATA 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,3(3:0)
+         Reported Location                  : Connector 0, Device 3
+         Vendor                             : ATA
+         Model                              : XF1230-1A0480
+         Firmware                           : ST200354
+         Serial number                      : 7CS00AAH
+         World-wide name                    : 5000C500813BF324
+         Reserved Size                      : 138008 KB
+         Used Size                          : 457728 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 457862 MB
+         Write Cache                        : Disabled (write-through)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full power,Powered off
+         SSD                                : Yes
+         NCQ status                         : Enabled
+
+
+Command completed successfully.
