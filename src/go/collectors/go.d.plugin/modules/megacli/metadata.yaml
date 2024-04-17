@@ -5,7 +5,7 @@ modules:
       plugin_name: go.d.plugin
       module_name: megacli
       monitored_instance:
-        name: MegaCli Hardware Raid
+        name: MegaCLI MegaRAID
         link: "https://wikitech.wikimedia.org/wiki/MegaCli"
         icon_filename: "hard-drive.svg"
         categories:
@@ -63,7 +63,7 @@ modules:
               default_value: 10
               required: false
             - name: timeout
-              description: lvs binary execution timeout.
+              description: megacli binary execution timeout.
               default_value: 2
               required: false
         examples:
