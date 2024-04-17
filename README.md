@@ -158,7 +158,7 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
   <br />
   Netdata actively supports and is a member of the Cloud Native Computing Foundation (CNCF)<br />
   &nbsp;<br/>
-  ...and due to your love :heart:, it is one of the most :star:'d projects in the <a href="https://landscape.cncf.io/?item=observability-and-analysis--monitoring--netdata">CNCF landscape</a>!
+  ...and due to your love :heart:, it is one of the most :star:'d projects in the <a href="https://landscape.cncf.io/?item=observability-and-analysis--observability--netdata">CNCF landscape</a>!
 </p>
 &nbsp;<br/>
 
