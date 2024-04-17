@@ -2515,7 +2515,6 @@ install(FILES src/collectors/python.d.plugin/python.d.conf
 # conf files
 
 install(FILES
-        src/collectors/python.d.plugin/adaptec_raid/adaptec_raid.conf
         src/collectors/python.d.plugin/alarms/alarms.conf
         src/collectors/python.d.plugin/am2320/am2320.conf
         src/collectors/python.d.plugin/anomalies/anomalies.conf
@@ -2565,7 +2564,6 @@ install(FILES
 # scripts
 
 install(FILES
-        src/collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
         src/collectors/python.d.plugin/alarms/alarms.chart.py
         src/collectors/python.d.plugin/am2320/am2320.chart.py
         src/collectors/python.d.plugin/anomalies/anomalies.chart.py
