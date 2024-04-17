@@ -1188,8 +1188,6 @@ int rrdeng_init(
         ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
 
     ctx->config.max_retention_s = max_retention_s;
-    strncpyz(ctx->config.dbfiles_path, dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
-    ctx->config.dbfiles_path[sizeof(ctx->config.dbfiles_path) - 1] = '\0';
 
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;

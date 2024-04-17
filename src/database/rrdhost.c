@@ -928,7 +928,6 @@ void dbengine_init(char *hostname) {
     }
 
     bool parallel_initialization = (storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
-    parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", parallel_initialization);
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
@@ -967,9 +966,6 @@ void dbengine_init(char *hostname) {
             config_move(CONFIG_SECTION_DB, dbengineconfig, CONFIG_SECTION_DB, dbengineconfig_new);
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig_new, tier_quota_mb[tier]);
         }
-
-//        size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
-//        storage_tiers_grouping_iterations[tier] = grouping_iterations;
 
         if(tier == 0)
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
