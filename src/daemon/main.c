@@ -2110,6 +2110,8 @@ int main(int argc, char **argv) {
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
 
+    watcher_thread_start();
+
     // init sentry
 #ifdef ENABLE_SENTRY
         sentry_native_init();
