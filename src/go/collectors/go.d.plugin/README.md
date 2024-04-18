@@ -114,9 +114,8 @@ see the appropriate collector readme.
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/redis)                           |             Redis             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/scaleio)                       |       Dell EMC ScaleIO        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/snmp)                             |             SNMP              |
-| [solr](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/solr)                             |             Solr              |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/squidlog)                     |             Squid             |
-| [springboot2](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/springboot2)               |         Spring Boot2          |
+| [storcli](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/storcli)                       |    Broadcom Hardware RAID     |
 | [supervisord](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/supervisord)               |          Supervisor           |
 | [systemdunits](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/systemdunits)             |      Systemd unit state       |
 | [tengine](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/tengine)                       |            Tengine            |
