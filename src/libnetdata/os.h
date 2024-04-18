@@ -60,7 +60,7 @@ pid_t get_system_pid_max(void);
 extern unsigned int system_hz;
 void get_system_HZ(void);
 
-#include <sys/timex.h>
+// #include <sys/timex.h>
 #if defined(__FreeBSD__) || defined(__APPLE__)
 #define ADJUST_TIMEX(x) ntp_adjtime(x)
 #else

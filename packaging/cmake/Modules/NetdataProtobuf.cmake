@@ -105,11 +105,11 @@ macro(netdata_detect_protobuf)
                 # logic for the old FindProtobuf module while others do not.
                 #
                 # Upstream bug reference: https://gitlab.kitware.com/cmake/cmake/-/issues/24321
-                find_package(Protobuf CONFIG)
+		# find_package(Protobuf CONFIG)
 
                 if(NOT TARGET protobuf::libprotobuf)
                         message(STATUS "Could not find Protobuf using Config mode, falling back to Module mode")
-                        find_package(Protobuf REQUIRED)
+			# find_package(Protobuf REQUIRED)
                 endif()
         endif()
 
@@ -163,10 +163,15 @@ macro(netdata_detect_protobuf)
                         set(NETDATA_PROTOBUF_INCLUDE_DIRS "")
                 endif()
         else()
-                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${PROTOBUF_PROTOC_EXECUTABLE})
-                set(NETDATA_PROTOBUF_CFLAGS_OTHER ${PROTOBUF_CFLAGS_OTHER})
-                set(NETDATA_PROTOBUF_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
-                set(NETDATA_PROTOBUF_LIBS ${PROTOBUF_LIBRARIES})
+		# set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${PROTOBUF_PROTOC_EXECUTABLE})
+		# set(NETDATA_PROTOBUF_CFLAGS_OTHER ${PROTOBUF_CFLAGS_OTHER})
+		# set(NETDATA_PROTOBUF_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
+		# set(NETDATA_PROTOBUF_LIBS ${PROTOBUF_LIBRARIES})
+		
+                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE "/bin/protoc")
+                set(NETDATA_PROTOBUF_CFLAGS_OTHER "")
+                set(NETDATA_PROTOBUF_INCLUDE_DIRS "")
+                set(NETDATA_PROTOBUF_LIBS "-lprotobuf")
         endif()
 
         set(ENABLE_PROTOBUF True)
