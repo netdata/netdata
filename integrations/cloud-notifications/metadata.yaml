@@ -506,7 +506,7 @@
     - Splunk
     - On-Call
   overview:
-    notification_description: "From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on Splunk VictorOps."
+    notification_description: "From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on Splunk On-Call/VictorOps."
     notification_limitations: ''
   setup:
     description: |
