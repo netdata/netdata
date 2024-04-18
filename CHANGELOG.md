@@ -6,6 +6,16 @@
 
 **Merged pull requests:**
 
+- Start watcher thread after fork [\#17436](https://github.com/netdata/netdata/pull/17436) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations.js [\#17434](https://github.com/netdata/netdata/pull/17434) ([netdatabot](https://github.com/netdatabot))
+- go.d fix adaptec/megacli meta name [\#17433](https://github.com/netdata/netdata/pull/17433) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17432](https://github.com/netdata/netdata/pull/17432) ([netdatabot](https://github.com/netdatabot))
+- go.d adaptec fix meta [\#17430](https://github.com/netdata/netdata/pull/17430) ([ilyam8](https://github.com/ilyam8))
+- remove python.d/adaptec\_raid [\#17429](https://github.com/netdata/netdata/pull/17429) ([ilyam8](https://github.com/ilyam8))
+- go.d rewrite python.d/adaptec\_raid [\#17428](https://github.com/netdata/netdata/pull/17428) ([ilyam8](https://github.com/ilyam8))
+- cncf changed the url [\#17427](https://github.com/netdata/netdata/pull/17427) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Regenerate integrations.js [\#17425](https://github.com/netdata/netdata/pull/17425) ([netdatabot](https://github.com/netdatabot))
+- Fix coverity issue 425241 [\#17424](https://github.com/netdata/netdata/pull/17424) ([stelfrag](https://github.com/stelfrag))
 - go.d megacli health fix megacli\_phys\_drive\_media\_errors [\#17419](https://github.com/netdata/netdata/pull/17419) ([ilyam8](https://github.com/ilyam8))
 - go.d megacli fix meta metrics\_description [\#17418](https://github.com/netdata/netdata/pull/17418) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/megacli [\#17417](https://github.com/netdata/netdata/pull/17417) ([ilyam8](https://github.com/ilyam8))
@@ -80,8 +90,11 @@
 - set min thread stack size to 1 MB [\#17317](https://github.com/netdata/netdata/pull/17317) ([ilyam8](https://github.com/ilyam8))
 - Call with resize true when dictionary has DICT\_OPTION\_INDEX\_HASHTABLE [\#17316](https://github.com/netdata/netdata/pull/17316) ([stelfrag](https://github.com/stelfrag))
 - Drop legacy dbengine support [\#17315](https://github.com/netdata/netdata/pull/17315) ([stelfrag](https://github.com/stelfrag))
+- Address cmake compilation [\#17314](https://github.com/netdata/netdata/pull/17314) ([thiagoftsm](https://github.com/thiagoftsm))
+- Explicitly require systemd for systemd journal plugin. [\#17313](https://github.com/netdata/netdata/pull/17313) ([Ferroin](https://github.com/Ferroin))
 - Fix assorted issues in the Docker build process. [\#17312](https://github.com/netdata/netdata/pull/17312) ([Ferroin](https://github.com/Ferroin))
 - dyncfg function on parents should not require any access rights [\#17310](https://github.com/netdata/netdata/pull/17310) ([ktsaou](https://github.com/ktsaou))
+- Add a build option to disable all optional features by default. [\#17309](https://github.com/netdata/netdata/pull/17309) ([Ferroin](https://github.com/Ferroin))
 - Update metadata frequency [\#17307](https://github.com/netdata/netdata/pull/17307) ([stelfrag](https://github.com/stelfrag))
 - Fix handling of post-release workflows triggered by Docker workflow. [\#17306](https://github.com/netdata/netdata/pull/17306) ([Ferroin](https://github.com/Ferroin))
 - go.d: sd ll: add mysql socket jobs [\#17305](https://github.com/netdata/netdata/pull/17305) ([ilyam8](https://github.com/ilyam8))
@@ -153,7 +166,6 @@
 - Skip Go code in CI if it hasn’t changed. [\#17077](https://github.com/netdata/netdata/pull/17077) ([Ferroin](https://github.com/Ferroin))
 - Fix conditional for Amazon Linux 2023 in repoconfig spec file. [\#17056](https://github.com/netdata/netdata/pull/17056) ([PaulSzymanski](https://github.com/PaulSzymanski))
 - Add fallback logic in installer for fetching files. [\#17045](https://github.com/netdata/netdata/pull/17045) ([Ferroin](https://github.com/Ferroin))
-- Add basic support for dinit in our system service handling code. [\#16836](https://github.com/netdata/netdata/pull/16836) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.3](https://github.com/netdata/netdata/tree/v1.45.3) (2024-04-12)
 
@@ -405,16 +417,6 @@
 - Include timer units failed state alert as default [\#16845](https://github.com/netdata/netdata/pull/16845) ([tkatsoulas](https://github.com/tkatsoulas))
 - kickstart: use extended-regexp in `get_redirect()` [\#16844](https://github.com/netdata/netdata/pull/16844) ([ilyam8](https://github.com/ilyam8))
 - Make the kickstart checksum's placeholder value more concrete [\#16843](https://github.com/netdata/netdata/pull/16843) ([tkatsoulas](https://github.com/tkatsoulas))
-- Improve service thread shutdown [\#16841](https://github.com/netdata/netdata/pull/16841) ([stelfrag](https://github.com/stelfrag))
-- Update statistics to address slow queries [\#16838](https://github.com/netdata/netdata/pull/16838) ([stelfrag](https://github.com/stelfrag))
-- New Permissions System [\#16837](https://github.com/netdata/netdata/pull/16837) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations.js [\#16835](https://github.com/netdata/netdata/pull/16835) ([netdatabot](https://github.com/netdatabot))
-- adds docs for cloud MS Teams integration [\#16834](https://github.com/netdata/netdata/pull/16834) ([papazach](https://github.com/papazach))
-- Fix coverity issue [\#16831](https://github.com/netdata/netdata/pull/16831) ([stelfrag](https://github.com/stelfrag))
-- add brotli and libyaml to buildinfo [\#16830](https://github.com/netdata/netdata/pull/16830) ([ktsaou](https://github.com/ktsaou))
-- Fix directory handling in Go toolchain handling script. [\#16828](https://github.com/netdata/netdata/pull/16828) ([Ferroin](https://github.com/Ferroin))
-- Change query label matching logic [\#16827](https://github.com/netdata/netdata/pull/16827) ([stelfrag](https://github.com/stelfrag))
-- Improve container detection logic for edit-config. [\#16825](https://github.com/netdata/netdata/pull/16825) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
