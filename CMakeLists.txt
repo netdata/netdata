@@ -234,7 +234,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
         set(LINUX True)
         set(COMPILED_FOR_LINUX True)
         add_definitions(-D_GNU_SOURCE)
-elseif(${CMAKE_SYSTEM_NAME} MATCHES "Cygwin")
+elseif(${CMAKE_SYSTEM_NAME} MATCHES "CYGWIN")
         set(CYGWIN True)
         set(COMPILED_FOR_CYGWIN True)
 else()
@@ -1291,7 +1291,6 @@ set(NETDATA_FILES
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
-        ${TIMEX_PLUGIN_FILES}
         ${PROFILE_PLUGIN_FILES}
 )
 

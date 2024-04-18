@@ -105,7 +105,7 @@ pid_t gettid(void) {
 
 #else /* __APPLE__*/
 
-    tid = (pid_t)syscall(SYS_gettid);
+    // tid = (pid_t)syscall(SYS_gettid);
 
 #endif /* __FreeBSD__, __APPLE__*/
 
