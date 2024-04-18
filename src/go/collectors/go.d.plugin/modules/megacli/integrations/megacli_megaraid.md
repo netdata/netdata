@@ -121,7 +121,16 @@ Metrics:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ megacli_adapter_health_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.adapter_health_state | MegaCLI adapter ${label:adapter_number} is in the degraded state |
+| [ megacli_phys_drive_media_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_media_errors | MegaCLI physical drive adapter ${label:adapter_number} slot ${label:slot_number} media errors |
+| [ megacli_phys_drive_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_predictive_failures | MegaCLI physical drive (adapter ${label:adapter_number} slot ${label:slot_number}) predictive failures |
+| [ megacli_bbu_charge ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_charge | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
+| [ megacli_bbu_recharge_cycles ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_recharge_cycles | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
 
 
 ## Setup

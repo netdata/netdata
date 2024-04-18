@@ -104,7 +104,13 @@ Metrics:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ adaptec_raid_ld_health_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf) | adaptecraid.logical_device_status | Adaptec RAID logical device (number ${label:ld_number} name ${label:ld_name}) health status is critical |
+| [ adaptec_raid_pd_health_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf) | adaptecraid.physical_device_state | Adaptec RAID physical device (number ${label:pd_number} location ${label:location}) health state is critical |
 
 
 ## Setup
