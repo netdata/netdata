@@ -80,7 +80,15 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
+    alerts:
+      - name: adaptec_raid_ld_health_status
+        metric: adaptecraid.logical_device_status
+        info: Adaptec RAID logical device (number ${label:ld_number} name ${label:ld_name}) health status is critical
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf
+      - name: adaptec_raid_pd_health_state
+        metric: adaptecraid.physical_device_state
+        info: Adaptec RAID physical device (number ${label:pd_number} location ${label:location}) health state is critical
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf
     metrics:
       folding:
         title: Metrics
