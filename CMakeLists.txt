@@ -230,11 +230,19 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
         set(FREEBSD True)
         set(COMPILED_FOR_FREEBSD True)
-else()
+elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
         set(LINUX True)
         set(COMPILED_FOR_LINUX True)
         add_definitions(-D_GNU_SOURCE)
+elseif(${CMAKE_SYSTEM_NAME} MATCHES "Cygwin")
+        set(CYGWIN True)
+        set(COMPILED_FOR_CYGWIN True)
+else()
+        set(FOREIGN_OS True)
+        set(COMPILED_FOR_FOREIGN_OS True)
 endif()
+
+message(INFO "Detected CMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}")
 
 #
 # Libm
