@@ -96,6 +96,10 @@ const struct netdata_static_thread static_threads_macos[] = {
     }
 };
 
+const struct netdata_static_thread static_threads_windows[] = {
+    {NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL}
+};
+
 struct netdata_static_thread *static_threads_get() {
     return static_threads_concat(static_threads_common, static_threads_linux);
 }

@@ -1321,6 +1321,10 @@ elseif(FREEBSD)
                 ${FREEBSD_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
         )
+elseif(FOREIGN_OS)
+        list(APPEND NETDATA_FILES
+                src/daemon/static_threads_windows.c
+        )
 endif()
 
 set(MQTT_WEBSOCKETS_FILES

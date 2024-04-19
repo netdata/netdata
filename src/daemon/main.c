@@ -2104,8 +2104,10 @@ int main(int argc, char **argv) {
     delta_startup_time("become daemon");
 
     // fork, switch user, create pid file, set process priority
+#if 0
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
+#endif
 
     watcher_thread_start();
 

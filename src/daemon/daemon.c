@@ -98,6 +98,7 @@ static void prepare_required_directories(uid_t uid, gid_t gid) {
     clean_directory(netdata_configured_lock_dir);
 }
 
+#if 0
 static int become_user(const char *username, int pid_fd) {
     int am_i_root = (getuid() == 0)?1:0;
 
@@ -186,6 +187,13 @@ static int become_user(const char *username, int pid_fd) {
 
     return(0);
 }
+#else
+static int become_user(const char *username, int pid_fd) {
+    UNUSED(username);
+    UNUSED(pid_fd);
+    return 0;
+}
+#endif
 
 #ifndef OOM_SCORE_ADJ_MAX
 #define OOM_SCORE_ADJ_MAX (1000)

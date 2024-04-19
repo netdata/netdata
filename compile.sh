@@ -4,7 +4,7 @@ set -exu -o pipefail
 
 export PATH="/usr/local/bin:${PATH}"
 
-WT_ROOT="/home/costa/src/netdata-ktsaou.git"
+WT_ROOT="/cygdrive/c/Users/vk/repos/nd/master"
 WT_PREFIX="/tmp"
 BUILD_TYPE="Debug"
 
@@ -17,8 +17,8 @@ fi
     -G Ninja \
     -DCMAKE_INSTALL_PREFIX="${WT_PREFIX}" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-    -DCMAKE_C_FLAGS="-Wall -Wextra" \
-    -DNETDATA_USER=costa \
+    -DCMAKE_C_FLAGS="-Wall -Wextra -Wno-char-subscripts" \
+    -DNETDATA_USER=vk \
     -DDEFAULT_FEATURE_STATE=Off \
     -DENABLE_H2O=Off \
     -DENABLE_LOGS_MANAGEMENT_TESTS=Off \
