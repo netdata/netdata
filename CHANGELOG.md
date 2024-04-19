@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Add documentation for VictorOps cloud notifications [\#17445](https://github.com/netdata/netdata/pull/17445) ([juacker](https://github.com/juacker))
+- Regenerate integrations.js [\#17439](https://github.com/netdata/netdata/pull/17439) ([netdatabot](https://github.com/netdatabot))
+- go.d mega/adaptec meta add alerts [\#17438](https://github.com/netdata/netdata/pull/17438) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17437](https://github.com/netdata/netdata/pull/17437) ([netdatabot](https://github.com/netdatabot))
 - Start watcher thread after fork [\#17436](https://github.com/netdata/netdata/pull/17436) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#17434](https://github.com/netdata/netdata/pull/17434) ([netdatabot](https://github.com/netdatabot))
 - go.d fix adaptec/megacli meta name [\#17433](https://github.com/netdata/netdata/pull/17433) ([ilyam8](https://github.com/ilyam8))
@@ -16,6 +20,8 @@
 - cncf changed the url [\#17427](https://github.com/netdata/netdata/pull/17427) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Regenerate integrations.js [\#17425](https://github.com/netdata/netdata/pull/17425) ([netdatabot](https://github.com/netdatabot))
 - Fix coverity issue 425241 [\#17424](https://github.com/netdata/netdata/pull/17424) ([stelfrag](https://github.com/stelfrag))
+- Indent generated files [\#17423](https://github.com/netdata/netdata/pull/17423) ([vkalintiris](https://github.com/vkalintiris))
+- Associate sentry events with guid. [\#17420](https://github.com/netdata/netdata/pull/17420) ([vkalintiris](https://github.com/vkalintiris))
 - go.d megacli health fix megacli\_phys\_drive\_media\_errors [\#17419](https://github.com/netdata/netdata/pull/17419) ([ilyam8](https://github.com/ilyam8))
 - go.d megacli fix meta metrics\_description [\#17418](https://github.com/netdata/netdata/pull/17418) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/megacli [\#17417](https://github.com/netdata/netdata/pull/17417) ([ilyam8](https://github.com/ilyam8))
@@ -412,11 +418,6 @@
 - detect sockets direction [\#16861](https://github.com/netdata/netdata/pull/16861) ([ktsaou](https://github.com/ktsaou))
 - add freebsd jail detection to system-info.sh [\#16858](https://github.com/netdata/netdata/pull/16858) ([ilyam8](https://github.com/ilyam8))
 - Add ARMv6 static builds. [\#16853](https://github.com/netdata/netdata/pull/16853) ([Ferroin](https://github.com/Ferroin))
-- CNCF link fix [\#16851](https://github.com/netdata/netdata/pull/16851) ([hugovalente-pm](https://github.com/hugovalente-pm))
-- Disable local Go builds in our RPM packages. [\#16848](https://github.com/netdata/netdata/pull/16848) ([Ferroin](https://github.com/Ferroin))
-- Include timer units failed state alert as default [\#16845](https://github.com/netdata/netdata/pull/16845) ([tkatsoulas](https://github.com/tkatsoulas))
-- kickstart: use extended-regexp in `get_redirect()` [\#16844](https://github.com/netdata/netdata/pull/16844) ([ilyam8](https://github.com/ilyam8))
-- Make the kickstart checksum's placeholder value more concrete [\#16843](https://github.com/netdata/netdata/pull/16843) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
