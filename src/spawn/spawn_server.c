@@ -110,6 +110,7 @@ static void child_waited_async_cb(uv_async_t *async_handle)
     }
 }
 
+#ifndef COMPILED_FOR_FOREIGN_OS
 static void wait_children(void *arg)
 {
     siginfo_t i;
@@ -156,6 +157,13 @@ static void wait_children(void *arg)
         }
     }
 }
+#else
+static void wait_children(void *arg)
+{
+    fatal("Should not have called this...");
+    UNUSED(arg);
+}
+#endif
 
 void spawn_protocol_execute_command(void *handle, char *command_to_run, uint16_t command_length)
 {

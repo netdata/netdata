@@ -298,3 +298,8 @@ int getsysctl_by_name(const char *name, void *ptr, size_t len) {
 const char *os_type = "linux";
 
 #endif
+
+
+#ifdef COMPILED_FOR_FOREIGN_OS
+const char *os_type = "windows";
+#endif
