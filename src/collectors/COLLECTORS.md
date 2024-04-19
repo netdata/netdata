@@ -1039,6 +1039,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Starwind VSAN VSphere Edition](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/starwind_vsan_vsphere_edition.md)
 
+- [StoreCLI RAID](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/storcli/integrations/storecli_raid.md)
+
 - [Storidge](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/storidge.md)
 
 - [Synology ActiveBackup](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/synology_activebackup.md)
