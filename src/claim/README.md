@@ -556,7 +556,7 @@ To remove a node from you Space in Netdata Cloud, and connect it to another Spac
 
 ### Regenerate Claiming Token
 
-In case of some security reason, or other, you need to revoke your previous claiming token and generate a new 
+If in case of some security reason, or other, you need to revoke your previous claiming token and generate a new 
 one you can achieve that from the Netdata Cloud UI.
 
 On any screen where you see the connect the node to Netdata Cloud command you'll see above it, next to the 
