@@ -31,7 +31,7 @@ In the modal, give your custom dashboard a name, and click **+ Add**.
 
 ## Using your dashboard
 
-Dashboards are designed to be interactive and flexible so you can design them to your exact needs. They are made from any number of charts and cards, which can contain charts or text.
+Dashboards are designed to be interactive and flexible so you can design them to your needs. They are made from any number of charts and cards, which can contain charts or text.
 
 ### Charts
 
@@ -43,7 +43,7 @@ Charts also synchronize as you interact with them, even across contexts _or_ nod
 
 You can use text cards as notes to explain to other members of the [War Room](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms) the purpose of the dashboard's arrangement.
 
-By clicking the `T` icon on the text box, you can cycle through font sizes.
+By clicking the `T` icon on the text box, you can switch between font sizes.
 
 ### Move elements
 
@@ -63,7 +63,7 @@ charts. Of course, you can continue to zoom, highlight, and pan through time jus
 
 ### Rename a chart
 
-By using the 3-dot icon in the corner of any chart, you can rename it to better explain your use case, or the visualization settings you have selected for the chart.
+Using the 3-dot icon in the corner of any chart, you can rename it to better explain your use case or the visualization settings you've chosen for the chart.
 
 ### Remove an individual element
 
