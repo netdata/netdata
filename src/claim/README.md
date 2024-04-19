@@ -560,7 +560,7 @@ In case of some security reason, or other, you need to revoke your previous clai
 one you can achieve that from the Netdata Cloud UI.
 
 On any screen where you see the connect the node to Netdata Cloud command you'll see above it, next to the 
-[updates channel](ttps://github.com/netdata/netdata/blob/master/docs/netdata-agent/versions-and-platforms.md), a 
+[updates channel](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/versions-and-platforms.md), a 
 button to **Regenerate toke**. This action will invalidate your previous token and generate a fresh new one.
 
 Only the administrators of a Space in Netdata Cloud can trigger this action.
