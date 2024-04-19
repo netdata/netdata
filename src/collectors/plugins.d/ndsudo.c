@@ -14,6 +14,22 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "storcli-controllers-info",
+        .params = "/cALL show all J nolog",
+        .search = {
+            [0] = "storcli",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "storcli-drives-info",
+        .params = "/cALL/eALL/sALL show all J nolog",
+        .search = {
+            [0] = "storcli",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "lvs-report-json",
         .params = "--reportformat json --units b --nosuffix -o {{options}}",
         .search = {
