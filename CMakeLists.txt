@@ -1283,7 +1283,6 @@ set(NETDATA_FILES
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
-        ${TIMEX_PLUGIN_FILES}
         ${PROFILE_PLUGIN_FILES}
 )
 
@@ -1294,6 +1293,7 @@ if(LINUX)
                 ${DISKSPACE_PLUGIN_FILES}
                 ${PROC_PLUGIN_FILES}
                 ${TC_PLUGIN_FILES}
+                ${TIMEX_PLUGIN_FILES}
         )
 
         if(ENABLE_SENTRY)
@@ -1305,11 +1305,13 @@ elseif(MACOS)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_macos.c
                 ${MACOS_PLUGIN_FILES}
+                ${TIMEX_PLUGIN_FILES}
         )
 elseif(FREEBSD)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_freebsd.c
                 ${FREEBSD_PLUGIN_FILES}
+                ${TIMEX_PLUGIN_FILES}
         )
 endif()
 

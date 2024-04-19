@@ -12,22 +12,12 @@ void *health_main(void *ptr);
 void *pluginsd_main(void *ptr);
 void *service_main(void *ptr);
 void *statsd_main(void *ptr);
-void *timex_main(void *ptr);
 void *profile_main(void *ptr);
 void *replication_thread_main(void *ptr);
 
 extern bool global_statistics_enabled;
 
 const struct netdata_static_thread static_threads_common[] = {
-    {
-        .name = "P[timex]",
-        .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "timex",
-        .enabled = 1,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = timex_main
-    },
     {
         .name = "P[idlejitter]",
         .config_section = CONFIG_SECTION_PLUGINS,
