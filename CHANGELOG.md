@@ -6,7 +6,17 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17458](https://github.com/netdata/netdata/pull/17458) ([netdatabot](https://github.com/netdatabot))
+- ndsudo add storcli [\#17455](https://github.com/netdata/netdata/pull/17455) ([ilyam8](https://github.com/ilyam8))
+- go.d add storcli collector [\#17454](https://github.com/netdata/netdata/pull/17454) ([ilyam8](https://github.com/ilyam8))
+- Bump github.com/vmware/govmomi from 0.37.0 to 0.37.1 in /src/go/collectors/go.d.plugin [\#17451](https://github.com/netdata/netdata/pull/17451) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/miekg/dns from 1.1.58 to 1.1.59 in /src/go/collectors/go.d.plugin [\#17449](https://github.com/netdata/netdata/pull/17449) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/prometheus/common from 0.52.3 to 0.53.0 in /src/go/collectors/go.d.plugin [\#17448](https://github.com/netdata/netdata/pull/17448) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump github.com/docker/docker from 26.0.1+incompatible to 26.0.2+incompatible in /src/go/collectors/go.d.plugin [\#17447](https://github.com/netdata/netdata/pull/17447) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Regenerate integrations.js [\#17446](https://github.com/netdata/netdata/pull/17446) ([netdatabot](https://github.com/netdatabot))
 - Add documentation for VictorOps cloud notifications [\#17445](https://github.com/netdata/netdata/pull/17445) ([juacker](https://github.com/juacker))
+- Reconnect to the cloud when resuming from suspension [\#17444](https://github.com/netdata/netdata/pull/17444) ([stelfrag](https://github.com/stelfrag))
+- timex is not supported on windows. [\#17443](https://github.com/netdata/netdata/pull/17443) ([vkalintiris](https://github.com/vkalintiris))
 - Regenerate integrations.js [\#17439](https://github.com/netdata/netdata/pull/17439) ([netdatabot](https://github.com/netdatabot))
 - go.d mega/adaptec meta add alerts [\#17438](https://github.com/netdata/netdata/pull/17438) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17437](https://github.com/netdata/netdata/pull/17437) ([netdatabot](https://github.com/netdatabot))
@@ -28,6 +38,7 @@
 - Regenerate integrations.js [\#17416](https://github.com/netdata/netdata/pull/17416) ([netdatabot](https://github.com/netdatabot))
 - go.d sd ll set max\_time\_series for prometheus/clickhouse [\#17415](https://github.com/netdata/netdata/pull/17415) ([ilyam8](https://github.com/ilyam8))
 - rewrite megacli in go [\#17410](https://github.com/netdata/netdata/pull/17410) ([ilyam8](https://github.com/ilyam8))
+- dashboards doc edits [\#17409](https://github.com/netdata/netdata/pull/17409) ([Ancairon](https://github.com/Ancairon))
 - Logs tab docs in dashboard section [\#17408](https://github.com/netdata/netdata/pull/17408) ([Ancairon](https://github.com/Ancairon))
 - gh labeler: go.d.plugin rm suffix [\#17407](https://github.com/netdata/netdata/pull/17407) ([ilyam8](https://github.com/ilyam8))
 - Bump go.mongodb.org/mongo-driver from 1.14.0 to 1.15.0 in /src/go/collectors/go.d.plugin [\#17406](https://github.com/netdata/netdata/pull/17406) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -407,17 +418,6 @@
 - Rm refs to map and save modes [\#16874](https://github.com/netdata/netdata/pull/16874) ([vkalintiris](https://github.com/vkalintiris))
 - Fix coverity issues [\#16873](https://github.com/netdata/netdata/pull/16873) ([stelfrag](https://github.com/stelfrag))
 - Network Viewer \(local-sockets version\) [\#16872](https://github.com/netdata/netdata/pull/16872) ([ktsaou](https://github.com/ktsaou))
-- Limit what we upload to GCS for nightlies. [\#16870](https://github.com/netdata/netdata/pull/16870) ([Ferroin](https://github.com/Ferroin))
-- Use dagger to build and test the agent. [\#16868](https://github.com/netdata/netdata/pull/16868) ([vkalintiris](https://github.com/vkalintiris))
-- Local sockets for network namespaces [\#16867](https://github.com/netdata/netdata/pull/16867) ([ktsaou](https://github.com/ktsaou))
-- Fix coverity issue [\#16866](https://github.com/netdata/netdata/pull/16866) ([stelfrag](https://github.com/stelfrag))
-- update alpine 3.16 fts-dev [\#16865](https://github.com/netdata/netdata/pull/16865) ([ilyam8](https://github.com/ilyam8))
-- Remove old mention of save db mode [\#16864](https://github.com/netdata/netdata/pull/16864) ([Ancairon](https://github.com/Ancairon))
-- port useful code from incomplete PRs [\#16863](https://github.com/netdata/netdata/pull/16863) ([ktsaou](https://github.com/ktsaou))
-- apply the right prototype to instances [\#16862](https://github.com/netdata/netdata/pull/16862) ([ktsaou](https://github.com/ktsaou))
-- detect sockets direction [\#16861](https://github.com/netdata/netdata/pull/16861) ([ktsaou](https://github.com/ktsaou))
-- add freebsd jail detection to system-info.sh [\#16858](https://github.com/netdata/netdata/pull/16858) ([ilyam8](https://github.com/ilyam8))
-- Add ARMv6 static builds. [\#16853](https://github.com/netdata/netdata/pull/16853) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
