@@ -18,6 +18,8 @@ const (
 	prioPhysDrivePredictiveFailures
 	prioPhysDriveSmartAlertStatus
 	prioPhysDriveTemperature
+
+	prioBBUTemperature
 )
 
 var controllerChartsTmpl = module.Charts{
@@ -106,13 +108,32 @@ var (
 	physDriveTemperatureChartTmpl = module.Chart{
 		ID:       "phys_drive_%s_cntrl_%s_temperature",
 		Title:    "Physical Drive temperature",
-		Units:    "status",
+		Units:    "Celsius",
 		Fam:      "pd temperature",
 		Ctx:      "storcli.phys_drive_temperature",
 		Type:     module.Line,
 		Priority: prioPhysDriveTemperature,
 		Dims: module.Dims{
 			{ID: "phys_drive_%s_cntrl_%s_temperature", Name: "temperature"},
+		},
+	}
+)
+
+var bbuChartsTmpl = module.Charts{
+	bbuTemperatureChartTmpl.Copy(),
+}
+
+var (
+	bbuTemperatureChartTmpl = module.Chart{
+		ID:       "bbu_%s_cntrl_%s_temperature",
+		Title:    "BBU temperature",
+		Units:    "Celsius",
+		Fam:      "bbu temperature",
+		Ctx:      "storcli.bbu_temperature",
+		Type:     module.Line,
+		Priority: prioBBUTemperature,
+		Dims: module.Dims{
+			{ID: "bbu_%s_cntrl_%s_temperature", Name: "temperature"},
 		},
 	}
 )
@@ -141,7 +162,7 @@ func (s *StorCli) addControllerCharts(cntrl controllerInfo) {
 func (s *StorCli) addPhysDriveCharts(cntrlNum int, di *driveInfo, ds *driveState, da *driveAttrs) {
 	charts := physDriveChartsTmpl.Copy()
 
-	if _, ok := parseInt(getDriveTemperature(ds.DriveTemperature)); !ok {
+	if _, ok := parseInt(getTemperature(ds.DriveTemperature)); !ok {
 		_ = charts.Remove(physDriveTemperatureChartTmpl.ID)
 	}
 
@@ -162,6 +183,26 @@ func (s *StorCli) addPhysDriveCharts(cntrlNum int, di *driveInfo, ds *driveState
 		}
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, da.WWN, num)
+		}
+	}
+
+	if err := s.Charts().Add(*charts...); err != nil {
+		s.Warning(err)
+	}
+}
+
+func (s *StorCli) addBBUCharts(cntrlNum, bbuNum, model string) {
+	charts := bbuChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, bbuNum, cntrlNum)
+		chart.Labels = []module.Label{
+			{Key: "controller_number", Value: cntrlNum},
+			{Key: "bbu_number", Value: bbuNum},
+			{Key: "model", Value: model},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, bbuNum, cntrlNum)
 		}
 	}
 
