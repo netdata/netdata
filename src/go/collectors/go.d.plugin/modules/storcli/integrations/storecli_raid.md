@@ -99,13 +99,39 @@ Metrics:
 | storcli.phys_drive_errors | media, other | errors/s |
 | storcli.phys_drive_predictive_failures | predictive_failures | failures/s |
 | storcli.phys_drive_smart_alert_status | active, inactive | status |
-| storcli.phys_drive_temperature | temperature | status |
+| storcli.phys_drive_temperature | temperature | Celsius |
+
+### Per bbu
+
+These metrics refer to the Backup Battery Unit.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| controller_number | Controller number (index) |
+| bbu_number | BBU number (index) |
+| model | BBU model |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| storcli.bbu_temperature | temperature | Celsius |
 
 
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ storcli_controller_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.controller_status | RAID controller ${label:controller_number} health status is not optimal |
+| [ storcli_controller_bbu_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.controller_bbu_status | RAID controller ${label:controller_number} BBU is unhealthy |
+| [ storcli_phys_drive_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.phys_drive_errors | RAID physical drive c${label:controller_number}/e${label:enclosure_number}/s${label:slot_number} errors |
+| [ storcli_phys_drive_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.phys_drive_predictive_failures | RAID physical drive c${label:controller_number}/e${label:enclosure_number}/s${label:slot_number} predictive failures |
 
 
 ## Setup
