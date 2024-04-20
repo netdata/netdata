@@ -112,7 +112,7 @@ func (s *StorCli) collectMegaRaidDrives(mx map[string]int64, resp *drivesInfoRes
 			if v, ok := parseInt(string(state.PredictiveFailureCount)); ok {
 				mx[px+"predictive_failure_count"] = v
 			}
-			if v, ok := parseInt(getDriveTemperature(state.DriveTemperature)); ok {
+			if v, ok := parseInt(getTemperature(state.DriveTemperature)); ok {
 				mx[px+"temperature"] = v
 			}
 			for _, st := range []string{"active", "inactive"} {
@@ -120,6 +120,8 @@ func (s *StorCli) collectMegaRaidDrives(mx map[string]int64, resp *drivesInfoRes
 			}
 			if state.SmartAlertFlagged == "Yes" {
 				mx[px+"smart_alert_status_active"] = 1
+			} else {
+				mx[px+"smart_alert_status_inactive"] = 1
 			}
 		}
 	}
@@ -216,13 +218,13 @@ func getDriveAttrs(driveDetailedInfo map[string]json.RawMessage, id string) (*dr
 	return &state, nil
 }
 
-func getDriveTemperature(s string) string {
-	// ' 28C (82.40 F)'
-	i := strings.IndexByte(s, 'C')
+func getTemperature(temp string) string {
+	// ' 28C (82.40 F)' (drive) or '33C' (bbu)
+	i := strings.IndexByte(temp, 'C')
 	if i == -1 {
 		return ""
 	}
-	return strings.TrimSpace(s[:i])
+	return strings.TrimSpace(temp[:i])
 }
 
 func parseInt(s string) (int64, bool) {

@@ -47,13 +47,14 @@ func (s *StorCli) collectControllersInfo(mx map[string]int64, resp *controllersI
 	for _, v := range resp.Controllers {
 		cntrl := v.ResponseData
 
-		idx := strconv.Itoa(cntrl.Basics.Controller)
-		if !s.controllers[idx] {
-			s.controllers[idx] = true
+		cntrlNum := strconv.Itoa(cntrl.Basics.Controller)
+
+		if !s.controllers[cntrlNum] {
+			s.controllers[cntrlNum] = true
 			s.addControllerCharts(cntrl)
 		}
 
-		px := fmt.Sprintf("cntrl_%s_", idx)
+		px := fmt.Sprintf("cntrl_%s_", cntrlNum)
 
 		for _, st := range []string{"optimal", "degraded", "partially_degraded", "failed"} {
 			mx[px+"status_"+st] = 0
@@ -72,7 +73,22 @@ func (s *StorCli) collectControllersInfo(mx map[string]int64, resp *controllersI
 		default:
 			mx[px+"bbu_status_unhealthy"] = 1
 		}
+
+		for i, bbu := range cntrl.BBUInfo {
+			bbuNum := strconv.Itoa(i)
+			if k := cntrlNum + bbuNum; !s.bbu[k] {
+				s.bbu[k] = true
+				s.addBBUCharts(cntrlNum, bbuNum, bbu.Model)
+			}
+
+			px := fmt.Sprintf("bbu_%s_cntrl_%s_", bbuNum, cntrlNum)
+
+			if v, ok := parseInt(getTemperature(bbu.Temp)); ok {
+				mx[px+"temperature"] = v
+			}
+		}
 	}
+
 	return nil
 }
 

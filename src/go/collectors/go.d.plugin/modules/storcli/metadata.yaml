@@ -147,7 +147,23 @@ modules:
                 - name: inactive
             - name: storcli.phys_drive_temperature
               description: Physical Drive temperature
-              unit: status
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+        - name: bbu
+          description: These metrics refer to the Backup Battery Unit.
+          labels:
+            - name: controller_number
+              description: Controller number (index)
+            - name: bbu_number
+              description: BBU number (index)
+            - name: model
+              description: BBU model
+          metrics:
+            - name: storcli.bbu_temperature
+              description: BBU temperature
+              unit: Celsius
               chart_type: line
               dimensions:
                 - name: temperature
