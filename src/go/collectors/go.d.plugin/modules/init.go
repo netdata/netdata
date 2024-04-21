@@ -29,6 +29,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/freeradius"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/geth"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/haproxy"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/hddtemp"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/hdfs"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/httpcheck"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/intelgpu"
