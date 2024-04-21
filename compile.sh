@@ -4,7 +4,7 @@ set -exu -o pipefail
 
 export PATH="/usr/local/bin:${PATH}"
 
-WT_ROOT="/cygdrive/c/Users/vk/repos/nd/master"
+WT_ROOT="$(pwd)"
 WT_PREFIX="/tmp"
 BUILD_TYPE="Debug"
 
