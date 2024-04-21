@@ -2555,7 +2555,6 @@ install(FILES
         src/collectors/python.d.plugin/gearman/gearman.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
-        src/collectors/python.d.plugin/hddtemp/hddtemp.conf
         src/collectors/python.d.plugin/hpssa/hpssa.conf
         src/collectors/python.d.plugin/icecast/icecast.conf
         src/collectors/python.d.plugin/ipfs/ipfs.conf
@@ -2604,7 +2603,6 @@ install(FILES
         src/collectors/python.d.plugin/gearman/gearman.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
-        src/collectors/python.d.plugin/hddtemp/hddtemp.chart.py
         src/collectors/python.d.plugin/hpssa/hpssa.chart.py
         src/collectors/python.d.plugin/icecast/icecast.chart.py
         src/collectors/python.d.plugin/ipfs/ipfs.chart.py

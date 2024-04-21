@@ -1,1 +1,0 @@
-integrations/hdd_temperature.md
