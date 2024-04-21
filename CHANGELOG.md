@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17461](https://github.com/netdata/netdata/pull/17461) ([netdatabot](https://github.com/netdatabot))
+- go.d storcli update [\#17460](https://github.com/netdata/netdata/pull/17460) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17458](https://github.com/netdata/netdata/pull/17458) ([netdatabot](https://github.com/netdatabot))
 - ndsudo add storcli [\#17455](https://github.com/netdata/netdata/pull/17455) ([ilyam8](https://github.com/ilyam8))
 - go.d add storcli collector [\#17454](https://github.com/netdata/netdata/pull/17454) ([ilyam8](https://github.com/ilyam8))
@@ -416,8 +418,6 @@
 - Network viewer fixes [\#16877](https://github.com/netdata/netdata/pull/16877) ([ktsaou](https://github.com/ktsaou))
 - Add requirements.txt for dag [\#16875](https://github.com/netdata/netdata/pull/16875) ([vkalintiris](https://github.com/vkalintiris))
 - Rm refs to map and save modes [\#16874](https://github.com/netdata/netdata/pull/16874) ([vkalintiris](https://github.com/vkalintiris))
-- Fix coverity issues [\#16873](https://github.com/netdata/netdata/pull/16873) ([stelfrag](https://github.com/stelfrag))
-- Network Viewer \(local-sockets version\) [\#16872](https://github.com/netdata/netdata/pull/16872) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
