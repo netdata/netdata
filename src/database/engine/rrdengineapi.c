@@ -5,18 +5,18 @@
 #include "dbengine-compression.h"
 
 /* Default global database instance */
-struct rrdengine_instance multidb_ctx_storage_tier0;
-struct rrdengine_instance multidb_ctx_storage_tier1;
-struct rrdengine_instance multidb_ctx_storage_tier2;
-struct rrdengine_instance multidb_ctx_storage_tier3;
-struct rrdengine_instance multidb_ctx_storage_tier4;
+struct rrdengine_instance multidb_ctx_storage_tier0 = { 0 };
+struct rrdengine_instance multidb_ctx_storage_tier1 = { 0 };
+struct rrdengine_instance multidb_ctx_storage_tier2 = { 0 };
+struct rrdengine_instance multidb_ctx_storage_tier3 = { 0 };
+struct rrdengine_instance multidb_ctx_storage_tier4 = { 0 };
 
 #define mrg_metric_ctx(metric) (struct rrdengine_instance *)mrg_metric_section(main_mrg, metric)
 
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
-struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
+struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS] = { 0 };
 uint8_t tier_page_type[RRD_STORAGE_TIERS] = {
     RRDENG_PAGE_TYPE_GORILLA_32BIT,
     RRDENG_PAGE_TYPE_ARRAY_TIER1,
@@ -46,6 +46,10 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[2] = &multidb_ctx_storage_tier2;
     multidb_ctx[3] = &multidb_ctx_storage_tier3;
     multidb_ctx[4] = &multidb_ctx_storage_tier4;
+
+    for(int i = 0; i < RRD_STORAGE_TIERS ; i++) {
+        uv_rwlock_init(&multidb_ctx[i]->datafiles.rwlock);
+    }
 }
 
 int db_engine_journal_check = 0;

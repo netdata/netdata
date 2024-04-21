@@ -103,9 +103,13 @@ pid_t gettid(void) {
         tid = (pid_t)pthread_self;
     #endif /* __MAC_OS_X_VERSION_MIN_REQUIRED */
 
-#else /* __APPLE__*/
+#elif defined(COMPILED_FOR_FOREIGN_OS)
 
-    // tid = (pid_t)syscall(SYS_gettid);
+    tid = (pid_t)pthread_self();
+
+#else
+
+    tid = (pid_t)syscall(SYS_gettid);
 
 #endif /* __FreeBSD__, __APPLE__*/
 
