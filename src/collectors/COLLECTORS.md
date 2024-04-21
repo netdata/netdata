@@ -491,8 +491,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [CUPS](https://github.com/netdata/netdata/blob/master/src/collectors/cups.plugin/integrations/cups.md)
 
-- [HDD temperature](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/hddtemp/integrations/hdd_temperature.md)
-
 - [HDD temperature](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/hddtemp/integrations/hdd_temperature.md)
 
 - [HP iLO](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/hp_ilo.md)
