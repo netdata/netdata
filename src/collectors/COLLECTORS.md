@@ -491,7 +491,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [CUPS](https://github.com/netdata/netdata/blob/master/src/collectors/cups.plugin/integrations/cups.md)
 
-- [HDD temperature](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/hddtemp/integrations/hdd_temperature.md)
+- [HDD temperature](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/hddtemp/integrations/hdd_temperature.md)
 
 - [HP iLO](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/hp_ilo.md)
 
@@ -501,9 +501,11 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [IPMI (By SoundCloud)](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/ipmi_by_soundcloud.md)
 
+- [Intel GPU](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/intelgpu/integrations/intel_gpu.md)
+
 - [Intelligent Platform Management Interface (IPMI)](https://github.com/netdata/netdata/blob/master/src/collectors/freeipmi.plugin/integrations/intelligent_platform_management_interface_ipmi.md)
 
-- [Linux Sensors (lm-sensors)](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/sensors/integrations/linux_sensors_lm-sensors.md)
+- [Linux Sensors (lm-sensors)](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/sensors/integrations/linux_sensors_lm-sensors.md)
 
 - [Linux Sensors (sysfs)](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/sensors/integrations/linux_sensors_sysfs.md)
 
@@ -985,7 +987,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### Storage, Mount Points and Filesystems
 
-- [AdaptecRAID](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/adaptec_raid/integrations/adaptecraid.md)
+- [Adaptec RAID](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/adaptecraid/integrations/adaptec_raid.md)
 
 - [Altaro Backup](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/altaro_backup.md)
 
@@ -1019,9 +1021,11 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [IPFS](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/ipfs/integrations/ipfs.md)
 
+- [LVM logical volumes](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/lvm/integrations/lvm_logical_volumes.md)
+
 - [Lagerist Disk latency](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/lagerist_disk_latency.md)
 
-- [MegaCLI](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/megacli/integrations/megacli.md)
+- [MegaCLI MegaRAID](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/megacli/integrations/megacli_megaraid.md)
 
 - [MogileFS](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/mogilefs.md)
 
@@ -1035,9 +1039,13 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Starwind VSAN VSphere Edition](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/starwind_vsan_vsphere_edition.md)
 
+- [StoreCLI RAID](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/storcli/integrations/storecli_raid.md)
+
 - [Storidge](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/storidge.md)
 
 - [Synology ActiveBackup](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/synology_activebackup.md)
+
+- [ZFS Pools](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/zfspool/integrations/zfs_pools.md)
 
 ### Synthetic Checks
 

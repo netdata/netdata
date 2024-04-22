@@ -29,23 +29,18 @@ static void update_filtered(ALARM_ENTRY *ae, int64_t unique_id, char *uuid_str)
         return;
     }
 
-    rc = sqlite3_bind_int64(res, 1,  ae->unique_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind ae unique_id for update_filtered");
-        goto done;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param,  ae->unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param,  unique_id));
 
-    rc = sqlite3_bind_int64(res, 2,  unique_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind unique_id for update_filtered");
-        goto done;
-    }
-
+    param = 0;
     rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_DONE))
         ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
 
 done:
+    REPORT_BIND_FAIL(res, param);
+
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement when trying to update_filtered, rc = %d", rc);
@@ -68,23 +63,18 @@ static inline bool is_event_from_alert_variable_config(int64_t unique_id, uuid_t
 
     bool ret = false;
 
-    rc = sqlite3_bind_int64(res, 1, unique_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind unique_id for checking alert variable.");
-        goto done;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
-    rc = sqlite3_bind_blob(res, 2, host_id, sizeof(*host_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for checking alert variable.");
-        goto done;
-    }
-
+    param = 0;
     rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW))
         ret = true;
 
 done:
+    REPORT_BIND_FAIL(res, param);
+
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement when trying to check for alert variables, rc = %d", rc);
@@ -125,20 +115,12 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 
     bool send = false;
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for checking should_send_to_cloud");
-        goto done;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (int) ae->alarm_id));
 
-    rc = sqlite3_bind_int(res, 2, (int) ae->alarm_id);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind alarm_id for checking should_send_to_cloud");
-        goto done;
-    }
-
+    param = 0;
     rc = sqlite3_step_monitored(res);
-
     if (likely(rc == SQLITE_ROW)) {
         uuid_t config_hash_id;
         RRDCALC_STATUS status = (RRDCALC_STATUS)sqlite3_column_int(res, 0);
@@ -156,6 +138,8 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         send = true;
 
 done:
+    REPORT_BIND_FAIL(res, param);
+
     rc = sqlite3_finalize(res);
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement when trying should_send_to_cloud, rc = %d", rc);

@@ -27,8 +27,7 @@ func init() {
 func New() *NVMe {
 	return &NVMe{
 		Config: Config{
-			BinaryPath: "nvme",
-			Timeout:    web.Duration(time.Second * 2),
+			Timeout: web.Duration(time.Second * 2),
 		},
 
 		charts:           &module.Charts{},
@@ -41,7 +40,6 @@ func New() *NVMe {
 type Config struct {
 	UpdateEvery int          `yaml:"update_every" json:"update_every"`
 	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
-	BinaryPath  string       `yaml:"binary_path" json:"binary_path"`
 }
 
 type (
@@ -69,17 +67,12 @@ func (n *NVMe) Configuration() any {
 }
 
 func (n *NVMe) Init() error {
-	if err := n.validateConfig(); err != nil {
-		n.Errorf("config validation: %v", err)
-		return err
-	}
-
-	v, err := n.initNVMeCLIExec()
+	nvmeExec, err := n.initNVMeCLIExec()
 	if err != nil {
 		n.Errorf("init nvme-cli exec: %v", err)
 		return err
 	}
-	n.exec = v
+	n.exec = nvmeExec
 
 	return nil
 }

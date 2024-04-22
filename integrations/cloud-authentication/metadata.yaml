@@ -1,0 +1,41 @@
+# yamllint disable rule:line-length
+---
+- id: 'okta-authentication'
+  meta:
+    name: 'Okta SSO'
+    link: 'https://netdata.cloud'
+    categories:
+      - auth
+    icon_filename: 'okta.png'
+  keywords:
+    - sso
+    - okta
+    - okta-sso
+  overview:
+    authentication_description: "Integrate your organization's Okta account with Netdata to better manage your team's access controls to Netdata Cloud."
+    authentication_limitations: ''
+  setup:
+    description: |
+      ### Prerequisites
+      - An Okta account
+      - A Netdata Cloud account
+      - Access to the Space as an administrator
+      - Space needs to be on the Business plan or higher
+
+      ### Setting up Okta
+      Steps needed to be done on Okta Admin Portal:
+      1. Click on **Applications** tab and choose to **Browse App Catalogue**
+      2. Find Netdata's preconfigured app for easy setup and click **Add Integration**
+      3. Give the app, that will be in your apps dashboard, the preferred **Application label** and click **Next** to move to the Sign-On options tab
+      4. In the **Sign-On Options** all the values we expect are already filled and no additional data is required
+      5. Click **Done**. You are able to go back and edit any fields later if need be
+      6. Go to the **Assignments** tab and enter the People or Group assignments as per your organization’s policies
+
+      ### Netdata Configuration Steps
+      1. Click on the Space settings cog (located above your profile icon)
+      2. Click on the **Authentication** tab
+      3. On the Okta SSO card, click on **Configure**
+      4. Fill in the [required credentials](https://developer.okta.com/docs/guides/find-your-app-credentials/main/), you get them from **Okta Admin Portal**:
+          - **Issuer URL** you can get it from your profile icon on top, e.g. `https://company-name.okta.com`
+          - **Client ID** you can get it from **General** tab on application you configured on Okta
+          - **Client Secret** you can get it from **General** tab on application you configured on Okta

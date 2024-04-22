@@ -74,7 +74,7 @@ Should you still want to, disabling nodes for Metric Correlation on the agent is
 
 ## Usage tips!
 
-- When running Metric Correlations from the [Overview tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view) across multiple nodes, you might find better results if you iterate on the initial results by grouping by node to then filter to nodes of interest and run the Metric Correlations again. So a typical workflow in this case would be to:
+- When running Metric Correlations from the [Metrics tab](docs/dashboard/metrics-tab-and-single-node-tabs.md) across multiple nodes, you might find better results if you iterate on the initial results by grouping by node to then filter to nodes of interest and rerun the Metric Correlations. So a typical workflow in this case would be to:
   - If unsure which nodes you are interested in then run MC on all nodes. 
   - Within the initial results returned group the most interesting chart by node to see if the changes are across all nodes or a subset of nodes.
   - If you see a subset of nodes clearly jump out when you group by node, then filter for just those nodes of interest and run the MC again. This will result in less aggregation needing to be done by Netdata and so should help give clearer results as you interact with the slider.

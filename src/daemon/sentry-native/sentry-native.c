@@ -19,7 +19,7 @@ static bool sentry_telemetry_disabled(void)
     return getenv("DISABLE_TELEMETRY") != NULL;
 }
 
-void sentry_native_init(void)
+void nd_sentry_init(void)
 {
     if (sentry_telemetry_disabled())
         return;
@@ -41,10 +41,17 @@ void sentry_native_init(void)
     sentry_init(options);
 }
 
-void sentry_native_fini(void)
+void nd_sentry_fini(void)
 {
     if (sentry_telemetry_disabled())
         return;
 
     sentry_close();
+}
+
+void nd_sentry_set_user(const char *guid)
+{
+    sentry_value_t user = sentry_value_new_object();
+    sentry_value_set_by_key(user, "id", sentry_value_new_string(guid));
+    sentry_set_user(user);
 }

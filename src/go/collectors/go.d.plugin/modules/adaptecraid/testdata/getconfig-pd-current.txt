@@ -1,0 +1,216 @@
+Controllers found: 1
+----------------------------------------------------------------------
+Physical Device information
+----------------------------------------------------------------------
+      Device #0
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SAS 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,1(1:0)
+         Reported Location                  : Connector 0, Device 1
+         Vendor                             : NETAPP
+         Model                              : X422_HCOBE600A10
+         Firmware                           : NA00
+         Reserved Size                      : 956312 KB
+         Used Size                          : 571392 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 572325 MB
+         Write Cache                        : Enabled (write-back)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full rpm,Powered off
+         SSD                                : No
+         Temperature                        : Not Supported
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                  : 0
+            SAS Address                     : 5000
+            Attached PHY Identifier         : 2
+            Attached SAS Address            : 5000
+         Phy #1
+            PHY Identifier                  : 1
+            SAS Address                     : 5000
+
+      Device #1
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SAS 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,2(2:0)
+         Reported Location                  : Connector 0, Device 2
+         Vendor                             : NETAPP
+         Model                              : X422_HCOBE600A10
+         Firmware                           : NA02
+         Reserved Size                      : 956312 KB
+         Used Size                          : 571392 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 572325 MB
+         Write Cache                        : Enabled (write-back)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full rpm,Powered off
+         SSD                                : No
+         Temperature                        : Not Supported
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                  : 0
+            SAS Address                     : 5000
+            Attached PHY Identifier         : 1
+            Attached SAS Address            : 5000
+         Phy #1
+            PHY Identifier                  : 1
+            SAS Address                     : 5000
+
+      Device #2
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SAS 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,4(4:0)
+         Reported Location                  : Connector 1, Device 0
+         Vendor                             : NETAPP
+         Model                              : X422_HCOBD600A10
+         Firmware                           : NA05
+         Reserved Size                      : 956312 KB
+         Used Size                          : 571392 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 572325 MB
+         Write Cache                        : Enabled (write-back)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full rpm,Powered off
+         SSD                                : No
+         Temperature                        : Not Supported
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                  : 0
+            SAS Address                     : 5000
+            Attached PHY Identifier         : 7
+            Attached SAS Address            : 5000
+         Phy #1
+            PHY Identifier                  : 1
+            SAS Address                     : 5000
+
+      Device #3
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SAS 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,5(5:0)
+         Reported Location                  : Connector 1, Device 1
+         Vendor                             : NETAPP
+         Model                              : X422_HCOBD600A10
+         Firmware                           : NA05
+         Reserved Size                      : 956312 KB
+         Used Size                          : 571392 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 572325 MB
+         Write Cache                        : Enabled (write-back)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full rpm,Powered off
+         SSD                                : No
+         Temperature                        : Not Supported
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                  : 0
+            SAS Address                     : 5000
+            Attached PHY Identifier         : 6
+            Attached SAS Address            : 5000
+         Phy #1
+            PHY Identifier                  : 1
+            SAS Address                     : 5000
+
+      Device #4
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SAS 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,6(6:0)
+         Reported Location                  : Connector 1, Device 2
+         Vendor                             : NETAPP
+         Model                              : X422_HCOBD600A10
+         Firmware                           : NA05
+         Reserved Size                      : 956312 KB
+         Used Size                          : 571392 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 572325 MB
+         Write Cache                        : Enabled (write-back)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full rpm,Powered off
+         SSD                                : No
+         Temperature                        : Not Supported
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                  : 0
+            SAS Address                     : 5000
+            Attached PHY Identifier         : 5
+            Attached SAS Address            : 5000
+         Phy #1
+            PHY Identifier                  : 1
+            SAS Address                     : 5000
+
+      Device #5
+         Device is a Hard drive
+         State                              : Online
+         Block Size                         : 512 Bytes
+         Supported                          : Yes
+         Transfer Speed                     : SAS 6.0 Gb/s
+         Reported Channel,Device(T:L)       : 0,7(7:0)
+         Reported Location                  : Connector 1, Device 3
+         Vendor                             : NETAPP
+         Model                              : X422_HCOBD600A10
+         Firmware                           : NA05
+         Reserved Size                      : 956312 KB
+         Used Size                          : 571392 MB
+         Unused Size                        : 64 KB
+         Total Size                         : 572325 MB
+         Write Cache                        : Enabled (write-back)
+         FRU                                : None
+         S.M.A.R.T.                         : No
+         S.M.A.R.T. warnings                : 0
+         Power State                        : Full rpm
+         Supported Power States             : Full rpm,Powered off
+         SSD                                : No
+         Temperature                        : Not Supported
+      ----------------------------------------------------------------
+      Device Phy Information
+      ----------------------------------------------------------------
+         Phy #0
+            PHY Identifier                  : 0
+            SAS Address                     : 5000
+            Attached PHY Identifier         : 4
+            Attached SAS Address            : 5000
+            PHY Identifier                  : 1
+            SAS Address                     : 5000
+
+
+
+Command completed successfully.

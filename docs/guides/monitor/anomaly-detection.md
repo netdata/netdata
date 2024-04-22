@@ -45,7 +45,7 @@ Once an area on the Anomaly Rate chart is highlighted netdata will append a "hea
 
 ## Embedded Anomaly Rate Charts
 
-Charts in both the [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) and [single node dashboard](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#jump-to-single-node-dashboards) tabs also expose the underlying anomaly rates for each dimension so users can easily see if the raw metrics are considered anomalous or not by Netdata.
+Charts in both the [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) and [single node tabs](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) also expose the underlying anomaly rates for each dimension so users can easily see if the raw metrics are considered anomalous or not by Netdata.
 
 Pressing the anomalies icon (next to the information icon in the chart header) will expand the anomaly rate chart to make it easy to see how the anomaly rate for any individual dimension corresponds to the raw underlying data. In the example below we can see that the spike in `system.pgpgio|in` corresponded in the anomaly rate for that dimension jumping to 100% for a small period of time until the spike passed.
 

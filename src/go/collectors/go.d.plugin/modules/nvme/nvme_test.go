@@ -45,28 +45,18 @@ func TestNVMe_ConfigurationSerialize(t *testing.T) {
 
 func TestNVMe_Init(t *testing.T) {
 	tests := map[string]struct {
-		prepare  func(n *NVMe)
+		config   Config
 		wantFail bool
 	}{
-		"fails if 'binary_path' not set": {
+		"fails if 'ndsudo' not found": {
 			wantFail: true,
-			prepare: func(n *NVMe) {
-				n.BinaryPath = ""
-			},
-		},
-		"fails if can't locate nvme-cli": {
-			wantFail: true,
-			prepare: func(n *NVMe) {
-				n.BinaryPath += "!!!"
-			},
+			config:   New().Config,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			nv := New()
-
-			test.prepare(nv)
 
 			if test.wantFail {
 				assert.Error(t, nv.Init())

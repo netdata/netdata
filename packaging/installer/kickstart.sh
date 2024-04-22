@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0517
+# Next unused error code: F0518
 
 # ======================================================================
 # Constants
@@ -311,23 +311,31 @@ telemetry_event() {
 EOF
 )"
 
+  succeeded=0
+
   if [ -n "${CURL}" ]; then
-    "${CURL}" --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
-  elif command -v wget > /dev/null 2>&1; then
-    if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
-      # BusyBox-compatible version of wget, there is no --no-check-certificate option
-      wget -q -O - \
-      -T 1 \
-      --header 'Content-Type: application/json' \
-      --post-data "${REQ_BODY}" \
-      "${TELEMETRY_URL}" > /dev/null
-    else
-      wget -q -O - --no-check-certificate \
-      --method POST \
-      --timeout=1 \
-      --header 'Content-Type: application/json' \
-      --body-data "${REQ_BODY}" \
-      "${TELEMETRY_URL}" > /dev/null
+    if "${CURL}" --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
+        # BusyBox-compatible version of wget, there is no --no-check-certificate option
+        wget -q -O - \
+        -T 1 \
+        --header 'Content-Type: application/json' \
+        --post-data "${REQ_BODY}" \
+        "${TELEMETRY_URL}" > /dev/null
+      else
+        wget -q -O - --no-check-certificate \
+        --method POST \
+        --timeout=1 \
+        --header 'Content-Type: application/json' \
+        --body-data "${REQ_BODY}" \
+        "${TELEMETRY_URL}" > /dev/null
+      fi
     fi
   fi
 }
@@ -367,6 +375,15 @@ trap 'trap_handler 15 0' TERM
 
 # ======================================================================
 # Utility functions
+
+canonical_path() {
+  cd "$(dirname "${1}")" || exit 1
+  case "$(basename "${1}")" in
+    ..) dirname "$(pwd -P)" ;;
+    .) pwd -P ;;
+    *) echo "$(pwd -P)/$(basename "${1}")" ;;
+  esac
+}
 
 setup_terminal() {
   TPUT_RESET=""
@@ -596,15 +613,38 @@ set_tmpdir() {
 
 check_for_remote_file() {
   url="${1}"
+  succeeded=0
+  checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
     [ -e "${url#file://}" ] || return 1
+    return 0
   elif [ -n "${NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT}" ]; then
     return 0
-  elif [ -n "${CURL}" ]; then
-    "${CURL}" --output /dev/null --silent --head --fail "${url}" || return 1
-  elif command -v wget > /dev/null 2>&1; then
-    wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK' || return 1
+  fi
+
+  if [ -n "${CURL}" ]; then
+    checked=1
+
+    if "${CURL}" --output /dev/null --silent --head --fail "${url}"; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK'; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
@@ -613,13 +653,39 @@ check_for_remote_file() {
 download() {
   url="${1}"
   dest="${2}"
+  succeeded=0
+  checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
     run cp "${url#file://}" "${dest}" || return 1
-  elif [ -n "${CURL}" ]; then
-    run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
-  elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O "${dest}" "${url}" || return 1
+    return 0
+  fi
+
+
+  if [ -n "${CURL}" ]; then
+    checked=1
+
+    if run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"; then
+      succeeded=1
+    else
+      rm -f "${dest}"
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if run wget -T 15 -O "${dest}" "${url}"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
@@ -643,11 +709,31 @@ get_actual_version() {
 
 get_redirect() {
   url="${1}"
+  succeeded=0
+  checked=0
 
   if [ -n "${CURL}" ]; then
-    run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+$'" || return 1
-  elif command -v wget > /dev/null 2>&1; then
-    run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+$'" || return 1
+    checked=1
+
+    if run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+$'"; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+$'"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
@@ -874,31 +960,47 @@ detect_existing_install() {
   set_tmpdir
 
   progress "Checking for existing installations of Netdata..."
+  EXISTING_INSTALL_IS_NATIVE="0"
+
+  if [ -n "${INSTALL_PREFIX}" ]; then
+    searchpath="/opt/netdata/bin:${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
+    searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
+  else
+    searchpath="/opt/netdata/bin:${PATH}"
+  fi
+
+  while [ -n "${searchpath}" ]; do
+    _ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
+
+    if [ -n "${_ndpath}" ]; then
+      _ndpath="$(canonical_path "$(ndpath)")"
+    fi
+
+    if [ -z "${ndpath}" ] && [ -n "${_ndpath}" ]; then
+      ndpath="${_ndpath}"
+    elif [ -n "${_ndpath}" ] && [ "${ndpath}" != "${_ndpath}" ]; then
+      fatal "Multiple installs of Netdata agent detected (located at '${ndpath}' and '${_ndpath}'). Such a setup is not generally supported. If you are certain you want to operate on one of them despite this, use the '--install-prefix' option to specifiy the install you want to operate on." F0517
+    fi
+
+    if [ -n "${INSTALL_PREFIX}" ] && [ -n "${ndpath}" ]; then
+      break
+    elif [ -z "${_ndpath}" ]; then
+      break
+    elif echo "${searchpath}" | grep -v ':'; then
+      searchpath=""
+    else
+      searchpath="$(echo "${searchpath}" | cut -f 2- -d ':')"
+    fi
+  done
 
   if pkg_installed netdata; then
     ndprefix="/"
     EXISTING_INSTALL_IS_NATIVE="1"
-  else
-    EXISTING_INSTALL_IS_NATIVE="0"
-    if [ -n "${INSTALL_PREFIX}" ]; then
-      searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
-      searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
-    else
-      searchpath="${PATH}"
-    fi
-
-    ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
-
-    if [ -z "$ndpath" ] && [ -x /opt/netdata/bin/netdata ]; then
-      ndpath="/opt/netdata/bin/netdata"
-    fi
-
-    if [ -n "${ndpath}" ]; then
-      case "${ndpath}" in
-        */usr/bin/netdata|*/usr/sbin/netdata) ndprefix="$(dirname "$(dirname "$(dirname "${ndpath}")")")" ;;
-        *) ndprefix="$(dirname "$(dirname "${ndpath}")")" ;;
-      esac
-    fi
+  elif [ -n "${ndpath}" ]; then
+    case "${ndpath}" in
+      */usr/bin/netdata|*/usr/sbin/netdata) ndprefix="$(dirname "$(dirname "$(dirname "${ndpath}")")")" ;;
+      *) ndprefix="$(dirname "$(dirname "${ndpath}")")" ;;
+    esac
 
     if echo "${ndprefix}" | grep -Eq '^/usr$'; then
       ndprefix="$(dirname "${ndprefix}")"

@@ -28,7 +28,7 @@
         "title": "Use CSV format",
         "description": "Determines the format used for requesting GPU information. If set, CSV format is used, otherwise XML.",
         "type": "boolean",
-        "default": true
+        "default": false
       }
     },
     "required": [

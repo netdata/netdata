@@ -39,15 +39,13 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Community**](https://community.netdata.cloud/): As a company with a passion and genesis in open-source, we are not just very proud of our community, but we consider our users, fans, and chatters to be an imperative part of the Netdata experience and culture.
 
-- [**Composite Charts**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view): Charts used by the **Overview** tab which aggregate metrics from all the nodes (or a filtered selection) in a given War Room.
-
 - [**Context**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
 
 - [**Custom dashboards**](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md) A dashboard that you can create using simple HTML (no javascript is required for basic dashboards).
 
 ## D
 
-- [**Dashboards**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md): Out-of-the box visual presentation of metrics that allows you to make sense of your infrastructure and its health and performance.
+- [**Dashboard**](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md): Out-of-the-box visual representation of metrics to provide insight into your infrastructure, its health and performance.
 
 - [**Definition Bar**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md): Bar within a composite chart that provides important information and options about the metrics within the chart.
 
@@ -79,7 +77,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Health Entity Reference**](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#health-entity-reference):
 
-- [**Home** tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#home): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the War Room.
+- [**Home** tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/home-tab.md): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the War Room.
 
 ## I
 
@@ -128,8 +126,6 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Orchestrators**](https://github.com/netdata/netdata/blob/master/src/collectors/README.md#collector-architecture-and-terminology): External plugins that run and manage one or more modules. They run as independent processes.
 
-- [**Overview** tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view): Tab in Netdata Cloud that uses composite charts. These charts display real-time aggregated metrics from all the nodes (or a filtered selection) in a given War Room.
-
 ## P
 
 - [**Parent**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md#streaming-basics): A node, running Netdata, that receives streamed metric data.
@@ -148,9 +144,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## S
 
-- [**Single Node Dashboard**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#overview-and-single-node-view): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
-
-<!-- No link for this file in current structure. - **Snapshots** https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/snapshot-data.md: An image of your dashboard at any given time, whicn can be imiported into any other node running Netdata or used to genereated a PDF file for your records. -->
+- [**Single Node Dashboard**](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
 
 - [**Space**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 
