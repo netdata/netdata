@@ -76,6 +76,7 @@ see the appropriate collector readme.
 | [fluentd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/fluentd)                       |            Fluentd            |
 | [freeradius](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/freeradius)                 |          FreeRADIUS           |
 | [haproxy](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/haproxy)                       |            HAProxy            |
+| [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hddtemp)                       |       Disks temperature       |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hdfs)                             |             HDFS              |
 | [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/httpcheck)                   |       Any HTTP Endpoint       |
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/intelgpu)                     |     Intel integrated GPU      |
@@ -113,6 +114,7 @@ see the appropriate collector readme.
 | [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/rabbitmq)                     |           RabbitMQ            |
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/redis)                           |             Redis             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/scaleio)                       |       Dell EMC ScaleIO        |
+| [sensors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules)                               |       Hardware Sensors        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/snmp)                             |             SNMP              |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/squidlog)                     |             Squid             |
 | [storcli](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/storcli)                       |    Broadcom Hardware RAID     |
