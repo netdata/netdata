@@ -178,6 +178,14 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 		return
 	}
 
+	if cfg.Vnode() != "" {
+		if _, ok := m.Vnodes.Lookup(cfg.Vnode()); !ok {
+			m.Warningf("dyncfg: test: module %s: vnode %s not found", mn, cfg.Vnode())
+			m.dyncfgRespf(fn, 400, "The specified vnode '%s' is not registered.", cfg.Vnode())
+			return
+		}
+	}
+
 	cfg.SetModule(mn)
 	cfg.SetName("test")
 
