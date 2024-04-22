@@ -1058,6 +1058,14 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "MacOS");
     build_info_set_status(BIB_PLUGIN_MACOS, true);
 #endif
+#ifdef COMPILED_FOR_CYGWIN
+    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Cygwin");
+#endif
+#ifdef COMPILED_FOR_MSYS
+    build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "MSYS");
+#endif
 
 #ifdef ENABLE_ACLK
     build_info_set_status(BIB_FEATURE_CLOUD, true);

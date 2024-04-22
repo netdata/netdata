@@ -1577,7 +1577,6 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
     wal_cleanup1();
     extent_buffer_cleanup1();
 
-#ifdef COMPILED_FOR_FOREIGN_OS
     {
         static time_t last_run_s = 0;
         time_t now_s = now_monotonic_sec();
@@ -1586,7 +1585,6 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
             journalfile_v2_data_unmount_cleanup(now_s);
         }
     }
-#endif
 
 #ifdef PDC_USE_JULYL
     julyl_cleanup1();
