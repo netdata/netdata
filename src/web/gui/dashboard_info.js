@@ -6813,6 +6813,9 @@ netdataDashboard.context = {
         info: 'The current battery charge.'
     },
 
+    'powersupply.power': {
+        info: 'The current battery discharge rate in Watts.'
+    },
     'powersupply.charge': {
         info: '<p>The battery charge in Amp-hours.</p>'+
         '<p><b>now</b> - actual charge value. '+
@@ -6839,7 +6842,6 @@ netdataDashboard.context = {
         '<b>max_design</b>, <b>min_design</b> - design values for maximal and minimal power supply voltages. '+
         'Maximal/minimal means values of voltages when battery considered "full"/"empty" at normal conditions.</p>'
     },
-
     // ------------------------------------------------------------------------
     // VMware vSphere
 

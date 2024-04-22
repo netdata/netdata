@@ -5123,6 +5123,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: capacity
+            - name: powersupply.power
+              description: Battery discharge rate
+              unit: "W"
+              chart_type: line
+              dimensions:
+                - name: power
             - name: powersupply.charge
               description: Battery charge
               unit: "Ah"
