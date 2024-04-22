@@ -1660,7 +1660,7 @@ if(ENABLE_PLUGIN_DEBUGFS)
     target_compile_options(debugfs.plugin PRIVATE ${CAP_CFLAGS_OTHER})
 
     install(TARGETS debugfs.plugin
-            COMPONENT debugfs_plugin
+            COMPONENT plugin-debugfs
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -1691,10 +1691,10 @@ if(ENABLE_PLUGIN_APPS)
     target_compile_options(apps.plugin PRIVATE ${CAP_CFLAGS_OTHER})
 
     install(TARGETS apps.plugin
-            COMPONENT apps_plugin
+            COMPONENT plugin-apps
             DESTINATION usr/libexec/netdata/plugins.d)
     install(FILES src/collectors/apps.plugin/apps_groups.conf
-            COMPONENT apps_plugin
+            COMPONENT plugin-apps
             DESTINATION usr/lib/netdata/conf.d)
 endif()
 
@@ -1713,7 +1713,7 @@ if(ENABLE_PLUGIN_FREEIPMI)
     target_compile_options(freeipmi.plugin PRIVATE ${IPMI_CFLAGS_OTHER})
 
     install(TARGETS freeipmi.plugin
-            COMPONENT freeipmi_plugin
+            COMPONENT plugin-freeipmi
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -1732,7 +1732,7 @@ if(ENABLE_PLUGIN_NFACCT)
     target_compile_options(nfacct.plugin PRIVATE ${MNL_CFLAGS_OTHER} ${NFACCT_CFLAGS_OTHER})
 
     install(TARGETS nfacct.plugin
-            COMPONENT nfacct_plugin
+            COMPONENT plugin-nfacct
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -1748,7 +1748,7 @@ if(ENABLE_PLUGIN_XENSTAT)
     target_compile_options(xenstat.plugin PRIVATE ${XENLIGHT_CFLAGS_OTHER} ${XENSTAT_CFLAGS_OTHER})
 
     install(TARGETS xenstat.plugin
-            COMPONENT xenstat_plugin
+            COMPONENT plugin-xenstat
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -1759,7 +1759,7 @@ if(ENABLE_PLUGIN_PERF)
     target_link_libraries(perf.plugin libnetdata)
 
     install(TARGETS perf.plugin
-            COMPONENT perf_plugin
+            COMPONENT plugin-perf
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -1770,7 +1770,7 @@ if(ENABLE_PLUGIN_SLABINFO)
     target_link_libraries(slabinfo.plugin libnetdata)
 
     install(TARGETS slabinfo.plugin
-            COMPONENT slabinfo_plugin
+            COMPONENT plugin-slabinfo
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -1787,15 +1787,15 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
     target_link_libraries(logs-management.plugin libnetdata)
 
     install(TARGETS logs-management.plugin
-            COMPONENT logs_management_plugin
+            COMPONENT plugin-logs-management
             DESTINATION usr/libexec/netdata/plugins.d)
 
     install(DIRECTORY src/logsmanagement/stock_conf/logsmanagement.d
-            COMPONENT logs_management_plugin
+            COMPONENT plugin-logs-management
             DESTINATION usr/lib/netdata/conf.d)
 
     install(DIRECTORY
-            COMPONENT logs_management_plugin
+            COMPONENT plugin-logs-management
             DESTINATION etc/netdata/logsmanagement.d)
 
     configure_file(src/logsmanagement/stock_conf/logsmanagement.d.conf.in
@@ -1803,7 +1803,7 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
                    @ONLY)
 
     install(FILES ${CMAKE_BINARY_DIR}/src/logsmanagement/stock_conf/logsmanagement.d.conf
-            COMPONENT logs_management_plugin
+            COMPONENT plugin-logs-management
             DESTINATION usr/lib/netdata/conf.d)
 endif()
 
@@ -1835,7 +1835,7 @@ if(ENABLE_PLUGIN_CUPS)
         target_compile_options(cups.plugin PRIVATE ${CUPS_CFLAGS_OTHER})
 
         install(TARGETS cups.plugin
-                COMPONENT cups_plugin
+                COMPONENT plugin-cups
                 DESTINATION usr/libexec/netdata/plugins.d)
     endif()
 endif()
@@ -1844,6 +1844,7 @@ set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
 
 add_executable(ndsudo ${NDSUDO_FILES})
 
+# TODO: separate component for this?
 install(TARGETS ndsudo
         COMPONENT ndsudo
         DESTINATION usr/libexec/netdata/plugins.d)
@@ -1854,6 +1855,7 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     add_executable(cgroup-network ${CGROUP_NETWORK_FILES})
     target_link_libraries(cgroup-network libnetdata)
 
+    # TODO: separate component for this?
     install(TARGETS cgroup-network
             COMPONENT cgroup_network_plugin
             DESTINATION usr/libexec/netdata/plugins.d)
@@ -1868,7 +1870,7 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
         target_link_libraries(systemd-journal.plugin libnetdata)
 
         install(TARGETS systemd-journal.plugin
-                COMPONENT systemd_journal_plugin
+                COMPONENT plugin-systemd-journal
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -1938,12 +1940,12 @@ if(ENABLE_PLUGIN_EBPF)
     target_link_libraries(ebpf.plugin libnetdata)
 
     install(TARGETS ebpf.plugin
-            COMPONENT ebpf_plugin
+            COMPONENT plugin-ebpf
             DESTINATION usr/libexec/netdata/plugins.d)
 
     install(FILES
             src/collectors/ebpf.plugin/ebpf.d.conf
-            COMPONENT ebpf_plugin
+            COMPONENT plugin-ebpf
             DESTINATION usr/lib/netdata/conf.d)
 
     install(FILES
@@ -1964,7 +1966,7 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf.d/swap.conf
             src/collectors/ebpf.plugin/ebpf.d/sync.conf
             src/collectors/ebpf.plugin/ebpf.d/vfs.conf
-            COMPONENT ebpf_plugin
+            COMPONENT plugin-ebpf
             DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 endif()
 
@@ -1983,6 +1985,7 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         target_link_libraries(local-listeners libnetdata
                               "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
 
+        # TODO: separate component for this?
         install(TARGETS local-listeners
                 COMPONENT local_listeners
                 DESTINATION usr/libexec/netdata/plugins.d)
@@ -2006,7 +2009,7 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
 
 
         install(TARGETS network-viewer.plugin
-                COMPONENT network_viewer_plugin
+                COMPONENT plugin-network-viewer
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -2172,7 +2175,7 @@ if(ENABLE_PLUGIN_GO)
     add_go_target(go-plugin go.d.plugin src/go/collectors/go.d.plugin cmd/godplugin)
 
     install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
-            COMPONENT go_d_plugin
+            COMPONENT plugin_go
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -2508,17 +2511,17 @@ install(FILES
 # charts.d plugin
 #
 
-install(DIRECTORY COMPONENT charts_d_plugin DESTINATION etc/netdata/charts.d)
+install(DIRECTORY COMPONENT plugin-chartsd DESTINATION etc/netdata/charts.d)
 
 configure_file(src/collectors/charts.d.plugin/charts.d.plugin.in src/collectors/charts.d.plugin/charts.d.plugin @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/charts.d.plugin/charts.d.plugin
-        COMPONENT charts_d_plugin
+        COMPONENT plugin-chartsd
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(FILES
         src/collectors/charts.d.plugin/charts.d.dryrun-helper.sh
-        COMPONENT charts_d_plugin
+        COMPONENT plugin-chartsd
         DESTINATION usr/libexec/netdata/plugins.d)
 
 # loopsleepms is used by the tc.plugin -> ship it in the netdata component
@@ -2529,7 +2532,7 @@ install(FILES
 
 install(FILES
         src/collectors/charts.d.plugin/charts.d.conf
-        COMPONENT charts_d_plugin
+        COMPONENT plugin-chartsd
         DESTINATION usr/lib/netdata/conf.d)
 
 install(FILES
@@ -2539,7 +2542,7 @@ install(FILES
         src/collectors/charts.d.plugin/libreswan/libreswan.chart.sh
         src/collectors/charts.d.plugin/opensips/opensips.chart.sh
         src/collectors/charts.d.plugin/sensors/sensors.chart.sh
-        COMPONENT charts_d_plugin
+        COMPONENT plugin-chartsd
         DESTINATION usr/libexec/netdata/charts.d)
 
 install(FILES
@@ -2549,7 +2552,7 @@ install(FILES
         src/collectors/charts.d.plugin/libreswan/libreswan.conf
         src/collectors/charts.d.plugin/opensips/opensips.conf
         src/collectors/charts.d.plugin/sensors/sensors.conf
-        COMPONENT charts_d_plugin
+        COMPONENT plugin-chartsd
         DESTINATION usr/lib/netdata/conf.d/charts.d)
 
 #
@@ -2575,15 +2578,15 @@ install(FILES
 
 configure_file(src/collectors/python.d.plugin/python.d.plugin.in src/collectors/python.d.plugin/python.d.plugin @ONLY)
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/python.d.plugin/python.d.plugin
-        COMPONENT python_d_plugin
+        COMPONENT plugin_pythond
         DESTINATION usr/libexec/netdata/plugins.d)
 
 install(DIRECTORY src/collectors/python.d.plugin/python_modules
-        COMPONENT python_d_plugin
+        COMPONENT plugin_pythond
         DESTINATION usr/libexec/netdata/python.d)
 
 install(FILES src/collectors/python.d.plugin/python.d.conf
-        COMPONENT python_d_plugin
+        COMPONENT plugin_pythond
         DESTINATION usr/lib/netdata/conf.d)
 
 install(FILES
@@ -2630,7 +2633,7 @@ install(FILES
         src/collectors/python.d.plugin/varnish/varnish.conf
         src/collectors/python.d.plugin/w1sensor/w1sensor.conf
         src/collectors/python.d.plugin/zscores/zscores.conf
-        COMPONENT python_d_plugin
+        COMPONENT plugin_pythond
         DESTINATION usr/lib/netdata/conf.d/python.d)
 
 install(FILES
@@ -2677,7 +2680,7 @@ install(FILES
         src/collectors/python.d.plugin/varnish/varnish.chart.py
         src/collectors/python.d.plugin/w1sensor/w1sensor.chart.py
         src/collectors/python.d.plugin/zscores/zscores.chart.py
-        COMPONENT python_d_plugin
+        COMPONENT plugin_pythond
         DESTINATION usr/libexec/netdata/python.d)
 
 #
@@ -2694,23 +2697,23 @@ install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
 #
 if(ENABLE_PLUGIN_GO)
     install(FILES src/go/collectors/go.d.plugin/config/go.d.conf
-            COMPONENT go_d_plugin
+            COMPONENT plugin_go
             DESTINATION usr/lib/netdata/conf.d)
 
     install(DIRECTORY
-            COMPONENT go_d_plugin
+            COMPONENT plugin_go
             DESTINATION usr/lib/netdata/conf.d/go.d)
     file(GLOB GO_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/*.conf)
     install(FILES ${GO_CONF_FILES}
-            COMPONENT go_d_plugin
+            COMPONENT plugin_go
             DESTINATION usr/lib/netdata/conf.d/go.d)
 
     install(DIRECTORY
-            COMPONENT go_d_plugin
+            COMPONENT plugin_go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
     file(GLOB GO_SD_CONF_FILES src/go/collectors/go.d.plugin/config/go.d/sd/*.conf)
     install(FILES ${GO_SD_CONF_FILES}
-            COMPONENT go_d_plugin
+            COMPONENT plugin_go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
 endif()
 

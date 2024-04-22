@@ -21,22 +21,22 @@ pushd artifacts
 declare -A packages
 
 packages=(
-    [netdata]=netdata-netdata_6.7.8_amd64.deb
-    [apps_plugin]=netdata-apps_plugin_6.7.8_amd64.deb
-    [charts_d_plugin]=netdata-charts_d_plugin_6.7.8_amd64.deb
-    [cups_plugin]=netdata-cups_plugin_6.7.8_amd64.deb
-    [debugfs_plugin]=netdata-debugfs_plugin_6.7.8_amd64.deb
-    [ebpf_plugin]=netdata-ebpf_plugin_6.7.8_amd64.deb
-    [freeipmi_plugin]=netdata-freeipmi_plugin_6.7.8_amd64.deb
-    [go_d_plugin]=netdata-go_d_plugin_6.7.8_amd64.deb
-    [logs_management_plugin]=netdata-logs_management_plugin_6.7.8_amd64.deb
-    [network_viewer_plugin]=netdata-network_viewer_plugin_6.7.8_amd64.deb
-    [nfacct_plugin]=netdata-nfacct_plugin_6.7.8_amd64.deb
-    [perf_plugin]=netdata-perf_plugin_6.7.8_amd64.deb
-    [python_d_plugin]=netdata-python_d_plugin_6.7.8_amd64.deb
-    [slabinfo_plugin]=netdata-slabinfo_plugin_6.7.8_amd64.deb
-    [systemd_journal_plugin]=netdata-systemd_journal_plugin_6.7.8_amd64.deb
-    [xenstat_plugin]=netdata-xenstat_plugin_6.7.8_amd64.deb
+    [netdata]=netdata_6.7.8_amd64.deb
+    [apps]=netdata-plugin-apps_6.7.8_amd64.deb
+    [chartsd]=netdata-plugin-chartsd_6.7.8_all.deb
+    [cups]=netdata-plugin-cups_6.7.8_amd64.deb
+    [debugfs]=netdata-plugin-debugfs_6.7.8_amd64.deb
+    [ebpf]=netdata-plugin-ebpf_6.7.8_amd64.deb
+    [freeipmi]=netdata-plugin-freeipmi_6.7.8_amd64.deb
+    [god]=netdata-plugin-go_6.7.8_amd64.deb
+    [logs_management]=netdata-plugin-logs-management_6.7.8_amd64.deb
+    [network_viewer]=netdata-plugin-network-viewer_6.7.8_amd64.deb
+    [nfacct]=netdata-plugin-nfacct_6.7.8_amd64.deb
+    [perf]=netdata-plugin-perf_6.7.8_amd64.deb
+    [pythond]=netdata-plugin-pythond_6.7.8_all.deb
+    [slabinfo]=netdata-plugin-slabinfo_6.7.8_amd64.deb
+    [systemd_journal]=netdata-plugin-systemd-journal_6.7.8_amd64.deb
+    [xenstat]=netdata-plugin-xenstat_6.7.8_amd64.deb
 )
 
 for key in "${!packages[@]}"; do
