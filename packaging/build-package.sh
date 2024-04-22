@@ -52,8 +52,7 @@ add_cmake_option ENABLE_BUNDLED_YAML Off
 case "${PKG_TYPE}" in
     DEB)
         if [ "$(uname -m)" = "x86_64" ]; then
-            "${SOURCE_DIR}/packaging/bundle_libbpf.sh" "${BUILD_DIR}" ''
-            add_cmake_option ENABLE_EBPF On
+            add_cmake_option ENABLE_EBPF Off
         else
             add_cmake_option ENABLE_EBPF Off
         fi
