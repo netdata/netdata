@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"regexp"
 	"strconv"
@@ -59,7 +60,7 @@ func (p *promTextParser) parseToSeries(text []byte) (Series, error) {
 			if entry == textparse.EntryInvalid && strings.HasPrefix(err.Error(), "invalid metric type") {
 				continue
 			}
-			return nil, err
+			return nil, fmt.Errorf("failed to parse prometheus metrics: %v", err)
 		}
 
 		switch entry {
@@ -97,7 +98,7 @@ func (p *promTextParser) parseToMetricFamilies(text []byte) (MetricFamilies, err
 			if entry == textparse.EntryInvalid && strings.HasPrefix(err.Error(), "invalid metric type") {
 				continue
 			}
-			return nil, err
+			return nil, fmt.Errorf("failed to parse prometheus metrics: %v", err)
 		}
 
 		switch entry {
