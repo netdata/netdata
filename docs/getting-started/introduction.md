@@ -151,7 +151,7 @@ charts, or use Netdata's health watchdog to send notifications whenever an anoma
 Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
 Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
-ask questions, find resources, and engage with passionate professionals. The team is also available and active in our [Discord](https://discord.com/invite/mPZ6WZKKG2) too.
+ask questions, find resources, and engage with passionate professionals. The team is also available and active in our [Discord](https://discord.com/invite/2mEmfW735j) too.
 
 You can also find Netdata on:
 

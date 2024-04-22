@@ -145,5 +145,5 @@ The next step is based on the collector's orchestrator.
 ```
 
 The output from the relevant command will provide valuable troubleshooting information. If you can't figure out how to
-enable the collector using the details from this output, feel free to [join our Discord server](https://discord.com/invite/mPZ6WZKKG2), 
+enable the collector using the details from this output, feel free to [join our Discord server](https://discord.com/invite/2mEmfW735j), 
 to get help from our experts.

@@ -94,30 +94,35 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
-option(ENABLE_CLOUD "enable cloud" True)
-option(ENABLE_ACLK "enable aclk" True)
-option(ENABLE_ML "enable machine learning" True)
+# This is intended to make life easier for developers who are working on one
+# specific feature.
+option(DEFAULT_FEATURE_STATE "specify the default state for optional features" True)
+mark_as_advanced(DEFAULT_FEATURE_STATE)
+
+option(ENABLE_CLOUD "enable cloud" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_ACLK "enable aclk" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_ML "enable machine learning" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_H2O "enable h2o" True)
 option(ENABLE_DBENGINE "enable dbengine" True)
 
-option(ENABLE_PLUGIN_APPS "enable apps.plugin" True)
-option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network plugin" True)
-option(ENABLE_PLUGIN_CUPS "enable cups.plugin" True)
-option(ENABLE_PLUGIN_DEBUGFS "enable debugfs.plugin" True)
-option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" True)
-option(ENABLE_PLUGIN_FREEIPMI "enable freeipmi.plugin" True)
-option(ENABLE_PLUGIN_GO "enable go.d.plugin" True)
-option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" True)
-option(ENABLE_PLUGIN_LOGS_MANAGEMENT "enable logs-management.plugin" True)
-option(ENABLE_PLUGIN_NETWORK_VIEWER "enable network-viewer" True)
-option(ENABLE_PLUGIN_NFACCT "enable nfacct.plugin" True)
-option(ENABLE_PLUGIN_PERF "enable perf.plugin" True)
-option(ENABLE_PLUGIN_SLABINFO "enable slabinfo.plugin" True)
-option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "enable systemd-journal.plugin" True)
-option(ENABLE_PLUGIN_XENSTAT "enable xenstat.plugin" True)
+option(ENABLE_PLUGIN_APPS "enable apps.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_CUPS "enable cups.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_DEBUGFS "enable debugfs.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_FREEIPMI "enable freeipmi.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_GO "enable go.d.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_LOGS_MANAGEMENT "enable logs-management.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_NETWORK_VIEWER "enable network-viewer" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_NFACCT "enable nfacct.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_PERF "enable perf.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_SLABINFO "enable slabinfo.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "enable systemd-journal.plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_XENSTAT "enable xenstat.plugin" ${DEFAULT_FEATURE_STATE})
 
-option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "enable prometheus remote write exporter" True)
-option(ENABLE_EXPORTER_MONGODB "enable mongodb exporter" True)
+option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "enable prometheus remote write exporter" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_EXPORTER_MONGODB "enable mongodb exporter" ${DEFAULT_FEATURE_STATE})
 
 option(ENABLE_BUNDLED_JSONC "enable bundled json-c" False)
 option(ENABLE_BUNDLED_YAML "enable bundled yaml" False)
@@ -652,10 +657,17 @@ set(LIBNETDATA_FILES
 )
 
 if(ENABLE_PLUGIN_EBPF)
-    list(APPEND LIBNETDATA_FILES
-            src/libnetdata/ebpf/ebpf.c
-            src/libnetdata/ebpf/ebpf.h
-    )
+        message(CHECK_START "Checking for vendored libbpf for eBPF plugin")
+        if (EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a" AND EXISTS "${CMAKE_SOURCE_DIR}/src/libnetdata/ebpf/includes/dc.skel.h")
+                message(CHECK_PASS "found")
+                list(APPEND LIBNETDATA_FILES
+                     src/libnetdata/ebpf/ebpf.c
+                     src/libnetdata/ebpf/ebpf.h
+                )
+        else()
+                message(CHECK_FAIL "not found")
+                message(FATAL_ERROR "eBPF plugin requires a vendored copy of libbpf.")
+        endif()
 endif()
 
 set(LIBH2O_FILES
@@ -1271,7 +1283,6 @@ set(NETDATA_FILES
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
         ${ACLK_ALWAYS_BUILD}
-        ${TIMEX_PLUGIN_FILES}
         ${PROFILE_PLUGIN_FILES}
 )
 
@@ -1282,6 +1293,7 @@ if(LINUX)
                 ${DISKSPACE_PLUGIN_FILES}
                 ${PROC_PLUGIN_FILES}
                 ${TC_PLUGIN_FILES}
+                ${TIMEX_PLUGIN_FILES}
         )
 
         if(ENABLE_SENTRY)
@@ -1293,11 +1305,13 @@ elseif(MACOS)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_macos.c
                 ${MACOS_PLUGIN_FILES}
+                ${TIMEX_PLUGIN_FILES}
         )
 elseif(FREEBSD)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_freebsd.c
                 ${FREEBSD_PLUGIN_FILES}
+                ${TIMEX_PLUGIN_FILES}
         )
 endif()
 
@@ -1837,6 +1851,10 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
+        if(NOT SYSTEMD_FOUND)
+                message(FATAL_ERROR "Systemd journal plugin requires systemd, but systemd was not found.")
+        endif()
+
         add_executable(systemd-journal.plugin ${SYSTEMD_JOURNAL_PLUGIN_FILES})
         target_link_libraries(systemd-journal.plugin libnetdata)
 
@@ -1889,6 +1907,22 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_unittest.h
             src/collectors/ebpf.plugin/ebpf_functions.c
             src/collectors/ebpf.plugin/ebpf_functions.h
+            src/libnetdata/ebpf/includes/cachestat.skel.h
+            src/libnetdata/ebpf/includes/dc.skel.h
+            src/libnetdata/ebpf/includes/disk.skel.h
+            src/libnetdata/ebpf/includes/fd.skel.h
+            src/libnetdata/ebpf/includes/filesystem.skel.h
+            src/libnetdata/ebpf/includes/hardirq.skel.h
+            src/libnetdata/ebpf/includes/mdflush.skel.h
+            src/libnetdata/ebpf/includes/mount.skel.h
+            src/libnetdata/ebpf/includes/oomkill.skel.h
+            src/libnetdata/ebpf/includes/process.skel.h
+            src/libnetdata/ebpf/includes/shm.skel.h
+            src/libnetdata/ebpf/includes/socket.skel.h
+            src/libnetdata/ebpf/includes/softirq.skel.h
+            src/libnetdata/ebpf/includes/swap.skel.h
+            src/libnetdata/ebpf/includes/sync.skel.h
+            src/libnetdata/ebpf/includes/vfs.skel.h
     )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})
@@ -2506,7 +2540,6 @@ install(FILES src/collectors/python.d.plugin/python.d.conf
 # conf files
 
 install(FILES
-        src/collectors/python.d.plugin/adaptec_raid/adaptec_raid.conf
         src/collectors/python.d.plugin/alarms/alarms.conf
         src/collectors/python.d.plugin/am2320/am2320.conf
         src/collectors/python.d.plugin/anomalies/anomalies.conf
@@ -2522,12 +2555,10 @@ install(FILES
         src/collectors/python.d.plugin/gearman/gearman.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
-        src/collectors/python.d.plugin/hddtemp/hddtemp.conf
         src/collectors/python.d.plugin/hpssa/hpssa.conf
         src/collectors/python.d.plugin/icecast/icecast.conf
         src/collectors/python.d.plugin/ipfs/ipfs.conf
         src/collectors/python.d.plugin/litespeed/litespeed.conf
-        src/collectors/python.d.plugin/megacli/megacli.conf
         src/collectors/python.d.plugin/memcached/memcached.conf
         src/collectors/python.d.plugin/monit/monit.conf
         src/collectors/python.d.plugin/nsd/nsd.conf
@@ -2541,7 +2572,6 @@ install(FILES
         src/collectors/python.d.plugin/retroshare/retroshare.conf
         src/collectors/python.d.plugin/riakkv/riakkv.conf
         src/collectors/python.d.plugin/samba/samba.conf
-        src/collectors/python.d.plugin/sensors/sensors.conf
         src/collectors/python.d.plugin/smartd_log/smartd_log.conf
         src/collectors/python.d.plugin/spigotmc/spigotmc.conf
         src/collectors/python.d.plugin/squid/squid.conf
@@ -2557,7 +2587,6 @@ install(FILES
 # scripts
 
 install(FILES
-        src/collectors/python.d.plugin/adaptec_raid/adaptec_raid.chart.py
         src/collectors/python.d.plugin/alarms/alarms.chart.py
         src/collectors/python.d.plugin/am2320/am2320.chart.py
         src/collectors/python.d.plugin/anomalies/anomalies.chart.py
@@ -2573,12 +2602,10 @@ install(FILES
         src/collectors/python.d.plugin/gearman/gearman.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
-        src/collectors/python.d.plugin/hddtemp/hddtemp.chart.py
         src/collectors/python.d.plugin/hpssa/hpssa.chart.py
         src/collectors/python.d.plugin/icecast/icecast.chart.py
         src/collectors/python.d.plugin/ipfs/ipfs.chart.py
         src/collectors/python.d.plugin/litespeed/litespeed.chart.py
-        src/collectors/python.d.plugin/megacli/megacli.chart.py
         src/collectors/python.d.plugin/memcached/memcached.chart.py
         src/collectors/python.d.plugin/monit/monit.chart.py
         src/collectors/python.d.plugin/nsd/nsd.chart.py
@@ -2592,7 +2619,6 @@ install(FILES
         src/collectors/python.d.plugin/retroshare/retroshare.chart.py
         src/collectors/python.d.plugin/riakkv/riakkv.chart.py
         src/collectors/python.d.plugin/samba/samba.chart.py
-        src/collectors/python.d.plugin/sensors/sensors.chart.py
         src/collectors/python.d.plugin/smartd_log/smartd_log.chart.py
         src/collectors/python.d.plugin/spigotmc/spigotmc.chart.py
         src/collectors/python.d.plugin/squid/squid.chart.py

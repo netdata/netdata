@@ -50,6 +50,7 @@ see the appropriate collector readme.
 
 | Name                                                                                                                          |           Monitors            |
 |:------------------------------------------------------------------------------------------------------------------------------|:-----------------------------:|
+| [adaptec_raid](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/adaptecraid)              |     Adaptec Hardware RAID     |
 | [activemq](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/activemq)                     |           ActiveMQ            |
 | [apache](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/apache)                         |            Apache             |
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/bind)                             |           ISC Bind            |
@@ -75,6 +76,7 @@ see the appropriate collector readme.
 | [fluentd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/fluentd)                       |            Fluentd            |
 | [freeradius](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/freeradius)                 |          FreeRADIUS           |
 | [haproxy](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/haproxy)                       |            HAProxy            |
+| [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hddtemp)                       |       Disks temperature       |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hdfs)                             |             HDFS              |
 | [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/httpcheck)                   |       Any HTTP Endpoint       |
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/intelgpu)                     |     Intel integrated GPU      |
@@ -86,6 +88,7 @@ see the appropriate collector readme.
 | [logind](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logind)                         |        systemd-logind         |
 | [logstash](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logstash)                     |           Logstash            |
 | [lvm](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/lvm)                               |      LVM logical volumes      |
+| [megacli](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/megacli)                       |     MegaCli Hardware Raid     |
 | [mongoDB](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/mongodb)                       |            MongoDB            |
 | [mysql](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/mysql)                           |             MySQL             |
 | [nginx](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/nginx)                           |             NGINX             |
@@ -111,10 +114,10 @@ see the appropriate collector readme.
 | [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/rabbitmq)                     |           RabbitMQ            |
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/redis)                           |             Redis             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/scaleio)                       |       Dell EMC ScaleIO        |
+| [sensors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules)                               |       Hardware Sensors        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/snmp)                             |             SNMP              |
-| [solr](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/solr)                             |             Solr              |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/squidlog)                     |             Squid             |
-| [springboot2](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/springboot2)               |         Spring Boot2          |
+| [storcli](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/storcli)                       |    Broadcom Hardware RAID     |
 | [supervisord](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/supervisord)               |          Supervisor           |
 | [systemdunits](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/systemdunits)             |      Systemd unit state       |
 | [tengine](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/tengine)                       |            Tengine            |

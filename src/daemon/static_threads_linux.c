@@ -45,6 +45,15 @@ const struct netdata_static_thread static_threads_linux[] = {
         .init_routine = NULL,
         .start_routine = cgroups_main
     },
+    {
+        .name = "P[timex]",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "timex",
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = timex_main
+    },
 
     // terminator
     {

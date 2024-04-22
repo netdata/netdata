@@ -475,7 +475,7 @@ void netdata_cleanup_and_exit(int ret, const char *action, const char *action_re
     if (ret)
         abort();
     else {
-        sentry_native_fini();
+        nd_sentry_fini();
         exit(ret);
     }
 #else
@@ -1889,9 +1889,6 @@ int main(int argc, char **argv) {
         load_cloud_conf(0);
     }
 
-    // @stelfrag: Where is the right place to call this?
-    watcher_thread_start();
-
     // ------------------------------------------------------------------------
     // initialize netdata
     {
@@ -2110,9 +2107,11 @@ int main(int argc, char **argv) {
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
 
+    watcher_thread_start();
+
     // init sentry
 #ifdef ENABLE_SENTRY
-        sentry_native_init();
+        nd_sentry_init();
 #endif
 
     // The "HOME" env var points to the root's home dir because Netdata starts as root. Can't use "HOME".
@@ -2159,7 +2158,14 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
     get_system_info(system_info);
-    (void) registry_get_this_machine_guid();
+
+    const char *guid = registry_get_this_machine_guid();
+#ifdef ENABLE_SENTRY
+    nd_sentry_set_user(guid);
+#else
+    UNUSED(guid);
+#endif
+
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
 

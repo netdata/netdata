@@ -45,7 +45,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## D
 
-- [**Dashboards**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md): Out-of-the box visual presentation of metrics that allows you to make sense of your infrastructure and its health and performance.
+- [**Dashboard**](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md): Out-of-the-box visual representation of metrics to provide insight into your infrastructure, its health and performance.
 
 - [**Definition Bar**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md): Bar within a composite chart that provides important information and options about the metrics within the chart.
 

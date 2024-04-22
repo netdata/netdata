@@ -8,6 +8,26 @@
 
 void analytics_set_data_str(char **name, const char *value);
 
+#define SQLITE_BIND_FAIL(label, rc)                                                                                    \
+    do {                                                                                                               \
+        if ((rc) != SQLITE_OK)                                                                                         \
+            goto label;                                                                                                \
+    } while (0)
+
+#define REPORT_BIND_FAIL(res, param)                                                                                   \
+    do {                                                                                                               \
+        if (unlikely((param))) {                                                                                       \
+            const char *failed_param = sqlite3_bind_parameter_name((res), (param));                                    \
+            nd_log(                                                                                                    \
+                NDLS_DAEMON,                                                                                           \
+                NDLP_ERR,                                                                                              \
+                "Failed to bind parameter %d (%s) in %s",                                                              \
+                (param),                                                                                               \
+                failed_param ? failed_param : "?",                                                                     \
+                __FUNCTION__);                                                                                         \
+        }                                                                                                              \
+    } while (0)
+
 #define SQL_MAX_RETRY (100)
 #define SQLITE_INSERT_DELAY (10)        // Insert delay in case of lock
 

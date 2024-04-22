@@ -396,15 +396,37 @@ check_for_curl() {
 _safe_download() {
   url="${1}"
   dest="${2}"
+  succeeded=0
+  checked=0
 
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    "${curl}" -fsSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
-    return $?
-  elif command -v wget > /dev/null 2>&1; then
-    wget -T 15 -O - "${url}" > "${dest}"
-    return $?
+    checked=1
+
+    if "${curl}" -fsSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"; then
+      succeeded=1
+    else
+      rm -f "${dest}"
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if wget -T 15 -O - "${url}" > "${dest}"; then
+        succeeded=1
+      else
+        rm -f "${dest}"
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     return 255
   fi
@@ -432,12 +454,20 @@ get_netdata_latest_tag() {
   check_for_curl
 
   if [ -n "${curl}" ]; then
-    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eom 1 '[^/]*/?$')
-  elif command -v wget >/dev/null 2>&1; then
-    tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep -m 1 Location | grep -Eo '[^/]*/?$')
-  else
+    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}')
+  fi
+
+  if [ -z "${tag}" ]; then
+    if command -v wget >/dev/null 2>&1; then
+      tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep Location)
+    fi
+  fi
+
+  if [ -z "${tag}" ]; then
     fatal "I need curl or wget to proceed, but neither of them are available on this system." U0006
   fi
+
+  tag="$(echo "${tag}" | grep -Eom 1 '[^/]*/?$')"
 
   # Fallback case for simpler local testing.
   if echo "${tag}" | grep -Eq 'latest/?$'; then

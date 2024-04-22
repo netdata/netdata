@@ -20,7 +20,7 @@ These charts provide a lot of useful information, so that you can:
 
 These charts are available on Netdata Cloud's
 [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md), [single sode tabs](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) and
-on your [Custom Dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).
+on your [Custom Dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/dashboard/dashboards-tab.md).
 
 ## Overview
 

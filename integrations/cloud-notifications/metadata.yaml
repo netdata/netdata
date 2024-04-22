@@ -494,6 +494,45 @@
             - HTTP Event Collector URI - The URI of your HTTP event collector in Splunk
             - HTTP Event Collector Token - the token that Splunk provided to you when you created the HTTP Event Collector
 
+- id: 'notify-cloud-victorops'
+  meta:
+    name: 'Splunk VictorOps'
+    link: 'https://www.splunk.com/en_us/about-splunk/acquisitions/splunk-on-call.html'
+    categories:
+      - notify.cloud
+    icon_filename: 'victorops.svg'
+  keywords:
+    - VictorOps
+    - Splunk
+    - On-Call
+  overview:
+    notification_description: "From the Cloud interface, you can manage your space's notification settings and from there you can add a specific configuration to get notifications delivered on Splunk On-Call/VictorOps."
+    notification_limitations: ''
+  setup:
+    description: |
+      ### Prerequisites
+
+      To add Splunk VictorOps notification (also known as Splunk On-Call) you need:
+
+      - A Netdata Cloud account
+      - Access to the space as an **administrator**
+      - Space needs to be on **Business** plan or higher
+      - Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [VictorOps documentation](https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide) for detailed instructions.
+
+      ### Steps
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Notification** tab
+      3. Click on the **+ Add configuration** button (near the top-right corner of your screen)
+      4. On the **Splunk VictorOps** card click on **+ Add**
+      5. A modal will be presented to you to enter the required details to enable the configuration:
+        - **Notification settings** are Netdata specific settings
+            - Configuration name - provide a descriptive name for your configuration to easily identify it.
+            - Rooms - select the nodes or areas of your infrastructure you want to receive notifications about.
+            - Notification - choose the type of notifications you want to receive: All Alerts and unreachable, All Alerts, Critical only.
+        - **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Splunk VictorOps:
+            - Destination URL - The URL provided by VictorOps of your REST endpoint.
+
 - id: 'notify-cloud-webhook'
   meta:
     name: 'Webhook'

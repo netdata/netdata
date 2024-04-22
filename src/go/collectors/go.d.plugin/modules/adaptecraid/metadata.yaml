@@ -1,0 +1,146 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-adaptecraid
+      plugin_name: go.d.plugin
+      module_name: adaptec_raid
+      monitored_instance:
+        name: Adaptec RAID
+        link: "https://www.microchip.com/en-us/products/storage"
+        icon_filename: "adaptec.svg"
+        categories:
+          - data-collection.storage-mount-points-and-filesystems
+      keywords:
+        - storage
+        - raid-controller
+        - manage-disks
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors the health of Adaptec Hardware RAID by tracking the status of logical and physical devices in your storage system.
+          It relies on the `arcconf` CLI tool but avoids directly executing the binary.
+          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
+          This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+
+          Executed commands:
+          -  `arcconf GETCONFIG 1 LD`
+          -  `arcconf GETCONFIG 1 PD`
+        method_description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: go.d/adaptec_raid.conf
+        options:
+          description: |
+            The following options can be defined globally: update_every.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: timeout
+              description: arcconf binary execution timeout.
+              default_value: 2
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Custom update_every
+              description: Allows you to override the default data collection interval.
+              config: |
+                jobs:
+                  - name: adaptec_raid
+                    update_every: 5  # Collect Adaptec Hardware RAID statistics every 5 seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts:
+      - name: adaptec_raid_ld_health_status
+        metric: adaptecraid.logical_device_status
+        info: Adaptec RAID logical device (number ${label:ld_number} name ${label:ld_name}) health status is critical
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf
+      - name: adaptec_raid_pd_health_state
+        metric: adaptecraid.physical_device_state
+        info: Adaptec RAID physical device (number ${label:pd_number} location ${label:location}) health state is critical
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: logical device
+          description: These metrics refer to the Logical Device (LD).
+          labels:
+            - name: ld_number
+              description: Logical device index number
+            - name: ld_name
+              description: Logical device name
+            - name: raid_level
+              description: RAID level
+          metrics:
+            - name: adaptecraid.logical_device_status
+              description: Logical Device status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: critical
+        - name: physical device
+          description: These metrics refer to the Physical Device (PD).
+          labels:
+            - name: pd_number
+              description: Physical device index number
+            - name: location
+              description: Physical device location (e.g. Connector 0, Device 1)
+            - name: vendor
+              description: Physical device vendor
+            - name: model
+              description: Physical device model
+          metrics:
+            - name: adaptecraid.physical_device_state
+              description: Physical Device state
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: ok
+                - name: critical
+            - name: adaptecraid.physical_device_smart_warnings
+              description: Physical Device SMART warnings
+              unit: warnings
+              chart_type: line
+              dimensions:
+                - name: smart
+            - name: adaptecraid.physical_device_temperature
+              description: Physical Device temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature

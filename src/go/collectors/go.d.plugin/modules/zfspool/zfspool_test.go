@@ -67,7 +67,6 @@ func TestZFSPool_Init(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestZFSPool_Cleanup(t *testing.T) {
@@ -205,7 +204,6 @@ func TestZFSPool_Collect(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func prepareMockOK() *mockZpoolCLIExec {

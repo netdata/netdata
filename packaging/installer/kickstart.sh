@@ -311,23 +311,31 @@ telemetry_event() {
 EOF
 )"
 
+  succeeded=0
+
   if [ -n "${CURL}" ]; then
-    "${CURL}" --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
-  elif command -v wget > /dev/null 2>&1; then
-    if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
-      # BusyBox-compatible version of wget, there is no --no-check-certificate option
-      wget -q -O - \
-      -T 1 \
-      --header 'Content-Type: application/json' \
-      --post-data "${REQ_BODY}" \
-      "${TELEMETRY_URL}" > /dev/null
-    else
-      wget -q -O - --no-check-certificate \
-      --method POST \
-      --timeout=1 \
-      --header 'Content-Type: application/json' \
-      --body-data "${REQ_BODY}" \
-      "${TELEMETRY_URL}" > /dev/null
+    if "${CURL}" --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
+        # BusyBox-compatible version of wget, there is no --no-check-certificate option
+        wget -q -O - \
+        -T 1 \
+        --header 'Content-Type: application/json' \
+        --post-data "${REQ_BODY}" \
+        "${TELEMETRY_URL}" > /dev/null
+      else
+        wget -q -O - --no-check-certificate \
+        --method POST \
+        --timeout=1 \
+        --header 'Content-Type: application/json' \
+        --body-data "${REQ_BODY}" \
+        "${TELEMETRY_URL}" > /dev/null
+      fi
     fi
   fi
 }
@@ -605,15 +613,38 @@ set_tmpdir() {
 
 check_for_remote_file() {
   url="${1}"
+  succeeded=0
+  checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
     [ -e "${url#file://}" ] || return 1
+    return 0
   elif [ -n "${NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT}" ]; then
     return 0
-  elif [ -n "${CURL}" ]; then
-    "${CURL}" --output /dev/null --silent --head --fail "${url}" || return 1
-  elif command -v wget > /dev/null 2>&1; then
-    wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK' || return 1
+  fi
+
+  if [ -n "${CURL}" ]; then
+    checked=1
+
+    if "${CURL}" --output /dev/null --silent --head --fail "${url}"; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK'; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
@@ -622,13 +653,39 @@ check_for_remote_file() {
 download() {
   url="${1}"
   dest="${2}"
+  succeeded=0
+  checked=0
 
   if echo "${url}" | grep -Eq "^file:///"; then
     run cp "${url#file://}" "${dest}" || return 1
-  elif [ -n "${CURL}" ]; then
-    run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
-  elif command -v wget > /dev/null 2>&1; then
-    run wget -T 15 -O "${dest}" "${url}" || return 1
+    return 0
+  fi
+
+
+  if [ -n "${CURL}" ]; then
+    checked=1
+
+    if run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"; then
+      succeeded=1
+    else
+      rm -f "${dest}"
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if run wget -T 15 -O "${dest}" "${url}"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
@@ -652,11 +709,31 @@ get_actual_version() {
 
 get_redirect() {
   url="${1}"
+  succeeded=0
+  checked=0
 
   if [ -n "${CURL}" ]; then
-    run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+$'" || return 1
-  elif command -v wget > /dev/null 2>&1; then
-    run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+$'" || return 1
+    checked=1
+
+    if run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -Eo '[^/]+$'"; then
+      succeeded=1
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 0 ]; then
+    if command -v wget > /dev/null 2>&1; then
+      checked=1
+
+      if run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -Eo '[^/]+$'"; then
+        succeeded=1
+      fi
+    fi
+  fi
+
+  if [ "${succeeded}" -eq 1 ]; then
+    return 0
+  elif [ "${checked}" -eq 1 ]; then
+    return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
