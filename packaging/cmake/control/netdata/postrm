@@ -39,6 +39,17 @@ case "$1" in
 
 esac
 
-#DEBHELPER#
+if [ "$1" = "remove" ]; then
+	if [ -x "/usr/bin/deb-systemd-helper" ]; then
+		deb-systemd-helper mask 'netdata.service' >/dev/null || true
+	fi
+fi
+
+if [ "$1" = "purge" ]; then
+	if [ -x "/usr/bin/deb-systemd-helper" ]; then
+		deb-systemd-helper purge 'netdata.service' >/dev/null || true
+		deb-systemd-helper unmask 'netdata.service' >/dev/null || true
+	fi
+fi
 
 exit 0
