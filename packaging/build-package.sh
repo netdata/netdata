@@ -14,7 +14,7 @@ SCRIPT_SOURCE="$(
     cd "${self%/*}" || exit 1
     echo "$(pwd -P)/${self##*/}"
 )"
-SOURCE_DIR="$(dirname "${SCRIPT_SOURCE}")"
+SOURCE_DIR="$(dirname "$(dirname "${SCRIPT_SOURCE}")")"
 
 CMAKE_ARGS="-S ${SOURCE_DIR} -B ${BUILD_DIR} -G Ninja"
 
