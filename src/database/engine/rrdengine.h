@@ -563,5 +563,6 @@ static inline int journal_metric_uuid_compare(const void *key, const void *metri
 // --------------------------------------------------------------------------------------------------------------------
 
 void dbengine_retention_statistics(void);
+uint64_t get_directory_free_bytes_space(struct rrdengine_instance *ctx);
 
 #endif /* NETDATA_RRDENGINE_H */

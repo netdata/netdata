@@ -1759,6 +1759,15 @@ static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_w
         work_dispatch(ctx, pdc, NULL, cmd.opcode, query_prep_tp_worker, NULL);
 }
 
+uint64_t get_directory_free_bytes_space(struct rrdengine_instance *ctx)
+{
+    uint64_t free_bytes = 0;
+    struct statvfs buff_statvfs;
+    if (statvfs(ctx->config.dbfiles_path, &buff_statvfs) == 0)
+        free_bytes = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
+    return free_bytes;
+}
+
 void dbengine_retention_statistics(void)
 {
     static bool init = false;
@@ -1795,10 +1804,11 @@ void dbengine_retention_statistics(void)
         uint64_t disk_space = get_used_disk_space(multidb_ctx[tier]);
         time_t retention = get_tier_retention(multidb_ctx[tier]);
 
-        collected_number disk_percentage =
-            (collected_number)multidb_ctx[tier]->config.max_disk_space ?
-                100 * (collected_number)disk_space / (collected_number)multidb_ctx[tier]->config.max_disk_space :
-                0;
+        uint64_t config_disk_space = multidb_ctx[tier]->config.max_disk_space;
+        if (!config_disk_space)
+            config_disk_space = get_directory_free_bytes_space(multidb_ctx[tier]);
+
+        collected_number disk_percentage = (collected_number) (config_disk_space ? 100 * disk_space / config_disk_space : 0);
 
         collected_number retention_percentage = (collected_number)multidb_ctx[tier]->config.max_retention_s ?
                                                     100 * retention / multidb_ctx[tier]->config.max_retention_s :

@@ -1175,17 +1175,7 @@ int rrdeng_init(
     if (disk_space_mb && disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
 
-    if (!disk_space_mb) {
-        struct statvfs buff_statvfs;
-        if (statvfs(ctx->config.dbfiles_path, &buff_statvfs) == 0) {
-            ctx->config.max_disk_space = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
-            ctx->config.max_disk_space = ctx->config.max_disk_space - (uint64_t ) (ctx->config.max_disk_space * 10 / 100);
-        }
-        else
-            ctx->config.max_disk_space = 0;
-    }
-    else
-        ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
+    ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
 
     ctx->config.max_retention_s = max_retention_s;
 
