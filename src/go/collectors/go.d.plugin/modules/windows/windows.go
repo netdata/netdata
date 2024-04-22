@@ -69,7 +69,8 @@ func New() *Windows {
 
 type Config struct {
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int `yaml:"update_every" json:"update_every"`
+	UpdateEvery int    `yaml:"update_every" json:"update_every"`
+	Vnode       string `yaml:"vnode" json:"vnode"`
 }
 
 type (

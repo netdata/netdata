@@ -28,6 +28,11 @@
         "description": "If set, the client will not follow HTTP redirects automatically.",
         "type": "boolean"
       },
+      "vnode": {
+        "title": "Vnode",
+        "description": "The hostname of the [virtual node](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md#virtual-nodes) defined in the vnodes.conf configuration file.",
+        "type": "string"
+      },
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
@@ -90,6 +95,14 @@
         "description": "The path to the client key file for TLS authentication.",
         "type": "string",
         "pattern": "^$|^/"
+      },
+      "body": {
+        "title": "Body",
+        "type": "string"
+      },
+      "method": {
+        "title": "Method",
+        "type": "string"
       }
     },
     "required": [
@@ -110,7 +123,8 @@
             "update_every",
             "url",
             "timeout",
-            "not_follow_redirects"
+            "not_follow_redirects",
+            "vnode"
           ]
         },
         {
@@ -148,8 +162,14 @@
     "uiOptions": {
       "fullPage": true
     },
+    "body": {
+      "ui:widget": "hidden"
+    },
+    "method": {
+      "ui:widget": "hidden"
+    },
     "url": {
-      "ui:placeholder": "https://203.0.113.0/metrics"
+      "ui:placeholder": "http://203.0.113.0:9182/metrics"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
