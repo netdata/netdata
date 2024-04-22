@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17465](https://github.com/netdata/netdata/pull/17465) ([netdatabot](https://github.com/netdatabot))
+- Regenerate integrations.js [\#17464](https://github.com/netdata/netdata/pull/17464) ([netdatabot](https://github.com/netdatabot))
+- remove python.d/hddtemp [\#17463](https://github.com/netdata/netdata/pull/17463) ([ilyam8](https://github.com/ilyam8))
+- go.d add hddtemp [\#17462](https://github.com/netdata/netdata/pull/17462) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17461](https://github.com/netdata/netdata/pull/17461) ([netdatabot](https://github.com/netdatabot))
 - go.d storcli update [\#17460](https://github.com/netdata/netdata/pull/17460) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17458](https://github.com/netdata/netdata/pull/17458) ([netdatabot](https://github.com/netdatabot))
@@ -415,9 +419,6 @@
 - highlight Challenge Secret title to be more visible [\#16882](https://github.com/netdata/netdata/pull/16882) ([juacker](https://github.com/juacker))
 - add the CLOEXEC flag to all sockets and files [\#16881](https://github.com/netdata/netdata/pull/16881) ([ktsaou](https://github.com/ktsaou))
 - Network viewer UI minor fixes [\#16880](https://github.com/netdata/netdata/pull/16880) ([ktsaou](https://github.com/ktsaou))
-- Network viewer fixes [\#16877](https://github.com/netdata/netdata/pull/16877) ([ktsaou](https://github.com/ktsaou))
-- Add requirements.txt for dag [\#16875](https://github.com/netdata/netdata/pull/16875) ([vkalintiris](https://github.com/vkalintiris))
-- Rm refs to map and save modes [\#16874](https://github.com/netdata/netdata/pull/16874) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
