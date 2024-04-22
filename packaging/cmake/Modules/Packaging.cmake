@@ -118,6 +118,10 @@ set(CPACK_DEBIAN_CUPS_PLUGIN_PACKAGE_SECTION "net")
 # set(CPACK_DEBIAN_CUPS_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_CUPS_PLUGIN_PACKAGE_PREDEPENDS "adduser")
 
+set(CPACK_DEBIAN_EBPF_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/cups/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/cups/postinst")
+
 #
 # xenstat.plugin
 #
