@@ -138,7 +138,7 @@ set(CPACK_DEBIAN_XENSTAT_PLUGIN_PACKAGE_PREDEPENDS "adduser")
 
 set(CPACK_DEBIAN_XENSTAT_PLUGIN_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/xenstat/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/postrm")
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/xenstat/postrm")
 
 #
 # slabinfo.plugin
