@@ -101,6 +101,10 @@ set(CPACK_DEBIAN_DEBUGFS_PLUGIN_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_DEBUGFS_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_DEBUGFS_PLUGIN_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
+set(CPACK_DEBIAN_EBPF_PLUGIN_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/debugfs/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/debugfs/postinst")
+
 #
 # cups.plugin
 #
