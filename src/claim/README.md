@@ -554,6 +554,17 @@ To remove a node from you Space in Netdata Cloud, and connect it to another Spac
   If you are using a `docker-compose.yml` file, you will have to overwrite it with the new claiming token.  
   The node should now appear online in that Space.
 
+### Regenerate Claiming Token
+
+If in case of some security reason, or other, you need to revoke your previous claiming token and generate a new 
+one you can achieve that from the Netdata Cloud UI.
+
+On any screen where you see the connect the node to Netdata Cloud command you'll see above it, next to the 
+[updates channel](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/versions-and-platforms.md), a 
+button to **Regenerate token**. This action will invalidate your previous token and generate a fresh new one.
+
+Only the administrators of a Space in Netdata Cloud can trigger this action.
+
 ## Connecting reference
 
 In the sections below, you can find reference material for the kickstart script, claiming script, connecting via the Agent's command line

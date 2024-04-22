@@ -46,13 +46,14 @@ To manage your **personal alert notification silencing rule settings**, you will
 
 ## Silencing rules examples
 
-| Rule name | War Rooms | Nodes | Host Label | Alert name | Alert context | Alert role | Description |
-| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :--|
+| Rule name | War Rooms | Nodes | Host Label | Alert name | Alert context | Alert instance | Alert role | Description |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- | :-- | :--|
 | Space silencing | All Rooms | * | * | * | * | * | This rule silences the entire space, targets all nodes and for all users. E.g. infrastructure wide maintenance window. |
-| DB Servers Rooms | PostgreSQL Servers | * | * | * | * | * | This rules silences the nodes in the room named PostgreSQL Servers, for example it doesn't silence the `All Nodes` room. E.g. My team with membership to this room doesn't want to receive notifications for these nodes. |
-| Node child1 | All Rooms | `child1` | * | * | * | * | This rule silences all alert state transitions for node `child1` on all rooms and for all users. E.g. node could be going under maintenance. |
-| Production nodes | All Rooms | * | `environment:production` | * | * | * | This rule silences all alert state transitions for nodes with the host label key-value pair `environment:production`. E.g. Maintenance window on nodes with specific host labels. |
-| Third party maintenance | All Rooms | * | * | `httpcheck_posthog_netdata_cloud.request_status` | * | * | This rule silences this specific alert since third party partner will be undergoing maintenance. |
-| Intended stress usage on CPU | All Rooms | * | * | * | `system.cpu` | * | This rule silences specific alerts across all nodes and their CPU cores. |
-| Silence role webmaster | All Rooms | * | * | * | * | `webmaster` | This rule silences all alerts configured with the role `webmaster`. |
-| Silence alert on node | All Rooms | `child1` | * | `httpcheck_posthog_netdata_cloud.request_status` | * | * | This rule silences the specific alert on the `child1` node. |
+| DB Servers Rooms | PostgreSQL Servers | * | * | * | * | * | * | This rules silences the nodes in the room named PostgreSQL Servers, for example it doesn't silence the `All Nodes` room. E.g. My team with membership to this room doesn't want to receive notifications for these nodes. |
+| Node child1 | All Rooms | `child1` | * | * | * | * | * | This rule silences all alert state transitions for node `child1` on all rooms and for all users. E.g. node could be going under maintenance. |
+| Production nodes | All Rooms | * | `environment:production` | * | * | * | * | This rule silences all alert state transitions for nodes with the host label key-value pair `environment:production`. E.g. Maintenance window on nodes with specific host labels. |
+| Third party maintenance | All Rooms | * | * | `httpcheck_posthog_netdata_cloud.request_status` | * | * | * | This rule silences this specific alert since third party partner will be undergoing maintenance. |
+| Intended stress usage on CPU | All Rooms | * | * | * | `system.cpu` | * | * | This rule silences specific alerts across all nodes and their CPU cores. |
+| Silence role webmaster | All Rooms | * | * | * | * | * | `webmaster` | This rule silences all alerts configured with the role `webmaster`. |
+| Silence alert on node | All Rooms | `child1` | * | `httpcheck_posthog_netdata_cloud.request_status` | * | * | * | This rule silences the specific alert on the `child1` node. |
+| Disk Space alerts on mount point | All Rooms | * | * | `disk_space_usage` | `disk.space` | `disk_space_opt_baddisk` | * | This rule silences the specific alert instance on all nodes `/opt/baddisk`. |
