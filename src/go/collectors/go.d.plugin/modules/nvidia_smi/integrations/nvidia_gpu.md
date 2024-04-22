@@ -152,22 +152,22 @@ The following options can be defined globally: update_every, autodetection_retry
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | binary_path | Path to nvidia_smi binary. The default is "nvidia_smi" and the executable is looked for in the directories specified in the PATH environment variable. | nvidia_smi | no |
 | timeout | nvidia_smi binary execution timeout. | 2 | no |
-| use_csv_format | Used format when requesting GPU information. XML is used if set to 'no'. | yes | no |
+| use_csv_format | Used format when requesting GPU information. XML is used if set to 'no'. | no | no |
 
 </details>
 
 #### Examples
 
-##### XML format
+##### CSV format
 
-Use XML format when requesting GPU information.
+Use CSV format when requesting GPU information.
 
 <details><summary>Config</summary>
 
 ```yaml
 jobs:
   - name: nvidia_smi
-    use_csv_format: no
+    use_csv_format: yes
 
 ```
 </details>
