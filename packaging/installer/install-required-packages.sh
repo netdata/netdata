@@ -626,6 +626,11 @@ declare -A pkg_distro_sdk=(
   ['default']="NOTREQUIRED"
 )
 
+declare -A pkg_coreutils=(
+  ['alpine']="coreutils"
+  ['default']="NOTREQUIRED"
+)
+
 declare -A pkg_autoconf=(
   ['gentoo']="sys-devel/autoconf"
   ['clearlinux']="c-basic"
@@ -1228,6 +1233,7 @@ packages() {
   # basic build environment
 
   suitable_package distro-sdk
+  suitable_package coreutils
   suitable_package libatomic
 
   require_cmd git || suitable_package git
