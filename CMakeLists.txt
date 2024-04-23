@@ -63,6 +63,7 @@ find_package(PkgConfig REQUIRED)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "netdata")
 
 option(USE_CXX_11 "use C++11 instead of C++14" False)
 
@@ -1890,9 +1891,8 @@ set(NDSUDO_FILES src/collectors/plugins.d/ndsudo.c)
 
 add_executable(ndsudo ${NDSUDO_FILES})
 
-# TODO: separate component for this?
 install(TARGETS ndsudo
-        COMPONENT ndsudo
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 if(ENABLE_PLUGIN_CGROUP_NETWORK)
@@ -1901,9 +1901,8 @@ if(ENABLE_PLUGIN_CGROUP_NETWORK)
     add_executable(cgroup-network ${CGROUP_NETWORK_FILES})
     target_link_libraries(cgroup-network libnetdata)
 
-    # TODO: separate component for this?
     install(TARGETS cgroup-network
-            COMPONENT cgroup_network_plugin
+            COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -2036,9 +2035,8 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         target_link_libraries(local-listeners libnetdata
                               "$<$<BOOL:${MNL_FOUND}>:${MNL_LIBRARIES}>")
 
-        # TODO: separate component for this?
         install(TARGETS local-listeners
-                COMPONENT local_listeners
+                COMPONENT netdata
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
@@ -2161,7 +2159,7 @@ add_executable(systemd-cat-native ${SYSTEMD_CAT_NATIVE_FILES})
 target_link_libraries(systemd-cat-native libnetdata)
 
 install(TARGETS systemd-cat-native
-        COMPONENT systemd-cat-native
+        COMPONENT netdata
         DESTINATION usr/sbin)
 
 #
@@ -2328,14 +2326,14 @@ configure_file(src/collectors/cgroups.plugin/cgroup-network-helper.sh.in
                src/collectors/cgroups.plugin/cgroup-network-helper.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-network-helper.sh
-        COMPONENT cgroup_network_plugin
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 configure_file(src/collectors/cgroups.plugin/cgroup-name.sh.in
                src/collectors/cgroups.plugin/cgroup-name.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-name.sh
-        # COMPONENT cgroup_network_plugin
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
@@ -2526,6 +2524,11 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION etc/init.d)
 
+install(PROGRAMS
+        packaging/installer/netdata-updater.sh
+        COMPONENT netdata
+        DESTINATION usr/libexec/netdata)
+
 #
 # TODO: check the following files for correct substitutions
 #
@@ -2653,7 +2656,7 @@ install(FILES
 configure_file(src/collectors/tc.plugin/tc-qos-helper.sh.in src/collectors/tc.plugin/tc-qos-helper.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/collectors/tc.plugin/tc-qos-helper.sh
-        COMPONENT tc_plugin
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 # confs

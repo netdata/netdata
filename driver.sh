@@ -88,13 +88,14 @@ fi
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
     -DCMAKE_C_FLAGS="-Wall -Wextra" \
     -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=mold" \
-    -DNETDATA_USER=vk \
+    -DNETDATA_USER=netdata \
     -DENABLE_PLUGIN_EBPF=Off \
     -DENABLE_PLUGIN_LOGS_MANAGEMENT=On \
     -DENABLE_LOGS_MANAGEMENT_TESTS=Off \
     -DENABLE_BUNDLED_JSONC=Off \
     -DENABLE_BUNDLED_YAML=Off \
     -DENABLE_BUNDLED_PROTOBUF=Off \
+    -DWEB_DIR=/var/lib/netdata/www \
     ${ASAN_OPTION} \
     ${SENTRY_FLAGS}
 

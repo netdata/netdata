@@ -42,7 +42,7 @@ packages=(
 for key in "${!packages[@]}"; do
     package=${packages[$key]}
     if [ -e "${package}" ]; then
-        dpkg-deb -R "$package" "$key"
+        dpkg-deb -x "$package" rfs
     fi
 done
 
