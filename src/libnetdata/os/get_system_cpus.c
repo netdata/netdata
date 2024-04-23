@@ -5,10 +5,10 @@
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"
 
+#include "../libnetdata.h"
+
 #if defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_MSYS)
 #include <windows.h>
-#else
-#include "../libnetdata.h"
 #endif
 
 #define CPUS_FOR_COLLECTORS 0
