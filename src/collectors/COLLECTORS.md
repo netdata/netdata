@@ -83,7 +83,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 ### Authentication and Authorization
 
-- [Fail2ban](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/fail2ban/integrations/fail2ban.md)
+- [Fail2ban](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/fail2ban/integrations/fail2ban.md)
 
 - [FreeRADIUS](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/freeradius/integrations/freeradius.md)
 
