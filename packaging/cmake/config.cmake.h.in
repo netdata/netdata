@@ -117,6 +117,8 @@
 
 #cmakedefine ENABLE_LOGSMANAGEMENT
 #cmakedefine ENABLE_LOGSMANAGEMENT_TESTS
+#cmakedefine FLB_HAVE_INOTIFY
+
 #cmakedefine ENABLE_PROMETHEUS_REMOTE_WRITE
 
 // enabled plugins

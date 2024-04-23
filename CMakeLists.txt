@@ -275,6 +275,10 @@ if(ENABLE_LEGACY_EBPF_PROGRAMS)
         include(NetdataEBPFLegacy)
 endif()
 
+if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
+        include(NetdataFluentBit)
+endif()
+
 if(ENABLE_SENTRY)
         include(NetdataSentry)
 endif()
@@ -288,6 +292,10 @@ netdata_detect_libyaml()
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         netdata_fetch_legacy_ebpf_code()
+endif()
+
+if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
+        netdata_bundle_flb()
 endif()
 
 if(ENABLE_SENTRY)
@@ -1921,6 +1929,8 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
     add_executable(logs-management.plugin ${LOGS_MANAGEMENT_PLUGIN_FILES})
     target_link_libraries(logs-management.plugin libnetdata)
 
+    netdata_require_flb_for_target(logs-management.plugin)
+
     install(TARGETS logs-management.plugin
             COMPONENT plugin-logs-management
             DESTINATION usr/libexec/netdata/plugins.d)
@@ -1947,6 +1957,12 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
                 COMPONENT plugin-logs-management
                 DESTINATION usr/share/doc/netdata-plugin-logs-management)
     endif()
+
+    install(DIRECTORY
+            COMPONENT plugin-logs-management
+            DESTINATION etc/netdata/logsmanagement.d)
+
+    netdata_install_flb(plugin-logs-management)
 endif()
 
 if(ENABLE_PLUGIN_CUPS)
