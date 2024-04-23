@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "config.h"
 #include "get_system_cpus.h"
+
+#if defined(COMPILED_FOR_LINUX)
 #include "../libnetdata.h"
+#endif
 
 #if defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_MSYS)
 #include <windows.h>

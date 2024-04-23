@@ -3,6 +3,7 @@
 #ifndef NETDATA_WAITID_H
 #define NETDATA_WAITID_H
 
+#include "config.h"
 #include <sys/wait.h>
 
 #ifndef WNOWAIT
