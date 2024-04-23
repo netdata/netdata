@@ -17,7 +17,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Agent-cloud link** or **ACLK**](https://github.com/netdata/netdata/blob/master/src/aclk/README.md): The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser through Netdata Cloud.
 
-- [**Aggregate Function**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#aggregate-functions-over-time): A function applied When the granularity of the data collected is higher than the plotted points on the chart.
+- [**Aggregate Function**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#aggregate-functions-over-time): A function applied When the granularity of the data collected is higher than the plotted points on the chart.
 
 - [**Alerts** (formerly **Alarms**)](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
 
@@ -39,7 +39,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Community**](https://community.netdata.cloud/): As a company with a passion and genesis in open-source, we are not just very proud of our community, but we consider our users, fans, and chatters to be an imperative part of the Netdata experience and culture.
 
-- [**Context**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
+- [**Context**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
 
 - [**Custom dashboards**](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md) A dashboard that you can create using simple HTML (no javascript is required for basic dashboards).
 
@@ -47,9 +47,9 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Dashboard**](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md): Out-of-the-box visual representation of metrics to provide insight into your infrastructure, its health and performance.
 
-- [**Definition Bar**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md): Bar within a composite chart that provides important information and options about the metrics within the chart.
+- [**Definition Bar**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md): Bar within a composite chart that provides important information and options about the metrics within the chart.
 
-- [**Dimension**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#dimensions): A dimension is a value that gets shown on a chart.
+- [**Dimension**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#dimensions): A dimension is a value that gets shown on a chart.
 
 ## E
 
@@ -57,7 +57,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## F
 
-- [**Family**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
+- [**Family**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
 
 - [**Flood Protection**](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud does not send notifications about this node
 
@@ -67,7 +67,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Guided Troubleshooting**](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/troubleshooting-overview.md): Troubleshooting with our Machine-Learning-powered tools designed to give you a cutting edge advantage in your troubleshooting battles.
 
-- [**Group by**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#group-by-dimension-node-or-chart): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
+- [**Group by**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#group-by-dimension-node-or-chart): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
 
 ## H
 

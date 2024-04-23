@@ -100,7 +100,7 @@ single-node dashboards in Netdata Cloud to drill down on specific issues, scrub 
 historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
 
 Learn more about [interacting with
-dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) to get the most from all of Netdata's real-time
+dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md) to get the most from all of Netdata's real-time
 metrics.
 
 ### Create new dashboards
