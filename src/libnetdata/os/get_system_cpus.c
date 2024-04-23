@@ -3,6 +3,9 @@
 #include "config.h"
 #include "get_system_cpus.h"
 
+#include <stdint.h>
+#include <sys/types.h>
+
 #if defined(COMPILED_FOR_LINUX)
 #include "../libnetdata.h"
 #endif
