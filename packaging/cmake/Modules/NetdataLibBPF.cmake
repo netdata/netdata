@@ -84,7 +84,7 @@ function(netdata_bundle_libbpf)
 
     set(_libbpf_lib_dir lib)
 
-    if(CMAKE_SYSTEM_PROCESSOR EQUAL X86_64)
+    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
         set(_libbpf_lib_dir lib64)
     endif()
 
