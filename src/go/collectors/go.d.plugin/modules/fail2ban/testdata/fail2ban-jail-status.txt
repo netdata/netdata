@@ -1,0 +1,9 @@
+Status for the jail: JAIL
+|- Filter
+|  |- Currently failed:	10
+|  |- Total failed:	20
+|  `- File list:	/var/log/auth.log
+`- Actions
+   |- Currently banned:	30
+   |- Total banned:	40
+   `- Banned IP list:
