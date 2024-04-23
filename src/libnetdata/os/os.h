@@ -3,8 +3,6 @@
 #ifndef NETDATA_OS_H
 #define NETDATA_OS_H
 
-#include "libnetdata/libnetdata.h"
-
 #if defined(COMPILED_FOR_LINUX) || defined(COMPILED_FOR_FREEBSD) || defined(COMPILED_FOR_MACOS)
 #include <sys/syscall.h>
 #endif
