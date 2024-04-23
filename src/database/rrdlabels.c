@@ -1144,7 +1144,10 @@ static SIMPLE_PATTERN_RESULT simple_pattern_match_name_only_callback(const char 
 
     // we return -1 to stop the walkthrough on first match
     t->searches++;
-    return simple_pattern_matches_extract(t->pattern, name, NULL, 0);
+    SIMPLE_PATTERN_RESULT ret = simple_pattern_matches_extract(t->pattern, name, NULL, 0);
+    if (ret == SP_MATCHED_NEGATIVE)
+        ret = SP_NOT_MATCHED;
+    return ret;
 }
 
 static SIMPLE_PATTERN_RESULT simple_pattern_match_name_and_value_callback(const char *name, const char *value, RRDLABEL_SRC ls __maybe_unused, void *data) {
