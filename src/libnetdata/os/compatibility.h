@@ -73,29 +73,91 @@ static inline int os_getgrouplist(const char *username __maybe_unused, gid_t gid
 // --------------------------------------------------------------------------------------------------------------------
 // waitid
 
-#if defined(COMPILED_FOR_CYGWIN)
-# define WSTOPPED	2	/* Report stopped child (same as WUNTRACED). */
-# define WEXITED	4	/* Report dead child.  */
-# define WCONTINUED	8	/* Report continued child.  */
-# define WNOWAIT	0x01000000 /* Don't reap, just poll status.  */
+#ifndef WNOWAIT
+#define WNOWAIT 0x01000000
+#endif
 
+#ifndef WEXITED
+#define WEXITED 4
+#endif
+
+#if !defined(HAVE_WAITID)
 typedef enum
 {
-    P_ALL,		/* Wait for any child.  */
-    P_PID,		/* Wait for specified process.  */
-    P_PGID,		/* Wait for members of process group.  */
-    P_PIDFD,		/* Wait for the child referred by the PID file
-			   descriptor.  */
+    P_ALL,     /* Wait for any child.  */
+    P_PID,     /* Wait for specified process.  */
+    P_PGID,    /* Wait for members of process group.  */
+    P_PIDFD,   /* Wait for the child referred by the PID file descriptor.  */
 } idtype_t;
 #endif
 
-static inline int os_waitid(idtype_t idtype __maybe_unused, id_t id __maybe_unused, siginfo_t *infop __maybe_unused, int options __maybe_unused) {
-#if defined(COMPILED_FOR_LINUX) || defined(COMPILED_FOR_FREEBSD) || defined(COMPILED_FOR_MACOS)
+static inline int os_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options) {
+#if defined(HAVE_WAITID)
     return waitid(idtype, id, infop, options);
-#endif
+#else
+    static __thread struct {
+        pid_t pid;
+        int status;
+    } last_p_all = { 0, 0 };
 
-    errno = ENOSYS;
+    memset(infop, 0, sizeof(*infop));
+    int status;
+    pid_t pid;
+
+    switch(idtype) {
+        case P_ALL:
+            pid = waitpid((pid_t)-1, &status, options);
+            if(options & WNOWAIT) {
+                last_p_all.pid = pid;           // the cache is updated
+                last_p_all.status = status;     // the cache is updated
+            }
+            else {
+                last_p_all.pid = 0;             // the cache is empty
+                last_p_all.status = 0;          // the cache is empty
+            }
+            break;
+
+        case P_PID:
+            if(last_p_all.pid == pid) {
+                pid = last_p_all.pid;
+                status = last_p_all.status;
+                last_p_all.pid = 0;             // the cache is used
+                last_p_all.status = 0;          // the cache is used
+            }
+            else
+                pid = waitpid((pid_t)id, &status, options);
+
+            break;
+
+        default:
+            errno = ENOSYS;
+            return -1;
+    }
+
+    if (pid > 0) {
+        if (WIFEXITED(status)) {
+            infop->si_code = CLD_EXITED;
+            infop->si_status = WEXITSTATUS(status);
+        } else if (WIFSIGNALED(status)) {
+            infop->si_code = WTERMSIG(status) == SIGABRT ? CLD_DUMPED : CLD_KILLED;
+            infop->si_status = WTERMSIG(status);
+        } else if (WIFSTOPPED(status)) {
+            infop->si_code = CLD_STOPPED;
+            infop->si_status = WSTOPSIG(status);
+        } else if (WIFCONTINUED(status)) {
+            infop->si_code = CLD_CONTINUED;
+            infop->si_status = SIGCONT;
+        }
+        infop->si_pid = pid;
+        return 0;
+    } else if (pid == 0) {
+        // No change in state, depends on WNOHANG
+        return 0;
+    }
+
+    // error case
     return -1;
+#endif
 }
 
 // --------------------------------------------------------------------------------------------------------------------
