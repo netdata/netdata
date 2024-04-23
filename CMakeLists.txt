@@ -2196,11 +2196,11 @@ if(PCRE2_FOUND)
         netdata_add_libyaml_to_target(log2journal)
 
         install(TARGETS log2journal
-                COMPONENT log2journal
+                COMPONENT netdata
                 DESTINATION usr/sbin)
 
         install(DIRECTORY src/collectors/log2journal/log2journal.d
-                COMPONENT log2journal
+                COMPONENT netdata
                 DESTINATION usr/lib/netdata/conf.d)
 endif()
 
