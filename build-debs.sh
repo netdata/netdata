@@ -41,7 +41,9 @@ packages=(
 
 for key in "${!packages[@]}"; do
     package=${packages[$key]}
-    dpkg-deb -R "$package" "$key"
+    if [ -e "${package}" ]; then
+        dpkg-deb -R "$package" "$key"
+    fi
 done
 
 popd
