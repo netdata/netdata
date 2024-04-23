@@ -84,7 +84,7 @@ function(netdata_bundle_libbpf)
 
     set(_libbpf_lib_dir lib)
 
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    if(CMAKE_SYSTEM_PROCESSOR EQUAL AMD64)
         set(_libbpf_lib_dir lib64)
     endif()
 
