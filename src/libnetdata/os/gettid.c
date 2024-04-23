@@ -1,28 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "config.h"
-#include "compatibility.h"
+#include "gettid.h"
 
 #if defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_MSYS)
 #include <windows.h>
+#else
+#include <pthread.h>
 #endif
-
-// --------------------------------------------------------------------------------------------------------------------
-
-int os_adjtimex(struct timex *buf __maybe_unused) {
-#if defined(COMPILED_FOR_MACOS) || defined(COMPILED_FOR_FREEBSD)
-    return ntp_adjtime(buf);
-#endif
-
-#if defined(COMPILED_FOR_LINUX)
-    return adjtimex(buf);
-#endif
-
-    errno = ENOSYS;
-    return -1;
-}
-
-// --------------------------------------------------------------------------------------------------------------------
 
 pid_t os_gettid(void) {
 #if defined(HAVE_GETTID)
@@ -42,5 +27,10 @@ pid_t os_gettid(void) {
 #endif
 }
 
-// --------------------------------------------------------------------------------------------------------------------
+static __thread pid_t gettid_cached_tid = 0;
+pid_t gettid_cached(void) {
+    if(unlikely(gettid_cached_tid == 0))
+        gettid_cached_tid = os_gettid();
 
+    return gettid_cached_tid;
+}

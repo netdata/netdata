@@ -375,6 +375,8 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) NORETURN;
 extern char *netdata_configured_host_prefix;
 
+#include "os/os.h"
+
 #define XXH_INLINE_ALL
 #include "xxhash.h"
 
@@ -385,8 +387,6 @@ extern char *netdata_configured_host_prefix;
 #include "config/dyncfg.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
-#include "os/compatibility.h"
-#include "os/os.h"
 #include "threads/threads.h"
 #include "buffer/buffer.h"
 #include "locks/locks.h"

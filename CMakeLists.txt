@@ -641,8 +641,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/log.h
         src/libnetdata/os/os.c
         src/libnetdata/os/os.h
-        src/libnetdata/os/compatibility.c
-        src/libnetdata/os/compatibility.h
         src/libnetdata/simple_hashtable.h
         src/libnetdata/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
@@ -699,6 +697,26 @@ set(LIBNETDATA_FILES
         src/libnetdata/linked-lists.h
         src/libnetdata/storage-point.h
         src/libnetdata/bitmap64.h
+        src/libnetdata/os/waitid.c
+        src/libnetdata/os/waitid.h
+        src/libnetdata/os/gettid.c
+        src/libnetdata/os/gettid.h
+        src/libnetdata/os/adjtimex.c
+        src/libnetdata/os/adjtimex.h
+        src/libnetdata/os/setresuid.c
+        src/libnetdata/os/setresuid.h
+        src/libnetdata/os/setresgid.c
+        src/libnetdata/os/setresgid.h
+        src/libnetdata/os/getgrouplist.c
+        src/libnetdata/os/getgrouplist.h
+        src/libnetdata/os/get_pid_max.c
+        src/libnetdata/os/get_pid_max.h
+        src/libnetdata/os/os-freebsd-wrappers.c
+        src/libnetdata/os/os-freebsd-wrappers.h
+        src/libnetdata/os/os-macos-wrappers.c
+        src/libnetdata/os/os-macos-wrappers.h
+        src/libnetdata/os/get_system_cpus.c
+        src/libnetdata/os/get_system_cpus.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
