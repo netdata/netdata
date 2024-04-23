@@ -118,7 +118,7 @@ static inline int os_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int opti
             break;
 
         case P_PID:
-            if(last_p_all.pid == pid) {
+            if(last_p_all.pid == id) {
                 pid = last_p_all.pid;
                 status = last_p_all.status;
                 last_p_all.pid = 0;             // the cache is used
