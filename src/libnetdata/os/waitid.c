@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "config.h"
-#include "waitid.h"
-
-#include <string.h>
-#include <errno.h>
+#include "../libnetdata.h"
 
 int os_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options) {
 #if defined(HAVE_WAITID)

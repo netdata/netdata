@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "config.h"
-#include "setresuid.h"
-
-#include <errno.h>
+#include "../libnetdata.h"
 
 int os_setresuid(uid_t uid __maybe_unused, uid_t euid __maybe_unused, uid_t suid __maybe_unused) {
 #if defined(COMPILED_FOR_LINUX) || defined(COMPILED_FOR_FREEBSD)

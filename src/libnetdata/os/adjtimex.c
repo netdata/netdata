@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "config.h"
-#include "adjtimex.h"
-
-#include <errno.h>
+#include "../libnetdata.h"
 
 int os_adjtimex(struct timex *buf __maybe_unused) {
 #if defined(COMPILED_FOR_MACOS) || defined(COMPILED_FOR_FREEBSD)

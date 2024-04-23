@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "config.h"
-#include "get_pid_max.h"
 #include "../libnetdata.h"
 
 pid_t pid_max = 32768;

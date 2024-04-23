@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "config.h"
-#include "get_system_cpus.h"
-#include "os-freebsd-wrappers.h"
-#include "os-macos-wrappers.h"
-
 #include "../libnetdata.h"
 
 #if defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_MSYS)

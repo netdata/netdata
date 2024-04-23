@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "os-macos-wrappers.h"
-
 #if defined(COMPILED_FOR_MACOS)
 
 #include "../libnetdata.h"

@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "config.h"
-#include "gettid.h"
+#include "../libnetdata.h"
 
 #if defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_MSYS)
 #include <windows.h>
-#else
-#include <pthread.h>
 #endif
 
 pid_t os_gettid(void) {
