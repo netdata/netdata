@@ -2452,6 +2452,7 @@ install(PROGRAMS
 configure_file(system/dinit/netdata.in system/dinit/netdata @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/dinit/netdata
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/system/dinit)
 
 configure_file(system/systemd/netdata.service.in system/systemd/netdata.service @ONLY)
