@@ -91,13 +91,13 @@ modules:
             - name: jail
               description: Jail's name
           metrics:
-            - name: fail2ban.banned_ips
+            - name: fail2ban.jail_banned_ips
               description: Fail2Ban Jail banned IPs
               unit: addresses
               chart_type: line
               dimensions:
                 - name: banned
-            - name: fail2ban.active_failures
+            - name: fail2ban.jail_active_failures
               description: Fail2Ban Jail active failures
               unit: failures
               chart_type: line

@@ -25,7 +25,7 @@ var (
 		Title:    "Fail2Ban Jail banned IPs",
 		Units:    "addresses",
 		Fam:      "bans",
-		Ctx:      "fail2ban.banned_ips",
+		Ctx:      "fail2ban.jail_banned_ips",
 		Type:     module.Line,
 		Priority: prioJailBannedIPs,
 		Dims: module.Dims{
@@ -37,7 +37,7 @@ var (
 		Title:    "Fail2Ban Jail active failures",
 		Units:    "failures",
 		Fam:      "failures",
-		Ctx:      "fail2ban.active_failures",
+		Ctx:      "fail2ban.jail_active_failures",
 		Type:     module.Line,
 		Priority: prioJailActiveFailures,
 		Dims: module.Dims{
