@@ -518,6 +518,7 @@ and metrics:
   # battery capacity = yes
   # battery charge = no
   # battery energy = no
+  # battery power = yes
   # power supply voltage = no
   # keep files open = auto
   # directory to monitor = /sys/class/power_supply

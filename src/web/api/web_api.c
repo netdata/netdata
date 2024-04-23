@@ -22,11 +22,6 @@ int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_pat
     w->access = HTTP_ACCESS_ALL;
 #endif
 
-    if((w->access & HTTP_ACCESS_SIGNED_ID) && !(w->access & HTTP_ACCESS_SAME_SPACE)) {
-        // this should never happen: a signed-in user from a different space
-        return web_client_permission_denied(w);
-    }
-
     if(unlikely(!url_path_endpoint || !*url_path_endpoint)) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Which API command?");

@@ -75,10 +75,10 @@ modules:
               required: false
             - name: use_csv_format
               description: Used format when requesting GPU information. XML is used if set to 'no'.
-              default_value: true
+              default_value: false
               required: false
               details: |
-                This module supports data collection in CSV and XML formats. The default is CSV.
+                This module supports data collection in CSV and XML formats. The default is XML.
                 
                 - XML provides more metrics, but requesting GPU information consumes more CPU, especially if there are multiple GPUs in the system.
                 - CSV provides fewer metrics, but is much lighter than XML in terms of CPU usage.
@@ -87,12 +87,12 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: XML format
-              description: Use XML format when requesting GPU information.
+            - name: CSV format
+              description: Use CSV format when requesting GPU information.
               config: |
                 jobs:
                   - name: nvidia_smi
-                    use_csv_format: no
+                    use_csv_format: yes
             - name: Custom binary path
               description: The executable is not in the directories specified in the PATH environment variable.
               config: |

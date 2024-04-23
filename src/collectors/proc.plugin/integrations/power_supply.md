@@ -68,6 +68,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | powersupply.capacity | capacity | percentage |
+| powersupply.power | power | W |
 | powersupply.charge | empty_design, empty, now, full, full_design | Ah |
 | powersupply.energy | empty_design, empty, now, full, full_design | Wh |
 | powersupply.voltage | min_design, min, now, max, max_design | V |

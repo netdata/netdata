@@ -12,7 +12,7 @@ was shipped with the agent.
 ## Main sections
 
 The Netdata dashboard consists of the following main sections:
-* [Netdata charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md)
+* [Netdata charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md)
 * [Infrastructure Overview](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md)
 * [Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
 * [Custom dashboards](https://learn.netdata.cloud/docs/visualizations/custom-dashboards)

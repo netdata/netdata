@@ -29,7 +29,7 @@ func New() *NvidiaSMI {
 	return &NvidiaSMI{
 		Config: Config{
 			Timeout:      web.Duration(time.Second * 10),
-			UseCSVFormat: true,
+			UseCSVFormat: false,
 		},
 		binName: "nvidia-smi",
 		charts:  &module.Charts{},
