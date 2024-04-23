@@ -4,7 +4,9 @@
 #define NETDATA_WAITID_H
 
 #include "config.h"
+#include <sys/types.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #ifndef WNOWAIT
 #define WNOWAIT 0x01000000
