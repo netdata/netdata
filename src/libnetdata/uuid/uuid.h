@@ -18,13 +18,13 @@ typedef struct {
             uint64_t low64;
         } parts;
     };
-} UUID;
-UUID UUID_generate_from_hash(const void *payload, size_t payload_len);
+} ND_UUID;
+ND_UUID UUID_generate_from_hash(const void *payload, size_t payload_len);
 
 #define UUIDeq(a, b) ((a).parts.hig64 == (b).parts.hig64 && (a).parts.low64 == (b).parts.low64)
 
-static inline UUID uuid2UUID(uuid_t uu1) {
-    UUID *ret = (UUID *)uu1;
+static inline ND_UUID uuid2UUID(uuid_t uu1) {
+    ND_UUID *ret = (ND_UUID *)uu1;
     return *ret;
 }
 

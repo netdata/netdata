@@ -111,7 +111,7 @@ void rrdeng_generate_unittest_uuid(const char *dim_id, const char *chart_id, uui
 {
     CLEAN_BUFFER *wb = buffer_create(100, NULL);
     buffer_sprintf(wb,"%s.%s", dim_id, chart_id);
-    UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
+    ND_UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
     uuid_copy(*ret_uuid, uuid.uuid);
 }
 
