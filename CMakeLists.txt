@@ -138,7 +138,8 @@ option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
 
-cmake_dependent_option(USE_LEGACY_LIBBPF "Use libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_LIBBPF" False)
+cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_LIBBPF" False)
+mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         set(NEED_PROTOBUF True)

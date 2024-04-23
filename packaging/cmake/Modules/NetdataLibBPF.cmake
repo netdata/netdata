@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 include(ExternalProject)
+include(NetdataUtil)
 
 set(libbpf_SOURCE_DIR "${CMAKE_BINARY_DIR}/libbpf")
 
@@ -38,8 +39,26 @@ function(netdata_identify_libc _libc_name)
     set(${_libc_name} unknown PARENT_SCOPE)
 endfunction()
 
+# Check if the kernel is old enough that we need to use a legacy copy of eBPF.
+function(_need_legacy_libbpf _var)
+    if(FORCE_LEGACY_LIBBPF)
+        set(${_var} TRUE PARENT_SCOPE)
+        return()
+    endif()
+
+    netdata_detect_host_kernel_version()
+
+    if(HOST_KERNEL_VERSION VERSION_LESS "4.14.0")
+        set(${_var} TRUE PARENT_SCOPE)
+    else()
+        set(${_var} FALSE PARENT_SCOPE)
+    endif()
+endfunction()
+
 # Prepare a vendored copy of libbpf
 function(netdata_bundle_libbpf)
+    _need_legacy_libbpf(USE_LEGACY_LIBBPF)
+
     if(USE_LEGACY_LIBBPF)
         set(_libbpf_tag 673424c56127bb556e64095f41fd60c26f9083ec) # v0.0.9_netdata-1
     else()
