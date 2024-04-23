@@ -1799,7 +1799,7 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
 endif()
 
 if(ENABLE_PLUGIN_CUPS)
-    find_package(CUPS REQUIRED)
+    find_package(Cups REQUIRED)
 
     set(CUPS_PLUGIN_FILES src/collectors/cups.plugin/cups_plugin.c)
     add_executable(cups.plugin ${CUPS_PLUGIN_FILES})
