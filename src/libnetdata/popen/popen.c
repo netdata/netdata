@@ -98,7 +98,7 @@ int netdata_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options) {
     }
     else {
         // we haven't reaped this child yet
-        ret = waitid(idtype, id, infop, options);
+        ret = os_waitid(idtype, id, infop, options);
 
         if(mp && !mp->reaped) {
             mp->reaped = true;

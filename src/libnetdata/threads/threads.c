@@ -80,40 +80,6 @@ void webrtc_set_thread_name(void) {
 }
 
 // ----------------------------------------------------------------------------
-// compatibility library functions
-
-static __thread pid_t gettid_cached_tid = 0;
-pid_t gettid(void) {
-    pid_t tid = 0;
-
-    if(likely(gettid_cached_tid > 0))
-        return gettid_cached_tid;
-
-#ifdef __FreeBSD__
-
-    tid = (pid_t)pthread_getthreadid_np();
-
-#elif defined(__APPLE__)
-
-    #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
-        uint64_t curthreadid;
-        pthread_threadid_np(NULL, &curthreadid);
-        tid = (pid_t)curthreadid;
-    #else /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-        tid = (pid_t)pthread_self;
-    #endif /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-
-#else /* __APPLE__*/
-
-    tid = (pid_t)syscall(SYS_gettid);
-
-#endif /* __FreeBSD__, __APPLE__*/
-
-    gettid_cached_tid = tid;
-    return tid;
-}
-
-// ----------------------------------------------------------------------------
 // early initialization
 
 size_t netdata_threads_init(void) {
@@ -184,7 +150,7 @@ static void thread_cleanup(void *ptr) {
     }
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", gettid());
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", gettid_cached());
 
     rrd_collector_finished();
     sender_thread_buffer_free();
@@ -218,9 +184,9 @@ void netdata_thread_set_tag(const char *tag) {
 #endif
 
     if (ret != 0)
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
+        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread name of %d to %s. ErrCode: %d", gettid_cached(), threadname, ret);
     else
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "set name of thread %d to %s", gettid(), threadname);
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "set name of thread %d to %s", gettid_cached(), threadname);
 
     if(netdata_thread) {
         strncpyz(netdata_thread->tag, threadname, sizeof(netdata_thread->tag) - 1);
@@ -262,7 +228,7 @@ static void *netdata_thread_init(void *ptr) {
     netdata_thread = (NETDATA_THREAD *)ptr;
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_STARTUP))
-        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread created with task id %d", gettid());
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread created with task id %d", gettid_cached());
 
     if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel type to DEFERRED.");

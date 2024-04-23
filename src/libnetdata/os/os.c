@@ -9,7 +9,7 @@
 #define CPUS_FOR_COLLECTORS 0
 #define CPUS_FOR_NETDATA 1
 
-long get_system_cpus_with_cache(bool cache, bool for_netdata) {
+long os_get_system_cpus_cached(bool cache, bool for_netdata) {
     static long processors[2] = { 0, 0 };
 
     int index = for_netdata ? CPUS_FOR_NETDATA : CPUS_FOR_COLLECTORS;
@@ -82,7 +82,7 @@ long get_system_cpus_with_cache(bool cache, bool for_netdata) {
 }
 
 pid_t pid_max = 32768;
-pid_t get_system_pid_max(void) {
+pid_t os_get_system_pid_max(void) {
 #ifdef __APPLE__
     // As we currently do not know a solution to query pid_max from the os
         // we use the number defined in bsd/sys/proc_internal.h in XNU sources
@@ -126,7 +126,7 @@ pid_t get_system_pid_max(void) {
 }
 
 unsigned int system_hz;
-void get_system_HZ(void) {
+void os_get_system_HZ(void) {
     long ticks;
 
     if ((ticks = sysconf(_SC_CLK_TCK)) == -1) {
@@ -146,7 +146,7 @@ static inline unsigned long cpuset_str2ul(char **s) {
     return n;
 }
 
-unsigned long read_cpuset_cpus(const char *filename, long system_cpus) {
+unsigned long os_read_cpuset_cpus(const char *filename, long system_cpus) {
     static char *buf = NULL;
     static size_t buf_size = 0;
 
@@ -194,8 +194,6 @@ unsigned long read_cpuset_cpus(const char *filename, long system_cpus) {
 // FreeBSD
 
 #if __FreeBSD__
-
-const char *os_type = "freebsd";
 
 int getsysctl_by_name(const char *name, void *ptr, size_t len) {
     size_t nlen = len;
@@ -272,8 +270,6 @@ int getsysctl_mib(const char *name, int *mib, size_t len) {
 
 #if __APPLE__
 
-const char *os_type = "macos";
-
 int getsysctl_by_name(const char *name, void *ptr, size_t len) {
     size_t nlen = len;
 
@@ -291,10 +287,36 @@ int getsysctl_by_name(const char *name, void *ptr, size_t len) {
 #endif
 
 // =====================================================================================================================
-// Linux
+// os_type
 
-#if __linux__
-
+#if defined(COMPILED_FOR_LINUX)
 const char *os_type = "linux";
-
 #endif
+
+#if defined(COMPILED_FOR_FREEBSD)
+const char *os_type = "freebsd";
+#endif
+
+#if defined(COMPILED_FOR_MACOS)
+const char *os_type = "macos";
+#endif
+
+#if defined(COMPILED_FOR_CYGWIN)
+const char *os_type = "cygwin";
+#endif
+
+#if defined(COMPILED_FOR_MSYS)
+const char *os_type = "msys";
+#endif
+
+
+// --------------------------------------------------------------------------------------------------------------------
+// gettid
+
+static __thread pid_t gettid_cached_tid = 0;
+pid_t gettid_cached(void) {
+    if(unlikely(gettid_cached_tid == 0))
+        gettid_cached_tid = os_gettid();
+
+    return gettid_cached_tid;
+}

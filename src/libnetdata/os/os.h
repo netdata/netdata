@@ -3,7 +3,8 @@
 #ifndef NETDATA_OS_H
 #define NETDATA_OS_H
 
-#include "libnetdata.h"
+#include "libnetdata/libnetdata.h"
+#include "compatibility.h"
 
 // =====================================================================================================================
 // FreeBSD
@@ -49,22 +50,15 @@ int getsysctl_by_name(const char *name, void *ptr, size_t len);
 
 extern const char *os_type;
 
-#define get_system_cpus() get_system_cpus_with_cache(true, false)
-#define get_system_cpus_uncached() get_system_cpus_with_cache(false, false)
-long get_system_cpus_with_cache(bool cache, bool for_netdata);
-unsigned long read_cpuset_cpus(const char *filename, long system_cpus);
+#define os_get_system_cpus() os_get_system_cpus_cached(true, false)
+#define os_get_system_cpus_uncached() os_get_system_cpus_cached(false, false)
+long os_get_system_cpus_cached(bool cache, bool for_netdata);
+unsigned long os_read_cpuset_cpus(const char *filename, long system_cpus);
 
 extern pid_t pid_max;
-pid_t get_system_pid_max(void);
+pid_t os_get_system_pid_max(void);
 
 extern unsigned int system_hz;
-void get_system_HZ(void);
-
-#include <sys/timex.h>
-#if defined(__FreeBSD__) || defined(__APPLE__)
-#define ADJUST_TIMEX(x) ntp_adjtime(x)
-#else
-#define ADJUST_TIMEX(x) adjtimex(x)
-#endif
+void os_get_system_HZ(void);
 
 #endif //NETDATA_OS_H

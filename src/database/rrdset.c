@@ -1081,7 +1081,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
                 last_time_s = now.tv_sec;
 
                 if(min_delta > permanent_min_delta) {
-                    netdata_log_info("MINIMUM MICROSECONDS DELTA of thread %d increased from %"PRIi64" to %"PRIi64" (+%"PRIi64")", gettid(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
+                    netdata_log_info("MINIMUM MICROSECONDS DELTA of thread %d increased from %"PRIi64" to %"PRIi64" (+%"PRIi64")", gettid_cached(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
                     permanent_min_delta = min_delta;
                 }
 

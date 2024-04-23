@@ -12,6 +12,9 @@
 #cmakedefine COMPILED_FOR_FREEBSD
 #cmakedefine COMPILED_FOR_LINUX
 #cmakedefine COMPILED_FOR_MACOS
+#cmakedefine COMPILED_FOR_CYGWIN
+#cmakedefine COMPILED_FOR_MSYS
+#cmakedefine COMPILED_FOR_FOREIGN_OS
 
 // checked headers
 
@@ -44,6 +47,9 @@
 #cmakedefine HAVE_FINITE
 #cmakedefine HAVE_ISFINITE
 #cmakedefine HAVE_RECVMMSG
+#cmakedefine HAVE_PTHREAD_GETTHREADID_NP
+#cmakedefine HAVE_PTHREAD_THREADID_NP
+#cmakedefine HAVE_GETTID
 #cmakedefine HAVE_NICE
 #cmakedefine HAVE_GETPRIORITY
 #cmakedefine HAVE_DLSYM

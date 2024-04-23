@@ -111,7 +111,7 @@ option(ENABLE_H2O "enable h2o" True)
 option(ENABLE_DBENGINE "enable dbengine" True)
 
 option(ENABLE_PLUGIN_APPS "enable apps.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network plugin" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network.plugin" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_CUPS "enable cups.plugin" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_DEBUGFS "enable debugfs.plugin" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" ${DEFAULT_FEATURE_STATE})
@@ -225,23 +225,42 @@ endforeach()
 # detect OS
 #
 
-set(LINUX   False)
-set(FREEBSD False)
-set(MACOS   False)
+set(LINUX       False)
+set(FREEBSD     False)
+set(MACOS       False)
+set(CYGWIN      False)
+set(MSYS        False)
+set(FOREIGN_OS  False)
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
         set(MACOS True)
         set(COMPILED_FOR_MACOS True)
-
         find_library(IOKIT IOKit)
         find_library(FOUNDATION Foundation)
-elseif(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+        message(INFO " Compiling for MacOS... ")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
         set(FREEBSD True)
         set(COMPILED_FOR_FREEBSD True)
-else()
+        message(INFO " Compiling for FreeBSD... ")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
         set(LINUX True)
         set(COMPILED_FOR_LINUX True)
         add_definitions(-D_GNU_SOURCE)
+        message(INFO " Compiling for Linux... ")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
+        set(CYGWIN True)
+        set(COMPILED_FOR_CYGWIN True)
+        add_definitions(-D_GNU_SOURCE)
+        message(INFO " Compiling for Cygwin... ")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS")
+        set(MSYS True)
+        set(COMPILED_FOR_MSYS True)
+        add_definitions(-D_GNU_SOURCE)
+        message(INFO " Compiling for MSYS... ")
+else()
+        set(FOREIGN_OS True)
+        set(COMPILED_FOR_FOREIGN_OS True)
+        message(INFO " Compiling for Unknown O/S... ")
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
@@ -332,6 +351,9 @@ check_symbol_exists(finite "math.h" HAVE_FINITE)
 check_symbol_exists(isfinite "math.h" HAVE_ISFINITE)
 check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
 
+check_function_exists(pthread_getthreadid_np HAVE_PTHREAD_GETTHREADID_NP)
+check_function_exists(pthread_threadid_np HAVE_PTHREAD_THREADID_NP)
+check_function_exists(gettid HAVE_GETTID)
 check_function_exists(nice HAVE_NICE)
 check_function_exists(recvmmsg HAVE_RECVMMSG)
 check_function_exists(getpriority HAVE_GETPRIORITY)
@@ -616,8 +638,9 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/journal.h
         src/libnetdata/log/log.c
         src/libnetdata/log/log.h
-        src/libnetdata/os.c
-        src/libnetdata/os.h
+        src/libnetdata/os/os.c
+        src/libnetdata/os/os.h
+        src/libnetdata/os/compatibility.h
         src/libnetdata/simple_hashtable.h
         src/libnetdata/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
@@ -1189,6 +1212,9 @@ set(FREEBSD_PLUGIN_FILES
         src/collectors/proc.plugin/zfs_common.h
 )
 
+set(WINDOWS_PLUGIN_FILES
+)
+
 set(PROC_PLUGIN_FILES
         src/collectors/proc.plugin/ipc.c
         src/collectors/proc.plugin/plugin_proc.c
@@ -1325,6 +1351,11 @@ elseif(FREEBSD)
                 src/daemon/static_threads_freebsd.c
                 ${FREEBSD_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
+        )
+elseif(CYGWIN OR MSYS)
+        list(APPEND NETDATA_FILES
+                src/daemon/static_threads_windows.c
+                ${WINDOWS_PLUGIN_FILES}
         )
 endif()
 

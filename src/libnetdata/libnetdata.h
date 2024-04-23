@@ -108,7 +108,6 @@ extern "C" {
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
-#include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -386,7 +385,7 @@ extern char *netdata_configured_host_prefix;
 #include "config/dyncfg.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
-#include "os.h"
+#include "libnetdata/os/os.h"
 #include "threads/threads.h"
 #include "buffer/buffer.h"
 #include "locks/locks.h"

@@ -326,7 +326,7 @@ static inline void spinlock_lock_internal(SPINLOCK *spinlock, bool cancelable) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     spinlock->spins += spins;
-    spinlock->locker_pid = gettid();
+    spinlock->locker_pid = gettid_cached();
 #endif
 }
 

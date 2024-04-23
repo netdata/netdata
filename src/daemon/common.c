@@ -31,9 +31,9 @@ long get_netdata_cpus(void) {
     if(processors)
         return processors;
 
-    long cores_proc_stat = get_system_cpus_with_cache(false, true);
-    long cores_cpuset_v1 = (long)read_cpuset_cpus("/sys/fs/cgroup/cpuset/cpuset.cpus", cores_proc_stat);
-    long cores_cpuset_v2 = (long)read_cpuset_cpus("/sys/fs/cgroup/cpuset.cpus", cores_proc_stat);
+    long cores_proc_stat = os_get_system_cpus_cached(false, true);
+    long cores_cpuset_v1 = (long)os_read_cpuset_cpus("/sys/fs/cgroup/cpuset/cpuset.cpus", cores_proc_stat);
+    long cores_cpuset_v2 = (long)os_read_cpuset_cpus("/sys/fs/cgroup/cpuset.cpus", cores_proc_stat);
 
     if(cores_cpuset_v2)
         processors = cores_cpuset_v2;

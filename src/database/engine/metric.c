@@ -600,7 +600,7 @@ inline uint32_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *m
 
 inline bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
     pid_t expected = __atomic_load_n(&metric->writer, __ATOMIC_RELAXED);
-    pid_t wanted = gettid();
+    pid_t wanted = gettid_cached();
     bool done = true;
 
     do {
@@ -757,7 +757,7 @@ static void *mrg_stress(void *ptr) {
     ssize_t end = (ssize_t)t->entries;
     ssize_t step = 1;
 
-    if(gettid() % 2) {
+    if(gettid_cached() % 2) {
         start = (ssize_t)t->entries - 1;
         end = -1;
         step = -1;

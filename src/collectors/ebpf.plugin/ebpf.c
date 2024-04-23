@@ -927,7 +927,7 @@ void ebpf_stop_threads(int sig)
 
     // Child thread should be closed by itself.
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (main_thread_id != gettid() || only_one) {
+    if (main_thread_id != gettid_cached() || only_one) {
         pthread_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
@@ -3040,7 +3040,7 @@ void set_global_variables()
     }
 
     isrh = get_redhat_release();
-    pid_max = get_system_pid_max();
+    pid_max = os_get_system_pid_max();
     running_on_kernel = ebpf_get_kernel_version();
 }
 
@@ -3974,7 +3974,7 @@ int main(int argc, char **argv)
     clocks_init();
     nd_log_initialize_for_external_plugins(NETDATA_EBPF_PLUGIN_NAME);
 
-    main_thread_id = gettid();
+    main_thread_id = gettid_cached();
 
     set_global_variables();
     ebpf_parse_args(argc, argv);

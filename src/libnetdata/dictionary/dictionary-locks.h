@@ -22,19 +22,19 @@ static inline size_t dictionary_locks_destroy(DICTIONARY *dict __maybe_unused) {
 }
 
 static inline void ll_recursive_lock_set_thread_as_writer(DICTIONARY *dict) {
-    pid_t expected = 0, desired = gettid();
+    pid_t expected = 0, desired = gettid_cached();
     if(!__atomic_compare_exchange_n(&dict->items.writer_pid, &expected, desired, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
-        fatal("DICTIONARY: Cannot set thread %d as exclusive writer, expected %d, desired %d, found %d.", gettid(), expected, desired, __atomic_load_n(&dict->items.writer_pid, __ATOMIC_RELAXED));
+        fatal("DICTIONARY: Cannot set thread %d as exclusive writer, expected %d, desired %d, found %d.", gettid_cached(), expected, desired, __atomic_load_n(&dict->items.writer_pid, __ATOMIC_RELAXED));
 }
 
 static inline void ll_recursive_unlock_unset_thread_writer(DICTIONARY *dict) {
-    pid_t expected = gettid(), desired = 0;
+    pid_t expected = gettid_cached(), desired = 0;
     if(!__atomic_compare_exchange_n(&dict->items.writer_pid, &expected, desired, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
-        fatal("DICTIONARY: Cannot unset thread %d as exclusive writer, expected %d, desired %d, found %d.", gettid(), expected, desired, __atomic_load_n(&dict->items.writer_pid, __ATOMIC_RELAXED));
+        fatal("DICTIONARY: Cannot unset thread %d as exclusive writer, expected %d, desired %d, found %d.", gettid_cached(), expected, desired, __atomic_load_n(&dict->items.writer_pid, __ATOMIC_RELAXED));
 }
 
 static inline bool ll_recursive_lock_is_thread_the_writer(DICTIONARY *dict) {
-    pid_t tid = gettid();
+    pid_t tid = gettid_cached();
     return tid > 0 && tid == __atomic_load_n(&dict->items.writer_pid, __ATOMIC_RELAXED);
 }
 

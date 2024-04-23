@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "daemon/common.h"
-#include "libnetdata/os.h"
+#include "libnetdata/os/os.h"
 
 #define PLUGIN_TIMEX_NAME "timex.plugin"
 
@@ -73,7 +73,7 @@ void *timex_main(void *ptr)
         int sync_state = 0;
         static int prev_sync_state = 0;
 
-        sync_state = ADJUST_TIMEX(&timex_buf);
+        sync_state = os_adjtimex(&timex_buf);
         
         int non_seq_failure = (sync_state == -1 && prev_sync_state != -1);
         prev_sync_state = sync_state;

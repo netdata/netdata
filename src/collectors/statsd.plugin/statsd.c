@@ -1115,7 +1115,7 @@ void *statsd_collector_thread(void *ptr) {
     worker_register_job_name(WORKER_JOB_TYPE_RCV_DATA, "receive");
     worker_register_job_name(WORKER_JOB_TYPE_SND_DATA, "send");
 
-    collector_info("STATSD collector thread started with taskid %d", gettid());
+    collector_info("STATSD collector thread started with taskid %d", gettid_cached());
 
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
     d->status = status;

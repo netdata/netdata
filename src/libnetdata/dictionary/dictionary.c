@@ -555,7 +555,7 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
     dict->creation_function = function;
     dict->creation_file = file;
     dict->creation_line = line;
-    dict->creation_tid = gettid();
+    dict->creation_tid = gettid_cached();
 #endif
 
     DICTIONARY_STATS_DICT_CREATIONS_PLUS1(dict);

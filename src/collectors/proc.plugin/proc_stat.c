@@ -484,7 +484,7 @@ int do_proc_stat(int update_every, usec_t dt) {
            *time_in_state_filename = NULL, *schedstat_filename = NULL, *cpuidle_name_filename = NULL, *cpuidle_time_filename = NULL;
     static const RRDVAR_ACQUIRED *cpus_var = NULL;
     static int accurate_freq_avail = 0, accurate_freq_is_used = 0;
-    size_t cores_found = (size_t)get_system_cpus();
+    size_t cores_found = (size_t)os_get_system_cpus();
 
     if(unlikely(do_cpu == -1)) {
         do_cpu                    = config_get_boolean("plugin:proc:/proc/stat", "cpu utilization", CONFIG_BOOLEAN_YES);
@@ -495,7 +495,7 @@ int do_proc_stat(int update_every, usec_t dt) {
         do_processes              = config_get_boolean("plugin:proc:/proc/stat", "processes running", CONFIG_BOOLEAN_YES);
 
         // give sane defaults based on the number of processors
-        if(unlikely(get_system_cpus() > 128)) {
+        if(unlikely(os_get_system_cpus() > 128)) {
             // the system has too many processors
             keep_per_core_fds_open = CONFIG_BOOLEAN_NO;
             do_core_throttle_count = CONFIG_BOOLEAN_NO;
@@ -511,7 +511,7 @@ int do_proc_stat(int update_every, usec_t dt) {
             do_cpu_freq = CONFIG_BOOLEAN_YES;
             do_cpuidle = CONFIG_BOOLEAN_NO;
         }
-        if(unlikely(get_system_cpus() > 24)) {
+        if(unlikely(os_get_system_cpus() > 24)) {
             // the system has too many processors
             keep_cpuidle_fds_open = CONFIG_BOOLEAN_NO;
         }

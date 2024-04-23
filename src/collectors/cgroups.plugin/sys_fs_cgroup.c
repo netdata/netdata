@@ -1158,7 +1158,7 @@ static inline void update_cpu_limits(char **filename, unsigned long long *value,
         int ret = -1;
 
         if(value == &cg->cpuset_cpus) {
-            unsigned long ncpus = read_cpuset_cpus(*filename, get_system_cpus());
+            unsigned long ncpus = os_read_cpuset_cpus(*filename, os_get_system_cpus());
             if(ncpus) {
                 *value = ncpus;
                 ret = 0;
@@ -1199,7 +1199,7 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
         }
 
         cg->cpu_cfs_period = str2ull(procfile_lineword(ff, 0, 1), NULL);
-        cg->cpuset_cpus = get_system_cpus();
+        cg->cpuset_cpus = os_get_system_cpus();
 
         char *s = "max\n\0";
         if(strcmp(s, procfile_lineword(ff, 0, 0)) == 0){

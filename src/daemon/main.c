@@ -64,7 +64,7 @@ struct service_globals {
 
 SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data, bool update __maybe_unused) {
     SERVICE_THREAD *sth = NULL;
-    pid_t tid = gettid();
+    pid_t tid = gettid_cached();
 
     spinlock_lock(&service_globals.lock);
     Pvoid_t *PValue = JudyLIns(&service_globals.pid_judy, tid, PJE0);
@@ -99,7 +99,7 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
 }
 
 void service_exits(void) {
-    pid_t tid = gettid();
+    pid_t tid = gettid_cached();
 
     spinlock_lock(&service_globals.lock);
     Pvoid_t *PValue = JudyLGet(service_globals.pid_judy, tid, PJE0);
@@ -195,7 +195,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         bool first = true;
         while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
             SERVICE_THREAD *sth = *PValue;
-            if(sth->services & service && sth->tid != gettid() && !sth->cancelled) {
+            if(sth->services & service && sth->tid != gettid_cached() && !sth->cancelled) {
                 sth->cancelled = true;
 
                 switch(sth->type) {
@@ -252,7 +252,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         bool first = true;
         while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
             SERVICE_THREAD *sth = *PValue;
-            if(sth->services & service && sth->tid != gettid()) {
+            if(sth->services & service && sth->tid != gettid_cached()) {
                 if(running)
                     buffer_strcat(thread_list, ", ");
 
@@ -1250,9 +1250,9 @@ static void get_netdata_configured_variables() {
     // --------------------------------------------------------------------
     // get various system parameters
 
-    get_system_HZ();
-    get_system_cpus_uncached();
-    get_system_pid_max();
+    os_get_system_HZ();
+    os_get_system_cpus_uncached();
+    os_get_system_pid_max();
 
 
 }
@@ -2103,9 +2103,11 @@ int main(int argc, char **argv) {
 
     delta_startup_time("become daemon");
 
+#if defined(COMPILED_FOR_LINUX) || defined(COMPILED_FOR_MACOS) || defined(COMPILED_FOR_FREEBSD)
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
+#endif
 
     watcher_thread_start();
 

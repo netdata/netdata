@@ -5,18 +5,18 @@
 #include "dbengine-compression.h"
 
 /* Default global database instance */
-struct rrdengine_instance multidb_ctx_storage_tier0;
-struct rrdengine_instance multidb_ctx_storage_tier1;
-struct rrdengine_instance multidb_ctx_storage_tier2;
-struct rrdengine_instance multidb_ctx_storage_tier3;
-struct rrdengine_instance multidb_ctx_storage_tier4;
+struct rrdengine_instance multidb_ctx_storage_tier0 = { 0 };
+struct rrdengine_instance multidb_ctx_storage_tier1 = { 0 };
+struct rrdengine_instance multidb_ctx_storage_tier2 = { 0 };
+struct rrdengine_instance multidb_ctx_storage_tier3 = { 0 };
+struct rrdengine_instance multidb_ctx_storage_tier4 = { 0 };
 
 #define mrg_metric_ctx(metric) (struct rrdengine_instance *)mrg_metric_section(main_mrg, metric)
 
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
-struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
+struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS] = { 0 };
 uint8_t tier_page_type[RRD_STORAGE_TIERS] = {
     RRDENG_PAGE_TYPE_GORILLA_32BIT,
     RRDENG_PAGE_TYPE_ARRAY_TIER1,
@@ -40,12 +40,21 @@ size_t page_type_size[256] = {
         [RRDENG_PAGE_TYPE_GORILLA_32BIT] = sizeof(storage_number)
 };
 
+static inline void initialize_single_ctx(struct rrdengine_instance *ctx) {
+    memset(ctx, 0, sizeof(*ctx));
+    uv_rwlock_init(&ctx->datafiles.rwlock);
+    rw_spinlock_init(&ctx->njfv2idx.spinlock);
+}
+
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[0] = &multidb_ctx_storage_tier0;
     multidb_ctx[1] = &multidb_ctx_storage_tier1;
     multidb_ctx[2] = &multidb_ctx_storage_tier2;
     multidb_ctx[3] = &multidb_ctx_storage_tier3;
     multidb_ctx[4] = &multidb_ctx_storage_tier4;
+
+    for(int i = 0; i < RRD_STORAGE_TIERS ; i++)
+        initialize_single_ctx(multidb_ctx[i]);
 }
 
 int db_engine_journal_check = 0;
@@ -687,7 +696,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch
 SPINLOCK global_query_handle_spinlock = NETDATA_SPINLOCK_INITIALIZER;
 static struct rrdeng_query_handle *global_query_handle_ll = NULL;
 static void register_query_handle(struct rrdeng_query_handle *handle) {
-    handle->query_pid = gettid();
+    handle->query_pid = gettid_cached();
     handle->started_time_s = now_realtime_sec();
 
     spinlock_lock(&global_query_handle_spinlock);
@@ -1143,12 +1152,12 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
         return UV_EMFILE;
     }
 
-    if(ctxp)
-        *ctxp = ctx = callocz(1, sizeof(*ctx));
-    else {
-        ctx = multidb_ctx[tier];
-        memset(ctx, 0, sizeof(*ctx));
+    if(ctxp) {
+        *ctxp = ctx = mallocz(sizeof(*ctx));
+        initialize_single_ctx(ctx);
     }
+    else
+        ctx = multidb_ctx[tier];
 
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tier_page_type[tier];
@@ -1162,7 +1171,6 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
 
-    rw_spinlock_init(&ctx->njfv2idx.spinlock);
     ctx->atomic.first_time_s = LONG_MAX;
     ctx->atomic.metrics = 0;
     ctx->atomic.samples = 0;

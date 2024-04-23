@@ -2,17 +2,17 @@
 
 #include "libnetdata.h"
 
-#ifdef __APPLE__
-#define INHERIT_NONE 0
-#endif /* __APPLE__ */
-#if defined(__FreeBSD__) || defined(__APPLE__)
-#    define O_NOATIME     0
-#    define MADV_DONTFORK INHERIT_NONE
-#endif /* __FreeBSD__ || __APPLE__*/
+#if !defined(MADV_DONTFORK)
+#define MADV_DONTFORK 0
+#endif
+
+#if !defined(O_NOATIME)
+#define O_NOATIME 0
+#endif
 
 struct rlimit rlimit_nofile = { .rlim_cur = 1024, .rlim_max = 1024 };
 
-#ifdef MADV_MERGEABLE
+#if defined(MADV_MERGEABLE)
 int enable_ksm = 1;
 #else
 int enable_ksm = 0;

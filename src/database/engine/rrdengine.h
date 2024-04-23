@@ -3,9 +3,6 @@
 #ifndef NETDATA_RRDENGINE_H
 #define NETDATA_RRDENGINE_H
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>

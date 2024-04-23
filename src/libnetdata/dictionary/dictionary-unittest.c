@@ -638,7 +638,7 @@ static void *unittest_dict_thread(void *arg) {
 
         // test concurrent deletions and flushes
         {
-            if(gettid() % 2) {
+            if(gettid_cached() % 2) {
                 char buf [256 + 1];
 
                 for (int i = 0; i < 1000; i++) {

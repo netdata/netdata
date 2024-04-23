@@ -1386,7 +1386,7 @@ static bool rrdpush_sender_pipe_close(RRDHOST *host, int *pipe_fds, bool reopen)
 }
 
 void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
-    if(unlikely(s->tid == gettid()))
+    if(unlikely(s->tid == gettid_cached()))
         return;
 
     RRDHOST *host = s->host;
@@ -1409,7 +1409,7 @@ static bool rrdhost_set_sender(RRDHOST *host) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
         host->rrdpush_sender_connection_counter++;
-        host->sender->tid = gettid();
+        host->sender->tid = gettid_cached();
         host->sender->last_state_since_t = now_realtime_sec();
         host->sender->exit.reason = STREAM_HANDSHAKE_NEVER;
         ret = true;
@@ -1424,7 +1424,7 @@ static bool rrdhost_set_sender(RRDHOST *host) {
 static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
     if(unlikely(!host->sender)) return;
 
-    if(host->sender->tid == gettid()) {
+    if(host->sender->tid == gettid_cached()) {
         host->sender->tid = 0;
         host->sender->exit.shutdown = false;
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
@@ -1615,19 +1615,19 @@ void *rrdpush_sender_thread(void *ptr) {
        !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||
        !*s->host->rrdpush_send_api_key) {
         netdata_log_error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
-              rrdhost_hostname(s->host), gettid());
+              rrdhost_hostname(s->host), gettid_cached());
         return NULL;
     }
 
     if(!rrdhost_set_sender(s->host)) {
         netdata_log_error("STREAM %s [send]: thread created (task id %d), but there is another sender running for this host.",
-              rrdhost_hostname(s->host), gettid());
+              rrdhost_hostname(s->host), gettid_cached());
         return NULL;
     }
 
     rrdpush_initialize_ssl_ctx(s->host);
 
-    netdata_log_info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid());
+    netdata_log_info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid_cached());
 
     s->timeout = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 600);

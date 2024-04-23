@@ -5,8 +5,6 @@
 
 #include "../libnetdata.h"
 
-pid_t gettid(void);
-
 typedef enum {
     NETDATA_THREAD_OPTION_DEFAULT          = 0 << 0,
     NETDATA_THREAD_OPTION_JOINABLE         = 1 << 0,

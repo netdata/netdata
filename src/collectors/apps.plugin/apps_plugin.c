@@ -552,7 +552,7 @@ static void normalize_utilization(struct target *root) {
     // here we try to eliminate them by disabling childs processing either for specific dimensions
     // or entirely. Of course, either way, we disable it just a single iteration.
 
-    kernel_uint_t max_time = get_system_cpus() * time_factor * RATES_DETAIL;
+    kernel_uint_t max_time = os_get_system_cpus() * time_factor * RATES_DETAIL;
     kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
     if(global_utime > max_time) global_utime = max_time;
@@ -1013,7 +1013,7 @@ int main(int argc, char **argv) {
 
     procfile_adaptive_initial_allocation = 1;
 
-    get_system_HZ();
+    os_get_system_HZ();
 #if defined(__FreeBSD__)
     time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
 #endif
@@ -1025,8 +1025,8 @@ int main(int argc, char **argv) {
     time_factor = system_hz; // Linux uses clock ticks
 #endif
 
-    get_system_pid_max();
-    get_system_cpus_uncached();
+    os_get_system_pid_max();
+    os_get_system_cpus_uncached();
 
     parse_args(argc, argv);
 

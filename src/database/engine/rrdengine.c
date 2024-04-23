@@ -233,7 +233,7 @@ static void after_work_standard_callback(uv_work_t* req, int status) {
 static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb do_work_cb, after_work_cb do_after_work_cb) {
     struct rrdeng_work *work_request = NULL;
 
-    internal_fatal(rrdeng_main.tid != gettid(), "work_dispatch() can only be run from the event loop thread");
+    internal_fatal(rrdeng_main.tid != gettid_cached(), "work_dispatch() can only be run from the event loop thread");
 
     work_request = aral_mallocz(rrdeng_main.work_cmd.ar);
     memset(work_request, 0, sizeof(struct rrdeng_work));
@@ -1734,7 +1734,7 @@ void dbengine_event_loop(void* arg) {
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
     struct rrdeng_cmd cmd;
-    main->tid = gettid();
+    main->tid = gettid_cached();
 
     fatal_assert(0 == uv_timer_start(&main->timer, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 

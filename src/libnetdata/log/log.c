@@ -2153,7 +2153,7 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     }
 
     if(likely(!thread_log_fields[NDF_TID].entry.set))
-        thread_log_fields[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid());
+        thread_log_fields[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid_cached());
 
     char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
     if(likely(!thread_log_fields[NDF_THREAD_TAG].entry.set)) {
