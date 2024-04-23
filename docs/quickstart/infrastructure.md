@@ -75,7 +75,7 @@ These tabs can be separated into "static", meaning they are by default presented
 
 - The third and most important tab is the [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) which uses composite charts to display real-time metrics from every available node in a given War Room.
 
-- [Kubernetes tab](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) is a logical grouping of charts regarding your Kubernetes clusters. It contains a subset of the charts available in the **Overview tab**.
+- [Kubernetes tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/kubernetes-tab.md) is a logical grouping of charts regarding your Kubernetes clusters. It contains a subset of the charts available in the **Overview tab**.
 
 - The [Dashboards tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/dashboards-tab.md) gives you the ability to have tailored made views of specific/targeted interfaces for your infrastructure using any number of charts from any number of nodes.
 
@@ -100,7 +100,7 @@ single-node dashboards in Netdata Cloud to drill down on specific issues, scrub 
 historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
 
 Learn more about [interacting with
-dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md) to get the most from all of Netdata's real-time
+dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md) to get the most from all of Netdata's real-time
 metrics.
 
 ### Create new dashboards
@@ -173,7 +173,7 @@ collect from across your infrastructure with Netdata.
     <BoxList>
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md)" title="Metrics tab" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md)" title="Nodes tab" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)" title="Kubernetes" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboard/kubernetes-tab.md)" title="Kubernetes" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboard/dashboards-tab.md)" title="Create new dashboards" />
     </BoxList>
   </Box>
@@ -208,7 +208,7 @@ collect from across your infrastructure with Netdata.
 - Dashboards
   - [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md)
   - [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md)
-  - [Kubernetes](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
+  - [Kubernetes](https://github.com/netdata/netdata/blob/master/docs/dashboard/kubernetes-tab.md)
   - [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/dashboard/dashboards-tab.md)
 - Alerts and notifications
   - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md#netdata-cloud)

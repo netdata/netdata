@@ -12,7 +12,7 @@ In the modal, give your custom dashboard a name, and click **+ Add**.
 
 - The **Add Chart** button on the top right of the interface adds your first chart card. From the dropdown, select either **All Nodes** or a specific node.  
   
-  Next, select the context. You'll see a preview of the chart before you finish adding it. In this modal you can also [interact with the chart](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md), meaning you can configure all the aspects of the [NIDL framework](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#nidl-framework) of the chart and more in detail, you can:
+  Next, select the context. You'll see a preview of the chart before you finish adding it. In this modal you can also [interact with the chart](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md), meaning you can configure all the aspects of the [NIDL framework](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#nidl-framework) of the chart and more in detail, you can:
   - define which `group by` method to use
   - select the aggregation function over the data source
   - select nodes
@@ -21,7 +21,7 @@ In the modal, give your custom dashboard a name, and click **+ Add**.
   - select labels
   - select the aggregation function over time
   
-  After you are done configuring the chart, you can also change the type of the chart from the right hand side of the [Title bar](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#title-bar), and select which of the final dimensions you want to be visible and in what order, from the [Dimensions bar](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#dimensions-bar).
+  After you are done configuring the chart, you can also change the type of the chart from the right hand side of the [Title bar](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#title-bar), and select which of the final dimensions you want to be visible and in what order, from the [Dimensions bar](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#dimensions-bar).
 
 - The **Add Text** button on the top right of the interface creates a new card with user-defined text, which you can use to describe or document a particular dashboard's meaning and purpose.
 
@@ -35,7 +35,7 @@ Dashboards are designed to be interactive and flexible so you can design them to
 
 ### Charts
 
-The charts you add to any dashboard are [fully interactive](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md), just like any other Netdata chart. You can zoom in and out, highlight timeframes, and more.
+The charts you add to any dashboard are [fully interactive](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md), just like any other Netdata chart. You can zoom in and out, highlight timeframes, and more.
 
 Charts also synchronize as you interact with them, even across contexts _or_ nodes.
 
