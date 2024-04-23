@@ -1076,6 +1076,8 @@ detect_libc() {
     warning "Cannot detect a supported libc on your system, eBPF support will be disabled."
     return 1
   fi
+
+  echo "${libc}"
 }
 
 should_install_ebpf() {
@@ -1159,7 +1161,7 @@ install_ebpf() {
   progress "Installing eBPF programs"
 
   # Detect libc
-  libc="${EBPF_LIBC:-"$(detect_libc)"}"
+  libc="$(detect_libc)"
 
   EBPF_VERSION="$(cat packaging/ebpf.version)"
   EBPF_TARBALL="netdata-kernel-collector-${libc}-${EBPF_VERSION}.tar.xz"
