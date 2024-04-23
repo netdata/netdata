@@ -97,7 +97,7 @@ typedef enum
 } idtype_t;
 #endif
 
-static inline int os_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options) {
+static inline int os_waitid(idtype_t idtype __maybe_unused, id_t id __maybe_unused, siginfo_t *infop __maybe_unused, int options __maybe_unused) {
 #if defined(COMPILED_FOR_LINUX) || defined(COMPILED_FOR_FREEBSD) || defined(COMPILED_FOR_MACOS)
     return waitid(idtype, id, infop, options);
 #endif
