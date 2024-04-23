@@ -2,6 +2,8 @@
 
 #include "config.h"
 #include "get_system_cpus.h"
+#include "os-freebsd-wrappers.h"
+#include "os-macos-wrappers.h"
 
 #include <stdint.h>
 #include <sys/types.h>
