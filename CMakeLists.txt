@@ -2345,7 +2345,7 @@ install(FILES
         src/collectors/statsd.plugin/asterisk.conf
         src/collectors/statsd.plugin/example.conf
         src/collectors/statsd.plugin/k6.conf
-        # COMPONENT netdata
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/statsd.d)
 
 #
@@ -2353,7 +2353,7 @@ install(FILES
 #
 install(FILES
         src/exporting/exporting.conf
-        # COMPONENT netdata
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d)
 
 #
@@ -2361,7 +2361,7 @@ install(FILES
 #
 install(FILES
         src/collectors/ioping.plugin/ioping.conf
-        COMPONENT ioping_plugin
+        COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d)
 
 #
@@ -2420,6 +2420,10 @@ install(FILES
         ${CMAKE_BINARY_DIR}/system/logrotate/netdata
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/logrotate)
+install(FILES
+        ${CMAKE_BINARY_DIR}/system/logrotate/netdata
+        COMPONENT netdata
+        DESTINATION etc/logrotate.d)
 
 configure_file(system/lsb/init.d/netdata.in system/lsb/init.d/netdata @ONLY)
 install(PROGRAMS
@@ -2456,6 +2460,11 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
+install(FILES
+        ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+        COMPONENT netdata
+        DESTINATION lib/systemd/system)
+
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235
@@ -2472,6 +2481,7 @@ install(FILES
         system/systemd/netdata-updater.timer
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
+
 install(FILES
         system/systemd/50-netdata.preset
         COMPONENT netdata
@@ -2486,14 +2496,34 @@ install(FILES
         system/.install-type
         COMPONENT netdata
         DESTINATION etc/netdata)
+
 install(FILES
         system/netdata-updater.conf
+        COMPONENT netdata
         DESTINATION etc/netdata)
 
 install(PROGRAMS
         system/edit-config
         COMPONENT netdata
         DESTINATION etc/netdata)
+
+install(FILES
+        system/netdata.conf
+        COMPONENT netdata
+        DESTINATION etc/netdata)
+
+#
+# misc files
+#
+install(FILES
+        packaging/cmake/control/netdata/etc/default/netdata
+        COMPONENT netdata
+        DESTINATION etc/default)
+
+install(PROGRAMS
+        packaging/cmake/control/netdata/etc/init.d/netdata
+        COMPONENT netdata
+        DESTINATION etc/init.d)
 
 #
 # TODO: check the following files for correct substitutions
@@ -2754,7 +2784,7 @@ install(FILES
 
 configure_file(src/collectors/ioping.plugin/ioping.plugin.in src/collectors/ioping.plugin/ioping.plugin @ONLY)
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
-        COMPONENT ioping_plugin
+        COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
 #
