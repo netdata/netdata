@@ -39,3 +39,7 @@
           - **Issuer URL** you can get it from your profile icon on top, e.g. `https://company-name.okta.com`
           - **Client ID** you can get it from **General** tab on application you configured on Okta
           - **Client Secret** you can get it from **General** tab on application you configured on Okta
+
+      ### SP-initiated SSO
+
+      If you start your authentication flow from Netdata sign-in page please check [these steps](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/enterprise-sso-authentication.md).
