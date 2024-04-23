@@ -1595,7 +1595,7 @@ static uint64_t get_used_disk_space(struct rrdengine_instance *ctx)
 
     uint64_t estimated_disk_space = ctx_current_disk_space_get(ctx) + rrdeng_target_data_file_size(ctx) - active_space;
 
-    uint64_t database_space = sqlite_get_db_space(db_meta) + sqlite_get_context_space() + sqlite_get_ml_space();
+    uint64_t database_space = get_total_database_space();
     uint64_t adjusted_database_space =  database_space * ctx->config.disk_percentage / 100 ;
     estimated_disk_space += adjusted_database_space;
 
@@ -1630,7 +1630,7 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
     uint64_t estimated_disk_space = get_used_disk_space(ctx);
     time_t retention = get_tier_retention(ctx);
 
-    if (retention && retention > ctx->config.max_retention_s)
+    if (ctx->config.max_retention_s && retention > ctx->config.max_retention_s)
         return true;
 
     if (ctx->config.max_disk_space && estimated_disk_space > ctx->config.max_disk_space)

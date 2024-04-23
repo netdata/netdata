@@ -1197,8 +1197,7 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_uint64(wb, "tier", tier);
             char human_retention[128];
-            //buffer_json_member_add_uint64(wb, "point_every", group_seconds);
-            convert_seconds_to_dhms(group_seconds, human_retention, sizeof(human_retention) - 1);
+            convert_seconds_to_dhms((time_t) group_seconds, human_retention, sizeof(human_retention) - 1);
             buffer_json_member_add_string(wb, "point_every", human_retention);
 
             buffer_json_member_add_uint64(wb, "metrics", storage_engine_metrics(eng->seb, localhost->db[tier].si));
@@ -1224,6 +1223,12 @@ void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now
                     time_t time_retention =  multidb_ctx[tier]->config.max_retention_s;
                     time_t space_retention = (time_t)((NETDATA_DOUBLE)(now_s - first_time_s) * 100.0 / percent);
                     time_t actual_retention = MIN(space_retention, time_retention ? time_retention : space_retention);
+
+                    if (time_retention) {
+                        convert_seconds_to_dhms(time_retention, human_retention, sizeof(human_retention) - 1);
+                        buffer_json_member_add_time_t(wb, "requested_retention", time_retention);
+                        buffer_json_member_add_string(wb, "requested_retention_human", human_retention);
+                    }
 
                     convert_seconds_to_dhms(actual_retention, human_retention, sizeof(human_retention) - 1);
                     buffer_json_member_add_time_t(wb, "expected_retention", actual_retention);
