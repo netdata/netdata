@@ -10,14 +10,14 @@ require (
 	github.com/Wing924/ltsv v0.3.1
 	github.com/apparentlymart/go-cidr v1.1.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
-	github.com/axiomhq/hyperloglog v0.0.0-20240124082744-24bca3a5b39b
+	github.com/axiomhq/hyperloglog v0.0.0-20240319100328-84253e514e02
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/docker/docker v26.0.2+incompatible
-	github.com/facebook/time v0.0.0-20240301144314-9afaa3836e98
+	github.com/facebook/time v0.0.0-20240419201005-e4f24e18edf7
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.8.1
