@@ -87,7 +87,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Kickstart** or **Kickstart Script**](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md): An automatic one-line installation script named 'kickstart.sh' that works on all Linux distributions and macOS.
 
-- [**Kubernetes Dashboard** or **Kubernetes Tab**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md): Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default Overview dashboard.
+- [**Kubernetes Dashboard** or **Kubernetes Tab**](https://github.com/netdata/netdata/blob/master/docs/dashboard/kubernetes-tab.md): Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default Overview dashboard.
 
 ## M
 
