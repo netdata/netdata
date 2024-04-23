@@ -16,9 +16,10 @@ import (
 
 func newIntelGpuTopExec(ndsudoPath string, updateEvery int, log *logger.Logger) (*intelGpuTopExec, error) {
 	topExec := &intelGpuTopExec{
-		Logger:      log,
-		ndsudoPath:  ndsudoPath,
-		updateEvery: updateEvery,
+		Logger:             log,
+		ndsudoPath:         ndsudoPath,
+		updateEvery:        updateEvery,
+		firstSampleTimeout: time.Second * 3,
 	}
 
 	if err := topExec.run(); err != nil {
@@ -31,8 +32,9 @@ func newIntelGpuTopExec(ndsudoPath string, updateEvery int, log *logger.Logger) 
 type intelGpuTopExec struct {
 	*logger.Logger
 
-	ndsudoPath  string
-	updateEvery int
+	ndsudoPath         string
+	updateEvery        int
+	firstSampleTimeout time.Duration
 
 	cmd  *exec.Cmd
 	done chan struct{}
@@ -42,12 +44,7 @@ type intelGpuTopExec struct {
 }
 
 func (e *intelGpuTopExec) run() error {
-	refresh := 900
-	if e.updateEvery > 1 {
-		refresh = e.updateEvery*1000 - 500 // milliseconds
-	}
-
-	cmd := exec.Command(e.ndsudoPath, "igt-json", "--interval", strconv.Itoa(refresh))
+	cmd := exec.Command(e.ndsudoPath, "igt-json", "--interval", e.calcIntervalArg())
 
 	e.Debugf("executing '%s'", cmd)
 
@@ -78,7 +75,7 @@ func (e *intelGpuTopExec) run() error {
 
 			text := sc.Text()
 
-			if buf.Cap() == 0 && text != "{" || text == "" {
+			if buf.Len() == 0 && text != "{" || text == "" {
 				continue
 			}
 
@@ -108,7 +105,7 @@ func (e *intelGpuTopExec) run() error {
 	case <-e.done:
 		_ = e.stop()
 		return errors.New("process exited before the first sample was collected")
-	case <-time.After(time.Second * 3):
+	case <-time.After(e.firstSampleTimeout):
 		_ = e.stop()
 		return errors.New("timed out waiting for first sample")
 	case <-firstSample:
@@ -144,4 +141,17 @@ func (e *intelGpuTopExec) stop() error {
 	case <-time.After(time.Second * 2):
 		return errors.New("timed out waiting for process to exit")
 	}
+}
+
+func (e *intelGpuTopExec) calcIntervalArg() string {
+	// intel_gpu_top appends the end marker ("},\n") of the previous sample to the beginning of the next sample.
+	// interval must be < than 'firstSampleTimeout'
+	var interval int
+	m := min(e.updateEvery, int(e.firstSampleTimeout.Seconds()))
+	if m <= 1 {
+		interval = 900
+	} else {
+		interval = m*1000 - 500 // milliseconds
+	}
+	return strconv.Itoa(interval)
 }
