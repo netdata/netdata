@@ -640,6 +640,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/log/log.h
         src/libnetdata/os/os.c
         src/libnetdata/os/os.h
+        src/libnetdata/os/compatibility.c
         src/libnetdata/os/compatibility.h
         src/libnetdata/simple_hashtable.h
         src/libnetdata/byteorder.h
