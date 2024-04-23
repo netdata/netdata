@@ -52,7 +52,7 @@ fetch() {
     # Check SHA256 of gzip'd tar file (apparently alpine's sha256sum requires
     # two empty spaces between the checksum and the file's path)
     set +e
-    echo "${sha256}  ${NETDATA_MAKESELF_PATH}/tmp/${tar}" | sha256sum -c -s
+    echo "${sha256}  ${NETDATA_MAKESELF_PATH}/tmp/${tar}" | sha256sum --c --status
     local rc=$?
     if [ ${rc} -ne 0 ]; then
         echo >&2 "SHA256 verification of tar file ${tar} failed (rc=${rc})"
