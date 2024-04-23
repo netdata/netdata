@@ -156,7 +156,7 @@ different namespaces.
 ![Time-series Kubernetes monitoring in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/109075210-126a1680-76b6-11eb-918d-5acdcdac152d.png)
 
-Each composite chart has a [definition bar](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md#definition-bar)
+Each composite chart has a [definition bar](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#definition-bar)
 for complete customization. For example, grouping the top chart by `k8s_container_name` reveals new information.
 
 ![Changing time-series charts](https://user-images.githubusercontent.com/1153921/109075212-139b4380-76b6-11eb-836f-939482ae55fc.png)
