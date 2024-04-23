@@ -24,6 +24,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/elasticsearch"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/envoy"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/example"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/fail2ban"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/filecheck"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/fluentd"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/freeradius"

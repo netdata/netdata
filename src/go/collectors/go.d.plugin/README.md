@@ -72,6 +72,7 @@ see the appropriate collector readme.
 | [energid](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/energid)                       |          Energi Core          |
 | [envoy](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/envoy)                           |             Envoy             |
 | [example](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/example)                       |               -               |
+| [fail2ban](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/fail2ban)                     |        Fail2Ban Jails         |
 | [filecheck](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/filecheck)                   |     Files and Directories     |
 | [fluentd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/fluentd)                       |            Fluentd            |
 | [freeradius](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/freeradius)                 |          FreeRADIUS           |
