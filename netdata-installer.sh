@@ -245,13 +245,16 @@ USAGE: ${PROGRAM} [options]
 HEREDOC
 }
 
+if [ "$(uname -s)" = "Linux" ]; then
+    ENABLE_EBPF=1
+fi
+
 DONOTSTART=0
 DONOTWAIT=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
-ENABLE_EBPF=1
 ENABLE_GO=1
 ENABLE_H2O=1
 ENABLE_CLOUD=1
@@ -323,14 +326,8 @@ while [ -n "${1}" ]; do
       # XXX: No longer supported.
       ;;
     "--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1 ;;
-    "--enable-ebpf")
-      ENABLE_EBPF=1
-      NETDATA_DISABLE_EBPF=0
-      ;;
-    "--disable-ebpf")
-      ENABLE_EBPF=0
-      NETDATA_DISABLE_EBPF=1
-      ;;
+    "--enable-ebpf") ENABLE_EBPF=1 ;;
+    "--disable-ebpf") ENABLE_EBPF=0 ;;
     "--skip-available-ram-check") SKIP_RAM_CHECK=1 ;;
     "--one-time-build")
       # XXX: No longer supported
@@ -1082,14 +1079,13 @@ detect_libc() {
 }
 
 should_install_ebpf() {
-  if [ "${NETDATA_DISABLE_EBPF:=0}" -eq 1 ]; then
-    run_failed "eBPF has been explicitly disabled, it will not be available in this install."
+  if [ "${ENABLE_EBPF:-0}" -eq 0 ]; then
     return 1
   fi
 
-  if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
-    if [ "${NETDATA_DISABLE_EBPF:=1}" -eq 0 ]; then
-      run_failed "Currently eBPF is only supported on Linux on X86_64."
+  if [ "$(uname -m)" != "x86_64" ]; then
+    if [ "${ENABLE_EBPF:-0}" -eq 1 ]; then
+      run_failed "Currently eBPF is only supported on Linux on x86_64."
     fi
 
     return 1
@@ -1160,7 +1156,7 @@ install_ebpf() {
 
   remove_old_ebpf
 
-  progress "Installing eBPF plugin"
+  progress "Installing eBPF programs"
 
   # Detect libc
   libc="${EBPF_LIBC:-"$(detect_libc)"}"
