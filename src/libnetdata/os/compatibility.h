@@ -10,6 +10,10 @@
 #include <sys/timex.h>
 #endif
 
+#if defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_MSYS)
+#include <windows.h>
+#endif
+
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -65,7 +69,7 @@ static inline int os_setresuid(uid_t uid __maybe_unused, uid_t euid __maybe_unus
 // --------------------------------------------------------------------------------------------------------------------
 // getgrouplist
 
-static inline int os_getgrouplist(const char *username, gid_t gid, gid_t *supplementary_groups, int *ngroups) {
+static inline int os_getgrouplist(const char *username __maybe_unused, gid_t gid __maybe_unused, gid_t *supplementary_groups __maybe_unused, int *ngroups __maybe_unused) {
 #if defined(COMPILED_FOR_LINUX) || defined(COMPILED_FOR_FREEBSD)
     return getgrouplist(username, gid, supplementary_groups, ngroups);
 #endif
@@ -120,6 +124,8 @@ static inline pid_t os_gettid(void) {
     uint64_t curthreadid;
     pthread_threadid_np(NULL, &curthreadid);
     return curthreadid;
+#elif defined(CCOMPILED_FOR_CYGWIN) || defined(CCOMPILED_FOR_MSYS)
+    return GetCurrentThreadId();
 #elif defined(COMPILED_FOR_LINUX)
     return (pid_t)syscall(SYS_gettid);
 #else

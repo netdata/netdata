@@ -201,7 +201,7 @@ typedef enum __attribute__((packed)) {
 
 struct sender_state {
     RRDHOST *host;
-    pid_t tid;                              // the thread id of the sender, from gettid()
+    pid_t tid;                              // the thread id of the sender, from gettid_cached()
     SENDER_FLAGS flags;
     int timeout;
     int default_port;
