@@ -14,6 +14,22 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "fail2ban-client-status",
+        .params = "status",
+        .search = {
+            [0] = "fail2ban-client",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "fail2ban-client-status-jail",
+        .params = "status {{jail}}",
+        .search = {
+            [0] = "fail2ban-client",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "storcli-controllers-info",
         .params = "/cALL show all J nolog",
         .search = {
