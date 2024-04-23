@@ -4,6 +4,19 @@
 #define NETDATA_OS_FREEBSD_WRAPPERS_H
 
 #if defined(COMPILED_FOR_FREEBSD)
+#include <pthread.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <ctype.h>
+#include <string.h>
+#include <strings.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <sys/sysctl.h>
 
 #define GETSYSCTL_BY_NAME(name, var) getsysctl_by_name(name, &(var), sizeof(var))

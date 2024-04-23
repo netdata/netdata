@@ -16,6 +16,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #if defined(COMPILED_FOR_LINUX)
 #include "../libnetdata.h"

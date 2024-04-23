@@ -4,6 +4,18 @@
 #define NETDATA_OS_MACOS_WRAPPERS_H
 
 #if defined(COMPILED_FOR_MACOS)
+#include <pthread.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <ctype.h>
+#include <string.h>
+#include <strings.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <sys/sysctl.h>
 #include "byteorder.h"
