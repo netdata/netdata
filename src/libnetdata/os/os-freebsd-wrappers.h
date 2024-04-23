@@ -3,6 +3,8 @@
 #ifndef NETDATA_OS_FREEBSD_WRAPPERS_H
 #define NETDATA_OS_FREEBSD_WRAPPERS_H
 
+#include "config.h"
+
 #if defined(COMPILED_FOR_FREEBSD)
 #include <pthread.h>
 #include <errno.h>
