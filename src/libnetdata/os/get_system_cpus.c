@@ -5,7 +5,16 @@
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"
 
-#include <stdint.h>
+#include <pthread.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <ctype.h>
+#include <string.h>
+#include <strings.h>
 #include <sys/types.h>
 
 #if defined(COMPILED_FOR_LINUX)
