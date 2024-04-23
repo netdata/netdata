@@ -2551,7 +2551,6 @@ install(FILES
         src/collectors/python.d.plugin/dovecot/dovecot.conf
         src/collectors/python.d.plugin/example/example.conf
         src/collectors/python.d.plugin/exim/exim.conf
-        src/collectors/python.d.plugin/fail2ban/fail2ban.conf
         src/collectors/python.d.plugin/gearman/gearman.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
@@ -2598,7 +2597,6 @@ install(FILES
         src/collectors/python.d.plugin/dovecot/dovecot.chart.py
         src/collectors/python.d.plugin/example/example.chart.py
         src/collectors/python.d.plugin/exim/exim.chart.py
-        src/collectors/python.d.plugin/fail2ban/fail2ban.chart.py
         src/collectors/python.d.plugin/gearman/gearman.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
