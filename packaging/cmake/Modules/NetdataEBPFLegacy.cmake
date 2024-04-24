@@ -23,7 +23,7 @@ function(netdata_fetch_legacy_ebpf_code)
 
     ExternalProject_Add(
         ebpf-code-legacy
-        URL https://github.com/netdata/kernel-collector/releases/download/v1.4.0/netdata-kernel-collector-${_hash}-v1.4.0.tar.xz
+        URL https://github.com/netdata/kernel-collector/releases/download/v1.4.0/netdata-kernel-collector-${_libc}-v1.4.0.tar.xz
         URL_HASH SHA256=${_hash}
         SOURCE_DIR "${ebpf-legacy_SOURCE_DIR}"
         CONFIGURE_COMMAND ""
