@@ -1,0 +1,35 @@
+{
+  "json_format_version": [
+    1,
+    0
+  ],
+  "smartctl": {
+    "version": [
+      7,
+      3
+    ],
+    "svn_revision": "5338",
+    "platform_info": "REDACTED",
+    "build_info": "(local build)",
+    "argv": [
+      "smartctl",
+      "--scan",
+      "--json"
+    ],
+    "exit_status": 0
+  },
+  "devices": [
+    {
+      "name": "/dev/sda",
+      "info_name": "/dev/sda [SAT]",
+      "type": "sat",
+      "protocol": "ATA"
+    },
+    {
+      "name": "/dev/sdc",
+      "info_name": "/dev/sdc [SAT]",
+      "type": "sat",
+      "protocol": "ATA"
+    }
+  ]
+}
