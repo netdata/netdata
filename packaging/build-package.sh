@@ -52,13 +52,13 @@ add_cmake_option ENABLE_BUNDLED_YAML Off
 case "${PKG_TYPE}" in
     DEB)
         if [ "$(uname -m)" = "x86_64" ]; then
-            add_cmake_option ENABLE_EBPF Off
+            add_cmake_option ENABLE_PLUGIN_EBPF On
         else
-            add_cmake_option ENABLE_EBPF Off
+            add_cmake_option ENABLE_PLUGIN_EBPF Off
         fi
         case "$(uname -m)" in
-            x86_64|arm64) add_cmake_option ENABLE_XENSTAT On ;;
-            *) add_cmake_option ENABLE_XENSTAT Off
+            x86_64|arm64) add_cmake_option ENABLE_PLUGIN_XENSTAT On ;;
+            *) add_cmake_option ENABLE_PLUGIN_XENSTAT Off
         esac
         ;;
     RPM) ;;
