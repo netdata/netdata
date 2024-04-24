@@ -364,18 +364,6 @@ endif()
 
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
-if(ENABLE_PLUGIN_EBPF)
-        include(NetdataLibBPF)
-        include(NetdataEBPFCORE)
-
-        if(NOT OS_LINUX)
-            message(FATAL_ERROR "The eBPF plugin is not supported on non-Linux systems")
-        endif()
-
-        netdata_bundle_libbpf()
-        netdata_fetch_ebpf_co_re()
-endif()
-
 pkg_check_modules(CURL libcurl>=7.21 REQUIRED IMPORTED_TARGET)
 set(HAVE_LIBCURL TRUE)
 
@@ -440,6 +428,19 @@ endif()
 netdata_detect_lz4()
 netdata_detect_zstd()
 netdata_detect_brotli()
+
+# Optional component dependencies
+if(ENABLE_PLUGIN_EBPF)
+        include(NetdataLibBPF)
+        include(NetdataEBPFCORE)
+
+        if(NOT OS_LINUX)
+            message(FATAL_ERROR "The eBPF plugin is not supported on non-Linux systems")
+        endif()
+
+        netdata_bundle_libbpf()
+        netdata_fetch_ebpf_co_re()
+endif()
 
 if(ENABLE_SENTRY)
         netdata_bundle_sentry()
@@ -2329,11 +2330,16 @@ if(OS_WINDOWS)
         endif()
 endif()
 
+# ebpf
+if(ENABLE_PLUGIN_EBPF)
+    netdata_add_libbpf_to_target(libnetdata PUBLIC)
+endif()
+
 # judy
 target_link_libraries(libnetdata PUBLIC judy)
 
-netdata_add_jsonc_to_target(libnetdata)
-netdata_add_libyaml_to_target(libnetdata)
+netdata_add_jsonc_to_target(libnetdata PUBLIC)
+netdata_add_libyaml_to_target(libnetdata PUBLIC)
 netdata_add_zlib_to_target(libnetdata PUBLIC)
 netdata_add_libuuid_to_target(libnetdata PUBLIC)
 netdata_add_libuv_to_target(libnetdata PUBLIC)
@@ -3030,7 +3036,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi>"
 )
 
-netdata_add_protobuf(netdata)
+netdata_add_protobuf_to_target(netdata PRIVATE)
 
 #
 # build systemd-cat-native
@@ -3080,7 +3086,7 @@ if(PCRE2_FOUND)
 
         target_link_libraries(log2journal PUBLIC libnetdata)
         target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
-        netdata_add_libyaml_to_target(log2journal)
+        netdata_add_libyaml_to_target(log2journal PUBLIC)
 
         install(TARGETS log2journal
                 COMPONENT netdata

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Functions and macros for handling of JSON-C
 
+include(NetdataUtil)
+
 # Handle bundling of json-c.
 #
 # This pulls it in as a sub-project using FetchContent functionality.
@@ -75,13 +77,8 @@ macro(netdata_detect_jsonc)
         if(NOT JSONC_FOUND)
                 set(ENABLE_BUNDLED_JSONC True)
                 netdata_bundle_jsonc()
-                set(NETDATA_JSONC_LDFLAGS json-c)
-                set(NETDATA_JSONC_INCLUDE_DIRS ${PROJECT_BINARY_DIR}/include)
-                get_target_property(NETDATA_JSONC_CFLAGS_OTHER json-c INTERFACE_COMPILE_DEFINITIONS)
-
-                if(NETDATA_JSONC_CFLAGS_OTHER STREQUAL NETDATA_JSONC_CFLAGS_OTHER-NOTFOUND)
-                        set(NETDATA_JSONC_CFLAGS_OTHER "")
-                endif()
+                set(JSONC_LIBRARIES json-c)
+                set(JSONC_INCLUDE_DIRS ${PROJECT_BINARY_DIR}/include)
 
                 add_custom_command(
                         OUTPUT ${PROJECT_BINARY_DIR}/include/json-c
@@ -95,9 +92,6 @@ macro(netdata_detect_jsonc)
                         DEPENDS ${PROJECT_BINARY_DIR}/include/json-c
                 )
         else()
-                set(NETDATA_JSONC_LDFLAGS ${JSONC_LDFLAGS})
-                set(NETDATA_JSONC_CFLAGS_OTHER ${JSONC_CFLAGS_OTHER})
-                set(NETDATA_JSONC_INCLUDE_DIRS ${JSONC_INCLUDE_DIRS})
                 add_custom_target(json-c-compat-link)
         endif()
 endmacro()
@@ -106,13 +100,7 @@ endmacro()
 #
 # The specified target must already exist, and the netdata_detect_json-c
 # macro must have already been run at least once for this to work correctly.
-function(netdata_add_jsonc_to_target _target)
-        if(ENABLE_BUNDLED_JSONC)
-                target_include_directories(${_target} BEFORE PUBLIC ${NETDATA_JSONC_INCLUDE_DIRS})
-        else()
-                target_include_directories(${_target} PUBLIC ${NETDATA_JSONC_INCLUDE_DIRS})
-        endif()
-        target_compile_options(${_target} PUBLIC ${NETDATA_JSONC_CFLAGS_OTHER})
-        target_link_libraries(${_target} PUBLIC ${NETDATA_JSONC_LDFLAGS})
+function(netdata_add_jsonc_to_target _target _scope)
+        netdata_add_lib_to_target(${_target} ${_scope} JSONC)
         add_dependencies(${_target} json-c-compat-link)
 endfunction()
