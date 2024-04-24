@@ -1,12 +1,11 @@
 #!/bin/sh
 
-set -exu -o pipefail
-
 export PATH="/usr/local/bin:${PATH}"
 
 WT_ROOT="$(pwd)"
 WT_PREFIX="/tmp"
 BUILD_TYPE="Debug"
+NULL=""
 
 if [ -z "${MSYSTEM}" ]; then
    build="${WT_ROOT}/build-${OSTYPE}"
@@ -14,12 +13,14 @@ else
    build="${WT_ROOT}/build-${OSTYPE}-${MSYSTEM}"
 fi
 
+set -exu -o pipefail
+
 if [ -d "${build}" ]
 then
 	rm -rf "${build}"
 fi
 
-/usr/bin/cmake -S "${WT_ROOT}" -B "${WT_ROOT}/build" \
+/usr/bin/cmake -S "${WT_ROOT}" -B "${build}" \
     -G Ninja \
     -DCMAKE_INSTALL_PREFIX="${WT_PREFIX}" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
