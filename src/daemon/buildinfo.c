@@ -1060,11 +1060,11 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef COMPILED_FOR_CYGWIN
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
-    build_info_set_value(BIB_FEATURE_BUILT_FOR, "CYGWIN");
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Cygwin");
 #endif
-#ifdef COMPILED_FOR_MSYS
+#ifdef COMPILED_FOR_WINDOWS
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
-    build_info_set_value(BIB_FEATURE_BUILT_FOR, "MSYS");
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows");
 #endif
 
 #ifdef ENABLE_ACLK

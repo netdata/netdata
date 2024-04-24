@@ -2,7 +2,7 @@
 
 #include "../libnetdata.h"
 
-#if defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_MSYS)
+#if defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_WINDOWS)
 #include <windows.h>
 #endif
 
@@ -15,7 +15,7 @@ pid_t os_gettid(void) {
     uint64_t curthreadid;
     pthread_threadid_np(NULL, &curthreadid);
     return curthreadid;
-#elif defined(CCOMPILED_FOR_CYGWIN) || defined(CCOMPILED_FOR_MSYS)
+#elif defined(CCOMPILED_FOR_CYGWIN) || defined(CCOMPILED_FOR_WINDOWS)
     return GetCurrentThreadId();
 #elif defined(COMPILED_FOR_LINUX)
     return (pid_t)syscall(SYS_gettid);

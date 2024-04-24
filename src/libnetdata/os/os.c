@@ -90,7 +90,7 @@ const char *os_type = "macos";
 const char *os_type = "cygwin";
 #endif
 
-#if defined(COMPILED_FOR_MSYS)
-const char *os_type = "msys";
+#if defined(COMPILED_FOR_WINDOWS)
+const char *os_type = "windows";
 #endif
 
