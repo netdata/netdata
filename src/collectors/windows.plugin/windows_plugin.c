@@ -13,6 +13,7 @@ static struct proc_module {
     // system metrics
     {.name = "GetSystemTimes",               .dim = "GetSystemTimes",           .func = do_GetSystemTimes},
     {.name = "GlobalMemoryStatusEx",         .dim = "GlobalMemoryStatusEx",     .func = do_GlobalMemoryStatusEx},
+    {.name = "GetTickCount64",               .dim = "GetTickCount64",           .func = do_GetTickCount64},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}

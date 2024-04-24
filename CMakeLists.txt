@@ -1246,6 +1246,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/windows_plugin.h
         src/collectors/windows.plugin/GetSystemTimes.c
         src/collectors/windows.plugin/GlobalMemoryStatusEx.c
+        src/collectors/windows.plugin/GetTickCount64.c
 )
 
 set(PROC_PLUGIN_FILES
