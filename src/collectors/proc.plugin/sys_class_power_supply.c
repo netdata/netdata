@@ -17,6 +17,15 @@ const long ps_property_priorities[] = {
     NETDATA_CHART_PRIO_POWER_SUPPLY_VOLTAGE
 };
 
+enum {
+    PS_PROP_CAPACITY,
+    PS_PROP_POWER,
+    PS_PROP_CHARGE,
+    PS_PROP_ENERGY,
+    PS_PROP_VOLTAGE,
+    PS_PROP_END
+};
+
 const unsigned long ps_property_divisors[] = {1, 1000000, 1000000, 1000000, 1000000 };
 
 const char *ps_property_dim_names[] = {
@@ -113,16 +122,16 @@ void power_supply_free(struct power_supply *ps) {
 
 int do_sys_class_power_supply(int update_every, usec_t dt) {
     (void)dt;
-    static int do_property[5] = {-1};
+    static int do_property[PS_PROP_END] = {-1};
     static int keep_fds_open = CONFIG_BOOLEAN_NO, keep_fds_open_config = -1;
     static char *dirname = NULL;
 
-    if(unlikely(do_property[0] == -1)) {
-        do_property[0] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);
-        do_property[1] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery power", CONFIG_BOOLEAN_YES);
-        do_property[2] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery charge", CONFIG_BOOLEAN_NO);
-        do_property[3] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery energy", CONFIG_BOOLEAN_NO);
-        do_property[4] = config_get_boolean("plugin:proc:/sys/class/power_supply", "power supply voltage", CONFIG_BOOLEAN_NO);
+    if(unlikely(do_property[PS_PROP_CAPACITY] == -1)) {
+        do_property[PS_PROP_CAPACITY] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery capacity", CONFIG_BOOLEAN_YES);
+        do_property[PS_PROP_POWER] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery power", CONFIG_BOOLEAN_YES);
+        do_property[PS_PROP_CHARGE] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery charge", CONFIG_BOOLEAN_NO);
+        do_property[PS_PROP_ENERGY] = config_get_boolean("plugin:proc:/sys/class/power_supply", "battery energy", CONFIG_BOOLEAN_NO);
+        do_property[PS_PROP_VOLTAGE] = config_get_boolean("plugin:proc:/sys/class/power_supply", "power supply voltage", CONFIG_BOOLEAN_NO);
 
         keep_fds_open_config = config_get_boolean_ondemand("plugin:proc:/sys/class/power_supply", "keep files open", CONFIG_BOOLEAN_AUTO);
 
@@ -171,9 +180,9 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 // allocate memory and initialize structures for every property and file found
                 size_t pr_idx;
                 size_t pd_idx = 0;
-                size_t prev_idx = 5; // there is no property with this index
+                size_t prev_idx = PS_PROP_END; // there is no property with this index
 
-                for(pr_idx = 0; pr_idx < 5; pr_idx++) {
+                for(pr_idx = 0; pr_idx < PS_PROP_END; pr_idx++) {
                     if(unlikely(do_property[pr_idx] != CONFIG_BOOLEAN_NO)) {
                         int pd_cur_idx = 0;
                         struct ps_property *pr = NULL;
