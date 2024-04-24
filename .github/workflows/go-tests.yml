@@ -62,7 +62,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y python3-packaging
+        run: |
+          sudo apt-get update || true
+          sudo apt-get install -y python3-packaging
       - name: Get Go version and modules
         id: get-version
         run: .github/scripts/get-go-version.py
