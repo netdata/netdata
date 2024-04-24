@@ -228,7 +228,6 @@ endforeach()
 set(LINUX       False)
 set(FREEBSD     False)
 set(MACOS       False)
-set(CYGWIN      False)
 set(WINDOWS     False)
 set(FOREIGN_OS  False)
 
@@ -247,12 +246,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
         set(COMPILED_FOR_LINUX True)
         add_definitions(-D_GNU_SOURCE)
         message(INFO " Compiling for Linux... ")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
-        set(CYGWIN True)
-        set(COMPILED_FOR_CYGWIN True)
-        add_definitions(-D_GNU_SOURCE)
-        message(INFO " Compiling for Cygwin... ")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
         set(WINDOWS True)
         set(COMPILED_FOR_WINDOWS True)
         add_definitions(-D_GNU_SOURCE)
@@ -1375,7 +1369,7 @@ elseif(FREEBSD)
                 ${FREEBSD_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
         )
-elseif(CYGWIN OR WINDOWS)
+elseif(WINDOWS)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_windows.c
                 ${WINDOWS_PLUGIN_FILES}
@@ -1564,7 +1558,7 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${LINUX}>,$<BOOL:${FREEBSD}>>:pthread;rt>"
-        "$<$<OR:$<BOOL:${CYGWIN}>,$<BOOL:${WINDOWS}>>:kernel32;advapi32>"
+        "$<$<BOOL:${WINDOWS}>:kernel32;advapi32>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 

@@ -2,7 +2,7 @@
 
 #include "../libnetdata.h"
 
-#if defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_WINDOWS)
+#if defined(COMPILED_FOR_WINDOWS)
 #include <windows.h>
 #endif
 
@@ -78,7 +78,7 @@ long os_get_system_cpus_cached(bool cache, bool for_netdata) {
     netdata_log_debug(D_SYSTEM, "System has %ld processors.", processors[index]);
     return processors[index];
 
-#elif defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_WINDOWS)
+#elif defined(COMPILED_FOR_WINDOWS)
 
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);

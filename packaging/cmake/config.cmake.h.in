@@ -12,7 +12,6 @@
 #cmakedefine COMPILED_FOR_FREEBSD
 #cmakedefine COMPILED_FOR_LINUX
 #cmakedefine COMPILED_FOR_MACOS
-#cmakedefine COMPILED_FOR_CYGWIN
 #cmakedefine COMPILED_FOR_WINDOWS
 #cmakedefine COMPILED_FOR_FOREIGN_OS
 

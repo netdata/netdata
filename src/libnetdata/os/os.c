@@ -86,10 +86,6 @@ const char *os_type = "freebsd";
 const char *os_type = "macos";
 #endif
 
-#if defined(COMPILED_FOR_CYGWIN)
-const char *os_type = "cygwin";
-#endif
-
 #if defined(COMPILED_FOR_WINDOWS)
 const char *os_type = "windows";
 #endif

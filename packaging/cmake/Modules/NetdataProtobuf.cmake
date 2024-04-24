@@ -84,7 +84,7 @@ endfunction()
 
 # Handle detection of Protobuf
 macro(netdata_detect_protobuf)
-        if(COMPILED_FOR_CYGWIN OR COMPILED_FOR_WINDOWS)
+        if(COMPILED_FOR_WINDOWS)
                 set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE "/bin/protoc")
                 set(NETDATA_PROTOBUF_CFLAGS_OTHER "")
                 set(NETDATA_PROTOBUF_INCLUDE_DIRS "")
