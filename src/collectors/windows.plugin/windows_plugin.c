@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "windows_plugin.h"
+
+static struct proc_module {
+    const char *name;
+    const char *dim;
+    int enabled;
+    int (*func)(int update_every, usec_t dt);
+    RRDDIM *rd;
+} win_modules[] = {
+
+    // system metrics
+    {.name = "GetSystemTimes",               .dim = "GetSystemTimes",  .func = do_GetSystemTimes},
+
+    // the terminator of this array
+    {.name = NULL, .dim = NULL, .func = NULL}
+};
+
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 36
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 36
+#endif
+
+static void windows_main_cleanup(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    collector_info("cleaning up...");
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    worker_unregister();
+}
+
+static bool log_windows_module(BUFFER *wb, void *data) {
+    struct proc_module *pm = data;
+    buffer_sprintf(wb, "windows.plugin[%s]", pm->name);
+    return true;
+}
+
+void *win_plugin_main(void *ptr) {
+    worker_register("WIN");
+
+    rrd_collector_started();
+
+    netdata_thread_cleanup_push(windows_main_cleanup, ptr)
+    {
+        // check the enabled status for each module
+        int i;
+        for(i = 0; win_modules[i].name; i++) {
+            struct proc_module *pm = &win_modules[i];
+
+            pm->enabled = config_get_boolean("plugin:windows", pm->name, CONFIG_BOOLEAN_YES);
+            pm->rd = NULL;
+
+            worker_register_job_name(i, win_modules[i].dim);
+        }
+
+        usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+        heartbeat_t hb;
+        heartbeat_init(&hb);
+
+#define LGS_MODULE_ID 0
+
+        ND_LOG_STACK lgs[] = {
+            [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "windows.plugin"),
+            ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        while(service_running(SERVICE_COLLECTORS)) {
+            worker_is_idle();
+            usec_t hb_dt = heartbeat_next(&hb, step);
+
+            if(unlikely(!service_running(SERVICE_COLLECTORS)))
+                break;
+
+            for(i = 0; win_modules[i].name; i++) {
+                if(unlikely(!service_running(SERVICE_COLLECTORS)))
+                    break;
+
+                struct proc_module *pm = &win_modules[i];
+                if(unlikely(!pm->enabled))
+                    continue;
+
+                worker_is_busy(i);
+                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_windows_module, pm);
+                pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
+                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "windows.plugin");
+            }
+        }
+    }
+    netdata_thread_cleanup_pop(1);
+    return NULL;
+}

@@ -2,7 +2,19 @@
 
 #include "common.h"
 
+void *win_plugin_main(void *ptr);
+
 static const struct netdata_static_thread static_threads_windows[] = {
+    {
+        .name = "P[windows]",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "windows",
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = win_plugin_main
+    },
+
     // terminator
     {
         .name = NULL,

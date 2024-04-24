@@ -2,8 +2,8 @@
 
 #include "common.h"
 
-extern void *macos_main(void *ptr);
-extern void *timex_main(void *ptr);
+void *macos_main(void *ptr);
+void *timex_main(void *ptr);
 
 static const struct netdata_static_thread static_threads_macos[] = {
     {
