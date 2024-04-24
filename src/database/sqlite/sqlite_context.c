@@ -76,7 +76,7 @@ int sql_init_context_database(int memory)
 // Fetching data
 //
 #define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, " \
-        "c.update_every, c.chart_type, c.family FROM chart c WHERE c.host_id = @host_id AND c.chart_id IS NOT NULL"
+    "c.update_every, c.chart_type, c.family FROM chart c WHERE c.host_id = @host_id AND c.chart_id IS NOT NULL"
 
 void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
@@ -95,13 +95,10 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
             return;
         }
     }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
 
-    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id to fetch the chart list");
-        goto skip_load;
-    }
-
+    param = 0;
     SQL_CHART_DATA chart_data = { 0 };
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         uuid_copy(chart_data.chart_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
@@ -117,15 +114,15 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
         dict_cb(&chart_data, data);
     }
 
-skip_load:
-    rc = sqlite3_reset(res);
-    if (rc != SQLITE_OK)
-        error_report("Failed to reset statement that fetches chart label data, rc = %d", rc);
+done:
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_RESET(res);
 }
 
 // Dimension list
 #define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END " \
-        "FROM dimension d WHERE d.chart_id = @id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
+    "FROM dimension d WHERE d.chart_id = @id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
 void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     int rc;
@@ -139,14 +136,12 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind chart_id to fetch dimension list");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC));
 
     SQL_DIMENSION_DATA dimension_data;
 
+    param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
@@ -155,10 +150,10 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
         dict_cb(&dimension_data, data);
     }
 
-failed:
-    rc = sqlite3_reset(res);
-    if (rc != SQLITE_OK)
-        error_report("Failed to reset statement that fetches the chart dimension list, rc = %d", rc);
+done:
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_RESET(res);
 }
 
 // LABEL LIST
@@ -177,12 +172,10 @@ void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, v
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind chart_id to fetch chart labels");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC));
 
+    param = 0;
     SQL_CLABEL_DATA label_data;
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
@@ -192,15 +185,15 @@ void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, v
         dict_cb(&label_data, data);
     }
 
-failed:
-    rc = sqlite3_reset(res);
-    if (rc != SQLITE_OK)
-        error_report("Failed to reset statement that fetches chart label data, rc = %d", rc);
+done:
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_RESET(res);
 }
 
 // CONTEXT LIST
 #define CTX_GET_CONTEXT_LIST  "SELECT id, version, title, chart_type, unit, priority, first_time_t, " \
-            "last_time_t, deleted, family FROM context c WHERE c.host_id = @host_id"
+    "last_time_t, deleted, family FROM context c WHERE c.host_id = @host_id"
 
 void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
 {
@@ -221,12 +214,9 @@ void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_D
 
     VERSIONED_CONTEXT_DATA context_data = {0};
 
-    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
-
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id to fetch versioned context data");
-        goto failed;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done,  sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
+    param = 0;
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         context_data.id = (char *) sqlite3_column_text(res, 0);
@@ -242,10 +232,10 @@ void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_D
         dict_cb(&context_data, data);
     }
 
-failed:
-    rc = sqlite3_reset(res);
-    if (rc != SQLITE_OK)
-        error_report("Failed to reset statement that fetches stored context versioned data, rc = %d", rc);
+done:
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_RESET(res);
 }
 
 
@@ -271,81 +261,29 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
         return 1;
     }
 
-    rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_uuid to store context details");
-        goto skip_store;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, bind_text_null(res, ++param, context_data->id, 0));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (time_t) context_data->version));
+    SQLITE_BIND_FAIL(done, bind_text_null(res, ++param, context_data->title, 0));
+    SQLITE_BIND_FAIL(done, bind_text_null(res, ++param, context_data->chart_type, 0));
+    SQLITE_BIND_FAIL(done, bind_text_null(res, ++param, context_data->units, 0));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (time_t) context_data->priority));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (time_t) context_data->first_time_s));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (time_t) context_data->last_time_s));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, context_data->deleted));
+    SQLITE_BIND_FAIL(done, bind_text_null(res, ++param, context_data->family, 1));
 
-    rc = bind_text_null(res, 2, context_data->id, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context to store context details");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_int64(res, 3, (time_t) context_data->version);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind first_time_t to store context details");
-        goto skip_store;
-    }
-
-    rc = bind_text_null(res, 4, context_data->title, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context to store context details");
-        goto skip_store;
-    }
-
-    rc = bind_text_null(res, 5, context_data->chart_type, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context to store context details");
-        goto skip_store;
-    }
-
-    rc = bind_text_null(res, 6, context_data->units, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context to store context details");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_int64(res, 7, (time_t) context_data->priority);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind first_time_t to store context details");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_int64(res, 8, (time_t) context_data->first_time_s);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind first_time_t to store context details");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_int64(res, 9, (time_t) context_data->last_time_s);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind last_time_t to store context details");
-        goto skip_store;
-    }
-
-    rc = sqlite3_bind_int(res, 10, context_data->deleted);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind deleted flag to store context details");
-        goto skip_store;
-    }
-
-    rc = bind_text_null(res, 11, context_data->family, 1);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context to store details");
-        goto skip_store;
-    }
-
+    param = 0;
     rc_stored = execute_insert(res);
 
     if (rc_stored != SQLITE_DONE)
         error_report("Failed store context details for context %s, rc = %d", context_data->id, rc_stored);
 
-skip_store:
-    rc = sqlite3_finalize(res);
-    if (rc != SQLITE_OK)
-        error_report("Failed to finalize statement that stores context details, rc = %d", rc);
+done:
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_FINALIZE(res);
 
     return (rc_stored != SQLITE_DONE);
 }
@@ -367,27 +305,20 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
         return 1;
     }
 
-	rc = sqlite3_bind_blob(res, 1, host_uuid, sizeof(*host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for context data deletion");
-        goto skip_delete;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, context_data->id, -1, SQLITE_STATIC));
 
-    rc = sqlite3_bind_text(res, 2, context_data->id, -1, SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind context id for context data deletion");
-        goto skip_delete;
-    }
-
+    param = 0;
     rc_stored = execute_insert(res);
 
     if (rc_stored != SQLITE_DONE)
         error_report("Failed to delete context %s, rc = %d", context_data->id, rc_stored);
 
-skip_delete:
-    rc = sqlite3_finalize(res);
-    if (rc != SQLITE_OK)
-        error_report("Failed to finalize statement where deleting a context, rc = %d", rc);
+done:
+    REPORT_BIND_FAIL(res, param);
+
+    SQLITE_FINALIZE(res);
 
     return (rc_stored != SQLITE_DONE);
 }

@@ -61,8 +61,7 @@ static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
 done:
     REPORT_BIND_FAIL(res, param);
 
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("HEALTH [%s]: Failed to reset statement for updating health log.", rrdhost_hostname(host));
+    SQLITE_RESET(res);
 }
 
 /* Health related SQL queries
@@ -128,8 +127,7 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
 done:
     REPORT_BIND_FAIL(res, param);
 
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("HEALTH [%s]: Failed to reset statement for inserting to health log detail", rrdhost_hostname(host));
+    SQLITE_RESET(res);
 }
 
 #define SQL_INSERT_HEALTH_LOG                                                                                          \
@@ -184,8 +182,7 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 done:
     REPORT_BIND_FAIL(res, param);
 
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("HEALTH [%s]: Failed to reset statement for inserting to health log", rrdhost_hostname(host));
+    SQLITE_RESET(res);
 }
 
 void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
@@ -271,9 +268,7 @@ void sql_health_alarm_log_cleanup(RRDHOST *host, bool claimed) {
 done:
     REPORT_BIND_FAIL(res, param);
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement to cleanup health log detail table (claimed)");
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_INJECT_REMOVED                                                                                                      \
@@ -314,8 +309,7 @@ bool sql_update_removed_in_health_log(RRDHOST *host, uint32_t alarm_id, uuid_t *
 done:
     REPORT_BIND_FAIL(res, param);
 
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
+    SQLITE_FINALIZE(res);
 
     return (param == 0 && rc == SQLITE_DONE);
 }
@@ -345,8 +339,7 @@ bool sql_update_removed_in_health_log_detail(uint32_t unique_id, uint32_t max_un
 done:
     REPORT_BIND_FAIL(res, param);
 
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
+    SQLITE_FINALIZE(res);
 
     return (param == 0 && rc == SQLITE_DONE);
 }
@@ -398,8 +391,7 @@ void sql_inject_removed_status(
 done:
     REPORT_BIND_FAIL(res, param);
 
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_SELECT_MAX_UNIQUE_ID                                                                                       \
@@ -422,7 +414,7 @@ uint32_t sql_get_max_unique_id (RRDHOST *host)
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter for SQL_SELECT_MAX_UNIQUE_ID.");
-        sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
         return 0;
     }
 
@@ -430,9 +422,7 @@ uint32_t sql_get_max_unique_id (RRDHOST *host)
          max_unique_id = (uint32_t) sqlite3_column_int64(res, 0);
      }
 
-     rc = sqlite3_finalize(res);
-     if (unlikely(rc != SQLITE_OK))
-         error_report("Failed to finalize the statement");
+     SQLITE_FINALIZE(res);
 
      return max_unique_id;
 }
@@ -457,7 +447,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter for SQL_SELECT_LAST_STATUSES.");
-        sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
         return;
     }
 
@@ -479,9 +469,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
         }
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the statement");
+    SQLITE_FINALIZE(res);
 }
 
 #define SQL_DELETE_MISSING_CHART_ALERT                                                                                 \
@@ -506,7 +494,7 @@ static void sql_remove_alerts_from_deleted_charts(RRDHOST *host, uuid_t *host_id
 
     if (unlikely(ret != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter for sql_remove_alerts_from_deleted_charts.");
-        sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
         return;
     }
 
@@ -514,9 +502,7 @@ static void sql_remove_alerts_from_deleted_charts(RRDHOST *host, uuid_t *host_id
     if (ret != SQLITE_DONE)
         error_report("Failed to execute command to delete missing charts from health_log");
 
-    ret = sqlite3_finalize(res);
-    if (unlikely(ret != SQLITE_OK))
-        error_report("Failed to finalize statement when deleting missing charts from health_log");
+    SQLITE_FINALIZE(res);
 }
 
 static int clean_host_alerts(void *data, int argc, char **argv, char **column)
@@ -589,7 +575,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
     ret = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(ret != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter for SQL_LOAD_HEALTH_LOG.");
-        sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
         return;
     }
 
@@ -737,9 +723,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
            "[%s]: Table health_log, loaded %zd alarm entries, errors in %zd entries.",
            rrdhost_hostname(host), loaded, errored);
 
-    ret = sqlite3_finalize(res);
-    if (unlikely(ret != SQLITE_OK))
-        error_report("Failed to finalize the health log read statement");
+    SQLITE_FINALIZE(res);
 }
 
 /*
@@ -873,8 +857,7 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap __maybe_unused)
 done:
     REPORT_BIND_FAIL(res, param);
     buffer_free(buf);
-    if (unlikely(sqlite3_reset(res) != SQLITE_OK))
-        error_report("Failed to reset statement in alert hash_id store function, rc = %d", rc);
+    SQLITE_RESET(res);
 }
 
 #define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT                                                                          \
@@ -924,11 +907,8 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
     }
 
 done:
-     rc = sqlite3_finalize(res);
-     if (unlikely(rc != SQLITE_OK))
-         error_report("Failed to finalize the statement.");
-
-     return ret;
+    SQLITE_FINALIZE(res);
+    return ret;
 }
 
 #define SQL_SELECT_HEALTH_LOG                                                                                          \
@@ -1084,9 +1064,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
     buffer_json_finalize(wb);
 
 finish:
-     rc = sqlite3_reset(stmt_query);
-     if (unlikely(rc != SQLITE_OK))
-         error_report("Failed to reset statement for SQL_SELECT_HEALTH_LOG");
+    SQLITE_RESET(stmt_query);
 }
 
 #define SQL_COPY_HEALTH_LOG(table) "INSERT OR IGNORE INTO health_log (host_id, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context) SELECT ?1, alarm_id, config_hash_id, name, chart, family, exec, recipient, units, chart_context from %s", table
@@ -1125,9 +1103,7 @@ int health_migrate_old_health_log_table(char *table) {
 
     rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to copy health log table, rc = %d", rc);
+        SQLITE_FINALIZE(res);
         freez(uuid_from_table);
         return 0;
     }
@@ -1135,9 +1111,7 @@ int health_migrate_old_health_log_table(char *table) {
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_COPY_HEALTH_LOG, rc = %d", rc);
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to copy health log table, rc = %d", rc);
+        SQLITE_FINALIZE(res);
         freez(uuid_from_table);
     }
 
@@ -1151,18 +1125,14 @@ int health_migrate_old_health_log_table(char *table) {
 
     rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to copy health log detail, rc = %d", rc);
+        SQLITE_FINALIZE(res);
         return 0;
     }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_COPY_HEALTH_LOG_DETAIL, rc = %d", rc);
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to copy health log detail table, rc = %d", rc);
+        SQLITE_FINALIZE(res);
         return 0;
     }
 
@@ -1176,9 +1146,7 @@ int health_migrate_old_health_log_table(char *table) {
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_UPDATE_HEALTH_LOG_DETAIL_TRANSITION_ID, rc = %d", rc);
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to update health log detail table with transition ids, rc = %d", rc);
+        SQLITE_FINALIZE(res);
         return 0;
     }
 
@@ -1191,26 +1159,20 @@ int health_migrate_old_health_log_table(char *table) {
 
     rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to update health log detail with health log ids, rc = %d", rc);
+        SQLITE_FINALIZE(res);
         return 0;
     }
 
     rc = sqlite3_bind_blob(res, 2, &uuid, sizeof(uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to update health log detail with health log ids, rc = %d", rc);
+        SQLITE_FINALIZE(res);
         return 0;
     }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_UPDATE_HEALTH_LOG_DETAIL_HEALTH_LOG_ID, rc = %d", rc);
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to update health log detail table with health log ids, rc = %d", rc);
+        SQLITE_FINALIZE(res);
     }
 
     //update last transition id
@@ -1222,18 +1184,14 @@ int health_migrate_old_health_log_table(char *table) {
 
     rc = sqlite3_bind_blob(res, 1, &uuid, sizeof(uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to update health log with last transition id, rc = %d", rc);
+        SQLITE_FINALIZE(res);
         return 0;
     }
 
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE)) {
         error_report("Failed to execute SQL_UPDATE_HEALTH_LOG_LAST_TRANSITION_ID, rc = %d", rc);
-        rc = sqlite3_finalize(res);
-        if (unlikely(rc != SQLITE_OK))
-            error_report("Failed to reset statement to update health log table with last transition id, rc = %d", rc);
+        SQLITE_FINALIZE(res);
     }
 
     return 1;
@@ -1257,14 +1215,14 @@ static uint32_t get_next_alarm_event_id(uint64_t health_log_id, uint32_t alarm_i
     rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) health_log_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter for SQL_GET_EVENT_ID.");
-        sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
         return alarm_id;
     }
 
     rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) alarm_id);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind char parameter for SQL_GET_EVENT_ID.");
-        sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
         return alarm_id;
     }
 
@@ -1272,9 +1230,7 @@ static uint32_t get_next_alarm_event_id(uint64_t health_log_id, uint32_t alarm_i
         next_event_id = (uint32_t) sqlite3_column_int64(res, 0);
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize the statement while getting an alarm id.");
+    SQLITE_FINALIZE(res);
 
     return next_event_id;
 }
@@ -1298,21 +1254,21 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
     rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind host_id parameter for SQL_GET_ALARM_ID.");
-        sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
         return alarm_id;
     }
 
     rc = SQLITE3_BIND_STRING_OR_NULL(res, 2, chart);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind char parameter for SQL_GET_ALARM_ID.");
-        sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
         return alarm_id;
     }
 
     rc = SQLITE3_BIND_STRING_OR_NULL(res, 3, name);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind name parameter for SQL_GET_ALARM_ID.");
-        sqlite3_finalize(res);
+        SQLITE_FINALIZE(res);
         return alarm_id;
     }
 
@@ -1321,9 +1277,7 @@ uint32_t sql_get_alarm_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *
         health_log_id = (uint64_t) sqlite3_column_int64(res, 1);
     }
 
-     rc = sqlite3_finalize(res);
-     if (unlikely(rc != SQLITE_OK))
-         error_report("Failed to finalize the statement while getting an alarm id.");
+    SQLITE_FINALIZE(res);
 
      if (alarm_id)
            *next_event_id = get_next_alarm_event_id(health_log_id, alarm_id);
@@ -1373,9 +1327,7 @@ bool sql_find_alert_transition(
 done:
     REPORT_BIND_FAIL(res, param);
 
-    rc = sqlite3_reset(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to reset the statement when trying to find transition");
+    SQLITE_RESET(res);
 
     return ok;
 }
@@ -1467,17 +1419,11 @@ void sql_alert_transitions(
         if (rc != SQLITE_DONE)
             error_report("Error while populating temp table");
 
-        rc = sqlite3_reset(res);
-        if (rc != SQLITE_OK)
-            error_report("Error while resetting parameters");
+        SQLITE_RESET(res);
     }
     dfe_done(t);
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        // log error but continue
-        error_report("Failed to finalize statement for sql_alert_transitions temp table population");
-    }
+    SQLITE_FINALIZE(res);
 
     command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
 
@@ -1550,9 +1496,7 @@ run_query:;
 done:
     REPORT_BIND_FAIL(res, param);
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement for sql_alert_transitions");
+    SQLITE_FINALIZE(res);
 
 done_only_drop:
     if (likely(!transition)) {
@@ -1616,17 +1560,11 @@ int sql_get_alert_configuration(
         if (rc != SQLITE_DONE)
             error_report("Error while populating temp table");
 
-        rc = sqlite3_reset(res);
-        if (rc != SQLITE_OK)
-            error_report("Error while resetting parameters");
+        SQLITE_RESET(res);
     }
     dfe_done(t);
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK)) {
-        // log error but continue
-        error_report("Failed to finalize statement for sql_get_alert_configuration temp table population");
-    }
+    SQLITE_FINALIZE(res);
 
     command = buffer_create(MAX_HEALTH_SQL_SIZE, NULL);
 
@@ -1685,9 +1623,7 @@ int sql_get_alert_configuration(
         added++;
     }
 
-    rc = sqlite3_finalize(res);
-    if (unlikely(rc != SQLITE_OK))
-        error_report("Failed to finalize statement for sql_get_alert_configuration");
+    SQLITE_FINALIZE(res);
 
 fail_only_drop:
     (void)snprintfz(sql, sizeof(sql) - 1, "DROP TABLE IF EXISTS c_%p", configs);

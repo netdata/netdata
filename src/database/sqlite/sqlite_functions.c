@@ -288,8 +288,7 @@ static int get_pragma_value(sqlite3 *database, const char *sql)
     if (likely(rc == SQLITE_ROW))
         result = sqlite3_column_int(res, 0);
 
-    rc = sqlite3_finalize(res);
-    (void) rc;
+    SQLITE_FINALIZE(res);
 
     return result;
 }
