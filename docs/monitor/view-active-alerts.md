@@ -6,7 +6,7 @@ Netdata comes with hundreds of pre-configured health alerts designed to notify y
 
 From the Active tab you can see all the active alerts in your War Room. You will be presented with a table having information about each alert that is in warning or critical state.
 
-You can always sort the table by a certain column by clicking on the name of that column, and use the gear icon on the top right to control which columns are visible at any given time.
+You can always sort the table by a certain column by clicking on the name of that column, and using the gear icon on the top right to control which columns are visible at any given time.
 
 ### Filter alerts
 
@@ -51,7 +51,7 @@ From this tab, the "Silencing" column shows if there is any rule present for eac
 
 From this tab you can view all the configurations for all potential alerts in your War Room. Each row concerns one alert, and it provides information about it in the rest of the table columns.
 
-You can control which columns are visible by using the gear icon in the right-hand side.
+You can control which columns are visible by using the gear icon on the right-hand side.
 
 Similarly to the previous tab, you can see the silencing status of an alert, while also being able to dig deeper and show the configuration for the alert and ask the [Netdata Assistant](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-assistant.md) for help.
 
