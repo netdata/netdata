@@ -2008,6 +2008,11 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf.d/vfs.conf
             COMPONENT plugin-ebpf
             DESTINATION usr/lib/netdata/conf.d/ebpf.d)
+
+    install(FILES
+            packaging/cmake/control/copyright
+            COMPONENT plugin-ebpf
+            DESTINATION usr/share/doc/netdata-plugin-ebpf)
 endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)

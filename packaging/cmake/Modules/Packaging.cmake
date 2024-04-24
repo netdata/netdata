@@ -159,7 +159,6 @@ set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_CONTROL_EXTRA
 # ebpf.plugin
 #
 
-# TODO: depend on legacy
 set(CPACK_COMPONENT_PLUGIN-EBPF_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-EBPF_DESCRIPTION
 		"The eBPF metrics collection plugin for the Netdata Agent
@@ -383,7 +382,7 @@ list(APPEND CPACK_COMPONENTS_ALL "plugin-apps")
 list(APPEND CPACK_COMPONENTS_ALL "plugin-chartsd")
 list(APPEND CPACK_COMPONENTS_ALL "plugin-cups")
 list(APPEND CPACK_COMPONENTS_ALL "plugin-debugfs")
-# list(APPEND CPACK_COMPONENTS_ALL "plugin-ebpf")
+list(APPEND CPACK_COMPONENTS_ALL "plugin-ebpf")
 list(APPEND CPACK_COMPONENTS_ALL "plugin-freeipmi")
 list(APPEND CPACK_COMPONENTS_ALL "plugin-go")
 list(APPEND CPACK_COMPONENTS_ALL "plugin-logs-management")
