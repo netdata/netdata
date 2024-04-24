@@ -404,6 +404,8 @@ endif()
 # Custom Modules
 #
 
+include(NetdataRequiredDeps)
+include(NetdataTLS)
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataBacktrace)
@@ -421,6 +423,10 @@ endif()
 # Checks from custom modules
 #
 
+netdata_detect_zlib()
+netdata_detect_libuuid()
+netdata_detect_libuv()
+netdata_detect_tls_and_crypto()
 netdata_detect_jsonc()
 netdata_detect_libyaml()
 
@@ -2320,8 +2326,12 @@ endif()
 target_link_libraries(libnetdata PUBLIC judy)
 
 netdata_add_jsonc_to_target(libnetdata)
-
 netdata_add_libyaml_to_target(libnetdata)
+netdata_add_zlib_to_target(libnetdata PUBLIC)
+netdata_add_libuuid_to_target(libnetdata PUBLIC)
+netdata_add_libuv_to_target(libnetdata PUBLIC)
+netdata_add_crypto_to_target(libnetdata PUBLIC)
+netdata_add_tls_to_target(libnetdata PUBLIC)
 
 # jemalloc
 if(ENABLE_JEMALLOC)
@@ -2363,18 +2373,6 @@ if(ENABLE_LIBUNWIND)
   endif()
 endif()
 
-# zlib
-if(OS_MACOS)
-        find_package(ZLIB REQUIRED)
-        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
-        target_link_libraries(libnetdata PUBLIC ZLIB::ZLIB)
-else()
-        pkg_check_modules(ZLIB REQUIRED zlib)
-        target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
-endif()
-
 # lz4 - try to find a version that is compatible with streaming compression
 # otherwise pick whichever one we can find to support dbengine but don't set
 # ENABLE_LZ4.
@@ -2406,29 +2404,6 @@ if(LIBBROTLI_FOUND)
         target_compile_options(libnetdata PUBLIC ${LIBBROTLI_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${LIBBROTLI_LDFLAGS})
 endif()
-
-# uuid
-if(OS_MACOS OR OS_WINDOWS)
-        # UUID functionality is part of the system libraries here, so no extra
-        # stuff needed.
-else()
-        pkg_check_modules(UUID REQUIRED uuid)
-        target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
-endif()
-
-# uv
-pkg_check_modules(LIBUV REQUIRED libuv)
-target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
-target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
-
-# crypto
-target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
-
-# openssl
-target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)
 
 # mnl
 if(NOT OS_MACOS)
