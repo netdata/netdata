@@ -27,7 +27,7 @@ function(netdata_fetch_legacy_ebpf_code)
         URL_HASH SHA256=${_hash}
         SOURCE_DIR "${ebpf-legacy_SOURCE_DIR}"
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND "sh -c 'mkdir -p ${ebpf-legacy_BUILD_DIR}/ebpf.d && mv ${ebpf-legacy_SOURCE_DIR}/*netdata_ebpf_*.o ${ebpf-legacy_BUILD_DIR}/ebpf.d'"
+        BUILD_COMMAND sh -c "mkdir -p ${ebpf-legacy_BUILD_DIR}/ebpf.d && mv ${ebpf-legacy_SOURCE_DIR}/*netdata_ebpf_*.o ${ebpf-legacy_BUILD_DIR}/ebpf.d"
         INSTALL_COMMAND ""
     )
 endfunction()
