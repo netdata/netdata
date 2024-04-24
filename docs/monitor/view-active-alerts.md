@@ -49,7 +49,10 @@ From this tab, the "Silencing" column shows if there is any rule present for eac
 
 ## Alert Configurations tab
 
-From this tab you can view all the configurations for all potential alerts in your War Room. Each row concerns one alert, and it provides information about it in the rest of the table columns.
+From this tab you can view all the configurations for all running alerts in your War Room. Each row concerns one alert, and it provides information about it in the rest of the table columns.
+
+By running alerts we mean alerts that are related to some metric that is or was collected. Netdata may have more alerts pre-configured that aren't applicable to your monitoring use-cases.
+
 
 You can control which columns are visible by using the gear icon on the right-hand side.
 
