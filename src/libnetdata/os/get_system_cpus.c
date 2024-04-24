@@ -36,7 +36,7 @@ long os_get_system_cpus_cached(bool cache, bool for_netdata) {
         processors[index] = 1;
 
         if(error)
-            netdata_log_error("Assuming system has %d processors.", processors[index]);
+            netdata_log_error("Assuming system has %ld processors.", processors[index]);
     }
 
     return processors[index];
