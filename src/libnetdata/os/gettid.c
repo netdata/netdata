@@ -15,8 +15,8 @@ pid_t os_gettid(void) {
     uint64_t curthreadid;
     pthread_threadid_np(NULL, &curthreadid);
     return curthreadid;
-#elif defined(CCOMPILED_FOR_CYGWIN) || defined(CCOMPILED_FOR_WINDOWS)
-    return GetCurrentThreadId();
+#elif defined(COMPILED_FOR_CYGWIN) || defined(COMPILED_FOR_WINDOWS)
+    return (pid_t)GetCurrentThreadId();
 #elif defined(COMPILED_FOR_LINUX)
     return (pid_t)syscall(SYS_gettid);
 #else

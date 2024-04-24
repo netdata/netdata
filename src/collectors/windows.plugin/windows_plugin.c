@@ -34,7 +34,7 @@ static void windows_main_cleanup(void *ptr) {
 
 static bool log_windows_module(BUFFER *wb, void *data) {
     struct proc_module *pm = data;
-    buffer_sprintf(wb, "windows.plugin[%s]", pm->name);
+    buffer_sprintf(wb, PLUGIN_WINDOWS_NAME "[%s]", pm->name);
     return true;
 }
 
@@ -63,7 +63,7 @@ void *win_plugin_main(void *ptr) {
 #define LGS_MODULE_ID 0
 
         ND_LOG_STACK lgs[] = {
-            [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "windows.plugin"),
+            [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, PLUGIN_WINDOWS_NAME),
             ND_LOG_FIELD_END(),
         };
         ND_LOG_STACK_PUSH(lgs);
@@ -86,7 +86,7 @@ void *win_plugin_main(void *ptr) {
                 worker_is_busy(i);
                 lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_windows_module, pm);
                 pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "windows.plugin");
+                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, PLUGIN_WINDOWS_NAME);
             }
         }
     }

@@ -5,6 +5,8 @@
 
 #include "daemon/common.h"
 
+#define PLUGIN_WINDOWS_NAME "windows.plugin"
+
 void *win_plugin_main(void *ptr);
 
 int do_GetSystemTimes(int update_every, usec_t dt);
