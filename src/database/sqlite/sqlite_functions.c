@@ -279,17 +279,12 @@ void sql_drop_table(const char *table)
 static int get_pragma_value(sqlite3 *database, const char *sql)
 {
     sqlite3_stmt *res = NULL;
-    int rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK))
-        return -1;
-
     int result = -1;
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW))
-        result = sqlite3_column_int(res, 0);
-
-    SQLITE_FINALIZE(res);
-
+    if (PREPARE_STATEMENT(database, sql, &res)) {
+        if (likely(sqlite3_step_monitored(res) == SQLITE_ROW))
+            result = sqlite3_column_int(res, 0);
+        SQLITE_FINALIZE(res);
+    }
     return result;
 }
 
