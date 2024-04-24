@@ -642,7 +642,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/os.c
         src/libnetdata/os/os.h
         src/libnetdata/simple_hashtable.h
-        src/libnetdata/byteorder.h
+        src/libnetdata/os/byteorder.h
         src/libnetdata/onewayalloc/onewayalloc.c
         src/libnetdata/onewayalloc/onewayalloc.h
         src/libnetdata/popen/popen.c
