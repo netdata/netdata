@@ -260,7 +260,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL
 else()
         set(FOREIGN_OS True)
         set(COMPILED_FOR_FOREIGN_OS True)
-        message(INFO " Compiling for Unknown O/S... (${CMAKE_SYSTEM_NAME})")
+        message(WARNING " Compiling for Unknown O/S... (${CMAKE_SYSTEM_NAME})")
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
