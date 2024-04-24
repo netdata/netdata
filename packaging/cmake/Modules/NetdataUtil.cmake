@@ -11,9 +11,7 @@ include_guard()
 # variable HOST_KERNEL_VERSION.
 function(netdata_detect_host_kernel_version)
     if(DEFINED HOST_KERNEL_VERSION)
-        if(NOT DEFINED CACHE HOST_KERNEL_VERSION)
-            message(STATUS "Using user supplied kernel version (${HOST_KERNEL_VERSION}) instead of detecting it.")
-        endif()
+        return()
     endif()
 
     message(CHECK_START "Determining host kernel version")
