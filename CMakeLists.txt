@@ -250,7 +250,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
         set(WINDOWS True)
         set(COMPILED_FOR_WINDOWS True)
         add_definitions(-D_GNU_SOURCE)
-        message(INFO " Compiling for Windows... ")
+        message(INFO " Compiling for Windows (${CMAKE_SYSTEM_NAME})... ")
 else()
         set(FOREIGN_OS True)
         set(COMPILED_FOR_FOREIGN_OS True)
