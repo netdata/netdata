@@ -70,7 +70,8 @@ find_package(PkgConfig REQUIRED)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
 
-option(USE_CXX_11 "use C++11 instead of C++14" False)
+option(USE_CXX_11 "Use C++11 instead of C++14 (should only be used on legacy systems that cannot support C++14, may disable some features)" False)
+mark_as_advanced(USE_CXX_11)
 
 if(USE_CXX_11)
     set(CMAKE_CXX_STANDARD 11)
@@ -85,7 +86,8 @@ if(NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-option(ENABLE_ADDRESS_SANITIZER "enable address sanitizer" False)
+option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
+mark_as_advanced(ENABLE_ADDRESS_SANITIZER)
 
 if(ENABLE_ADDRESS_SANITIZER)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
@@ -101,42 +103,55 @@ set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
 # This is intended to make life easier for developers who are working on one
 # specific feature.
-option(DEFAULT_FEATURE_STATE "specify the default state for optional features" True)
+option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
-option(ENABLE_CLOUD "enable cloud" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_ACLK "enable aclk" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_ML "enable machine learning" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_H2O "enable h2o" True)
-option(ENABLE_DBENGINE "enable dbengine" True)
+# High-level features
+option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
+cmake_dependent_option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" True "NOT ENABLE_ACLK" False)
+mark_as_advanced(ENABLE_CLOUD)
+option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
-option(ENABLE_PLUGIN_APPS "enable apps.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_CGROUP_NETWORK "enable cgroup-network plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_CUPS "enable cups.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_DEBUGFS "enable debugfs.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_EBPF "enable ebpf.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_FREEIPMI "enable freeipmi.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_GO "enable go.d.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_LOCAL_LISTENERS "enable local-listeners" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_LOGS_MANAGEMENT "enable logs-management.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_NETWORK_VIEWER "enable network-viewer" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_NFACCT "enable nfacct.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_PERF "enable perf.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_SLABINFO "enable slabinfo.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "enable systemd-journal.plugin" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_XENSTAT "enable xenstat.plugin" ${DEFAULT_FEATURE_STATE})
+# Data collection plugins
+option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_CGROUP_NETWORK "Enable Linux CGroup network usage monitoring" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocator monitoring" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "Enable systemd journal log collection" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_XENSTAT "Enable Xen domain monitoring" ${DEFAULT_FEATURE_STATE})
 
-option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "enable prometheus remote write exporter" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_EXPORTER_MONGODB "enable mongodb exporter" ${DEFAULT_FEATURE_STATE})
+# Metrics exporters
+option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "Enable exporting to Prometheus via remote write API" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_EXPORTER_MONGODB "Enable exporting to MongoDB" ${DEFAULT_FEATURE_STATE})
 
-option(ENABLE_BUNDLED_JSONC "enable bundled json-c" False)
-option(ENABLE_BUNDLED_YAML "enable bundled yaml" False)
-option(ENABLE_BUNDLED_PROTOBUF "enable bundled protobuf" False)
+# Vendoring
+option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
+option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
+option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 
-option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
+# Optional test code
+cmake_dependent_option(ENABLE_LOGS_MANAGEMENT_TESTS "Enable test code for logs-management plugin." True "NOT ENABLE_PLUGIN_LOGS_MANAGEMENT" False)
+mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
 
-option(ENABLE_SENTRY "enable sentry" False)
-option(ENABLE_WEBRTC "enable webrtc" False)
+# Experimental features
+option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
+mark_as_advanced(ENABLE_WEBRTC)
+option(ENABLE_H2O "Enable H2O web server (experimental)" True)
+mark_as_advanced(ENABLE_H2O)
+
+# Other optional functionality
+option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
+mark_as_advanced(ENABLE_SENTRY)
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_LIBBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
@@ -190,9 +205,9 @@ include(NetdataCompilerFlags)
 
 # Disable hardening for debug builds by default.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" TRUE)
+        option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" TRUE)
 else()
-        option(DISABLE_HARDENING "disable adding extra compiler flags for hardening" FALSE)
+        option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" FALSE)
 endif()
 
 set(EXTRA_HARDENING_C_FLAGS "")
@@ -271,7 +286,7 @@ if(NOT HAVE_LOG10)
         list(APPEND CMAKE_REQUIRED_LIBRARIES m)
         check_function_exists(log10 HAVE_LOG10)
         if(HAVE_LOG10)
-                set(LINK_LIBM True CACHE BOOL "" FORCE)
+                set(LINK_LIBM True)
         else()
                 message(FATAL_ERROR "Can not use log10 with/without libm.")
         endif()
