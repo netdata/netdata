@@ -3,6 +3,8 @@
 # Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+include(NetdataUtil)
+
 # Handle bundling of libyaml.
 #
 # This pulls it in as a sub-project using FetchContent functionality.
@@ -44,13 +46,7 @@ macro(netdata_detect_libyaml)
 
         if(ENABLE_BUNDLED_LIBYAML OR NOT YAML_FOUND)
                 netdata_bundle_libyaml()
-                set(NETDATA_YAML_LDFLAGS yaml)
-                get_target_property(NETDATA_YAML_INCLUDE_DIRS yaml INTERFACE_INCLUDE_DIRECTORIES)
-                get_target_property(NETDATA_YAML_CFLAGS_OTHER yaml INTERFACE_COMPILE_DEFINITIONS)
-        else()
-                set(NETDATA_YAML_LDFLAGS ${YAML_LDFLAGS})
-                set(NETDATA_YAML_CFLAGS_OTHER ${YAML_CFLAGS_OTHER})
-                set(NETDATA_YAML_INCLUDE_DIRS ${YAML_INCLUDE_DIRS})
+                set(YAML_LIBRARIES yaml)
         endif()
 endmacro()
 
@@ -58,8 +54,6 @@ endmacro()
 #
 # The specified target must already exist, and the netdata_detect_libyaml
 # macro must have already been run at least once for this to work correctly.
-function(netdata_add_libyaml_to_target _target)
-        target_include_directories(${_target} PUBLIC ${NETDATA_YAML_INCLUDE_DIRS})
-        target_compile_definitions(${_target} PUBLIC ${NETDATA_YAML_CFLAGS_OTHER})
-        target_link_libraries(${_target} PUBLIC ${NETDATA_YAML_LDFLAGS})
+function(netdata_add_libyaml_to_target _target _scope)
+        netdata_add_lib_to_target(${_target} ${_scope} YAML)
 endfunction()
