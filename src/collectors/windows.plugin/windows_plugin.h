@@ -10,5 +10,6 @@
 void *win_plugin_main(void *ptr);
 
 int do_GetSystemTimes(int update_every, usec_t dt);
+int do_GlobalMemoryStatusEx(int update_every, usec_t dt);
 
 #endif //NETDATA_WINDOWS_PLUGIN_H
