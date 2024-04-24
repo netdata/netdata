@@ -2,6 +2,10 @@
 
 cmake_minimum_required(VERSION 3.13.0)
 
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
 #
 # version atrocities
 #
@@ -58,6 +62,7 @@ project(netdata
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/packaging/cmake/Modules")
+include(CMakeDependentOption)
 
 find_package(PkgConfig REQUIRED)
 
@@ -132,6 +137,9 @@ option(ENABLE_LOGS_MANAGEMENT_TESTS "enable logs management tests" True)
 
 option(ENABLE_SENTRY "enable sentry" False)
 option(ENABLE_WEBRTC "enable webrtc" False)
+
+cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_LIBBPF" False)
+mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         set(NEED_PROTOBUF True)
@@ -234,6 +242,18 @@ else()
         set(LINUX True)
         set(COMPILED_FOR_LINUX True)
         add_definitions(-D_GNU_SOURCE)
+endif()
+
+if(ENABLE_PLUGIN_EBPF)
+        include(NetdataLibBPF)
+        include(NetdataEBPFCORE)
+
+        if(NOT LINUX)
+            message(FATAL_ERROR "The eBPF plugin is not supported on non-Linux systems")
+        endif()
+
+        netdata_bundle_libbpf()
+        netdata_fetch_ebpf_co_re()
 endif()
 
 #
@@ -657,17 +677,10 @@ set(LIBNETDATA_FILES
 )
 
 if(ENABLE_PLUGIN_EBPF)
-        message(CHECK_START "Checking for vendored libbpf for eBPF plugin")
-        if (EXISTS "${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a" AND EXISTS "${CMAKE_SOURCE_DIR}/src/libnetdata/ebpf/includes/dc.skel.h")
-                message(CHECK_PASS "found")
-                list(APPEND LIBNETDATA_FILES
-                     src/libnetdata/ebpf/ebpf.c
-                     src/libnetdata/ebpf/ebpf.h
-                )
-        else()
-                message(CHECK_FAIL "not found")
-                message(FATAL_ERROR "eBPF plugin requires a vendored copy of libbpf.")
-        endif()
+        list(APPEND LIBNETDATA_FILES
+                src/libnetdata/ebpf/ebpf.c
+                src/libnetdata/ebpf/ebpf.h
+        )
 endif()
 
 set(LIBH2O_FILES
@@ -1502,16 +1515,7 @@ target_link_libraries(libnetdata PUBLIC
 
 # ebpf
 if(ENABLE_PLUGIN_EBPF)
-        target_link_libraries(libnetdata PUBLIC ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/libbpf.a)
-        target_include_directories(libnetdata BEFORE PUBLIC
-                ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include
-                ${CMAKE_SOURCE_DIR}/externaldeps/libbpf/include/uapi
-        )
-
-        pkg_check_modules(ELF REQUIRED libelf)
-        target_include_directories(libnetdata BEFORE PUBLIC ${ELF_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${ELF_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${ELF_LIBRARIES})
+        netdata_add_libbpf_to_target(libnetdata)
 endif()
 
 # judy
@@ -1968,26 +1972,12 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_unittest.h
             src/collectors/ebpf.plugin/ebpf_functions.c
             src/collectors/ebpf.plugin/ebpf_functions.h
-            src/libnetdata/ebpf/includes/cachestat.skel.h
-            src/libnetdata/ebpf/includes/dc.skel.h
-            src/libnetdata/ebpf/includes/disk.skel.h
-            src/libnetdata/ebpf/includes/fd.skel.h
-            src/libnetdata/ebpf/includes/filesystem.skel.h
-            src/libnetdata/ebpf/includes/hardirq.skel.h
-            src/libnetdata/ebpf/includes/mdflush.skel.h
-            src/libnetdata/ebpf/includes/mount.skel.h
-            src/libnetdata/ebpf/includes/oomkill.skel.h
-            src/libnetdata/ebpf/includes/process.skel.h
-            src/libnetdata/ebpf/includes/shm.skel.h
-            src/libnetdata/ebpf/includes/socket.skel.h
-            src/libnetdata/ebpf/includes/softirq.skel.h
-            src/libnetdata/ebpf/includes/swap.skel.h
-            src/libnetdata/ebpf/includes/sync.skel.h
-            src/libnetdata/ebpf/includes/vfs.skel.h
     )
 
     add_executable(ebpf.plugin ${EBPF_PLUGIN_FILES})
     target_link_libraries(ebpf.plugin libnetdata)
+
+    netdata_add_ebpf_co_re_to_target(ebpf.plugin)
 
     install(TARGETS ebpf.plugin
             COMPONENT plugin-ebpf
@@ -2695,7 +2685,6 @@ install(FILES
         src/collectors/python.d.plugin/dovecot/dovecot.conf
         src/collectors/python.d.plugin/example/example.conf
         src/collectors/python.d.plugin/exim/exim.conf
-        src/collectors/python.d.plugin/fail2ban/fail2ban.conf
         src/collectors/python.d.plugin/gearman/gearman.conf
         src/collectors/python.d.plugin/go_expvar/go_expvar.conf
         src/collectors/python.d.plugin/haproxy/haproxy.conf
@@ -2741,7 +2730,6 @@ install(FILES
         src/collectors/python.d.plugin/dovecot/dovecot.chart.py
         src/collectors/python.d.plugin/example/example.chart.py
         src/collectors/python.d.plugin/exim/exim.chart.py
-        src/collectors/python.d.plugin/fail2ban/fail2ban.chart.py
         src/collectors/python.d.plugin/gearman/gearman.chart.py
         src/collectors/python.d.plugin/go_expvar/go_expvar.chart.py
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py

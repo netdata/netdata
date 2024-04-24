@@ -28,6 +28,26 @@ void analytics_set_data_str(char **name, const char *value);
         }                                                                                                              \
     } while (0)
 
+#define SQLITE_FINALIZE(res)                                                                                           \
+    do {                                                                                                               \
+        if ((res)) {                                                                                                   \
+            int _rc = sqlite3_finalize((res));                                                                         \
+            if (_rc != SQLITE_OK) {                                                                                    \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to finalize statement rc=%d in %s", _rc, __FUNCTION__);          \
+            }                                                                                                          \
+        }                                                                                                              \
+    } while (0)
+
+#define SQLITE_RESET(res)                                                                                              \
+    do {                                                                                                               \
+        if ((res)) {                                                                                                   \
+            int _rc = sqlite3_reset((res));                                                                            \
+            if (_rc != SQLITE_OK) {                                                                                    \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to reset statement rc=%d in %s", _rc, __FUNCTION__);             \
+            }                                                                                                          \
+        }                                                                                                              \
+    } while (0)
+
 #define SQL_MAX_RETRY (100)
 #define SQLITE_INSERT_DELAY (10)        // Insert delay in case of lock
 

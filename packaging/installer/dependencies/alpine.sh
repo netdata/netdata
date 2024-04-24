@@ -9,6 +9,7 @@ DONT_WAIT=0
 
 package_tree="
   alpine-sdk
+  coreutils
   git
   gcc
   g++

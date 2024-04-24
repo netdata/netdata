@@ -61,7 +61,6 @@ func TestLVM_Init(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestLVM_Cleanup(t *testing.T) {
@@ -190,7 +189,6 @@ func TestLVM_Collect(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func prepareMockOK() *mockLvmCliExec {

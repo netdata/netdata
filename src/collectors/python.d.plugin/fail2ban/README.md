@@ -1,1 +1,0 @@
-integrations/fail2ban.md

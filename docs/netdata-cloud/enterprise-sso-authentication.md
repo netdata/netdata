@@ -10,7 +10,7 @@ Netdata provides you with means to streamline and control how your team connects
 ## How to set it up?
 
 If you want to setup your Netdata Space to allow user Authentication through an Enterprise SSO tool you need to:
-* Confirm the integration to the tool you want is available ([Authentication integations](tbd))
+* Confirm the integration to the tool you want is available ([Authentication integations](https://learn.netdata.cloud/docs/netdata-cloud/authentication-&-authorization/cloud-authentication-&-authorization-integrations))
 * Have a Netdata Cloud account
 * Have Access to the Space as an administrator
 * Your Space needs to be on the Business plan or higher
