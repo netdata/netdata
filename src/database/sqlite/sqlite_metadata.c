@@ -1006,7 +1006,7 @@ static int add_host_sysinfo_key_value(const char *name, const char *value, uuid_
 
     int store_rc = sqlite3_step_monitored(res);
     if (unlikely(store_rc != SQLITE_DONE))
-        error_report("Failed to store host info value %s, rc = %d", name, rc);
+        error_report("Failed to store host info value %s, rc = %d", name, store_rc);
 
     SQLITE_RESET(res);
 
