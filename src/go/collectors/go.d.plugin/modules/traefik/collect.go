@@ -166,6 +166,7 @@ func (t *Traefik) collectEntrypointOpenConnections(mx map[string]int64, pms prom
 			if err := ce.openConn.AddDim(dim); err != nil {
 				t.Warning(err)
 			}
+			ce.openConn.MarkNotCreated()
 		}
 	}
 }
