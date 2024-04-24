@@ -92,96 +92,95 @@ macro(netdata_detect_protobuf)
 
                 set(ENABLE_PROTOBUF True)
                 set(HAVE_PROTOBUF True)
-                return()
-        endif()
-
-        if(NOT ENABLE_BUNDLED_PROTOBUF)
-                if (NOT BUILD_SHARED_LIBS)
-                        set(Protobuf_USE_STATIC_LIBS On)
-                endif()
-
-                # The FindProtobuf CMake module shipped by upstream CMake is
-                # broken for Protobuf version 22.0 and newer because it does
-                # not correctly pull in the new Abseil dependencies. Protobuf
-                # itself sometimes ships a CMake Package Configuration module
-                # that _does_ work correctly, so use that in preference to the
-                # Find module shipped with CMake.
-                #
-                # The code below works by first attempting to use find_package
-                # in config mode, and then checking for the existence of the
-                # target we actually use that gets defined by the protobuf
-                # CMake Package Configuration Module to determine if that
-                # worked. A bit of extra logic is required in the case of the
-                # config mode working, because some systems ship compatibility
-                # logic for the old FindProtobuf module while others do not.
-                #
-                # Upstream bug reference: https://gitlab.kitware.com/cmake/cmake/-/issues/24321
-                find_package(Protobuf CONFIG)
-
-                if(NOT TARGET protobuf::libprotobuf)
-                        message(STATUS "Could not find Protobuf using Config mode, falling back to Module mode")
-                        find_package(Protobuf REQUIRED)
-                endif()
-        endif()
-
-        if(TARGET protobuf::libprotobuf)
-                if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
-                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                IMPORTED_LOCATION_RELEASE)
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_RELWITHDEBINFO)
-                        endif()
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_MINSIZEREL)
-                        endif()
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_DEBUG)
-                        endif()
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_NOCONFIG)
-                        endif()
-                        if(NOT Protobuf_PROTOC_EXECUTABLE)
-                                set(Protobuf_PROTOC_EXECUTABLE protobuf::protoc)
-                        endif()
-                endif()
-
-                # It is technically possible that this may still not
-                # be set by this point, so we need to check it and
-                # fail noisily if it isn't because the build won't
-                # work without it.
-                if(NOT Protobuf_PROTOC_EXECUTABLE)
-                        message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
-                endif()
-
-                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
-                set(NETDATA_PROTOBUF_LIBS protobuf::libprotobuf)
-                get_target_property(NETDATA_PROTOBUF_CFLAGS_OTHER
-                                    protobuf::libprotobuf
-                                    INTERFACE_COMPILE_DEFINITIONS)
-                get_target_property(NETDATA_PROTOBUF_INCLUDE_DIRS
-                                    protobuf::libprotobuf
-                                    INTERFACE_INCLUDE_DIRECTORIES)
-
-                if(NETDATA_PROTOBUF_CFLAGS_OTHER STREQUAL NETDATA_PROTOBUF_CFLAGS_OTHER-NOTFOUND)
-                        set(NETDATA_PROTOBUF_CFLAGS_OTHER "")
-                endif()
-
-                if(NETDATA_PROTOBUF_INCLUDE_DIRS STREQUAL NETDATA_PROTOBUF_INCLUDE_DIRS-NOTFOUND)
-                        set(NETDATA_PROTOBUF_INCLUDE_DIRS "")
-                endif()
         else()
-                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${PROTOBUF_PROTOC_EXECUTABLE})
-                set(NETDATA_PROTOBUF_CFLAGS_OTHER ${PROTOBUF_CFLAGS_OTHER})
-                set(NETDATA_PROTOBUF_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
-                set(NETDATA_PROTOBUF_LIBS ${PROTOBUF_LIBRARIES})
-        endif()
+                if(NOT ENABLE_BUNDLED_PROTOBUF)
+                        if (NOT BUILD_SHARED_LIBS)
+                                set(Protobuf_USE_STATIC_LIBS On)
+                        endif()
 
-        set(ENABLE_PROTOBUF True)
-        set(HAVE_PROTOBUF True)
+                        # The FindProtobuf CMake module shipped by upstream CMake is
+                        # broken for Protobuf version 22.0 and newer because it does
+                        # not correctly pull in the new Abseil dependencies. Protobuf
+                        # itself sometimes ships a CMake Package Configuration module
+                        # that _does_ work correctly, so use that in preference to the
+                        # Find module shipped with CMake.
+                        #
+                        # The code below works by first attempting to use find_package
+                        # in config mode, and then checking for the existence of the
+                        # target we actually use that gets defined by the protobuf
+                        # CMake Package Configuration Module to determine if that
+                        # worked. A bit of extra logic is required in the case of the
+                        # config mode working, because some systems ship compatibility
+                        # logic for the old FindProtobuf module while others do not.
+                        #
+                        # Upstream bug reference: https://gitlab.kitware.com/cmake/cmake/-/issues/24321
+                        find_package(Protobuf CONFIG)
+
+                        if(NOT TARGET protobuf::libprotobuf)
+                                message(STATUS "Could not find Protobuf using Config mode, falling back to Module mode")
+                                find_package(Protobuf REQUIRED)
+                        endif()
+                endif()
+
+                if(TARGET protobuf::libprotobuf)
+                        if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
+                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                        IMPORTED_LOCATION_RELEASE)
+                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                                IMPORTED_LOCATION_RELWITHDEBINFO)
+                                endif()
+                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                                IMPORTED_LOCATION_MINSIZEREL)
+                                endif()
+                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                                IMPORTED_LOCATION_DEBUG)
+                                endif()
+                                if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
+                                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
+                                                IMPORTED_LOCATION_NOCONFIG)
+                                endif()
+                                if(NOT Protobuf_PROTOC_EXECUTABLE)
+                                        set(Protobuf_PROTOC_EXECUTABLE protobuf::protoc)
+                                endif()
+                        endif()
+
+                        # It is technically possible that this may still not
+                        # be set by this point, so we need to check it and
+                        # fail noisily if it isn't because the build won't
+                        # work without it.
+                        if(NOT Protobuf_PROTOC_EXECUTABLE)
+                                message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
+                        endif()
+
+                        set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
+                        set(NETDATA_PROTOBUF_LIBS protobuf::libprotobuf)
+                        get_target_property(NETDATA_PROTOBUF_CFLAGS_OTHER
+                                            protobuf::libprotobuf
+                                            INTERFACE_COMPILE_DEFINITIONS)
+                        get_target_property(NETDATA_PROTOBUF_INCLUDE_DIRS
+                                            protobuf::libprotobuf
+                                            INTERFACE_INCLUDE_DIRECTORIES)
+
+                        if(NETDATA_PROTOBUF_CFLAGS_OTHER STREQUAL NETDATA_PROTOBUF_CFLAGS_OTHER-NOTFOUND)
+                                set(NETDATA_PROTOBUF_CFLAGS_OTHER "")
+                        endif()
+
+                        if(NETDATA_PROTOBUF_INCLUDE_DIRS STREQUAL NETDATA_PROTOBUF_INCLUDE_DIRS-NOTFOUND)
+                                set(NETDATA_PROTOBUF_INCLUDE_DIRS "")
+                        endif()
+                else()
+                        set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${PROTOBUF_PROTOC_EXECUTABLE})
+                        set(NETDATA_PROTOBUF_CFLAGS_OTHER ${PROTOBUF_CFLAGS_OTHER})
+                        set(NETDATA_PROTOBUF_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
+                        set(NETDATA_PROTOBUF_LIBS ${PROTOBUF_LIBRARIES})
+                endif()
+
+                set(ENABLE_PROTOBUF True)
+                set(HAVE_PROTOBUF True)
+        endif()
 endmacro()
 
 # Helper function to compile protocol definitions into C++ code.
