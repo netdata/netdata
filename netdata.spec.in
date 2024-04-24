@@ -433,11 +433,6 @@ install -m 644 -p "%{__cmake_builddir}/system/systemd/%{name}.service.v235" "${R
 install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
 install -m 644 -p "system/systemd/50-%{name}.preset" "${RPM_BUILD_ROOT}%{_presetdir}/50-%{name}.preset"
 
-%if 0%{?_have_ebpf}
-${RPM_BUILD_DIR}/%{name}-%{version}/packaging/bundle-ebpf.sh ${RPM_BUILD_DIR}/%{name}-%{version} \
-${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d
-%endif
-
 %pre
 
 if ! getent group %{name} > /dev/null; then
