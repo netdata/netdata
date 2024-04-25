@@ -192,6 +192,30 @@ set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE On)
 
 #
+# ebpf-code-legacy
+#
+
+set(CPACK_COMPONENT_EBPF-CODE-LEGACY_DEPENDS "netdata")
+set(CPACK_COMPONENT_EBPF-CODE-LEGACY_DESCRIPTION
+		"Compiled eBPF legacy code for the Netdata eBPF plugin
+This package provides the pre-compiled eBPF legacy code for use by
+the Netdata eBPF plugin.  This code is only needed when using the eBPF
+plugin with kernel that do not include BTF support (mostly kernel
+versions lower than 5.10).")
+
+set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_NAME "netdata-ebpf-code-legacy")
+set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_PREDEPENDS "adduser")
+set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_DEPENDS  "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
+
+set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_CONTROL_EXTRA
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf-code-legacy/preinst;"
+	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf-code-legacy/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE Off)
+
+#
 # freeipmi.plugin
 #
 
@@ -413,6 +437,7 @@ set(CPACK_DEBIAN_PLUGIN-XENSTAT_DEBUGINFO_PACKAGE On)
 # CPack components
 #
 
+list(APPEND CPACK_COMPONENTS_ALL "ebpf-code-legacy")
 list(APPEND CPACK_COMPONENTS_ALL "netdata")
 list(APPEND CPACK_COMPONENTS_ALL "plugin-apps")
 list(APPEND CPACK_COMPONENTS_ALL "plugin-chartsd")

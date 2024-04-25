@@ -26,6 +26,7 @@ packages=(
     [chartsd]=netdata-plugin-chartsd_6.7.8_all.deb
     [cups]=netdata-plugin-cups_6.7.8_amd64.deb
     [debugfs]=netdata-plugin-debugfs_6.7.8_amd64.deb
+    [ebpf_code_legacy]=netdata-ebpf-code-legacy_6.7.8_amd64.deb
     [ebpf]=netdata-plugin-ebpf_6.7.8_amd64.deb
     [freeipmi]=netdata-plugin-freeipmi_6.7.8_amd64.deb
     [god]=netdata-plugin-go_6.7.8_amd64.deb
