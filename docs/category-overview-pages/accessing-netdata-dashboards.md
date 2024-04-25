@@ -1,12 +1,12 @@
 # Dashboards and Charts
 
-This section contains documentation on how you can access the Netdata dashboard, which is the same both for the Agent and Cloud, while also containing links to the documentation of the main sections of the dashboard.
+This guide covers how to access both Agent and Cloud dashboards, along with links to explore specific sections in more detail.
 
-A user accessing the Netdata dashboard **from the Cloud** will always be presented with the latest Netdata dashboard version.
+When you access the Netdata dashboard through the Cloud, you'll always have the latest version available.
 
-A user accessing the Netdata dashboard **from the Agent** will, by default, be presented with the latest Netdata dashboard version (the same as Netdata Cloud) except in the following scenarios:
+By default, the Agent dashboard shows the latest version (matching Netdata Cloud). However, there are a few exceptions:
 
-- The Agent doesn't have Internet access, and is unable to get the latest Netdata dashboards, as a result it falls back to the Netdata dashboard version that was shipped with the agent.
+- Without internet access, the Agent can't download the newest dashboards. In this case, it will automatically use the bundled version.
 - Users have defined, e.g. through URL bookmark, that they want to see the previous version of the dashboard (accessible `http://NODE:19999/v1`, replacing `NODE` with the IP address or hostname of your Agent).
 
 ## Main sections
@@ -25,7 +25,7 @@ The Netdata dashboard consists of the following main sections:
 
 > **Note**
 >
-> Some sections of the dashboard, when accessed through the agent,  may require the user to be signed in to Netdata Cloud or having the Agent claimed to Netdata Cloud for their full functionality. Examples include saving visualization settings on charts or custom dashboards, claiming the node to Netdata Cloud, or executing functions on an Agent.
+> Some sections of the dashboard, when accessed through the agent, may require the user to be signed in to Netdata Cloud or have the Agent claimed to Netdata Cloud for their full functionality. Examples include saving visualization settings on charts or custom dashboards, claiming the node to Netdata Cloud, or executing functions on an Agent.
 
 ## How to access the dashboards?
 
@@ -35,7 +35,6 @@ You can access the dashboard at <https://app.netdata.cloud/> and [sign-in](https
 
 ### Netdata Agent
 
-Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and
-navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If you try to access the dashboard from the same node the Agent is installed on you can also use `http://localhost:19999`.
+To view your Netdata dashboard, open a web browser and enter the address `http://NODE:19999`  - replace `NODE` with your Agent's IP address or hostname. If the Agent is on the same machine, use http://localhost:19999.
 
 Documentation for previous Agent dashboard can still be found [here](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md).
