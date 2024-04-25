@@ -5,9 +5,13 @@ set -exu -o pipefail
 #
 # Build the debs
 #
-rm -rf artifacts/
 
-./driver.sh -r cpack
+if [ -d build/ ]; then
+    rm -rf build/packages/
+    ./driver.sh -r cpack
+else
+    ninja -C build
+fi
 
 pushd build
 cpack -G DEB

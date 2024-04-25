@@ -53,12 +53,15 @@ is also real-time and full of interactive charts that precisely
 render all collected values.")
 
 set(CPACK_DEBIAN_NETDATA_PACKAGE_NAME "netdata")
+set(CPACK_DEBIAN_NETDATA_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS
 		"adduser, dpkg (>= 1.17.14), libcap2-bin (>=1:2.0), lsb-base (>= 3.1-23.2)")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
 		"netdata-plugin-cups (= ${CPACK_PACKAGE_VERSION}), netdata-plugin-freeipmi (= ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
-		"netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION}), netdata-plugin-logs-management (= ${CPACK_PACKAGE_VERSION})")
+		"netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION}), \
+netdata-plugin-logs-management (= ${CPACK_PACKAGE_VERSION}), \
+netdata-plugin-network-viewer (= ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
 
@@ -74,7 +77,7 @@ netdata-plugin-perf (= ${CPACK_PACKAGE_VERSION})")
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
 		set(CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS
-    		"netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION}), ${CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS}")
+        "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION}), ${CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS}")
 endif()
 
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
@@ -184,7 +187,8 @@ detailed kernel-level metrics for the system.")
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_NAME "netdata-plugin-ebpf")
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
-set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_PREDEPENDS "adduser")
+set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_RECOMMENDS "netdata-plugin-apps (= ${CPACK_PACKAGE_VERSION}), netdata-ebpf-code-legacy (= ${CPACK_PACKAGE_VERSION})")
 
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf.d/preinst;"
@@ -208,13 +212,13 @@ set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_NAME "netdata-ebpf-code-legacy")
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_PREDEPENDS "adduser")
-set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_DEPENDS  "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_RECOMMENDS  "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
 
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf-code-legacy/preinst;"
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf-code-legacy/postinst")
 
-set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_EBPF-CODE-LEGACY_DEBUGINFO_PACKAGE Off)
 
 #
 # freeipmi.plugin
@@ -298,6 +302,7 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK_VIEWER_PACKAGE_NAME "netdata-plugin-network-view
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
+set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_RECOMMENDS "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
 
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/network-viewer/preinst;"
