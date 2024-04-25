@@ -280,6 +280,21 @@ func getChartUnits(metric string) string {
 
 	idx := strings.LastIndexByte(metric, '_')
 	if idx == -1 {
+		// snmp_exporter: e.g. ifOutUcastPkts, ifOutOctets.
+		if idx = strings.LastIndexFunc(metric, func(r rune) bool { return r >= 'A' && r <= 'Z' }); idx != -1 {
+			v := strings.ToLower(metric[idx:])
+			switch v {
+			case "pkts":
+				return "packets"
+			case "octets":
+				return "bytes"
+			case "mtu":
+				return "octets"
+			case "speed":
+				return "bits"
+			}
+			return v
+		}
 		return "events"
 	}
 	switch suffix := metric[idx:]; suffix {
