@@ -188,10 +188,16 @@ if(ENABLE_WOLFSSL)
         set(ENABLE_H2O False)
         # OSSL_DECODER_CTX does not exist in WolfSSL
         set(ENABLE_ACLK False)
+
+        # wolfssl
+        pkg_check_modules(WOLFSSL wolfssl)
 else()
         set(ENABLE_OPENSSL True)
         option(ENABLE_H2O "Enable H2O web server (experimental)" True)
         mark_as_advanced(ENABLE_H2O)
+
+        # openssl/crypto
+        pkg_check_modules(OPENSSL openssl)
 endif()
 
 if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
@@ -506,12 +512,6 @@ int my_function() {
 if(FREEBSD OR MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
 endif()
-
-# openssl/crypto
-pkg_check_modules(OPENSSL openssl)
-
-# wolfssl
-pkg_check_modules(WOLFSSL wolfssl)
 
 if(NOT OPENSSL_FOUND AND ENABLE_OPENSSL)
         if(MACOS)
