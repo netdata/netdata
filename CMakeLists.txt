@@ -1651,7 +1651,8 @@ if(ENABLE_MQTTWEBSOCKETS)
 
         target_compile_options(mqttwebsockets PUBLIC -DMQTT_WSS_CUSTOM_ALLOC
                                                      -DRBUF_CUSTOM_MALLOC
-                                                     -DMQTT_WSS_CPUSTATS)
+                                                     -DMQTT_WSS_CPUSTATS
+                                                     "$<$<BOOL:${ENABLE_OPENSSL}>:-DENABLE_OPENSSL>")
 
         target_include_directories(mqttwebsockets PUBLIC ${CMAKE_SOURCE_DIR}/aclk/helpers
                                                          ${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/include)

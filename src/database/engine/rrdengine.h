@@ -9,8 +9,10 @@
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
+#if defined(ENABLE_OPENSSL)
 #include <openssl/sha.h>
 #include <openssl/evp.h>
+#endif
 #include "daemon/common.h"
 #include "../rrd.h"
 #include "rrddiskprotocol.h"

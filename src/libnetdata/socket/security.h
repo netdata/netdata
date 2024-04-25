@@ -14,6 +14,7 @@ typedef enum __attribute__((packed)) {
 
 # ifdef ENABLE_HTTPS
 
+#if defined(ENABLE_OPENSSL)
 #define OPENSSL_VERSION_095 0x00905100L
 #define OPENSSL_VERSION_097 0x0907000L
 #define OPENSSL_VERSION_110 0x10100000L
@@ -32,6 +33,7 @@ typedef enum __attribute__((packed)) {
 #include <openssl/core_names.h>
 #include <openssl/decoder.h>
 #endif
+#endif // ENABLE_OPENSSL
 
 typedef struct netdata_ssl {
     SSL *conn;               // SSL connection
