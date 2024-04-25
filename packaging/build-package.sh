@@ -2,6 +2,8 @@
 #
 # Invoked by the package builder images to actually build native packages.
 
+set -e
+
 PKG_TYPE="${1}"
 BUILD_DIR="${2}"
 SCRIPT_SOURCE="$(
@@ -68,4 +70,5 @@ esac
 # shellcheck disable=SC2086
 cmake ${CMAKE_ARGS}
 cmake --build "${BUILD_DIR}" --parallel "$(nproc)"
-cpack -B "${BUILD_DIR}" -G "${PACKAGE_TYPE}"
+cd "${BUILD_DIR}" || exit 1
+cpack -v -G "${PACKAGE_TYPE}"
