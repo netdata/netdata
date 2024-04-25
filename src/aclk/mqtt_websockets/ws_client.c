@@ -17,7 +17,9 @@
 #include <errno.h>
 #include <ctype.h>
 
+#if defined(ENABLE_OPENSSL)
 #include <openssl/evp.h>
+#endif
 
 #include "ws_client.h"
 #include "common_internal.h"
