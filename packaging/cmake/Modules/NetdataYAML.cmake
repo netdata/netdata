@@ -57,6 +57,7 @@ macro(netdata_detect_libyaml)
         if(ENABLE_BUNDLED_LIBYAML OR NOT YAML_FOUND)
                 netdata_bundle_libyaml()
                 set(YAML_LIBRARIES yaml)
+                set(YAML_LIBRARY_DIRECTORIES ${yaml_BINARY_DIR})
         endif()
 endmacro()
 

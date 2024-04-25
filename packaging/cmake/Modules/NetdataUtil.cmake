@@ -248,8 +248,8 @@ endfunction()
 function(netdata_add_lib_to_target _target _scope _prefix)
   target_link_libraries(${_target} ${_scope} ${${_prefix}_LIBRARIES})
 
-  if(DEFINED ${_prefix}_LINK_DIRS)
-    target_link_directories(${_target} ${_scope} ${${_prefix}_LINK_DIRS})
+  if(DEFINED ${_prefix}_LIBRARY_DIRS)
+    target_link_directories(${_target} ${_scope} ${${_prefix}_LIBRARY_DIRS})
   endif()
 
   if(DEFINED ${_prefix}_LDFLAGS_OTHER)
