@@ -71,4 +71,4 @@ esac
 cmake ${CMAKE_ARGS}
 cmake --build "${BUILD_DIR}" --parallel "$(nproc)"
 cd "${BUILD_DIR}" || exit 1
-cpack -v -G "${PKG_TYPE}"
+cpack -V -G "${PKG_TYPE}"
