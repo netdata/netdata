@@ -14,7 +14,16 @@ typedef enum __attribute__((packed)) {
 
 # ifdef ENABLE_HTTPS
 
-#if defined(ENABLE_OPENSSL)
+#if defined(ENABLE_WOLFSSL)
+#include <wolfssl/options.h>
+#include <wolfssl/version.h>
+#include <wolfssl/ssl.h>
+#include <wolfssl/error-ssl.h>
+
+#include <wolfssl/openssl/ssl.h>
+#include <wolfssl/openssl/sha.h>
+#include <wolfssl/openssl/evp.h>
+#elif defined(ENABLE_OPENSSL)
 #define OPENSSL_VERSION_095 0x00905100L
 #define OPENSSL_VERSION_097 0x0907000L
 #define OPENSSL_VERSION_110 0x10100000L

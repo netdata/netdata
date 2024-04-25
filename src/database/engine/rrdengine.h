@@ -9,7 +9,11 @@
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
-#if defined(ENABLE_OPENSSL)
+#if defined(ENABLE_WOLFSSL)
+#include <wolfssl/options.h>
+#include <wolfssl/openssl/sha.h>
+#include <wolfssl/openssl/evp.h>
+#elif defined(ENABLE_OPENSSL)
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #endif

@@ -183,8 +183,11 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 if(ENABLE_WOLFSSL)
         set(ENABLE_OPENSSL False)
+        # two features are incompatible
         set(ENABLE_PLUGIN_LOGS_MANAGEMENT False)
         set(ENABLE_H2O False)
+        # OSSL_DECODER_CTX does not exist in WolfSSL
+        set(ENABLE_ACLK False)
 else()
         set(ENABLE_OPENSSL True)
         option(ENABLE_H2O "Enable H2O web server (experimental)" True)
@@ -1316,7 +1319,7 @@ set(NETDATA_FILES
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
-        ${ACLK_ALWAYS_BUILD}
+        "$<$<BOOL:${ENABLE_OPENSSL}>:${ACLK_ALWAYS_BUILD}>"
         ${PROFILE_PLUGIN_FILES}
 )
 
@@ -1624,7 +1627,9 @@ if (ENABLE_WOLFSSL)
         message(STATUS "Compiling Netdata with WolfSSL")
 
         target_include_directories(libnetdata BEFORE PUBLIC ${WOLFSSL_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${WOLFSSL_CFLAGS_OTHER})
+        target_compile_options(libnetdata PUBLIC ${WOLFSSL_CFLAGS_OTHER}
+                               -DENABLE_WOLFSSL
+                               -DWOLFSSL_BASE64_ENCODE)
         target_link_libraries(libnetdata PUBLIC ${WOLFSSL_LDFLAGS})
 endif()
 

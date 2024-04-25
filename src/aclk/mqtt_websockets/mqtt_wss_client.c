@@ -23,7 +23,11 @@
 #include <netinet/tcp.h> //TCP_NODELAY
 #include <netdb.h>
 
-#if defined(ENABLE_OPENSSL)
+#if defined(ENABLE_WOLFSSL)
+#include <wolfssl/options.h>
+#include <wolfssl/openssl/err.h>
+#include <wolfssl/openssl/ssl.h>
+#elif defined(ENABLE_OPENSSL)
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #endif
