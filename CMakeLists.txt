@@ -160,6 +160,9 @@ option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 
+# SSL
+option(ENABLE_WOLFSSL "Force use of WolfSSL instead OpenSSL" False)
+
 # Optional test code
 cmake_dependent_option(ENABLE_LOGS_MANAGEMENT_TESTS "Enable test code for logs-management plugin." True "NOT ENABLE_PLUGIN_LOGS_MANAGEMENT" False)
 mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
@@ -167,8 +170,6 @@ mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
-option(ENABLE_H2O "Enable H2O web server (experimental)" True)
-mark_as_advanced(ENABLE_H2O)
 
 # Other optional functionality
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
@@ -179,6 +180,16 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
+
+if(ENABLE_WOLFSSL)
+        set(ENABLE_OPENSSL False)
+        set(ENABLE_PLUGIN_LOGS_MANAGEMENT False)
+        set(ENABLE_H2O False)
+else()
+        set(ENABLE_OPENSSL True)
+        option(ENABLE_H2O "Enable H2O web server (experimental)" True)
+        mark_as_advanced(ENABLE_H2O)
+endif()
 
 if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         set(NEED_PROTOBUF True)
@@ -494,10 +505,12 @@ if(FREEBSD OR MACOS)
 endif()
 
 # openssl/crypto
-set(ENABLE_OPENSSL True)
 pkg_check_modules(OPENSSL openssl)
 
-if(NOT OPENSSL_FOUND)
+# wolfssl
+pkg_check_modules(WOLFSSL wolfssl)
+
+if(NOT OPENSSL_FOUND AND ENABLE_OPENSSL)
         if(MACOS)
                 execute_process(COMMAND
                                 brew --prefix --installed openssl
@@ -517,7 +530,7 @@ if(NOT OPENSSL_FOUND)
         endif()
 endif()
 
-if(NOT MACOS)
+if(NOT MACOS AND ENABLE_OPENSSL)
         pkg_check_modules(CRYPTO libcrypto)
 endif()
 
@@ -1594,15 +1607,23 @@ target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
 target_compile_definitions(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
 
-# crypto
-target_include_directories(libnetdata BEFORE PUBLIC ${CRYPTO_INCLUDE_DIRS})
-target_compile_options(libnetdata PUBLIC ${CRYPTO_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${CRYPTO_LDFLAGS})
+if (ENABLE_OPENSSL)
+        # crypto
+        target_include_directories(libnetdata BEFORE PUBLIC ${CRYPTO_INCLUDE_DIRS})
+        target_compile_options(libnetdata PUBLIC ${CRYPTO_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${CRYPTO_LDFLAGS})
 
-# openssl
-target_include_directories(libnetdata BEFORE PUBLIC ${OPENSSL_INCLUDE_DIRS})
-target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
+        # openssl
+        target_include_directories(libnetdata BEFORE PUBLIC ${OPENSSL_INCLUDE_DIRS})
+        target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
+endif()
+
+if (ENABLE_WOLFSSL)
+        target_include_directories(libnetdata BEFORE PUBLIC ${WOLFSSL_INCLUDE_DIRS})
+        target_compile_options(libnetdata PUBLIC ${WOLFSSL_CFLAGS_OTHER})
+        target_link_libraries(libnetdata PUBLIC ${WOLFSSL_LDFLAGS})
+endif()
 
 # mnl
 if(NOT MACOS)
