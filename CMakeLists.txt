@@ -1608,6 +1608,7 @@ target_compile_definitions(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
 
 if (ENABLE_OPENSSL)
+        message(STATUS "Compiling Netdata with OpenSSL")
         # crypto
         target_include_directories(libnetdata BEFORE PUBLIC ${CRYPTO_INCLUDE_DIRS})
         target_compile_options(libnetdata PUBLIC ${CRYPTO_CFLAGS_OTHER})
@@ -1620,6 +1621,8 @@ if (ENABLE_OPENSSL)
 endif()
 
 if (ENABLE_WOLFSSL)
+        message(STATUS "Compiling Netdata with WolfSSL")
+
         target_include_directories(libnetdata BEFORE PUBLIC ${WOLFSSL_INCLUDE_DIRS})
         target_compile_options(libnetdata PUBLIC ${WOLFSSL_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${WOLFSSL_LDFLAGS})
@@ -1652,7 +1655,9 @@ if(ENABLE_MQTTWEBSOCKETS)
         target_compile_options(mqttwebsockets PUBLIC -DMQTT_WSS_CUSTOM_ALLOC
                                                      -DRBUF_CUSTOM_MALLOC
                                                      -DMQTT_WSS_CPUSTATS
-                                                     "$<$<BOOL:${ENABLE_OPENSSL}>:-DENABLE_OPENSSL>")
+                                                     "$<$<BOOL:${ENABLE_OPENSSL}>:-DENABLE_OPENSSL>"
+                                                     "$<$<BOOL:${ENABLE_WOLFSSL}>:-DENABLE_WOLFSSL>"
+                )
 
         target_include_directories(mqttwebsockets PUBLIC ${CMAKE_SOURCE_DIR}/aclk/helpers
                                                          ${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/include)
