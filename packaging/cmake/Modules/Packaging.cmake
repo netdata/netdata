@@ -55,27 +55,27 @@ render all collected values.")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_NAME "netdata")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS
 		"adduser, dpkg (>= 1.17.14), libcap2-bin (>=1:2.0), lsb-base (>= 3.1-23.2)")
-# set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
-# 		"netdata-plugin-cups (= ${CPACK_PACKAGE_VERSION}), netdata-plugin-freeipmi (= ${CPACK_PACKAGE_VERSION})")
-# set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
-# 		"netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION}), netdata-plugin-logs-management (= ${CPACK_PACKAGE_VERSION})")
-# set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
-# 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
+set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
+		"netdata-plugin-cups (= ${CPACK_PACKAGE_VERSION}), netdata-plugin-freeipmi (= ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
+		"netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION}), netdata-plugin-logs-management (= ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
+		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
 
-# set(CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS
-# 		"netdata-plugin-apps (= ${CPACK_PACKAGE_VERSION}), \
-# netdata-plugin-pythond (= ${CPACK_PACKAGE_VERSION}), \
-# netdata-plugin-go (= ${CPACK_PACKAGE_VERSION}), \
-# netdata-plugin-debugfs (= ${CPACK_PACKAGE_VERSION}), \
-# netdata-plugin-nfacct (= ${CPACK_PACKAGE_VERSION}), \
-# netdata-plugin-chartsd (= ${CPACK_PACKAGE_VERSION}), \
-# netdata-plugin-slabinfo (= ${CPACK_PACKAGE_VERSION}), \
-# netdata-plugin-perf (= ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS
+		"netdata-plugin-apps (= ${CPACK_PACKAGE_VERSION}), \
+netdata-plugin-pythond (= ${CPACK_PACKAGE_VERSION}), \
+netdata-plugin-go (= ${CPACK_PACKAGE_VERSION}), \
+netdata-plugin-debugfs (= ${CPACK_PACKAGE_VERSION}), \
+netdata-plugin-nfacct (= ${CPACK_PACKAGE_VERSION}), \
+netdata-plugin-chartsd (= ${CPACK_PACKAGE_VERSION}), \
+netdata-plugin-slabinfo (= ${CPACK_PACKAGE_VERSION}), \
+netdata-plugin-perf (= ${CPACK_PACKAGE_VERSION})")
 
-# if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-# 		set(CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS
-#     		"netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION}), ${CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS}")
-# endif()
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+		set(CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS
+    		"netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION}), ${CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS}")
+endif()
 
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/conffiles;"
