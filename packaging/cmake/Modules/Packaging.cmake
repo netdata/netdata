@@ -47,10 +47,10 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 
 set(CPACK_COMPONENT_NETDATA_DESCRIPTION
 	  "real-time charts for system monitoring
-Netdata is a daemon that collects data in realtime (per second)
-and presents a web site to view and analyze them. The presentation
-is also real-time and full of interactive charts that precisely
-render all collected values.")
+ Netdata is a daemon that collects data in realtime (per second)
+ and presents a web site to view and analyze them. The presentation
+ is also real-time and full of interactive charts that precisely
+ render all collected values.")
 
 set(CPACK_DEBIAN_NETDATA_PACKAGE_NAME "netdata")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SECTION "net")
@@ -94,8 +94,8 @@ set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE On)
 
 set(CPACK_COMPONENT_PLUGIN-APPS_DESCRIPTION
 		"The per-application metrics collector plugin for the Netdata Agent
-This plugin allows the Netdata Agent to collect per-application and
-per-user metrics without using cgroups.")
+ This plugin allows the Netdata Agent to collect per-application and
+ per-user metrics without using cgroups.")
 
 set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_NAME "netdata-plugin-apps")
 set(CPACK_COMPONENT_PLUGIN-APPS_DEPENDS "netdata")
@@ -116,9 +116,9 @@ set(CPACK_DEBIAN_PLUGIN-APPS_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-CHARTSD_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-CHARTSD_DESCRIPTION
 		"The charts.d metrics collection plugin for the Netdata Agent
-This plugin adds a selection of additional collectors written in shell
-script to the Netdata Agent. It includes collectors for APCUPSD,
-LibreSWAN, OpenSIPS, and Wireless access point statistics.")
+ This plugin adds a selection of additional collectors written in shell
+ script to the Netdata Agent. It includes collectors for APCUPSD,
+ LibreSWAN, OpenSIPS, and Wireless access point statistics.")
 
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_NAME "netdata-plugin-chartsd")
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_SECTION "net")
@@ -141,7 +141,7 @@ set(CPACK_DEBIAN_PLUGIN-CHARTSD_DEBUGINFO_PACKAGE Off)
 set(CPACK_COMPONENT_PLUGIN-CUPS_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-CUPS_DESCRIPTION
 	  "The CUPS metrics collection plugin for the Netdata Agent
-This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System.")
+ This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System.")
 
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_NAME "netdata-plugin-cups")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_SECTION "net")
@@ -161,8 +161,8 @@ set(CPACK_DEBIAN_PLUGIN-CUPS_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-DEBUGFS_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-DEBUGFS_DESCRIPTION
 		"The debugfs metrics collector for the Netdata Agent
-This plugin allows the Netdata Agent to collect Linux kernel metrics
-exposed through debugfs.")
+ This plugin allows the Netdata Agent to collect Linux kernel metrics
+ exposed through debugfs.")
 
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_NAME "netdata-plugin-debugfs")
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_SECTION "net")
@@ -181,8 +181,8 @@ set(CPACK_DEBIAN_PLUGIN-DEBUGFS_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-EBPF_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-EBPF_DESCRIPTION
 		"The eBPF metrics collection plugin for the Netdata Agent
-This plugin allows the Netdata Agent to use eBPF code to collect more
-detailed kernel-level metrics for the system.")
+ This plugin allows the Netdata Agent to use eBPF code to collect more
+ detailed kernel-level metrics for the system.")
 
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_NAME "netdata-plugin-ebpf")
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_SECTION "net")
@@ -203,10 +203,10 @@ set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_EBPF-CODE-LEGACY_DEPENDS "netdata")
 set(CPACK_COMPONENT_EBPF-CODE-LEGACY_DESCRIPTION
 		"Compiled eBPF legacy code for the Netdata eBPF plugin
-This package provides the pre-compiled eBPF legacy code for use by
-the Netdata eBPF plugin.  This code is only needed when using the eBPF
-plugin with kernel that do not include BTF support (mostly kernel
-versions lower than 5.10).")
+ This package provides the pre-compiled eBPF legacy code for use by
+ the Netdata eBPF plugin.  This code is only needed when using the eBPF
+ plugin with kernel that do not include BTF support (mostly kernel
+ versions lower than 5.10).")
 
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_NAME "netdata-ebpf-code-legacy")
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_SECTION "net")
@@ -227,8 +227,8 @@ set(CPACK_DEBIAN_EBPF-CODE-LEGACY_DEBUGINFO_PACKAGE Off)
 set(CPACK_COMPONENT_PLUGIN-FREEIPMI_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-FREEIPMI_DESCRIPTION
 		"The FreeIPMI metrics collection plugin for the Netdata Agent
-This plugin allows the Netdata Agent to collect metrics from hardware
-using FreeIPMI.")
+ This plugin allows the Netdata Agent to collect metrics from hardware
+ using FreeIPMI.")
 
 set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_NAME "netdata-plugin-freeipmi")
 set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_SECTION "net")
@@ -249,10 +249,10 @@ set(CPACK_DEBIAN_PLUGIN-FREEIPMI_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-GO_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-GO_DESCRIPTION
 		"The go.d metrics collection plugin for the Netdata Agent
-This plugin adds a selection of additional collectors written in Go to
-the Netdata Agent. A significant percentage of the application specific
-collectors provided by Netdata are part of this plugin, so most users
-will want it installed.")
+ This plugin adds a selection of additional collectors written in Go to
+ the Netdata Agent. A significant percentage of the application specific
+ collectors provided by Netdata are part of this plugin, so most users
+ will want it installed.")
 
 set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_NAME "netdata-plugin-go")
 set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_SECTION "net")
@@ -273,8 +273,8 @@ set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 set(CPACK_COMPONENT_PLUGIN-LOGS-MANAGEMENT_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-LOGS-MANAGEMENT_DESCRIPTION
 		"The logs-management plugin for the Netdata Agent
-This plugin allows the Netdata Agent to collect logs from the system
-and parse them to extract metrics.")
+ This plugin allows the Netdata Agent to collect logs from the system
+ and parse them to extract metrics.")
 
 set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_NAME "netdata-plugin-logs-management")
 set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_SECTION "net")
@@ -295,8 +295,8 @@ set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-NETWORK-VIEWER_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-NETWORK-VIEWER_DESCRIPTION
 		"The network viewer plugin for the Netdata Agent
-This plugin allows the Netdata Agent to provide network connection
-mapping functionality for use in Netdata Cloud.")
+ This plugin allows the Netdata Agent to provide network connection
+ mapping functionality for use in Netdata Cloud.")
 
 set(CPACK_DEBIAN_PLUGIN-NETWORK_VIEWER_PACKAGE_NAME "netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_SECTION "net")
@@ -317,8 +317,8 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-NFACCT_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-NFACCT_DESCRIPTION
 		"The NFACCT metrics collection plugin for the Netdata Agent
-This plugin allows the Netdata Agent to collect metrics from the firewall
-using NFACCT objects.")
+ This plugin allows the Netdata Agent to collect metrics from the firewall
+ using NFACCT objects.")
 
 set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_NAME "netdata-plugin-nfacct")
 set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_SECTION "net")
@@ -338,8 +338,8 @@ set(CPACK_DEBIAN_PLUGIN-NFACCT_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-PERF_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-PERF_DESCRIPTION
 		"The perf metrics collector for the Netdata Agent
-This plugin allows the Netdata to collect metrics from the Linux perf
-subsystem.")
+ This plugin allows the Netdata to collect metrics from the Linux perf
+ subsystem.")
 
 set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_NAME "netdata-plugin-perf")
 set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_SECTION "net")
@@ -359,9 +359,9 @@ set(CPACK_DEBIAN_PLUGIN-PERF_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-PYTHOND_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-PYTHOND_DESCRIPTION
 		"The python.d metrics collection plugin for the Netdata Agent
-Many of the collectors provided by this package are also available
-in netdata-plugin-god. In msot cases, you probably want to use those
-versions instead of the Python versions.")
+ Many of the collectors provided by this package are also available
+ in netdata-plugin-god. In msot cases, you probably want to use those
+ versions instead of the Python versions.")
 
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_NAME "netdata-plugin-pythond")
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_SECTION "net")
@@ -384,8 +384,8 @@ set(CPACK_DEBIAN_PLUGIN-PYTHOND_DEBUGINFO_PACKAGE Off)
 set(CPACK_COMPONENT_PLUGIN-SLABINFO_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-SLABINFO_DESCRIPTION
 		"The slabinfo metrics collector for the Netdata Agent
-This plugin allows the Netdata Agent to collect perfromance and
-utilization metrics for the Linux kernel’s SLAB allocator.")
+ This plugin allows the Netdata Agent to collect perfromance and
+ utilization metrics for the Linux kernel’s SLAB allocator.")
 
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_NAME "netdata-plugin-slabinfo")
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_SECTION "net")
@@ -405,8 +405,8 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-SYSTEMD-JOURNAL_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-SYSTEMD-JOURNAL_DESCRIPTION
 		"The systemd-journal collector for the Netdata Agent
-This plugin allows the Netdata Agent to present logs from the systemd
-journal on Netdata Cloud or the local Agent dashboard.")
+ This plugin allows the Netdata Agent to present logs from the systemd
+ journal on Netdata Cloud or the local Agent dashboard.")
 
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_NAME "netdata-plugin-systemd-journal")
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_SECTION "net")
@@ -426,8 +426,8 @@ set(CPACK_DEBIAN_PLUGIN-SYSTEMD_JOURNAL_DEBUGINFO_PACKAGE On)
 set(CPACK_COMPONENT_PLUGIN-XENSTAT_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-XENSTAT_DESCRIPTION
 		"The xenstat plugin for the Netdata Agent
-This plugin allows the Netdata Agent to collect metrics from the Xen
-Hypervisor.")
+ This plugin allows the Netdata Agent to collect metrics from the Xen
+ Hypervisor.")
 
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_NAME "netdata-plugin-xenstat")
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_SECTION "net")
