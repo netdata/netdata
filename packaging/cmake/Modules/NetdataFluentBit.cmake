@@ -3,6 +3,8 @@
 # Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+set(_ND_FLB_SRC_DIR "${CMAKE_BINARY_DIR}/_deps/fluentbit-src")
+
 # Handle bundling of fluent-bit
 function(netdata_bundle_flb)
     include(FetchContent)
@@ -24,7 +26,7 @@ function(netdata_bundle_flb)
     include("${CMAKE_SOURCE_DIR}/src/logsmanagement/fluent_bit_build/config.cmake")
 
     FetchContent_Declare(
-        fluent-bit
+        fluentbit
         GIT_REPOSITORY https://github.com/fluent/fluent-bit.git
         GIT_TAG b19e9ce674de872640c00a697fa545b66df0628a # last used submodule commit
         GIT_PROGRESS On
@@ -33,7 +35,7 @@ function(netdata_bundle_flb)
         CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
     )
 
-    FetchContent_MakeAvailable_NoInstall(fluent-bit)
+    FetchContent_MakeAvailable_NoInstall(fluentbit)
 
     message(STATUS "Finished preparing vendored copy of fluent-bit")
 endfunction()
@@ -45,7 +47,7 @@ endfunction()
 
 # Install the fluentbit library in the correct path for our plugin to find it
 function(netdata_install_flb _component)
-    install(FILES ${fluent-bit_BINARY_DIR}/lib/libfluent-bit.so
+    install(FILES ${fluentbit_BINARY_DIR}/lib/libfluent-bit.so
             DESTINATION usr/lib/netdata
             COMPONENT ${_component})
 endfunction()
