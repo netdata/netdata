@@ -16,7 +16,7 @@ popd
 #
 # Extract the artifacts
 #
-pushd artifacts
+pushd build/packages
 
 declare -A packages
 
