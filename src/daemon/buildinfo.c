@@ -112,6 +112,7 @@ typedef enum __attribute__((packed)) {
     BIB_EXPORT_SHELL,
     BIB_DEVEL_TRACE_ALLOCATIONS,
     BIB_DEVELOPER_MODE,
+    BIB_LIB_WOLFSSL,
 
     // leave this last
     BIB_TERMINATOR,
@@ -994,6 +995,14 @@ static struct {
                 .json = "dev-mode",
                 .value = NULL,
         },
+        [BIB_LIB_WOLFSSL] = {
+               .category = BIC_LIBS,
+               .type = BIT_BOOLEAN,
+               .analytics = NULL,
+               .print = "WolfSSL (cryptography)",
+               .json = "wolfssl",
+               .value = NULL,
+        },
 
         // leave this last
         [BIB_TERMINATOR] = {
@@ -1154,6 +1163,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef ENABLE_OPENSSL
     build_info_set_status(BIB_LIB_OPENSSL, true);
+#endif
+#ifdef ENABLE_WOLFSSL
+    build_info_set_status(BIB_LIB_WOLFSSL, true);
 #endif
 #ifdef ENABLE_JSONC
     build_info_set_status(BIB_LIB_JSONC, true);
