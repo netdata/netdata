@@ -137,6 +137,9 @@ option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 
+option(BUILD_FOR_PACKAGING "Include component files for deb packages" False)
+mark_as_advanced(BUILD_FOR_PACKAGING)
+
 # Optional test code
 cmake_dependent_option(ENABLE_LOGS_MANAGEMENT_TESTS "Enable test code for logs-management plugin." True "NOT ENABLE_PLUGIN_LOGS_MANAGEMENT" False)
 mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
@@ -1689,10 +1692,12 @@ if(ENABLE_PLUGIN_DEBUGFS)
             COMPONENT plugin-debugfs
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-debugfs
-            DESTINATION usr/share/doc/netdata-plugin-debugfs)
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-debugfs
+                DESTINATION usr/share/doc/netdata-plugin-debugfs)
+    endif()
 endif()
 
 if(ENABLE_PLUGIN_APPS)
@@ -1729,10 +1734,12 @@ if(ENABLE_PLUGIN_APPS)
             COMPONENT plugin-apps
             DESTINATION usr/lib/netdata/conf.d)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-apps
-            DESTINATION usr/share/doc/netdata-plugin-apps)
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-apps
+                DESTINATION usr/share/doc/netdata-plugin-apps)
+    endif()
 endif()
 
 if(CAP_FOUND)
@@ -1753,10 +1760,12 @@ if(ENABLE_PLUGIN_FREEIPMI)
             COMPONENT plugin-freeipmi
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-freeipmi
-            DESTINATION usr/share/doc/netdata-plugin-freeipmi)
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-freeipmi
+                DESTINATION usr/share/doc/netdata-plugin-freeipmi)
+    endif()
 endif()
 
 if(ENABLE_PLUGIN_NFACCT)
@@ -1777,10 +1786,12 @@ if(ENABLE_PLUGIN_NFACCT)
             COMPONENT plugin-nfacct
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-nfacct
-            DESTINATION usr/share/doc/netdata-plugin-nfacct)
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-nfacct
+                DESTINATION usr/share/doc/netdata-plugin-nfacct)
+    endif()
 endif()
 
 if(ENABLE_PLUGIN_XENSTAT)
@@ -1798,10 +1809,12 @@ if(ENABLE_PLUGIN_XENSTAT)
             COMPONENT plugin-xenstat
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-xenstat
-            DESTINATION usr/share/doc/netdata-plugin-xenstat)
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-xenstat
+                DESTINATION usr/share/doc/netdata-plugin-xenstat)
+    endif()
 endif()
 
 if(ENABLE_PLUGIN_PERF)
@@ -1814,10 +1827,12 @@ if(ENABLE_PLUGIN_PERF)
             COMPONENT plugin-perf
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-perf
-            DESTINATION usr/share/doc/netdata-plugin-perf)
+    if(BUILD_FOR_PACKAGING)
+         install(FILES
+                 packaging/cmake/control/copyright
+                 COMPONENT plugin-perf
+                 DESTINATION usr/share/doc/netdata-plugin-perf)
+    endif()
 endif()
 
 if(ENABLE_PLUGIN_SLABINFO)
@@ -1830,10 +1845,12 @@ if(ENABLE_PLUGIN_SLABINFO)
             COMPONENT plugin-slabinfo
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-slabinfo
-            DESTINATION usr/share/doc/netdata-plugin-slabinfo)
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-slabinfo
+                DESTINATION usr/share/doc/netdata-plugin-slabinfo)
+    endif()
 endif()
 
 if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
@@ -1868,10 +1885,12 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
             COMPONENT plugin-logs-management
             DESTINATION usr/lib/netdata/conf.d)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-logs-management
-            DESTINATION usr/share/doc/netdata-plugin-logs-management)
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-logs-management
+                DESTINATION usr/share/doc/netdata-plugin-logs-management)
+    endif()
 endif()
 
 if(ENABLE_PLUGIN_CUPS)
@@ -1905,10 +1924,12 @@ if(ENABLE_PLUGIN_CUPS)
                 COMPONENT plugin-cups
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        install(FILES
-                packaging/cmake/control/copyright
-                COMPONENT plugin-cups
-                DESTINATION usr/share/doc/netdata-plugin-cups)
+        if(BUILD_FOR_PACKAGING)
+                install(FILES
+                        packaging/cmake/control/copyright
+                        COMPONENT plugin-cups
+                        DESTINATION usr/share/doc/netdata-plugin-cups)
+        endif()
     endif()
 endif()
 
@@ -1943,10 +1964,12 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                 COMPONENT plugin-systemd-journal
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        install(FILES
-                packaging/cmake/control/copyright
-                COMPONENT plugin-systemd-journal
-                DESTINATION usr/share/doc/netdata-plugin-systemd-journal)
+        if(BUILD_FOR_PACKAGING)
+                install(FILES
+                        packaging/cmake/control/copyright
+                        COMPONENT plugin-systemd-journal
+                        DESTINATION usr/share/doc/netdata-plugin-systemd-journal)
+        endif()
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
@@ -2030,10 +2053,12 @@ if(ENABLE_PLUGIN_EBPF)
             COMPONENT plugin-ebpf
             DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-ebpf
-            DESTINATION usr/share/doc/netdata-plugin-ebpf)
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-ebpf
+                DESTINATION usr/share/doc/netdata-plugin-ebpf)
+    endif()
 
     if(ENABLE_LEGACY_EBPF_PROGRAMS)
         netdata_install_legacy_ebpf_code()
@@ -2080,10 +2105,12 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 COMPONENT plugin-network-viewer
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        install(FILES
-                packaging/cmake/control/copyright
-                COMPONENT plugin-network-viewer
-                DESTINATION usr/share/doc/netdata-plugin-network-viewer)
+        if(BUILD_FOR_PACKAGING)
+                install(FILES
+                        packaging/cmake/control/copyright
+                        COMPONENT plugin-network-viewer
+                        DESTINATION usr/share/doc/netdata-plugin-network-viewer)
+        endif()
 endif()
 
 #
@@ -2479,10 +2506,12 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
-install(FILES
-        ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
-        COMPONENT netdata
-        DESTINATION lib/systemd/system)
+if(BUILD_FOR_PACKAGING)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+                COMPONENT netdata
+                DESTINATION lib/systemd/system)
+endif()
 
 configure_file(system/systemd/netdata.service.v235.in system/systemd/netdata.service.v235 @ONLY)
 install(FILES
@@ -2534,15 +2563,19 @@ install(FILES
 #
 # misc files
 #
-install(FILES
-        packaging/cmake/control/netdata/etc/default/netdata
-        COMPONENT netdata
-        DESTINATION etc/default)
+if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/netdata/etc/default/netdata
+                COMPONENT netdata
+                DESTINATION etc/default)
+endif()
 
+if(BUILD_FOR_PACKAGING)
 install(PROGRAMS
         packaging/cmake/control/netdata/etc/init.d/netdata
         COMPONENT netdata
         DESTINATION etc/init.d)
+endif()
 
 install(PROGRAMS
         packaging/installer/netdata-updater.sh
@@ -2664,10 +2697,12 @@ install(FILES
         COMPONENT plugin-chartsd
         DESTINATION usr/lib/netdata/conf.d/charts.d)
 
-install(FILES
-        packaging/cmake/control/copyright
-        COMPONENT plugin-chartsd
-        DESTINATION usr/share/doc/netdata-plugin-chartsd)
+if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-chartsd
+                DESTINATION usr/share/doc/netdata-plugin-chartsd)
+endif()
 
 #
 # tc-qos-helper
@@ -2793,10 +2828,12 @@ install(FILES
         COMPONENT plugin-pythond
         DESTINATION usr/libexec/netdata/python.d)
 
-install(FILES
-        packaging/cmake/control/copyright
-        COMPONENT plugin-pythond
-        DESTINATION usr/share/doc/netdata-plugin-pythond)
+if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-pythond
+                DESTINATION usr/share/doc/netdata-plugin-pythond)
+endif()
 
 #
 # ioping.plugin
@@ -2831,10 +2868,12 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/sd)
 
-    install(FILES
-            packaging/cmake/control/copyright
-            COMPONENT plugin-go
-            DESTINATION usr/share/doc/netdata-plugin-go)
+    if(BUILD_FOR_PACKAGING)
+        install(FILES
+                packaging/cmake/control/copyright
+                COMPONENT plugin-go
+                DESTINATION usr/share/doc/netdata-plugin-go)
+    endif()
 endif()
 
 #
