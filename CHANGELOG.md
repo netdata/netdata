@@ -6,8 +6,15 @@
 
 **Merged pull requests:**
 
+- add smartctl to ndsudo [\#17515](https://github.com/netdata/netdata/pull/17515) ([ilyam8](https://github.com/ilyam8))
+- Fix handling of kernel version detection in CMake. [\#17514](https://github.com/netdata/netdata/pull/17514) ([Ferroin](https://github.com/Ferroin))
+- Work around MS’s broken infra in CI. [\#17513](https://github.com/netdata/netdata/pull/17513) ([Ferroin](https://github.com/Ferroin))
+- go.d traefik fix "got a SET but dimension does not exist" [\#17511](https://github.com/netdata/netdata/pull/17511) ([ilyam8](https://github.com/ilyam8))
+- Documentation edits [\#17509](https://github.com/netdata/netdata/pull/17509) ([Ancairon](https://github.com/Ancairon))
+- Report correct error code when data insert fails [\#17508](https://github.com/netdata/netdata/pull/17508) ([stelfrag](https://github.com/stelfrag))
 - Sso improvements [\#17506](https://github.com/netdata/netdata/pull/17506) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Regenerate integrations.js [\#17505](https://github.com/netdata/netdata/pull/17505) ([netdatabot](https://github.com/netdatabot))
+- Additional SQL code cleanup [\#17503](https://github.com/netdata/netdata/pull/17503) ([stelfrag](https://github.com/stelfrag))
 - remove python.d/fail2ban [\#17502](https://github.com/netdata/netdata/pull/17502) ([ilyam8](https://github.com/ilyam8))
 - add go.d fail2ban [\#17501](https://github.com/netdata/netdata/pull/17501) ([ilyam8](https://github.com/ilyam8))
 - better redirect [\#17500](https://github.com/netdata/netdata/pull/17500) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -21,6 +28,7 @@
 - move netdata charts documentation to proper folder [\#17488](https://github.com/netdata/netdata/pull/17488) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#17487](https://github.com/netdata/netdata/pull/17487) ([netdatabot](https://github.com/netdatabot))
 - move netdata charts documentation to proper folder [\#17486](https://github.com/netdata/netdata/pull/17486) ([Ancairon](https://github.com/Ancairon))
+- Move libbpf and eBPF CO-RE bundling into CMake. [\#17484](https://github.com/netdata/netdata/pull/17484) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17483](https://github.com/netdata/netdata/pull/17483) ([netdatabot](https://github.com/netdatabot))
 - Fix labels name-only matching [\#17482](https://github.com/netdata/netdata/pull/17482) ([stelfrag](https://github.com/stelfrag))
 - go.d nvidia\_smi: use XML format by default [\#17481](https://github.com/netdata/netdata/pull/17481) ([ilyam8](https://github.com/ilyam8))
@@ -54,6 +62,7 @@
 - Add documentation for VictorOps cloud notifications [\#17445](https://github.com/netdata/netdata/pull/17445) ([juacker](https://github.com/juacker))
 - Reconnect to the cloud when resuming from suspension [\#17444](https://github.com/netdata/netdata/pull/17444) ([stelfrag](https://github.com/stelfrag))
 - timex is not supported on windows. [\#17443](https://github.com/netdata/netdata/pull/17443) ([vkalintiris](https://github.com/vkalintiris))
+- Clean up CMake build options. [\#17442](https://github.com/netdata/netdata/pull/17442) ([Ferroin](https://github.com/Ferroin))
 - Fix maintainer documentation to reflect the new build system. [\#17441](https://github.com/netdata/netdata/pull/17441) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17439](https://github.com/netdata/netdata/pull/17439) ([netdatabot](https://github.com/netdatabot))
 - go.d mega/adaptec meta add alerts [\#17438](https://github.com/netdata/netdata/pull/17438) ([ilyam8](https://github.com/ilyam8))
@@ -412,13 +421,6 @@
 - Remove duplicate check [\#16936](https://github.com/netdata/netdata/pull/16936) ([stelfrag](https://github.com/stelfrag))
 - Drop ESLint CI jobs and config. [\#16935](https://github.com/netdata/netdata/pull/16935) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#16934](https://github.com/netdata/netdata/pull/16934) ([netdatabot](https://github.com/netdatabot))
-- Move daemon/ under src/ [\#16933](https://github.com/netdata/netdata/pull/16933) ([vkalintiris](https://github.com/vkalintiris))
-- Exporting moved, so changes needed for integrations, + CODEOWNERS change [\#16932](https://github.com/netdata/netdata/pull/16932) ([Ancairon](https://github.com/Ancairon))
-- Make sure the duration is not negative [\#16931](https://github.com/netdata/netdata/pull/16931) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations.js [\#16930](https://github.com/netdata/netdata/pull/16930) ([netdatabot](https://github.com/netdatabot))
-- Protect analytics set data [\#16929](https://github.com/netdata/netdata/pull/16929) ([stelfrag](https://github.com/stelfrag))
-- Minor rework on document optimize performance guide [\#16925](https://github.com/netdata/netdata/pull/16925) ([tkatsoulas](https://github.com/tkatsoulas))
-- fix installation of `libfluent-bit.so` [\#16924](https://github.com/netdata/netdata/pull/16924) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 

@@ -1,13 +1,14 @@
-# View active alerts
+# Alerts tab
 
 Netdata comes with hundreds of pre-configured health alerts designed to notify you when an anomaly or performance issue affects your node or its applications.
 
-From the Alerts tab you can see all the active alerts in your War Room. You will be presented with a table having information about each alert that is in warning and critical state.
-You can always sort the table by a certain column by clicking on the name of that column, and use the gear icon on the top right to control which columns are visible at any given time.
+## Active tab
 
-![image](https://user-images.githubusercontent.com/70198089/226340574-7e138dc7-5eab-4c47-a4a9-5f2640e38643.png)
+From the Active tab you can see all the active alerts in your War Room. You will be presented with a table having information about each alert that is in warning or critical state.
 
-## Filter alerts
+You can always sort the table by a certain column by clicking on the name of that column, and using the gear icon on the top right to control which columns are visible at any given time.
+
+### Filter alerts
 
 From this tab, you can also filter alerts with the right hand bar. More specifically you can filter:
 
@@ -19,52 +20,48 @@ From this tab, you can also filter alerts with the right hand bar. More specific
   - Filter based on the alert's type (e.g. System, Web Server) and component (e.g. CPU, Disk, Load)
 - Alert role
   - Filter by the role that the alert is set to notify (e.g. Sysadmin, Webmaster etc.)
+- Host labels
+  - Filter based on the host labels that are configured for the nodes across the War Room (e.g. `_cloud_instance_region` to match `us-east-1`)
+- Node status
+  -  Filter by node availability status (e.g. Live or Offline)
+- Netdata version
+  -  Filter by Netdata version (e.g. `v1.45.3`)
 - Nodes
-  - Filter the alerts based on the nodes that are online, next to each node's name you can see how many alerts the node has, "critical" colored in red and "warning" colored in yellow
+  - Filter the alerts based on the nodes of your War Room.
 
-## View alert details
+### View alert details
 
 By clicking on the name of an entry of the table you can access that alert's details page, providing you with:
 
 - Latest and Triggered time values
 - The alert's description
-- A link to the Community forum's alert page
+- A link to the Netdata Advisor's page about this alert 
 - The chart at the time frame that the alert was triggered
-- The alert's information: Node name, chart ID, type, component and class
+- The alert's information: Node name, chart instance, type, component and class
 - Configuration section
 - Instance values - Node Instances
 
-![image](https://user-images.githubusercontent.com/70198089/226339928-bae60140-0293-42cf-9713-ac4901708aba.png)
+At the bottom of the panel you can click the green button "View alert page" to open a [dynamic tab](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md#dynamic-tabs) containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
 
-At the bottom of the panel you can click the green button "View dedicated alert page" to open a [dynamic tab](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md#dynamic-tabs) containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
+### Silence an alert
 
-![image](https://user-images.githubusercontent.com/70198089/226339794-61896c35-0b93-4ac9-92aa-07116fe63784.png)
+From this tab, the "Silencing" column shows if there is any rule present for each alert, and from the "Actions" column you can create a new [silencing rule](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#silencing-alert-notifications) for this alert, or get help and information about this alert from the [Netdata Assistant](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-assistant.md).
 
-<!-- 
-## Local Netdata Agent dashboard
+## Alert Configurations tab
 
-Find the alerts icon ![Alerts
-icon](https://raw.githubusercontent.com/netdata/netdata-ui/98e31799c1ec0983f433537ff16d2ac2b0d994aa/src/components/icon/assets/alarm.svg)
-in the top navigation to bring up a modal that shows currently raised alerts, all running alerts, and the alerts log.
-Here is an example of a raised `system.cpu` alert, followed by the full list and alert log:
+From this tab you can view all the configurations for all running alerts in your War Room. Each row concerns one alert, and it provides information about it in the rest of the table columns.
 
-![Animated GIF of looking at raised alerts and the alert
-log](https://user-images.githubusercontent.com/1153921/80842482-8c289500-8bb6-11ea-9791-600cfdbe82ce.gif)
+By running alerts we mean alerts that are related to some metric that is or was collected. Netdata may have more alerts pre-configured that aren't applicable to your monitoring use-cases.
 
-And a static screenshot of the raised CPU alert: 
 
-![Screenshot of a raised system CPU
-alert](https://user-images.githubusercontent.com/1153921/80842330-2dfbb200-8bb6-11ea-8147-3cd366eb0f37.png)
+You can control which columns are visible by using the gear icon on the right-hand side.
 
-The alert itself is named **system - cpu**, and its context is `system.cpu`. Beneath that is an auto-updating badge that
-shows the latest value of the chart that triggered the alert.
+Similarly to the previous tab, you can see the silencing status of an alert, while also being able to dig deeper and show the configuration for the alert and ask the [Netdata Assistant](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-assistant.md) for help.
 
-With the three icons beneath that and the **role** designation, you can:
+### See the configuration for an alert
 
-1.  Scroll to the chart associated with this raised alert.
-2.  Copy a link to the badge to your clipboard.
-3.  Copy the code to embed the badge onto another web page using an `<embed>` element.
+From the actions column you can explore the alert's configuration, split by the different nodes that have this alert configured.
 
-The table on the right-hand side displays information about the health entity that triggered the alert, which you can
-use as a reference to [configure alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md).
- -->
+From there you can click on any of the rows to get to the individual alert configurations for that node.
+
+Click on an alert row to see the alert's page, with all the information about when it was last triggered and what it's configuration is.
