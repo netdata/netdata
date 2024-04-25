@@ -1,29 +1,20 @@
-<!--
-title: "Events feed"
-sidebar_label: "Events feed"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md"
-sidebar_position: "2800"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Concepts"
-learn_docs_purpose: "Present the Netdata Events feed."
--->
+# Events tab
 
-# Events feed
-
-Netdata Cloud provides the Events feed which is a powerful feature that tracks events that happen on your infrastructure, or in your Space. The feed lets you investigate events that occurred in the past, which is invaluable for troubleshooting. Common use cases are ones like when a node goes offline, and you want to understand what events happened before that. A detailed event history can also assist in attributing sudden pattern changes in a time series to specific changes in your environment.
+The Events tab provides a feed which is a powerful feature that tracks events that happen on your infrastructure, or in your War Room. The feed lets you investigate events that occurred in the past, which is invaluable for troubleshooting. Common use cases are ones like when a node goes offline, and you want to understand what events happened before that. A detailed event history can also assist in attributing sudden pattern changes in a time series to specific changes in your environment.
 
 ## What are the available events?
 
 At a high-level view, these are the domains from which the Events feed will provide visibility into.
 
-> ⚠️ Based on your space's plan, different allowances are defined to query past data.
+> **Note**
+>
+> Based on your space's plan, different allowances are defined to query past data.
 
-| **Domains of events** | **Community** | **Pro** | **Business** |
-| :-- | :-- | :-- | :-- |
-| **[Auditing events](#auditing-events)** - <br/>Events related to actions done on your Space, e.g. invite user, change user role or change plan.| 4 hours | 7 days | 90 days |
-| **[Topology events](#topology-events)**<br/>Node state transition events, e.g. live or offline.| 4 hours | 7 days | 14 days |
-| **[Alert events](#alert-events)**<br/>Alert state transition events, can be seen as an alert history log.| 4 hours | 7 days | 90 days |
+| **Domains of events** | **Community** | **Business** |
+| :-- | :-- | :-- |
+| **[Auditing events](#auditing-events)** - <br/>Events related to actions done on your Space, e.g. invite user, change user role or change plan.| 4 hours | 90 days |
+| **[Topology events](#topology-events)**<br/>Node state transition events, e.g. live or offline.| 4 hours | 14 days |
+| **[Alert events](#alert-events)**<br/>Alert state transition events, can be seen as an alert history log.| 4 hours | 90 days |
 
 ### Auditing events
 
@@ -69,15 +60,17 @@ At a high-level view, these are the domains from which the Events feed will prov
 
 ## Who can access the events?
 
-All users will be able to see events from the Topology and Alerts domain but Auditing events, once these are added, only be accessible to administrators. For more details checkout [Netdata Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md).
+All users will be able to see events from the Topology and Alerts domain but Auditing events, once these are added, will only be accessible to administrators. For more details check the [Netdata Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md).
 
 ## How to use the events feed
 
 1. Click on the **Events** tab (located near the top of your screen)
-1. You will be presented with a table listing the events that occurred from the timeframe defined on the date time picker
-1. You can use the filtering capabilities available on right-hand bar to slice through the results provided. See more details on event types and filters 
+1. You will be presented with a table listing the events that occurred from the timeframe defined on the [date time picker](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md#date-and-time-selector)
+1. You can use the filtering capabilities available on right-hand bar to slice through the results provided. See more details on [event types and filters](#event-types-and-filters)
 
-Note: When you try to query a longer period than what your space allows you will see an error message highlighting that you are querying data outside of your plan.
+> **Note**
+>
+> When you try to query a longer period than what your space allows you will see an error message highlighting that you are querying data outside of your plan.
 
 ### Event types and filters
 
