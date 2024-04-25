@@ -1627,9 +1627,7 @@ if (ENABLE_WOLFSSL)
         message(STATUS "Compiling Netdata with WolfSSL")
 
         target_include_directories(libnetdata BEFORE PUBLIC ${WOLFSSL_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${WOLFSSL_CFLAGS_OTHER}
-                               -DENABLE_WOLFSSL
-                               -DWOLFSSL_BASE64_ENCODE)
+        target_compile_options(libnetdata PUBLIC ${WOLFSSL_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${WOLFSSL_LDFLAGS})
 endif()
 
