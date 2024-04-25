@@ -607,6 +607,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # logs management belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
+%exclude %{_libdir}/%{name}/libfluent-bit.so
 %exclude %{_libdir}/%{name}/conf.d/logsmanagement.d.conf
 %exclude %{_libdir}/%{name}/conf.d/logsmanagement.d
 
@@ -969,6 +970,7 @@ fi
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/logsmanagement.d.conf
 %{_libdir}/%{name}/conf.d/logsmanagement.d
+%{_libdir}/%{name}/libfluent-bit.so
 %defattr(0750,root,netdata,0750)
 # CAP_DAC_READ_SEARCH and CAP_SYSLOG needed for data collection.
 %caps(cap_dac_read_search,cap_syslog=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/logs-management.plugin
