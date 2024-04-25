@@ -81,7 +81,7 @@ These tabs can be separated into "static", meaning they are by default presented
 
 - The [Alerts tab](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md) provides you with an overview for all the active alerts you receive for the nodes in this War Room, you can also see all the alerts that are configured to be triggered in any given moment.
 
-- The [Anomalies tab](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md) is dedicated to the Anomaly Advisor tool.
+- The [Anomalies tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md) is dedicated to the Anomaly Advisor tool.
 
 - The [Functions tab](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) gives you the ability to visualize functions that the Netdata Agent collectors are able to expose.
 
@@ -187,7 +187,7 @@ collect from across your infrastructure with Netdata.
   <Box
     title="Troubleshooting with Netdata Cloud">
     <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)" title="Metric Correlations" />
-    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md)" title="Anomaly Advisor" />
+    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md)" title="Anomaly Advisor" />
     <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)" title="Events Feed" />
   </Box>
   <Box
@@ -215,7 +215,7 @@ collect from across your infrastructure with Netdata.
   - [Alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 - Troubleshooting with Netdata Cloud
   - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
-  - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md)
+  - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md)
   - [Events Feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 - Management and settings
   - [Sign in with email, Google, or GitHub](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md)

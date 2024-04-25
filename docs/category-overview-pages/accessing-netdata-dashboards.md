@@ -17,7 +17,7 @@ The Netdata dashboard consists of the following main sections:
 * [Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
 * [Custom dashboards](https://learn.netdata.cloud/docs/visualizations/custom-dashboards)
 * [Alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md)
-* [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md)
+* [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md)
 * [Functions](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md)
 * [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 
