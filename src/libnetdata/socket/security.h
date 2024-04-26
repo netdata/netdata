@@ -14,35 +14,7 @@ typedef enum __attribute__((packed)) {
 
 # ifdef ENABLE_HTTPS
 
-#if defined(ENABLE_WOLFSSL)
-#include <wolfssl/options.h>
-#include <wolfssl/version.h>
-#include <wolfssl/ssl.h>
-#include <wolfssl/error-ssl.h>
-
-#include <wolfssl/openssl/ssl.h>
-#include <wolfssl/openssl/sha.h>
-#include <wolfssl/openssl/evp.h>
-#elif defined(ENABLE_OPENSSL)
-#define OPENSSL_VERSION_095 0x00905100L
-#define OPENSSL_VERSION_097 0x0907000L
-#define OPENSSL_VERSION_110 0x10100000L
-#define OPENSSL_VERSION_111 0x10101000L
-#define OPENSSL_VERSION_300 0x30000000L
-
-#  include <openssl/ssl.h>
-#  include <openssl/err.h>
-#  include <openssl/evp.h>
-#  include <openssl/pem.h>
-#  if (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
-#   include <openssl/conf.h>
-#  endif
-
-#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
-#include <openssl/core_names.h>
-#include <openssl/decoder.h>
-#endif
-#endif // ENABLE_OPENSSL
+#include "../ssl/ssl.h"
 
 typedef struct netdata_ssl {
     SSL *conn;               // SSL connection
