@@ -973,7 +973,7 @@ detect_existing_install() {
     _ndpath="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
 
     if [ -n "${_ndpath}" ]; then
-      _ndpath="$(canonical_path "$(ndpath)")"
+      _ndpath="$(canonical_path "${_ndpath}")"
     fi
 
     if [ -z "${ndpath}" ] && [ -n "${_ndpath}" ]; then
