@@ -33,9 +33,6 @@ chown -R root:root /usr/src/netdata
 
 cd /usr/src/netdata/packaging/makeself || exit 1
 
-git clean -dxf
-git submodule foreach --recursive git clean -dxf
-
 cat >&2 << EOF
 This program will create a self-extracting shell package containing
 a statically linked netdata, able to run on any 64bit Linux system,
