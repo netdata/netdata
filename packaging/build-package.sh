@@ -56,7 +56,7 @@ add_cmake_option BUILD_FOR_PACKAGING On
 case "${PKG_TYPE}" in
     DEB)
         case "$(dpkg-architecture -q DEB_TARGET_ARCH)" in
-            x86_64)
+            amd64)
                 add_cmake_option ENABLE_PLUGIN_XENSTAT On
                 add_cmake_option ENABLE_PLUGIN_EBPF On
                 ;;

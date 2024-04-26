@@ -65,20 +65,38 @@ netdata-plugin-network-viewer (= ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
 
-set(CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS
-		"netdata-plugin-apps (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-pythond (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-go (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-debugfs (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-nfacct (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-chartsd (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-slabinfo (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-perf (= ${CPACK_PACKAGE_VERSION})")
+list(APPEND _main_deps "netdata-plugin-chartsd (= ${CPACK_PACKAGE_VERSION})")
+list(APPEND _main_deps "netdata-plugin-pythond (= ${CPACK_PACKAGE_VERSION})")
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
-		set(CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS
-        "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION}), ${CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS}")
+if(ENABLE_PLUGIN_APPS)
+        list(APPEND _main_deps "netdata-plguin-apps (= ${CPACK_PACKAGE_VERSION})")
 endif()
+
+if(ENABLE_PLUGIN_GO)
+        list(APPEND _main_deps "netdata-plugin-go (= ${CPACK_PACKAGE_VERSION})")
+endif()
+
+if(ENABLE_PLUGIN_DEBUGFS)
+        list(APPEND _main_deps "netdata-plugin-debugfs (= ${CPACK_PACKAGE_VERSION})")
+endif()
+
+if(ENABLE_PLUGIN_NFACCT)
+        list(APPEND _main_deps "netdata-plugin-nfacct (= ${CPACK_PACKAGE_VERSION})")
+endif()
+
+if(ENABLE_PLUGIN_SLABINFO)
+        list(APPEND _main_deps "netdata-plugin-slabinfo (= ${CPACK_PACKAGE_VERSION})")
+endif()
+
+if(ENABLE_PLUGIN_PERF)
+        list(APPEND _main_deps "netdata-plugin-perf (= ${CPACK_PACKAGE_VERSION})")
+endif()
+
+if(ENABLE_PLUGIN_EBPF)
+        list(APPEND _main_deps "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
+endif()
+
+list(JOIN "${_main_deps}" ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
 
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/conffiles;"
@@ -92,13 +110,13 @@ set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE On)
 # apps.plugin
 #
 
+set(CPACK_COMPONENT_PLUGIN-APPS_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-APPS_DESCRIPTION
 		"The per-application metrics collector plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect per-application and
  per-user metrics without using cgroups.")
 
 set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_NAME "netdata-plugin-apps")
-set(CPACK_COMPONENT_PLUGIN-APPS_DEPENDS "netdata")
 set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
@@ -124,7 +142,7 @@ set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_NAME "netdata-plugin-chartsd")
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_PREDEPENDS "adduser")
-set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_DEPENDS "bash")
+set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_RECOMMENDS "bash")
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_ARCHITECTURE "all")
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_SUGGESTS "apcupsd, iw, sudo")
 
@@ -145,7 +163,7 @@ set(CPACK_COMPONENT_PLUGIN-CUPS_DESCRIPTION
 
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_NAME "netdata-plugin-cups")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_SECTION "net")
-# set(CPACK_DEBIAN_CUPS_PLUGIN_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_DEPENDS "cups")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_PREDEPENDS "adduser")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_CONTROL_EXTRA
@@ -367,8 +385,8 @@ set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_NAME "netdata-plugin-pythond")
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_PREDEPENDS "adduser")
-set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_RECOMMENDS "python3")
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_SUGGESTS "sudo")
+set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACHAGE_RECOMMENDS "python3")
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_ARCHITECTURE "all")
 
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_CONTROL_EXTRA
