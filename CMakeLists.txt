@@ -192,8 +192,7 @@ option(DEFAULT_FEATURE_STATE "Specify the default state for most optional featur
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # High-level features
-option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_CLOUD "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
@@ -248,7 +247,7 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
-if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
+if(ENABLE_CLOUD OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         set(NEED_PROTOBUF True)
 else()
         set(NEED_PROTOBUF False)
@@ -296,6 +295,8 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_bundle_libbpf()
         netdata_fetch_ebpf_co_re()
 endif()
+
+set(ENABLE_ACLK ${ENABLE_CLOUD})
 
 #
 # Libm
@@ -1746,7 +1747,7 @@ endif()
 #
 # mqtt library
 #
-if (ENABLE_H2O OR ENABLE_ACLK)
+if (ENABLE_H2O OR ENABLE_CLOUD)
         set(ENABLE_MQTTWEBSOCKETS True)
 endif()
 
@@ -1770,7 +1771,7 @@ if(ENABLE_MQTTWEBSOCKETS)
 
 endif()
 
-if(ENABLE_ACLK)
+if(ENABLE_CLOUD)
         #
         # proto definitions
         #
@@ -2276,7 +2277,7 @@ endif()
 
 add_executable(netdata
         ${NETDATA_FILES}
-        "$<$<BOOL:${ENABLE_ACLK}>:${ACLK_FILES}>"
+        "$<$<BOOL:${ENABLE_CLOUD}>:${ACLK_FILES}>"
         "$<$<BOOL:${ENABLE_H2O}>:${H2O_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGODB_EXPORTING_FILES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES}>"
@@ -2292,7 +2293,7 @@ target_compile_options(netdata PRIVATE
 )
 
 target_include_directories(netdata PRIVATE
-        "$<$<BOOL:${ENABLE_ACLK}>:${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas>"
+        "$<$<BOOL:${ENABLE_CLOUD}>:${CMAKE_SOURCE_DIR}/src/aclk/aclk-schemas>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_INCLUDE_DIRS}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_INCLUDE_DIRS}>"
 )
@@ -2466,12 +2467,6 @@ set(netdata_user_POST "${NETDATA_USER}")
 
 # netdata-claim.sh
 if(ENABLE_CLOUD)
-        set(enable_cloud_POST "yes")
-else()
-        set(enable_cloud_POST "no")
-endif()
-
-if(ENABLE_ACLK)
         set(enable_aclk_POST "yes")
 else()
         set(enable_aclk_POST "no")
