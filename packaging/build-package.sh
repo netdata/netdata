@@ -55,14 +55,19 @@ add_cmake_option BUILD_FOR_PACKAGING On
 
 case "${PKG_TYPE}" in
     DEB)
-        if [ "$(uname -m)" = "x86_64" ]; then
-            add_cmake_option ENABLE_PLUGIN_EBPF On
-        else
-            add_cmake_option ENABLE_PLUGIN_EBPF Off
-        fi
-        case "$(uname -m)" in
-            x86_64|arm64) add_cmake_option ENABLE_PLUGIN_XENSTAT On ;;
-            *) add_cmake_option ENABLE_PLUGIN_XENSTAT Off
+        case "$(dpkg-architecture -q DEB_TARGET_ARCH)" in
+            x86_64)
+                add_cmake_option ENABLE_PLUGIN_XENSTAT On
+                add_cmake_option ENABLE_PLUGIN_EBPF On
+                ;;
+            arm64)
+                add_cmake_option ENABLE_PLUGIN_XENSTAT On
+                add_cmake_option ENABLE_PLUGIN_EBPF Off
+                ;;
+            *)
+                add_cmake_option ENABLE_PLUGIN_XENSTAT Off
+                add_cmake_option ENABLE_PLUGIN_EBPF Off
+                ;;
         esac
         ;;
     RPM) ;;
