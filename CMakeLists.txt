@@ -570,7 +570,7 @@ if(NOT OPENSSL_FOUND)
 endif()
 
 if(NOT MACOS)
-        pkg_check_modules(CRYPTO libcrypto)
+        pkg_check_modules(CRYPTO IMPORTED_TARGET libcrypto)
 endif()
 
 #
