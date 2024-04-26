@@ -1,6 +1,6 @@
 # Anomaly Advisor tab
 
-The Anomaly Advisor tab lets you quickly surface potentially anomalous metrics and charts related to a particular highlighted window of interest.
+The Anomaly Advisor tab lets you focus on potentially anomalous metrics and charts related to a particular highlighted window of interest. In addition to this tab, each chart in the [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) also has an [Anomaly Rate ribbon](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#anomaly-rate-ribbon). 
 
 
 More details about configuration can be found in the [ML documentation](https://github.com/netdata/netdata/blob/master/src/ml/README.md#configuration).
