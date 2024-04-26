@@ -2,7 +2,6 @@
 
 The Anomaly Advisor tab lets you quickly surface potentially anomalous metrics and charts related to a particular highlighted window of interest.
 
-To enable the Anomaly Advisor you must first ensure that ML is enabled on your nodes.
 
 More details about configuration can be found in the [ML documentation](https://github.com/netdata/netdata/blob/master/src/ml/README.md#configuration).
 
