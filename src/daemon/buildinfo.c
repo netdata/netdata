@@ -69,7 +69,7 @@ typedef enum __attribute__((packed)) {
     BIB_LIB_ZLIB,
     BIB_LIB_BROTLI,
     BIB_LIB_PROTOBUF,
-    BIB_LIB_OPENSSL,
+    BIB_LIB_SSL,
     BIB_LIB_LIBDATACHANNEL,
     BIB_LIB_JSONC,
     BIB_LIB_LIBCAP,
@@ -112,7 +112,6 @@ typedef enum __attribute__((packed)) {
     BIB_EXPORT_SHELL,
     BIB_DEVEL_TRACE_ALLOCATIONS,
     BIB_DEVELOPER_MODE,
-    BIB_LIB_WOLFSSL,
 
     // leave this last
     BIB_TERMINATOR,
@@ -651,12 +650,17 @@ static struct {
                 .json = "protobuf",
                 .value = NULL,
         },
-        [BIB_LIB_OPENSSL] = {
+        [BIB_LIB_SSL] = {
                 .category = BIC_LIBS,
                 .type = BIT_BOOLEAN,
                 .analytics = NULL,
+#if defined(ENABLE_OPENSSL)
                 .print = "OpenSSL (cryptography)",
                 .json = "openssl",
+#elif defined(ENABLE_WOLFSSL)
+                .print = "WolfSSL (cryptography)",
+                .json = "wolfssl",
+#endif
                 .value = NULL,
         },
         [BIB_LIB_LIBDATACHANNEL] = {
@@ -995,14 +999,6 @@ static struct {
                 .json = "dev-mode",
                 .value = NULL,
         },
-        [BIB_LIB_WOLFSSL] = {
-               .category = BIC_LIBS,
-               .type = BIT_BOOLEAN,
-               .analytics = NULL,
-               .print = "WolfSSL (cryptography)",
-               .json = "wolfssl",
-               .value = NULL,
-        },
 
         // leave this last
         [BIB_TERMINATOR] = {
@@ -1161,11 +1157,8 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_LIBDATACHANNEL
     build_info_set_status(BIB_LIB_LIBDATACHANNEL, true);
 #endif
-#ifdef ENABLE_OPENSSL
-    build_info_set_status(BIB_LIB_OPENSSL, true);
-#endif
-#ifdef ENABLE_WOLFSSL
-    build_info_set_status(BIB_LIB_WOLFSSL, true);
+#if defined(ENABLE_OPENSSL) || defined(ENABLE_WOLFSSL)
+    build_info_set_status(BIB_LIB_SSL, true);
 #endif
 #ifdef ENABLE_JSONC
     build_info_set_status(BIB_LIB_JSONC, true);
