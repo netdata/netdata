@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- Revert changes to ENABLE\_CLOUD option. [\#17528](https://github.com/netdata/netdata/pull/17528) ([Ferroin](https://github.com/Ferroin))
+- fix \_ndpath in detect\_existing\_install\(\) [\#17527](https://github.com/netdata/netdata/pull/17527) ([ilyam8](https://github.com/ilyam8))
 - go.d prometheus fix units for snmp\_exporter [\#17524](https://github.com/netdata/netdata/pull/17524) ([ilyam8](https://github.com/ilyam8))
 - update the file [\#17522](https://github.com/netdata/netdata/pull/17522) ([Ancairon](https://github.com/Ancairon))
 - Bump github.com/docker/docker from 26.0.2+incompatible to 26.1.0+incompatible in /src/go/collectors/go.d.plugin [\#17520](https://github.com/netdata/netdata/pull/17520) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Anomaly Advisor documentation edits [\#17518](https://github.com/netdata/netdata/pull/17518) ([Ancairon](https://github.com/Ancairon))
 - add smartctl to ndsudo [\#17515](https://github.com/netdata/netdata/pull/17515) ([ilyam8](https://github.com/ilyam8))
 - Fix handling of kernel version detection in CMake. [\#17514](https://github.com/netdata/netdata/pull/17514) ([Ferroin](https://github.com/Ferroin))
 - Work around MS’s broken infra in CI. [\#17513](https://github.com/netdata/netdata/pull/17513) ([Ferroin](https://github.com/Ferroin))
@@ -417,10 +420,6 @@
 - Split network viewer plugin to it’s own package. [\#16949](https://github.com/netdata/netdata/pull/16949) ([Ferroin](https://github.com/Ferroin))
 - update bundled UI to v6.85.0 [\#16948](https://github.com/netdata/netdata/pull/16948) ([ilyam8](https://github.com/ilyam8))
 - Update codeowners and cleanup .gitignore [\#16946](https://github.com/netdata/netdata/pull/16946) ([vkalintiris](https://github.com/vkalintiris))
-- Remove cleanup\_destroyed\_dictionaries call during shutdown [\#16944](https://github.com/netdata/netdata/pull/16944) ([stelfrag](https://github.com/stelfrag))
-- respect NETDATA\_LOG\_LEVEL if set [\#16943](https://github.com/netdata/netdata/pull/16943) ([ilyam8](https://github.com/ilyam8))
-- enable network-viewer aggregated views [\#16940](https://github.com/netdata/netdata/pull/16940) ([ktsaou](https://github.com/ktsaou))
-- fix charts.d.plugin configuration directory names [\#16939](https://github.com/netdata/netdata/pull/16939) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
