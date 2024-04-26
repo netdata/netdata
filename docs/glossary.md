@@ -23,7 +23,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Alarm Entity Type**](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#health-entity-reference): Entity types that are attached to specific charts and use the `alarm` label.
 
-- [**Anomaly Advisor**](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md): A Netdata feature that lets you quickly surface potentially anomalous metrics and charts related to a particular highlight window of interest.
+- [**Anomaly Advisor**](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md): A Netdata feature that lets you focus on potentially anomalous metrics and charts related to a particular highlight window of interest.
 
 ## B
 
