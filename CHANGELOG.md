@@ -6,9 +6,13 @@
 
 **Merged pull requests:**
 
+- go.d prometheus fix units for snmp\_exporter [\#17524](https://github.com/netdata/netdata/pull/17524) ([ilyam8](https://github.com/ilyam8))
+- update the file [\#17522](https://github.com/netdata/netdata/pull/17522) ([Ancairon](https://github.com/Ancairon))
+- Bump github.com/docker/docker from 26.0.2+incompatible to 26.1.0+incompatible in /src/go/collectors/go.d.plugin [\#17520](https://github.com/netdata/netdata/pull/17520) ([dependabot[bot]](https://github.com/apps/dependabot))
 - add smartctl to ndsudo [\#17515](https://github.com/netdata/netdata/pull/17515) ([ilyam8](https://github.com/ilyam8))
 - Fix handling of kernel version detection in CMake. [\#17514](https://github.com/netdata/netdata/pull/17514) ([Ferroin](https://github.com/Ferroin))
 - Work around MS’s broken infra in CI. [\#17513](https://github.com/netdata/netdata/pull/17513) ([Ferroin](https://github.com/Ferroin))
+- Move handling of legacy eBPF programs into CMake. [\#17512](https://github.com/netdata/netdata/pull/17512) ([Ferroin](https://github.com/Ferroin))
 - go.d traefik fix "got a SET but dimension does not exist" [\#17511](https://github.com/netdata/netdata/pull/17511) ([ilyam8](https://github.com/ilyam8))
 - Documentation edits [\#17509](https://github.com/netdata/netdata/pull/17509) ([Ancairon](https://github.com/Ancairon))
 - Report correct error code when data insert fails [\#17508](https://github.com/netdata/netdata/pull/17508) ([stelfrag](https://github.com/stelfrag))
@@ -19,6 +23,7 @@
 - add go.d fail2ban [\#17501](https://github.com/netdata/netdata/pull/17501) ([ilyam8](https://github.com/ilyam8))
 - better redirect [\#17500](https://github.com/netdata/netdata/pull/17500) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - add fail2ban-client to ndsudo [\#17499](https://github.com/netdata/netdata/pull/17499) ([ilyam8](https://github.com/ilyam8))
+- Update CMake to request new behavior for all policies through v3.28.0. [\#17496](https://github.com/netdata/netdata/pull/17496) ([Ferroin](https://github.com/Ferroin))
 - Fix usage of sha256sum in static builds. [\#17495](https://github.com/netdata/netdata/pull/17495) ([Ferroin](https://github.com/Ferroin))
 - add generic sso authenciation page and SP-initiated SSO on Okta [\#17494](https://github.com/netdata/netdata/pull/17494) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Public NC Spaces access fix [\#17492](https://github.com/netdata/netdata/pull/17492) ([ktsaou](https://github.com/ktsaou))
@@ -416,11 +421,6 @@
 - respect NETDATA\_LOG\_LEVEL if set [\#16943](https://github.com/netdata/netdata/pull/16943) ([ilyam8](https://github.com/ilyam8))
 - enable network-viewer aggregated views [\#16940](https://github.com/netdata/netdata/pull/16940) ([ktsaou](https://github.com/ktsaou))
 - fix charts.d.plugin configuration directory names [\#16939](https://github.com/netdata/netdata/pull/16939) ([ilyam8](https://github.com/ilyam8))
-- Assorted cleanup of CI/packaging related code. [\#16938](https://github.com/netdata/netdata/pull/16938) ([Ferroin](https://github.com/Ferroin))
-- Check for agent already running [\#16937](https://github.com/netdata/netdata/pull/16937) ([stelfrag](https://github.com/stelfrag))
-- Remove duplicate check [\#16936](https://github.com/netdata/netdata/pull/16936) ([stelfrag](https://github.com/stelfrag))
-- Drop ESLint CI jobs and config. [\#16935](https://github.com/netdata/netdata/pull/16935) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations.js [\#16934](https://github.com/netdata/netdata/pull/16934) ([netdatabot](https://github.com/netdatabot))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
