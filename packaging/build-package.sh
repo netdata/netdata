@@ -51,6 +51,8 @@ add_cmake_option ENABLE_BUNDLED_PROTOBUF Off
 add_cmake_option ENABLE_BUNDLED_JSONC Off
 add_cmake_option ENABLE_BUNDLED_YAML Off
 
+add_cmake_option BUILD_FOR_PACKAGING On
+
 case "${PKG_TYPE}" in
     DEB)
         if [ "$(uname -m)" = "x86_64" ]; then

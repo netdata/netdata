@@ -137,9 +137,6 @@ option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 
-option(BUILD_FOR_PACKAGING "Include component files for deb packages" False)
-mark_as_advanced(BUILD_FOR_PACKAGING)
-
 # Optional test code
 cmake_dependent_option(ENABLE_LOGS_MANAGEMENT_TESTS "Enable test code for logs-management plugin." True "NOT ENABLE_PLUGIN_LOGS_MANAGEMENT" False)
 mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
@@ -153,6 +150,9 @@ mark_as_advanced(ENABLE_H2O)
 # Other optional functionality
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
 mark_as_advanced(ENABLE_SENTRY)
+
+option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
+mark_as_advanced(BUILD_FOR_PACKAGING)
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_LIBBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
