@@ -3,47 +3,19 @@
 # Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-macro(netdata_protobuf_21_tags)
-        set(PROTOBUF_TAG f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c) # v21.12
-        set(NEED_ABSL False)
-endmacro()
-
-macro(netdata_protobuf_25_tags)
-        set(PROTOBUF_TAG 4a2aef570deb2bfb8927426558701e8bfc26f2a4) # v25.3
-        set(NEED_ABSL True)
-        set(ABSL_TAG 2f9e432cce407ce0ae50676696666f33a77d42ac) # 20240116.1
-endmacro()
-
-# Determine what version of protobuf and abseil to bundle.
-#
-# This is unfortunately very complicated because we support systems
-# older than what Google officially supports for C++.
-macro(netdata_set_bundled_protobuf_tags)
-        netdata_protobuf_21_tags()
-
-        if(NOT USE_CXX_11)
-                if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
-                        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7.3.1)
-                                netdata_protobuf_25_tags()
-                        endif()
-                elseif(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
-                        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 7.0.0)
-                                netdata_protobuf_25_tags()
-                        endif()
-                elseif(CMAKE_CXX_COMPILER_ID STREQUAL AppleClang)
-                        if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
-                                netdata_protobuf_25_tags()
-                        endif()
-                endif()
-        endif()
-endmacro()
-
 # Prepare a vendored copy of Protobuf for use with Netdata.
 function(netdata_bundle_protobuf)
         include(FetchContent)
         include(NetdataFetchContentExtra)
 
-        netdata_set_bundled_protobuf_tags()
+        set(PROTOBUF_TAG f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c) # v21.12
+        set(NEED_ABSL False)
+
+        if(CMAKE_CXX_STANDARD GREATER_EQUAL 14)
+                set(PROTOBUF_TAG 4a2aef570deb2bfb8927426558701e8bfc26f2a4) # v25.3
+                set(NEED_ABSL True)
+                set(ABSL_TAG 2f9e432cce407ce0ae50676696666f33a77d42ac) # 20240116.1
+        endif()
 
         set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
 
@@ -115,27 +87,7 @@ macro(netdata_detect_protobuf)
 
         if(TARGET protobuf::libprotobuf)
                 if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
-                        get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                IMPORTED_LOCATION_RELEASE)
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_RELWITHDEBINFO)
-                        endif()
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_MINSIZEREL)
-                        endif()
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_DEBUG)
-                        endif()
-                        if(NOT EXISTS "${Protobuf_PROTOC_EXECUTABLE}")
-                                get_target_property(Protobuf_PROTOC_EXECUTABLE protobuf::protoc
-                                        IMPORTED_LOCATION_NOCONFIG)
-                        endif()
-                        if(NOT Protobuf_PROTOC_EXECUTABLE)
-                                set(Protobuf_PROTOC_EXECUTABLE protobuf::protoc)
-                        endif()
+                        set(Protobuf_PROTOC_EXECUTABLE protobuf::protoc)
                 endif()
 
                 # It is technically possible that this may still not
@@ -146,27 +98,8 @@ macro(netdata_detect_protobuf)
                         message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
                 endif()
 
-                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
-                set(NETDATA_PROTOBUF_LIBS protobuf::libprotobuf)
-                get_target_property(NETDATA_PROTOBUF_CFLAGS_OTHER
-                                    protobuf::libprotobuf
-                                    INTERFACE_COMPILE_DEFINITIONS)
-                get_target_property(NETDATA_PROTOBUF_INCLUDE_DIRS
-                                    protobuf::libprotobuf
-                                    INTERFACE_INCLUDE_DIRECTORIES)
-
-                if(NETDATA_PROTOBUF_CFLAGS_OTHER STREQUAL NETDATA_PROTOBUF_CFLAGS_OTHER-NOTFOUND)
-                        set(NETDATA_PROTOBUF_CFLAGS_OTHER "")
-                endif()
-
-                if(NETDATA_PROTOBUF_INCLUDE_DIRS STREQUAL NETDATA_PROTOBUF_INCLUDE_DIRS-NOTFOUND)
-                        set(NETDATA_PROTOBUF_INCLUDE_DIRS "")
-                endif()
-        else()
-                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${PROTOBUF_PROTOC_EXECUTABLE})
-                set(NETDATA_PROTOBUF_CFLAGS_OTHER ${PROTOBUF_CFLAGS_OTHER})
-                set(NETDATA_PROTOBUF_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
-                set(NETDATA_PROTOBUF_LIBS ${PROTOBUF_LIBRARIES})
+                set(PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
+                set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
         endif()
 
         set(ENABLE_PROTOBUF True)
@@ -203,9 +136,9 @@ function(netdata_protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
                 endif()
 
                 add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
-                                   COMMAND ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
+                                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
                                    ARGS "-I$<JOIN:${_PROTOC_INCLUDE_DIRS},;-I>" --cpp_out=${OUT_DIR} ${ABS_FIL}
-                                   DEPENDS ${ABS_FIL} ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
+                                   DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
                                    COMMENT "Running C++ protocol buffer compiler on ${FIL}"
                                    COMMAND_EXPAND_LISTS)
         endforeach()
@@ -219,7 +152,7 @@ endfunction()
 
 # Add protobuf to a specified target.
 function(netdata_add_protobuf _target)
-        target_compile_definitions(${_target} PRIVATE ${NETDATA_PROTOBUF_CFLAGS_OTHER})
-        target_include_directories(${_target} PRIVATE ${NETDATA_PROTOBUF_INCLUDE_DIRS})
-        target_link_libraries(${_target} PRIVATE ${NETDATA_PROTOBUF_LIBS})
+        target_compile_definitions(${_target} PRIVATE ${PROTOBUF_CFLAGS_OTHER})
+        target_include_directories(${_target} PRIVATE ${PROTOBUF_INCLUDE_DIRS})
+        target_link_libraries(${_target} PRIVATE ${PROTOBUF_LIBRARIES})
 endfunction()
