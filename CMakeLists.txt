@@ -104,8 +104,7 @@ mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # High-level features
 option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
-cmake_dependent_option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" True "NOT ENABLE_ACLK" False)
-mark_as_advanced(ENABLE_CLOUD)
+option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
