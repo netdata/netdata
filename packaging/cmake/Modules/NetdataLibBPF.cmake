@@ -8,37 +8,6 @@ include(NetdataUtil)
 
 set(libbpf_SOURCE_DIR "${CMAKE_BINARY_DIR}/libbpf")
 
-# Check what libc we're using.
-#
-# Sets the specified variable to the name of the libc or "unknown"
-function(netdata_identify_libc _libc_name)
-    message(INFO "Detecting libc implementation")
-
-    execute_process(COMMAND ldd --version
-                    COMMAND grep -q -i -E "glibc|gnu libc"
-                    RESULT_VARIABLE LDD_IS_GLIBC
-                    OUTPUT_VARIABLE LDD_OUTPUT
-                    ERROR_VARIABLE LDD_OUTPUT)
-
-    if(LDD_IS_GLIBC)
-        set(${_libc_name} glibc PARENT_SCOPE)
-        return()
-    endif()
-
-    execute_process(COMMAND ldd --version
-                    COMMAND grep -q -i -E "musl"
-                    RESULT_VARIABLE LDD_IS_MUSL
-                    OUTPUT_VARIABLE LDD_OUTPUT
-                    ERROR_VARIABLE LDD_OUTPUT)
-
-    if(LDD_IS_MUSL)
-        set(${_libc_name} musl PARENT_SCOPE)
-        return()
-    endif()
-
-    set(${_libc_name} unknown PARENT_SCOPE)
-endfunction()
-
 # Check if the kernel is old enough that we need to use a legacy copy of eBPF.
 function(_need_legacy_libbpf _var)
     if(FORCE_LEGACY_LIBBPF)

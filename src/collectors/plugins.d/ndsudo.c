@@ -14,6 +14,22 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "smartctl-json-scan",
+        .params = "--json --scan",
+        .search = {
+            [0] = "smartctl",
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "smartctl-json-device-info",
+        .params = "--json --all {{deviceName}} --device {{deviceType}} --nocheck {{powerMode}}",
+        .search = {
+            [0] = "smartctl",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "fail2ban-client-status",
         .params = "status",
         .search = {
