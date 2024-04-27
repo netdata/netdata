@@ -126,9 +126,13 @@ set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
+# ssl
+option(ENABLE_WOLFSSL "Compile netdata using WolfSSL." False)
+cmake_dependent_option(ENABLE_OPENSSL "Compile netdata using OpenSSL." True "NOT ENABLE_WOLFSSL" False)
+
 # High-level features
-option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
+cmake_dependent_option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
+cmake_dependent_option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
@@ -143,7 +147,7 @@ mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE})
-option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" ${DEFAULT_FEATURE_STATE})
+cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
 option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE})
@@ -171,6 +175,8 @@ mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
 
+cmake_dependent_option(ENABLE_H2O "Enable H2O web server (experimental)" True "NOT ENABLE_WOLFSSL" False)
+
 # Other optional functionality
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
 mark_as_advanced(ENABLE_SENTRY)
@@ -182,20 +188,8 @@ cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead 
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 if(ENABLE_WOLFSSL)
-        set(ENABLE_OPENSSL False)
-        # two features are incompatible
-        set(ENABLE_PLUGIN_LOGS_MANAGEMENT False)
-        set(ENABLE_H2O False)
-        # OSSL_DECODER_CTX does not exist in WolfSSL
-        set(ENABLE_ACLK False)
-
-        # wolfssl
         pkg_check_modules(WOLFSSL wolfssl)
 else()
-        set(ENABLE_OPENSSL True)
-        option(ENABLE_H2O "Enable H2O web server (experimental)" True)
-        mark_as_advanced(ENABLE_H2O)
-
         # openssl/crypto
         pkg_check_modules(OPENSSL openssl)
 endif()
