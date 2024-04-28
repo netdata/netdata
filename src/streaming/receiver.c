@@ -414,7 +414,9 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
         rrdpush_receiver_replication_reset(host);
 
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
+#ifdef ENABLE_ACLK
         aclk_queue_node_info(rpt->host, true);
+#endif
 
         rrdpush_reset_destinations_postpone_time(host);
 
