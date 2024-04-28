@@ -13,4 +13,7 @@ int do_GetSystemTimes(int update_every, usec_t dt);
 int do_GlobalMemoryStatusEx(int update_every, usec_t dt);
 int do_GetTickCount64(int update_every, usec_t dt);
 
+void RegistryInitialize(void);
+void RegistryUpdate(void);
+
 #endif //NETDATA_WINDOWS_PLUGIN_H

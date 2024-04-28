@@ -1379,6 +1379,10 @@ int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
 
+#ifdef COMPILED_FOR_WINDOWS
+int windows_perflib_dump(void);
+#endif
+
 int unittest_prepare_rrd(char **user) {
     post_conf_load(user);
     get_netdata_configured_variables();
@@ -1583,6 +1587,11 @@ int main(int argc, char **argv) {
                             unittest_running = true;
                             return uuid_unittest();
                         }
+#ifdef COMPILED_FOR_WINDOWS
+                        else if(strcmp(optarg, "perflibdump") == 0) {
+                            return windows_perflib_dump();
+                        }
+#endif
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;

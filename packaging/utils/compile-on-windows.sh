@@ -1,5 +1,20 @@
 #!/bin/sh
 
+# On MSYS2, install these dependencies to build netdata:
+install_dependencies() {
+    pacman -S \
+       git cmake ninja \
+        base-devel msys2-devel libyaml-devel libzstd-devel libutil-linux libutil-linux-devel \
+        mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-toolchain \
+        msys/zlib-devel mingw64/mingw-w64-x86_64-zlib ucrt64/mingw-w64-ucrt-x86_64-zlib \
+        msys/libuv-devel ucrt64/mingw-w64-ucrt-x86_64-libuv mingw64/mingw-w64-x86_64-libuv \
+        liblz4-devel mingw64/mingw-w64-x86_64-lz4 ucrt64/mingw-w64-ucrt-x86_64-lz4 \
+        openssl-devel mingw64/mingw-w64-x86_64-openssl ucrt64/mingw-w64-ucrt-x86_64-openssl \
+        protobuf-devel mingw64/mingw-w64-x86_64-protobuf ucrt64/mingw-w64-ucrt-x86_64-protobuf \
+        msys/pcre2-devel mingw64/mingw-w64-x86_64-pcre2 ucrt64/mingw-w64-ucrt-x86_64-pcre2 \
+        msys/brotli-devel mingw64/mingw-w64-x86_64-brotli ucrt64/mingw-w64-ucrt-x86_64-brotli
+}
+
 export PATH="/usr/local/bin:${PATH}"
 
 WT_ROOT="$(pwd)"
