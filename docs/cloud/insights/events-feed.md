@@ -35,6 +35,8 @@ At a high-level view, these are the domains from which the Events feed will prov
 | Silencing Rule Created | A new alert notification silencing rule was created on the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **created** by `John Smith` |
 | Silencing Rule Changed | An existing alert notification silencing rule was modified on the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **changed** by `John Doe` |
 | Silencing Rule Deleted | An existing alert notifications silencing rule was removed from the Space. | Silencing rule `DB Servers schedule silencing` on rooms `All nodes` and `DB Servers` was **changed** by `Alan Smith` |
+| Space Claiming Token Created | A Space Claiming Token was created. | Claiming Token was created by user `John Doe` |
+| Space Claiming Token Revoked | A Space Claiming Token was revoked. | Claiming Token `_OtF2ssjrv` was revoked by user `John Doe` |
 
 ### Topology events
 
