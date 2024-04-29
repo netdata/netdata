@@ -920,7 +920,7 @@ int windows_perflib_dump(void) {
     RegistryInitialize();
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
     perflib_query_and_traverse(0, dumpDataCb, dumpObjectCb, dumpInstanceCb, dumpInstanceCounterCb, dumpCounterCb, wb);
 
