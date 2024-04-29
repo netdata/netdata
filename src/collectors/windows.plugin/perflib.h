@@ -18,17 +18,25 @@ PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PE
 
 typedef struct _rawdata {
     DWORD CounterType;
+    DWORD MultiCounterData;  // Second raw counter value for multi-valued counters
     ULONGLONG Data;          // Raw counter data
     LONGLONG Time;           // Is a time value or a base value
-    DWORD MultiCounterData;  // Second raw counter value for multi-valued counters
     LONGLONG Frequency;
 } RAW_DATA, *PRAW_DATA;
 
-typedef struct {
+typedef struct _counterdata {
     DWORD id;
+    bool updated;
     const char *name;
-    RAW_DATA d;
+    RAW_DATA current;
+    RAW_DATA previous;
 } COUNTER_DATA;
+
+#define RAW_DATA_EMPTY (RAW_DATA){ 0 }
+
+RRDDIM *perflib_rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divider, COUNTER_DATA *cd);
+void perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd);
+
 bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *d);
 
 typedef bool (*perflib_data_cb)(PERF_DATA_BLOCK *pDataBlock, void *data);

@@ -105,6 +105,8 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = statsd_main
     },
+#ifndef COMPILED_FOR_WINDOWS
+    // this crashes the debugger under windows
     {
         .name = "EXPORTING",
         .config_section = NULL,
@@ -114,6 +116,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = exporting_main
     },
+#endif
     {
         .name = "SNDR[localhost]",
         .config_section = NULL,

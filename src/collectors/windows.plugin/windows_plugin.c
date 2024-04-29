@@ -14,6 +14,7 @@ static struct proc_module {
     {.name = "GetSystemUptime",           .dim = "GetSystemUptime",         .func = do_GetSystemUptime},
     {.name = "GetSystemRAM",              .dim = "GetSystemRAM",            .func = do_GetSystemRAM},
     {.name = "GetSystemCPU",              .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
+    {.name = "PerflibDisks",              .dim = "PerflibDisks",            .func = do_PerflibDisks},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}
