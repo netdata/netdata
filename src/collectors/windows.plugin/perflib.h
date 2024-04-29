@@ -11,6 +11,11 @@ const char *RegistryFindHelpByID(DWORD id);
 DWORD RegistryFindIDByName(const char *name);
 #define REGISTRY_NAME_NOT_FOUND (DWORD)-1
 
+PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id);
+void perflibFreePerformanceData(void);
+PERF_OBJECT_TYPE *perflibFindObjectTypeByName(PERF_DATA_BLOCK *pDataBlock, const char *name);
+PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *lastInstance);
+
 typedef struct _rawdata {
     DWORD CounterType;
     ULONGLONG Data;          // Raw counter data
@@ -25,7 +30,7 @@ typedef bool (*perflib_instance_cb)(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYP
 typedef bool (*perflib_instance_counter_cb)(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, PERF_COUNTER_DEFINITION *pCounter, RAW_DATA *sample, void *data);
 typedef bool (*perflib_counter_cb)(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_COUNTER_DEFINITION *pCounter, RAW_DATA *sample, void *data);
 
-int perflib_query_and_traverse(DWORD id,
+int perflibQueryAndTraverse(DWORD id,
                                perflib_data_cb dataCb,
                                perflib_object_cb objectCb,
                                perflib_instance_cb instanceCb,

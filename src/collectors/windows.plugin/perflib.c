@@ -10,9 +10,6 @@
 #include <strsafe.h>
 #include <stdio.h>
 
-
-#define INIT_OBJECT_BUFFER_SIZE (256 * 1024) // Initial buffer size to use when querying specific objects.
-
 // --------------------------------------------------------------------------------
 
 // Retrieve a buffer that contains the specified performance data.
@@ -22,49 +19,39 @@
 // and the RegQueryValueEx will set your size variable to the required buffer size. However,
 // if the source is "Global" or one or more object index values, you will need to increment
 // the buffer size in a loop until RegQueryValueEx does not return ERROR_MORE_DATA.
-static LPBYTE getPerformanceData(const char *pwszSource, DWORD dwInitialBufferSize)
-{
-    LPBYTE pBuffer = NULL;
-    DWORD dwBufferSize = 0;        //Size of buffer, used to increment buffer size
-    DWORD dwSize = 0;              //Size of buffer, used when calling RegQueryValueEx
-    LPBYTE pTemp = NULL;           //Temp variable for realloc() in case it fails
+static LPBYTE getPerformanceData(const char *pwszSource) {
+    static __thread DWORD size = 0;
+    static __thread LPBYTE buffer = NULL;
+
+    if(pwszSource == (const char *)0x01) {
+        freez(buffer);
+        buffer = NULL;
+        size = 0;
+        return NULL;
+    }
+
+    if(!size) {
+        size = 32 * 1024;
+        buffer = mallocz(size);
+    }
+
     LONG status = ERROR_SUCCESS;
-
-    dwBufferSize = dwSize = dwInitialBufferSize;
-    pBuffer = (LPBYTE)malloc(dwBufferSize);
-    if (pBuffer) {
-        while (ERROR_MORE_DATA == (status = RegQueryValueEx(HKEY_PERFORMANCE_DATA, pwszSource, NULL, NULL, pBuffer, &dwSize)))
-        {
-            //Contents of dwSize is unpredictable if RegQueryValueEx fails, which is why
-            //you need to increment dwBufferSize and use it to set dwSize.
-            dwBufferSize *= 2;
-
-            pTemp = (LPBYTE)realloc(pBuffer, dwBufferSize);
-            if (pTemp) {
-                pBuffer = pTemp;
-                dwSize = dwBufferSize;
-            }
-            else {
-                printf("Reallocation error.\n");
-                free(pBuffer);
-                pBuffer = NULL;
-                goto cleanup;
-            }
-        }
-
-        if (ERROR_SUCCESS != status) {
-            printf("RegQueryValueEx failed with 0x%x.\n", status);
-            free(pBuffer);
-            pBuffer = NULL;
-        }
-    }
-    else {
-        printf("malloc failed to allocate initial memory request.\n");
+    while ((status = RegQueryValueEx(HKEY_PERFORMANCE_DATA, pwszSource,
+                                     NULL, NULL, buffer, &size)) == ERROR_MORE_DATA) {
+        size *= 2;
+        buffer = reallocz(buffer, size);
     }
 
-cleanup:
-    RegCloseKey(HKEY_PERFORMANCE_DATA);
-    return pBuffer;
+    if (status != ERROR_SUCCESS) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "RegQueryValueEx failed with 0x%x.\n", status);
+        return NULL;
+    }
+
+    return buffer;
+}
+
+void perflibFreePerformanceData(void) {
+    getPerformanceData((const char *)0x01);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -466,13 +453,15 @@ static PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer) {
     static WCHAR signature[] = { 'P', 'E', 'R', 'F' };
 
     if(memcmp(pDataBlock->Signature, signature, sizeof(signature)) != 0) {
-        printf("> Invalid data block signature.\n");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "WINDOWS: PERFLIB: Invalid data block signature.");
         return NULL;
     }
 
     if(!isValidPointer(pDataBlock, (PBYTE)pDataBlock + pDataBlock->SystemNameOffset) ||
         !isValidStructure(pDataBlock, (PBYTE)pDataBlock + pDataBlock->SystemNameOffset, pDataBlock->SystemNameLength)) {
-        printf(" > Invalid system name array\n");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "WINDOWS: PERFLIB: Invalid system name array.");
         return NULL;
     }
 
@@ -488,7 +477,8 @@ static PERF_OBJECT_TYPE *getObjectType(PERF_DATA_BLOCK* pDataBlock, PERF_OBJECT_
         pObjectType = (PERF_OBJECT_TYPE *)((PBYTE)lastObjectType + lastObjectType->TotalByteLength);
 
     if(pObjectType && (!isValidPointer(pDataBlock, pObjectType) || !isValidStructure(pDataBlock, pObjectType, pObjectType->TotalByteLength))) {
-        printf(" > Invalid ObjectType!\n");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "WINDOWS: PERFLIB: Invalid ObjectType!");
         pObjectType = NULL;
         abort();
     }
@@ -520,7 +510,8 @@ static PERF_INSTANCE_DEFINITION *getInstance(
         pInstance = (PERF_INSTANCE_DEFINITION *)((PBYTE)lastCounterBlock + lastCounterBlock->ByteLength);
 
     if(pInstance && (!isValidPointer(pDataBlock, pInstance) || !isValidStructure(pDataBlock, pInstance, pInstance->ByteLength))) {
-        printf("> Invalid Instance Definition!\n");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "WINDOWS: PERFLIB: Invalid Instance Definition!");
         pInstance = NULL;
     }
 
@@ -534,7 +525,8 @@ static PERF_COUNTER_BLOCK *getObjectTypeCounterBlock(
     PERF_COUNTER_BLOCK *pCounterBlock = (PERF_COUNTER_BLOCK *)((PBYTE)pObjectType + pObjectType->DefinitionLength);
 
     if(pCounterBlock && (!isValidPointer(pDataBlock, pCounterBlock) || !isValidStructure(pDataBlock, pCounterBlock, pCounterBlock->ByteLength))) {
-        printf("> Invalid ObjectType CounterBlock!\n");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "WINDOWS: PERFLIB: Invalid ObjectType CounterBlock!");
         pCounterBlock = NULL;
     }
 
@@ -550,7 +542,8 @@ static PERF_COUNTER_BLOCK *getInstanceCounterBlock(
     PERF_COUNTER_BLOCK *pCounterBlock = (PERF_COUNTER_BLOCK *)((PBYTE)pInstance + pInstance->ByteLength);
 
     if(pCounterBlock && (!isValidPointer(pDataBlock, pCounterBlock) || !isValidStructure(pDataBlock, pCounterBlock, pCounterBlock->ByteLength))) {
-        printf("> Invalid Instance CounterBlock!\n");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "WINDOWS: PERFLIB: Invalid Instance CounterBlock!");
         pCounterBlock = NULL;
     }
 
@@ -576,7 +569,8 @@ static PERF_COUNTER_DEFINITION *getCounterDefinition(PERF_DATA_BLOCK *pDataBlock
         pCounterDefinition = (PERF_COUNTER_DEFINITION *)((PBYTE)lastCounterDefinition +	lastCounterDefinition->ByteLength);
 
     if(pCounterDefinition && (!isValidPointer(pDataBlock, pCounterDefinition) || !isValidStructure(pDataBlock, pCounterDefinition, pCounterDefinition->ByteLength))) {
-        printf("> Invalid Counter Definition!\n");
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "WINDOWS: PERFLIB: Invalid Counter Definition!");
         pCounterDefinition = NULL;
     }
 
@@ -647,7 +641,39 @@ bool ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
     return pObjectType->NumInstances != PERF_NO_INSTANCES && pObjectType->NumInstances > 0;
 }
 
-int perflib_query_and_traverse(DWORD id,
+PERF_OBJECT_TYPE *perflibFindObjectTypeByName(PERF_DATA_BLOCK *pDataBlock, const char *name) {
+    PERF_OBJECT_TYPE* pObjectType = NULL;
+    for(DWORD o = 0; o < pDataBlock->NumObjectTypes; o++) {
+        pObjectType = getObjectType(pDataBlock, pObjectType);
+        if(strcmp(name, RegistryFindNameByID(pObjectType->ObjectNameTitleIndex)) == 0)
+            return pObjectType;
+    }
+
+    return NULL;
+}
+
+PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *lastInstance) {
+    if(!ObjectTypeHasInstances(pDataBlock, pObjectType))
+        return NULL;
+
+    return getInstance(pDataBlock, pObjectType,
+                       lastInstance ? getInstanceCounterBlock(pDataBlock, pObjectType, lastInstance) : NULL );
+}
+
+PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id) {
+    char source[24];
+    snprintfz(source, sizeof(source), "%u", id);
+
+    LPBYTE pData = (LPBYTE)getPerformanceData((id > 0) ? source : NULL);
+    if (!pData) return NULL;
+
+    PERF_DATA_BLOCK *pDataBlock = getDataBlock(pData);
+    if(!pDataBlock) return NULL;
+
+    return pDataBlock;
+}
+
+int perflibQueryAndTraverse(DWORD id,
                                perflib_data_cb dataCb,
                                perflib_object_cb objectCb,
                                perflib_instance_cb instanceCb,
@@ -656,13 +682,7 @@ int perflib_query_and_traverse(DWORD id,
                                void *data) {
     int counters = -1;
 
-    char source[24];
-    snprintfz(source, sizeof(source), "%u", id);
-
-    LPBYTE pData = (LPBYTE)getPerformanceData((id > 0) ? source : NULL, INIT_OBJECT_BUFFER_SIZE);
-    if (!pData) goto cleanup;
-
-    PERF_DATA_BLOCK *pDataBlock = getDataBlock(pData);
+    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
     if(!pDataBlock) goto cleanup;
 
     bool do_data = true;
@@ -670,12 +690,12 @@ int perflib_query_and_traverse(DWORD id,
         do_data = dataCb(pDataBlock, data);
 
     PERF_OBJECT_TYPE* pObjectType = NULL;
-    for(DWORD d = 0; do_data && d < pDataBlock->NumObjectTypes; d++) {
+    for(DWORD o = 0; do_data && o < pDataBlock->NumObjectTypes; o++) {
         pObjectType = getObjectType(pDataBlock, pObjectType);
         if(!pObjectType) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "WINDOWS: PERFLIB: Cannot read object type No %d (out of %d)",
-                   d, pDataBlock->NumObjectTypes);
+                   o, pDataBlock->NumObjectTypes);
             break;
         }
 
@@ -771,6 +791,5 @@ int perflib_query_and_traverse(DWORD id,
     }
 
 cleanup:
-    if(pData) free(pData);
     return counters;
 }

@@ -327,7 +327,7 @@ void dumpSystemTime(BUFFER *wb, SYSTEMTIME *st) {
 bool dumpDataCb(PERF_DATA_BLOCK *pDataBlock, void *data) {
     char name[4096];
     if(!getSystemName(pDataBlock, name, sizeof(name)))
-        strncpy(name, "[failed]", sizeof(name));
+        strncpyz(name, "[failed]", sizeof(name) - 1);
 
     BUFFER *wb = data;
     buffer_json_member_add_string(wb, "SystemName", name);
@@ -369,7 +369,7 @@ bool dumpDataCb(PERF_DATA_BLOCK *pDataBlock, void *data) {
     buffer_json_object_close(wb);
 
     if(pDataBlock->NumObjectTypes)
-        buffer_json_member_add_array(wb, "objects");
+        buffer_json_member_add_array(wb, "Objects");
 
     return true;
 }
@@ -413,9 +413,9 @@ bool dumpObjectCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, vo
     buffer_json_member_add_string(wb, "DetailLevel", GetDetailLevel(pObjectType->DetailLevel));
 
     if(ObjectTypeHasInstances(pDataBlock, pObjectType))
-        buffer_json_member_add_array(wb, "instances");
+        buffer_json_member_add_array(wb, "Instances");
     else
-        buffer_json_member_add_array(wb, "counters");
+        buffer_json_member_add_array(wb, "Counters");
 
     return true;
 }
@@ -431,11 +431,12 @@ bool dumpInstanceCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, 
 
     char name[4096];
     if(!getInstanceName(pDataBlock, pObjectType, pInstance, name, sizeof(name)))
-        strncpy(name, "[failed]", sizeof(name));
+        strncpyz(name, "[failed]", sizeof(name) - 1);
 
     buffer_json_add_array_item_object(wb);
+    buffer_json_member_add_string(wb, "Instance", name);
     buffer_json_member_add_int64(wb, "UniqueID", pInstance->UniqueID);
-    buffer_json_member_add_array(wb, "rrdlabels");
+    buffer_json_member_add_array(wb, "Labels");
     {
         buffer_json_add_array_item_object(wb);
         {
@@ -451,7 +452,7 @@ bool dumpInstanceCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, 
                 pi = getInstanceByPosition(pDataBlock, po, pi->ParentObjectInstance);
 
                 if(!getInstanceName(pDataBlock, po, pi, name, sizeof(name)))
-                    strncpy(name, "[failed]", sizeof(name));
+                    strncpyz(name, "[failed]", sizeof(name) - 1);
 
                 buffer_json_add_array_item_object(wb);
                 {
@@ -464,12 +465,12 @@ bool dumpInstanceCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, 
     }
     buffer_json_array_close(wb); // rrdlabels
 
-    buffer_json_member_add_array(wb, "counters");
+    buffer_json_member_add_array(wb, "Counters");
     return true;
 }
 
 void dumpSample(BUFFER *wb, RAW_DATA *d) {
-    buffer_json_member_add_object(wb, "value");
+    buffer_json_member_add_object(wb, "Value");
     buffer_json_member_add_uint64(wb, "data", d->Data);
     buffer_json_member_add_int64(wb, "time", d->Time);
     buffer_json_member_add_uint64(wb, "type", d->CounterType);
@@ -483,12 +484,12 @@ bool dumpCounterCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, P
     (void)pObjectType;
     BUFFER *wb = data;
     buffer_json_add_array_item_object(wb);
-    buffer_json_member_add_string(wb, "name", RegistryFindNameByID(pCounter->CounterNameTitleIndex));
+    buffer_json_member_add_string(wb, "Counter", RegistryFindNameByID(pCounter->CounterNameTitleIndex));
     dumpSample(wb, sample);
-    buffer_json_member_add_string(wb, "help", RegistryFindHelpByID(pCounter->CounterHelpTitleIndex));
-    buffer_json_member_add_string(wb, "type", getCounterType(pCounter->CounterType));
-    buffer_json_member_add_string(wb, "algorithm", getCounterAlgorithm(pCounter->CounterType));
-    buffer_json_member_add_string(wb, "description", getCounterDescription(pCounter->CounterType));
+    buffer_json_member_add_string(wb, "Help", RegistryFindHelpByID(pCounter->CounterHelpTitleIndex));
+    buffer_json_member_add_string(wb, "Type", getCounterType(pCounter->CounterType));
+    buffer_json_member_add_string(wb, "Algorithm", getCounterAlgorithm(pCounter->CounterType));
+    buffer_json_member_add_string(wb, "Description", getCounterDescription(pCounter->CounterType));
     buffer_json_object_close(wb);
     return true;
 }
@@ -517,9 +518,12 @@ int windows_perflib_dump(const char *key) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
-    perflib_query_and_traverse(id, dumpDataCb, dumpObjectCb, dumpInstanceCb, dumpInstanceCounterCb, dumpCounterCb, wb);
+    perflibQueryAndTraverse(id, dumpDataCb, dumpObjectCb, dumpInstanceCb, dumpInstanceCounterCb, dumpCounterCb, wb);
 
     buffer_json_finalize(wb);
     printf("\n%s\n", buffer_tostring(wb));
+
+    perflibFreePerformanceData();
+
     return 0;
 }
