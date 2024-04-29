@@ -30,4 +30,17 @@ int perflib_query_and_traverse(DWORD id,
                                perflib_instance_counter_cb instanceCounterCb,
                                perflib_counter_cb counterCb,
                                void *data);
+
+bool ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType);
+
+BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance,
+                     char *buffer, size_t bufferLen);
+
+PERF_OBJECT_TYPE *getObjectTypeByIndex(PERF_DATA_BLOCK *pDataBlock, DWORD ObjectNameTitleIndex);
+
+PERF_INSTANCE_DEFINITION *getInstanceByPosition(
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    DWORD instancePosition);
+
 #endif //NETDATA_PERFLIB_H

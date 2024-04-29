@@ -1250,6 +1250,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib.c
         src/collectors/windows.plugin/perflib.h
         src/collectors/windows.plugin/perflib-names.c
+        src/collectors/windows.plugin/perflib-dump.c
 )
 
 set(PROC_PLUGIN_FILES
