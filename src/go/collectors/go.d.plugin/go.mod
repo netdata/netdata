@@ -16,7 +16,7 @@ require (
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/docker/docker v26.0.2+incompatible
+	github.com/docker/docker v26.1.0+incompatible
 	github.com/facebook/time v0.0.0-20240419201005-e4f24e18edf7
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-redis/redis/v8 v8.11.5
@@ -28,7 +28,7 @@ require (
 	github.com/ilyam8/hashstructure v1.1.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jessevdk/go-flags v1.5.0
-	github.com/likexian/whois v1.15.2
+	github.com/likexian/whois v1.15.3
 	github.com/likexian/whois-parser v1.24.15
 	github.com/lmittmann/tint v1.0.4
 	github.com/mattn/go-isatty v0.0.20

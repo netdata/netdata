@@ -30,3 +30,41 @@ function(netdata_detect_host_kernel_version)
     message(CHECK_PASS "${_kversion}")
     set(HOST_KERNEL_VERSION "${_kversion}" CACHE STRING "Detected host kernel version")
 endfunction()
+
+# Check what libc we're using.
+#
+# Sets the specified variable to the name of the libc or "unknown"
+function(netdata_identify_libc _libc_name)
+    if(NOT DEFINED _ND_DETECTED_LIBC)
+        message(INFO "Detecting libc implementation")
+
+        execute_process(COMMAND ldd --version
+                        COMMAND grep -q -i -E "glibc|gnu libc"
+                        RESULT_VARIABLE LDD_IS_GLIBC
+                        OUTPUT_VARIABLE LDD_OUTPUT
+                        ERROR_VARIABLE LDD_OUTPUT)
+
+        if(LDD_IS_GLIBC)
+            set(${_libc_name} glibc PARENT_SCOPE)
+            set(_ND_DETECTED_LIBC glibc CACHE INTERNAL "")
+            return()
+        endif()
+
+        execute_process(COMMAND ldd --version
+                        COMMAND grep -q -i -E "musl"
+                        RESULT_VARIABLE LDD_IS_MUSL
+                        OUTPUT_VARIABLE LDD_OUTPUT
+                        ERROR_VARIABLE LDD_OUTPUT)
+
+        if(LDD_IS_MUSL)
+            set(${_libc_name} musl PARENT_SCOPE)
+            set(_ND_DETECTED_LIBC musl CACHE INTERNAL "")
+            return()
+        endif()
+
+        set(${_libc_name} unknown PARENT_SCOPE)
+        set(_ND_DETECTED_LIBC unknown CACHE INTERNAL "")
+    else()
+        set(${_libc_name} ${_ND_DETECTED_LIBC} PARENT_SCOPE)
+    endif()
+endfunction()

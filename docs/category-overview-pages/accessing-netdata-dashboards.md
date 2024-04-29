@@ -1,38 +1,40 @@
-# Accessing Netdata Dashboards
+# Dashboards and Charts
 
-This section contains documentation on how you can access the Netdata dashboard, which are the same both for the Agent and Cloud.
+This guide covers how to access both Agent and Cloud dashboards, along with links to explore specific sections in more detail.
 
-A user accessing the Netdata dashboard **from the Cloud** will always be presented with the latest Netdata dashboard version.
+When you access the Netdata dashboard through the Cloud, you'll always have the latest version available.
 
-A user accessing the Netdata dashboard **from the Agent** will, by default, be presented with the latest Netdata dashboard version (the same as Netdata Cloud) except in the following scenarios:
-* Agent doesn't have Internet access, and is unable to get the latest Netdata dashboards, as a result it falls back to the Netdata dashboard version that 
-was shipped with the agent.
-* Users have defined, e.g. through URL bookmark, that they want to see the previous version of the dashboard (accessible `http://NODE:19999/v1`, replacing `NODE` with the IP address or hostname of your Agent). 
+By default, the Agent dashboard shows the latest version (matching Netdata Cloud). However, there are a few exceptions:
+
+- Without internet access, the Agent can't download the newest dashboards. In this case, it will automatically use the bundled version.
+- Users have defined, e.g. through URL bookmark, that they want to see the previous version of the dashboard (accessible `http://NODE:19999/v1`, replacing `NODE` with the IP address or hostname of your Agent).
 
 ## Main sections
 
 The Netdata dashboard consists of the following main sections:
-* [Netdata charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md)
-* [Infrastructure Overview](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md)
-* [Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
-* [Custom dashboards](https://learn.netdata.cloud/docs/visualizations/custom-dashboards)
-* [Alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md)
-* [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md)
-* [Functions](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md)
-* [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 
-> ⚠️ Some sections of the dashboard, when accessed through the agent,  may require the user to be signed in to Netdata Cloud or having the Agent claimed to Netdata Cloud for their full functionality. Examples include saving visualization settings on charts or custom dashboards, claiming the node to Netdata Cloud, or executing functions on an Agent.
+- [Home tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/home-tab.md)
+- [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md)
+- [Netdata charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md)
+- [Metrics tab and single node tabs](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md)
+- [Top tab](https://github.com/netdata/netdata/blob/master/docs/cloud/runtime-troubleshooting-with-functions.md)
+- [Logs tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/logs-tab.md)
+- [Dashboards tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/dashboards-tab.md)
+- [Alerts tab](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md)
+- [Events tab](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
+
+> **Note**
+>
+> Some sections of the dashboard, when accessed through the agent, may require the user to be signed in to Netdata Cloud or have the Agent claimed to Netdata Cloud for their full functionality. Examples include saving visualization settings on charts or custom dashboards, claiming the node to Netdata Cloud, or executing functions on an Agent.
 
 ## How to access the dashboards?
 
 ### Netdata Cloud
 
-You can access the dashboard at https://app.netdata.cloud/ and [sign-in](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md) with an account or [sign-up](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md#dont-have-a-netdata-cloud-account-yet) if you don't have an account yet.
+You can access the dashboard at <https://app.netdata.cloud/> and [sign-in](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md) with an account or [sign-up](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md#dont-have-a-netdata-cloud-account-yet) if you don't have an account yet.
 
 ### Netdata Agent
 
-Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and
-navigate to `http://NODE:19999`, replacing `NODE` with the IP address or hostname of your Agent. If installed on localhost, you can access it through `http://localhost:19999`.
-
+To view your Netdata dashboard, open a web browser and enter the address `http://NODE:19999`  - replace `NODE` with your Agent's IP address or hostname. If the Agent is on the same machine, use http://localhost:19999.
 
 Documentation for previous Agent dashboard can still be found [here](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md).

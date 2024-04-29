@@ -148,6 +148,8 @@ override_dh_install:
 		mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/ebpf.plugin $(TOP)-plugin-ebpf/usr/libexec/netdata/plugins.d/ebpf.plugin; \
 		mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/ebpf.d.conf $(TOP)-plugin-ebpf/usr/lib/netdata/conf.d/ebpf.d.conf; \
 		mv -f $(TEMPTOP)/usr/lib/netdata/conf.d/ebpf.d $(TOP)-plugin-ebpf/usr/lib/netdata/conf.d/ebpf.d; \
+		mkdir -p $(TOP)-ebpf-code-legacy/usr/libexec/netdata/plugins.d/; \
+		mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/ebpf.d $(TOP)-ebpf-code-legacy/usr/libexec/netdata/plugins.d/ebpf.d; \
 	fi
 
 	# Add python plugin install rules
@@ -235,13 +237,6 @@ override_dh_install:
 	# Copy the updater script
 	#
 	cp -v packaging/installer/netdata-updater.sh $(TOP)/usr/libexec/netdata/netdata-updater.sh
-
-	# Handle eBPF code
-	#
-	if [ $(HAVE_EBPF) -eq 1 ]; then \
-		mkdir -p $(TOP)-ebpf-code-legacy/usr/libexec/netdata/plugins.d/; \
-		packaging/bundle-ebpf.sh . ${TOP}-ebpf-code-legacy/usr/libexec/netdata/plugins.d/ force; \
-	fi
 
 
 override_dh_installdocs:

@@ -1,10 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-cmake_minimum_required(VERSION 3.13.0)
-
-if(POLICY CMP0135)
-    cmake_policy(SET CMP0135 NEW)
-endif()
+cmake_minimum_required(VERSION 3.13.0...3.28)
 
 #
 # version atrocities
@@ -108,8 +104,7 @@ mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # High-level features
 option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
-cmake_dependent_option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" True "NOT ENABLE_ACLK" False)
-mark_as_advanced(ENABLE_CLOUD)
+option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
@@ -119,6 +114,8 @@ option(ENABLE_PLUGIN_CGROUP_NETWORK "Enable Linux CGroup network usage monitorin
 option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE})
+cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True ENABLE_PLUGIN_EBPF False)
+mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE})
@@ -312,6 +309,10 @@ endif()
 include(NetdataJSONC)
 include(NetdataYAML)
 
+if(ENABLE_LEGACY_EBPF_PROGRAMS)
+        include(NetdataEBPFLegacy)
+endif()
+
 if(ENABLE_SENTRY)
         include(NetdataSentry)
 endif()
@@ -322,6 +323,10 @@ endif()
 
 netdata_detect_jsonc()
 netdata_detect_libyaml()
+
+if(ENABLE_LEGACY_EBPF_PROGRAMS)
+        netdata_fetch_legacy_ebpf_code()
+endif()
 
 if(ENABLE_SENTRY)
         netdata_bundle_sentry()
@@ -1991,6 +1996,10 @@ if(ENABLE_PLUGIN_EBPF)
     install(TARGETS ebpf.plugin
             COMPONENT ebpf_plugin
             DESTINATION usr/libexec/netdata/plugins.d)
+
+    if(ENABLE_LEGACY_EBPF_PROGRAMS)
+        netdata_install_legacy_ebpf_code()
+    endif()
 endif()
 
 if(ENABLE_PLUGIN_LOCAL_LISTENERS)
