@@ -11,16 +11,53 @@ typedef struct perflib_registry {
     char *help;
 } perfLibRegistryEntry;
 
+static inline bool compare_perfLibRegistryEntry(const char *k1, const char *k2) {
+    return strcmp(k1, k2) == 0;
+}
+
+static inline const char *value2key_perfLibRegistryEntry(perfLibRegistryEntry *entry) {
+    return entry->key;
+}
+
+#define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION compare_perfLibRegistryEntry
+#define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION value2key_perfLibRegistryEntry
+#define SIMPLE_HASHTABLE_KEY_TYPE const char
+#define SIMPLE_HASHTABLE_VALUE_TYPE perfLibRegistryEntry
+#define SIMPLE_HASHTABLE_NAME _PERFLIB
+#include "libnetdata/simple_hashtable.h"
+
 static struct {
     SPINLOCK spinlock;
     size_t size;
     perfLibRegistryEntry **array;
+    struct simple_hashtable_PERFLIB hashtable;
     FILETIME lastWriteTime;
 } names_globals = {
     .spinlock = NETDATA_SPINLOCK_INITIALIZER,
     .size = 0,
     .array = NULL,
 };
+
+DWORD RegistryFindIDByName(const char *name) {
+    DWORD rc = REGISTRY_NAME_NOT_FOUND;
+
+    spinlock_lock(&names_globals.spinlock);
+    XXH64_hash_t hash = XXH3_64bits((void *)name, strlen(name));
+    SIMPLE_HASHTABLE_SLOT_PERFLIB *sl = simple_hashtable_get_slot_PERFLIB(&names_globals.hashtable, hash, name, false);
+    perfLibRegistryEntry *e = SIMPLE_HASHTABLE_SLOT_DATA(sl);
+    if(e) rc = e->id;
+    spinlock_unlock(&names_globals.spinlock);
+
+    return rc;
+}
+
+static inline void RegistryAddToHashTable_unsafe(perfLibRegistryEntry *entry) {
+    XXH64_hash_t hash = XXH3_64bits((void *)entry->key, strlen(entry->key));
+    SIMPLE_HASHTABLE_SLOT_PERFLIB *sl = simple_hashtable_get_slot_PERFLIB(&names_globals.hashtable, hash, entry->key, true);
+    perfLibRegistryEntry *e = SIMPLE_HASHTABLE_SLOT_DATA(sl);
+    if(!e || e->id > entry->id)
+        simple_hashtable_set_slot_PERFLIB(&names_globals.hashtable, sl, hash, entry);
+}
 
 static void RegistrySetData_unsafe(DWORD id, const char *key, const char *help) {
     if(id >= names_globals.size) {
@@ -42,13 +79,19 @@ static void RegistrySetData_unsafe(DWORD id, const char *key, const char *help) 
     if(!entry)
         entry = names_globals.array[id] = (perfLibRegistryEntry *)calloc(1, sizeof(perfLibRegistryEntry));
 
-    if(key && !entry->key)
+    bool add_to_hash = false;
+    if(key && !entry->key) {
         entry->key = strdup(key);
+        add_to_hash = true;
+    }
 
     if(help && !entry->help)
         entry->help = strdup(help);
 
     entry->id = id;
+
+    if(add_to_hash)
+        RegistryAddToHashTable_unsafe(entry);
 }
 
 const char *RegistryFindNameByID(DWORD id) {
@@ -172,17 +215,29 @@ static BOOL RegistryKeyModification(FILETIME *lastWriteTime) {
     return ret;
 }
 
-void RegistryInitialize(void) {
-    spinlock_lock(&names_globals.spinlock);
-    RegistryKeyModification(&names_globals.lastWriteTime);
+static inline void RegistryFetchAll_unsafe(void) {
     readRegistryKeys_unsafe(FALSE);
     readRegistryKeys_unsafe(TRUE);
+}
+
+void RegistryInitialize(void) {
+    spinlock_lock(&names_globals.spinlock);
+    simple_hashtable_init_PERFLIB(&names_globals.hashtable, 20000);
+    RegistryKeyModification(&names_globals.lastWriteTime);
+    RegistryFetchAll_unsafe();
     spinlock_unlock(&names_globals.spinlock);
 }
+
 void RegistryUpdate(void) {
     FILETIME lastWriteTime = { 0 };
     RegistryKeyModification(&lastWriteTime);
 
-    if(CompareFileTime(&lastWriteTime, &names_globals.lastWriteTime) > 0)
-        RegistryInitialize();
+    if(CompareFileTime(&lastWriteTime, &names_globals.lastWriteTime) > 0) {
+        spinlock_lock(&names_globals.spinlock);
+        if(CompareFileTime(&lastWriteTime, &names_globals.lastWriteTime) > 0) {
+            names_globals.lastWriteTime = lastWriteTime;
+            RegistryFetchAll_unsafe();
+        }
+        spinlock_unlock(&names_globals.spinlock);
+    }
 }

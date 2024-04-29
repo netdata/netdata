@@ -72,7 +72,7 @@ cleanup:
 // Retrieve the raw counter value and any supporting data needed to calculate
 // a displayable counter value. Use the counter type to determine the information
 // needed to calculate the value.
-static BOOL GetValue(
+static BOOL getCounterData(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE* pObject,
     PERF_COUNTER_DEFINITION* pCounter,
@@ -637,6 +637,11 @@ BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType,
                                   ((char *) pInstance + pInstance->NameOffset), pInstance->NameLength);
 }
 
+BOOL getSystemName(PERF_DATA_BLOCK *pDataBlock, char *buffer, size_t bufferLen) {
+    return getEncodedStringToUTF8(buffer, bufferLen, 0,
+                                  ((char *)pDataBlock + pDataBlock->SystemNameOffset), pDataBlock->SystemNameLength);
+}
+
 bool ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType) {
     (void)pDataBlock;
     return pObjectType->NumInstances != PERF_NO_INSTANCES && pObjectType->NumInstances > 0;
@@ -660,11 +665,12 @@ int perflib_query_and_traverse(DWORD id,
     PERF_DATA_BLOCK *pDataBlock = getDataBlock(pData);
     if(!pDataBlock) goto cleanup;
 
+    bool do_data = true;
     if(dataCb)
-        dataCb(pDataBlock, data);
+        do_data = dataCb(pDataBlock, data);
 
     PERF_OBJECT_TYPE* pObjectType = NULL;
-    for(DWORD d = 0; d < pDataBlock->NumObjectTypes; d++) {
+    for(DWORD d = 0; do_data && d < pDataBlock->NumObjectTypes; d++) {
         pObjectType = getObjectType(pDataBlock, pObjectType);
         if(!pObjectType) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -673,8 +679,12 @@ int perflib_query_and_traverse(DWORD id,
             break;
         }
 
+        bool do_object = true;
         if(objectCb)
-            objectCb(pDataBlock, pObjectType, data);
+            do_object = objectCb(pDataBlock, pObjectType, data);
+
+        if(!do_object)
+            continue;
 
         if(ObjectTypeHasInstances(pDataBlock, pObjectType)) {
             PERF_INSTANCE_DEFINITION *pInstance = NULL;
@@ -696,8 +706,12 @@ int perflib_query_and_traverse(DWORD id,
                     break;
                 }
 
+                bool do_instance = true;
                 if(instanceCb)
-                    instanceCb(pDataBlock, pObjectType, pInstance, data);
+                    do_instance = instanceCb(pDataBlock, pObjectType, pInstance, data);
+
+                if(!do_instance)
+                    continue;
 
                 PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
                 for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
@@ -712,7 +726,7 @@ int perflib_query_and_traverse(DWORD id,
                     RAW_DATA sample = {
                         .CounterType = pCounterDefinition->CounterType,
                     };
-                    if(GetValue(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &sample)) {
+                    if(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &sample)) {
                         // DisplayCalculatedValue(&sample, &sample);
 
                         if(instanceCounterCb) {
@@ -741,7 +755,7 @@ int perflib_query_and_traverse(DWORD id,
                 RAW_DATA sample = {
                     .CounterType = pCounterDefinition->CounterType,
                 };
-                if(GetValue(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &sample)) {
+                if(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &sample)) {
                     // DisplayCalculatedValue(&sample, &sample);
 
                     if(counterCb) {

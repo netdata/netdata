@@ -8,6 +8,8 @@
 
 const char *RegistryFindNameByID(DWORD id);
 const char *RegistryFindHelpByID(DWORD id);
+DWORD RegistryFindIDByName(const char *name);
+#define REGISTRY_NAME_NOT_FOUND (DWORD)-1
 
 typedef struct _rawdata {
     DWORD CounterType;
@@ -35,6 +37,8 @@ bool ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
 
 BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance,
                      char *buffer, size_t bufferLen);
+
+BOOL getSystemName(PERF_DATA_BLOCK *pDataBlock, char *buffer, size_t bufferLen);
 
 PERF_OBJECT_TYPE *getObjectTypeByIndex(PERF_DATA_BLOCK *pDataBlock, DWORD ObjectNameTitleIndex);
 

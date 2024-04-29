@@ -817,6 +817,10 @@ int help(int exitcode) {
             "                           Check if string matches pattern and exit.\n\n"
             "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
             "                           Claim the agent to the workspace rooms pointed to by TOKEN and ROOM*.\n\n"
+#ifdef COMPILED_FOR_WINDOWS
+            "  -W perflibdump [key]\n"
+            "                           Dump the Windows Performance Counters Registry in JSON.\n\n"
+#endif
     );
 
     fprintf(stream, "\n Signals netdata handles:\n\n"
@@ -1380,7 +1384,7 @@ int progress_unittest(void);
 int dyncfg_unittest(void);
 
 #ifdef COMPILED_FOR_WINDOWS
-int windows_perflib_dump(void);
+int windows_perflib_dump(const char *key);
 #endif
 
 int unittest_prepare_rrd(char **user) {
@@ -1589,7 +1593,7 @@ int main(int argc, char **argv) {
                         }
 #ifdef COMPILED_FOR_WINDOWS
                         else if(strcmp(optarg, "perflibdump") == 0) {
-                            return windows_perflib_dump();
+                            return windows_perflib_dump(optind + 1 > argc ? NULL : argv[optind]);
                         }
 #endif
 #ifdef ENABLE_DBENGINE
