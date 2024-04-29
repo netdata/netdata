@@ -26,12 +26,16 @@ static void RegistrySetData_unsafe(DWORD id, const char *key, const char *help) 
     if(id >= names_globals.size) {
         // increase the size of the array
 
+        size_t old_size = names_globals.size;
+
         if(!names_globals.size)
             names_globals.size = 20000;
         else
             names_globals.size *= 2;
 
         names_globals.array = reallocz(names_globals.array, names_globals.size * sizeof(perfLibRegistryEntry *));
+
+        memset(names_globals.array + old_size, 0, (names_globals.size - old_size) * sizeof(perfLibRegistryEntry *));
    }
 
     perfLibRegistryEntry *entry = names_globals.array[id];

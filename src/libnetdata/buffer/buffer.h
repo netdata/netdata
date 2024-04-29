@@ -141,6 +141,9 @@ static inline void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE typ
     assert(wb->json.depth <= BUFFER_JSON_MAX_DEPTH && "BUFFER JSON: max nesting reached");
 #endif
     wb->json.depth++;
+#ifdef NETDATA_INTERNAL_CHECKS
+    assert(wb->json.depth >= 0 && "Depth wrapped around and is negative");
+#endif
     wb->json.stack[wb->json.depth].count = 0;
     wb->json.stack[wb->json.depth].type = type;
 }

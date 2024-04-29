@@ -226,7 +226,6 @@ BOOL GetValue(
         case PERF_COUNTER_MULTI_BASE:
         case PERF_RAW_BASE:
         case PERF_LARGE_RAW_BASE:
-            printf(" > Ignored base counter type: 0x%08x\n", pCounter->CounterType);
             pRawData->Data = 0;
             pRawData->Time = 0;
             fSuccess = FALSE;
@@ -242,7 +241,6 @@ BOOL GetValue(
         case PERF_COUNTER_TEXT:
         case PERF_COUNTER_NODATA:
         case PERF_COUNTER_HISTOGRAM_TYPE:
-            printf(" > Unsupported counter type: 0x%08x\n", pCounter->CounterType);
             pRawData->Data = 0;
             pRawData->Time = 0;
             fSuccess = FALSE;
@@ -250,7 +248,6 @@ BOOL GetValue(
 
         //Encountered an unidentified counter.
         default:
-            printf(" > Unrecognized counter type: 0x%08x\n", pCounter->CounterType);
             pRawData->Data = 0;
             pRawData->Time = 0;
             fSuccess = FALSE;
@@ -808,13 +805,15 @@ bool dumpDataCb(PERF_DATA_BLOCK *pDataBlock, void *data) {
 }
 
 bool dumpObjectCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, void *data) {
+    (void)pDataBlock;
     BUFFER *wb = data;
     if(!pObjectType) {
-        buffer_json_object_close(wb); // instances or counters
+        buffer_json_array_close(wb); // instances or counters
+        buffer_json_object_close(wb); // objectType
         return true;
     }
 
-    buffer_json_add_array_item_object(wb);
+    buffer_json_add_array_item_object(wb); // objectType
     buffer_json_member_add_int64(wb, "NameId", pObjectType->ObjectNameTitleIndex);
     buffer_json_member_add_string(wb, "Name", RegistryFindNameByID(pObjectType->ObjectNameTitleIndex));
     buffer_json_member_add_int64(wb, "HelpId", pObjectType->ObjectHelpTitleIndex);
@@ -836,6 +835,7 @@ bool dumpObjectCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, vo
 }
 
 bool dumpInstanceCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, void *data) {
+    (void)pDataBlock;
     BUFFER *wb = data;
     if(!pInstance) {
         buffer_json_array_close(wb); // counters
@@ -892,6 +892,9 @@ void dumpSample(BUFFER *wb, RAW_DATA *d) {
 }
 
 bool dumpInstanceCounterCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, PERF_COUNTER_DEFINITION *pCounter, RAW_DATA *sample, void *data) {
+    (void)pDataBlock;
+    (void)pObjectType;
+    (void)pInstance;
     BUFFER *wb = data;
     buffer_json_add_array_item_object(wb);
     buffer_json_member_add_string(wb, "name", RegistryFindNameByID(pCounter->CounterNameTitleIndex));
@@ -902,6 +905,8 @@ bool dumpInstanceCounterCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjec
 }
 
 bool dumpCounterCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_COUNTER_DEFINITION *pCounter, RAW_DATA *sample, void *data) {
+    (void)pDataBlock;
+    (void)pObjectType;
     BUFFER *wb = data;
     buffer_json_add_array_item_object(wb);
     buffer_json_member_add_string(wb, "name", RegistryFindNameByID(pCounter->CounterNameTitleIndex));
