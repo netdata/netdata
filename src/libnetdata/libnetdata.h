@@ -9,7 +9,7 @@ extern "C" {
 
 #include "config.h"
 
-#ifdef ENABLE_OPENSSL
+#if defined(ENABLE_OPENSSL) || defined(ENABLE_WOLFSSL)
 #define ENABLE_HTTPS 1
 #endif
 
