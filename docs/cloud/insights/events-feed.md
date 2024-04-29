@@ -1,6 +1,6 @@
 # Events tab
 
-The Events tab provides a feed which is a powerful feature that tracks events that happen on your infrastructure, or in your War Room. The feed lets you investigate events that occurred in the past, which is invaluable for troubleshooting. Common use cases are ones like when a node goes offline, and you want to understand what events happened before that. A detailed event history can also assist in attributing sudden pattern changes in a time series to specific changes in your environment.
+The Events tab provides a feed which is a powerful feature that tracks events that happen on your infrastructure, or in your Space. The feed lets you investigate events that occurred in the past, which is invaluable for troubleshooting. Common use cases are ones like when a node goes offline, and you want to understand what events happened before that. A detailed event history can also assist in attributing sudden pattern changes in a time series to specific changes in your environment.
 
 ## What are the available events?
 
@@ -71,22 +71,3 @@ All users will be able to see events from the Topology and Alerts domain but Aud
 > **Note**
 >
 > When you try to query a longer period than what your space allows you will see an error message highlighting that you are querying data outside of your plan.
-
-### Event types and filters
-
-| Event type | Tags | Nodes | Alert Status | Alert Names | Chart Names | 
-| :-- | :-- | :-- | :-- | :-- | :-- |
-| Node Became Live | node, lifecycle | Node name | - | - | - |
-| Node Became Stale | node, lifecycle | Node name | - | - | - |
-| Node Became Offline | node, lifecycle | Node name | - | - | - |
-| Node Created | node, lifecycle | Node name | - | - | - |
-| Node Removed | node, lifecycle | Node name | - | - | - |
-| Node Restored | node, lifecycle | Node name | - | - | - |
-| Node Deleted | node, lifecycle | Node name | - | - | - |
-| Agent Claimed | agent | - | - | - | - | 
-| Agent Connected | agent | - | - | - | - | 
-| Agent Disconnected | agent | - | - | - | - | 
-| Agent Authenticated | agent | - | - | - | - | 
-| Agent Authentication Failed | agent | - | - | - | - | 
-| Space Statistics | space, node, statistics | Node name | - | - | - |
-| Node Alert State Changed | alert, node | Node name | Cleared, Warning, Critical, Removed, Error or Unknown | Alert name | Chart name |
