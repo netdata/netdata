@@ -2104,7 +2104,7 @@ static void vfs_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_vfs_read_global_table(stats, maps_per_core);
 
-        if (cgroups)
+        if (cgroups && shm_ebpf_cgroup.header)
             read_update_vfs_cgroup();
 
         pthread_mutex_lock(&lock);
@@ -2115,7 +2115,7 @@ static void vfs_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_vfs_send_apps_data(em, apps_groups_root_target);
 
-        if (cgroups && shm_ebpf_cgroup.header && ebpf_cgroup_pids)
+        if (cgroups && shm_ebpf_cgroup.header)
             ebpf_vfs_send_cgroup_data(em);
 
         pthread_mutex_unlock(&lock);
