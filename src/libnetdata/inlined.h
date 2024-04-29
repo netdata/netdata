@@ -453,7 +453,7 @@ static inline bool sanitize_command_argument_string(char *dst, const char *src, 
         if (dst_size < 1)
             return false;
 
-        if (iscntrl(*src) || *src == '$') {
+        if (iscntrl((uint8_t)*src) || *src == '$') {
             // remove control characters and characters that are expanded by bash
             *dst++ = '_';
             dst_size--;
@@ -597,7 +597,7 @@ static inline char *strsep_skip_consecutive_separators(char **ptr, char *s) {
 // remove leading and trailing spaces; may return NULL
 static inline char *trim(char *s) {
     // skip leading spaces
-    while (*s && isspace(*s)) s++;
+    while (*s && isspace((uint8_t)*s)) s++;
     if (!*s) return NULL;
 
     // skip tailing spaces
@@ -605,7 +605,7 @@ static inline char *trim(char *s) {
     ssize_t l = (ssize_t)strlen(s);
     if (--l >= 0) {
         char *p = s + l;
-        while (p > s && isspace(*p)) p--;
+        while (p > s && isspace((uint8_t)*p)) p--;
         *++p = '\0';
     }
 
@@ -619,27 +619,27 @@ static inline char *trim_all(char *buffer) {
     char *d = buffer, *s = buffer;
 
     // skip spaces
-    while(isspace(*s)) s++;
+    while(isspace((uint8_t)*s)) s++;
 
     while(*s) {
         // copy the non-space part
-        while(*s && !isspace(*s)) *d++ = *s++;
+        while(*s && !isspace((uint8_t)*s)) *d++ = *s++;
 
         // add a space if we have to
-        if(*s && isspace(*s)) {
+        if(*s && isspace((uint8_t)*s)) {
             *d++ = ' ';
             s++;
         }
 
         // skip spaces
-        while(isspace(*s)) s++;
+        while(isspace((uint8_t)*s)) s++;
     }
 
     *d = '\0';
 
     if(d > buffer) {
         d--;
-        if(isspace(*d)) *d = '\0';
+        if(isspace((uint8_t)*d)) *d = '\0';
     }
 
     if(!buffer[0]) return NULL;

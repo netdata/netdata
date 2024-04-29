@@ -275,10 +275,10 @@ BOOL DisplayCalculatedValue(RAW_DATA* pSample0, RAW_DATA* pSample1)
         {
             default:
                 if (PERF_DELTA_COUNTER != (pSample0->CounterType & PERF_DELTA_COUNTER))
-                {
                     break;
-                }
                 __fallthrough;
+                // fallthrough
+
             case PERF_AVERAGE_TIMER: // Special case.
             case PERF_AVERAGE_BULK:  // Special case.
                 printf(" > The counter type requires two samples but only one sample was provided.\n");

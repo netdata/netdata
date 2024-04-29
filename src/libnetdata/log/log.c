@@ -1599,7 +1599,7 @@ static bool needs_quotes_for_logfmt(const char *s)
         return true;
 
     while(*s) {
-        if(*s == '=' || isspace(*s) || !safe_for_logfmt[(uint8_t)*s])
+        if(*s == '=' || isspace((uint8_t)*s) || !safe_for_logfmt[(uint8_t)*s])
             return true;
 
         s++;
@@ -1733,7 +1733,7 @@ bool nd_log_journal_socket_available(void) {
     return is_path_unix_socket("/run/systemd/journal/socket");
 }
 
-static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields_max) {
+static bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_t fields_max __maybe_unused) {
 #ifdef HAVE_SYSTEMD
 
     //  --- FIELD_PARSER_VERSIONS ---

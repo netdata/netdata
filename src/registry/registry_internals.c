@@ -35,12 +35,12 @@ static inline char *registry_fix_machine_name(char *name, size_t *len) {
     char *s = name?name:"";
 
     // skip leading spaces
-    while(*s && isspace(*s)) s++;
+    while(*s && isspace((uint8_t)*s)) s++;
 
     // make sure all spaces are a SPACE
     char *t = s;
     while(*t) {
-        if(unlikely(isspace(*t)))
+        if(unlikely(isspace((uint8_t)*t)))
             *t = ' ';
 
         t++;

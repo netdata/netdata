@@ -67,7 +67,7 @@ int journal_direct_fd(const char *path) {
     return fd;
 }
 
-static inline bool journal_send_with_memfd(int fd, const char *msg, size_t msg_len) {
+static inline bool journal_send_with_memfd(int fd __maybe_unused, const char *msg __maybe_unused, size_t msg_len __maybe_unused) {
 #if defined(__NR_memfd_create) && defined(MFD_ALLOW_SEALING) && defined(F_ADD_SEALS) && defined(F_SEAL_SHRINK) && defined(F_SEAL_GROW) && defined(F_SEAL_WRITE)
     // Create a memory file descriptor
     int memfd = (int)syscall(__NR_memfd_create, "journald", MFD_ALLOW_SEALING);

@@ -306,7 +306,7 @@ static bool check_claim_param(const char *s) {
     if(!s || !*s) return true;
 
     do {
-        if(isalnum(*s) || *s == '.' || *s == ',' || *s == '-' || *s == ':' || *s == '/' || *s == '_')
+        if(isalnum((uint8_t)*s) || *s == '.' || *s == ',' || *s == '-' || *s == ':' || *s == '/' || *s == '_')
             ;
         else
             return false;

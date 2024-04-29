@@ -201,7 +201,7 @@ void sock_setcloexec(int fd)
 #endif
 }
 
-int sock_setreuse_port(int fd, int reuse) {
+int sock_setreuse_port(int fd __maybe_unused, int reuse __maybe_unused) {
     int ret;
 
 #ifdef SO_REUSEPORT
@@ -757,10 +757,10 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
         char *e = s;
 
         // skip separators, moving both s(tart) and e(nd)
-        while(isspace(*e) || *e == ',') s = ++e;
+        while(isspace((uint8_t)*e) || *e == ',') s = ++e;
 
         // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',') e++;
+        while(*e && !isspace((uint8_t)*e) && *e != ',') e++;
 
         // is there anything?
         if(!*s || s == e) break;
@@ -1091,10 +1091,10 @@ void foreach_entry_in_connection_string(const char *destination, bool (*callback
         const char *e = s;
 
         // skip separators, moving both s(tart) and e(nd)
-        while(isspace(*e) || *e == ',') s = ++e;
+        while(isspace((uint8_t)*e) || *e == ',') s = ++e;
 
         // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',') e++;
+        while(*e && !isspace((uint8_t)*e) && *e != ',') e++;
 
         // is there anything?
         if(!*s || s == e) break;

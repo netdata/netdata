@@ -333,10 +333,10 @@ int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size
                 s = &buffer[key_length - 1];
 
             // skip a word from the end
-            while (s >= buffer && !isspace(*s)) *s-- = '\0';
+            while (s >= buffer && !isspace((uint8_t)*s)) *s-- = '\0';
 
             // skip all spaces
-            while (s >= buffer && isspace(*s)) *s-- = '\0';
+            while (s >= buffer && isspace((uint8_t)*s)) *s-- = '\0';
         }
     }
 

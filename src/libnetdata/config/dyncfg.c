@@ -203,7 +203,7 @@ bool dyncfg_is_valid_id(const char *id) {
     const char *s = id;
 
     while(*s) {
-        if(isspace(*s) || *s == '\'') return false;
+        if(isspace((uint8_t)*s) || *s == '\'') return false;
         s++;
     }
 
@@ -221,7 +221,7 @@ char *dyncfg_escape_id_for_filename(const char *id) {
     char *dest = escaped;
 
     while (*src) {
-        if (*src == '/' || isspace(*src) || !isprint(*src)) {
+        if (*src == '/' || isspace((uint8_t)*src) || !isprint((uint8_t)*src)) {
             sprintf(dest, "%%%02X", (unsigned char)*src);
             dest += 3;
         } else {

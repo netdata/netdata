@@ -383,7 +383,7 @@ static inline void print_parsed_as_node(BUFFER *out, EVAL_NODE *op, int *error) 
 // skip spaces
 static inline void skip_spaces(const char **string) {
     const char *s = *string;
-    while(isspace(*s)) s++;
+    while(isspace((uint8_t)*s)) s++;
     *string = s;
 }
 
@@ -1219,7 +1219,7 @@ void expression_hardcode_variable(EVAL_EXPRESSION *expression, STRING *variable,
             }
 
             if (s) {
-                if (s == s1 && (isalnum(s[len]) || s[len] == '_')) {
+                if (s == s1 && (isalnum((uint8_t)s[len]) || s[len] == '_')) {
                     // Move past the variable if it's part of a larger word.
                     source_ptr = s + len;
                     continue;

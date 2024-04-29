@@ -904,7 +904,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
  * @return It returns 1 on success and 0 otherwise
  */
 int config_parse_duration(const char* string, int* result) {
-    while(*string && isspace(*string)) string++;
+    while(*string && isspace((uint8_t)*string)) string++;
 
     if(unlikely(!*string)) goto fallback;
 
@@ -915,7 +915,7 @@ int config_parse_duration(const char* string, int* result) {
     }
 
     // make sure it is a number
-    if(!(isdigit(*string) || *string == '+' || *string == '-')) goto fallback;
+    if(!(isdigit((uint8_t)*string) || *string == '+' || *string == '-')) goto fallback;
 
     char *e = NULL;
     NETDATA_DOUBLE n = str2ndd(string, &e);

@@ -67,11 +67,11 @@ int uuid_parse_flexi(const char *in, uuid_t uu) {
                 return -2;
         }
 
-        if (likely(isxdigit(*s))) {
+        if (likely(isxdigit((uint8_t)*s))) {
             int high = hex_char_to_int(*s++);
             hexCharCount++;
 
-            if (likely(isxdigit(*s))) {
+            if (likely(isxdigit((uint8_t)*s))) {
                 int low = hex_char_to_int(*s++);
                 hexCharCount++;
 

@@ -2229,8 +2229,8 @@ static int facets_keys_reorder_compar(const void *a, const void *b) {
     if(!an) an = "0";
     if(!bn) bn = "0";
 
-    while(*an && ispunct(*an)) an++;
-    while(*bn && ispunct(*bn)) bn++;
+    while(*an && ispunct((uint8_t)*an)) an++;
+    while(*bn && ispunct((uint8_t)*bn)) bn++;
 
     return strcasecmp(an, bn);
 }
@@ -2256,8 +2256,8 @@ static int facets_key_values_reorder_by_name_compar(const void *a, const void *b
     const char *an = (av->name && av->name_len) ? av->name : "0";
     const char *bn = (bv->name && bv->name_len) ? bv->name : "0";
 
-    while(*an && ispunct(*an)) an++;
-    while(*bn && ispunct(*bn)) bn++;
+    while(*an && ispunct((uint8_t)*an)) an++;
+    while(*bn && ispunct((uint8_t)*bn)) bn++;
 
     int ret = strcasecmp(an, bn);
     return ret;
@@ -2309,7 +2309,7 @@ static uint32_t facets_sort_and_reorder_values_internal(FACET_KEY *k) {
 
         if(all_values_numeric && !v->empty && v->name && v->name_len) {
             const char *s = v->name;
-            while(isdigit(*s)) s++;
+            while(isdigit((uint8_t)*s)) s++;
             if(*s != '\0')
                 all_values_numeric = false;
         }

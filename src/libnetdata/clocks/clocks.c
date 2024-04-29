@@ -92,7 +92,7 @@ void clocks_init(void) {
 inline time_t now_sec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
+        netdata_log_error("clock_gettime(%ld, &timespec) failed.", (long int)clk_id);
         return 0;
     }
     return ts.tv_sec;
@@ -101,7 +101,7 @@ inline time_t now_sec(clockid_t clk_id) {
 inline usec_t now_usec(clockid_t clk_id) {
     struct timespec ts;
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
+        netdata_log_error("clock_gettime(%ld, &timespec) failed.", (long int)clk_id);
         return 0;
     }
     return (usec_t)ts.tv_sec * USEC_PER_SEC + (usec_t)(ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
@@ -111,7 +111,7 @@ inline int now_timeval(clockid_t clk_id, struct timeval *tv) {
     struct timespec ts;
 
     if(unlikely(clock_gettime(clk_id, &ts) == -1)) {
-        netdata_log_error("clock_gettime(%d, &timespec) failed.", clk_id);
+        netdata_log_error("clock_gettime(%ld, &timespec) failed.", (long int)clk_id);
         tv->tv_sec = 0;
         tv->tv_usec = 0;
         return -1;

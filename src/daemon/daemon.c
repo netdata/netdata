@@ -206,7 +206,7 @@ static void oom_score_adj(void) {
 
     // check netdata.conf configuration
     s = config_get(CONFIG_SECTION_GLOBAL, "OOM score", s);
-    if(s && *s && (isdigit(*s) || *s == '-' || *s == '+'))
+    if(s && *s && (isdigit((uint8_t)*s) || *s == '-' || *s == '+'))
         wanted_score = atoll(s);
     else if(s && !strcmp(s, "keep")) {
         netdata_log_info("Out-Of-Memory (OOM) kept as-is (running with %d)", (int) old_score);

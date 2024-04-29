@@ -44,7 +44,7 @@ unsigned long os_read_cpuset_cpus(const char *filename, long system_cpus) {
 
         // parse the cpuset string and calculate the number of cpus the cgroup is allowed to use
         while (*s) {
-            if (isspace(*s)) {
+            if (isspace((uint8_t)*s)) {
                 s++;
                 continue;
             }

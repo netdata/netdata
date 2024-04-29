@@ -777,7 +777,7 @@ void get_system_timezone(void)
         *d = '\0';
 
         while (*timezone) {
-            if (isalnum(*timezone) || *timezone == '_' || *timezone == '/')
+            if (isalnum((uint8_t)*timezone) || *timezone == '_' || *timezone == '/')
                 *d++ = *timezone++;
             else
                 timezone++;
@@ -816,11 +816,11 @@ void get_system_timezone(void)
             } else {
                 sign[0] = zone[0] == '-' || zone[0] == '+' ? zone[0] : '0';
                 sign[1] = '\0';
-                hh[0] = isdigit(zone[1]) ? zone[1] : '0';
-                hh[1] = isdigit(zone[2]) ? zone[2] : '0';
+                hh[0] = isdigit((uint8_t)zone[1]) ? zone[1] : '0';
+                hh[1] = isdigit((uint8_t)zone[2]) ? zone[2] : '0';
                 hh[2] = '\0';
-                mm[0] = isdigit(zone[3]) ? zone[3] : '0';
-                mm[1] = isdigit(zone[4]) ? zone[4] : '0';
+                mm[0] = isdigit((uint8_t)zone[3]) ? zone[3] : '0';
+                mm[1] = isdigit((uint8_t)zone[4]) ? zone[4] : '0';
                 mm[2] = '\0';
 
                 netdata_configured_utc_offset = (str2i(hh) * 3600) + (str2i(mm) * 60);

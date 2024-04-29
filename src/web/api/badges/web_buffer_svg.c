@@ -255,7 +255,7 @@ static inline char *format_value_with_precision_and_unit(char *value_string, siz
         value = 0.0;
 
     char *separator = "";
-    if(unlikely(isalnum(*units)))
+    if(unlikely(isalnum((uint8_t)*units)))
         separator = " ";
 
     if(precision < 0) {
