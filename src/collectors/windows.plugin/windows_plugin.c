@@ -11,9 +11,9 @@ static struct proc_module {
 } win_modules[] = {
 
     // system metrics
-    {.name = "GetSystemTimes",               .dim = "GetSystemTimes",           .func = do_GetSystemTimes},
-    {.name = "GlobalMemoryStatusEx",         .dim = "GlobalMemoryStatusEx",     .func = do_GlobalMemoryStatusEx},
-    {.name = "GetTickCount64",               .dim = "GetTickCount64",           .func = do_GetTickCount64},
+    {.name = "GetSystemUptime",           .dim = "GetSystemUptime",         .func = do_GetSystemUptime},
+    {.name = "GetSystemRAM",              .dim = "GetSystemRAM",            .func = do_GetSystemRAM},
+    {.name = "GetSystemCPU",              .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}

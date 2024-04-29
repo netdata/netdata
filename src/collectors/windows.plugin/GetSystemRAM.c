@@ -3,7 +3,7 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-int do_GlobalMemoryStatusEx(int update_every, usec_t dt __maybe_unused) {
+int do_GetSystemRAM(int update_every, usec_t dt __maybe_unused) {
     MEMORYSTATUSEX memStat = { 0 };
     memStat.dwLength = sizeof(memStat);
 

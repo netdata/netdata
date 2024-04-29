@@ -3,7 +3,7 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-int do_GetTickCount64(int update_every, usec_t dt __maybe_unused) {
+int do_GetSystemUptime(int update_every, usec_t dt __maybe_unused) {
     ULONGLONG uptime = GetTickCount64(); // in milliseconds
 
     static RRDSET *st = NULL;

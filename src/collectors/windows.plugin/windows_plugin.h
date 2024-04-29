@@ -9,9 +9,9 @@
 
 void *win_plugin_main(void *ptr);
 
-int do_GetSystemTimes(int update_every, usec_t dt);
-int do_GlobalMemoryStatusEx(int update_every, usec_t dt);
-int do_GetTickCount64(int update_every, usec_t dt);
+int do_GetSystemUptime(int update_every, usec_t dt);
+int do_GetSystemRAM(int update_every, usec_t dt);
+int do_GetSystemCPU(int update_every, usec_t dt);
 
 void RegistryInitialize(void);
 void RegistryUpdate(void);

@@ -3,7 +3,7 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
-int do_GetSystemTimes(int update_every, usec_t dt __maybe_unused) {
+int do_GetSystemCPU(int update_every, usec_t dt __maybe_unused) {
     FILETIME idleTime, kernelTime, userTime;
 
     memset(&idleTime, 0, sizeof(idleTime));

@@ -1244,9 +1244,9 @@ set(FREEBSD_PLUGIN_FILES
 set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/windows_plugin.c
         src/collectors/windows.plugin/windows_plugin.h
-        src/collectors/windows.plugin/GetSystemTimes.c
-        src/collectors/windows.plugin/GlobalMemoryStatusEx.c
-        src/collectors/windows.plugin/GetTickCount64.c
+        src/collectors/windows.plugin/GetSystemUptime.c
+        src/collectors/windows.plugin/GetSystemRAM.c
+        src/collectors/windows.plugin/GetSystemCPU.c
         src/collectors/windows.plugin/perflib.c
         src/collectors/windows.plugin/perflib.h
         src/collectors/windows.plugin/perflib-names.c
