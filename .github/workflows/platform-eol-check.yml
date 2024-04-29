@@ -119,7 +119,7 @@ jobs:
         if: steps.check.outputs.pending == 'true' && steps.existing.outputs.exists == 'false'
         uses: imjohnbo/issue-bot@v3
         with:
-          assignees: netdata/agent-sre
+          assignees: Ferroin
           labels: area/packaging, needs triage
           title: ${{ steps.title.outputs.title }}
           body: |
