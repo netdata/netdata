@@ -28,7 +28,7 @@ require (
 	github.com/ilyam8/hashstructure v1.1.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jessevdk/go-flags v1.5.0
-	github.com/likexian/whois v1.15.2
+	github.com/likexian/whois v1.15.3
 	github.com/likexian/whois-parser v1.24.15
 	github.com/lmittmann/tint v1.0.4
 	github.com/mattn/go-isatty v0.0.20
