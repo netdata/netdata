@@ -9,6 +9,41 @@ struct LogicalDisk {
     DICTIONARY *counters;
 };
 
+
+struct logical_disk {
+    COUNTER_DATA percentDiskFree;
+    COUNTER_DATA freeMegabytes;
+
+    COUNTER_DATA percentIdleTime;
+    COUNTER_DATA percentDiskTime;
+    COUNTER_DATA percentDiskReadTime;
+    COUNTER_DATA percentDiskWriteTime;
+
+    COUNTER_DATA currentDiskQueueLength;
+    COUNTER_DATA averageDiskQueueLength;
+    COUNTER_DATA averageDiskReadQueueLength;
+    COUNTER_DATA averageDiskWriteQueueLength;
+
+    COUNTER_DATA averageDiskSecondsPerTransfer;
+    COUNTER_DATA averageDiskSecondsPerRead;
+    COUNTER_DATA averageDiskSecondsPerWrite;
+
+    COUNTER_DATA diskTransfersPerSec;
+    COUNTER_DATA diskReadsPerSec;
+    COUNTER_DATA diskWritesPerSec;
+
+    COUNTER_DATA diskBytesPerSec;
+    COUNTER_DATA diskReadBytesPerSec;
+    COUNTER_DATA diskWriteBytesPerSec;
+
+    COUNTER_DATA averageDiskBytesPerTransfer;
+    COUNTER_DATA averageDiskBytesPerRead;
+    COUNTER_DATA averageDiskBytesPerWrite;
+
+    COUNTER_DATA splitIoPerSec;
+};
+
+
 int do_PerflibDisks(int update_every, usec_t dt __maybe_unused) {
     char name[4096];
 
@@ -27,7 +62,14 @@ int do_PerflibDisks(int update_every, usec_t dt __maybe_unused) {
             if(!getInstanceName(pDataBlock, pLogicalDisk, pi, name, sizeof(name)))
                 strncpyz(name, "[unknown]", sizeof(name) - 1);
 
+            COUNTER_DATA diskFree = {
+                .name = "% Free Space",
+            }, freeMegabytes = {
+                             .name = "Free Megabytes",
+                         };
 
+            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &diskFree);
+            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &freeMegabytes);
         }
     }
 

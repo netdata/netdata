@@ -439,15 +439,23 @@ cleanup:
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline BOOL isValidPointer(PERF_DATA_BLOCK *pDataBlock, void *ptr) {
+static inline BOOL isValidPointer(PERF_DATA_BLOCK *pDataBlock __maybe_unused, void *ptr __maybe_unused) {
+#ifdef NETDATA_INTERNAL_CHECKS
     return (PBYTE)ptr >= (PBYTE)pDataBlock + pDataBlock->TotalByteLength ? FALSE : TRUE;
+#else
+    return TRUE;
+#endif
 }
 
-static inline BOOL isValidStructure(PERF_DATA_BLOCK *pDataBlock, void *ptr, size_t length) {
+static inline BOOL isValidStructure(PERF_DATA_BLOCK *pDataBlock __maybe_unused, void *ptr __maybe_unused, size_t length __maybe_unused) {
+#ifdef NETDATA_INTERNAL_CHECKS
     return (PBYTE)ptr + length > (PBYTE)pDataBlock + pDataBlock->TotalByteLength ? FALSE : TRUE;
+#else
+    return TRUE;
+#endif
 }
 
-static PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer) {
+static inline PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer) {
     PERF_DATA_BLOCK *pDataBlock = (PERF_DATA_BLOCK *)pBuffer;
 
     static WCHAR signature[] = { 'P', 'E', 'R', 'F' };
@@ -468,7 +476,7 @@ static PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer) {
     return pDataBlock;
 }
 
-static PERF_OBJECT_TYPE *getObjectType(PERF_DATA_BLOCK* pDataBlock, PERF_OBJECT_TYPE *lastObjectType) {
+static inline PERF_OBJECT_TYPE *getObjectType(PERF_DATA_BLOCK* pDataBlock, PERF_OBJECT_TYPE *lastObjectType) {
     PERF_OBJECT_TYPE* pObjectType = NULL;
 
     if(!lastObjectType)
@@ -486,7 +494,7 @@ static PERF_OBJECT_TYPE *getObjectType(PERF_DATA_BLOCK* pDataBlock, PERF_OBJECT_
     return pObjectType;
 }
 
-PERF_OBJECT_TYPE *getObjectTypeByIndex(PERF_DATA_BLOCK *pDataBlock, DWORD ObjectNameTitleIndex) {
+inline PERF_OBJECT_TYPE *getObjectTypeByIndex(PERF_DATA_BLOCK *pDataBlock, DWORD ObjectNameTitleIndex) {
     PERF_OBJECT_TYPE *po = NULL;
     for(DWORD o = 0; o < pDataBlock->NumObjectTypes ; o++) {
         po = getObjectType(pDataBlock, po);
@@ -497,7 +505,7 @@ PERF_OBJECT_TYPE *getObjectTypeByIndex(PERF_DATA_BLOCK *pDataBlock, DWORD Object
     return NULL;
 }
 
-static PERF_INSTANCE_DEFINITION *getInstance(
+static inline PERF_INSTANCE_DEFINITION *getInstance(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     PERF_COUNTER_BLOCK *lastCounterBlock
@@ -518,7 +526,7 @@ static PERF_INSTANCE_DEFINITION *getInstance(
     return pInstance;
 }
 
-static PERF_COUNTER_BLOCK *getObjectTypeCounterBlock(
+static inline PERF_COUNTER_BLOCK *getObjectTypeCounterBlock(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType
 ) {
@@ -533,7 +541,7 @@ static PERF_COUNTER_BLOCK *getObjectTypeCounterBlock(
     return pCounterBlock;
 }
 
-static PERF_COUNTER_BLOCK *getInstanceCounterBlock(
+static inline PERF_COUNTER_BLOCK *getInstanceCounterBlock(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     PERF_INSTANCE_DEFINITION *pInstance
@@ -550,7 +558,7 @@ static PERF_COUNTER_BLOCK *getInstanceCounterBlock(
     return pCounterBlock;
 }
 
-PERF_INSTANCE_DEFINITION *getInstanceByPosition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, DWORD instancePosition) {
+inline PERF_INSTANCE_DEFINITION *getInstanceByPosition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, DWORD instancePosition) {
     PERF_INSTANCE_DEFINITION *pi = NULL;
     PERF_COUNTER_BLOCK *pc = NULL;
     for(DWORD i = 0; i <= instancePosition ;i++) {
@@ -560,7 +568,7 @@ PERF_INSTANCE_DEFINITION *getInstanceByPosition(PERF_DATA_BLOCK *pDataBlock, PER
     return pi;
 }
 
-static PERF_COUNTER_DEFINITION *getCounterDefinition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_COUNTER_DEFINITION *lastCounterDefinition) {
+static inline PERF_COUNTER_DEFINITION *getCounterDefinition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_COUNTER_DEFINITION *lastCounterDefinition) {
     PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
 
     if(!lastCounterDefinition)
@@ -579,7 +587,7 @@ static PERF_COUNTER_DEFINITION *getCounterDefinition(PERF_DATA_BLOCK *pDataBlock
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodePage, char *start, DWORD length) {
+static inline BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodePage, char *start, DWORD length) {
     WCHAR *tempBuffer;  // Temporary buffer for Unicode data
     DWORD charsCopied = 0;
     BOOL free_tempBuffer;
@@ -621,7 +629,7 @@ static BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodePage, ch
     return TRUE;
 }
 
-BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance,
+inline BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance,
                      char *buffer, size_t bufferLen) {
     (void)pDataBlock;
 
@@ -631,12 +639,12 @@ BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType,
                                   ((char *) pInstance + pInstance->NameOffset), pInstance->NameLength);
 }
 
-BOOL getSystemName(PERF_DATA_BLOCK *pDataBlock, char *buffer, size_t bufferLen) {
+inline BOOL getSystemName(PERF_DATA_BLOCK *pDataBlock, char *buffer, size_t bufferLen) {
     return getEncodedStringToUTF8(buffer, bufferLen, 0,
                                   ((char *)pDataBlock + pDataBlock->SystemNameOffset), pDataBlock->SystemNameLength);
 }
 
-bool ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType) {
+inline bool ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType) {
     (void)pDataBlock;
     return pObjectType->NumInstances != PERF_NO_INSTANCES && pObjectType->NumInstances > 0;
 }
@@ -658,6 +666,37 @@ PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PE
 
     return getInstance(pDataBlock, pObjectType,
                        lastInstance ? getInstanceCounterBlock(pDataBlock, pObjectType, lastInstance) : NULL );
+}
+
+bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *d) {
+    PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
+    for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
+        pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
+        if(!pCounterDefinition) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "WINDOWS: PERFLIB: Cannot read counter definition No %u (out of %u)",
+                   c, pObjectType->NumCounters);
+            break;
+        }
+
+        if(d->id) {
+            if(d->id != pCounterDefinition->CounterNameTitleIndex)
+                continue;
+        }
+        else {
+            if(strcmp(RegistryFindNameByID(pCounterDefinition->CounterNameTitleIndex), d->name) != 0)
+                continue;
+
+            d->id = pCounterDefinition->CounterNameTitleIndex;
+        }
+
+        d->d.CounterType = pCounterDefinition->CounterType;
+        PERF_COUNTER_BLOCK *pCounterBlock = getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
+
+        return getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &d->d);
+    }
+
+    return false;
 }
 
 PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id) {

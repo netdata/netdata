@@ -24,6 +24,13 @@ typedef struct _rawdata {
     LONGLONG Frequency;
 } RAW_DATA, *PRAW_DATA;
 
+typedef struct {
+    DWORD id;
+    const char *name;
+    RAW_DATA d;
+} COUNTER_DATA;
+bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *d);
+
 typedef bool (*perflib_data_cb)(PERF_DATA_BLOCK *pDataBlock, void *data);
 typedef bool (*perflib_object_cb)(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, void *data);
 typedef bool (*perflib_instance_cb)(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, void *data);
