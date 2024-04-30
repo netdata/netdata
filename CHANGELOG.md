@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix platform EOL check issue assignment. [\#17544](https://github.com/netdata/netdata/pull/17544) ([Ferroin](https://github.com/Ferroin))
+- Bump github.com/likexian/whois from 1.15.2 to 1.15.3 in /src/go/collectors/go.d.plugin [\#17542](https://github.com/netdata/netdata/pull/17542) ([dependabot[bot]](https://github.com/apps/dependabot))
 - add features section requested on Okta review [\#17531](https://github.com/netdata/netdata/pull/17531) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Don’t unnescesarily clean repo during static builds. [\#17530](https://github.com/netdata/netdata/pull/17530) ([Ferroin](https://github.com/Ferroin))
 - Revert changes to ENABLE\_CLOUD option. [\#17528](https://github.com/netdata/netdata/pull/17528) ([Ferroin](https://github.com/Ferroin))
@@ -418,9 +420,6 @@
 - Move health/ under src/ [\#16954](https://github.com/netdata/netdata/pull/16954) ([vkalintiris](https://github.com/vkalintiris))
 - fix linking of a markdown file [\#16952](https://github.com/netdata/netdata/pull/16952) ([tkatsoulas](https://github.com/tkatsoulas))
 - Do not declare struct meant for internal usage [\#16951](https://github.com/netdata/netdata/pull/16951) ([vkalintiris](https://github.com/vkalintiris))
-- fix wrong sizeof [\#16950](https://github.com/netdata/netdata/pull/16950) ([ktsaou](https://github.com/ktsaou))
-- Split network viewer plugin to it’s own package. [\#16949](https://github.com/netdata/netdata/pull/16949) ([Ferroin](https://github.com/Ferroin))
-- update bundled UI to v6.85.0 [\#16948](https://github.com/netdata/netdata/pull/16948) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
