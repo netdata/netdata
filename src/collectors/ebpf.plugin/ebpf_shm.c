@@ -1119,7 +1119,7 @@ static void shm_collector(ebpf_module_t *em)
         ebpf_shm_read_global_table(stats, maps_per_core);
         pthread_mutex_lock(&lock);
 
-        if (cgroups) {
+        if (cgroups && shm_ebpf_cgroup.header) {
             ebpf_update_shm_cgroup();
         }
 
@@ -1129,7 +1129,7 @@ static void shm_collector(ebpf_module_t *em)
             ebpf_shm_send_apps_data(apps_groups_root_target);
         }
 
-        if (cgroups) {
+        if (cgroups && shm_ebpf_cgroup.header) {
             ebpf_shm_send_cgroup_data(update_every);
         }
 
