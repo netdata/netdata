@@ -72,14 +72,8 @@ static void sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     static __thread sqlite3_stmt *res = NULL;
     int rc;
 
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report(
-                "HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG_DETAIL", rrdhost_hostname(host));
-            return;
-        }
-    }
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG_DETAIL, &res))
+        return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id));
@@ -135,13 +129,8 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
 
     REQUIRE_DB(db_meta);
 
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, SQL_INSERT_HEALTH_LOG, &res);
-        if (unlikely(rc != SQLITE_OK)) {
-            error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
-            return;
-        }
-    }
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_HEALTH_LOG, &res))
+        return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
