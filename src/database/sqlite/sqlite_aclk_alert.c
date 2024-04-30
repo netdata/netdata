@@ -483,8 +483,6 @@ void aclk_send_alarm_configuration(char *config_hash)
 void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash __maybe_unused)
 {
 #ifdef ENABLE_ACLK
-    int rc;
-
     sqlite3_stmt *res = NULL;
     struct aclk_sync_cfg_t *wc;
 
