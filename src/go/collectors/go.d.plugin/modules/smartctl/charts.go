@@ -193,7 +193,9 @@ func (s *Smartctl) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 	charts := module.Charts{}
 
 	for _, attr := range attrs {
-		if !isSmartAttrValid(attr) || strings.HasPrefix(attr.name(), "Unknown") {
+		if !isSmartAttrValid(attr) ||
+			strings.HasPrefix(attr.name(), "Unknown") ||
+			strings.HasPrefix(attr.name(), "Not_In_Use") {
 			continue
 		}
 
@@ -202,14 +204,17 @@ func (s *Smartctl) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 			deviceSmartAttributeNormalizedChartTmpl.Copy(),
 		}
 
-		name := cleanAttributeName(attr)
+		attrName := attributeNameMap(attr.name())
+		cleanAttrName := cleanAttributeName(attrName)
 
-		// FIXME: attribute charts unit
 		for _, chart := range cs {
-			chart.ID = fmt.Sprintf(chart.ID, dev.deviceName(), dev.deviceType(), name)
-			chart.Title = fmt.Sprintf(chart.Title, attr.name())
-			chart.Fam = fmt.Sprintf(chart.Fam, name)
-			chart.Ctx = fmt.Sprintf(chart.Ctx, name)
+			if chart.ID == deviceSmartAttributeDecodedChartTmpl.ID {
+				chart.Units = attributeUnit(attrName)
+			}
+			chart.ID = fmt.Sprintf(chart.ID, dev.deviceName(), dev.deviceType(), cleanAttrName)
+			chart.Title = fmt.Sprintf(chart.Title, attrName)
+			chart.Fam = fmt.Sprintf(chart.Fam, cleanAttrName)
+			chart.Ctx = fmt.Sprintf(chart.Ctx, cleanAttrName)
 			chart.Labels = []module.Label{
 				{Key: "device_name", Value: dev.deviceName()},
 				{Key: "device_type", Value: dev.deviceType()},
@@ -217,8 +222,8 @@ func (s *Smartctl) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 				{Key: "serial_number", Value: dev.serialNumber()},
 			}
 			for _, dim := range chart.Dims {
-				dim.ID = fmt.Sprintf(dim.ID, dev.deviceName(), dev.deviceType(), name)
-				dim.Name = fmt.Sprintf(dim.Name, name)
+				dim.ID = fmt.Sprintf(dim.ID, dev.deviceName(), dev.deviceType(), cleanAttrName)
+				dim.Name = fmt.Sprintf(dim.Name, cleanAttrName)
 			}
 		}
 
@@ -232,6 +237,50 @@ func (s *Smartctl) newDeviceSmartAttrCharts(dev *smartDevice) *module.Charts {
 
 var attrNameReplacer = strings.NewReplacer(" ", "_", "/", "_")
 
-func cleanAttributeName(attr *smartAttribute) string {
-	return strings.ToLower(attrNameReplacer.Replace(attr.name()))
+func cleanAttributeName(attrName string) string {
+	return strings.ToLower(attrNameReplacer.Replace(attrName))
+}
+
+func attributeUnit(attrName string) string {
+	units := map[string]string{
+		"Airflow_Temperature_Cel": "Celsius",
+		"Case_Temperature":        "Celsius",
+		"Drive_Temperature":       "Celsius",
+		"Temperature_Case":        "Celsius",
+		"Temperature_Celsius":     "Celsius",
+		"Temperature_Internal":    "Celsius",
+		"Power_On_Hours":          "hours",
+		"Spin_Up_Time":            "milliseconds",
+		"Media_Wearout_Indicator": "percent",
+		"Percent_Life_Remaining":  "percent",
+		"Percent_Lifetime_Remain": "percent",
+		"Total_LBAs_Read":         "sectors",
+		"Total_LBAs_Written":      "sectors",
+		"Offline_Uncorrectable":   "sectors",
+		"Pending_Sector_Count":    "sectors",
+		"Reallocated_Sector_Ct":   "sectors",
+	}
+
+	if unit, ok := units[attrName]; ok {
+		return unit
+	}
+
+	if strings.Contains(attrName, "Error") {
+		return "errors"
+	}
+
+	for _, s := range []string{"_Count", "_Cnt", "_Ct"} {
+		if strings.HasSuffix(attrName, s) {
+			return "events"
+		}
+	}
+
+	return "value"
+}
+
+func attributeNameMap(attrName string) string {
+	// TODO: Handle Vendor-Specific S.M.A.R.T. Attribute Naming
+	// S.M.A.R.T. attribute names can vary slightly between vendors (e.g., "Thermal_Throttle_St" vs. "Thermal_Throttle_Status").
+	// This function ensures consistent naming.
+	return attrName
 }
