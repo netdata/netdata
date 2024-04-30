@@ -4,6 +4,8 @@
 #include "windows-internals.h"
 
 struct logical_disk {
+    bool collected_metadata;
+
     STRING *filesystem;
 
     RRDSET *st_disk_space;
@@ -12,6 +14,22 @@ struct logical_disk {
 
     COUNTER_DATA percentDiskFree;
     // COUNTER_DATA freeMegabytes;
+};
+
+struct physical_disk {
+    bool collected_metadata;
+
+    STRING *device_type;
+    STRING *model;
+    STRING *serial;
+    STRING *id;
+
+    RRDSET *st_io;
+    RRDDIM *rd_io_reads;
+    RRDDIM *rd_io_writes;
+    COUNTER_DATA diskReadBytesPerSec;
+    COUNTER_DATA diskWriteBytesPerSec;
+
     COUNTER_DATA percentIdleTime;
     COUNTER_DATA percentDiskTime;
     COUNTER_DATA percentDiskReadTime;
@@ -27,12 +45,14 @@ struct logical_disk {
     COUNTER_DATA diskReadsPerSec;
     COUNTER_DATA diskWritesPerSec;
     COUNTER_DATA diskBytesPerSec;
-    COUNTER_DATA diskReadBytesPerSec;
-    COUNTER_DATA diskWriteBytesPerSec;
     COUNTER_DATA averageDiskBytesPerTransfer;
     COUNTER_DATA averageDiskBytesPerRead;
     COUNTER_DATA averageDiskBytesPerWrite;
     COUNTER_DATA splitIoPerSec;
+};
+
+struct physical_disk system_physical_total = {
+    .collected_metadata = true,
 };
 
 void dict_logical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -40,38 +60,53 @@ void dict_logical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, voi
 
     ld->percentDiskFree.name = "% Free Space";
     // ld->freeMegabytes.name = "Free Megabytes";
-    ld->percentIdleTime.name = "% Idle Time";
-    ld->percentDiskTime.name = "% Disk Time";
-    ld->percentDiskReadTime.name = "% Disk Read Time";
-    ld->percentDiskWriteTime.name = "% Disk Write Time";
-    ld->currentDiskQueueLength.name = "Current Disk Queue Length";
-    ld->averageDiskQueueLength.name = "Avg. Disk Queue Length";
-    ld->averageDiskReadQueueLength.name = "Avg. Disk Read Queue Length";
-    ld->averageDiskWriteQueueLength.name = "Avg. Disk Write Queue Length";
-    ld->averageDiskSecondsPerTransfer.name = "Avg. Disk sec/Transfer";
-    ld->averageDiskSecondsPerRead.name = "Avg. Disk sec/Read";
-    ld->averageDiskSecondsPerWrite.name = "Avg. Disk sec/Write";
-    ld->diskTransfersPerSec.name = "Disk Transfers/sec";
-    ld->diskReadsPerSec.name = "Disk Reads/sec";
-    ld->diskWritesPerSec.name = "Disk Writes/sec";
-    ld->diskBytesPerSec.name = "Disk Bytes/sec";
-    ld->diskReadBytesPerSec.name = "Disk Read Bytes/sec";
-    ld->diskWriteBytesPerSec.name = "Disk Write Bytes/sec";
-    ld->averageDiskBytesPerTransfer.name = "Avg. Disk Bytes/Transfer";
-    ld->averageDiskBytesPerRead.name = "Avg. Disk Bytes/Read";
-    ld->averageDiskBytesPerWrite.name = "Avg. Disk Bytes/Write";
-    ld->splitIoPerSec.name = "Split IO/Sec";
 }
 
-static DICTIONARY *logicalDisks = NULL;
+void initialize_physical_disk(struct physical_disk *pd) {
+    pd->percentIdleTime.name = "% Idle Time";
+    pd->percentDiskTime.name = "% Disk Time";
+    pd->percentDiskReadTime.name = "% Disk Read Time";
+    pd->percentDiskWriteTime.name = "% Disk Write Time";
+    pd->currentDiskQueueLength.name = "Current Disk Queue Length";
+    pd->averageDiskQueueLength.name = "Avg. Disk Queue Length";
+    pd->averageDiskReadQueueLength.name = "Avg. Disk Read Queue Length";
+    pd->averageDiskWriteQueueLength.name = "Avg. Disk Write Queue Length";
+    pd->averageDiskSecondsPerTransfer.name = "Avg. Disk sec/Transfer";
+    pd->averageDiskSecondsPerRead.name = "Avg. Disk sec/Read";
+    pd->averageDiskSecondsPerWrite.name = "Avg. Disk sec/Write";
+    pd->diskTransfersPerSec.name = "Disk Transfers/sec";
+    pd->diskReadsPerSec.name = "Disk Reads/sec";
+    pd->diskWritesPerSec.name = "Disk Writes/sec";
+    pd->diskBytesPerSec.name = "Disk Bytes/sec";
+    pd->diskReadBytesPerSec.name = "Disk Read Bytes/sec";
+    pd->diskWriteBytesPerSec.name = "Disk Write Bytes/sec";
+    pd->averageDiskBytesPerTransfer.name = "Avg. Disk Bytes/Transfer";
+    pd->averageDiskBytesPerRead.name = "Avg. Disk Bytes/Read";
+    pd->averageDiskBytesPerWrite.name = "Avg. Disk Bytes/Write";
+    pd->splitIoPerSec.name = "Split IO/Sec";
+}
+
+void dict_physical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct physical_disk *pd = value;
+    initialize_physical_disk(pd);
+}
+
+static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
 static void initialize(void) {
-    logicalDisks = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE |
+    initialize_physical_disk(&system_physical_total);
+
+    logicalDisks = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE |
                                                   DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
 
     dictionary_register_insert_callback(logicalDisks, dict_logical_disk_insert_cb, NULL);
+
+    physicalDisks = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE |
+                                                  DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct physical_disk));
+
+    dictionary_register_insert_callback(physicalDisks, dict_physical_disk_insert_cb, NULL);
 }
 
-STRING *getFileSystemType(const char* diskName) {
+static STRING *getFileSystemType(const char* diskName) {
     if (!diskName || !*diskName) return NULL;
 
     char fileSystemNameBuffer[128] = {0};  // Buffer for file system name
@@ -106,7 +141,162 @@ STRING *getFileSystemType(const char* diskName) {
         return string_strdupz(fileSystemNameBuffer);  // Duplicate the file system name
     }
     else
-        return string_strdupz("unknown");
+        return NULL;
+}
+
+static char buffer[4096];
+
+static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
+    DICTIONARY *dict = logicalDisks;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "LogicalDisk");
+    if(!pObjectType) return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for(LONG i = 0; i < pObjectType->NumInstances ; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if(!pi) break;
+
+        if(!getInstanceName(pDataBlock, pObjectType, pi, buffer, sizeof(buffer)))
+            strncpyz(buffer, "[unknown]", sizeof(buffer) - 1);
+
+        if(strcasecmp(buffer, "_Total") == 0)
+            continue;
+
+        struct logical_disk *d = dictionary_set(dict, buffer, NULL, sizeof(*d));
+
+        if(!d->collected_metadata) {
+            d->filesystem = getFileSystemType(buffer);
+            d->collected_metadata = true;
+        }
+
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
+        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->freeMegabytes);
+
+        if(!d->st_disk_space) {
+            d->st_disk_space = rrdset_create_localhost(
+                "disk_space"
+                , buffer
+                , NULL
+                , buffer
+                , "disk.space"
+                , "Disk Space Usage"
+                , "GiB"
+                , PLUGIN_WINDOWS_NAME
+                , "PerflibDisks"
+                , NETDATA_CHART_PRIO_DISKSPACE_SPACE
+                , update_every
+                , RRDSET_TYPE_STACKED
+            );
+
+            rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", buffer, RRDLABEL_SRC_AUTO);
+            // rrdlabels_add(d->st_disk_space->rrdlabels, "mount_root", name, RRDLABEL_SRC_AUTO);
+
+            if(d->filesystem)
+                rrdlabels_add(d->st_disk_space->rrdlabels, "filesystem", string2str(d->filesystem), RRDLABEL_SRC_AUTO);
+
+            d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        // percentDiskFree has the free space in Data and the size of the disk in Time, in MiB.
+        rrddim_set_by_pointer(d->st_disk_space, d->rd_disk_space_free, (collected_number)d->percentDiskFree.current.Data);
+        rrddim_set_by_pointer(d->st_disk_space, d->rd_disk_space_used, (collected_number)(d->percentDiskFree.current.Time - d->percentDiskFree.current.Data));
+        rrdset_done(d->st_disk_space);
+    }
+
+    return true;
+}
+
+static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
+    DICTIONARY *dict = physicalDisks;
+
+    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "PhysicalDisk");
+    if(!pObjectType) return false;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
+        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
+        if (!pi)
+            break;
+
+        if (!getInstanceName(pDataBlock, pObjectType, pi, buffer, sizeof(buffer)))
+            strncpyz(buffer, "[unknown]", sizeof(buffer) - 1);
+
+        char *device = buffer;
+        char *mount_point = NULL;
+
+        if((mount_point = strchr(device, ' '))) {
+            *mount_point = '\0';
+            mount_point++;
+        }
+
+        struct physical_disk *d;
+        if (strcasecmp(buffer, "_Total") == 0)
+            d = &system_physical_total;
+        else
+            d = dictionary_set(dict, device, NULL, sizeof(*d));
+
+        if (!d->collected_metadata) {
+            // TODO collect metadata
+            d->collected_metadata = true;
+        }
+
+        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadBytesPerSec) &&
+            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWriteBytesPerSec)) {
+            if (!d->st_io) {
+                d->st_io = rrdset_create_localhost(
+                    d == &system_physical_total ? "system" : "disk_io",
+                    d == &system_physical_total ? "io" : device,
+                    NULL,
+                    d == &system_physical_total ? "disk" : device,
+                    d == &system_physical_total ? "system.io" : "disk.io",
+                    "Disk I/O Bandwidth",
+                    "KiB/s",
+                    PLUGIN_WINDOWS_NAME,
+                    "PerflibDisks",
+                    d == &system_physical_total ? NETDATA_CHART_PRIO_SYSTEM_IO : NETDATA_CHART_PRIO_DISK_IO,
+                    update_every,
+                    RRDSET_TYPE_AREA);
+
+                if(d != &system_physical_total) {
+                    rrdlabels_add(d->st_io->rrdlabels, "device", device, RRDLABEL_SRC_AUTO);
+
+                    if (mount_point)
+                        rrdlabels_add(d->st_io->rrdlabels, "mount_point", mount_point, RRDLABEL_SRC_AUTO);
+                }
+
+                d->rd_io_reads = perflib_rrddim_add(d->st_io, "reads", NULL, 1, 1024, &d->diskReadBytesPerSec);
+                d->rd_io_writes = perflib_rrddim_add(d->st_io, "writes", NULL, -1, 1024, &d->diskWriteBytesPerSec);
+            }
+
+            perflib_rrddim_set_by_pointer(d->st_io, d->rd_io_reads, &d->diskReadBytesPerSec);
+            perflib_rrddim_set_by_pointer(d->st_io, d->rd_io_writes, &d->diskWriteBytesPerSec);
+            rrdset_done(d->st_io);
+        }
+
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskTime);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskReadTime);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskWriteTime);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->currentDiskQueueLength);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskQueueLength);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskReadQueueLength);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskWriteQueueLength);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerTransfer);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerRead);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskSecondsPerWrite);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskTransfersPerSec);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadsPerSec);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWritesPerSec);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskBytesPerSec);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerTransfer);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerRead);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->averageDiskBytesPerWrite);
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->splitIoPerSec);
+    }
+
+    return true;
 }
 
 int do_PerflibDisks(int update_every, usec_t dt __maybe_unused) {
@@ -117,8 +307,6 @@ int do_PerflibDisks(int update_every, usec_t dt __maybe_unused) {
         initialized = true;
     }
 
-    char name[4096];
-
     DWORD id = RegistryFindIDByName("LogicalDisk");
     if(id == REGISTRY_NAME_NOT_FOUND)
         return -1;
@@ -126,83 +314,8 @@ int do_PerflibDisks(int update_every, usec_t dt __maybe_unused) {
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
     if(!pDataBlock) return -1;
 
-    PERF_OBJECT_TYPE *pLogicalDisk = perflibFindObjectTypeByName(pDataBlock, "LogicalDisk");
-    if(pLogicalDisk) {
-        PERF_INSTANCE_DEFINITION *pi = NULL;
-        for(LONG i = 0; i < pLogicalDisk->NumInstances ; i++) {
-            pi = perflibForEachInstance(pDataBlock, pLogicalDisk, pi);
-            if(!pi) break;
-
-            if(!getInstanceName(pDataBlock, pLogicalDisk, pi, name, sizeof(name)))
-                strncpyz(name, "[unknown]", sizeof(name) - 1);
-
-            if(strcasecmp(name, "_Total") == 0)
-                continue;
-
-            struct logical_disk *ld = dictionary_set(logicalDisks, name, NULL, sizeof(struct logical_disk));
-
-            if(!ld->filesystem)
-                ld->filesystem = getFileSystemType(name);
-
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->percentDiskFree);
-            // perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->freeMegabytes);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->percentIdleTime);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->percentDiskTime);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->percentDiskReadTime);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->percentDiskWriteTime);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->currentDiskQueueLength);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->averageDiskQueueLength);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->averageDiskReadQueueLength);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->averageDiskWriteQueueLength);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->averageDiskSecondsPerTransfer);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->averageDiskSecondsPerRead);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->averageDiskSecondsPerWrite);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->diskTransfersPerSec);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->diskReadsPerSec);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->diskWritesPerSec);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->diskBytesPerSec);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->diskReadBytesPerSec);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->diskWriteBytesPerSec);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->averageDiskBytesPerTransfer);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->averageDiskBytesPerRead);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->averageDiskBytesPerWrite);
-            perflibGetInstanceCounter(pDataBlock, pLogicalDisk, pi, &ld->splitIoPerSec);
-
-            if(!ld->st_disk_space) {
-                ld->st_disk_space = rrdset_create_localhost(
-                    "disk_space"
-                    , name
-                    , NULL
-                    , name
-                    , "disk.space"
-                    , "Disk Space Usage"
-                    , "GiB"
-                    , PLUGIN_WINDOWS_NAME
-                    , "PerflibDisks"
-                    , NETDATA_CHART_PRIO_DISKSPACE_SPACE
-                    , update_every
-                    , RRDSET_TYPE_STACKED
-                );
-
-                rrdlabels_add(ld->st_disk_space->rrdlabels, "mount_point", name, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(ld->st_disk_space->rrdlabels, "mount_root", name, RRDLABEL_SRC_AUTO);
-                rrdlabels_add(ld->st_disk_space->rrdlabels, "filesystem", string2str(ld->filesystem), RRDLABEL_SRC_AUTO);
-
-                ld->rd_disk_space_free = rrddim_add(ld->st_disk_space, "avail", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-                ld->rd_disk_space_used = rrddim_add(ld->st_disk_space, "used", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            // percentDiskFree has the free space in Data and the size of the disk in Time, in MiB.
-            rrddim_set_by_pointer(ld->st_disk_space, ld->rd_disk_space_free, (collected_number)ld->percentDiskFree.current.Time);
-            rrddim_set_by_pointer(ld->st_disk_space, ld->rd_disk_space_used, (collected_number)ld->percentDiskFree.current.Data);
-            rrdset_done(ld->st_disk_space);
-        }
-    }
-
-//    PERF_OBJECT_TYPE *pPhysicalDisk = perflibFindObjectTypeByName(pDataBlock, "PhysicalDisk");
-//    if(pPhysicalDisk) {
-//
-//    }
+    do_logical_disk(pDataBlock, update_every);
+    do_physical_disk(pDataBlock, update_every);
 
     return 0;
 }

@@ -254,7 +254,9 @@ RRDDIM *perflib_rrddim_add(RRDSET *st, const char *id, const char *name, collect
         case PERF_SAMPLE_COUNTER:
         case PERF_COUNTER_BULK_COUNT:
             // (N1 - N0) / ((D1 - D0) / F)
-            multiplier *= cd->current.Frequency;
+            // multiplier *= cd->current.Frequency / 10000000;
+            // tested, the frequency is not that useful for netdata
+            // we get right results without it.
             algorithm = RRD_ALGORITHM_INCREMENTAL;
             break;
 
@@ -332,7 +334,7 @@ RRDDIM *perflib_rrddim_add(RRDSET *st, const char *id, const char *name, collect
 
         case PERF_AVERAGE_TIMER:
             // ((N1 - N0) / TB) / (B1 - B0)
-            divider *= cd->current.Frequency;
+            // divider *= cd->current.Frequency / 10000000;
             algorithm = RRD_ALGORITHM_INCREMENTAL;
             break;
 
@@ -358,7 +360,7 @@ RRDDIM *perflib_rrddim_add(RRDSET *st, const char *id, const char *name, collect
 #define VALID_DELTA(cd) \
     ((cd)->previous.Time > 0 && (cd)->current.Data >= (cd)->previous.Data && (cd)->current.Time > (cd)->previous.Time)
 
-void perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd) {
+collected_number perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd) {
     ULONGLONG numerator = 0;
     LONGLONG denominator = 0;
     double doubleValue = 0.0;
@@ -395,7 +397,7 @@ void perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd) {
         case PERF_COUNTER_TIMER_INV:
         case PERF_100NSEC_TIMER_INV:
             // 100 * (1 - ((N1 - N0) / (D1 - D0)))
-            if(!VALID_DELTA(cd)) return;
+            if(!VALID_DELTA(cd)) return 0;
             numerator = cd->current.Data - cd->previous.Data;
             denominator = cd->current.Time - cd->previous.Time;
             doubleValue = 100.0 * (1.0 - ((double)numerator / (double)denominator));
@@ -405,7 +407,7 @@ void perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd) {
 
         case PERF_COUNTER_MULTI_TIMER:
             // 100 * ((N1 - N0) / ((D1 - D0) / TB)) / B1
-            if(!VALID_DELTA(cd)) return;
+            if(!VALID_DELTA(cd)) return 0;
             numerator = cd->current.Data - cd->previous.Data;
             denominator = cd->current.Time - cd->previous.Time;
             denominator /= cd->current.Frequency;
@@ -416,7 +418,7 @@ void perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd) {
 
         case PERF_100NSEC_MULTI_TIMER:
             // 100 * ((N1 - N0) / (D1 - D0)) / B1
-            if(!VALID_DELTA(cd)) return;
+            if(!VALID_DELTA(cd)) return 0;
             numerator = cd->current.Data - cd->previous.Data;
             denominator = cd->current.Time - cd->previous.Time;
             doubleValue = 100.0 * ((double)numerator / (double)denominator) / (double)cd->current.MultiCounterData;
@@ -427,7 +429,7 @@ void perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd) {
         case PERF_COUNTER_MULTI_TIMER_INV:
         case PERF_100NSEC_MULTI_TIMER_INV:
             // 100 * (B1 - ((N1 - N0) / (D1 - D0)))
-            if(!VALID_DELTA(cd)) return;
+            if(!VALID_DELTA(cd)) return 0;
             numerator = cd->current.Data - cd->previous.Data;
             denominator = cd->current.Time - cd->previous.Time;
             doubleValue = 100.0 * ((double)cd->current.MultiCounterData - ((double)numerator / (double)denominator));
@@ -449,24 +451,24 @@ void perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd) {
 
         case PERF_COUNTER_DELTA:
         case PERF_COUNTER_LARGE_DELTA:
-            if(!VALID_DELTA(cd)) return;
+            if(!VALID_DELTA(cd)) return 0;
             value = (collected_number)(cd->current.Data - cd->previous.Data);
             break;
 
         case PERF_RAW_FRACTION:
         case PERF_LARGE_RAW_FRACTION:
             // 100 * N / B
-            if(!cd->current.Time) return;
+            if(!cd->current.Time) return 0;
             doubleValue = 100.0 * (double)cd->current.Data / (double)cd->current.Time;
             // printf("Display value is (fraction): %f%%\n", doubleValue);
             value = (collected_number)(doubleValue * COLLECTED_NUMBER_PRECISION);
             break;
 
         default:
-            return;
+            return 0;
     }
 
-    rrddim_set_by_pointer(st, rd, value);
+    return rrddim_set_by_pointer(st, rd, value);
 }
 
 /*

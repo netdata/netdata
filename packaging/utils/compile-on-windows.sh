@@ -18,7 +18,7 @@ install_dependencies() {
 export PATH="/usr/local/bin:${PATH}"
 
 WT_ROOT="$(pwd)"
-WT_PREFIX="/tmp"
+WT_PREFIX="/opt/netdata"
 BUILD_TYPE="Debug"
 NULL=""
 
