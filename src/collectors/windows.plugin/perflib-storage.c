@@ -58,32 +58,32 @@ struct physical_disk system_physical_total = {
 void dict_logical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct logical_disk *ld = value;
 
-    ld->percentDiskFree.name = "% Free Space";
-    // ld->freeMegabytes.name = "Free Megabytes";
+    ld->percentDiskFree.key = "% Free Space";
+    // ld->freeMegabytes.key = "Free Megabytes";
 }
 
 void initialize_physical_disk(struct physical_disk *pd) {
-    pd->percentIdleTime.name = "% Idle Time";
-    pd->percentDiskTime.name = "% Disk Time";
-    pd->percentDiskReadTime.name = "% Disk Read Time";
-    pd->percentDiskWriteTime.name = "% Disk Write Time";
-    pd->currentDiskQueueLength.name = "Current Disk Queue Length";
-    pd->averageDiskQueueLength.name = "Avg. Disk Queue Length";
-    pd->averageDiskReadQueueLength.name = "Avg. Disk Read Queue Length";
-    pd->averageDiskWriteQueueLength.name = "Avg. Disk Write Queue Length";
-    pd->averageDiskSecondsPerTransfer.name = "Avg. Disk sec/Transfer";
-    pd->averageDiskSecondsPerRead.name = "Avg. Disk sec/Read";
-    pd->averageDiskSecondsPerWrite.name = "Avg. Disk sec/Write";
-    pd->diskTransfersPerSec.name = "Disk Transfers/sec";
-    pd->diskReadsPerSec.name = "Disk Reads/sec";
-    pd->diskWritesPerSec.name = "Disk Writes/sec";
-    pd->diskBytesPerSec.name = "Disk Bytes/sec";
-    pd->diskReadBytesPerSec.name = "Disk Read Bytes/sec";
-    pd->diskWriteBytesPerSec.name = "Disk Write Bytes/sec";
-    pd->averageDiskBytesPerTransfer.name = "Avg. Disk Bytes/Transfer";
-    pd->averageDiskBytesPerRead.name = "Avg. Disk Bytes/Read";
-    pd->averageDiskBytesPerWrite.name = "Avg. Disk Bytes/Write";
-    pd->splitIoPerSec.name = "Split IO/Sec";
+    pd->percentIdleTime.key = "% Idle Time";
+    pd->percentDiskTime.key = "% Disk Time";
+    pd->percentDiskReadTime.key = "% Disk Read Time";
+    pd->percentDiskWriteTime.key = "% Disk Write Time";
+    pd->currentDiskQueueLength.key = "Current Disk Queue Length";
+    pd->averageDiskQueueLength.key = "Avg. Disk Queue Length";
+    pd->averageDiskReadQueueLength.key = "Avg. Disk Read Queue Length";
+    pd->averageDiskWriteQueueLength.key = "Avg. Disk Write Queue Length";
+    pd->averageDiskSecondsPerTransfer.key = "Avg. Disk sec/Transfer";
+    pd->averageDiskSecondsPerRead.key = "Avg. Disk sec/Read";
+    pd->averageDiskSecondsPerWrite.key = "Avg. Disk sec/Write";
+    pd->diskTransfersPerSec.key = "Disk Transfers/sec";
+    pd->diskReadsPerSec.key = "Disk Reads/sec";
+    pd->diskWritesPerSec.key = "Disk Writes/sec";
+    pd->diskBytesPerSec.key = "Disk Bytes/sec";
+    pd->diskReadBytesPerSec.key = "Disk Read Bytes/sec";
+    pd->diskWriteBytesPerSec.key = "Disk Write Bytes/sec";
+    pd->averageDiskBytesPerTransfer.key = "Avg. Disk Bytes/Transfer";
+    pd->averageDiskBytesPerRead.key = "Avg. Disk Bytes/Read";
+    pd->averageDiskBytesPerWrite.key = "Avg. Disk Bytes/Write";
+    pd->splitIoPerSec.key = "Split IO/Sec";
 }
 
 void dict_physical_disk_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
@@ -183,7 +183,7 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                 , "Disk Space Usage"
                 , "GiB"
                 , PLUGIN_WINDOWS_NAME
-                , "PerflibDisks"
+                , "PerflibStorage"
                 , NETDATA_CHART_PRIO_DISKSPACE_SPACE
                 , update_every
                 , RRDSET_TYPE_STACKED
@@ -232,13 +232,18 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         }
 
         struct physical_disk *d;
-        if (strcasecmp(buffer, "_Total") == 0)
+        bool is_system;
+        if (strcasecmp(buffer, "_Total") == 0) {
             d = &system_physical_total;
-        else
+            is_system = true;
+        }
+        else {
             d = dictionary_set(dict, device, NULL, sizeof(*d));
+            is_system = false;
+        }
 
         if (!d->collected_metadata) {
-            // TODO collect metadata
+            // TODO collect metadata - device_type, serial, id
             d->collected_metadata = true;
         }
 
@@ -246,20 +251,20 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWriteBytesPerSec)) {
             if (!d->st_io) {
                 d->st_io = rrdset_create_localhost(
-                    d == &system_physical_total ? "system" : "disk_io",
-                    d == &system_physical_total ? "io" : device,
+                    is_system ? "system" : "disk_io",
+                    is_system ? "io" : device,
                     NULL,
-                    d == &system_physical_total ? "disk" : device,
-                    d == &system_physical_total ? "system.io" : "disk.io",
+                    is_system ? "disk" : device,
+                    is_system ? "system.io" : "disk.io",
                     "Disk I/O Bandwidth",
                     "KiB/s",
                     PLUGIN_WINDOWS_NAME,
-                    "PerflibDisks",
-                    d == &system_physical_total ? NETDATA_CHART_PRIO_SYSTEM_IO : NETDATA_CHART_PRIO_DISK_IO,
+                    "PerflibStorage",
+                    is_system ? NETDATA_CHART_PRIO_SYSTEM_IO : NETDATA_CHART_PRIO_DISK_IO,
                     update_every,
                     RRDSET_TYPE_AREA);
 
-                if(d != &system_physical_total) {
+                if(!is_system) {
                     rrdlabels_add(d->st_io->rrdlabels, "device", device, RRDLABEL_SRC_AUTO);
 
                     if (mount_point)
@@ -299,7 +304,7 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     return true;
 }
 
-int do_PerflibDisks(int update_every, usec_t dt __maybe_unused) {
+int do_PerflibStorage(int update_every, usec_t dt __maybe_unused) {
     static bool initialized = false;
 
     if(unlikely(!initialized)) {

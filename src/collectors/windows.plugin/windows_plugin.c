@@ -11,10 +11,11 @@ static struct proc_module {
 } win_modules[] = {
 
     // system metrics
-    {.name = "GetSystemUptime",           .dim = "GetSystemUptime",         .func = do_GetSystemUptime},
-    {.name = "GetSystemRAM",              .dim = "GetSystemRAM",            .func = do_GetSystemRAM},
-    {.name = "GetSystemCPU",              .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
-    {.name = "PerflibDisks",              .dim = "PerflibDisks",            .func = do_PerflibDisks},
+    {.name = "GetSystemUptime",     .dim = "GetSystemUptime",         .func = do_GetSystemUptime},
+    {.name = "GetSystemRAM",        .dim = "GetSystemRAM",            .func = do_GetSystemRAM},
+    {.name = "GetSystemCPU",        .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
+    {.name = "PerflibStorage",      .dim = "PerflibStorage",          .func = do_PerflibStorage},
+    {.name = "PerflibNetwork",      .dim = "PerflibNetwork",          .func = do_PerflibNetwork},
 
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL}

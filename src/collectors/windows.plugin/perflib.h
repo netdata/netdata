@@ -27,7 +27,8 @@ typedef struct _rawdata {
 typedef struct _counterdata {
     DWORD id;
     bool updated;
-    const char *name;
+    const char *key;
+    DWORD OverwriteCounterType; // if set, the counter type will be overwritten once read
     RAW_DATA current;
     RAW_DATA previous;
 } COUNTER_DATA;
@@ -37,7 +38,8 @@ typedef struct _counterdata {
 RRDDIM *perflib_rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divider, COUNTER_DATA *cd);
 collected_number perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd);
 
-bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *d);
+bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd);
+bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, COUNTER_DATA *cd);
 
 typedef bool (*perflib_data_cb)(PERF_DATA_BLOCK *pDataBlock, void *data);
 typedef bool (*perflib_object_cb)(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, void *data);

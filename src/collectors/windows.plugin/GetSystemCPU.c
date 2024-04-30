@@ -54,7 +54,7 @@ int do_GetSystemCPU(int update_every, usec_t dt __maybe_unused) {
         );
 
         rd_user = rrddim_add(st, "user", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
-        rd_kernel = rrddim_add(st, "kernel", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
+        rd_kernel = rrddim_add(st, "system", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
         rd_idle = rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
         rrddim_hide(st, "idle");
     }
