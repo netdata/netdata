@@ -1004,7 +1004,7 @@ int perflibQueryAndTraverse(DWORD id,
         if(ObjectTypeHasInstances(pDataBlock, pObjectType)) {
             PERF_INSTANCE_DEFINITION *pInstance = NULL;
             PERF_COUNTER_BLOCK *pCounterBlock = NULL;
-            for(int i = 0; i < pObjectType->NumInstances ;i++) {
+            for(LONG i = 0; i < pObjectType->NumInstances ;i++) {
                 pInstance = getInstance(pDataBlock, pObjectType, pCounterBlock);
                 if(!pInstance) {
                     nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -1058,7 +1058,7 @@ int perflibQueryAndTraverse(DWORD id,
         else {
             PERF_COUNTER_BLOCK *pCounterBlock = getObjectTypeCounterBlock(pDataBlock, pObjectType);
             PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
-            for(unsigned c = 0; c < pObjectType->NumCounters ;c++) {
+            for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
                 pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
                 if(!pCounterDefinition) {
                     nd_log(NDLS_COLLECTORS, NDLP_ERR,
