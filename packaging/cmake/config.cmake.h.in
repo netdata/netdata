@@ -107,6 +107,7 @@
 #cmakedefine ENABLE_PLUGIN_SLABINFO
 #cmakedefine ENABLE_PLUGIN_CUPS
 #cmakedefine ENABLE_PLUGIN_CGROUP_NETWORK
+#cmakedefine USE_LEGACY_LIBBPF
 #cmakedefine ENABLE_PLUGIN_EBPF
 
 // enabled sentry
