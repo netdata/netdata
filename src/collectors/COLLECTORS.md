@@ -517,6 +517,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [S.M.A.R.T.](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/smartd_log/integrations/s.m.a.r.t..md)
 
+- [S.M.A.R.T.](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/smartctl/integrations/s.m.a.r.t..md)
+
 - [ServerTech](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/servertech.md)
 
 - [Siemens S7 PLC](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/siemens_s7_plc.md)
