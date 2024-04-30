@@ -70,6 +70,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/redis"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/scaleio"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/sensors"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/smartctl"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/snmp"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/squidlog"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/storcli"

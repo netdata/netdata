@@ -118,6 +118,7 @@ see the appropriate collector readme.
 | [sensors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules)                               |       Hardware Sensors        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/snmp)                             |             SNMP              |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/squidlog)                     |             Squid             |
+| [smartctl](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/smartctl)                     |   S.M.A.R.T Storage Devices   |
 | [storcli](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/storcli)                       |    Broadcom Hardware RAID     |
 | [supervisord](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/supervisord)               |          Supervisor           |
 | [systemdunits](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/systemdunits)             |      Systemd unit state       |
@@ -213,8 +214,7 @@ sudo su -s /bin/bash netdata
 ./go.d.plugin -d -m <module name>
 ```
 
-Change `<module name>` to the module name you want to debug. See the [whole list](#available-modules) of available
-modules.
+Change `<module name>` to the [module name](#available-modules) you want to debug.
 
 ## Netdata Community
 

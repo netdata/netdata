@@ -1,0 +1,652 @@
+{
+  "json_format_version": [
+    1,
+    0
+  ],
+  "smartctl": {
+    "version": [
+      7,
+      3
+    ],
+    "svn_revision": "5338",
+    "platform_info": "REDACTED",
+    "build_info": "(local build)",
+    "argv": [
+      "smartctl",
+      "--all",
+      "--json",
+      "--device=sat",
+      "/dev/sdc"
+    ],
+    "drive_database_version": {
+      "string": "7.3/5319"
+    },
+    "exit_status": 0
+  },
+  "local_time": {
+    "time_t": 1714480059,
+    "asctime": "Tue Apr 30 15:27:39 2024 EEST"
+  },
+  "device": {
+    "name": "/dev/sdc",
+    "info_name": "/dev/sdc [SAT]",
+    "type": "sat",
+    "protocol": "ATA"
+  },
+  "model_name": "WDC  WDS400T1R0A-68A4W0",
+  "serial_number": "REDACTED",
+  "wwn": {
+    "naa": 5,
+    "oui": 6980,
+    "id": 37319905210
+  },
+  "firmware_version": "REDACTED",
+  "user_capacity": {
+    "blocks": 7814037168,
+    "bytes": 4000787030016
+  },
+  "logical_block_size": 512,
+  "physical_block_size": 512,
+  "rotation_rate": 0,
+  "form_factor": {
+    "ata_value": 3,
+    "name": "2.5 inches"
+  },
+  "trim": {
+    "supported": true,
+    "deterministic": true,
+    "zeroed": true
+  },
+  "in_smartctl_database": false,
+  "ata_version": {
+    "string": "ACS-4 T13/BSR INCITS 529 revision 5",
+    "major_value": 4080,
+    "minor_value": 94
+  },
+  "sata_version": {
+    "string": "SATA 3.3",
+    "value": 511
+  },
+  "interface_speed": {
+    "max": {
+      "sata_value": 14,
+      "string": "6.0 Gb/s",
+      "units_per_second": 60,
+      "bits_per_unit": 100000000
+    },
+    "current": {
+      "sata_value": 3,
+      "string": "6.0 Gb/s",
+      "units_per_second": 60,
+      "bits_per_unit": 100000000
+    }
+  },
+  "smart_support": {
+    "available": true,
+    "enabled": true
+  },
+  "smart_status": {
+    "passed": true
+  },
+  "ata_smart_data": {
+    "offline_data_collection": {
+      "status": {
+        "value": 0,
+        "string": "was never started"
+      },
+      "completion_seconds": 0
+    },
+    "self_test": {
+      "status": {
+        "value": 0,
+        "string": "completed without error",
+        "passed": true
+      },
+      "polling_minutes": {
+        "short": 2,
+        "extended": 10
+      }
+    },
+    "capabilities": {
+      "values": [
+        17,
+        3
+      ],
+      "exec_offline_immediate_supported": true,
+      "offline_is_aborted_upon_new_cmd": false,
+      "offline_surface_scan_supported": false,
+      "self_tests_supported": true,
+      "conveyance_self_test_supported": false,
+      "selective_self_test_supported": false,
+      "attribute_autosave_enabled": true,
+      "error_logging_supported": true,
+      "gp_logging_supported": true
+    }
+  },
+  "ata_smart_attributes": {
+    "revision": 4,
+    "table": [
+      {
+        "id": 5,
+        "name": "Reallocated_Sector_Ct",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 0,
+          "string": "0"
+        }
+      },
+      {
+        "id": 9,
+        "name": "Power_On_Hours",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 8244,
+          "string": "8244"
+        }
+      },
+      {
+        "id": 12,
+        "name": "Power_Cycle_Count",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 13,
+          "string": "13"
+        }
+      },
+      {
+        "id": 165,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 515627355118,
+          "string": "515627355118"
+        }
+      },
+      {
+        "id": 166,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 1,
+          "string": "1"
+        }
+      },
+      {
+        "id": 167,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 84,
+          "string": "84"
+        }
+      },
+      {
+        "id": 168,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 34,
+          "string": "34"
+        }
+      },
+      {
+        "id": 169,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 1600,
+          "string": "1600"
+        }
+      },
+      {
+        "id": 170,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 0,
+          "string": "0"
+        }
+      },
+      {
+        "id": 171,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 0,
+          "string": "0"
+        }
+      },
+      {
+        "id": 172,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 0,
+          "string": "0"
+        }
+      },
+      {
+        "id": 173,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 15,
+          "string": "15"
+        }
+      },
+      {
+        "id": 174,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 4,
+          "string": "4"
+        }
+      },
+      {
+        "id": 184,
+        "name": "End-to-End_Error",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 0,
+          "string": "0"
+        }
+      },
+      {
+        "id": 187,
+        "name": "Reported_Uncorrect",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 0,
+          "string": "0"
+        }
+      },
+      {
+        "id": 188,
+        "name": "Command_Timeout",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 0,
+          "string": "0"
+        }
+      },
+      {
+        "id": 194,
+        "name": "Temperature_Celsius",
+        "value": 73,
+        "worst": 43,
+        "flags": {
+          "value": 34,
+          "string": "-O---K ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": false,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 184684970011,
+          "string": "27 (Min/Max 21/43)"
+        }
+      },
+      {
+        "id": 199,
+        "name": "UDMA_CRC_Error_Count",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 0,
+          "string": "0"
+        }
+      },
+      {
+        "id": 230,
+        "name": "Unknown_SSD_Attribute",
+        "value": 4,
+        "worst": 4,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 4694419309637,
+          "string": "4694419309637"
+        }
+      },
+      {
+        "id": 232,
+        "name": "Available_Reservd_Space",
+        "value": 100,
+        "worst": 100,
+        "thresh": 4,
+        "when_failed": "",
+        "flags": {
+          "value": 51,
+          "string": "PO--CK ",
+          "prefailure": true,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 100,
+          "string": "100"
+        }
+      },
+      {
+        "id": 233,
+        "name": "Media_Wearout_Indicator",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 65406,
+          "string": "65406"
+        }
+      },
+      {
+        "id": 234,
+        "name": "Unknown_Attribute",
+        "value": 100,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 190852,
+          "string": "190852"
+        }
+      },
+      {
+        "id": 241,
+        "name": "Total_LBAs_Written",
+        "value": 253,
+        "worst": 253,
+        "flags": {
+          "value": 48,
+          "string": "----CK ",
+          "prefailure": false,
+          "updated_online": false,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 173833,
+          "string": "173833"
+        }
+      },
+      {
+        "id": 242,
+        "name": "Total_LBAs_Read",
+        "value": 253,
+        "worst": 253,
+        "flags": {
+          "value": 48,
+          "string": "----CK ",
+          "prefailure": false,
+          "updated_online": false,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 76778,
+          "string": "76778"
+        }
+      },
+      {
+        "id": 244,
+        "name": "Unknown_Attribute",
+        "value": 0,
+        "worst": 100,
+        "flags": {
+          "value": 50,
+          "string": "-O--CK ",
+          "prefailure": false,
+          "updated_online": true,
+          "performance": false,
+          "error_rate": false,
+          "event_count": true,
+          "auto_keep": true
+        },
+        "raw": {
+          "value": 0,
+          "string": "0"
+        }
+      }
+    ]
+  },
+  "power_on_time": {
+    "hours": 8244
+  },
+  "power_cycle_count": 13,
+  "temperature": {
+    "current": 27
+  },
+  "ata_smart_error_log": {
+    "summary": {
+      "revision": 1,
+      "count": 0
+    }
+  },
+  "ata_smart_self_test_log": {
+    "standard": {
+      "revision": 1,
+      "count": 0
+    }
+  }
+}
