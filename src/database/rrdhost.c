@@ -903,6 +903,10 @@ void dbengine_init(char *hostname) {
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 update every iterations") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 update every iterations") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 1 multihost disk space MB") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 2 multihost disk space MB") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 3 multihost disk space MB") &&
+         !config_exists(CONFIG_SECTION_DB, "dbengine tier 4 multihost disk space MB") &&
          !config_exists(CONFIG_SECTION_DB, "dbengine multihost disk space MB"));
 
     if (!new_dbengine_defaults) {
@@ -967,20 +971,11 @@ void dbengine_init(char *hostname) {
                 divisor *= 2;
             disk_space_mb = default_multidb_disk_quota_mb / divisor;
 
-//            char dbengineconfig_new[200 + 1];
-//            // Move sections
-//            if (tier > 0)
-//                snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu multihost disk space MB", tier);
-//            else
-//                snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine multihost disk space MB");
-//
-//
-//            snprintfz(dbengineconfig_new, sizeof(dbengineconfig_new) - 1, "dbengine tier %zu MB", tier);
-//            config_move(CONFIG_SECTION_DB, dbengineconfig, CONFIG_SECTION_DB, dbengineconfig_new);
-//            disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig_new, tier_quota_mb[tier]);
-
             grouping_iterations = storage_tiers_grouping_iterations[tier];
             if (tier > 0) {
+                snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu multihost disk space MB", tier);
+                disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
+
                 snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu update every iterations", tier);
                 grouping_iterations = config_get_number(CONFIG_SECTION_DB, dbengineconfig, grouping_iterations);
                 if(grouping_iterations < 2) {
