@@ -23,24 +23,20 @@ static void update_filtered(ALARM_ENTRY *ae, int64_t unique_id, char *uuid_str)
 
     char sql[ACLK_SYNC_QUERY_SIZE];
     snprintfz(sql, sizeof(sql) - 1, SQL_UPDATE_FILTERED_ALERT, uuid_str);
-    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to update_filtered");
+
+    if (!PREPARE_STATEMENT(db_meta, sql, &res))
         return;
-    }
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param,  ae->unique_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param,  unique_id));
 
     param = 0;
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_DONE))
+    if (likely(sqlite3_step_monitored(res) == SQLITE_DONE))
         ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_FINALIZE(res);
 }
 
@@ -53,11 +49,8 @@ static inline bool is_event_from_alert_variable_config(int64_t unique_id, uuid_t
 {
     sqlite3_stmt *res = NULL;
 
-    int rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to check for alert variables.");
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_VARIABLE_ALERT_BY_UNIQUE_ID, &res))
         return false;
-    }
 
     bool ret = false;
 
@@ -66,15 +59,11 @@ static inline bool is_event_from_alert_variable_config(int64_t unique_id, uuid_t
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
 
     param = 0;
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW))
-        ret = true;
+    ret = (sqlite3_step_monitored(res) == SQLITE_ROW);
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_FINALIZE(res);
-
     return ret;
 }
 
@@ -103,11 +92,8 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     //base the search on the last filtered event
     snprintfz(sql, sizeof(sql) - 1, SQL_SELECT_ALERT_BY_ID, host->aclk_config->uuid_str);
 
-    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying should_send_to_cloud.");
+    if (!PREPARE_STATEMENT(db_meta, sql, &res))
         return true;
-    }
 
     bool send = false;
 
@@ -116,7 +102,7 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (int) ae->alarm_id));
 
     param = 0;
-    rc = sqlite3_step_monitored(res);
+    int rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW)) {
         uuid_t config_hash_id;
         RRDCALC_STATUS status = (RRDCALC_STATUS)sqlite3_column_int(res, 0);
@@ -135,9 +121,7 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_FINALIZE(res);
-
     return send;
 }
 
@@ -147,7 +131,7 @@ done:
 
 void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, bool skip_filter)
 {
-    sqlite3_stmt *res_alert = NULL;
+    sqlite3_stmt *res = NULL;
     char sql[ACLK_SYNC_QUERY_SIZE];
 
     if (!service_running(SERVICE_ACLK))
@@ -164,17 +148,14 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, bool skip_filter)
 
     snprintfz(sql, sizeof(sql) - 1, SQL_QUEUE_ALERT_TO_CLOUD, host->aclk_config->uuid_str);
 
-    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res_alert, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to store alert event");
+    if (!PREPARE_STATEMENT(db_meta, sql, &res))
         return;
-    }
 
-    rc = sqlite3_bind_int64(res_alert, 1, ae->unique_id);
-    if (unlikely(rc != SQLITE_OK))
-        goto done;
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, ae->unique_id));
 
-    rc = execute_insert(res_alert);
+    param = 0;
+    int rc = execute_insert(res);
     if (unlikely(rc == SQLITE_DONE)) {
         ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
         rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -182,7 +163,8 @@ void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, bool skip_filter)
         error_report("Failed to store alert event %"PRIu32", rc = %d", ae->unique_id, rc);
 
 done:
-    SQLITE_FINALIZE(res_alert);
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
 }
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
@@ -275,8 +257,7 @@ static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
         " ORDER BY aa.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES,
         wc->uuid_str);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (rc != SQLITE_OK) {
+    if (!PREPARE_STATEMENT(db_meta, buffer_tostring(sql), &res)) {
 
         BUFFER *sql_fix = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
         buffer_sprintf(sql_fix, TABLE_ACLK_ALERT, wc->uuid_str);
@@ -287,10 +268,7 @@ static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
         buffer_free(sql_fix);
 
         // Try again
-        rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to prepare statement when trying to send an alert update via ACLK");
-
+        if (!PREPARE_STATEMENT(db_meta, buffer_tostring(sql), &res)) {
             buffer_free(sql);
             freez(claim_id);
             return;
@@ -455,24 +433,21 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
         "AND hld.updated_by_id = 0 AND hl.host_id = @host_id ORDER BY hld.unique_id ASC ON CONFLICT (alert_unique_id) DO NOTHING",
         wc->uuid_str);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to queue existing alerts.");
+    if (!PREPARE_STATEMENT(db_meta,  buffer_tostring(sql), &res))
         goto skip;
-    }
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for when trying to queue existing alerts.");
-        goto done;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
 
+    param = 0;
     rc = execute_insert(res);
     if (unlikely(rc != SQLITE_DONE))
         error_report("Failed to queue existing alerts, rc = %d", rc);
     else
         rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+
 done:
+    REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
 
 skip:
@@ -508,8 +483,6 @@ void aclk_send_alarm_configuration(char *config_hash)
 void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_hash __maybe_unused)
 {
 #ifdef ENABLE_ACLK
-    int rc;
-
     sqlite3_stmt *res = NULL;
     struct aclk_sync_cfg_t *wc;
 
@@ -521,27 +494,22 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
         return;
     }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_ALERT_CONFIG, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to fetch an alarm hash configuration");
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_CONFIG, &res))
         return;
-    }
 
     uuid_t hash_uuid;
     if (uuid_parse(config_hash, hash_uuid))
         return;
 
-    rc = sqlite3_bind_blob(res, 1, &hash_uuid , sizeof(hash_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK))
-        goto bind_fail;
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &hash_uuid , sizeof(hash_uuid), SQLITE_STATIC));
 
     struct aclk_alarm_configuration alarm_config;
     struct provide_alarm_configuration p_alarm_config;
     p_alarm_config.cfg_hash = NULL;
 
+    param = 0;
     if (sqlite3_step_monitored(res) == SQLITE_ROW) {
-
-        int param = 0;
         alarm_config.alarm = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.tmpl = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
         alarm_config.on_chart = SQLITE3_COLUMN_STRDUPZ_OR_NULL(res, param++);
@@ -600,6 +568,8 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
         p_alarm_config.cfg = alarm_config;
     }
 
+    param = 0;
+
     if (likely(p_alarm_config.cfg_hash)) {
         nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK RES [%s (%s)]: Sent alert config %s.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
         aclk_send_provide_alarm_cfg(&p_alarm_config);
@@ -609,9 +579,9 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
     else
         nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK STA [%s (%s)]: Alert config for %s not found.", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A", config_hash);
 
-bind_fail:
+done:
+    REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-
     freez(config_hash);
     freez(node_id);
 #endif
@@ -666,31 +636,27 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
     if (unlikely(!host || !(wc = host->aclk_config)))
         return;
 
-    char sql[ACLK_SYNC_QUERY_SIZE * 2];
     sqlite3_stmt *res = NULL;
 
-    snprintfz(sql, sizeof(sql) - 1, SQL_QUEUE_REMOVE_ALERTS, wc->uuid_str, wc->uuid_str);
+    CLEAN_BUFFER *wb = buffer_create(1024, NULL); // Note buffer auto free on function return
+    buffer_sprintf(wb, SQL_QUEUE_REMOVE_ALERTS, wc->uuid_str, wc->uuid_str);
 
-    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to queue removed alerts.");
+    if (!PREPARE_STATEMENT(db_meta, buffer_tostring(wb), &res))
         return;
-    }
 
-    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for when trying to queue remvoed alerts.");
-        goto skip;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
 
-    rc = execute_insert(res);
+    param = 0;
+    int rc = execute_insert(res);
     if (likely(rc == SQLITE_DONE)) {
         nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         wc->alert_queue_removed = 0;
     }
 
-skip:
+done:
+    REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
 }
 
@@ -932,23 +898,19 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
     snprintfz(sql, sizeof(sql) - 1, SQL_DELETE_ALERT_ENTRIES, wc->uuid_str);
 
     sqlite3_stmt *res = NULL;
-    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement for cleaning stale ACLK alert entries.");
+
+    if (!PREPARE_STATEMENT(db_meta, sql, &res))
         return;
-    }
 
-    rc = sqlite3_bind_int64(res, 1, MAX_REMOVED_PERIOD);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind MAX_REMOVED_PERIOD parameter.");
-        goto skip;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, MAX_REMOVED_PERIOD));
 
-    rc = sqlite3_step_monitored(res);
+    int rc = sqlite3_step_monitored(res);
     if (rc != SQLITE_DONE)
         error_report("Failed to execute DELETE query for cleaning stale ACLK alert entries.");
 
-skip:
+done:
+    REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
 }
 
@@ -965,15 +927,11 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     proto_alert_status->alert_updates = wc->alert_updates;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
-
-    sqlite3_stmt *res = NULL;
     snprintfz(sql, sizeof(sql) - 1, SQL_GET_MIN_MAX_ALERT_SEQ, wc->uuid_str, wc->uuid_str);
 
-    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to get alert log status from the database.");
+    sqlite3_stmt *res = NULL;
+    if (!PREPARE_STATEMENT(db_meta, sql, &res))
         return 1;
-    }
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         proto_alert_status->pending_min_sequence_id =
