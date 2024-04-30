@@ -47,3 +47,58 @@
       ### SP-initiated SSO
 
       If you start your authentication flow from Netdata sign-in page please check [these steps](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/enterprise-sso-authentication.md#from-netdata-sign-up-page).
+
+- id: 'oidc-authentication'
+  meta:
+    name: 'OIDC'
+    link: 'https://netdata.cloud'
+    categories:
+      - auth
+    icon_filename: 'openid.svg'
+  keywords:
+    - sso
+    - oidc
+  overview:
+    authentication_description: "Integrate your organization's Authorization Servers with Netdata to better manage your team's access controls to Netdata Cloud."
+    authentication_limitations: ''
+  setup:
+    description: |
+      ### Prerequisites
+      - Authorization Server with OIDC protocol supported
+      - A Netdata Cloud account
+      - Access to the Space as an administrator
+      - Space needs to be on the Business plan or higher
+
+      ### Setting up Authorization Server
+      Your server should follow the [full specification for OIDC](https://openid.net/specs/openid-connect-core-1_0.html).
+      In order to integrate your Authorization Server with Netdata the creation of a client is required. Clients are applications and services that can request authentication of a user.
+      The access settings for your client are the following:
+      | field                    | value                                                                                                                                                                                        |
+      | :--                      | :--                                                                                                                                                                                          |
+      | Root URL                 | https://app.netdata.cloud/                                                                                                                                                                   |
+      | Home/Initiate login URL  | https://app.netdata.cloud/api/v2/auth/account/auth-server?iss={your-server-issuer-url}&redirect_uri=https://app.netdata.cloud/sign-in&register_uri=https://app.netdata.cloud/sign-up/verify  |
+      | Redirect URL             | https://app.netdata.cloud/api/v2/auth/account/auth-server/callback                                                                                                                           |
+
+      ### Netdata Configuration Steps
+      1. Click on the Space settings cog (located above your profile icon)
+      2. Click on the **Authentication** tab
+      3. On the OIDC card, click on **Configure**
+      4. Fill in the required credentials:
+          - **Issuer URL** the Authorization Server Issuer URL, e.g. `https://my-auth-server.com/`
+          - **Client ID** the Client ID from the created client
+          - **Client Secret** the Client Secret from the created client
+          - **Authorization URL** the Authorization Server authorization URL, e.g. `https://my-auth-server.com/openid-connect/auth`
+          - **Token URL** the Authorization Server token URL, e.g. `https://my-auth-server.com/openid-connect/token`
+          - **User URL** the Authorization Server user info URL, e.g. `https://my-auth-server.com/openid-connect/userinfo`
+
+      ### Supported features
+      * SP-initiated SSO (Single Sign-On)
+      * IdP-initiated SSO
+
+      ### SP-initiated SSO
+
+      If you start your authentication flow from Netdata sign-in page please check [these steps](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/enterprise-sso-authentication.md#from-netdata-sign-up-page).
+
+
+      ### Reference
+      https://openid.net/developers/how-connect-works/
