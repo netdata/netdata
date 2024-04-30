@@ -877,10 +877,22 @@ confirm() {
 # ======================================================================
 # Existing install handling code
 
-update() {
-  updater="${ndprefix}/usr/libexec/netdata/netdata-updater.sh"
+find_libexec_script() {
+    prefix="${1}"
+    script="${2}"
 
-  if run_as_root test -x "${updater}"; then
+    for p in libexec/netdata usr/libexec/netdata netdata/libexec/netdata netdata/usr/libexec/netdata; do
+        if run_as_root test -x "${prefix}/${p}/${script}"; then
+            echo "${prefix}/${p}/${script}"
+            break
+        fi
+    done
+}
+
+update() {
+  updater="$(find_libexec_script "${ndprefix}" netdata-updater.sh)"
+
+  if [ -n "${updater}" ]; then
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would attempt to update existing installation by running the updater script located at: ${updater}"
       return 0
@@ -919,7 +931,7 @@ uninstall() {
     INSTALL_PREFIX="${ndprefix}"
   fi
 
-  uninstaller="${INSTALL_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh"
+  uninstaller="$(find_libexec_script "${INSTALL_PREFIX}" netdata-uninstaller.sh)"
   uninstaller_url="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-uninstaller.sh"
 
   if [ $INTERACTIVE = 0 ]; then
@@ -928,7 +940,7 @@ uninstall() {
     FLAGS="--yes"
   fi
 
-  if run_as_root test -x "${uninstaller}"; then
+  if [ -n "${uninstaller}" ]; then
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would attempt to uninstall existing install with uninstaller script found at: ${uninstaller}"
       return 0
@@ -1249,8 +1261,14 @@ is_netdata_running() {
       NETDATACLI_PATH=/usr/sbin/netdatacli
     elif [ "${INSTALL_PREFIX}" = "/opt/netdata" ]; then
       NETDATACLI_PATH="/opt/netdata/bin/netdatacli"
-    else
+    elif [ -x "${INSTALL_PREFIX}/netdata/usr/sbin/netdatacli" ]; then
       NETDATACLI_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdatacli"
+    elif [ -x "${INSTALL_PREFIX}/usr/sbin/netdatacli" ]; then
+      NETDATACLI_PATH="${INSTALL_PREFIX}/usr/sbin/netdatacli"
+    elif [ -x "${INSTALL_PREFIX}/netdata/sbin/netdatacli" ]; then
+      NETDATACLI_PATH="${INSTALL_PREFIX}/netdata/sbin/netdatacli"
+    else
+      NETDATACLI_PATH="${INSTALL_PREFIX}/sbin/netdatacli"
     fi
 
     if "${NETDATACLI_PATH}" ping > /dev/null 2>&1; then
@@ -1281,7 +1299,11 @@ claim() {
         NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/sbin/netdata-claim.sh"
     fi
   else
-    NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
+    if [ -d "${INSTALL_PREFIX}/netdata/usr" ]; then
+        NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/usr/sbin/netdata-claim.sh"
+    else
+        NETDATA_CLAIM_PATH="${INSTALL_PREFIX}/netdata/sbin/netdata-claim.sh"
+    fi
   fi
 
   err_msg=
@@ -1353,11 +1375,9 @@ claim() {
 # ======================================================================
 # Auto-update handling code.
 set_auto_updates() {
-  if run_as_root test -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"; then
-    updater="${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"
-  elif run_as_root test -x "${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh"; then
-    updater="${INSTALL_PREFIX}/netdata/usr/libexec/netdata/netdata-updater.sh"
-  else
+  updater="$(find_libexec_script "${INSTALL_PREFIX}" netdata-updater.sh)"
+
+  if [ -z "${updater}" ]; then
     warning "Could not find netdata-updater.sh. This means that auto-updates cannot (currently) be enabled on this system. See https://learn.netdata.cloud/docs/agent/packaging/installer/update for more information about updating Netdata."
     return 0
   fi

@@ -19,13 +19,13 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run make -j "$(nproc)"
 fi
 
-run mkdir -p "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/
-run install -o root -g root -m 4750 ioping "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/
+run mkdir -p "${NETDATA_INSTALL_PATH}"/libexec/netdata/plugins.d/
+run install -o root -g root -m 4750 ioping "${NETDATA_INSTALL_PATH}"/libexec/netdata/plugins.d/
 
 store_cache ioping "${NETDATA_MAKESELF_PATH}/tmp/ioping-${IOPING_VERSION}"
 
 if [ "${NETDATA_BUILD_WITH_DEBUG}" -eq 0 ]; then
-  run strip "${NETDATA_INSTALL_PATH}"/usr/libexec/netdata/plugins.d/ioping
+  run strip "${NETDATA_INSTALL_PATH}"/libexec/netdata/plugins.d/ioping
 fi
 
 # shellcheck disable=SC2015

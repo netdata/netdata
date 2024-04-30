@@ -34,7 +34,7 @@ c_unit_tests() {
   echo "Running C code unit tests"
 
   ASAN_OPTIONS=detect_leaks=0 \
-  "$HOME"/netdata/usr/sbin/netdata -W unittest
+  "$HOME/netdata/sbin/netdata" -W unittest
 }
 
 install_netdata || exit 1
