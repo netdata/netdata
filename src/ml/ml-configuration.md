@@ -55,7 +55,7 @@ flowchart BT
     C3 --> P1
 ```
 
-```toml
+```text
 # parent will run ML for itself and child 1,2, it will skip running ML for child 0.
 # child 0 will run its own ML at the edge.
 # child 1 will run its own ML at the edge, even though parent will also run ML for it, a bit wasteful potentially to run ML in both places but is possible (Netdata Cloud will essentially average any overlapping models).

@@ -10,11 +10,11 @@ Because Metric Correlations uses every available metric from your infrastructure
 
 When viewing the [Metrics tab or a single-node dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md), the **Metric Correlations** button appears in the top right corner of the page.
 
-To start correlating metrics, click the **Metric Correlations** button, then hold the `Alt` key (or `⌘` on macOS) and click-and-drag a selection of metrics on a single chart. The selected timeframe needs to be at least 15 seconds for Metric Correlation to work.
+To start correlating metrics, click the **Metric Correlations** button, hold the `Alt` key (or `⌘` on macOS), and drag a selection of metrics on a single chart. The selected timeframe needs at least 15 seconds for Metric Correlation to work.
 
 The menu then displays information about the selected area and reference baseline. Metric Correlations uses the reference baseline to discover which additional metrics are most closely connected to the selected metrics. The reference baseline is based upon the period immediately preceding the highlighted window and is the length of 4 times the highlighted window. This is to ensure that the reference baseline is always immediately before the highlighted window of interest and a bit longer so as to ensure it's a more representative short term baseline.
 
-Press the **Find Correlations** button to start up the correlations process, the button is only enabled when a valid timeframe is selected. Once pressed, the process will score all available metrics on your nodes and return a filtered version of the Netdata dashboard. Now, you'll see only those metrics that have changed the most between a baseline window and the highlighted window you have selected.
+Click the **Find Correlations** button to begin the correlation process. This button is only active if a valid timeframe is selected. Once clicked, the process will evaluate all available metrics on your nodes and return a filtered version of the Netdata dashboard. You will now only see the metrics that changed the most between the base window and the highlighted window you selected..
 
 These charts are fully interactive, and whenever possible, will only show the **dimensions** related to the timeline you selected.
 
@@ -39,7 +39,7 @@ Behind the scenes, Netdata will aggregate the raw data as needed such that arbit
 
 ### Data
 
-Netdata is different from typical observability agents since, in addition to just collecting raw metric values, it will by default also assign an [Anomaly Bit](https://github.com/netdata/netdata/tree/master/src/ml#anomaly-bit) related to each collected metric each second. This bit will be 0 for "normal" and 1 for "anomalous". This means that each metric also natively has an anomaly rate associated with it and, as such, MC can be run against the raw metric values or their corresponding anomaly rates.
+Unlike other observability agents that only collect raw metrics, Netdata also assigns an [Anomaly Bit](https://github.com/netdata/netdata/tree/master/src/ml#anomaly-bit) in real-time. This bit flags whether a metric is within normal ranges (0) or deviates significantly (1). This built-in anomaly detection allows for the analysis of both the raw data and the anomaly rates.
 
 **Note**: Read more [here](https://github.com/netdata/netdata/blob/master/src/ml/README.md) to learn more about the native anomaly detection features within netdata.
 
