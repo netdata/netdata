@@ -300,8 +300,7 @@ static bool dyncfg_unittest_check(TEST *t, DYNCFG_CMDS c, const char *cmd, bool 
 
     usec_t give_up_ut = now_monotonic_usec() + 2 * USEC_PER_SEC;
     while(!__atomic_load_n(&t->finished, __ATOMIC_RELAXED)) {
-        static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
-        nanosleep(&ns, NULL);
+        tinysleep();
 
         if(now_monotonic_usec() > give_up_ut) {
             fprintf(stderr, "\n  - gave up waiting for the plugin to process this!");

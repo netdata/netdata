@@ -15,6 +15,7 @@
 #include "waitid.h"
 #include "get_pid_max.h"
 #include "get_system_cpus.h"
+#include "tinysleep.h"
 
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"

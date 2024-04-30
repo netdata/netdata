@@ -298,8 +298,6 @@ void spinlock_init(SPINLOCK *spinlock) {
 }
 
 static inline void spinlock_lock_internal(SPINLOCK *spinlock, bool cancelable) {
-    static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
-
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t spins = 0;
 #endif
@@ -318,7 +316,7 @@ static inline void spinlock_lock_internal(SPINLOCK *spinlock, bool cancelable) {
 #endif
         if(unlikely(i == 8)) {
             i = 0;
-            nanosleep(&ns, NULL);
+            tinysleep();
         }
     }
 
@@ -414,8 +412,6 @@ void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock) {
 }
 
 void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
-    static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
-
     size_t spins = 0;
     while(1) {
         spins++;
@@ -426,7 +422,7 @@ void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
 
         // Busy wait until all readers have released their locks.
         spinlock_unlock(&rw_spinlock->spinlock);
-        nanosleep(&ns, NULL);
+        tinysleep();
     }
 
     (void)spins;
