@@ -15,18 +15,59 @@ function(netdata_detect_host_kernel_version)
     endif()
 
     message(CHECK_START "Determining host kernel version")
+    list(APPEND CMAKE_MESSAGE_INDENT "  ")
 
-    execute_process(COMMAND uname -r
-                    RESULT_VARIABLE _uname_result
-                    OUTPUT_VARIABLE _uname_output)
+    if(NOT CMAKE_CROSSCOMPILING)
+        include(CheckIncludeFile)
 
-    if(NOT _uname_result EQUAL 0)
-        message(CHECK_FAIL "unknown")
-        set(HOST_KERNEL_VERSION "0.0.0" CACHE STRING "Detected host kernel version")
-        return()
+        check_include_file("linux/version.h" CAN_USE_VERSION_H)
+
+        if(CAN_USE_VERSION_H)
+            message(CHECK_START "Checking version using linux/version.h")
+            file(WRITE "${CMAKE_BINARY_DIR}/kversion-test.c" "
+            #include <stdio.h>
+            #include <linux/version.h>
+
+            int main() {
+                printf(\"%i.%i.%i\", LINUX_VERSION_MAJOR, LINUX_VERSION_PATCHLEVEL, LINUX_VERSION_SUBLEVEL);
+            }
+            ")
+
+            try_run(_run_success _compile_success
+                    ${CMAKE_BINARY_DIR}
+                    SOURCES ${CMAKE_BINARY_DIR}/kversion-test.c
+                    RUN_OUTPUT_VARIABLE _kversion_output)
+
+            if(_compile_success AND _run_success EQUAL 0)
+                message(CHECK_PASS "success")
+                set(_kversion_value "${_kversion_output}")
+            else()
+                message(CHECK_FAIL "failed")
+            endif()
+        endif()
     endif()
 
-    string(REGEX REPLACE "-.+$" "" _kversion "${_uname_output}")
+    if(NOT DEFINED _kversion_value)
+        message(CHECK_START "Checking version using uname")
+        execute_process(COMMAND uname -r
+                        RESULT_VARIABLE _uname_result
+                        OUTPUT_VARIABLE _uname_output)
+
+        if(NOT _uname_result EQUAL 0)
+            message(CHECK_FAIL "failed")
+            list(POP_BACK CMAKE_MESSAGE_INDENT)
+            message(CHECK_FAIL "unknown")
+            set(HOST_KERNEL_VERSION "0.0.0" CACHE STRING "Detected host kernel version")
+            return()
+        else()
+            message(CHECK_PASS "success")
+        endif()
+
+        set(_kversion_value "${_uname_output}")
+    endif()
+
+    string(REGEX REPLACE "-.+$" "" _kversion "${_kversion_value}")
+    list(POP_BACK CMAKE_MESSAGE_INDENT)
     message(CHECK_PASS "${_kversion}")
     set(HOST_KERNEL_VERSION "${_kversion}" CACHE STRING "Detected host kernel version")
 endfunction()
