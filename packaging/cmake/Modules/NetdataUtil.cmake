@@ -15,7 +15,6 @@ function(netdata_detect_host_kernel_version)
     endif()
 
     message(CHECK_START "Determining host kernel version")
-    list(APPEND CMAKE_MESSAGE_INDENT "  ")
 
     if(NOT CMAKE_CROSSCOMPILING)
         include(CheckIncludeFile)
@@ -55,7 +54,6 @@ function(netdata_detect_host_kernel_version)
 
         if(NOT _uname_result EQUAL 0)
             message(CHECK_FAIL "failed")
-            list(POP_BACK CMAKE_MESSAGE_INDENT)
             message(CHECK_FAIL "unknown")
             set(HOST_KERNEL_VERSION "0.0.0" CACHE STRING "Detected host kernel version")
             return()
@@ -67,7 +65,6 @@ function(netdata_detect_host_kernel_version)
     endif()
 
     string(REGEX REPLACE "-.+$" "" _kversion "${_kversion_value}")
-    list(POP_BACK CMAKE_MESSAGE_INDENT)
     message(CHECK_PASS "${_kversion}")
     set(HOST_KERNEL_VERSION "${_kversion}" CACHE STRING "Detected host kernel version")
 endfunction()
