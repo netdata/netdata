@@ -71,7 +71,7 @@
 
       ### Setting up Authorization Server
       Your server should follow the [full specification for OIDC](https://openid.net/specs/openid-connect-core-1_0.html).
-      In order to integrate your Authorization Server with Netdata a creation of a client is required, clients are applications and services that can request authentication of a user.
+      In order to integrate your Authorization Server with Netdata the creation of a client is required. Clients are applications and services that can request authentication of a user.
       The access settings for your client are the following:
       | field                    | value                                                                                                                                                                                        |
       | :--                      | :--                                                                                                                                                                                          |
