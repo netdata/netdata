@@ -23,6 +23,7 @@ int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
 time_t netdata_start_time = 0;
 struct netdata_static_thread *static_threads;
+bool i_am_the_spawn_server = false;
 
 struct config netdata_config = {
         .first_section = NULL,
@@ -303,6 +304,9 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 void web_client_cache_destroy(void);
 
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) {
+    if (i_am_the_spawn_server)
+        exit(ret);
+
     watcher_shutdown_begin();
 
     nd_log_limits_unlimited();
@@ -1420,6 +1424,7 @@ int main(int argc, char **argv) {
 
     if (argc > 1 && strcmp(argv[1], SPAWN_SERVER_COMMAND_LINE_ARGUMENT) == 0) {
         // don't run netdata, this is the spawn server
+        i_am_the_spawn_server = true;
         spawn_server();
         exit(0);
     }
