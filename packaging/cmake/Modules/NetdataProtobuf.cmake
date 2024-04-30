@@ -47,8 +47,8 @@ function(netdata_bundle_protobuf)
 
         set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
 
-        string(REPLACE "-fsanitize=address" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
-        string(REPLACE "-fsanitize=address" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+        string(REPLACE "-fsanitize=address" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+        string(REPLACE "-fsanitize=address" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
         # ignore debhelper
         set(FETCHCONTENT_FULLY_DISCONNECTED Off)
