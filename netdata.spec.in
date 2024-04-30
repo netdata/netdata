@@ -332,6 +332,11 @@ happened, on your systems and applications.
 	%endif
 	%if %{_have_ebpf}
 	-DENABLE_PLUGIN_EBPF=On \
+	%if 0%{?centos_ver:1}
+	%if 0%{?centos_ver} < 8
+	-DFORCE_LEGACY_LIBBPF=On \
+	%endif
+	%endif
 	%else
 	-DENABLE_PLUGIN_EBPF=Off \
 	%endif
