@@ -178,19 +178,13 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 static int is_host_available(uuid_t *host_id)
 {
     sqlite3_stmt *res = NULL;
-    int rc;
+    int rc = 0;
 
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
+    if (!REQUIRE_DB(db_meta))
         return 1;
-    }
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOST_BY_UUID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to select node instance information for a node");
+    if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_BY_UUID, &res))
         return 1;
-    }
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
@@ -200,9 +194,7 @@ static int is_host_available(uuid_t *host_id)
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_FINALIZE(res);
-
     return (rc == SQLITE_ROW);
 }
 
@@ -235,11 +227,9 @@ static void sql_delete_aclk_table_list(char *host_guid)
     buffer_sprintf(sql,"SELECT 'drop '||type||' IF EXISTS '||name||';' FROM sqlite_schema " \
                         "WHERE name LIKE 'aclk_%%_%s' AND type IN ('table', 'trigger', 'index')", uuid_str);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement to clean up aclk tables");
+    if (!PREPARE_STATEMENT(db_meta, buffer_tostring(sql), &res))
         goto fail;
-    }
+
     buffer_flush(sql);
 
     while (sqlite3_step_monitored(res) == SQLITE_ROW)
@@ -265,19 +255,13 @@ static void sql_unregister_node(char *machine_guid)
         return;
 
     rc = uuid_parse(machine_guid, host_uuid);
-    if (rc) {
-        freez(machine_guid);
-        return;
-    }
+    if (rc)
+        goto skip;
 
     sqlite3_stmt *res = NULL;
 
-    rc = sqlite3_prepare_v2(db_meta, "UPDATE node_instance SET node_id = NULL WHERE host_id = @host_id", -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to remove the host node id");
-        freez(machine_guid);
-        return;
-    }
+    if (!PREPARE_STATEMENT(db_meta, "UPDATE node_instance SET node_id = NULL WHERE host_id = @host_id", &res))
+        goto skip;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host_uuid, sizeof(host_uuid), SQLITE_STATIC));
@@ -294,8 +278,8 @@ static void sql_unregister_node(char *machine_guid)
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_FINALIZE(res);
+skip:
     freez(machine_guid);
 }
 
@@ -352,10 +336,8 @@ static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_un
     uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
 
     RRDHOST *host = rrdhost_find_by_guid(uuid_str);
-    if (host == localhost)
-        return 0;
-
-    sql_create_aclk_table(host, (uuid_t *) argv[0], (uuid_t *) argv[1]);
+    if (host != localhost)
+        sql_create_aclk_table(host, (uuid_t *) argv[0], (uuid_t *) argv[1]);
     return 0;
 }
 
@@ -576,13 +558,7 @@ void sql_aclk_sync_init(void)
     char *err_msg = NULL;
     int rc;
 
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
-            return;
-        }
-        error_report("Database has not been initialized");
-        return;
-    }
+    REQUIRE_DB(db_meta);
 
     netdata_log_info("Creating archived hosts");
     int number_of_children = 0;

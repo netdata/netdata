@@ -48,6 +48,39 @@ void analytics_set_data_str(char **name, const char *value);
         }                                                                                                              \
     } while (0)
 
+#define REQUIRE_DB(db)                                                                                                 \
+    ({                                                                                                                 \
+        if (unlikely(!(db))) {                                                                                         \
+            if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)                                                   \
+                error_report("Database has not been initialized in %s", __FUNCTION__);                                 \
+        }                                                                                                              \
+        (db) != NULL;                                                                                                  \
+    })
+
+#define PREPARE_COMPILED_STATEMENT(db, sql, stmt_ptr)                                                                  \
+    ({                                                                                                                 \
+        bool _ret = true;                                                                                              \
+        if ((!*(stmt_ptr))) {                                                                                          \
+            int _rc = prepare_statement((db), (sql), stmt_ptr);                                                        \
+            if (_rc != SQLITE_OK) {                                                                                    \
+                internal_error(true, "Failed to prepare statement \"%s\", rc=%d in %s", (sql), _rc, __FUNCTION__);     \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to prepare statement, rc=%d in %s", _rc, __FUNCTION__);          \
+            }                                                                                                          \
+            _ret = (_rc == SQLITE_OK);                                                                                 \
+        }                                                                                                              \
+        _ret;                                                                                                          \
+    })
+
+#define PREPARE_STATEMENT(db, sql, stmt_ptr)                                                                           \
+    ({                                                                                                                 \
+        int _rc = sqlite3_prepare_v2((db), (sql), -1, stmt_ptr, 0);                                                    \
+        if (_rc != SQLITE_OK) {                                                                                        \
+            internal_error(true, "Failed to prepare statement \"%s\", rc=%d in %s", (sql), _rc, __FUNCTION__);         \
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to prepare statement, rc=%d in %s", _rc, __FUNCTION__);              \
+        }                                                                                                              \
+        _rc == SQLITE_OK;                                                                                              \
+    })
+
 #define SQL_MAX_RETRY (100)
 #define SQLITE_INSERT_DELAY (10)        // Insert delay in case of lock
 
