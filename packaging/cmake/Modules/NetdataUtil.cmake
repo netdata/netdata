@@ -20,7 +20,7 @@ function(netdata_detect_host_kernel_version)
                     RESULT_VARIABLE _uname_result
                     OUTPUT_VARIABLE _uname_output)
 
-    if(NOT _uname_result)
+    if(NOT _uname_result EQUAL 0)
         message(CHECK_FAIL "unknown")
         set(HOST_KERNEL_VERSION "0.0.0" CACHE STRING "Detected host kernel version")
         return()
