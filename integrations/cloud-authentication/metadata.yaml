@@ -54,7 +54,7 @@
     link: 'https://netdata.cloud'
     categories:
       - auth
-    icon_filename: 'oidc.png'
+    icon_filename: 'openid.svg'
   keywords:
     - sso
     - oidc
