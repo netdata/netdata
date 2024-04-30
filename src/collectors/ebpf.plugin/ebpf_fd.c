@@ -6,8 +6,10 @@
 static char *fd_dimension_names[NETDATA_FD_SYSCALL_END] = { "open", "close" };
 static char *fd_id_names[NETDATA_FD_SYSCALL_END] = { "do_sys_open",  "__close_fd" };
 
+#ifdef LIBBPF_MAJOR_VERSION
 static char *close_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"close_fd", "__close_fd"};
 static char *open_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"do_sys_openat2", "do_sys_open"};
+#endif
 
 static netdata_syscall_stat_t fd_aggregated_data[NETDATA_FD_SYSCALL_END];
 static netdata_publish_syscall_t fd_publish_aggregated[NETDATA_FD_SYSCALL_END];
