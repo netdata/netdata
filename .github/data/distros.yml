@@ -24,6 +24,7 @@ default_sentry: &default_sentry # Default configuration for Sentry usage
   armhfp: false
   arm64: false
   aarch64: false
+default_builder_rev: &def_builder_rev v1
 include:
   - &alpine
     distro: alpine
@@ -80,6 +81,7 @@ include:
     packages: &amzn_packages
       type: rpm
       repo_distro: amazonlinux/2
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
@@ -104,6 +106,7 @@ include:
     packages:
       type: rpm
       repo_distro: el/7
+      builder_rev: *def_builder_rev
       alt_links:
         - el/7Server
         - el/7Client
@@ -126,6 +129,7 @@ include:
     packages: &cs_packages
       type: rpm
       repo_distro: el/c9s
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
@@ -155,6 +159,7 @@ include:
     packages: &debian_packages
       type: deb
       repo_distro: debian/bookworm
+      builder_rev: v2
       arches:
         - i386
         - amd64
@@ -192,6 +197,7 @@ include:
     packages: &fedora_packages
       type: rpm
       repo_distro: fedora/40
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
@@ -225,6 +231,7 @@ include:
     packages: &opensuse_packages
       type: rpm
       repo_distro: opensuse/15.5
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
@@ -243,6 +250,7 @@ include:
     packages: &oracle_packages
       type: rpm
       repo_distro: ol/8
+      builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
@@ -266,6 +274,7 @@ include:
     packages: &rocky_packages
       type: rpm
       repo_distro: el/9
+      builder_rev: *def_builder_rev
       alt_links:
         - el/9Server
         - el/9Client
@@ -301,6 +310,7 @@ include:
     packages: &ubuntu_packages
       type: deb
       repo_distro: ubuntu/noble
+      builder_rev: v2
       arches:
         - amd64
         - armhf

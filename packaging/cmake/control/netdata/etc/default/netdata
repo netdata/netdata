@@ -1,0 +1,3 @@
+# Extra arguments to pass to netdata
+#
+EXTRA_OPTS="-P /var/run/netdata/netdata.pid"
