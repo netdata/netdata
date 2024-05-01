@@ -1,6 +1,6 @@
 # Creating Alerts with Netdata Alerts Configuration Manager
 
-The Netdata Alerts Configuration Manager enables users with [Business subscriptions](https://www.netdata.cloud/pricing/) to create alerts from the Netdata Dashboard with an intuitive user interface. 
+The Netdata Alerts Configuration Manager enables users with [paid subscriptions](https://www.netdata.cloud/pricing/) to create alerts from the Netdata Dashboard with an intuitive user interface.
 
 ## Using Alerts Configuration Manager
 
@@ -20,7 +20,6 @@ The Netdata Alerts Configuration Manager enables users with [Business subscripti
 
 6. Reload Netdata Alert Health checks `<path to netdata install>/usr/sbin/netdatacli reload-health` and the new alert is now configured.
 
-
 ## Alerts Configuration Manager Sections
 
 - **Alert Detection Method**
@@ -29,23 +28,22 @@ The Netdata Alerts Configuration Manager enables users with [Business subscripti
   - Based on a standard `threshold`
   - Based on metric `variance`
   - Based on the `anomaly rate` of the metric
- 
 
 - **Metrics Lookup, Filtering and Formula Section**
   <!--![Metrics Lookup, Filtering and Formula Section](https://github.com/netdata/netdata/assets/96257330/784c3f54-d7ce-45ea-9505-3f789d6d3ddb)-->
 
-  - **Metrics Lookup**: This is the **Evaluate** line of fields in the modal and it defines the parameters for the database lookup that is needed to get the value that will be compared against the alert definition. It corresponds to the [`lookup`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-lookup) line of the Alert configuration file. The Alerts Configuration Manager provides a default selection for the lookup and can be modified to suit your requirements. The parameters that can be modified are: 
+  - **Metrics Lookup**: This is the **Evaluate** line of fields in the modal and it defines the parameters for the database lookup that is needed to get the value that will be compared against the alert definition. It corresponds to the [`lookup`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-lookup) line of the Alert configuration file. The Alerts Configuration Manager provides a default selection for the lookup and can be modified to suit your requirements. The parameters that can be modified are:
     - METHOD (`avg`, `sum`, `min`, `max`, `cv`, `stddev`)
     - COMPUTATION (sum of all dimensions or individually for each dimension)
     - DIMENSIONS (All dimensions, or a selection of dimensions)
-    - DURATION (the period in time to run the lookup) 
+    - DURATION (the period in time to run the lookup)
     - OPTIONS (`absolute`, `unaligned`, `percentage`, `min2max`)
 
   - **Alert Filtering**: This functionality can be accessed through the **Show advanced** checkbox and it allows for filtering the alert health checks to be run only for specific components of the infrastructure. It helps in achieving a fine-grained configuration for any given alert.
-      - `HOSTS` / `NODES` - By default all hosts are selected. You can pick nodes from the dropdown list, or enter a wildcard matching a list of hosts that you want the alert health check to run on. This field corresponds to the [`hosts`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-hosts) line of the Alert configuration file.
-      - `INSTANCES` - All instances are selected by default. You can pick instances from the dropdown list, or enter a wildcard matching a list of instances that you want the alert health check to run on. This field corresponds to the [`charts`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-charts) line of the Alert configuration file.
-      - `CHART LABELS` - All chart labels are selected by default. You can pick a chart label from the dropdown list or enter a wildcard matching a list of chart labels that you want the alert health check to run on. This field corresponds to the [`chart labels`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-chart-labels) line of the Alert configuration file.
-      - `OS` - All Operating Systems are selected by default. You can choose which OS(s) an alert health check should run on. This field corresponds to the [`os`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-os) line of the Alert configuration file.
+    - `HOSTS` / `NODES` - By default all hosts are selected. You can pick nodes from the dropdown list, or enter a wildcard matching a list of hosts that you want the alert health check to run on. This field corresponds to the [`hosts`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-hosts) line of the Alert configuration file.
+    - `INSTANCES` - All instances are selected by default. You can pick instances from the dropdown list, or enter a wildcard matching a list of instances that you want the alert health check to run on. This field corresponds to the [`charts`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-charts) line of the Alert configuration file.
+    - `CHART LABELS` - All chart labels are selected by default. You can pick a chart label from the dropdown list or enter a wildcard matching a list of chart labels that you want the alert health check to run on. This field corresponds to the [`chart labels`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-chart-labels) line of the Alert configuration file.
+    - `OS` - All Operating Systems are selected by default. You can choose which OS(s) an alert health check should run on. This field corresponds to the [`os`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-os) line of the Alert configuration file.
 
   - **Formula / Calculation**: This field is available through the **Show advanced** checkbox and it is used to define a formula to be run on top of the `lookup` value. The result of the lookup is available in the `$this` variable, and after the formula is run, the result is also stored in `$this` and can be accessed while setting the alert thresholds. This field corresponds to the [`calc`](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-calc) line of the Alert configuration file.
 

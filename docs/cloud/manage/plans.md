@@ -12,7 +12,7 @@ These are divided into three different plans: **Homelab**, **Business**, and **E
 
 The plan is an attribute that is directly attached to your Space and dictates what capabilities and customizations you have available on that Space.
 
-If you have different Spaces you will have different Netdata plans on them. This gives you flexibility to chose what is more adequate for your needs on each of your Spaces.
+If you have different Spaces you will have different subscription plans on them. This gives you flexibility to chose what is more adequate for your needs on each of your Spaces.
 
 Netdata Cloud plans, with the exception of Community, work as subscriptions and overall consist of two pricing components:
 
@@ -48,7 +48,7 @@ For a given month, if your usage is over these committed nodes we will charge th
 
 It is ok to change your mind. We allow to change your plan, billing frequency or adjust the committed nodes on yearly plans, at any time.
 
-To achieve this you can check our documentation on [updating your plan](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/view-plan-billing.md#update-plan).
+To achieve this you can check our documentation on [updating your plan](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/view-plan-billing.md#update-a-subscription-plan).
 
 > **Note**
 >
@@ -56,7 +56,7 @@ To achieve this you can check our documentation on [updating your plan](https://
 >
 >   After that, any notification methods unavailable in your new plan at that time will be automatically disabled. You can always re-enable them once you move to a paid plan that includes them.
 >
-> - Also note that a downgrade or a cancellation may affect users in your Space. Please check what roles are available on [each of the plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#areas-impacted-by-plans). Users with unavailable roles on the new plan will immediately have restricted access to the Space.
+> - Also note that a downgrade or a cancellation may affect users in your Space. Please check what roles are available on [each of the plans](#areas-that-change-upon-subscription). Users with unavailable roles on the new plan will immediately have restricted access to the Space.
 >
 > - Any credit given to you will be available to use on future paid subscriptions with us. It will be available until the **end of the following year**.
 

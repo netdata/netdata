@@ -61,7 +61,8 @@ These are: Email and discord
 
 #### Business
 
-Notification methods classified as Business are only available for **Business** plans
+Notification methods classified as Business are only available for [paid plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md)
+
 These are: PagerDuty, Slack, Opsgenie
 
 ## Alert notifications silencing rules
