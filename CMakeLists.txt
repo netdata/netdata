@@ -733,6 +733,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/get_system_cpus.h
         src/libnetdata/os/tinysleep.c
         src/libnetdata/os/tinysleep.h
+        src/libnetdata/os/uuid_generate.c
+        src/libnetdata/os/uuid_generate.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
@@ -1588,7 +1590,7 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${LINUX}>,$<BOOL:${FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${WINDOWS}>:kernel32;advapi32;winmm>"
+        "$<$<BOOL:${WINDOWS}>:kernel32;advapi32;winmm;rpcrt4>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 
@@ -1649,7 +1651,7 @@ if(LIBBROTLI_FOUND)
 endif()
 
 # uuid
-if(MACOS)
+if(MACOS OR WINDOWS)
         # UUID functionality is part of the system libraries here, so no extra
         # stuff needed.
 else()

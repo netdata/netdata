@@ -16,6 +16,7 @@
 #include "get_pid_max.h"
 #include "get_system_cpus.h"
 #include "tinysleep.h"
+#include "uuid_generate.h"
 
 #include "os-freebsd-wrappers.h"
 #include "os-macos-wrappers.h"

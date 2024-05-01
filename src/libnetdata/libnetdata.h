@@ -114,16 +114,9 @@ extern "C" {
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
-#include <uuid/uuid.h>
 #include <spawn.h>
 #include <uv.h>
 #include <assert.h>
-
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN (37)
-#endif
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>

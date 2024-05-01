@@ -30,6 +30,44 @@ void uuid_unparse_lower_compact(const uuid_t uuid, char *out) {
     out[32] = '\0'; // Null-terminate the string
 }
 
+void uuid_unparse_lower(const uuid_t uuid, char *out) {
+    static const char *hex_chars = "0123456789abcdef";
+    int positions[] = {8, 4, 4, 4, 12}; // Lengths of each UUID segment
+    int pos = 0; // Current position in the output array
+    int offset = 0; // Offset in the UUID array
+
+    for (int segment = 0; segment < 5; segment++) {
+        for (int i = 0; i < positions[segment]; i++) {
+            out[pos++] = hex_chars[(uuid[offset] >> 4) & 0x0F];
+            out[pos++] = hex_chars[uuid[offset] & 0x0F];
+            offset++;
+        }
+        if (segment < 4) { // Add hyphen after each segment except the last one
+            out[pos++] = '-';
+        }
+    }
+    out[pos] = '\0'; // Null-terminate the string
+}
+
+void uuid_unparse_upper(const uuid_t uuid, char *out) {
+    static const char *hex_chars = "0123456789ABCDEF";
+    int positions[] = {8, 4, 4, 4, 12}; // Lengths of each UUID segment
+    int pos = 0; // Current position in the output array
+    int offset = 0; // Offset in the UUID array
+
+    for (int segment = 0; segment < 5; segment++) {
+        for (int i = 0; i < positions[segment]; i++) {
+            out[pos++] = hex_chars[(uuid[offset] >> 4) & 0x0F];
+            out[pos++] = hex_chars[uuid[offset] & 0x0F];
+            offset++;
+        }
+        if (segment < 4) { // Add hyphen after each segment except the last one
+            out[pos++] = '-';
+        }
+    }
+    out[pos] = '\0'; // Null-terminate the string
+}
+
 inline int uuid_parse_compact(const char *in, uuid_t uuid) {
     if (strlen(in) != 32)
         return -1; // Invalid input length
