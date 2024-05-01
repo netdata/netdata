@@ -115,6 +115,6 @@ void uuid_generate_time(uuid_t out);
 
 #define uuid_unparse(uu, out) nd_uuid_unparse_lower(uu, out)
 #define uuid_unparse_lower(uu, out) nd_uuid_unparse_lower(uu, out)
-#define uuid_unparse_upper(uu, out) nd_uuid_unparse_lower(uu, out)
+#define uuid_unparse_upper(uu, out) nd_uuid_unparse_upper(uu, out)
 
 #endif //NETDATA_UUID_H
