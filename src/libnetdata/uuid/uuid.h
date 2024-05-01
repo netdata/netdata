@@ -59,24 +59,62 @@ static inline int hex_char_to_int(char c) {
     return -1; // Invalid hexadecimal character
 }
 
-int uuid_is_null(const uuid_t uu);
-void uuid_clear(uuid_t uu);
-int uuid_compare(const uuid_t uu1, const uuid_t uu2);
-void uuid_copy(uuid_t dst, const uuid_t src);
-#define uuid_memcmp(uu1, uu2) uuid_compare(*(uu1), *(uu2))
+static inline int nd_uuid_is_null(const uuid_t uu) {
+    const ND_UUID *u = (ND_UUID *)uu;
+    return u->parts.hig64 == 0 && u->parts.low64 == 0;
+}
+
+static inline void nd_uuid_clear(uuid_t uu) {
+    ND_UUID *u = (ND_UUID *)uu;
+    u->parts.low64 = u->parts.hig64 = 0;
+}
+
+static inline int nd_uuid_compare(const uuid_t uu1, const uuid_t uu2) {
+    ND_UUID *u1 = (ND_UUID *)uu1;
+    ND_UUID *u2 = (ND_UUID *)uu2;
+
+    if(u1->parts.hig64 == u2->parts.hig64) {
+        if(u1->parts.low64 < u2->parts.low64) return -1;
+        if(u1->parts.low64 > u2->parts.low64) return 1;
+        return 0;
+    }
+
+    if(u1->parts.hig64 < u2->parts.hig64) return -1;
+    if(u1->parts.hig64 > u2->parts.hig64) return 1;
+    return 0;
+}
+
+static inline void nd_uuid_copy(uuid_t dst, const uuid_t src) {
+    ND_UUID *d = (ND_UUID *)dst;
+    const ND_UUID *s = (const ND_UUID *)src;
+    *d = *s;
+}
+
+static inline int nd_uuid_memcmp(const uuid_t *uu1, const uuid_t *uu2) {
+    return memcmp(uu1, uu2, sizeof(uuid_t));
+}
+
+void nd_uuid_unparse_lower(const uuid_t uuid, char *out);
+void nd_uuid_unparse_upper(const uuid_t uuid, char *out);
+
+#define uuid_is_null(uu) nd_uuid_is_null(uu)
+#define uuid_clear(uu) nd_uuid_clear(uu)
+#define uuid_compare(uu1, uu2) nd_uuid_compare(uu1, uu2)
+#define uuid_memcmp(puu1, puu2) nd_uuid_memcmp(puu1, puu2)
+#define uuid_copy(dst, src) nd_uuid_copy(dst, src)
 
 #ifdef COMPILED_FOR_WINDOWS
 #define uuid_generate(out) os_uuid_generate(out)
-#define uuid_generate_random(out) uuid_generate(out)
-#define uuid_generate_time(out) uuid_generate(out)
+#define uuid_generate_random(out) os_uuid_generate(out)
+#define uuid_generate_time(out) os_uuid_generate(out)
 #else
 void uuid_generate(uuid_t out);
 void uuid_generate_random(uuid_t out);
 void uuid_generate_time(uuid_t out);
 #endif
 
-void uuid_unparse_lower(const uuid_t uu, char *out);
-void uuid_unparse_upper(const uuid_t uu, char *out);
-#define uuid_unparse(uu, out) uuid_unparse_lower(uu, out)
+#define uuid_unparse(uu, out) nd_uuid_unparse_lower(uu, out)
+#define uuid_unparse_lower(uu, out) nd_uuid_unparse_lower(uu, out)
+#define uuid_unparse_upper(uu, out) nd_uuid_unparse_lower(uu, out)
 
 #endif //NETDATA_UUID_H

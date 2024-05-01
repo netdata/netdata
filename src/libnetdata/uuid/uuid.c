@@ -2,37 +2,6 @@
 
 #include "../libnetdata.h"
 
-int uuid_is_null(const uuid_t uu) {
-    const ND_UUID *u = (ND_UUID *)uu;
-    return u->parts.hig64 == 0 && u->parts.low64 == 0;
-}
-
-void uuid_clear(uuid_t uu) {
-    ND_UUID *u = (ND_UUID *)uu;
-    u->parts.low64 = u->parts.hig64 = 0;
-}
-
-int uuid_compare(const uuid_t uu1, const uuid_t uu2) {
-    ND_UUID *u1 = (ND_UUID *)uu1;
-    ND_UUID *u2 = (ND_UUID *)uu2;
-
-    if(u1->parts.hig64 == u2->parts.hig64) {
-        if(u1->parts.low64 < u2->parts.low64) return -1;
-        if(u1->parts.low64 > u2->parts.low64) return 1;
-        return 0;
-    }
-
-    if(u1->parts.hig64 < u2->parts.hig64) return -1;
-    if(u1->parts.hig64 > u2->parts.hig64) return 1;
-    return 0;
-}
-
-void uuid_copy(uuid_t dst, const uuid_t src) {
-    ND_UUID *d = (ND_UUID *)dst;
-    const ND_UUID *s = (const ND_UUID *)src;
-    *d = *s;
-}
-
 ND_UUID UUID_generate_from_hash(const void *payload, size_t payload_len) {
     assert(sizeof(XXH128_hash_t) == sizeof(ND_UUID));
 
@@ -61,7 +30,7 @@ void uuid_unparse_lower_compact(const uuid_t uuid, char *out) {
     out[32] = '\0'; // Null-terminate the string
 }
 
-void uuid_unparse_lower(const uuid_t uuid, char *out) {
+void nd_uuid_unparse_lower(const uuid_t uuid, char *out) {
     static const char *hex_chars = "0123456789abcdef";
     int positions[] = {8, 4, 4, 4, 12}; // Lengths of each UUID segment
     int pos = 0; // Current position in the output array
@@ -80,7 +49,7 @@ void uuid_unparse_lower(const uuid_t uuid, char *out) {
     out[pos] = '\0'; // Null-terminate the string
 }
 
-void uuid_unparse_upper(const uuid_t uuid, char *out) {
+void nd_uuid_unparse_upper(const uuid_t uuid, char *out) {
     static const char *hex_chars = "0123456789ABCDEF";
     int positions[] = {8, 4, 4, 4, 12}; // Lengths of each UUID segment
     int pos = 0; // Current position in the output array
