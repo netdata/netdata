@@ -86,6 +86,32 @@ include(NetdataCompilerFlags)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
+# Check for the mold linker and try to use it if available
+option(USE_MOLD "If the MOLD linker is available on the system, use it instead of the default linker." TRUE)
+
+if(USE_MOLD)
+        message(CHECK_START "Searching for MOLD linker")
+        find_program(MOLD_LINKER NAMES ld.mold mold)
+
+        if(MOLD_LINKER)
+                execute_process(COMMAND ${MOLD_LINKER} --version
+                                RESULT_VARIABLE MOLD_VERSION_RESULT
+                                OUTPUT_VARIABLE MOLD_VERSION)
+
+                if(NOT MOLD_VERSION_RESULT)
+                        string(REPLACE "\n" "" MOLD_VERSION "${MOLD_VERSION}")
+                        message(CHECK_PASS "found (version: ${MOLD_VERSION})")
+                        message(STATUS "Using mold instead of the system default for linking.")
+                        add_compile_options("-fuse-ld=mold")
+                        add_link_options("-fuse-ld=mold")
+                else()
+                        message(CHECK_FAIL "failed")
+                endif()
+        else()
+                message(CHECK_FAIL "failed")
+        endif()
+endif()
+
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
