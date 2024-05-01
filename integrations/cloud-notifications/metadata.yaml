@@ -50,7 +50,7 @@
     description: |
       ### Prerequisites
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
+      - Access to the Netdata Space as an **Admin**
       - You need to have a Discord server able to receive webhooks integrations.
 
       ### Discord Server Configuration
@@ -91,7 +91,7 @@
     description: |
       ### Prerequisites
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
+      - Access to the Netdata Space as an **Admin**
       - The Netdata Space needs to be on a paid plan
       - You need to have a PagerDuty service to receive events using webhooks.
 
@@ -135,7 +135,7 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
+      - Access to the Netdata Space as an **Admin**
       - The Netdata Space needs to be on a paid plan
       - You need to have a Slack app on your workspace to receive the Webhooks.
 
@@ -185,7 +185,7 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
+      - Access to the Netdata Space as an **Admin**
       - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Opsgenie to add new integrations.
 
@@ -228,7 +228,7 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
+      - Access to the Netdata Space as an **Admin**
       - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Mattermost to add new integrations.
       - You need to have a Mattermost app on your workspace to receive the webhooks.
@@ -279,7 +279,7 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
+      - Access to the Netdata Space as an **Admin**
       - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Mattermost to add new integrations.
       - You need to have a RocketChat app on your workspace to receive the webhooks.
@@ -332,7 +332,7 @@
       To add AWS SNS notification you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
+      - Access to the space as an **Admin**
       - Space needs to be on **Business** plan or higher
       - Have an AWS account with AWS SNS access, for more details check [how to configure this on AWS SNS](#settings-on-aws-sns)
 
@@ -381,7 +381,7 @@
       To add Microsoft Teams notifications integration to your Netdata Cloud space you will need the following:
 
       - A Netdata Cloud account.
-      - Access to the Netdata Cloud space as an **administrator**.
+      - Access to the Netdata Cloud space as an **Admin**.
       - The Space to be on **Business** plan or higher.
       - A [Microsoft 365 for Business Account](https://www.microsoft.com/en-us/microsoft-365/business). Note that this is a **paid** account.
 
@@ -430,7 +430,7 @@
       To add Telegram notification you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
+      - Access to the space as an **Admin**
       - Space needs to be on **Business** plan or higher
       - The Telegram bot token and chat ID
 
@@ -475,7 +475,7 @@
       To add Splunk notification you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
+      - Access to the space as an **Admin**
       - Space needs to be on **Business** plan or higher
       - URI and token for your Splunk HTTP Event Collector. Refer to the [Splunk documentation](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) for detailed instructions.
 
@@ -515,7 +515,7 @@
       To add Splunk VictorOps notification (also known as Splunk On-Call) you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
+      - Access to the space as an **Admin**
       - Space needs to be on **Business** plan or higher
       - Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [VictorOps documentation](https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide) for detailed instructions.
 
@@ -551,7 +551,7 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
+      - Access to the Netdata Space as an **Admin**
       - The Netdata Space needs to be on a paid plan
       - You need to have an app that allows you to receive webhooks following a predefined schema.
 
