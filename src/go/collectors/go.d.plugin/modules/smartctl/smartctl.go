@@ -37,6 +37,7 @@ func New() *Smartctl {
 			DeviceSelector:   "*",
 		},
 		charts:      &module.Charts{},
+		deviceSr:    matcher.TRUE(),
 		seenDevices: make(map[string]bool),
 	}
 }
