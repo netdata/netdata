@@ -43,6 +43,13 @@
           "idle"
         ],
         "default": "standby"
+      },
+      "device_selector": {
+        "title": "Device selector",
+        "description": "Specifies a [pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to match the 'info name' of devices as reported by `smartctl --scan --json`. Only devices whose 'info name' matches this pattern will be collected.",
+        "type": "string",
+        "minimum": 1,
+        "default": "*"
       }
     },
     "additionalProperties": false,
@@ -54,14 +61,39 @@
     "uiOptions": {
       "fullPage": true
     },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "timeout",
+            "scan_every",
+            "poll_devices_every",
+            "no_check_power_mode"
+          ]
+        },
+        {
+          "title": "Filtering",
+          "fields": [
+            "device_selector"
+          ]
+        }
+      ]
+    },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },
     "no_check_power_mode": {
+      "ui:help": "`never` - check the device always; `sleep` - check the device unless it is in SLEEP mode; `standby` - check the device unless it is in SLEEP or STANDBY mode; `idle` - check the device unless it is in SLEEP, STANDBY or IDLE mode.",
       "ui:widget": "radio",
       "ui:options": {
         "inline": true
       }
+    },
+    "device_selector": {
+      "ui:help": "Leave blank or use `*` to collect data for all devices."
     }
   }
 }

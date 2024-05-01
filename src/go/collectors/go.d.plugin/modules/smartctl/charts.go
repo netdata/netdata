@@ -259,10 +259,23 @@ func attributeUnit(attrName string) string {
 		"Offline_Uncorrectable":   "sectors",
 		"Pending_Sector_Count":    "sectors",
 		"Reallocated_Sector_Ct":   "sectors",
+		"Current_Pending_Sector":  "sectors",
+		"Reported_Uncorrect":      "errors",
+		"Command_Timeout":         "events",
 	}
 
 	if unit, ok := units[attrName]; ok {
 		return unit
+	}
+
+	// TODO: convert to bytes during data collection? (examples: NAND_Writes_32MiB, Flash_Writes_GiB)
+	if strings.HasSuffix(attrName, "MiB") || strings.HasSuffix(attrName, "GiB") {
+		if strings.Contains(attrName, "Writes") {
+			return "writes"
+		}
+		if strings.Contains(attrName, "Reads") {
+			return "reads"
+		}
 	}
 
 	if strings.Contains(attrName, "Error") {

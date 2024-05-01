@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 
 	"github.com/tidwall/gjson"
@@ -33,8 +34,10 @@ func New() *Smartctl {
 			ScanEvery:        web.Duration(time.Minute * 15),
 			PollDevicesEvery: web.Duration(time.Minute * 5),
 			NoCheckPowerMode: "standby",
+			DeviceSelector:   "*",
 		},
 		charts:      &module.Charts{},
+		deviceSr:    matcher.TRUE(),
 		seenDevices: make(map[string]bool),
 	}
 }
@@ -45,6 +48,7 @@ type Config struct {
 	ScanEvery        web.Duration `yaml:"scan_every" json:"scan_every"`
 	PollDevicesEvery web.Duration `yaml:"poll_devices_every" json:"poll_devices_every"`
 	NoCheckPowerMode string       `yaml:"no_check_power_mode" json:"no_check_power_mode"`
+	DeviceSelector   string       `yaml:"device_selector" json:"device_selector"`
 }
 
 type (
@@ -55,6 +59,8 @@ type (
 		charts *module.Charts
 
 		exec smartctlCli
+
+		deviceSr matcher.Matcher
 
 		lastScanTime   time.Time
 		forceScan      bool
@@ -81,6 +87,13 @@ func (s *Smartctl) Init() error {
 		s.Errorf("config validation error: %s", err)
 		return err
 	}
+
+	sr, err := s.initDeviceSelector()
+	if err != nil {
+		s.Errorf("device selector initialization: %v", err)
+		return err
+	}
+	s.deviceSr = sr
 
 	smartctlExec, err := s.initSmartctlCli()
 	if err != nil {
