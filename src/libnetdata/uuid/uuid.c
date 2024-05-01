@@ -2,6 +2,28 @@
 
 #include "../libnetdata.h"
 
+int uuid_is_null(const uuid_t uu) {
+    const ND_UUID *u = (ND_UUID *)uu;
+    return u->parts.hig64 == 0 && u->parts.low64 == 0;
+}
+
+void uuid_clear(uuid_t uu) {
+    ND_UUID *u = (ND_UUID *)uu;
+    u->parts.low64 = u->parts.hig64 = 0;
+}
+
+int uuid_compare(const uuid_t uu1, const uuid_t uu2) {
+    ND_UUID *u1 = (ND_UUID *)uu1;
+    ND_UUID *u2 = (ND_UUID *)uu2;
+    return u1->parts.hig64 == u2->parts.hig64 && u1->parts.low64 == u2->parts.low64 ? 0 : 1;
+}
+
+void uuid_copy(uuid_t dst, const uuid_t src) {
+    ND_UUID *d = (ND_UUID *)dst;
+    const ND_UUID *s = (const ND_UUID *)src;
+    *d = *s;
+}
+
 ND_UUID UUID_generate_from_hash(const void *payload, size_t payload_len) {
     assert(sizeof(XXH128_hash_t) == sizeof(ND_UUID));
 

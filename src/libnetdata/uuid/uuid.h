@@ -59,28 +59,11 @@ static inline int hex_char_to_int(char c) {
     return -1; // Invalid hexadecimal character
 }
 
-static inline int uuid_is_null(const uuid_t uu) {
-    const ND_UUID *u = (ND_UUID *)uu;
-    return u->parts.hig64 == 0 && u->parts.low64 == 0;
-}
-
-static inline void uuid_clear(uuid_t uu) {
-    ND_UUID *u = (ND_UUID *)uu;
-    u->parts.low64 = u->parts.hig64 = 0;
-}
-
-static inline int uuid_compare(const uuid_t uu1, const uuid_t uu2) {
-    ND_UUID *u1 = (ND_UUID *)uu1;
-    ND_UUID *u2 = (ND_UUID *)uu2;
-    return u1->parts.hig64 == u2->parts.hig64 && u1->parts.low64 == u2->parts.low64 ? 0 : 1;
-}
+int uuid_is_null(const uuid_t uu);
+void uuid_clear(uuid_t uu);
+int uuid_compare(const uuid_t uu1, const uuid_t uu2);
+void uuid_copy(uuid_t dst, const uuid_t src);
 #define uuid_memcmp(uu1, uu2) uuid_compare(*(uu1), *(uu2))
-
-static inline void uuid_copy(uuid_t dst, const uuid_t src) {
-    ND_UUID *d = (ND_UUID *)dst;
-    const ND_UUID *s = (const ND_UUID *)src;
-    *d = *s;
-}
 
 #ifdef COMPILED_FOR_WINDOWS
 #define uuid_generate(out) os_uuid_generate(out)
