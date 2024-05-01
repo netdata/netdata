@@ -30,42 +30,26 @@ void uuid_unparse_lower_compact(const uuid_t uuid, char *out) {
     out[32] = '\0'; // Null-terminate the string
 }
 
-void nd_uuid_unparse_lower(const uuid_t uuid, char *out) {
-    static const char *hex_chars = "0123456789abcdef";
-    int positions[] = {8, 4, 4, 4, 12}; // Lengths of each UUID segment
-    int pos = 0; // Current position in the output array
-    int offset = 0; // Offset in the UUID array
-
-    for (int segment = 0; segment < 5; segment++) {
-        for (int i = 0; i < positions[segment]; i++) {
-            out[pos++] = hex_chars[(uuid[offset] >> 4) & 0x0F];
-            out[pos++] = hex_chars[uuid[offset] & 0x0F];
-            offset++;
+static inline void nd_uuid_unparse_full(const uuid_t uuid, char *out, const char *hex_chars) {
+    int shifts = 0;
+    for (int i = 0; i < 16; i++) {
+        if (i == 4 || i == 6 || i == 8 || i == 10) {
+            out[i * 2 + shifts] = '-';
+            shifts++;
         }
-        if (segment < 4) { // Add hyphen after each segment except the last one
-            out[pos++] = '-';
-        }
+        out[i * 2 + shifts] = hex_chars[(uuid[i] >> 4) & 0x0F];
+        out[i * 2 + 1 + shifts] = hex_chars[uuid[i] & 0x0F];
     }
-    out[pos] = '\0'; // Null-terminate the string
+    out[36] = '\0'; // Null-terminate the string
+}
+
+// Wrapper functions for lower and upper case hexadecimal representation
+void nd_uuid_unparse_lower(const uuid_t uuid, char *out) {
+    nd_uuid_unparse_full(uuid, out, "0123456789abcdef");
 }
 
 void nd_uuid_unparse_upper(const uuid_t uuid, char *out) {
-    static const char *hex_chars = "0123456789ABCDEF";
-    int positions[] = {8, 4, 4, 4, 12}; // Lengths of each UUID segment
-    int pos = 0; // Current position in the output array
-    int offset = 0; // Offset in the UUID array
-
-    for (int segment = 0; segment < 5; segment++) {
-        for (int i = 0; i < positions[segment]; i++) {
-            out[pos++] = hex_chars[(uuid[offset] >> 4) & 0x0F];
-            out[pos++] = hex_chars[uuid[offset] & 0x0F];
-            offset++;
-        }
-        if (segment < 4) { // Add hyphen after each segment except the last one
-            out[pos++] = '-';
-        }
-    }
-    out[pos] = '\0'; // Null-terminate the string
+    nd_uuid_unparse_full(uuid, out, "0123456789ABCDEF");
 }
 
 inline int uuid_parse_compact(const char *in, uuid_t uuid) {
