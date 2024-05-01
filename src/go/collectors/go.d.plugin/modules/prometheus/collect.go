@@ -209,6 +209,9 @@ func (p *Prometheus) joinLabels(labels labels.Labels) string {
 				val = backslashReplacer.Replace(val)
 			}
 		}
+		if strings.IndexByte(val, '\'') != -1 {
+			val = apostropheReplacer.Replace(val)
+		}
 
 		sb.WriteString("-" + name + "=" + val)
 	}
@@ -247,8 +250,9 @@ func decodeLabelValue(value string) string {
 }
 
 var (
-	spaceReplacer     = strings.NewReplacer(" ", "_")
-	backslashReplacer = strings.NewReplacer(`\`, "_")
+	spaceReplacer      = strings.NewReplacer(" ", "_")
+	backslashReplacer  = strings.NewReplacer(`\`, "_")
+	apostropheReplacer = strings.NewReplacer("'", "")
 )
 
 func hasPrefix(mf map[string]*prometheus.MetricFamily, prefix string) bool {
