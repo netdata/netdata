@@ -75,6 +75,10 @@ modules:
               description: interval for gathering data for every device, measured in seconds. Data is cached for this interval.
               default_value: 300
               required: false
+            - name: device_selector
+              description: "Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`."
+              default_value: "*"
+              required: false
         examples:
           folding:
             title: Config
