@@ -623,6 +623,7 @@ declare -A pkg_find=(
 
 declare -A pkg_distro_sdk=(
   ['alpine']="alpine-sdk"
+  ['centos']="kernel-headers"
   ['default']="NOTREQUIRED"
 )
 
