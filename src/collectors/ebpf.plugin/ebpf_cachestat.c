@@ -1412,7 +1412,7 @@ static void cachestat_collector(ebpf_module_t *em)
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_cachestat_read_global_tables(stats, maps_per_core);
 
-        if (cgroups)
+        if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_cachestat_cgroup();
 
         pthread_mutex_lock(&lock);
@@ -1422,7 +1422,7 @@ static void cachestat_collector(ebpf_module_t *em)
         if (apps & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_cache_send_apps_data(apps_groups_root_target);
 
-        if (cgroups)
+        if (cgroups && shm_ebpf_cgroup.header)
             ebpf_cachestat_send_cgroup_data(update_every);
 
         pthread_mutex_unlock(&lock);

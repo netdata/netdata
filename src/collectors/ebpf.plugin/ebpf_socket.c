@@ -2665,7 +2665,7 @@ static void socket_collector(ebpf_module_t *em)
             ebpf_socket_read_hash_global_tables(stats, maps_per_core);
         }
 
-        if (cgroups)
+        if (cgroups && shm_ebpf_cgroup.header)
             ebpf_update_socket_cgroup();
 
         pthread_mutex_lock(&lock);
@@ -2675,7 +2675,7 @@ static void socket_collector(ebpf_module_t *em)
         if (socket_apps_enabled & NETDATA_EBPF_APPS_FLAG_CHART_CREATED)
             ebpf_socket_send_apps_data();
 
-        if (cgroups && shm_ebpf_cgroup.header && ebpf_cgroup_pids)
+        if (cgroups && shm_ebpf_cgroup.header)
             ebpf_socket_send_cgroup_data(update_every);
 
         fflush(stdout);

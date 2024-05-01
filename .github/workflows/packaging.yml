@@ -249,7 +249,7 @@ jobs:
           timeout_seconds: 900
           command: |
             docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}
-            docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-v1
+            docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Build Packages
         id: build
         if: needs.file-check.outputs.run == 'true'
@@ -259,7 +259,7 @@ jobs:
                     -e ENABLE_SENTRY=${{ matrix.bundle_sentry }} -e RELEASE_PIPELINE=${{ env.RELEASE_PIPELINE }} \
                     -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.arch }} -e UPLOAD_SENTRY=${{ env.UPLOAD_SENTRY }} \
                     -e SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_CLI_TOKEN }} -e NETDATA_SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
-                     --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-v1
+                     --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Save Packages
         id: artifacts
         if: needs.file-check.outputs.run == 'true'

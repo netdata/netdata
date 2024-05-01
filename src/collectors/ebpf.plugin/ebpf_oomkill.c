@@ -470,7 +470,7 @@ static void oomkill_collector(ebpf_module_t *em)
         stats[NETDATA_CONTROLLER_PID_TABLE_DEL] += (uint64_t) count;
 
         pthread_mutex_lock(&lock);
-        if (cgroups && shm_ebpf_cgroup.header && ebpf_cgroup_pids) {
+        if (cgroups && shm_ebpf_cgroup.header) {
             ebpf_update_oomkill_cgroup(keys, count);
             // write everything from the ebpf map.
             ebpf_oomkill_send_cgroup_data(update_every);

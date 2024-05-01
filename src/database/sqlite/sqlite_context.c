@@ -80,7 +80,6 @@ int sql_init_context_database(int memory)
 
 void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
-    int rc;
     static __thread sqlite3_stmt *res = NULL;
 
     if (unlikely(!host_uuid)) {
@@ -88,13 +87,9 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
        return;
     }
 
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, CTX_GET_CHART_LIST, &res);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to prepare statement to fetch chart list");
-            return;
-        }
-    }
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, CTX_GET_CHART_LIST, &res))
+        return;
+
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
 
@@ -116,7 +111,6 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_RESET(res);
 }
 
@@ -125,16 +119,10 @@ done:
     "FROM dimension d WHERE d.chart_id = @id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
 void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
-    int rc;
     static __thread sqlite3_stmt *res = NULL;
 
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_meta, CTX_GET_DIMENSION_LIST, &res);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to prepare statement to fetch chart dimension data");
-            return;
-        }
-    }
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, CTX_GET_DIMENSION_LIST, &res))
+        return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC));
@@ -152,7 +140,6 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_RESET(res);
 }
 
@@ -161,16 +148,10 @@ done:
 
 void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data)
 {
-    int rc;
     static __thread sqlite3_stmt *res = NULL;
 
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_context_meta, CTX_GET_LABEL_LIST, &res);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to prepare statement to fetch chart labels");
-            return;
-        }
-    }
+    if (!PREPARE_COMPILED_STATEMENT(db_context_meta, CTX_GET_LABEL_LIST, &res))
+        return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, chart_uuid, sizeof(*chart_uuid), SQLITE_STATIC));
@@ -187,7 +168,6 @@ void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, v
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_RESET(res);
 }
 
@@ -201,16 +181,10 @@ void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_D
     if (unlikely(!host_uuid))
         return;
 
-    int rc;
     static __thread sqlite3_stmt *res = NULL;
 
-    if (unlikely(!res)) {
-        rc = prepare_statement(db_context_meta, CTX_GET_CONTEXT_LIST, &res);
-        if (rc != SQLITE_OK) {
-            error_report("Failed to prepare statement to fetch stored context list");
-            return;
-        }
-    }
+    if (!PREPARE_COMPILED_STATEMENT(db_context_meta, CTX_GET_CONTEXT_LIST, &res))
+        return;
 
     VERSIONED_CONTEXT_DATA context_data = {0};
 
@@ -234,7 +208,6 @@ void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_D
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_RESET(res);
 }
 
@@ -249,17 +222,14 @@ done:
 
 int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
-    int rc, rc_stored = 1;
+    int rc_stored = 1;
     sqlite3_stmt *res = NULL;
 
     if (unlikely(!host_uuid || !context_data || !context_data->id))
         return 0;
 
-    rc = sqlite3_prepare_v2(db_context_meta, CTX_STORE_CONTEXT, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to store context");
+    if (!PREPARE_STATEMENT(db_context_meta, CTX_STORE_CONTEXT, &res))
         return 1;
-    }
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
@@ -282,9 +252,7 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_FINALIZE(res);
-
     return (rc_stored != SQLITE_DONE);
 }
 
@@ -293,17 +261,14 @@ done:
 #define CTX_DELETE_CONTEXT "DELETE FROM context WHERE host_id = @host_id AND id = @context"
 int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
-    int rc, rc_stored = 1;
+    int rc_stored = 1;
     sqlite3_stmt *res = NULL;
 
     if (unlikely(!context_data || !context_data->id))
         return 0;
 
-    rc = sqlite3_prepare_v2(db_context_meta, CTX_DELETE_CONTEXT, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to delete context");
+    if (!PREPARE_STATEMENT(db_context_meta, CTX_DELETE_CONTEXT, &res))
         return 1;
-    }
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
@@ -317,9 +282,7 @@ int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 
 done:
     REPORT_BIND_FAIL(res, param);
-
     SQLITE_FINALIZE(res);
-
     return (rc_stored != SQLITE_DONE);
 }
 
