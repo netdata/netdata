@@ -1,6 +1,6 @@
 # Netdata Subscription Plans
 
-This page will guide you through the differences between the Community, Homelab, Business and Enterprise On-Premise plans.
+This page will guide you through the differences between the Community plan and paid plans.
 
 At Netdata, we believe in providing free and unrestricted access to high-quality monitoring solutions, and our commitment to this principle will not change. We offer our free SaaS - what we call **Community plan** - and Open Source Agent, which features unlimited nodes and users, unlimited metrics, and retention, providing real-time, high-fidelity, out-of-the-box infrastructure monitoring for packaged applications, containers, and operating systems.
 
