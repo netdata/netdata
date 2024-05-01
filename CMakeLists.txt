@@ -2523,20 +2523,22 @@ install(FILES
         COMPONENT netdata
         DESTINATION etc/netdata)
 
-install(FILES
-        system/netdata-updater.conf
-        COMPONENT netdata
-        DESTINATION etc/netdata)
-
 install(PROGRAMS
         system/edit-config
         COMPONENT netdata
         DESTINATION etc/netdata)
 
+if(BUILD_FOR_PACKAGING)
+        set(NETDATA_CONF_DEST "etc/netdata")
+else()
+        set(NETDATA_CONF_DEST "usr/lib/netdata/conf.d")
+endif()
+
 install(FILES
         system/netdata.conf
+        system/netdata-updater.conf
         COMPONENT netdata
-        DESTINATION etc/netdata)
+        DESTINATION ${NETDATA_CONF_DEST})
 
 #
 # misc files
