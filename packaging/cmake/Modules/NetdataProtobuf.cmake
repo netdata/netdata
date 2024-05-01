@@ -3,6 +3,8 @@
 # Copyright (c) 2024 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+include(NetdataUtil)
+
 macro(netdata_protobuf_21_tags)
         set(PROTOBUF_TAG f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c) # v21.12
         set(NEED_ABSL False)
@@ -146,27 +148,8 @@ macro(netdata_detect_protobuf)
                         message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
                 endif()
 
-                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
-                set(NETDATA_PROTOBUF_LIBS protobuf::libprotobuf)
-                get_target_property(NETDATA_PROTOBUF_CFLAGS_OTHER
-                                    protobuf::libprotobuf
-                                    INTERFACE_COMPILE_DEFINITIONS)
-                get_target_property(NETDATA_PROTOBUF_INCLUDE_DIRS
-                                    protobuf::libprotobuf
-                                    INTERFACE_INCLUDE_DIRECTORIES)
-
-                if(NETDATA_PROTOBUF_CFLAGS_OTHER STREQUAL NETDATA_PROTOBUF_CFLAGS_OTHER-NOTFOUND)
-                        set(NETDATA_PROTOBUF_CFLAGS_OTHER "")
-                endif()
-
-                if(NETDATA_PROTOBUF_INCLUDE_DIRS STREQUAL NETDATA_PROTOBUF_INCLUDE_DIRS-NOTFOUND)
-                        set(NETDATA_PROTOBUF_INCLUDE_DIRS "")
-                endif()
-        else()
-                set(NETDATA_PROTOBUF_PROTOC_EXECUTABLE ${PROTOBUF_PROTOC_EXECUTABLE})
-                set(NETDATA_PROTOBUF_CFLAGS_OTHER ${PROTOBUF_CFLAGS_OTHER})
-                set(NETDATA_PROTOBUF_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
-                set(NETDATA_PROTOBUF_LIBS ${PROTOBUF_LIBRARIES})
+                set(PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
+                set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
         endif()
 
         set(ENABLE_PROTOBUF True)
@@ -203,9 +186,9 @@ function(netdata_protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
                 endif()
 
                 add_custom_command(OUTPUT ${GENERATED_PB_CC} ${GENERATED_PB_H}
-                                   COMMAND ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
+                                   COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
                                    ARGS "-I$<JOIN:${_PROTOC_INCLUDE_DIRS},;-I>" --cpp_out=${OUT_DIR} ${ABS_FIL}
-                                   DEPENDS ${ABS_FIL} ${NETDATA_PROTOBUF_PROTOC_EXECUTABLE}
+                                   DEPENDS ${ABS_FIL} ${PROTOBUF_PROTOC_EXECUTABLE}
                                    COMMENT "Running C++ protocol buffer compiler on ${FIL}"
                                    COMMAND_EXPAND_LISTS)
         endforeach()
@@ -218,8 +201,6 @@ function(netdata_protoc_generate_cpp INC_DIR OUT_DIR SRCS HDRS)
 endfunction()
 
 # Add protobuf to a specified target.
-function(netdata_add_protobuf _target)
-        target_compile_definitions(${_target} PRIVATE ${NETDATA_PROTOBUF_CFLAGS_OTHER})
-        target_include_directories(${_target} PRIVATE ${NETDATA_PROTOBUF_INCLUDE_DIRS})
-        target_link_libraries(${_target} PRIVATE ${NETDATA_PROTOBUF_LIBS})
+function(netdata_add_protobuf_to_target _target _scope)
+        netdata_add_lib_to_target(${_target} ${_scope} PROTOBUF)
 endfunction()

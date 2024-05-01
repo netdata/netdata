@@ -86,9 +86,9 @@ function(netdata_bundle_libbpf)
 endfunction()
 
 # Add libbpf as a link dependency for the given target.
-function(netdata_add_libbpf_to_target _target)
-    target_link_libraries(${_target} PUBLIC libbpf_library)
-    target_include_directories(${_target} BEFORE PUBLIC "${NETDATA_LIBBPF_INCLUDE_DIRECTORIES}")
-    target_compile_definitions(${_target} PUBLIC "${NETDATA_LIBBPF_COMPILE_DEFINITIONS}")
+function(netdata_add_libbpf_to_target _target _scope)
+    target_link_libraries(${_target} ${_scope} libbpf_library)
+    target_include_directories(${_target} BEFORE ${_scope} "${NETDATA_LIBBPF_INCLUDE_DIRECTORIES}")
+    target_compile_definitions(${_target} ${_scope} "${NETDATA_LIBBPF_COMPILE_DEFINITIONS}")
     add_dependencies(${_target} libbpf)
 endfunction()
