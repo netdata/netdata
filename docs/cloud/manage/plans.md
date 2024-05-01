@@ -75,7 +75,7 @@ The plan you have subscribed on your Space will determine the amount of historic
 The plan on your Space will determine what type of notifications methods will be available to you:
 
 - **Community** - Email and Discord
-- **Business/Homelab/Enterprise On-Premise** - Unlimited, this includes Slack, PagerDuty, Opsgenie etc.
+- **Homelab/Business/Enterprise On-Premise** - Unlimited, this includes Slack, PagerDuty, Opsgenie etc.
 
 For more details check the documentation under [Centralized Cloud notifications](/docs/alerts-&-notifications/notifications/centralized-cloud-notifications).
 
