@@ -48,7 +48,10 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Install smartmontools (v7.0+)
+            description: |
+              Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
       configuration:
         file:
           name: go.d/smartctl.conf
