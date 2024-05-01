@@ -26,7 +26,7 @@
       2. Open the App and Choose the Sign In Option
         - Sign In with Email Address: Enter the Email Address of your registered Netdata Cloud Account and Click on the Verification link received by Email on your mobile device.
         - Sign In with QR Code: Scan the QR Code from your `Netdata Cloud` UI under **User Settings** --> **Notifications** --> **Mobile App Notifications** --> **Show QR Code**
-      3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Business Subscription**
+      3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Subscription plan**
 
       ### Netdata Configuration Steps
       1. Click on the **User settings** on the bottom left of your screen (your profile icon)
@@ -333,7 +333,7 @@
 
       - A Netdata Cloud account
       - Access to the space as an **Admin**
-      - Space needs to be on **Business** plan or higher
+      - The Space needs to be on a paid plan
       - Have an AWS account with AWS SNS access, for more details check [how to configure this on AWS SNS](#settings-on-aws-sns)
 
       ### Steps
@@ -382,7 +382,7 @@
 
       - A Netdata Cloud account.
       - Access to the Netdata Cloud space as an **Admin**.
-      - The Space to be on **Business** plan or higher.
+      - The Space to be on a paid plan.
       - A [Microsoft 365 for Business Account](https://www.microsoft.com/en-us/microsoft-365/business). Note that this is a **paid** account.
 
       ### Settings on Microsoft Teams
@@ -431,7 +431,7 @@
 
       - A Netdata Cloud account
       - Access to the space as an **Admin**
-      - Space needs to be on **Business** plan or higher
+      - The Space needs to be on a paid plan
       - The Telegram bot token and chat ID
 
       ### Steps
@@ -476,7 +476,7 @@
 
       - A Netdata Cloud account
       - Access to the space as an **Admin**
-      - Space needs to be on **Business** plan or higher
+      - The Space needs to be on a paid plan
       - URI and token for your Splunk HTTP Event Collector. Refer to the [Splunk documentation](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) for detailed instructions.
 
       ### Steps
@@ -516,7 +516,7 @@
 
       - A Netdata Cloud account
       - Access to the space as an **Admin**
-      - Space needs to be on **Business** plan or higher
+      - The Space needs to be on a paid plan
       - Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [VictorOps documentation](https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide) for detailed instructions.
 
       ### Steps
