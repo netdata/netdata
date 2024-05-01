@@ -1,6 +1,6 @@
 # Centralized Cloud Notifications Reference
 
-Netdata Cloud can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, you ensure no alert, on any node in your infrastructure, goes unnoticed by you or your team.
+Netdata Cloud can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, you ensure that no alert on any node in your infrastructure goes unnoticed by you or your team.
 
 Having this information centralized helps you:
 
@@ -10,17 +10,17 @@ methods to use and where to use them, filtering rules, etc.
 * Quickly troubleshoot using [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
 or [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md)
 
-If a node is getting disconnected often or has many alerts, we protect you and your team from alert fatigue by sending you a flood protection notification. Getting one of these notifications is a good signal of health or performance issues on that node.
+To prevent alert overload, we automatically send a "flood protection" notification if a node experiences frequent disconnections or triggers a high volume of alerts. This notification highlights potential health or performance problems on that specific node.
 
-Admins must [enable alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#manage-space-notification-settings) for their Space(s). All users in a Space can then personalize their notifications settings from within their [account menu](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/#manage-user-notification-settings).
+Admins must [enable alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#manage-space-notification-settings) for their Space(s). All users in the Space can then personalize their notifications settings in [account menu](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/#manage-user-notification-settings).
 
 > **Note**
 >
-> Centralized alert notifications from Netdata Cloud is a independent process from [notifications from Netdata Agents](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md). You can enable one or the other, or both, based on your needs. However, the alerts you see in Netdata Cloud are based on those streamed from your Netdata-monitoring nodes. If you want to tweak or add new alert that you see in Netdata Cloud, and receive via centralized alert notifications, you must [configure](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) each node's alert watchdog.
+> Centralized alerts in Netdata Cloud work independently of notifications sent by individual [Netdata Agents](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md). You can use one or both depending on your needs. Сentralized alerts displayed in Netdata Cloud come directly from your Netdata-monitored nodes. To customize or add new alerts, you need to [configure them](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) on each node.
 
 ## Alert notifications
 
-Alert notifications can be delivered through different methods, these can go from an Email sent from Netdata to the use of a 3rd party integration like PagerDuty or Slack.
+Alert notifications are delivered through various methods, including email sent directly from Netdata and integrations with third-party services like PagerDuty or Slack.
 
 Notification methods are classified on two main attributes:
 
@@ -32,7 +32,7 @@ All users in a Space can personalize their notifications settings, for Personal 
 
 > **Note**
 >
-> Netdata Cloud supports different notification methods and their availability will depend on the plan you are at. For more details check [Service classification](#service-classification) and [netdata.cloud/pricing](https://www.netdata.cloud/pricing).
+> Netdata Cloud supports various notification methods, and their accessibility may vary depending on your subscription plan. For more details check [Service classification](#service-classification) and [netdata.cloud/pricing](https://www.netdata.cloud/pricing).
 
 ### Service level
 
@@ -40,7 +40,7 @@ All users in a Space can personalize their notifications settings, for Personal 
 
 The notifications methods classified as **Personal** are what we consider generic, meaning that these can't have specific rules for them set by the administrators.
 
-These notifications are sent to the destination of the channel which is a user-specific attribute, e.g. user's e-mail, and the users are the ones that will then be able to manage what specific configurations they want for the Space / Room(s) and the desired Notification level, they can achieve this from their User Profile page under **Notifications**.
+Notifications are sent to user-defined destinations, such as email addresses. Users can manage their notification preferences, including Space/Room configurations and desired notification level, from the **Notifications** section of their User Profile.
 
 One example of such a notification method is the E-mail.
 
@@ -48,7 +48,7 @@ One example of such a notification method is the E-mail.
 
 For **System** notification methods, the destination of the channel will be a target that usually isn't specific to a single user, e.g. slack channel.
 
-These notification methods allow for fine-grain rule settings to be done by administrators and more than one configuration can exist for them since. You can specify different targets depending on Room or Notification level settings.
+Administrators can define granular notification rules for these methods. This allows for flexible configurations, where you can specify different notification targets based on Space/Room or desired notification level.
 
 Some examples of such notification methods are: Webhook, PagerDuty, Slack.
 
