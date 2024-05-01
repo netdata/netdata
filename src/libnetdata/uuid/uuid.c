@@ -15,7 +15,16 @@ void uuid_clear(uuid_t uu) {
 int uuid_compare(const uuid_t uu1, const uuid_t uu2) {
     ND_UUID *u1 = (ND_UUID *)uu1;
     ND_UUID *u2 = (ND_UUID *)uu2;
-    return u1->parts.hig64 == u2->parts.hig64 && u1->parts.low64 == u2->parts.low64 ? 0 : 1;
+
+    if(u1->parts.hig64 == u2->parts.hig64) {
+        if(u1->parts.low64 < u2->parts.low64) return -1;
+        if(u1->parts.low64 > u2->parts.low64) return 1;
+        return 0;
+    }
+
+    if(u1->parts.hig64 < u2->parts.hig64) return -1;
+    if(u1->parts.hig64 > u2->parts.hig64) return 1;
+    return 0;
 }
 
 void uuid_copy(uuid_t dst, const uuid_t src) {
