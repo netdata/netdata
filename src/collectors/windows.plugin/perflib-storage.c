@@ -190,7 +190,7 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
             );
 
             rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", buffer, RRDLABEL_SRC_AUTO);
-            // rrdlabels_add(d->st_disk_space->rrdlabels, "mount_root", name, RRDLABEL_SRC_AUTO);
+            // rrdlabels_add(d->st->rrdlabels, "mount_root", name, RRDLABEL_SRC_AUTO);
 
             if(d->filesystem)
                 rrdlabels_add(d->st_disk_space->rrdlabels, "filesystem", string2str(d->filesystem), RRDLABEL_SRC_AUTO);

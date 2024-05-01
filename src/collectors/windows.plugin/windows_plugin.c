@@ -13,7 +13,11 @@ static struct proc_module {
     // system metrics
     {.name = "GetSystemUptime",     .dim = "GetSystemUptime",         .func = do_GetSystemUptime},
     {.name = "GetSystemRAM",        .dim = "GetSystemRAM",            .func = do_GetSystemRAM},
-    {.name = "GetSystemCPU",        .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
+
+    // the same is provided by PerflibProcessor, with more detailed analysis
+    //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
+
+    {.name = "PerflibProcessor",    .dim = "PerflibProcessor",        .func = do_PerflibProcessor},
     {.name = "PerflibStorage",      .dim = "PerflibStorage",          .func = do_PerflibStorage},
     {.name = "PerflibNetwork",      .dim = "PerflibNetwork",          .func = do_PerflibNetwork},
 
