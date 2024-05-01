@@ -6,8 +6,18 @@
 
 **Merged pull requests:**
 
+- go.d smartctl improve units [\#17564](https://github.com/netdata/netdata/pull/17564) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17561](https://github.com/netdata/netdata/pull/17561) ([netdatabot](https://github.com/netdatabot))
+- Regenerate integrations.js [\#17560](https://github.com/netdata/netdata/pull/17560) ([netdatabot](https://github.com/netdatabot))
+- Add OIDC docs [\#17557](https://github.com/netdata/netdata/pull/17557) ([car12o](https://github.com/car12o))
+- try hardcode docs links [\#17553](https://github.com/netdata/netdata/pull/17553) ([Ancairon](https://github.com/Ancairon))
+- Notification section updates [\#17551](https://github.com/netdata/netdata/pull/17551) ([Ancairon](https://github.com/Ancairon))
+- Adjust eBPF code. [\#17550](https://github.com/netdata/netdata/pull/17550) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix platform EOL check issue assignment. [\#17544](https://github.com/netdata/netdata/pull/17544) ([Ferroin](https://github.com/Ferroin))
+- refresh the ML documentation and consolidate the two docs [\#17543](https://github.com/netdata/netdata/pull/17543) ([Ancairon](https://github.com/Ancairon))
 - Bump github.com/likexian/whois from 1.15.2 to 1.15.3 in /src/go/collectors/go.d.plugin [\#17542](https://github.com/netdata/netdata/pull/17542) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Additional code cleanup [\#17541](https://github.com/netdata/netdata/pull/17541) ([stelfrag](https://github.com/stelfrag))
+- go.d smartctl [\#17536](https://github.com/netdata/netdata/pull/17536) ([ilyam8](https://github.com/ilyam8))
 - add features section requested on Okta review [\#17531](https://github.com/netdata/netdata/pull/17531) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Don’t unnescesarily clean repo during static builds. [\#17530](https://github.com/netdata/netdata/pull/17530) ([Ferroin](https://github.com/Ferroin))
 - Revert changes to ENABLE\_CLOUD option. [\#17528](https://github.com/netdata/netdata/pull/17528) ([Ferroin](https://github.com/Ferroin))
@@ -49,6 +59,7 @@
 - go.d windows add "vnode" to config schema [\#17478](https://github.com/netdata/netdata/pull/17478) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17477](https://github.com/netdata/netdata/pull/17477) ([netdatabot](https://github.com/netdatabot))
 - move dashboards file [\#17476](https://github.com/netdata/netdata/pull/17476) ([Ancairon](https://github.com/Ancairon))
+- Use CPack to generate Debian packages [\#17475](https://github.com/netdata/netdata/pull/17475) ([vkalintiris](https://github.com/vkalintiris))
 - bump go toolchain to v1.22.0 in check-for-go-toolchain.sh [\#17474](https://github.com/netdata/netdata/pull/17474) ([ilyam8](https://github.com/ilyam8))
 - remove python.d/sensors [\#17473](https://github.com/netdata/netdata/pull/17473) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17472](https://github.com/netdata/netdata/pull/17472) ([netdatabot](https://github.com/netdatabot))
@@ -411,15 +422,6 @@
 - fix move collectors to src/ leftovers [\#16967](https://github.com/netdata/netdata/pull/16967) ([ilyam8](https://github.com/ilyam8))
 - necessary changes for integrations to work after moving collectors/ i… [\#16966](https://github.com/netdata/netdata/pull/16966) ([Ancairon](https://github.com/Ancairon))
 - Move collectors/ under src/ [\#16965](https://github.com/netdata/netdata/pull/16965) ([vkalintiris](https://github.com/vkalintiris))
-- network-viewer: aggregated view improvements [\#16960](https://github.com/netdata/netdata/pull/16960) ([ktsaou](https://github.com/ktsaou))
-- Improve agent shutdown [\#16959](https://github.com/netdata/netdata/pull/16959) ([stelfrag](https://github.com/stelfrag))
-- DYNCFG: support test on new jobs [\#16958](https://github.com/netdata/netdata/pull/16958) ([ktsaou](https://github.com/ktsaou))
-- Updated txt - Prometheus section README.md [\#16957](https://github.com/netdata/netdata/pull/16957) ([Aliki92](https://github.com/Aliki92))
-- Fix path in health integrations [\#16956](https://github.com/netdata/netdata/pull/16956) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#16955](https://github.com/netdata/netdata/pull/16955) ([netdatabot](https://github.com/netdatabot))
-- Move health/ under src/ [\#16954](https://github.com/netdata/netdata/pull/16954) ([vkalintiris](https://github.com/vkalintiris))
-- fix linking of a markdown file [\#16952](https://github.com/netdata/netdata/pull/16952) ([tkatsoulas](https://github.com/tkatsoulas))
-- Do not declare struct meant for internal usage [\#16951](https://github.com/netdata/netdata/pull/16951) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
