@@ -259,6 +259,9 @@ func attributeUnit(attrName string) string {
 		"Offline_Uncorrectable":   "sectors",
 		"Pending_Sector_Count":    "sectors",
 		"Reallocated_Sector_Ct":   "sectors",
+		"Current_Pending_Sector":  "sectors",
+		"Reported_Uncorrect":      "errors",
+		"Command_Timeout":         "events",
 	}
 
 	if unit, ok := units[attrName]; ok {
