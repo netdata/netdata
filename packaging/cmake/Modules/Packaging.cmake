@@ -96,9 +96,9 @@ if(ENABLE_PLUGIN_EBPF)
         list(APPEND _main_deps "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
 endif()
 
-list(JOIN "${_main_deps}" ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
+list(JOIN _main_deps ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
 
-set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+set(CPACK_DEBIAN_NETDATA_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/conffiles;"
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/preinst"
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/postinst"
