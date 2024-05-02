@@ -35,7 +35,7 @@ set(CPACK_INSTALL_DEFAULT_DIRECTORY_PERMISSIONS
 
 function(netdata_declare_package)
     set(options DEBUGINFO NOARCH AUTODEPS INSTALL_CAPS)
-    set(oneValueArgs NAME COMPONENT DESCRIPTION SUMMARY)
+    set(oneValueArgs NAME COMPONENT DESCRIPTION SUMMARY OPTION_NAME)
     set(multiValueArgs DEPENDS RECOMMENDS SUGGESTS CONFLICTS)
     cmake_parse_arguments(DECL_PKG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
@@ -65,6 +65,14 @@ function(netdata_declare_package)
 
     list(JOIN deb_predeps ", " deb_predeps)
     set(CPACK_DEBIAN_${_comp}_PACKAGE_PREDEPENDS "${deb_predeps}" PARENT_SCOPE)
+
+    if(DEFINED DECL_PKG_OPTION_NAME)
+        if(${DECL_PKG_OPTION_NAME})
+            list(APPEND CPACK_COMPONENTS_ALL ${DECL_PKG_NAME})
+        endif()
+    else()
+        list(APPEND CPACK_COMPONENTS_ALL ${DECL_PKG_NAME})
+    endif()
 endfunction()
 
 #
@@ -152,6 +160,7 @@ set(CPACK_COMPONENT_PLUGIN-APPS_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-apps
     NAME netdata-plugin-apps
+    OPTION_NAME ENABLE_PLUGIN_APPS
     SUMMARY "The per-application metrics collector plugin for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to collect per-application and
@@ -199,6 +208,7 @@ set(CPACK_COMPONENT_PLUGIN-CUPS_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-cups
     NAME netdata-plugin-cups
+    OPTION_NAME ENABLE_PLUGIN_CUPS
     SUMMARY "The CUPS metrics collection plugin for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System."
@@ -219,6 +229,7 @@ set(CPACK_COMPONENT_PLUGIN-DEBUGFS_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-debugfs
     NAME netdata-plugin-debugfs
+    OPTION_NAME ENABLE_PLUGIN_DEBUGFS
     SUMMARY "The debugfs metrics collector for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to collect Linux kernel metrics
@@ -242,6 +253,7 @@ set(CPACK_COMPONENT_PLUGIN-EBPF_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-ebpf
     NAME netdata-plugin-ebpf
+    OPTION_NAME ENABLE_PLUGIN_EBPF
     SUMMARY "The eBPF metrics collection plugin for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to use eBPF code to collect more
@@ -265,6 +277,7 @@ set(CPACK_COMPONENT_EBPF-CODE-LEGACY_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT ebpf-code-legacy
     NAME netdata-ebpf-code-legacy
+    OPTION_NAME ENABLE_LEGACY_EBPF_PROGRAMS
     SUMMARY "Compiled eBPF legacy code for the Netdata eBPF plugin"
     DESCRIPTION
 " This package provides the pre-compiled eBPF legacy code for use by
@@ -288,6 +301,7 @@ set(CPACK_COMPONENT_PLUGIN-FREEIPMI_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-freeipmi
     NAME netdata-plugin-freeipmi
+    OPTION_NAME ENABLE_PLUGIN_FREEIPMI
     SUMMARY "The FreeIPMI metrics collection plugin for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to collect metrics from hardware
@@ -309,6 +323,7 @@ set(CPACK_COMPONENT_PLUGIN-GO_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-go
     NAME netdata-plugin-go
+    OPTION_NAME ENABLE_PLUGIN_GO
     SUMMARY "The go.d metrics collection plugin for the Netdata Agent"
     DESCRIPTION
 " This plugin adds a selection of additional collectors written in Go to
@@ -333,6 +348,7 @@ set(CPACK_COMPONENT_PLUGIN-LOGS-MANAGEMENT_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-logs-management
     NAME netdata-plugin-logs-management
+    OPTION_NAME ENABLE_PLUGIN_LOGS_MANAGEMENT
     SUMMARY "The logs-management plugin for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to collect logs from the system
@@ -355,6 +371,7 @@ set(CPACK_COMPONENT_PLUGIN-NETWORK-VIEWER_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-network-viewer
     NAME netdata-plugin-network-viewer
+    OPTION_NAME ENABLE_PLUGIN_NETWORK_VIEWER
     SUMMARY "The network viewer plugin for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to provide network connection
@@ -378,6 +395,7 @@ set(CPACK_COMPONENT_PLUGIN-NFACCT_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-nfacct
     NAME netdata-plugin-nfacct
+    OPTION_NAME ENABLE_PLUGIN_NFACCT
     SUMMARY "The NFACCT metrics collection plugin for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to collect metrics from the firewall
@@ -400,6 +418,7 @@ set(CPACK_COMPONENT_PLUGIN-PERF_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-perf
     NAME netdata-plugin-perf
+    OPTION_NAME ENABLE_PLUGIN_PERF
     SUMMARY "The perf metrics collector for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata to collect metrics from the Linux perf
@@ -447,6 +466,7 @@ set(CPACK_COMPONENT_PLUGIN-SLABINFO_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-slabinfo
     NAME netdata-plugin-slabinfo
+    OPTION_NAME ENABLE_PLUGIN_SLABINFO
     SUMMARY "The slabinfo metrics collector for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to collect perfromance and
@@ -470,6 +490,7 @@ set(CPACK_COMPONENT_PLUGIN-SYSTEMD-JOURNAL_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-systemd-journal
     NAME netdata-plugin-systemd-journal
+    OPTION_NAME ENABLE_PLUGIN_SYSTEMD_JOURNAL
     SUMMARY "The systemd-journal collector for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to present logs from the systemd
@@ -492,6 +513,7 @@ set(CPACK_COMPONENT_PLUGIN-XENSTAT_DEPENDS "netdata")
 netdata_declare_package(
     COMPONENT plugin-xenstat
     NAME netdata-plugin-xenstat
+    OPTION_NAME ENABLE_PLUGIN_XENSTAT
     SUMMARY "The xenstat plugin for the Netdata Agent"
     DESCRIPTION
 " This plugin allows the Netdata Agent to collect metrics from the Xen
@@ -510,49 +532,5 @@ set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONTROL_EXTRA
 #
 
 list(APPEND CPACK_COMPONENTS_ALL "netdata")
-if(ENABLE_PLUGIN_APPS)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-apps")
-endif()
-list(APPEND CPACK_COMPONENTS_ALL "plugin-chartsd")
-if(ENABLE_PLUGIN_CUPS)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-cups")
-endif()
-if(ENABLE_PLUGIN_DEBUGFS)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-debugfs")
-endif()
-if(ENABLE_PLUGIN_EBPF)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-ebpf")
-endif()
-if(ENABLE_EBPF_LEGACY_PROGRAMS)
-        list(APPEND CPACK_COMPONENTS_ALL "ebpf-code-legacy")
-endif()
-if(ENABLE_PLUGIN_FREEIPMI)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-freeipmi")
-endif()
-if(ENABLE_PLUGIN_GO)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-go")
-endif()
-if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-logs-management")
-endif()
-if(ENABLE_PLUGIN_NETWORK_VIEWER)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-network-viewer")
-endif()
-if(ENABLE_PLUGIN_NFACCT)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-nfacct")
-endif()
-if(ENABLE_PLUGIN_PERF)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-perf")
-endif()
-list(APPEND CPACK_COMPONENTS_ALL "plugin-pythond")
-if(ENABLE_PLUGIN_SLABINFO)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-slabinfo")
-endif()
-if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-systemd-journal")
-endif()
-if(ENABLE_PLUGIN_XENSTAT)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-xenstat")
-endif()
 
 include(CPack)
