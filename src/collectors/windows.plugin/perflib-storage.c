@@ -144,8 +144,6 @@ static STRING *getFileSystemType(const char* diskName) {
         return NULL;
 }
 
-static char buffer[4096];
-
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     DICTIONARY *dict = logicalDisks;
 
@@ -157,16 +155,16 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
         if(!pi) break;
 
-        if(!getInstanceName(pDataBlock, pObjectType, pi, buffer, sizeof(buffer)))
-            strncpyz(buffer, "[unknown]", sizeof(buffer) - 1);
+        if(!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
-        if(strcasecmp(buffer, "_Total") == 0)
+        if(strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct logical_disk *d = dictionary_set(dict, buffer, NULL, sizeof(*d));
+        struct logical_disk *d = dictionary_set(dict, windows_shared_buffer, NULL, sizeof(*d));
 
         if(!d->collected_metadata) {
-            d->filesystem = getFileSystemType(buffer);
+            d->filesystem = getFileSystemType(windows_shared_buffer);
             d->collected_metadata = true;
         }
 
@@ -176,10 +174,10 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if(!d->st_disk_space) {
             d->st_disk_space = rrdset_create_localhost(
                 "disk_space"
-                , buffer
-                , NULL
-                , buffer
-                , "disk.space"
+                ,
+                windows_shared_buffer, NULL
+                ,
+                windows_shared_buffer, "disk.space"
                 , "Disk Space Usage"
                 , "GiB"
                 , PLUGIN_WINDOWS_NAME
@@ -189,7 +187,7 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                 , RRDSET_TYPE_STACKED
             );
 
-            rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", buffer, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             // rrdlabels_add(d->st->rrdlabels, "mount_root", name, RRDLABEL_SRC_AUTO);
 
             if(d->filesystem)
@@ -220,10 +218,10 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if (!pi)
             break;
 
-        if (!getInstanceName(pDataBlock, pObjectType, pi, buffer, sizeof(buffer)))
-            strncpyz(buffer, "[unknown]", sizeof(buffer) - 1);
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
 
-        char *device = buffer;
+        char *device = windows_shared_buffer;
         char *mount_point = NULL;
 
         if((mount_point = strchr(device, ' '))) {
@@ -233,7 +231,7 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
         struct physical_disk *d;
         bool is_system;
-        if (strcasecmp(buffer, "_Total") == 0) {
+        if (strcasecmp(windows_shared_buffer, "_Total") == 0) {
             d = &system_physical_total;
             is_system = true;
         }

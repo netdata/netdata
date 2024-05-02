@@ -9,6 +9,8 @@
 
 void *win_plugin_main(void *ptr);
 
+extern char windows_shared_buffer[8192];
+
 int do_GetSystemUptime(int update_every, usec_t dt);
 int do_GetSystemRAM(int update_every, usec_t dt);
 int do_GetSystemCPU(int update_every, usec_t dt);
