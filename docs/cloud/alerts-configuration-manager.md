@@ -1,6 +1,6 @@
 # Creating Alerts with Netdata Alerts Configuration Manager
 
-The Netdata Alerts Configuration Manager allows subscribers to easily set up alerts directly from the Netdata Dashboard. More details on subscriptions can be found [here](https://www.netdata.cloud/pricing/).
+The Netdata Alerts Configuration Manager enables subscribers to easily set up alerts directly from the Netdata Dashboard. More details on subscriptions can be found [here](https://www.netdata.cloud/pricing/).
 
 ## Using the Alerts Configuration Manager
 
