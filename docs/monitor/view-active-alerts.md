@@ -23,9 +23,9 @@ From this tab, you can also filter alerts with the right hand bar. More specific
 - Host labels
   - Filter based on the host labels that are configured for the nodes across the War Room (e.g. `_cloud_instance_region` to match `us-east-1`)
 - Node status
-  -  Filter by node availability status (e.g. Live or Offline)
+  - Filter by node availability status (e.g. Live or Offline)
 - Netdata version
-  -  Filter by Netdata version (e.g. `v1.45.3`)
+  - Filter by Netdata version (e.g. `v1.45.3`)
 - Nodes
   - Filter the alerts based on the nodes of your War Room.
 
@@ -35,7 +35,7 @@ By clicking on the name of an entry of the table you can access that alert's det
 
 - Latest and Triggered time values
 - The alert's description
-- A link to the Netdata Advisor's page about this alert 
+- A link to the Netdata Advisor's page about this alert
 - The chart at the time frame that the alert was triggered
 - The alert's information: Node name, chart instance, type, component and class
 - Configuration section
@@ -45,14 +45,13 @@ At the bottom of the panel you can click the green button "View alert page" to o
 
 ### Silence an alert
 
-From this tab, the "Silencing" column shows if there is any rule present for each alert, and from the "Actions" column you can create a new [silencing rule](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#silencing-alert-notifications) for this alert, or get help and information about this alert from the [Netdata Assistant](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-assistant.md).
+From this tab, the "Silencing" column shows if there is any rule present for each alert, and from the "Actions" column you can create a new [silencing rule](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#alert-notifications-silencing-rules) for this alert, or get help and information about this alert from the [Netdata Assistant](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-assistant.md).
 
 ## Alert Configurations tab
 
 From this tab you can view all the configurations for all running alerts in your War Room. Each row concerns one alert, and it provides information about it in the rest of the table columns.
 
 By running alerts we mean alerts that are related to some metric that is or was collected. Netdata may have more alerts pre-configured that aren't applicable to your monitoring use-cases.
-
 
 You can control which columns are visible by using the gear icon on the right-hand side.
 
