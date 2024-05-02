@@ -6,11 +6,17 @@
 
 **Merged pull requests:**
 
+- fix table [\#17581](https://github.com/netdata/netdata/pull/17581) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Regenerate integrations.js [\#17578](https://github.com/netdata/netdata/pull/17578) ([netdatabot](https://github.com/netdatabot))
+- Cpack fixes [\#17576](https://github.com/netdata/netdata/pull/17576) ([vkalintiris](https://github.com/vkalintiris))
+- Fix compilation without `dbengine` [\#17575](https://github.com/netdata/netdata/pull/17575) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix handling of netdata.conf on install in build system. [\#17572](https://github.com/netdata/netdata/pull/17572) ([Ferroin](https://github.com/Ferroin))
+- Update Netdata subscription plans documentation [\#17571](https://github.com/netdata/netdata/pull/17571) ([Ancairon](https://github.com/Ancairon))
 - go.d prometheus remove apostrophe in label values [\#17570](https://github.com/netdata/netdata/pull/17570) ([ilyam8](https://github.com/ilyam8))
 - remove go.d symbol/debug info with RelWithDebInfo [\#17569](https://github.com/netdata/netdata/pull/17569) ([ilyam8](https://github.com/ilyam8))
 - go.d smartctl add meta setup prerequisites [\#17568](https://github.com/netdata/netdata/pull/17568) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17567](https://github.com/netdata/netdata/pull/17567) ([netdatabot](https://github.com/netdatabot))
+- Increase the message size to the spawn server [\#17566](https://github.com/netdata/netdata/pull/17566) ([stelfrag](https://github.com/stelfrag))
 - go.d smartctl small improvements [\#17565](https://github.com/netdata/netdata/pull/17565) ([ilyam8](https://github.com/ilyam8))
 - go.d smartctl improve units [\#17564](https://github.com/netdata/netdata/pull/17564) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17561](https://github.com/netdata/netdata/pull/17561) ([netdatabot](https://github.com/netdatabot))
@@ -418,11 +424,6 @@
 - Use changed files in check-files workflow [\#16993](https://github.com/netdata/netdata/pull/16993) ([tkatsoulas](https://github.com/tkatsoulas))
 - Move web/ under src/ [\#16992](https://github.com/netdata/netdata/pull/16992) ([vkalintiris](https://github.com/vkalintiris))
 - Add spinlock to protect metric release [\#16989](https://github.com/netdata/netdata/pull/16989) ([stelfrag](https://github.com/stelfrag))
-- updated message ids for systemd and dbus [\#16987](https://github.com/netdata/netdata/pull/16987) ([ktsaou](https://github.com/ktsaou))
-- Cache key wasn't taking account changes in the version of bundled software [\#16985](https://github.com/netdata/netdata/pull/16985) ([tkatsoulas](https://github.com/tkatsoulas))
-- Update input skip patterns [\#16984](https://github.com/netdata/netdata/pull/16984) ([tkatsoulas](https://github.com/tkatsoulas))
-- Update input paths for tj-actions/changed-files [\#16982](https://github.com/netdata/netdata/pull/16982) ([tkatsoulas](https://github.com/tkatsoulas))
-- Update synology.md [\#16980](https://github.com/netdata/netdata/pull/16980) ([pschaer](https://github.com/pschaer))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
