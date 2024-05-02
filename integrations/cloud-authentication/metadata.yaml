@@ -19,7 +19,7 @@
       ### Prerequisites
       - An Okta account
       - A Netdata Cloud account
-      - Access to the Space as an administrator
+      - Access to the Space as an **Admin**
       - Space needs to be on a paid plan
 
       ### Setting up Okta
@@ -66,7 +66,7 @@
       ### Prerequisites
       - Authorization Server with OIDC protocol supported
       - A Netdata Cloud account
-      - Access to the Space as an administrator
+      - Access to the Space as an **Admin**
       - Space needs to be on a paid plan
 
       ### Setting up Authorization Server
