@@ -10,11 +10,11 @@ At a high-level view, these are the domains from which the Events feed will prov
 >
 > Based on your space's plan, different allowances are defined to query past data.
 
-| **Domains of events**                                                                                                                           | **Community** | **Homelab/Business/Enterprise On-Premise** |
-|:------------------------------------------------------------------------------------------------------------------------------------------------|:--------------|:-------------------------------------------|
-| **[Auditing events](#auditing-events)** <p>Events related to actions done on your Space, e.g. invite user, change user role or change plan.</p> | 4 hours       | 90 days                                    |
-| **[Topology events](#topology-events)** <p>Node state transition events, e.g. live or offline.</p>                                              | 4 hours       | 14 days                                    |
-| **[Alert events](#alert-events)** <p>Alert state transition events, can be seen as an alert history log.</p>                                    | 4 hours       | 90 days                                    |
+| **Domains of events**                                                                                                                           | **Community** | **Homelab** | **Business** | **Enterprise On-Premise** |
+|:------------------------------------------------------------------------------------------------------------------------------------------------|:--------------|:------------|:-------------|:--------------------------|
+| **[Auditing events](#auditing-events)** <p>Events related to actions done on your Space, e.g. invite user, change user role or change plan.</p> | 4 hours       | 90 days     | 90 days      | User dependent            |
+| **[Topology events](#topology-events)** <p>Node state transition events, e.g. live or offline.</p>                                              | 4 hours       | 14 days     | 14 days      | User dependent            |
+| **[Alert events](#alert-events)** <p>Alert state transition events, can be seen as an alert history log.</p>                                    | 4 hours       | 90 days     | 90 days      | User dependent            |
 
 ### Auditing events
 

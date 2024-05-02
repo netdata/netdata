@@ -39,7 +39,7 @@ This section outlines how to view and manage your Space's plan, billing settings
 
 ### What Payment Methods are Accepted?
 
-Netdata accepts most major Credit/Debit Cards, with more options coming soon.
+Netdata accepts most major Credit/Debit Cards and Bank payments through Stripe and AWS, with more options coming soon.
 
 ### What Happens if a Renewal Payment Fails?
 

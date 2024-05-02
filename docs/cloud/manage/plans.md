@@ -1,10 +1,12 @@
 # Netdata Subscription Plans
 
-This page explains the differences between the Community plan and paid plans at Netdata.
+This page explains the Netdata subscription plan structure.
 
 ## Overview
 
-Netdata offers a **Community plan** (a free SaaS and Open Source Agent) that includes unlimited nodes, users, and metrics. This plan provides real-time, high-fidelity monitoring for applications, containers, and operating systems. We also offer paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — each designed to meet varying needs for tighter and customizable integration.
+Netdata offers a **Community plan**, a free SaaS and Open Source Agent, while also offer paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — providing key business features and unlimited access to your dashboards.
+
+For more info visit the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page.
 
 ### Plans
 
@@ -37,23 +39,4 @@ You can change your plan, billing frequency, or committed nodes at any time. For
 
 ## Areas That Change Upon Subscription
 
-### Role-Based Access Model
-
-Different plans offer different roles. For specifics, refer to [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md).
-
-### Events Feed
-
-The plan determines the historical data and events you can access. Details are in the [Events feed documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md).
-
-### Notification Integrations
-
-Available notification methods depend on your plan:
-
-- **Community**: Email and Discord
-- **Homelab/Business/Enterprise On-Premise**: Includes Slack, PagerDuty, Opsgenie, etc.
-
-For more information, visit [Centralized Cloud notifications](/docs/alerts-&-notifications/notifications/centralized-cloud-notifications).
-
-### Alert Notification Silencing Rules
-
-Silencing rules are available only to subscribed Spaces. More details are available in the [silencing rules documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-alert-notification-silencing-rules.md).
+Please refer to the [Netdata Cloud Pricing](https://netdata.cloud/pricing) page for more information on what each plan provides.

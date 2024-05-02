@@ -7,14 +7,14 @@ Netdata Cloud's role-based-access mechanism allows you to control what functiona
 With the advent of the paid plans we revamped the roles to cover needs expressed by Netdata users, like providing more limited access to their customers, or
 being able to join any room. We also aligned the offered roles to the target audience of each plan. The end result is the following:
 
-| **Role**                                                                                                                                                                                      |   **Community**    | **Homelab/Business/Enterprise On-Premise** |
-|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------------------:|:------------------------------------------:|
-| **Admins**<p>Users with this role can control Spaces, War Rooms, Nodes, Users and Billing.</p><p>They can also access any War Room in the Space.</p>                                  | :heavy_check_mark: |             :heavy_check_mark:             |
-| **Managers**<p>Users with this role can manage War Rooms and Users.</p><p>They can access any War Room in the Space.</p>                                                                      |         -          |             :heavy_check_mark:             |
-| **Troubleshooters**<p>Users with this role can use Netdata to troubleshoot, not manage entities.</p><p>They can access any War Room in the Space.</p>                                         |         -          |             :heavy_check_mark:             |
-| **Observers**<p>Users with this role can only view data in specific War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p>                        |         -          |             :heavy_check_mark:             |
-| **Billing**<p>Users with this role can handle billing options and invoices.</p>                                                                                                               |         -          |             :heavy_check_mark:             |
-| **Member** ⚠️ Legacy role<p>Users with this role can create War Rooms and invite other Members.</p><p>They can only see the War Rooms they belong to and all Nodes in the All Nodes room.</p> |         -          |                     -                      |
+| **Role**                                                                                                                                                                                          | **Community**      | **Homelab**        | **Business**       | **Enterprise On-Premise** |
+|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------|:-------------------|:-------------------|:--------------------------|
+| **Admins**<p>Users with this role can control Spaces, War Rooms, Nodes, Users and Billing.</p><p>They can also access any War Room in the Space.</p>                                              | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Managers**<p>Users with this role can manage War Rooms and Users.</p><p>They can access any War Room in the Space.</p>                                                                          | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Troubleshooters**<p>Users with this role can use Netdata to troubleshoot, not manage entities.</p><p>They can access any War Room in the Space.</p>                                             | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Observers**<p>Users with this role can only view data in specific War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p>                            | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Billing**<p>Users with this role can handle billing options and invoices.</p>                                                                                                                   | -                  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:        |
+| **Member** ⚠️ Legacy role<p>Users with this role you can create War Rooms and invite other Members.</p><p>They can only see the War Rooms they belong to and all Nodes in the All Nodes room.</p> | -                  | -                  | -                  | -                         |
 
 ## Which functionalities are available for each role?
 
@@ -22,7 +22,7 @@ In more detail, you can find on the following tables which functionalities are a
 
 ### Space Management
 
-| **Functionality**      | **Admin**  |    **Manager**     | **Troubleshooter** |    **Observer**    |    **Billing**     |     **Member**     |
+| **Functionality**      |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    |    **Billing**     |     **Member**     |
 |:-----------------------|:------------------:|:------------------:|:------------------:|:------------------:|:------------------:|:------------------:|
 | See Space              | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | Leave Space            | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
@@ -34,7 +34,7 @@ In more detail, you can find on the following tables which functionalities are a
 
 ### Node Management
 
-| **Functionality**                         | **Admin**  |    **Manager**     | **Troubleshooter** | **Observer** | **Billing** |     **Member**     | Notes                                      |
+| **Functionality**                         |     **Admin**      |    **Manager**     | **Troubleshooter** | **Observer** | **Billing** |     **Member**     | Notes                                      |
 |:------------------------------------------|:------------------:|:------------------:|:------------------:|:------------:|:-----------:|:------------------:|:-------------------------------------------|
 | See all Nodes in Space (_All Nodes_ room) | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -       |      -      | :heavy_check_mark: | Members are always on the _All Nodes_ room |
 | Connect Node to Space                     | :heavy_check_mark: |         -          |         -          |      -       |      -      |         -          | -                                          |
@@ -42,7 +42,7 @@ In more detail, you can find on the following tables which functionalities are a
 
 ### User Management
 
-| **Functionality**                  | **Admin**  |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     | Notes                                                                                         |
+| **Functionality**                  |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     | Notes                                                                                         |
 |:-----------------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:------------------:|:----------------------------------------------------------------------------------------------|
 | See all Users in Space             | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      | :heavy_check_mark: |                                                                                               |
 | Invite new User to Space           | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      | :heavy_check_mark: | You can't invite a user with a role you don't have permissions to appoint to (see below)      |
@@ -60,7 +60,7 @@ In more detail, you can find on the following tables which functionalities are a
 
 ### Room Management
 
-| **Functionality**            | **Admin**  |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     | Notes                                                                              |
+| **Functionality**            |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     | Notes                                                                              |
 |:-----------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:------------------:|:-----------------------------------------------------------------------------------|
 | See all Rooms in a Space     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |         -          |                                                                                    |
 | Join any Room in a Space     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |         -          | By joining a room you will be enabled to get notifications from nodes on that room |
@@ -74,7 +74,7 @@ In more detail, you can find on the following tables which functionalities are a
 
 ### Notifications Management
 
-| **Functionality**                                                         | **Admin**  |    **Manager**     | **Troubleshooter** |    **Observer**    |    **Billing**     |     **Member**     | Notes                                                                                                                                                                                                                               |
+| **Functionality**                                                         |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    |    **Billing**     |     **Member**     | Notes                                                                                                                                                                                                                               |
 |:--------------------------------------------------------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:------------------:|:------------------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | See all configured notifications on a Space                               | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          | :heavy_check_mark: |                                                                                                                                                                                                                                     |
 | Add new configuration                                                     | :heavy_check_mark: |         -          |         -          |         -          |         -          |         -          |                                                                                                                                                                                                                                     |
@@ -95,7 +95,7 @@ In more detail, you can find on the following tables which functionalities are a
 
 ### Dashboards
 
-| **Functionality**            | **Admin**  |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     |
+| **Functionality**            |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     |
 |:-----------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:------------------:|
 | See all dashboards in Room   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: |
 | Add new dashboard to Room    | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: |
@@ -115,14 +115,14 @@ In more detail, you can find on the following tables which functionalities are a
 
 ### Events feed
 
-| **Functionality**            | **Admin**  |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     | Notes                                          |
+| **Functionality**            |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     | Notes                                          |
 |:-----------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:------------------:|:-----------------------------------------------|
 | See Alert or Topology events | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: |                                                |
 | See Auditing events          | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |         -          | These are coming soon, not currently available |
 
 ### Billing
 
-| **Functionality**          | **Admin**  | **Manager** | **Troubleshooter** | **Observer** |    **Billing**     | **Member** | Notes                                                           |
+| **Functionality**          |     **Admin**      | **Manager** | **Troubleshooter** | **Observer** |    **Billing**     | **Member** | Notes                                                           |
 |:---------------------------|:------------------:|:-----------:|:------------------:|:------------:|:------------------:|:----------:|:----------------------------------------------------------------|
 | See Plan & Billing details | :heavy_check_mark: |      -      |         -          |      -       | :heavy_check_mark: |     -      | Current plan and usage figures                                  |
 | Update plans               | :heavy_check_mark: |      -      |         -          |      -       |         -          |     -      | This includes cancelling current plan (going to Community plan) |
@@ -132,7 +132,7 @@ In more detail, you can find on the following tables which functionalities are a
 
 ### Other permissions
 
-| **Functionality**          | **Admin**  |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     |
+| **Functionality**          |     **Admin**      |    **Manager**     | **Troubleshooter** |    **Observer**    | **Billing** |     **Member**     |
 |:---------------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|:------------------:|
 | See Bookmarks in Space     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      | :heavy_check_mark: |
 | Add Bookmark to Space      | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      | :heavy_check_mark: |
