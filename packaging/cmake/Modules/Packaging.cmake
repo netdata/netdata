@@ -75,6 +75,13 @@ function(netdata_declare_package)
     else()
         list(APPEND CPACK_COMPONENTS_ALL ${DECL_PKG_NAME})
     endif()
+
+    file(GLOB CPACK_DEBIAN_${_comp}_PACKAGE_CONTROL_EXTRA
+         "${PKG_FILES}/deb/${DECL_PKG_NAME}/preinst"
+         "${PKG_FILES}/deb/${DECL_PKG_NAME}/postinst"
+         "${PKG_FILES}/deb/${DECL_PKG_NAME}/prerm"
+         "${PKG_FILES}/deb/${DECL_PKG_NAME}/postrm"
+         "${PKG_FILES}/deb/${DECL_PKG_NAME}/conffiles")
 endfunction()
 
 #
@@ -173,9 +180,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
-set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-apps/preinst;"
-	  "${PKG_FILES}/deb/plugin-apps/postinst")
 
 #
 # charts.d.plugin
@@ -197,9 +201,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_CONFLICTS "netdata (<< 1.40")
-set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-chartsd/preinst;"
-	  "${PKG_FILES}/deb/plugin-chartsd/postinst")
 
 #
 # cups.plugin
@@ -217,10 +218,6 @@ netdata_declare_package(
     AUTODEPS
     DEBUGINFO
 )
-
-set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-cups/preinst;"
-	  "${PKG_FILES}/deb/plugin-cups/postinst")
 
 #
 # debugfs.plugin
@@ -242,9 +239,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-debugfs/preinst;"
-	  "${PKG_FILES}/deb/plugin-debugfs/postinst")
 
 #
 # ebpf.plugin
@@ -266,9 +260,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-ebpf/preinst;"
-	  "${PKG_FILES}/deb/plugin-ebpf/postinst")
 
 #
 # ebpf-code-legacy
@@ -290,9 +281,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/ebpf-code-legacy/preinst;"
-	  "${PKG_FILES}/deb/ebpf-code-legacy/postinst")
 
 #
 # freeipmi.plugin
@@ -311,10 +299,6 @@ netdata_declare_package(
     DEBUGINFO
     AUTODEPS
 )
-
-set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-freeipmi/preinst;"
-	  "${PKG_FILES}/deb/plugin-freeipmi/postinst")
 
 #
 # go.plugin
@@ -337,9 +321,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-go/preinst;"
-	  "${PKG_FILES}/deb/plugin-go/postinst")
 
 #
 # logs-management.plugin
@@ -359,10 +340,6 @@ netdata_declare_package(
     AUTODEPS
     INSTALL_CAPS
 )
-
-set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-logs-management/preinst;"
-	  "${PKG_FILES}/deb/plugin-logs-management/postinst")
 
 #
 # network-viewer.plugin
@@ -384,10 +361,6 @@ netdata_declare_package(
     INSTALL_CAPS
 )
 
-set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-network-viewer/preinst;"
-	  "${PKG_FILES}/deb/plugin-network-viewer/postinst")
-
 #
 # nfacct.plugin
 #
@@ -407,9 +380,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-nfacct/preinst;"
-	  "${PKG_FILES}/deb/plugin-nfacct/postinst")
 
 #
 # perf.plugin
@@ -431,9 +401,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-perf/preinst;"
-	  "${PKG_FILES}/deb/plugin-perf/postinst")
 
 #
 # pythond.plugin
@@ -455,9 +422,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-pythond/preinst;"
-	  "${PKG_FILES}/deb/plugin-pythond/postinst")
 
 #
 # slabinfo.plugin
@@ -479,9 +443,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-slabinfo/preinst;"
-	  "${PKG_FILES}/deb/plugin-slabinfo/postinst")
 
 #
 # systemd-journal.plugin
@@ -502,10 +463,6 @@ netdata_declare_package(
     INSTALL_CAPS
 )
 
-set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-systemd-journal/preinst;"
-	  "${PKG_FILES}/deb/plugin-systemd-journal/postinst")
-
 #
 # xenstat.plugin
 #
@@ -525,9 +482,6 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/plugin-xenstat/preinst;"
-	  "${PKG_FILES}/deb/plugin-xenstat/postinst")
 
 #
 # CPack components
