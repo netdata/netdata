@@ -99,26 +99,6 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 # netdata
 #
 
-set(CPACK_COMPONENT_NETDATA_DESCRIPTION
-	  "real-time charts for system monitoring
- Netdata is a daemon that collects data in realtime (per second)
- and presents a web site to view and analyze them. The presentation
- is also real-time and full of interactive charts that precisely
- render all collected values.")
-
-set(CPACK_DEBIAN_NETDATA_PACKAGE_NAME "netdata")
-set(CPACK_DEBIAN_NETDATA_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS
-		"adduser, dpkg (>= 1.17.14), libcap2-bin (>=1:2.0), lsb-base (>= 3.1-23.2)")
-set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
-		"netdata-plugin-cups (= ${CPACK_PACKAGE_VERSION}), netdata-plugin-freeipmi (= ${CPACK_PACKAGE_VERSION})")
-set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
-		"netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-logs-management (= ${CPACK_PACKAGE_VERSION}), \
-netdata-plugin-network-viewer (= ${CPACK_PACKAGE_VERSION})")
-set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
-		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
-
 list(APPEND _main_deps "netdata-plugin-chartsd (= ${CPACK_PACKAGE_VERSION})")
 list(APPEND _main_deps "netdata-plugin-pythond (= ${CPACK_PACKAGE_VERSION})")
 
@@ -152,13 +132,23 @@ endif()
 
 list(JOIN _main_deps ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
 
-set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
-	  "${PKG_FILES}/deb/netdata/conffiles;"
-	  "${PKG_FILES}/deb/netdata/preinst"
-	  "${PKG_FILES}/deb/netdata/postinst"
-	  "${PKG_FILES}/deb/netdata/postrm")
-
-set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE On)
+netdata_declare_package(
+    COMPONENT netdata
+    NAME netdata
+    SUMMARY "real-time charts for system monitoring"
+    DESCRIPTION
+" Netdata is a daemon that collects data in realtime (per second)
+ and presents a web site to view and analyze them. The presentation
+ is also real-time and full of interactive charts that precisely
+ render all collected values."
+    DEPENDS ${_main_deps}
+    RECOMMENDS netdata-plugin-systemd-journal netdata-plugin-logs-management netdata-plugin-network-viewer
+    SUGGESTS netdata-plugin-cups netdata-plugin-freeipmi
+    CONFLICTS netdata-core netdata-plugins-bash netdata-plugins-python netdata-web
+    DEBUGINFO
+    AUTODEPS
+    INSTALL_CAPS
+)
 
 #
 # apps.plugin
@@ -482,11 +472,5 @@ netdata_declare_package(
 )
 
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONFLICTS "netdata (<< 1.40)")
-
-#
-# CPack components
-#
-
-list(APPEND CPACK_COMPONENTS_ALL "netdata")
 
 include(CPack)
