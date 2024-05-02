@@ -15,6 +15,8 @@ set(CPACK_DEBIAN_DEBUGINFO_PACKAGE NO)
 
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS YES)
 
+set(PKG_FILES "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
+
 set(CPACK_PACKAGING_INSTALL_PREFIX "/")
 
 set(CPACK_PACKAGE_VENDOR "Netdata Inc.")
@@ -98,10 +100,10 @@ endif()
 list(JOIN _main_deps ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
 
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/conffiles;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/preinst"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/postinst"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/postrm")
+	  "${PKG_FILES}/deb/netdata/conffiles;"
+	  "${PKG_FILES}/deb/netdata/preinst"
+	  "${PKG_FILES}/deb/netdata/postinst"
+	  "${PKG_FILES}/deb/netdata/postrm")
 
 set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE On)
 
@@ -121,8 +123,8 @@ set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
 set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/apps/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/apps/postinst")
+	  "${PKG_FILES}/deb/plugin-apps/preinst;"
+	  "${PKG_FILES}/deb/plugin-apps/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-APPS_DEBUGINFO_PACKAGE On)
 
@@ -146,8 +148,8 @@ set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_ARCHITECTURE "all")
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_SUGGESTS "apcupsd, iw, sudo")
 
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/charts.d/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/charts.d/postinst")
+	  "${PKG_FILES}/deb/plugin-chartsd/preinst;"
+	  "${PKG_FILES}/deb/plugin-chartsd/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_DEBUGINFO_PACKAGE Off)
 
@@ -164,8 +166,8 @@ set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_NAME "netdata-plugin-cups")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_PREDEPENDS "adduser")
 set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/cups/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/cups/postinst")
+	  "${PKG_FILES}/deb/plugin-cups/preinst;"
+	  "${PKG_FILES}/deb/plugin-cups/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-CUPS_DEBUGINFO_PACKAGE On)
 
@@ -184,8 +186,8 @@ set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/debugfs/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/debugfs/postinst")
+	  "${PKG_FILES}/deb/plugin-debugfs/preinst;"
+	  "${PKG_FILES}/deb/plugin-debugfs/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_DEBUGINFO_PACKAGE On)
 
@@ -206,8 +208,8 @@ set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_PREDEPENDS "adduser")
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_RECOMMENDS "netdata-plugin-apps (= ${CPACK_PACKAGE_VERSION}), netdata-ebpf-code-legacy (= ${CPACK_PACKAGE_VERSION})")
 
 set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf.d/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf.d/postinst")
+	  "${PKG_FILES}/deb/plugin-ebpf/preinst;"
+	  "${PKG_FILES}/deb/plugin-ebpf/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE On)
 
@@ -230,8 +232,8 @@ set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_PREDEPENDS "adduser")
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_RECOMMENDS  "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
 
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf-code-legacy/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/ebpf-code-legacy/postinst")
+	  "${PKG_FILES}/deb/ebpf-code-legacy/preinst;"
+	  "${PKG_FILES}/deb/ebpf-code-legacy/postinst")
 
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_DEBUGINFO_PACKAGE Off)
 
@@ -250,8 +252,8 @@ set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_PREDEPENDS "adduser")
 
 set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/freeipmi/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/freeipmi/postinst")
+	  "${PKG_FILES}/deb/plugin-freeipmi/preinst;"
+	  "${PKG_FILES}/deb/plugin-freeipmi/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-FREEIPMI_DEBUGINFO_PACKAGE On)
 
@@ -274,8 +276,8 @@ set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_SUGGESTS "nvme-cli")
 
 set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/go.d/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/go.d/postinst")
+	  "${PKG_FILES}/deb/plugin-go/preinst;"
+	  "${PKG_FILES}/deb/plugin-go/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 
@@ -294,8 +296,8 @@ set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
 set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/logs-management/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/logs-management/postinst")
+	  "${PKG_FILES}/deb/plugin-logs-management/preinst;"
+	  "${PKG_FILES}/deb/plugin-logs-management/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-LOGS-MANAGEMENT_DEBUGINFO_PACKAGE On)
 
@@ -316,8 +318,8 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_PREDEPENDS "libcap2-bin, adduser"
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_RECOMMENDS "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
 
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/network-viewer/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/network-viewer/postinst")
+	  "${PKG_FILES}/deb/plugin-network-viewer/preinst;"
+	  "${PKG_FILES}/deb/plugin-network-viewer/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE On)
 
@@ -337,8 +339,8 @@ set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_PREDEPENDS "adduser")
 
 set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/nfacct/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/nfacct/postinst")
+	  "${PKG_FILES}/deb/plugin-nfacct/preinst;"
+	  "${PKG_FILES}/deb/plugin-nfacct/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-NFACCT_DEBUGINFO_PACKAGE On)
 
@@ -358,8 +360,8 @@ set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
 set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/perf/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/perf/postinst")
+	  "${PKG_FILES}/deb/plugin-perf/preinst;"
+	  "${PKG_FILES}/deb/plugin-perf/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-PERF_DEBUGINFO_PACKAGE On)
 
@@ -383,8 +385,8 @@ set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACHAGE_DEPENDS "python3")
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_ARCHITECTURE "all")
 
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/python.d/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/python.d/postinst")
+	  "${PKG_FILES}/deb/plugin-pythond/preinst;"
+	  "${PKG_FILES}/deb/plugin-pythond/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_DEBUGINFO_PACKAGE Off)
 
@@ -404,8 +406,8 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/slabinfo/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/slabinfo/postinst")
+	  "${PKG_FILES}/deb/plugin-slabinfo/preinst;"
+	  "${PKG_FILES}/deb/plugin-slabinfo/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_DEBUGINFO_PACKAGE On)
 
@@ -424,8 +426,8 @@ set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/systemd-journal/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/systemd-journal/postinst")
+	  "${PKG_FILES}/deb/plugin-systemd-journal/preinst;"
+	  "${PKG_FILES}/deb/plugin-systemd-journal/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD_JOURNAL_DEBUGINFO_PACKAGE On)
 
@@ -445,8 +447,8 @@ set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_PREDEPENDS "adduser")
 
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONTROL_EXTRA
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/xenstat/preinst;"
-	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/xenstat/postinst")
+	  "${PKG_FILES}/deb/plugin-xenstat/preinst;"
+	  "${PKG_FILES}/deb/plugin-xenstat/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_DEBUGINFO_PACKAGE On)
 
