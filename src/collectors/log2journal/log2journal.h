@@ -83,6 +83,18 @@ static inline void freez(void *ptr) {
         free(ptr);
 }
 
+#ifdef COMPILED_FOR_WINDOWS
+// strndup() is not available on Windows
+static inline char *os_strndup( const char *s1, size_t n)
+{
+    char *copy= (char*)malloc( n+1 );
+    memcpy( copy, s1, n );
+    copy[n] = 0;
+    return copy;
+};
+#define strndup(s, n) os_strndup(s, n)
+#endif
+
 // ----------------------------------------------------------------------------
 
 #define XXH_INLINE_ALL

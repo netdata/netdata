@@ -738,6 +738,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/tinysleep.h
         src/libnetdata/os/uuid_generate.c
         src/libnetdata/os/uuid_generate.h
+        src/libnetdata/os/setenv.c
+        src/libnetdata/os/setenv.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
