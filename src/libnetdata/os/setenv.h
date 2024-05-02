@@ -5,7 +5,7 @@
 
 #include "config.h"
 
-#ifdef COMPILED_FOR_WINDOWS
+#ifndef HAVE_SETENV
 int os_setenv(const char *name, const char *value, int overwrite);
 #define setenv(name, value, overwrite) os_setenv(name, value, overwrite)
 #endif

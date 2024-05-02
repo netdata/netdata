@@ -2,7 +2,7 @@
 
 #include "config.h"
 
-#ifdef COMPILED_FOR_WINDOWS
+#ifndef HAVE_SETENV
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,7 +23,7 @@ int os_setenv(const char *name, const char *value, int overwrite) {
     snprintf(env_var, len, "%s=%s", name, value);
 
     result = putenv(env_var);
-    free(env_var); // _putenv in Windows makes a copy of the string
+    // free(env_var); // _putenv in Windows makes a copy of the string
     return result;
 }
 

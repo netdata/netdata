@@ -52,6 +52,7 @@
 #cmakedefine HAVE_WAITID
 #cmakedefine HAVE_NICE
 #cmakedefine HAVE_GETPRIORITY
+#cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
 
 #cmakedefine HAVE_BACKTRACE

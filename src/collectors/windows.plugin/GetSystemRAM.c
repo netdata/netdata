@@ -3,6 +3,10 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+#define _COMMON_PLUGIN_NAME "windows.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "GetSystemRam"
+#include "../common-contexts/common-contexts.h"
+
 int do_GetSystemRAM(int update_every, usec_t dt __maybe_unused) {
     MEMORYSTATUSEX memStat = { 0 };
     memStat.dwLength = sizeof(memStat);
@@ -12,35 +16,19 @@ int do_GetSystemRAM(int update_every, usec_t dt __maybe_unused) {
         return 1;
     }
 
-    ULONGLONG totalMemory = memStat.ullTotalPhys;
-    ULONGLONG freeMemory = memStat.ullAvailPhys;
-    ULONGLONG usedMemory = totalMemory - freeMemory;
-
-    static RRDSET *st = NULL;
-    static RRDDIM *rd_free = NULL, *rd_used = NULL;
-    if (!st) {
-        st = rrdset_create_localhost(
-            "system"
-            , "ram"
-            , NULL
-            , "memory"
-            , "system.ram"
-            , "Total RAM utilization"
-            , "MiB"
-            , PLUGIN_WINDOWS_NAME
-            , "GlobalMemoryStatusEx"
-            , NETDATA_CHART_PRIO_SYSTEM_RAM
-            , update_every
-            , RRDSET_TYPE_STACKED
-        );
-
-        rd_free = rrddim_add(st, "free", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
-        rd_used = rrddim_add(st, "used", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+    {
+        ULONGLONG total_bytes = memStat.ullTotalPhys;
+        ULONGLONG free_bytes = memStat.ullAvailPhys;
+        ULONGLONG used_bytes = total_bytes - free_bytes;
+        common_system_ram(free_bytes, used_bytes, update_every);
     }
 
-    rrddim_set_by_pointer(st, rd_free, (collected_number)freeMemory);
-    rrddim_set_by_pointer(st, rd_used, (collected_number)usedMemory);
-    rrdset_done(st);
+    {
+        DWORDLONG total_bytes = memStat.ullTotalPageFile;
+        DWORDLONG free_bytes = memStat.ullAvailPageFile;
+        DWORDLONG used_bytes = total_bytes - free_bytes;
+        common_mem_swap(free_bytes, used_bytes, update_every);
+    }
 
     return 0;
 }
