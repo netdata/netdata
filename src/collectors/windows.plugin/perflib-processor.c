@@ -103,7 +103,7 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                 is_total ? "system" : "cpu"
                 , is_total ? "cpu" : buffer
                 , NULL
-                , is_total ? "utilization" : buffer
+                , is_total ? "cpu" : "utilization"
                 , is_total ? "system.cpu" : "cpu.cpu"
                 , is_total ? "Total CPU Utilization" : "Core Utilization"
                 , "percentage"

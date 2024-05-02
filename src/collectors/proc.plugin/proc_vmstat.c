@@ -6,6 +6,10 @@
 
 #define OOM_KILL_STRING "oom_kill"
 
+#define _COMMON_PLUGIN_NAME PLUGIN_PROC_NAME
+#define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_VMSTAT_NAME
+#include "../common-contexts/common-contexts.h"
+
 int do_proc_vmstat(int update_every, usec_t dt) {
     (void)dt;
 
@@ -328,34 +332,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(do_pgfaults) {
-        static RRDSET *st_pgfaults = NULL;
-        static RRDDIM *rd_minor = NULL, *rd_major = NULL;
-
-        if(unlikely(!st_pgfaults)) {
-            st_pgfaults = rrdset_create_localhost(
-                    "mem"
-                    , "pgfaults"
-                    , NULL
-                    , "page faults"
-                    , NULL
-                    , "Memory Page Faults"
-                    , "faults/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_VMSTAT_NAME
-                    , NETDATA_CHART_PRIO_MEM_SYSTEM_PGFAULTS
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rrdset_flag_set(st_pgfaults, RRDSET_FLAG_DETAIL);
-
-            rd_minor = rrddim_add(st_pgfaults, "minor", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_major = rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_pgfaults, rd_minor, pgfault);
-        rrddim_set_by_pointer(st_pgfaults, rd_major, pgmajfault);
-        rrdset_done(st_pgfaults);
+        common_mem_pgfaults(pgfault, pgmajfault, update_every);
     }
 
         // --------------------------------------------------------------------

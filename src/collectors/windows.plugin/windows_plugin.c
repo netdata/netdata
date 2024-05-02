@@ -18,6 +18,7 @@ static struct proc_module {
     //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",            .func = do_GetSystemCPU},
 
     {.name = "PerflibProcessor",    .dim = "PerflibProcessor",        .func = do_PerflibProcessor},
+    {.name = "PerflibMemory",       .dim = "PerflibMemory",          .func = do_PerflibMemory},
     {.name = "PerflibStorage",      .dim = "PerflibStorage",          .func = do_PerflibStorage},
     {.name = "PerflibNetwork",      .dim = "PerflibNetwork",          .func = do_PerflibNetwork},
 

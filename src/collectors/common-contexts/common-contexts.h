@@ -8,5 +8,6 @@
 
 #include "system.ram.h"
 #include "mem.swap.h"
+#include "mem.pgfaults.h"
 
 #endif //NETDATA_COMMON_CONTEXTS_H
