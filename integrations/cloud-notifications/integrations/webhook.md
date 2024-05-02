@@ -23,8 +23,8 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 ### Prerequisites
 
 - A Netdata Cloud account
-- Access to the Netdata Space as an **administrator**
-- The Netdata Space needs to be on **Pro** plan or higher
+- Access to the Netdata Space as an **Admin**
+- The Netdata Space needs to be on a paid plan
 - You need to have an app that allows you to receive webhooks following a predefined schema.
 
 ### Netdata Configuration Steps

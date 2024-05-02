@@ -23,8 +23,8 @@ Integrate your organization's Okta account with Netdata to better manage your te
 ### Prerequisites
 - An Okta account
 - A Netdata Cloud account
-- Access to the Space as an administrator
-- Space needs to be on the Business plan or higher
+- Access to the Space as an **Admin**
+- Space needs to be on a paid plan
 
 ### Setting up Okta
 Steps needed to be done on Okta Admin Portal:
