@@ -69,7 +69,7 @@ list(APPEND _main_deps "netdata-plugin-chartsd (= ${CPACK_PACKAGE_VERSION})")
 list(APPEND _main_deps "netdata-plugin-pythond (= ${CPACK_PACKAGE_VERSION})")
 
 if(ENABLE_PLUGIN_APPS)
-        list(APPEND _main_deps "netdata-plguin-apps (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-apps (= ${CPACK_PACKAGE_VERSION})")
 endif()
 
 if(ENABLE_PLUGIN_GO)
