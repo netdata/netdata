@@ -260,6 +260,7 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
         rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
 }
 
+#ifdef ENABLE_DBENGINE
 //
 //  true on success
 //
@@ -323,6 +324,7 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
     }
     return host;
 }
+#endif
 
 static RRDHOST *rrdhost_create(
         const char *hostname,
