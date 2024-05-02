@@ -45,7 +45,7 @@ fi
     -DENABLE_H2O=Off \
     -DENABLE_LOGS_MANAGEMENT_TESTS=Off \
     -DENABLE_ACLK=On \
-    -DENABLE_ML=Off \
+    -DENABLE_ML=On \
     -DENABLE_BUNDLED_PROTOBUF=Off \
     ${NULL}
 
