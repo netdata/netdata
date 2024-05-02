@@ -23,8 +23,8 @@ Integrate your organization's Authorization Servers with Netdata to better manag
 ### Prerequisites
 - Authorization Server with OIDC protocol supported
 - A Netdata Cloud account
-- Access to the Space as an administrator
-- Space needs to be on the Business plan or higher
+- Access to the Space as an **Admin**
+- Space needs to be on a paid plan
 
 ### Setting up Authorization Server
 Your server should follow the [full specification for OIDC](https://openid.net/specs/openid-connect-core-1_0.html).
