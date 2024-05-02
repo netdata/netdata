@@ -9,5 +9,6 @@
 #include "system.ram.h"
 #include "mem.swap.h"
 #include "mem.pgfaults.h"
+#include "mem.available.h"
 
 #endif //NETDATA_COMMON_CONTEXTS_H

@@ -27,6 +27,20 @@ static bool do_memory(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         common_mem_pgfaults(minor, major, update_every);
     }
 
+    static COUNTER_DATA availableBytes = { .key = "Available Bytes" };
+    static COUNTER_DATA availableKBytes = { .key = "Available KBytes" };
+    static COUNTER_DATA availableMBytes = { .key = "Available MBytes" };
+    ULONGLONG available_bytes = 0;
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &availableBytes))
+        available_bytes = availableBytes.current.Data;
+    else if(perflibGetObjectCounter(pDataBlock, pObjectType, &availableKBytes))
+        available_bytes = availableKBytes.current.Data * 1024;
+    else if(perflibGetObjectCounter(pDataBlock, pObjectType, &availableMBytes))
+        available_bytes = availableMBytes.current.Data * 1024;
+
+    common_mem_available(available_bytes, update_every);
+
     return true;
 }
 

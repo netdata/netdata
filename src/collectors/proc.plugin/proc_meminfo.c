@@ -248,32 +248,8 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     if(do_ram) {
         common_system_ram(MemFree * 1024, MemUsed * 1024, MemCached * 1024, Buffers * 1024, update_every);
 
-        if(arl_memavailable->flags & ARL_ENTRY_FLAG_FOUND) {
-            static RRDSET *st_mem_available = NULL;
-            static RRDDIM *rd_avail = NULL;
-
-            if(unlikely(!st_mem_available)) {
-                st_mem_available = rrdset_create_localhost(
-                        "mem"
-                        , "available"
-                        , NULL
-                        , "overview"
-                        , NULL
-                        , "Available RAM for applications"
-                        , "MiB"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_MEMINFO_NAME
-                        , NETDATA_CHART_PRIO_MEM_SYSTEM_AVAILABLE
-                        , update_every
-                        , RRDSET_TYPE_AREA
-                );
-
-                rd_avail   = rrddim_add(st_mem_available, "MemAvailable", "avail", 1, 1024, RRD_ALGORITHM_ABSOLUTE);
-            }
-
-            rrddim_set_by_pointer(st_mem_available, rd_avail, MemAvailable);
-            rrdset_done(st_mem_available);
-        }
+        if(arl_memavailable->flags & ARL_ENTRY_FLAG_FOUND)
+            common_mem_available(MemAvailable * 1024, update_every);
     }
 
     unsigned long long SwapUsed = SwapTotal - SwapFree;
