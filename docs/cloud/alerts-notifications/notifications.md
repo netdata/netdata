@@ -1,95 +1,67 @@
 # Centralized Cloud Notifications Reference
 
-Netdata Cloud can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, you ensure that no alert on any node in your infrastructure goes unnoticed by you or your team.
+Netdata Cloud sends alert notifications for nodes in warning, critical, or unreachable states, ensuring alerts are managed centrally and efficiently.
 
-Having this information centralized helps you:
+## Benefits of Centralized Notifications
 
-* Have a clear view of the health across your infrastructure, seeing all alerts in one place.
-* Easily [set up your alert notification process](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md):
-methods to use and where to use them, filtering rules, etc.
-* Quickly troubleshoot using [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
-or [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md)
+- Consolidate health status views across all infrastructure in one place.
+- Set up and [manage your alert notifications easily](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md).
+- Expedite troubleshooting with tools like [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) and the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md).
 
-To prevent alert overload, we automatically send a "flood protection" notification if a node experiences frequent disconnections or triggers a high volume of alerts. This notification highlights potential health or performance problems on that specific node.
+To avoid notification overload, **flood protection** is triggered when a node frequently disconnects or sends excessive alerts, highlighting potential issues.
 
-Admins must [enable alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#manage-space-notification-settings) for their Space(s). All users in the Space can then personalize their notifications settings in [account menu](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/#manage-user-notification-settings).
+Admins must [enable alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#manage-space-notification-settings) for their Space(s). All users can then customize their notification preferences through their [account menu](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/#manage-user-notification-settings).
 
 > **Note**
 >
-> Centralized alerts in Netdata Cloud work independently of notifications sent by individual [Netdata Agents](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md). You can use one or both depending on your needs. Сentralized alerts displayed in Netdata Cloud come directly from your Netdata-monitored nodes. To customize or add new alerts, you need to [configure them](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) on each node.
+> Centralized alerts in Netdata Cloud are separate from the [Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) notifications. Alerts must be [configured individually](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) on each node.
 
-## Alert notifications
+## Alert Notifications
 
-Alert notifications are delivered through various methods, including email sent directly from Netdata and integrations with third-party services like PagerDuty or Slack.
+Notifications can be sent via email or through third-party services like PagerDuty or Slack. Admins manage notification settings for the entire Space, while individual users can personalize settings in their profile.
 
-Notification methods are classified on two main attributes:
-
-* Service level: Personal or System
-* Service classification: Community or Business
-
-Only administrators are able to manage the space's alert notification settings.
-All users in a Space can personalize their notifications settings, for Personal service level notification methods, from within their profile menu.
-
-> **Note**
->
-> Netdata Cloud supports various notification methods, and their accessibility may vary depending on your subscription plan. For more details check [Service classification](#service-classification) and [netdata.cloud/pricing](https://www.netdata.cloud/pricing).
-
-### Service level
+### Service Level
 
 #### Personal
 
-The notifications methods classified as **Personal** are what we consider generic, meaning that these can't have specific rules for them set by the administrators.
-
-Notifications are sent to user-defined destinations, such as email addresses. Users can manage their notification preferences, including Space/Room configurations and desired notification level, from the **Notifications** section of their User Profile.
-
-One example of such a notification method is the E-mail.
+Notifications are sent to user-specific destinations, such as email, which are managed by users under their profile settings.
 
 #### System
 
-For **System** notification methods, the destination of the channel will be a target that usually isn't specific to a single user, e.g. slack channel.
+These notifications go to general targets like a Slack channel, with admins setting rules for notification targets based on workspace or alert level.
 
-Administrators can define granular notification rules for these methods. This allows for flexible configurations, where you can specify different notification targets based on Space/Room or desired notification level.
-
-Some examples of such notification methods are: Webhook, PagerDuty, Slack.
-
-### Service classification
+### Service Classification
 
 #### Community
 
-Notification methods classified as Community can be used by everyone independent on the plan your space is at.
-These are: Email and discord
+Available to all plans, includes basic methods like Email and Discord.
 
 #### Business
 
-Notification methods classified as Business are only available for [paid plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md)
+Exclusive to [paid plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md), includes advanced services like PagerDuty and Slack.
 
-These are: PagerDuty, Slack, Opsgenie
+## Alert Notification Silencing Rules
 
-## Alert notifications silencing rules
+Netdata Cloud offers a silencing rule engine to mute alert notifications based on specific conditions related to nodes or alert types. Learn how to manage these settings [here](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-alert-notification-silencing-rules.md).
 
-Netdata Cloud provides you a silencing Rule engine which allows you to mute alert notifications. This muting action is specific to alert state transition notifications, it doesn't include node unreachable state transitions.
+## Flood Protection
 
-The silencing rule engine is flexible and allows you to enter silence rules for the two main entities involved on alert notifications and can be set using different attributes. The main entities you can enter are **Nodes** and **Alerts** which can be used in combination or isolation to target specific needs. Learn how to [manage alert notification silencing rules](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-alert-notification-silencing-rules.md).
+If a node repeatedly changes state or fires alerts, flood protection limits notifications to prevent overload. You can still access node details through Netdata Cloud or directly via the local Agent dashboard.
 
-## Flood protection
+## Anatomy of an Email Alert Notification
 
-If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud does not send notifications about this node. Even with flood protection active, it is possible to access the node directly, either via Netdata Cloud or the local Agent dashboard at `http://NODEIP:19999`.
+Email notifications provide comprehensive details:
 
-## Anatomy of an email alert notification
-
-Email alert notifications show the following information:
-
-* The Space's name
-* The node's name
-* Alert status: critical, warning, cleared
-* Previous alert status
-* Time at which the alert triggered
-* Chart context that triggered the alert
-* Name and information about the triggered alert
-* Alert value
-* Total number of warning and critical alerts on that node
-* Threshold for triggering the given alert state
-* Calculation or database lookups that Netdata uses to compute the value
-* Source of the alert, including which file you can edit to configure this alert on an individual node
-
-Email notifications also feature a **Go to Node** button, which takes you directly to the offending chart for that node within Cloud's embedded dashboards.
+- The Space's name
+- The node's name
+- Alert status: critical, warning, cleared
+- Previous alert status
+- Time at which the alert triggered
+- Chart context that triggered the alert
+- Name and information about the triggered alert
+- Alert value
+- Total number of warning and critical alerts on that node
+- Threshold for triggering the given alert state
+- Calculation or database lookups that Netdata uses to compute the value
+- Source of the alert, including which file you can edit to configure this alert on an individual node
+- Direct link to the node’s chart in Cloud dashboards.

@@ -1,84 +1,59 @@
 # Netdata Subscription Plans
 
-This page will guide you through the differences between the Community plan and paid plans.
+This page explains the differences between the Community plan and paid plans at Netdata.
 
-At Netdata, we believe in providing free and unrestricted access to high-quality monitoring solutions, and our commitment to this principle will not change. We offer our free SaaS - what we call **Community plan** - and Open Source Agent, which features unlimited nodes and users, unlimited metrics, and retention, providing real-time, high-fidelity, out-of-the-box infrastructure monitoring for packaged applications, containers, and operating systems.
+## Overview
 
-We also provide paid subscriptions that are designed to provide additional features and capabilities for businesses and labs that need tighter and customizable integration of the free monitoring solution to their processes.
+Netdata offers a **Community plan** (a free SaaS and Open Source Agent) that includes unlimited nodes, users, and metrics. This plan provides real-time, high-fidelity monitoring for applications, containers, and operating systems. We also offer paid subscriptions — **Homelab**, **Business**, and **Enterprise On-Premise** — each designed to meet varying needs for tighter and customizable integration.
 
-These are divided into three different plans: **Homelab**, **Business**, and **Enterprise On-Premise**. Each plan offers a different set of features and capabilities to meet the needs of businesses with different sizes and monitoring requirements.
+### Plans
 
-## Plans
+Each plan is linked to a Space, defining the capabilities and customizations available. Different Spaces can have different plans, offering flexibility based on your needs.
 
-The plan is an attribute that is directly attached to your Space and dictates what capabilities and customizations you have available on that Space.
+Netdata Cloud plans (excluding Community) involve:
 
-If you have different Spaces you will have different subscription plans on them. This gives you flexibility to chose what is more adequate for your needs on each of your Spaces.
+- A yearly flat fee for [committed nodes](#committed-nodes)
+- An on-demand metered component based on the [number of running nodes](#running-nodes-and-billing)
 
-Netdata Cloud plans, with the exception of Community, work as subscriptions and overall consist of two pricing components:
+Billing options include monthly (pay-as-you-go) and yearly (annual prepayment). For more details, visit [Netdata Cloud Pricing](https://netdata.cloud/pricing).
 
-- A flat fee component, that is applied on yearly subscriptions for the [committed nodes](#committed-nodes)
-- An on-demand metered component, that is related to your usage of Netdata which is directly linked to the [number of nodes you have running](#running-nodes-and-billing)
+## Running Nodes and Billing
 
-Netdata provides two billing frequency options:
+Billing is based on the number of active nodes. We do not charge for offline or stale nodes. We calculate daily and running P90 figures to ensure fair billing by smoothing out sporadic spikes in node activity.
 
-- Monthly - Pay as you go, where we charge the on-demand component every month
-- Yearly - Annual prepayment, where we charge upfront the flat fee and have the on-demand metered component for any overages that might occur above the [committed nodes](#committed-nodes)
+## Committed Nodes
 
-For more details on the plans and subscription conditions please check <https://netdata.cloud/pricing>.
+Yearly plans require specifying a number of committed nodes, which receive a discounted rate. Usage above these committed nodes incurs charges at the standard rate.
 
-## Running nodes and billing
+## Plan Changes and Credit Balance
 
-The only dynamic variable we consider for billing is the number of concurrently running nodes or Agents. We only charge you for your active running nodes, so we don't count:
-
-- offline nodes
-- stale nodes, nodes that are available to query through a Netdata parent Agent but are not actively connecting metrics at the moment
-
-To ensure we don't overcharge you due to sporadic spikes throughout a month or even at a certain point in a day we are:
-
-- Calculate a daily P90 figure for your running nodes. To achieve that, we take a daily snapshot of your running nodes, and using the node state change events (live, offline) we guarantee that a daily P90 figure is calculated to remove any daily spikes
-- On top of the above, we do a running P90 calculation from the start to the end of your billing cycle. Even if you have a yearly billing frequency we keep a monthly subscription linked to that to identify any potential overage over your [committed nodes](#committed-nodes).
-
-## Committed nodes
-
-When you subscribe to a Yearly plan you will need to specify the number of nodes that you will commit to. On these nodes, a discounted price is applied.
-
-For a given month, if your usage is over these committed nodes we will charge the original cost per node for the nodes above the committed number. That's what we call overage.
-
-## Plan changes and credit balance
-
-It is ok to change your mind. We allow to change your plan, billing frequency or adjust the committed nodes on yearly plans, at any time.
-
-To achieve this you can check our documentation on [updating your plan](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/view-plan-billing.md#update-a-subscription-plan).
+You can change your plan, billing frequency, or committed nodes at any time. For guidance, see [updating your plan](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/view-plan-billing.md#update-a-subscription-plan).
 
 > **Note**
 >
-> - On a downgrade (going to a new plan with less benefits) or cancellation of an active subscription, please note that you will have all your notification methods configurations active **for a period of 24 hours**.
->
->   After that, any notification methods unavailable in your new plan at that time will be automatically disabled. You can always re-enable them once you move to a paid plan that includes them.
->
-> - Also note that a downgrade or a cancellation may affect users in your Space. Please check what roles are available on [each of the plans](#areas-that-change-upon-subscription). Users with unavailable roles on the new plan will immediately have restricted access to the Space.
->
-> - Any credit given to you will be available to use on future paid subscriptions with us. It will be available until the **end of the following year**.
+> - Changes like downgrades or cancellations keep notification configurations active for 24 hours. After that, any methods not supported by the new plan are disabled.
+> - Changes may restrict user access in your Space. Review role availability under [each plan](#areas-that-change-upon-subscription).
+> - Any credits are valid until the end of the following year.
 
-## Areas that change upon subscription
+## Areas That Change Upon Subscription
 
-### Role-Based Access model
+### Role-Based Access Model
 
-Depending on the plan associated to your Space you will have different roles available, please check the documentation under [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md) for more info.
+Different plans offer different roles. For specifics, refer to [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md).
 
-### Events feed
+### Events Feed
 
-The plan you have subscribed on your Space will determine the amount of historical data you will be able to query and the events that will be available. For more details check the documentation related to the [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md).
+The plan determines the historical data and events you can access. Details are in the [Events feed documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md).
 
-### Notification integrations
+### Notification Integrations
 
-The plan on your Space will determine what type of notifications methods will be available to you:
+Available notification methods depend on your plan:
 
-- **Community** - Email and Discord
-- **Homelab/Business/Enterprise On-Premise** - Unlimited, this includes Slack, PagerDuty, Opsgenie etc.
+- **Community**: Email and Discord
+- **Homelab/Business/Enterprise On-Premise**: Includes Slack, PagerDuty, Opsgenie, etc.
 
-For more details check the documentation under [Centralized Cloud notifications](/docs/alerts-&-notifications/notifications/centralized-cloud-notifications).
+For more information, visit [Centralized Cloud notifications](/docs/alerts-&-notifications/notifications/centralized-cloud-notifications).
 
-### Alert notification silencing rules
+### Alert Notification Silencing Rules
 
-The silencing rules feature is only available for Spaces on a subscription, for more details check the [related documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-alert-notification-silencing-rules.md).
+Silencing rules are available only to subscribed Spaces. More details are available in the [silencing rules documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-alert-notification-silencing-rules.md).
