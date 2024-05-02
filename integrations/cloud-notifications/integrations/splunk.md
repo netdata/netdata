@@ -25,8 +25,8 @@ From the Cloud interface, you can manage your space's notification settings and 
 To add Splunk notification you need:
 
 - A Netdata Cloud account
-- Access to the space as an **administrator**
-- Space needs to be on **Business** plan or higher
+- Access to the space as an **Admin**
+- The Space needs to be on a paid plan
 - URI and token for your Splunk HTTP Event Collector. Refer to the [Splunk documentation](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) for detailed instructions.
 
 ### Steps

@@ -48,7 +48,10 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Install smartmontools (v7.0+)
+            description: |
+              Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
       configuration:
         file:
           name: go.d/smartctl.conf
@@ -74,6 +77,10 @@ modules:
             - name: poll_devices_every
               description: interval for gathering data for every device, measured in seconds. Data is cached for this interval.
               default_value: 300
+              required: false
+            - name: device_selector
+              description: "Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`."
+              default_value: "*"
               required: false
         examples:
           folding:

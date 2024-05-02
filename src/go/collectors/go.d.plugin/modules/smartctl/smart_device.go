@@ -59,12 +59,12 @@ func (d *smartDevice) temperature() (int64, bool) {
 }
 
 func (d *smartDevice) powerCycleCount() (int64, bool) {
-	v := d.data.Get("power_cycle_count")
-	if v.Exists() {
-		return v.Int(), true
+	for _, s := range []string{"power_cycle_count", "scsi_start_stop_cycle_counter.accumulated_start_stop_cycles"} {
+		if v := d.data.Get(s); v.Exists() {
+			return v.Int(), true
+		}
 	}
-	v = d.data.Get("scsi_start_stop_cycle_counter.accumulated_start_stop_cycles")
-	return v.Int(), v.Exists()
+	return 0, false
 }
 
 func (d *smartDevice) smartStatusPassed() (bool, bool) {

@@ -69,7 +69,7 @@ list(APPEND _main_deps "netdata-plugin-chartsd (= ${CPACK_PACKAGE_VERSION})")
 list(APPEND _main_deps "netdata-plugin-pythond (= ${CPACK_PACKAGE_VERSION})")
 
 if(ENABLE_PLUGIN_APPS)
-        list(APPEND _main_deps "netdata-plguin-apps (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-apps (= ${CPACK_PACKAGE_VERSION})")
 endif()
 
 if(ENABLE_PLUGIN_GO)
@@ -96,7 +96,7 @@ if(ENABLE_PLUGIN_EBPF)
         list(APPEND _main_deps "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
 endif()
 
-list(JOIN "${_main_deps}" ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
+list(JOIN _main_deps ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
 
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 	  "${CMAKE_SOURCE_DIR}/packaging/cmake/control/netdata/conffiles;"

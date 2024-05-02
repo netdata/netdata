@@ -26,7 +26,7 @@
       2. Open the App and Choose the Sign In Option
         - Sign In with Email Address: Enter the Email Address of your registered Netdata Cloud Account and Click on the Verification link received by Email on your mobile device.
         - Sign In with QR Code: Scan the QR Code from your `Netdata Cloud` UI under **User Settings** --> **Notifications** --> **Mobile App Notifications** --> **Show QR Code**
-      3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Business Subscription**
+      3. Start receiving alert and reachability notifications for your **Space(s)** on a **Paid Subscription plan**
 
       ### Netdata Configuration Steps
       1. Click on the **User settings** on the bottom left of your screen (your profile icon)
@@ -50,7 +50,7 @@
     description: |
       ### Prerequisites
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
+      - Access to the Netdata Space as an **Admin**
       - You need to have a Discord server able to receive webhooks integrations.
 
       ### Discord Server Configuration
@@ -91,8 +91,8 @@
     description: |
       ### Prerequisites
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have a PagerDuty service to receive events using webhooks.
 
 
@@ -135,8 +135,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have a Slack app on your workspace to receive the Webhooks.
 
       ### Slack Server Configuration
@@ -185,8 +185,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Opsgenie to add new integrations.
 
       ### Opsgenie Server Configuration
@@ -228,8 +228,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Mattermost to add new integrations.
       - You need to have a Mattermost app on your workspace to receive the webhooks.
 
@@ -279,8 +279,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Business** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have permissions on Mattermost to add new integrations.
       - You need to have a RocketChat app on your workspace to receive the webhooks.
 
@@ -332,8 +332,8 @@
       To add AWS SNS notification you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
-      - Space needs to be on **Business** plan or higher
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
       - Have an AWS account with AWS SNS access, for more details check [how to configure this on AWS SNS](#settings-on-aws-sns)
 
       ### Steps
@@ -381,8 +381,8 @@
       To add Microsoft Teams notifications integration to your Netdata Cloud space you will need the following:
 
       - A Netdata Cloud account.
-      - Access to the Netdata Cloud space as an **administrator**.
-      - The Space to be on **Business** plan or higher.
+      - Access to the Netdata Cloud space as an **Admin**.
+      - The Space to be on a paid plan.
       - A [Microsoft 365 for Business Account](https://www.microsoft.com/en-us/microsoft-365/business). Note that this is a **paid** account.
 
       ### Settings on Microsoft Teams
@@ -430,8 +430,8 @@
       To add Telegram notification you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
-      - Space needs to be on **Business** plan or higher
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
       - The Telegram bot token and chat ID
 
       ### Steps
@@ -475,8 +475,8 @@
       To add Splunk notification you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
-      - Space needs to be on **Business** plan or higher
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
       - URI and token for your Splunk HTTP Event Collector. Refer to the [Splunk documentation](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) for detailed instructions.
 
       ### Steps
@@ -515,8 +515,8 @@
       To add Splunk VictorOps notification (also known as Splunk On-Call) you need:
 
       - A Netdata Cloud account
-      - Access to the space as an **administrator**
-      - Space needs to be on **Business** plan or higher
+      - Access to the space as an **Admin**
+      - The Space needs to be on a paid plan
       - Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [VictorOps documentation](https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide) for detailed instructions.
 
       ### Steps
@@ -551,8 +551,8 @@
       ### Prerequisites
 
       - A Netdata Cloud account
-      - Access to the Netdata Space as an **administrator**
-      - The Netdata Space needs to be on **Pro** plan or higher
+      - Access to the Netdata Space as an **Admin**
+      - The Netdata Space needs to be on a paid plan
       - You need to have an app that allows you to receive webhooks following a predefined schema.
 
       ### Netdata Configuration Steps

@@ -396,7 +396,8 @@ happened, on your systems and applications.
 rm -rf "${RPM_BUILD_ROOT}"
 %{cmake_install}
 
-install -m 644 -p "system/%{name}.conf" "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
+install -m 644 -p "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/%{name}.conf" "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
+install -m 644 -p "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/%{name}-updater.conf" "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 
 # ###########################################################
 # Install updater script

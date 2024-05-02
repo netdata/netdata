@@ -40,7 +40,10 @@ func (p *Prometheus) addGaugeChart(id, name, help string, labels labels.Labels) 
 
 	for _, lbl := range labels {
 		chart.Labels = append(chart.Labels,
-			module.Label{Key: lbl.Name, Value: lbl.Value},
+			module.Label{
+				Key:   lbl.Name,
+				Value: apostropheReplacer.Replace(lbl.Value),
+			},
 		)
 	}
 
@@ -80,7 +83,10 @@ func (p *Prometheus) addCounterChart(id, name, help string, labels labels.Labels
 	}
 	for _, lbl := range labels {
 		chart.Labels = append(chart.Labels,
-			module.Label{Key: lbl.Name, Value: lbl.Value},
+			module.Label{
+				Key:   lbl.Name,
+				Value: apostropheReplacer.Replace(lbl.Value),
+			},
 		)
 	}
 
@@ -147,7 +153,10 @@ func (p *Prometheus) addSummaryCharts(id, name, help string, labels labels.Label
 
 	for _, chart := range charts {
 		for _, lbl := range labels {
-			chart.Labels = append(chart.Labels, module.Label{Key: lbl.Name, Value: lbl.Value})
+			chart.Labels = append(chart.Labels, module.Label{
+				Key:   lbl.Name,
+				Value: apostropheReplacer.Replace(lbl.Value),
+			})
 		}
 		if err := p.Charts().Add(chart); err != nil {
 			p.Warning(err)
@@ -212,7 +221,10 @@ func (p *Prometheus) addHistogramCharts(id, name, help string, labels labels.Lab
 
 	for _, chart := range charts {
 		for _, lbl := range labels {
-			chart.Labels = append(chart.Labels, module.Label{Key: lbl.Name, Value: lbl.Value})
+			chart.Labels = append(chart.Labels, module.Label{
+				Key:   lbl.Name,
+				Value: apostropheReplacer.Replace(lbl.Value),
+			})
 		}
 		if err := p.Charts().Add(chart); err != nil {
 			p.Warning(err)

@@ -82,17 +82,35 @@ if(NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
-mark_as_advanced(ENABLE_ADDRESS_SANITIZER)
-
-if(ENABLE_ADDRESS_SANITIZER)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
-endif()
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
+include(NetdataCompilerFlags)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
+
+# Check for the mold linker and try to use it if available
+option(USE_MOLD "If the MOLD linker is available on the system, use it instead of the default linker." TRUE)
+
+if(USE_MOLD)
+        message(CHECK_START "Searching for MOLD linker")
+        find_program(MOLD_LINKER NAMES ld.mold mold)
+
+        if(MOLD_LINKER)
+                execute_process(COMMAND ${MOLD_LINKER} --version
+                                RESULT_VARIABLE MOLD_VERSION_RESULT
+                                OUTPUT_VARIABLE MOLD_VERSION)
+
+                if(NOT MOLD_VERSION_RESULT)
+                        string(REPLACE "\n" "" MOLD_VERSION "${MOLD_VERSION}")
+                        message(CHECK_PASS "found (version: ${MOLD_VERSION})")
+                        message(STATUS "Using mold instead of the system default for linking.")
+                        add_compile_options("-fuse-ld=mold")
+                        add_link_options("-fuse-ld=mold")
+                else()
+                        message(CHECK_FAIL "failed")
+                endif()
+        else()
+                message(CHECK_FAIL "failed")
+        endif()
+endif()
 
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
@@ -196,45 +214,6 @@ if(NEED_PROTOBUF)
                 netdata_bundle_protobuf()
         endif()
 endif()
-
-#
-# handling of extra compiler flags
-#
-
-include(NetdataCompilerFlags)
-
-# Disable hardening for debug builds by default.
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" TRUE)
-else()
-        option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" FALSE)
-endif()
-
-set(EXTRA_HARDENING_C_FLAGS "")
-set(EXTRA_HARDENING_CXX_FLAGS "")
-
-set(EXTRA_OPT_C_FLAGS "")
-set(EXTRA_OPT_CXX_FLAGS "")
-
-if(NOT ${DISABLE_HARDENING})
-        add_double_extra_compiler_flag("stack-protector" "-fstack-protector-strong" "-fstack-protector" EXTRA_HARDENING)
-        add_double_extra_compiler_flag("_FORTIFY_SOURCE" "-D_FORTIFY_SOURCE=3" "-D_FORTIFY_SOURCE=2" EXTRA_HARDENING)
-        add_simple_extra_compiler_flag("stack-clash-protection" "-fstack-clash-protection" EXTRA_HARDENING)
-        add_simple_extra_compiler_flag("-fcf-protection" "-fcf-protection=full" EXTRA_HARDENING)
-        add_simple_extra_compiler_flag("branch-protection" "-mbranch-protection=standard" EXTRA_HARDENING)
-endif()
-
-foreach(FLAG function-sections data-sections)
-        add_simple_extra_compiler_flag("${FLAG}" "-f${FLAG}" EXTRA_OPT)
-endforeach()
-
-add_simple_extra_compiler_flag("-Wbuiltin-macro-redefined" "-Wno-builtin-macro-redefined" EXTRA_OPT)
-
-foreach(RELTYP RELEASE DEBUG RELWITHDEBINFO MINSIZEREL)
-        foreach(L C CXX)
-                set(CMAKE_${L}_FLAGS_${RELTYP} "${CMAKE_${L}_FLAGS_${RELTYP}} ${EXTRA_HARDENING_C_FLAGS} ${EXTRA_OPT_C_FLAGS}")
-        endforeach()
-endforeach()
 
 #
 # detect OS
@@ -2621,20 +2600,22 @@ install(FILES
         COMPONENT netdata
         DESTINATION etc/netdata)
 
-install(FILES
-        system/netdata-updater.conf
-        COMPONENT netdata
-        DESTINATION etc/netdata)
-
 install(PROGRAMS
         system/edit-config
         COMPONENT netdata
         DESTINATION etc/netdata)
 
+if(BUILD_FOR_PACKAGING)
+        set(NETDATA_CONF_DEST "etc/netdata")
+else()
+        set(NETDATA_CONF_DEST "usr/lib/netdata/conf.d")
+endif()
+
 install(FILES
         system/netdata.conf
+        system/netdata-updater.conf
         COMPONENT netdata
-        DESTINATION etc/netdata)
+        DESTINATION ${NETDATA_CONF_DEST})
 
 #
 # misc files

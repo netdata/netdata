@@ -97,7 +97,11 @@ There are no alerts configured by default for this integration.
 
 ### Prerequisites
 
-No action required.
+#### Install smartmontools (v7.0+)
+
+Install `smartmontools` version 7.0 or later using your distribution's package manager. Version 7.0 introduced the `--json` output mode, which is required for this collector to function properly.
+
+
 
 ### Configuration
 
@@ -126,6 +130,7 @@ The following options can be defined globally: update_every.
 | timeout | smartctl binary execution timeout. | 5 | no |
 | scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. | 900 | no |
 | poll_devices_every | interval for gathering data for every device, measured in seconds. Data is cached for this interval. | 300 | no |
+| device_selector | Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
 
 </details>
 
