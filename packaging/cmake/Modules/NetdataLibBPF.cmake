@@ -34,12 +34,20 @@ function(netdata_bundle_libbpf)
         set(_libbpf_tag b981a3a138e3a30024e4e143d62cff2dc307121e) # v1.4.0p_netdata
     endif()
 
-    netdata_identify_libc(_libc)
+    if(DEFINED BUILD_SHARED_LIBS)
+        if(NOT BUILD_SHARED_LIBS)
+            set(need_static TRUE)
+        endif()
+    endif()
 
-    string(REGEX MATCH "glibc|musl" _libc_supported "${_libc}")
+    if(NOT need_static)
+        netdata_identify_libc(_libc)
 
-    if(NOT _libc_supported)
-        message(FATAL_ERROR "This system’s libc (detected: ${_libc}) is not not supported by the eBPF plugin.")
+        string(REGEX MATCH "glibc|musl" _libc_supported "${_libc}")
+
+        if(NOT _libc_supported)
+            message(FATAL_ERROR "This system’s libc (detected: ${_libc}) is not not supported by the eBPF plugin.")
+        endif()
     endif()
 
     find_program(MAKE_COMMAND make)
