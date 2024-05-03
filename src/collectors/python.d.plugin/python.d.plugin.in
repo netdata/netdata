@@ -895,10 +895,12 @@ def main():
         log.logger.severity = 'DEBUG'
     elif level == 'info':
         log.logger.severity = 'INFO'
-    elif level == 'warn' or level == 'warning':
+    elif level == 'warn' or level == 'warning' or level == 'notice':
         log.logger.severity = 'WARNING'
     elif level == 'err' or level == 'error':
         log.logger.severity = 'ERROR'
+    elif level == 'emergency' or level == 'alert' or level == 'critical':
+        log.logger.severity = 'DISABLE'
 
     if cmd.debug:
         log.logger.severity = 'DEBUG'
