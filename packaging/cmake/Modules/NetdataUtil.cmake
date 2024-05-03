@@ -78,11 +78,11 @@ function(netdata_identify_libc _libc_name)
 
         execute_process(COMMAND ldd --version
                         COMMAND grep -q -i -E "glibc|gnu libc"
-                        RESULT_VARIABLE LDD_IS_GLIBC
+                        RESULT_VARIABLE LDD_RESULT
                         OUTPUT_VARIABLE LDD_OUTPUT
                         ERROR_VARIABLE LDD_OUTPUT)
 
-        if(LDD_IS_GLIBC)
+        if(NOT LDD_RESULT)
             set(${_libc_name} glibc PARENT_SCOPE)
             set(_ND_DETECTED_LIBC glibc CACHE INTERNAL "")
             return()
@@ -90,11 +90,11 @@ function(netdata_identify_libc _libc_name)
 
         execute_process(COMMAND ldd --version
                         COMMAND grep -q -i -E "musl"
-                        RESULT_VARIABLE LDD_IS_MUSL
+                        RESULT_VARIABLE LDD_RESULT
                         OUTPUT_VARIABLE LDD_OUTPUT
                         ERROR_VARIABLE LDD_OUTPUT)
 
-        if(LDD_IS_MUSL)
+        if(NOT LDD_RESULT)
             set(${_libc_name} musl PARENT_SCOPE)
             set(_ND_DETECTED_LIBC musl CACHE INTERNAL "")
             return()
