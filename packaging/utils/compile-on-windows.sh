@@ -6,6 +6,8 @@ install_dependencies() {
        git cmake ninja \
         base-devel msys2-devel libyaml-devel libzstd-devel libutil-linux libutil-linux-devel \
         mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-toolchain \
+        mingw64/mingw-w64-x86_64-mold ucrt64/mingw-w64-ucrt-x86_64-mold \
+        msys/gdb ucrt64/mingw-w64-ucrt-x86_64-gdb mingw64/mingw-w64-x86_64-gdb \
         msys/zlib-devel mingw64/mingw-w64-x86_64-zlib ucrt64/mingw-w64-ucrt-x86_64-zlib \
         msys/libuv-devel ucrt64/mingw-w64-ucrt-x86_64-libuv mingw64/mingw-w64-x86_64-libuv \
         liblz4-devel mingw64/mingw-w64-x86_64-lz4 ucrt64/mingw-w64-ucrt-x86_64-lz4 \
@@ -14,6 +16,12 @@ install_dependencies() {
         msys/pcre2-devel mingw64/mingw-w64-x86_64-pcre2 ucrt64/mingw-w64-ucrt-x86_64-pcre2 \
         msys/brotli-devel mingw64/mingw-w64-x86_64-brotli ucrt64/mingw-w64-ucrt-x86_64-brotli
 }
+
+if [ "${1}" = "install" ]
+then
+	install_dependencies || exit 1
+	exit 0
+fi
 
 export PATH="/usr/local/bin:${PATH}"
 
