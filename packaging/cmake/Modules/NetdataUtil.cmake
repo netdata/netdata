@@ -74,7 +74,7 @@ endfunction()
 # Sets the specified variable to the name of the libc or "unknown"
 function(netdata_identify_libc _libc_name)
     if(NOT DEFINED _ND_DETECTED_LIBC)
-        message(INFO "Detecting libc implementation")
+        message(CHECK_START "Detecting libc implementation")
 
         execute_process(COMMAND ldd --version
                         COMMAND grep -q -i -E "glibc|gnu libc"
@@ -85,6 +85,7 @@ function(netdata_identify_libc _libc_name)
         if(NOT LDD_RESULT)
             set(${_libc_name} glibc PARENT_SCOPE)
             set(_ND_DETECTED_LIBC glibc CACHE INTERNAL "")
+            message(CHECK_PASS "glibc")
             return()
         endif()
 
@@ -96,11 +97,13 @@ function(netdata_identify_libc _libc_name)
         if(NOT LDD_RESULT)
             set(${_libc_name} musl PARENT_SCOPE)
             set(_ND_DETECTED_LIBC musl CACHE INTERNAL "")
+            message(CHECK_PASS "musl")
             return()
         endif()
 
         set(${_libc_name} unknown PARENT_SCOPE)
         set(_ND_DETECTED_LIBC unknown CACHE INTERNAL "")
+        message(CHECK_FAIL "unknown")
     else()
         set(${_libc_name} ${_ND_DETECTED_LIBC} PARENT_SCOPE)
     endif()
