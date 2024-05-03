@@ -172,7 +172,7 @@ netdata_declare_package(
     INSTALL_CAPS
 )
 
-set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSION})")
+set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 
 #
 # charts.d.plugin
