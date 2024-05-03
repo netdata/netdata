@@ -382,7 +382,7 @@ static bool do_network_interface(PERF_DATA_BLOCK *pDataBlock, int update_every, 
         }
     }
 
-    {
+    if(physical) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_received = NULL, *rd_sent = NULL;
 
