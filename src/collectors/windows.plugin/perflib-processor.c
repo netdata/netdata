@@ -124,11 +124,17 @@ static bool do_processors(PERF_DATA_BLOCK *pDataBlock, int update_every) {
                 cpus_var = rrdvar_host_variable_add_and_acquire(localhost, "active_processors");
         }
 
-        rrddim_set_by_pointer(p->st, p->rd_user, (collected_number)p->percentUserTime.current.Data);
-        rrddim_set_by_pointer(p->st, p->rd_system, (collected_number)(p->percentPrivilegedTime.current.Data - p->percentDPCTime.current.Data));
-        rrddim_set_by_pointer(p->st, p->rd_irq, (collected_number)p->percentInterruptTime.current.Data);
-        rrddim_set_by_pointer(p->st, p->rd_dpc, (collected_number)p->percentDPCTime.current.Data);
-        rrddim_set_by_pointer(p->st, p->rd_idle, (collected_number)p->percentIdleTime.current.Data);
+        uint64_t user = p->percentUserTime.current.Data;
+        uint64_t system = p->percentPrivilegedTime.current.Data;
+        uint64_t dpc = p->percentDPCTime.current.Data;
+        uint64_t irq = p->percentInterruptTime.current.Data;
+        uint64_t idle = p->percentIdleTime.current.Data;
+
+        rrddim_set_by_pointer(p->st, p->rd_user, (collected_number)user);
+        rrddim_set_by_pointer(p->st, p->rd_system, (collected_number)system);
+        rrddim_set_by_pointer(p->st, p->rd_irq, (collected_number)irq);
+        rrddim_set_by_pointer(p->st, p->rd_dpc, (collected_number)dpc);
+        rrddim_set_by_pointer(p->st, p->rd_idle, (collected_number)idle);
         rrdset_done(p->st);
 
 //        if(!p->st2) {
