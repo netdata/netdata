@@ -88,8 +88,7 @@ function(netdata_identify_libc _libc_name)
             return()
         endif()
 
-        execute_process(COMMAND ldd --version
-                        COMMAND grep -q -i -E "musl"
+        execute_process(COMMAND sh -c "ldd --version 2>&1 | grep -q -i 'musl'"
                         RESULT_VARIABLE LDD_RESULT
                         OUTPUT_VARIABLE LDD_OUTPUT
                         ERROR_VARIABLE LDD_OUTPUT)
