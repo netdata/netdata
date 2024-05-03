@@ -3,6 +3,10 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+#define _COMMON_PLUGIN_NAME PLUGIN_WINDOWS_NAME
+#define _COMMON_PLUGIN_MODULE_NAME "PerflibStorage"
+#include "../common-contexts/common-contexts.h"
+
 struct logical_disk {
     bool collected_metadata;
 
@@ -19,14 +23,10 @@ struct logical_disk {
 struct physical_disk {
     bool collected_metadata;
 
-    STRING *device_type;
-    STRING *model;
-    STRING *serial;
-    STRING *id;
+    STRING *device;
+    STRING *mount_point;
 
-    RRDSET *st_io;
-    RRDDIM *rd_io_reads;
-    RRDDIM *rd_io_writes;
+    ND_DISK_IO disk_io;
     COUNTER_DATA diskReadBytesPerSec;
     COUNTER_DATA diskWriteBytesPerSec;
 
@@ -174,10 +174,8 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         if(!d->st_disk_space) {
             d->st_disk_space = rrdset_create_localhost(
                 "disk_space"
-                ,
-                windows_shared_buffer, NULL
-                ,
-                windows_shared_buffer, "disk.space"
+                , windows_shared_buffer, NULL
+                , windows_shared_buffer, "disk.space"
                 , "Disk Space Usage"
                 , "GiB"
                 , PLUGIN_WINDOWS_NAME
@@ -204,6 +202,16 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     }
 
     return true;
+}
+
+static void physical_disk_labels(RRDSET *st, void *data) {
+    struct physical_disk *d = data;
+
+    if(d->device)
+        rrdlabels_add(st->rrdlabels, "device", string2str(d->device), RRDLABEL_SRC_AUTO);
+
+    if (d->mount_point)
+        rrdlabels_add(st->rrdlabels, "mount_point", string2str(d->mount_point), RRDLABEL_SRC_AUTO);
 }
 
 static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
@@ -242,40 +250,25 @@ static bool do_physical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
         if (!d->collected_metadata) {
             // TODO collect metadata - device_type, serial, id
+            d->device = string_strdupz(device);
+            d->mount_point = string_strdupz(mount_point);
             d->collected_metadata = true;
         }
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskReadBytesPerSec) &&
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->diskWriteBytesPerSec)) {
-            if (!d->st_io) {
-                d->st_io = rrdset_create_localhost(
-                    is_system ? "system" : "disk_io",
-                    is_system ? "io" : device,
+            if(is_system)
+                common_system_io(d->diskReadBytesPerSec.current.Data, d->diskWriteBytesPerSec.current.Data, update_every);
+            else
+                common_disk_io(
+                    &d->disk_io,
+                    device,
                     NULL,
-                    is_system ? "disk" : device,
-                    is_system ? "system.io" : "disk.io",
-                    "Disk I/O Bandwidth",
-                    "KiB/s",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibStorage",
-                    is_system ? NETDATA_CHART_PRIO_SYSTEM_IO : NETDATA_CHART_PRIO_DISK_IO,
+                    d->diskReadBytesPerSec.current.Data,
+                    d->diskWriteBytesPerSec.current.Data,
                     update_every,
-                    RRDSET_TYPE_AREA);
-
-                if(!is_system) {
-                    rrdlabels_add(d->st_io->rrdlabels, "device", device, RRDLABEL_SRC_AUTO);
-
-                    if (mount_point)
-                        rrdlabels_add(d->st_io->rrdlabels, "mount_point", mount_point, RRDLABEL_SRC_AUTO);
-                }
-
-                d->rd_io_reads = perflib_rrddim_add(d->st_io, "reads", NULL, 1, 1024, &d->diskReadBytesPerSec);
-                d->rd_io_writes = perflib_rrddim_add(d->st_io, "writes", NULL, -1, 1024, &d->diskWriteBytesPerSec);
-            }
-
-            perflib_rrddim_set_by_pointer(d->st_io, d->rd_io_reads, &d->diskReadBytesPerSec);
-            perflib_rrddim_set_by_pointer(d->st_io, d->rd_io_writes, &d->diskWriteBytesPerSec);
-            rrdset_done(d->st_io);
+                    physical_disk_labels,
+                    d);
         }
 
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentIdleTime);

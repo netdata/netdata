@@ -31,6 +31,7 @@ static inline void common_mem_pgfaults(uint64_t minor, uint64_t major, int updat
         rd_major = rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
+    // this always have to be in base units, so that exporting sends base units to other time-series db
     rrddim_set_by_pointer(st_pgfaults, rd_minor, minor);
     rrddim_set_by_pointer(st_pgfaults, rd_major, major);
     rrdset_done(st_pgfaults);

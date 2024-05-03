@@ -27,6 +27,7 @@ static inline void common_mem_available(uint64_t available_bytes, int update_eve
         rd_avail   = rrddim_add(st_mem_available, "avail", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
+    // this always have to be in base units, so that exporting sends base units to other time-series db
     rrddim_set_by_pointer(st_mem_available, rd_avail, (collected_number)available_bytes);
     rrdset_done(st_mem_available);
 }
