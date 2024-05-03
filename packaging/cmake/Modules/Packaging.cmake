@@ -70,10 +70,10 @@ function(netdata_declare_package)
 
     if(DEFINED DECL_PKG_OPTION_NAME)
         if(${DECL_PKG_OPTION_NAME})
-            list(APPEND CPACK_COMPONENTS_ALL ${DECL_PKG_NAME})
+            list(APPEND CPACK_COMPONENTS_ALL ${DECL_PKG_COMPONENT})
         endif()
     else()
-        list(APPEND CPACK_COMPONENTS_ALL ${DECL_PKG_NAME})
+        list(APPEND CPACK_COMPONENTS_ALL ${DECL_PKG_COMPONENT})
     endif()
 
     set(CPACK_COMPONENTS_ALL "${CPACK_COMPONENTS_ALL}" PARENT_SCOPE)
@@ -193,7 +193,7 @@ netdata_declare_package(
     SUGGESTS iw sudo
 )
 
-set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_CONFLICTS "netdata (<< 1.40")
+set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 
 #
 # cups.plugin
