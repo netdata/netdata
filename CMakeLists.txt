@@ -547,9 +547,9 @@ endif()
 
 # openssl/crypto
 set(ENABLE_OPENSSL True)
-pkg_check_modules(OPENSSL openssl)
+pkg_check_modules(TLS IMPORTED_TARGET openssl)
 
-if(NOT OPENSSL_FOUND)
+if(NOT TARGET PkgConfig::OPENSSL)
         if(MACOS)
                 execute_process(COMMAND
                                 brew --prefix --installed openssl
@@ -561,9 +561,16 @@ if(NOT OPENSSL_FOUND)
                         message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
                 endif()
 
-                set(OPENSSL_INCLUDE_DIRS "${BREW_OPENSSL_PREFIX}/include")
-                set(OPENSSL_CFLAGS_OTHER "")
-                set(OPENSSL_LDFLAGS "-L${BREW_OPENSSL_PREFIX}/lib;-lssl;-lcrypto")
+                add_library(PkgConfig::CRYPTO IMPORTED)
+                set_target_properties(PkgConfig::CRYPTO
+                        IMPORTED_LOCATION ${BREW_OPENSSL_PREFIX}/lib/libcrypto.dylib
+                        INTERFACE_INCLUDE_DIRECTORIES ${BREW_OPENSSL_PREFIX}/include)
+
+                add_library(PkgConfig::TLS IMPORTED)
+                set_target_properties(PkgConfig::TLS
+                        IMPORTED_LOCATION ${BREW_OPENSSL_PREFIX}/lib/libssl.dylib
+                        INTERFACE_LINK_LIBRARIES PkgConfig::CRYPTO
+                        INTERFACE_INCLUDE_DIRECTORIES ${BREW_OPENSSL_PREFIX}/include)
         else()
             message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
         endif()
@@ -1576,10 +1583,7 @@ if(ENABLE_H2O)
         )
 
         target_compile_options(h2o PUBLIC -DH2O_USE_LIBUV=0)
-
-        target_include_directories(h2o BEFORE PRIVATE ${OPENSSL_INCLUDE_DIRS})
-        target_compile_options(h2o PRIVATE ${OPENSSL_CFLAGS_OTHER})
-        target_link_libraries(h2o PRIVATE ${OPENSSL_LIBRARIES})
+        target_link_libraries(h2o PRIVATE PkgConfig::OPENSSL)
 endif()
 
 #
@@ -1713,14 +1717,10 @@ target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
 
 # crypto
-target_include_directories(libnetdata BEFORE PUBLIC ${CRYPTO_INCLUDE_DIRS})
-target_compile_options(libnetdata PUBLIC ${CRYPTO_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${CRYPTO_LDFLAGS})
+target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
 
 # openssl
-target_include_directories(libnetdata BEFORE PUBLIC ${OPENSSL_INCLUDE_DIRS})
-target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
-target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
+target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)
 
 # mnl
 if(NOT MACOS)
