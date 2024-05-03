@@ -59,6 +59,7 @@ void perflibFreePerformanceData(void) {
 // Retrieve the raw counter value and any supporting data needed to calculate
 // a displayable counter value. Use the counter type to determine the information
 // needed to calculate the value.
+
 static BOOL getCounterData(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE* pObject,
@@ -133,6 +134,8 @@ static BOOL getCounterData(
         case PERF_COUNTER_RAWCOUNT:
         case PERF_COUNTER_RAWCOUNT_HEX:
         case PERF_COUNTER_DELTA:
+            // some counters in these categories, have CounterSize = sizeof(ULONGLONG)
+            // but the official documentation always uses them as sizeof(DWORD)
             pRawData->Data = (ULONGLONG)(*(DWORD*)pData);
             pRawData->Time = 0;
             break;
@@ -228,13 +231,7 @@ static BOOL getCounterData(
         case PERF_COUNTER_TEXT:
         case PERF_COUNTER_NODATA:
         case PERF_COUNTER_HISTOGRAM_TYPE:
-            pRawData->Data = 0;
-            pRawData->Time = 0;
-            fSuccess = FALSE;
-            break;
-
-        //Encountered an unidentified counter.
-        default:
+        default: // unknown counter types
             pRawData->Data = 0;
             pRawData->Time = 0;
             fSuccess = FALSE;

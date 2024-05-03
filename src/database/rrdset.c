@@ -1675,8 +1675,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     if(stream_buffer.wb && !stream_buffer.v2)
         rrdset_push_metrics_v1(&stream_buffer, st);
 
-    uint32_t has_reset_value = 0;
-
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);
     struct rda_item *rda_base = rrdset_thread_rda_get(&rda_slots);
 
