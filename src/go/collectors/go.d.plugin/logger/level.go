@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-const levelNotice = slog.Level(2)
+const (
+	levelNotice  = slog.Level(2)
+	levelDisable = slog.Level(99)
+)
 
 var (
 	customLevels = map[slog.Leveler]string{
@@ -33,6 +36,7 @@ func (l *level) Set(level slog.Level) {
 }
 
 func (l *level) SetByName(level string) {
+	// https://github.com/netdata/netdata/tree/master/src/libnetdata/log#log-levels
 	switch strings.ToLower(level) {
 	case "err", "error":
 		l.lvl.Set(slog.LevelError)
@@ -44,5 +48,7 @@ func (l *level) SetByName(level string) {
 		l.lvl.Set(slog.LevelInfo)
 	case "debug":
 		l.lvl.Set(slog.LevelDebug)
+	case "emergency", "alert", "critical":
+		l.lvl.Set(levelDisable)
 	}
 }
