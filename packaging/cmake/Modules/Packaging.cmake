@@ -44,7 +44,7 @@ function(netdata_declare_package)
     string(TOUPPER "${DECL_PKG_COMPONENT}" _comp)
 
     set(CPACK_DEBIAN_${_comp}_PACKAGE_SHLIBDEPS ${DECL_PKG_AUTODEPS} PARENT_SCOPE)
-    set(CPACK_DEBIAN_${_comp}_PACKAGE_DEBUGINFO ${DECL_PKG_DEBUGINFO} PARENT_SCOPE)
+    set(CPACK_DEBIAN_${_comp}_DEBUGINFO_PACKAGE ${DECL_PKG_DEBUGINFO} PARENT_SCOPE)
 
     if(DECL_PKG_NOARCH)
         set(CPACK_DEBIAN_${_comp}_PACKAGE_ARCHITECTURE "all" PARENT_SCOPE)
@@ -56,7 +56,7 @@ function(netdata_declare_package)
     foreach(dep_type ITEMS DEPENDS RECOMMENDS SUGGESTS CONFLICTS)
         list(JOIN DECL_PKG_${dep_type} ", " dep_list)
 
-        set(CPACK_DEBIAN${_comp}_PACKAGE_${dep_type} "${dep_list}" PARENT_SCOPE)
+        set(CPACK_DEBIAN_${_comp}_PACKAGE_${dep_type} "${dep_list}" PARENT_SCOPE)
     endforeach()
 
     list(APPEND deb_predeps "adduser")
@@ -76,12 +76,17 @@ function(netdata_declare_package)
         list(APPEND CPACK_COMPONENTS_ALL ${DECL_PKG_NAME})
     endif()
 
-    file(GLOB CPACK_DEBIAN_${_comp}_PACKAGE_CONTROL_EXTRA
-         "${PKG_FILES}/deb/${DECL_PKG_NAME}/preinst"
-         "${PKG_FILES}/deb/${DECL_PKG_NAME}/postinst"
-         "${PKG_FILES}/deb/${DECL_PKG_NAME}/prerm"
-         "${PKG_FILES}/deb/${DECL_PKG_NAME}/postrm"
-         "${PKG_FILES}/deb/${DECL_PKG_NAME}/conffiles")
+    set(CPACK_COMPONENTS_ALL "${CPACK_COMPONENTS_ALL}" PARENT_SCOPE)
+
+    foreach(ctrl_file ITEMS preinst postinst prerm postrm conffiles)
+        set(_path "${PKG_FILES}/deb/${DECL_PKG_NAME}/${ctrl_file}")
+
+        if(EXISTS "${_path}")
+            list(APPEND CPACK_DEBIAN_${_comp}_PACKAGE_CONTROL_EXTRA "${_path}")
+        endif()
+    endforeach()
+
+    set(CPACK_DEBIAN_${_comp}_PACKAGE_CONTROL_EXTRA "${CPACK_DEBIAN_${_comp}_PACKAGE_CONTROL_EXTRA}" PARENT_SCOPE)
 endfunction()
 
 #
@@ -99,38 +104,36 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 # netdata
 #
 
-list(APPEND _main_deps "netdata-plugin-chartsd (= ${CPACK_PACKAGE_VERSION})")
-list(APPEND _main_deps "netdata-plugin-pythond (= ${CPACK_PACKAGE_VERSION})")
+list(APPEND _main_deps "netdata-plugin-chartsd")
+list(APPEND _main_deps "netdata-plugin-pythond")
 
 if(ENABLE_PLUGIN_APPS)
-        list(APPEND _main_deps "netdata-plugin-apps (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-apps")
 endif()
 
 if(ENABLE_PLUGIN_GO)
-        list(APPEND _main_deps "netdata-plugin-go (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-go")
 endif()
 
 if(ENABLE_PLUGIN_DEBUGFS)
-        list(APPEND _main_deps "netdata-plugin-debugfs (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-debugfs")
 endif()
 
 if(ENABLE_PLUGIN_NFACCT)
-        list(APPEND _main_deps "netdata-plugin-nfacct (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-nfacct")
 endif()
 
 if(ENABLE_PLUGIN_SLABINFO)
-        list(APPEND _main_deps "netdata-plugin-slabinfo (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-slabinfo")
 endif()
 
 if(ENABLE_PLUGIN_PERF)
-        list(APPEND _main_deps "netdata-plugin-perf (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-perf")
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
-        list(APPEND _main_deps "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
+        list(APPEND _main_deps "netdata-plugin-ebpf")
 endif()
-
-list(JOIN _main_deps ", " CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS)
 
 netdata_declare_package(
     COMPONENT netdata
