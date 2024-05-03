@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- Fix DEB package conflict entries. [\#17584](https://github.com/netdata/netdata/pull/17584) ([Ferroin](https://github.com/Ferroin))
+- fix ndsudo setuid bit for static builds [\#17583](https://github.com/netdata/netdata/pull/17583) ([ilyam8](https://github.com/ilyam8))
 - fix table [\#17581](https://github.com/netdata/netdata/pull/17581) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Fix invalid item in postinst script for Netdata package. [\#17580](https://github.com/netdata/netdata/pull/17580) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17578](https://github.com/netdata/netdata/pull/17578) ([netdatabot](https://github.com/netdatabot))
 - Cpack fixes [\#17576](https://github.com/netdata/netdata/pull/17576) ([vkalintiris](https://github.com/vkalintiris))
 - Fix compilation without `dbengine` [\#17575](https://github.com/netdata/netdata/pull/17575) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -423,7 +426,6 @@
 - Remove config macros that are always set. [\#16994](https://github.com/netdata/netdata/pull/16994) ([vkalintiris](https://github.com/vkalintiris))
 - Use changed files in check-files workflow [\#16993](https://github.com/netdata/netdata/pull/16993) ([tkatsoulas](https://github.com/tkatsoulas))
 - Move web/ under src/ [\#16992](https://github.com/netdata/netdata/pull/16992) ([vkalintiris](https://github.com/vkalintiris))
-- Add spinlock to protect metric release [\#16989](https://github.com/netdata/netdata/pull/16989) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
