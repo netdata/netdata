@@ -394,7 +394,7 @@ static void ebpf_swap_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     if (ebpf_read_swap.thread)
-        netdata_thread_cancel(*ebpf_read_swap.thread);
+        nd_thread_cancel(ebpf_read_swap.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -1161,12 +1161,8 @@ void *ebpf_swap_thread(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_swap.thread = mallocz(sizeof(netdata_thread_t));
-    netdata_thread_create(ebpf_read_swap.thread,
-                          ebpf_read_swap.name,
-                          NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_read_swap_thread,
-                          em);
+    ebpf_read_swap.thread = nd_thread_create(ebpf_read_swap.name, NETDATA_THREAD_OPTION_DEFAULT,
+                                             ebpf_read_swap_thread, em);
 
     swap_collector(em);
 

@@ -886,7 +886,7 @@ static void ebpf_vfs_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     if (ebpf_read_vfs.thread)
-        netdata_thread_cancel(*ebpf_read_vfs.thread);
+        nd_thread_cancel(ebpf_read_vfs.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -2637,12 +2637,7 @@ void *ebpf_vfs_thread(void *ptr)
 
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_vfs.thread = mallocz(sizeof(netdata_thread_t));
-    netdata_thread_create(ebpf_read_vfs.thread,
-                          ebpf_read_vfs.name,
-                          NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_read_vfs_thread,
-                          em);
+    ebpf_read_vfs.thread = nd_thread_create(ebpf_read_vfs.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_vfs_thread, em);
 
     vfs_collector(em);
 

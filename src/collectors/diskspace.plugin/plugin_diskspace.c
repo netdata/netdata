@@ -14,7 +14,7 @@
 #define MAX_STAT_USEC 10000LU
 #define SLOW_UPDATE_EVERY 5
 
-static netdata_thread_t *diskspace_slow_thread = NULL;
+static ND_THREAD *diskspace_slow_thread = NULL;
 
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
@@ -513,8 +513,7 @@ cleanup:
     dictionary_acquired_item_release(dict_mountpoints, item);
 }
 
-static void diskspace_slow_worker_cleanup(void *ptr)
-{
+static void diskspace_slow_worker_cleanup(void *ptr) {
     UNUSED(ptr);
 
     collector_info("cleaning up...");
@@ -526,7 +525,6 @@ static void diskspace_slow_worker_cleanup(void *ptr)
 #define WORKER_JOB_SLOW_CLEANUP 1
 
 struct slow_worker_data {
-    netdata_thread_t *slow_thread;
     int update_every;
 };
 
@@ -542,7 +540,7 @@ void *diskspace_slow_worker(void *ptr)
 
     int slow_update_every = data->update_every > SLOW_UPDATE_EVERY ? data->update_every : SLOW_UPDATE_EVERY;
 
-    netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, data->slow_thread);
+    netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, data);
 
     usec_t step = slow_update_every * USEC_PER_SEC;
     usec_t real_step = USEC_PER_SEC;
@@ -617,7 +615,7 @@ static void diskspace_main_cleanup(void *ptr) {
     collector_info("cleaning up...");
 
     if (diskspace_slow_thread) {
-        nd_thread_join(*diskspace_slow_thread);
+        nd_thread_join(diskspace_slow_thread);
         freez(diskspace_slow_thread);
     }
 
@@ -870,12 +868,9 @@ void *diskspace_main(void *ptr) {
 
     netdata_mutex_init(&slow_mountinfo_mutex);
 
-    diskspace_slow_thread = mallocz(sizeof(netdata_thread_t));
+    struct slow_worker_data slow_worker_data = { .update_every = update_every };
 
-    struct slow_worker_data slow_worker_data = {.slow_thread = diskspace_slow_thread, .update_every = update_every};
-
-    netdata_thread_create(
-        diskspace_slow_thread,
+    diskspace_slow_thread = nd_thread_create(
         "P[diskspace slow]",
         NETDATA_THREAD_OPTION_JOINABLE,
         diskspace_slow_worker,

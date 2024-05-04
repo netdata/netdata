@@ -237,7 +237,7 @@ struct collection_thread_status {
     bool running;
     uint32_t max_sockets;
 
-    netdata_thread_t thread;
+    ND_THREAD *thread;
 };
 
 static struct statsd {
@@ -2404,7 +2404,7 @@ static void statsd_main_cleanup(void *data) {
             spinlock_lock(&statsd.collection_threads_status[i].spinlock);
             if(statsd.collection_threads_status[i].running) {
                 collector_info("STATSD: stopping data collection thread %d...", i + 1);
-                netdata_thread_cancel(statsd.collection_threads_status[i].thread);
+                nd_thread_cancel(statsd.collection_threads_status[i].thread);
             }
             else {
                 collector_info("STATSD: data collection thread %d found stopped.", i + 1);
@@ -2585,7 +2585,8 @@ void *statsd_main(void *ptr) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_IN[%d]", i + 1);
         spinlock_init(&statsd.collection_threads_status[i].spinlock);
-        netdata_thread_create(&statsd.collection_threads_status[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);
+        statsd.collection_threads_status[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
+                                                                      statsd_collector_thread, &statsd.collection_threads_status[i]);
     }
 
     // ----------------------------------------------------------------------------------------------------------------

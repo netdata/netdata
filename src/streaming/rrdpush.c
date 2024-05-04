@@ -718,7 +718,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wai
         host->sender->exit.reason = reason;
 
         // signal it to cancel
-        netdata_thread_cancel(host->rrdpush_sender_thread);
+        nd_thread_cancel(host->rrdpush_sender_thread);
     }
 
     sender_unlock(host->sender);
@@ -744,7 +744,9 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_SENDER "[%s]", rrdhost_hostname(host));
 
-        if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_sender_thread, (void *) host->sender))
+        host->rrdpush_sender_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
+                                                       rrdpush_sender_thread, (void *)host->sender);
+        if(!host->rrdpush_sender_thread)
             nd_log_daemon(NDLP_ERR, "STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
         else
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
@@ -1197,7 +1199,8 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
     snprintfz(tag, NETDATA_THREAD_TAG_MAX, THREAD_TAG_STREAM_RECEIVER "[%s]", rpt->hostname);
     tag[NETDATA_THREAD_TAG_MAX] = '\0';
 
-    if(netdata_thread_create(&rpt->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt)) {
+    rpt->thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt);
+    if(!rpt->thread) {
         rrdpush_receive_log_status(
                 rpt, "can't create receiver thread",
                 RRDPUSH_STATUS_INTERNAL_SERVER_ERROR, NDLP_ERR);

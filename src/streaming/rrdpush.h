@@ -337,7 +337,7 @@ typedef struct stream_node_instance {
 struct receiver_state {
     RRDHOST *host;
     pid_t tid;
-    netdata_thread_t thread;
+    ND_THREAD *thread;
     int fd;
     char *key;
     char *hostname;

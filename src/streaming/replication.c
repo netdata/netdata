@@ -1036,7 +1036,7 @@ static struct replication_thread {
     struct {
         size_t last_executed;           // caching of the atomic.executed to report number of requests executed since last time
 
-        netdata_thread_t **threads_ptrs;
+        ND_THREAD **threads_ptrs;
         size_t threads;
     } main_thread;                      // access is allowed only by the main thread
 
@@ -1860,13 +1860,12 @@ static void replication_main_cleanup(void *ptr) {
 
     int threads = (int)replication_globals.main_thread.threads;
     for(int i = 0; i < threads ;i++) {
-        nd_thread_join(*replication_globals.main_thread.threads_ptrs[i]);
-        freez(replication_globals.main_thread.threads_ptrs[i]);
-        __atomic_sub_fetch(&replication_buffers_allocated, sizeof(netdata_thread_t), __ATOMIC_RELAXED);
+        nd_thread_join(replication_globals.main_thread.threads_ptrs[i]);
+        __atomic_sub_fetch(&replication_buffers_allocated, sizeof(ND_THREAD *), __ATOMIC_RELAXED);
     }
     freez(replication_globals.main_thread.threads_ptrs);
     replication_globals.main_thread.threads_ptrs = NULL;
-    __atomic_sub_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&replication_buffers_allocated, threads * sizeof(ND_THREAD *), __ATOMIC_RELAXED);
 
     aral_destroy(replication_globals.aral_rse);
     replication_globals.aral_rse = NULL;
@@ -1894,16 +1893,16 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
     if(--threads) {
         replication_globals.main_thread.threads = threads;
-        replication_globals.main_thread.threads_ptrs = mallocz(threads * sizeof(netdata_thread_t *));
-        __atomic_add_fetch(&replication_buffers_allocated, threads * sizeof(netdata_thread_t), __ATOMIC_RELAXED);
+        replication_globals.main_thread.threads_ptrs = mallocz(threads * sizeof(ND_THREAD *));
+        __atomic_add_fetch(&replication_buffers_allocated, threads * sizeof(ND_THREAD *), __ATOMIC_RELAXED);
 
         for(int i = 0; i < threads ;i++) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "REPLAY[%d]", i + 2);
-            replication_globals.main_thread.threads_ptrs[i] = mallocz(sizeof(netdata_thread_t));
-            __atomic_add_fetch(&replication_buffers_allocated, sizeof(netdata_thread_t), __ATOMIC_RELAXED);
-            netdata_thread_create(replication_globals.main_thread.threads_ptrs[i], tag,
-                                  NETDATA_THREAD_OPTION_JOINABLE, replication_worker_thread, NULL);
+            replication_globals.main_thread.threads_ptrs[i] = mallocz(sizeof(ND_THREAD *));
+            __atomic_add_fetch(&replication_buffers_allocated, sizeof(ND_THREAD *), __ATOMIC_RELAXED);
+            replication_globals.main_thread.threads_ptrs[i] = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
+                                                                               replication_worker_thread, NULL);
         }
     }
 

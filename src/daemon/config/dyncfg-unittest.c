@@ -578,9 +578,7 @@ int dyncfg_unittest(void) {
     // ------------------------------------------------------------------------
     // create the thread for testing async communication
 
-    netdata_thread_t thread;
-    netdata_thread_create(&thread, "unittest", NETDATA_THREAD_OPTION_JOINABLE,
-                          dyncfg_unittest_thread_action, NULL);
+    ND_THREAD *thread = nd_thread_create("unittest", NETDATA_THREAD_OPTION_JOINABLE, dyncfg_unittest_thread_action, NULL);
 
     // ------------------------------------------------------------------------
     // single
@@ -790,7 +788,7 @@ int dyncfg_unittest(void) {
 //    if(rc == HTTP_RESP_OK)
 //        fprintf(stderr, "%s\n", buffer_tostring(wb));
 
-    netdata_thread_cancel(thread);
+    nd_thread_cancel(thread);
     nd_thread_join(thread);
     dyncfg_unittest_cleanup_files();
     dictionary_destroy(dyncfg_unittest_data.nodes);

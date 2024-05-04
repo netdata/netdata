@@ -209,13 +209,14 @@ extern "C" void *profile_main(void *ptr) {
         Profilers.push_back(P);
     }
 
-    std::vector<netdata_thread_t> Threads(NumThreads);
+    std::vector<ND_THREAD *> Threads(NumThreads);
 
     for (size_t Idx = 0; Idx != NumThreads; Idx++) {
         char Tag[NETDATA_THREAD_TAG_MAX + 1];
 
         snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "PROFILER[%zu]", Idx);
-        netdata_thread_create(&Threads[Idx], Tag, NETDATA_THREAD_OPTION_JOINABLE, subprofile_main, static_cast<void *>(&Profilers[Idx]));
+        Threads[Idx] = nd_thread_create(Tag, NETDATA_THREAD_OPTION_JOINABLE,
+                                        subprofile_main, static_cast<void *>(&Profilers[Idx]));
     }
 
     for (size_t Idx = 0; Idx != NumThreads; Idx++)

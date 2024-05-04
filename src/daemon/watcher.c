@@ -6,7 +6,7 @@ watcher_step_t *watcher_steps;
 
 static struct completion shutdown_begin_completion;
 static struct completion shutdown_end_completion;
-static netdata_thread_t watcher_thread;
+static ND_THREAD *watcher_thread;
 
 void watcher_shutdown_begin(void) {
     completion_mark_complete(&shutdown_begin_completion);
@@ -161,7 +161,7 @@ void watcher_thread_start() {
     completion_init(&shutdown_begin_completion);
     completion_init(&shutdown_end_completion);
 
-    netdata_thread_create(&watcher_thread, "P[WATCHER]", NETDATA_THREAD_OPTION_JOINABLE, watcher_main, NULL);
+    watcher_thread = nd_thread_create("P[WATCHER]", NETDATA_THREAD_OPTION_JOINABLE, watcher_main, NULL);
 }
 
 void watcher_thread_stop() {

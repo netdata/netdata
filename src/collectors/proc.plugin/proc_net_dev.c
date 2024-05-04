@@ -1738,16 +1738,15 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     return 0;
 }
 
-static void netdev_main_cleanup(void *ptr)
-{
-    UNUSED(ptr);
+static void netdev_main_cleanup(void *ptr_in_null) {
+    UNUSED(ptr_in_null);
 
     collector_info("cleaning up...");
 
     worker_unregister();
 }
 
-void *netdev_main(void *ptr)
+void *netdev_main(void *ptr_is_null)
 {
     worker_register("NETDEV");
     worker_register_job_name(0, "netdev");
@@ -1760,7 +1759,7 @@ void *netdev_main(void *ptr)
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             netdev_function_net_interfaces);
 
-    netdata_thread_cleanup_push(netdev_main_cleanup, ptr) {
+    netdata_thread_cleanup_push(netdev_main_cleanup, ptr_is_null) {
         usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
         heartbeat_t hb;
         heartbeat_init(&hb);

@@ -569,7 +569,7 @@ struct thread_unittest {
     DICTIONARY *dict;
     int dups;
 
-    netdata_thread_t thread;
+    ND_THREAD *thread;
     struct dictionary_stats stats;
 };
 
@@ -690,8 +690,7 @@ static int dictionary_unittest_threads() {
 
         char buf[100 + 1];
         snprintf(buf, 100, "dict%d", i);
-        netdata_thread_create(
-            &tu[i].thread,
+        tu[i].thread = nd_thread_create(
             buf,
             NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
             unittest_dict_thread,
@@ -869,18 +868,16 @@ static int dictionary_unittest_view_threads() {
         "\nChecking dictionary concurrency with 1 master and 1 view threads for %lld seconds...\n",
         (long long)seconds_to_run);
 
-    netdata_thread_t master_thread, view_thread;
+    ND_THREAD *master_thread, *view_thread;
     tv.join = 0;
 
-    netdata_thread_create(
-        &master_thread,
+    master_thread = nd_thread_create(
         "master",
         NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
         unittest_dict_master_thread,
         &tv);
 
-    netdata_thread_create(
-        &view_thread,
+    view_thread = nd_thread_create(
         "view",
         NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
         unittest_dict_view_thread,

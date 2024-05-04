@@ -61,7 +61,7 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
 // the main socket listener - STATIC-THREADED
 
 struct web_server_static_threaded_worker {
-    netdata_thread_t thread;
+    ND_THREAD *thread;
 
     int id;
     int running;
@@ -466,7 +466,7 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
 //        if(static_workers_private_data[i].running) {
 //            found++;
 //            netdata_log_info("stopping worker %d", i + 1);
-//            netdata_thread_cancel(static_workers_private_data[i].thread);
+//            nd_thread_cancel(static_workers_private_data[i].thread);
 //        }
 //        else
 //            netdata_log_info("found stopped worker %d", i + 1);
@@ -548,8 +548,9 @@ void *socket_listen_main_static_threaded(void *ptr) {
         snprintfz(tag, sizeof(tag) - 1, "WEB[%d]", i+1);
 
         netdata_log_info("starting worker %d", i+1);
-        netdata_thread_create(&static_workers_private_data[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT,
-                              socket_listen_main_static_threaded_worker, (void *)&static_workers_private_data[i]);
+        static_workers_private_data[i].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
+                                                                 socket_listen_main_static_threaded_worker,
+                                                                 (void *)&static_workers_private_data[i]);
     }
 
     // and the main one

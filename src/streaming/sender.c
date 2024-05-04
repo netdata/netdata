@@ -1015,7 +1015,7 @@ static bool attempt_to_connect(struct sender_state *state) {
     usec_t now_ut = now_monotonic_usec();
     usec_t end_ut = now_ut + USEC_PER_SEC * state->reconnect_delay;
     while(now_ut < end_ut) {
-        netdata_thread_testcancel();
+        nd_thread_testcancel();
         sleep_usec(500 * USEC_PER_MS); // seconds
         now_ut = now_monotonic_usec();
     }
@@ -1440,7 +1440,7 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
 
 static bool rrdhost_sender_should_exit(struct sender_state *s) {
     // check for outstanding cancellation requests
-    netdata_thread_testcancel();
+    nd_thread_testcancel();
 
     if(unlikely(!service_running(SERVICE_STREAMING))) {
         if(!s->exit.reason)
@@ -1794,7 +1794,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // Spurious wake-ups without error - loop again
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR))) {
-            netdata_thread_testcancel();
+            nd_thread_testcancel();
             netdata_log_debug(D_STREAM, "Spurious wakeup");
             now_s = now_monotonic_sec();
             continue;

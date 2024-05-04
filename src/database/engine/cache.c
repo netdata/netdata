@@ -2524,7 +2524,7 @@ void unittest_stress_test(void) {
     pgc_uts.metrics = callocz(pgc_uts.clean_metrics + pgc_uts.hot_metrics, sizeof(PGC_PAGE *));
 
     pthread_t service_thread;
-    netdata_thread_create(&service_thread, "SERVICE",
+    nd_thread_create(&service_thread, "SERVICE",
                           NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
                           unittest_stress_test_service, NULL);
 
@@ -2534,7 +2534,7 @@ void unittest_stress_test(void) {
         collect_thread_ids[i] = i;
         char buffer[100 + 1];
         snprintfz(buffer, sizeof(buffer) - 1, "COLLECT_%zu", i);
-        netdata_thread_create(&collect_threads[i], buffer,
+        nd_thread_create(&collect_threads[i], buffer,
                               NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
                               unittest_stress_test_collector, &collect_thread_ids[i]);
     }
@@ -2547,7 +2547,7 @@ void unittest_stress_test(void) {
         char buffer[100 + 1];
         snprintfz(buffer, sizeof(buffer) - 1, "QUERY_%zu", i);
         initstate_r(1, pgc_uts.rand_statebufs, 1024, &pgc_uts.random_data[i]);
-        netdata_thread_create(&queries_threads[i], buffer,
+        nd_thread_create(&queries_threads[i], buffer,
                               NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
                               unittest_stress_test_queries, &query_thread_ids[i]);
     }

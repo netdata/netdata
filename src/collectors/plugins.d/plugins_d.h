@@ -33,7 +33,7 @@ struct plugind {
         SPINLOCK spinlock;
         bool running;                  // do not touch this structure after setting this to 1
         bool enabled;                   // if this is enabled or not
-        netdata_thread_t thread;
+        ND_THREAD *thread;
         pid_t pid;
     } unsafe;
 

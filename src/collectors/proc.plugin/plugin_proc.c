@@ -84,7 +84,7 @@ static struct proc_module {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 36
 #endif
 
-static netdata_thread_t *netdev_thread = NULL;
+static ND_THREAD *netdev_thread = NULL;
 
 static void proc_main_cleanup(void *ptr)
 {
@@ -93,10 +93,7 @@ static void proc_main_cleanup(void *ptr)
 
     collector_info("cleaning up...");
 
-    if (netdev_thread) {
-        nd_thread_join(*netdev_thread);
-        freez(netdev_thread);
-    }
+    nd_thread_join(netdev_thread);
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
@@ -151,10 +148,8 @@ void *proc_main(void *ptr)
     rrd_collector_started();
 
     if (config_get_boolean("plugin:proc", "/proc/net/dev", CONFIG_BOOLEAN_YES)) {
-        netdev_thread = mallocz(sizeof(netdata_thread_t));
         netdata_log_debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);
-        netdata_thread_create(
-            netdev_thread, THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, netdev_main, netdev_thread);
+        netdev_thread = nd_thread_create(THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, netdev_main, NULL);
     }
 
     netdata_thread_cleanup_push(proc_main_cleanup, ptr)

@@ -528,7 +528,7 @@ static void ebpf_cachestat_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     if (ebpf_read_cachestat.thread)
-        netdata_thread_cancel(*ebpf_read_cachestat.thread);
+        nd_thread_cancel(ebpf_read_cachestat.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -1628,12 +1628,11 @@ void *ebpf_cachestat_thread(void *ptr)
 
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_cachestat.thread = mallocz(sizeof(netdata_thread_t));
-    netdata_thread_create(ebpf_read_cachestat.thread,
-                          ebpf_read_cachestat.name,
-                          NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_read_cachestat_thread,
-                          em);
+    ebpf_read_cachestat.thread = nd_thread_create(
+        ebpf_read_cachestat.name,
+        NETDATA_THREAD_OPTION_DEFAULT,
+        ebpf_read_cachestat_thread,
+        em);
 
     cachestat_collector(em);
 

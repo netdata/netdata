@@ -886,7 +886,7 @@ static void ebpf_socket_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     if (ebpf_read_socket.thread)
-        netdata_thread_cancel(*ebpf_read_socket.thread);
+        nd_thread_cancel(ebpf_read_socket.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -2918,12 +2918,8 @@ void *ebpf_socket_thread(void *ptr)
         socket_aggregated_data, socket_publish_aggregated, socket_dimension_names, socket_id_names,
         algorithms, NETDATA_MAX_SOCKET_VECTOR);
 
-    ebpf_read_socket.thread = mallocz(sizeof(netdata_thread_t));
-    netdata_thread_create(ebpf_read_socket.thread,
-                          ebpf_read_socket.name,
-                          NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_read_socket_thread,
-                          em);
+    ebpf_read_socket.thread = nd_thread_create(ebpf_read_socket.name, NETDATA_THREAD_OPTION_DEFAULT,
+                                               ebpf_read_socket_thread, em);
 
     pthread_mutex_lock(&lock);
     ebpf_socket_create_global_charts(em);

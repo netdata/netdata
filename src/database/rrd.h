@@ -1231,7 +1231,7 @@ struct rrdhost {
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
-    netdata_thread_t rrdpush_sender_thread;         // the sender thread
+    ND_THREAD *rrdpush_sender_thread;               // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
     struct aclk_sync_cfg_t *aclk_config;
 

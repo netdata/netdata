@@ -387,7 +387,7 @@ void *aclk_stats_main_thread(void *ptr)
     struct aclk_metrics permanent;
 
     while (service_running(SERVICE_ACLK | SERVICE_COLLECTORS)) {
-        netdata_thread_testcancel();
+        nd_thread_testcancel();
         // ------------------------------------------------------------------------
         // Wait for the next iteration point.
 

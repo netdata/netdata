@@ -551,7 +551,7 @@ static void ebpf_fd_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     if (ebpf_read_fd.thread)
-        netdata_thread_cancel(*ebpf_read_fd.thread);
+        nd_thread_cancel(ebpf_read_fd.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -1467,12 +1467,7 @@ void *ebpf_fd_thread(void *ptr)
 
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_fd.thread = mallocz(sizeof(netdata_thread_t));
-    netdata_thread_create(ebpf_read_fd.thread,
-                          ebpf_read_fd.name,
-                          NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_read_fd_thread,
-                          em);
+    ebpf_read_fd.thread = nd_thread_create(ebpf_read_fd.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_fd_thread, em);
 
     fd_collector(em);
 

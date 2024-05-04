@@ -935,7 +935,7 @@ void ebpf_stop_threads(int sig)
     int i;
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPING) {
-            netdata_thread_cancel(*ebpf_modules[i].thread->thread);
+            nd_thread_cancel(ebpf_modules[i].thread->thread);
 #ifdef NETDATA_DEV_MODE
             netdata_log_info("Sending cancel for thread %s", ebpf_modules[i].info.thread_name);
 #endif
@@ -945,13 +945,13 @@ void ebpf_stop_threads(int sig)
 
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         if (ebpf_threads[i].thread)
-            nd_thread_join(*ebpf_threads[i].thread);
+            nd_thread_join(ebpf_threads[i].thread);
     }
 
     ebpf_plugin_exit = true;
 
     pthread_mutex_lock(&mutex_cgroup_shm);
-    netdata_thread_cancel(*cgroup_integration_thread.thread);
+    nd_thread_cancel(cgroup_integration_thread.thread);
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("Sending cancel for thread %s", cgroup_integration_thread.name);
 #endif
@@ -4010,11 +4010,13 @@ int main(int argc, char **argv)
 
     ebpf_set_static_routine();
 
-    cgroup_integration_thread.thread = mallocz(sizeof(netdata_thread_t));
     cgroup_integration_thread.start_routine = ebpf_cgroup_integration;
 
-    netdata_thread_create(cgroup_integration_thread.thread, cgroup_integration_thread.name,
-                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_cgroup_integration, NULL);
+    cgroup_integration_thread.thread = nd_thread_create(
+        cgroup_integration_thread.name,
+        NETDATA_THREAD_OPTION_DEFAULT,
+        ebpf_cgroup_integration,
+        NULL);
 
     int i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
@@ -4024,10 +4026,9 @@ int main(int argc, char **argv)
         em->thread = st;
         em->thread_id = i;
         if (em->enabled != NETDATA_THREAD_EBPF_NOT_RUNNING) {
-            st->thread = mallocz(sizeof(netdata_thread_t));
             em->enabled = NETDATA_THREAD_EBPF_RUNNING;
             em->lifetime = EBPF_NON_FUNCTION_LIFE_TIME;
-            netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
+            st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_JOINABLE, st->start_routine, em);
         } else {
             em->lifetime = EBPF_DEFAULT_LIFETIME;
         }

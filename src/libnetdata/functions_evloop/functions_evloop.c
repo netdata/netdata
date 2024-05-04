@@ -50,8 +50,8 @@ struct functions_evloop_globals {
     netdata_mutex_t *stdout_mutex;
     bool *plugin_should_exit;
 
-    netdata_thread_t reader_thread;
-    netdata_thread_t *worker_threads;
+    ND_THREAD *reader_thread;
+    ND_THREAD **worker_threads;
 
     struct {
         DICTIONARY *nodes;
@@ -310,18 +310,18 @@ struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, co
     wg->plugin_should_exit = plugin_should_exit;
     wg->stdout_mutex = stdout_mutex;
     wg->workers = worker_threads;
-    wg->worker_threads = callocz(wg->workers, sizeof(netdata_thread_t ));
+    wg->worker_threads = callocz(wg->workers, sizeof(ND_THREAD *));
     wg->tag = tag;
 
     char tag_buffer[NETDATA_THREAD_TAG_MAX + 1];
     snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_READER", wg->tag);
-    netdata_thread_create(&wg->reader_thread, tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
-                          rrd_functions_worker_globals_reader_main, wg);
+    wg->reader_thread = nd_thread_create(tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
+                                         rrd_functions_worker_globals_reader_main, wg);
 
     for(size_t i = 0; i < wg->workers ; i++) {
         snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_WORK[%zu]", wg->tag, i+1);
-        netdata_thread_create(&wg->worker_threads[i], tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
-                              rrd_functions_worker_globals_worker_main, wg);
+        wg->worker_threads[i] = nd_thread_create(tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
+                                                 rrd_functions_worker_globals_worker_main, wg);
     }
 
     functions_evloop_add_function(wg, "config", functions_evloop_config_cb, 120, wg);
@@ -341,9 +341,9 @@ void functions_evloop_add_function(struct functions_evloop_globals *wg, const ch
 
 void functions_evloop_cancel_threads(struct functions_evloop_globals *wg){
     for(size_t i = 0; i < wg->workers ; i++)
-        netdata_thread_cancel(wg->worker_threads[i]);
+        nd_thread_cancel(wg->worker_threads[i]);
 
-    netdata_thread_cancel(wg->reader_thread);
+    nd_thread_cancel(wg->reader_thread);
 }
 
 // ----------------------------------------------------------------------------

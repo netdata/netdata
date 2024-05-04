@@ -811,7 +811,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 
 #ifdef ENABLE_DBENGINE
 struct dbengine_initialization {
-    netdata_thread_t thread;
+    ND_THREAD *thread;
     char path[FILENAME_MAX + 1];
     int disk_space_mb;
     size_t tier;
@@ -937,8 +937,7 @@ void dbengine_init(char *hostname) {
         if(parallel_initialization) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
-            netdata_thread_create(&tiers_init[tier].thread, tag, NETDATA_THREAD_OPTION_JOINABLE,
-                                  dbengine_tier_init, &tiers_init[tier]);
+            tiers_init[tier].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, dbengine_tier_init, &tiers_init[tier]);
         }
         else
             dbengine_tier_init(&tiers_init[tier]);

@@ -47,7 +47,7 @@ typedef struct service_thread {
     bool cancelled;
 
     union {
-        netdata_thread_t netdata_thread;
+        ND_THREAD *netdata_thread;
         uv_thread_t uv_thread;
     };
 
@@ -82,7 +82,7 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
         switch(thread_type) {
             default:
             case SERVICE_THREAD_TYPE_NETDATA:
-                sth->netdata_thread = netdata_thread_self();
+                sth->netdata_thread = nd_thread_self();
                 break;
 
             case SERVICE_THREAD_TYPE_EVENT_LOOP:
@@ -202,7 +202,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                 switch(sth->type) {
                     default:
                     case SERVICE_THREAD_TYPE_NETDATA:
-                        netdata_thread_cancel(sth->netdata_thread);
+                        nd_thread_cancel(sth->netdata_thread);
                         break;
 
                     case SERVICE_THREAD_TYPE_EVENT_LOOP:
@@ -667,7 +667,7 @@ void cancel_main_threads() {
         if (static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
             if (static_threads[i].thread) {
                 netdata_log_info("EXIT: Stopping main thread: %s", static_threads[i].name);
-                netdata_thread_cancel(*static_threads[i].thread);
+                nd_thread_cancel(static_threads[i].thread);
             } else {
                 netdata_log_info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
                 static_threads[i].enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -688,7 +688,7 @@ void cancel_main_threads() {
                 continue;
 
             // Don't wait ourselves.
-            if (static_threads[i].thread && (*static_threads[i].thread == pthread_self()))
+            if (nd_thread_is_me(static_threads[i].thread))
                 continue;
 
             found++;
@@ -703,9 +703,6 @@ void cancel_main_threads() {
     }
     else
         netdata_log_info("All threads finished.");
-
-    for (i = 0; static_threads[i].name != NULL ; i++)
-        freez(static_threads[i].thread);
 
     freez(static_threads);
     static_threads = NULL;
@@ -2245,9 +2242,8 @@ int main(int argc, char **argv) {
         struct netdata_static_thread *st = &static_threads[i];
 
         if(st->enabled) {
-            st->thread = mallocz(sizeof(netdata_thread_t));
             netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
-            netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+            st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
         }
         else
             netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
@@ -2283,10 +2279,9 @@ int main(int argc, char **argv) {
         for (i = 0; static_threads[i].name != NULL; i++) {
             if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
                 struct netdata_static_thread *st = &static_threads[i];
-                st->thread = mallocz(sizeof(netdata_thread_t));
                 st->enabled = 1;
                 netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
-                netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+                st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
             }
         }
     }

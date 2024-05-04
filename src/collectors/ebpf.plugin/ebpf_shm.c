@@ -453,7 +453,7 @@ static void ebpf_shm_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     if (ebpf_read_shm.thread)
-        netdata_thread_cancel(*ebpf_read_shm.thread);
+        nd_thread_cancel(ebpf_read_shm.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -1364,12 +1364,7 @@ void *ebpf_shm_thread(void *ptr)
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, em->maps, EBPF_ACTION_STAT_ADD);
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_shm.thread = mallocz(sizeof(netdata_thread_t));
-    netdata_thread_create(ebpf_read_shm.thread,
-                          ebpf_read_shm.name,
-                          NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_read_shm_thread,
-                          em);
+    ebpf_read_shm.thread = nd_thread_create(ebpf_read_shm.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_shm_thread, em);
 
     shm_collector(em);
 

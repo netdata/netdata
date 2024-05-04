@@ -861,13 +861,10 @@ void *aclk_main(void *ptr)
     aclk_stats_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "statistics", global_statistics_enabled);
     if (aclk_stats_enabled) {
         stats_thread = callocz(1, sizeof(struct aclk_stats_thread));
-        stats_thread->thread = mallocz(sizeof(netdata_thread_t));
         stats_thread->query_thread_count = query_threads.count;
         stats_thread->client = mqttwss_client;
         aclk_stats_thread_prepare(query_threads.count, proto_hdl_cnt);
-        netdata_thread_create(
-                stats_thread->thread, "ACLK_STATS", NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
-                stats_thread);
+        stats_thread->thread = nd_thread_create("ACLK_STATS", NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread, stats_thread);
     }
 
     // Keep reconnecting and talking until our time has come
@@ -901,9 +898,8 @@ exit_full:
     aclk_query_threads_cleanup(&query_threads);
 
     if (aclk_stats_enabled) {
-        nd_thread_join(*stats_thread->thread);
+        nd_thread_join(stats_thread->thread);
         aclk_stats_thread_cleanup();
-        freez(stats_thread->thread);
         freez(stats_thread);
     }
     free_topic_cache();

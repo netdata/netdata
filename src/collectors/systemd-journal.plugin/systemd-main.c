@@ -67,9 +67,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ------------------------------------------------------------------------
     // watcher thread
 
-    netdata_thread_t watcher_thread;
-    netdata_thread_create(&watcher_thread, "SDWATCH",
-                          NETDATA_THREAD_OPTION_DONT_LOG, journal_watcher_main, NULL);
+    nd_thread_create("SDWATCH", NETDATA_THREAD_OPTION_DONT_LOG, journal_watcher_main, NULL);
 
     // ------------------------------------------------------------------------
     // the event loop for functions

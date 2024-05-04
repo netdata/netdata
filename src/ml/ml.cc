@@ -1833,12 +1833,14 @@ void ml_start_threads() {
     char tag[NETDATA_THREAD_TAG_MAX + 1];
 
     snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "PREDICT");
-    netdata_thread_create(&Cfg.detection_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_detect_main, NULL);
+    Cfg.detection_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
+                                            ml_detect_main, NULL);
 
     for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
         ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%zu]", training_thread->id);
-        netdata_thread_create(&training_thread->nd_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, ml_train_main, training_thread);
+        training_thread->nd_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE,
+                                                      ml_train_main, training_thread);
     }
 }
 
@@ -1867,7 +1869,7 @@ void ml_stop_threads()
     for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
         ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
 
-        netdata_thread_cancel(training_thread->nd_thread);
+        nd_thread_cancel(training_thread->nd_thread);
     }
 
     // join training threads

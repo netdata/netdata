@@ -215,7 +215,7 @@ static void pluginsd_main_cleanup(void *data) {
             netdata_log_info("PLUGINSD: 'host:%s', stopping plugin thread: %s",
                  rrdhost_hostname(cd->host), cd->id);
 
-            netdata_thread_cancel(cd->unsafe.thread);
+            nd_thread_cancel(cd->unsafe.thread);
         }
         spinlock_unlock(&cd->unsafe.spinlock);
     }
@@ -340,11 +340,8 @@ void *pluginsd_main(void *ptr)
                         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "PD[%s]", pluginname);
 
                         // spawn a new thread for it
-                        netdata_thread_create(&cd->unsafe.thread,
-                                              tag,
-                                              NETDATA_THREAD_OPTION_DEFAULT,
-                                              pluginsd_worker_thread,
-                                              cd);
+                        cd->unsafe.thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT,
+                                                             pluginsd_worker_thread, cd);
                     }
                 }
             }

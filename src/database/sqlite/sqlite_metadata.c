@@ -2318,13 +2318,12 @@ static void *metadata_unittest_threads(void)
         threads_to_create,
         (long long)seconds_to_run);
 
-    netdata_thread_t threads[threads_to_create];
+    ND_THREAD *threads[threads_to_create];
     tu.join = 0;
     for (int i = 0; i < threads_to_create; i++) {
         char buf[100 + 1];
         snprintf(buf, sizeof(buf) - 1, "META[%d]", i);
-        netdata_thread_create(
-            &threads[i],
+        threads[i] = nd_thread_create(
             buf,
             NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
             unittest_queue_metadata,

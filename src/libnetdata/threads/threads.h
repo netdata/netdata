@@ -11,9 +11,8 @@ typedef enum __attribute__((packed)) {
     NETDATA_THREAD_OPTION_DONT_LOG_STARTUP = 1 << 1,
     NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP = 1 << 2,
     NETDATA_THREAD_STATUS_STARTED          = 1 << 3,
-    NETDATA_THREAD_STATUS_CANCELLED        = 1 << 4,
-    NETDATA_THREAD_STATUS_FINISHED         = 1 << 5,
-    NETDATA_THREAD_STATUS_JOINED           = 1 << 6,
+    NETDATA_THREAD_STATUS_FINISHED         = 1 << 4,
+    NETDATA_THREAD_STATUS_JOINED           = 1 << 5,
 } NETDATA_THREAD_OPTIONS;
 
 #define NETDATA_THREAD_OPTIONS_ALL (NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
@@ -25,7 +24,6 @@ typedef enum __attribute__((packed)) {
 void netdata_thread_set_tag(const char *tag);
 
 typedef struct nd_thread ND_THREAD;
-typedef pthread_t netdata_thread_t;
 
 struct netdata_static_thread {
     // the name of the thread as it should appear in the logs
@@ -41,7 +39,7 @@ struct netdata_static_thread {
     volatile sig_atomic_t enabled;
 
     // internal use, to maintain a pointer to the created thread
-    netdata_thread_t *thread;
+    ND_THREAD *thread;
 
     // an initialization function to run before spawning the thread
     void (*init_routine) (void);
@@ -67,29 +65,27 @@ int netdata_thread_tag_exists(void);
 #define THREAD_TAG_STREAM_RECEIVER "RCVR"
 #define THREAD_TAG_STREAM_SENDER "SNDR"
 
-
 size_t netdata_threads_init(void);
 void netdata_threads_init_after_fork(size_t stacksize);
 void netdata_threads_init_for_external_plugins(size_t stacksize);
 
-int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine) (void *), void *arg);
+ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine) (void *), void *arg);
+void nd_thread_join(ND_THREAD * nti);
+ND_THREAD *nd_thread_self(void);
+bool nd_thread_is_me(ND_THREAD *nti);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-#define netdata_thread_cancel(thread) netdata_thread_cancel_with_trace(thread, __LINE__, __FILE__, __FUNCTION__)
-int netdata_thread_cancel_with_trace(netdata_thread_t thread, int line, const char *file, const char *function);
+#define nd_thread_cancel(nti) nd_thread_cancel_with_trace(nti, __LINE__, __FILE__, __FUNCTION__)
+int nd_thread_cancel_with_trace(ND_THREAD *nti, int line, const char *file, const char *function);
 #else
-int netdata_thread_cancel(netdata_thread_t thread);
+int nd_thread_cancel(ND_THREAD *nti);
 #endif
-
-void nd_thread_join(netdata_thread_t thread);
+void nd_thread_testcancel(void);
 
 #define NETDATA_THREAD_NAME_MAX 15
 void uv_thread_set_name_np(uv_thread_t ut, const char* name);
 void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1]);
 
 void webrtc_set_thread_name(void);
-
-#define netdata_thread_self pthread_self
-#define netdata_thread_testcancel pthread_testcancel
 
 #endif //NETDATA_THREADS_H
