@@ -233,12 +233,13 @@ static void join_exited_detached_threads(void) {
         NETDATA_THREAD *nti;
 
         spinlock_lock(&threads_globals.exited.spinlock);
+
         nti = threads_globals.exited.list;
-        while (nti && nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_STATUS_ACQUIRED) != 0)
+        while (nti && nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) == 0)
             nti = nti->next;
 
         if(nti)
-            nd_thread_status_set(nti, NETDATA_THREAD_STATUS_ACQUIRED);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
 
         spinlock_unlock(&threads_globals.exited.spinlock);
 
@@ -380,6 +381,7 @@ void nd_thread_join(netdata_thread_t thread) {
         freez(nti);
     }
     else {
+        internal_fatal(true, "pthread_join() returned NULL ptr.");
         nd_log(NDLS_DAEMON, NDLP_WARNING, "pthread_join() returned NULL ptr.");
     }
 }

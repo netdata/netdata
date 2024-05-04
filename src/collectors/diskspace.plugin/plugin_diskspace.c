@@ -617,7 +617,7 @@ static void diskspace_main_cleanup(void *ptr) {
     collector_info("cleaning up...");
 
     if (diskspace_slow_thread) {
-        nd_thread_join(*diskspace_slow_thread, NULL);
+        nd_thread_join(*diskspace_slow_thread);
         freez(diskspace_slow_thread);
     }
 
