@@ -361,7 +361,7 @@ void aclk_query_threads_cleanup(struct aclk_query_threads *query_threads)
 {
     if (query_threads && query_threads->thread_list) {
         for (int i = 0; i < query_threads->count; i++) {
-            netdata_thread_join(query_threads->thread_list[i].thread, NULL);
+            nd_thread_join(query_threads->thread_list[i].thread);
         }
         freez(query_threads->thread_list);
     }

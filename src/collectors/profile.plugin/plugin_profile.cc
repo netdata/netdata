@@ -219,7 +219,7 @@ extern "C" void *profile_main(void *ptr) {
     }
 
     for (size_t Idx = 0; Idx != NumThreads; Idx++)
-        netdata_thread_join(Threads[Idx], nullptr);
+        nd_thread_join(Threads[Idx]);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

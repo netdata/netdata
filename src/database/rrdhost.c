@@ -947,10 +947,8 @@ void dbengine_init(char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        void *ptr;
-
         if(parallel_initialization)
-            netdata_thread_join(tiers_init[tier].thread, &ptr);
+            nd_thread_join(tiers_init[tier].thread);
 
         if(tiers_init[tier].ret != 0) {
             nd_log(NDLS_DAEMON, NDLP_ERR,

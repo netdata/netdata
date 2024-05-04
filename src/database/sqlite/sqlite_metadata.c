@@ -2335,8 +2335,7 @@ static void *metadata_unittest_threads(void)
 
     __atomic_store_n(&tu.join, 1, __ATOMIC_RELAXED);
     for (int i = 0; i < threads_to_create; i++) {
-        void *retval;
-        netdata_thread_join(threads[i], &retval);
+        nd_thread_join(threads[i]);
     }
     sleep_usec(5 * USEC_PER_SEC);
 

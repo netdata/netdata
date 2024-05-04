@@ -902,7 +902,7 @@ int mrg_unittest(void) {
 
     usec_t started_ut = now_monotonic_usec();
 
-    pthread_t th[threads];
+    netdata_thread_t th[threads];
     for(size_t i = 0; i < threads ; i++) {
         char buf[15 + 1];
         snprintfz(buf, sizeof(buf) - 1, "TH[%zu]", i);
@@ -918,7 +918,7 @@ int mrg_unittest(void) {
         netdata_thread_cancel(th[i]);
 
     for(size_t i = 0; i < threads ; i++)
-        netdata_thread_join(th[i], NULL);
+        nd_thread_join(th[i]);
 
     usec_t ended_ut = now_monotonic_usec();
 

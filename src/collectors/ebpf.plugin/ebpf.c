@@ -945,7 +945,7 @@ void ebpf_stop_threads(int sig)
 
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         if (ebpf_threads[i].thread)
-            netdata_thread_join(*ebpf_threads[i].thread, NULL);
+            nd_thread_join(*ebpf_threads[i].thread, NULL);
     }
 
     ebpf_plugin_exit = true;

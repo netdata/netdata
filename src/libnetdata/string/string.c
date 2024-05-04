@@ -673,8 +673,7 @@ int string_unittest(size_t entries) {
 
         __atomic_store_n(&tu.join, 1, __ATOMIC_RELAXED);
         for (int i = 0; i < threads_to_create; i++) {
-            void *retval;
-            netdata_thread_join(threads[i], &retval);
+            nd_thread_join(threads[i]);
         }
 
         size_t inserts, deletes, searches, sentries, references, memory, duplications, releases;

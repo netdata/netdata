@@ -703,8 +703,7 @@ static int dictionary_unittest_threads() {
     for (int i = 0; i < threads_to_create; i++) {
         __atomic_store_n(&tu[i].join, 1, __ATOMIC_RELAXED);
 
-        void *retval;
-        netdata_thread_join(tu[i].thread, &retval);
+        nd_thread_join(tu[i].thread);
 
         if(i) {
             tu[0].stats.ops.inserts += tu[i].stats.ops.inserts;
@@ -890,9 +889,8 @@ static int dictionary_unittest_view_threads() {
     sleep_usec(seconds_to_run * USEC_PER_SEC);
 
     __atomic_store_n(&tv.join, 1, __ATOMIC_RELAXED);
-    void *retval;
-    netdata_thread_join(view_thread, &retval);
-    netdata_thread_join(master_thread, &retval);
+    nd_thread_join(view_thread);
+    nd_thread_join(master_thread);
 
 #ifdef DICT_WITH_STATS
     fprintf(stderr,

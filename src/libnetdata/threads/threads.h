@@ -5,13 +5,20 @@
 
 #include "../libnetdata.h"
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     NETDATA_THREAD_OPTION_DEFAULT          = 0 << 0,
     NETDATA_THREAD_OPTION_JOINABLE         = 1 << 0,
     NETDATA_THREAD_OPTION_DONT_LOG_STARTUP = 1 << 1,
     NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP = 1 << 2,
-    NETDATA_THREAD_OPTION_DONT_LOG         = NETDATA_THREAD_OPTION_DONT_LOG_STARTUP|NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP,
+    NETDATA_THREAD_STATUS_STARTED          = 1 << 3,
+    NETDATA_THREAD_STATUS_CANCELLED        = 1 << 4,
+    NETDATA_THREAD_STATUS_FINISHED         = 1 << 5,
+    NETDATA_THREAD_STATUS_JOINED           = 1 << 6,
+    NETDATA_THREAD_STATUS_ACQUIRED         = 1 << 7,
 } NETDATA_THREAD_OPTIONS;
+
+#define NETDATA_THREAD_OPTIONS_ALL (NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
+#define NETDATA_THREAD_OPTION_DONT_LOG (NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
 
 #define netdata_thread_cleanup_push(func, arg) pthread_cleanup_push(func, arg)
 #define netdata_thread_cleanup_pop(execute) pthread_cleanup_pop(execute)
@@ -74,8 +81,7 @@ int netdata_thread_cancel_with_trace(netdata_thread_t thread, int line, const ch
 int netdata_thread_cancel(netdata_thread_t thread);
 #endif
 
-int netdata_thread_join(netdata_thread_t thread, void **retval);
-int netdata_thread_detach(pthread_t thread);
+void nd_thread_join(netdata_thread_t thread);
 
 #define NETDATA_THREAD_NAME_MAX 15
 void uv_thread_set_name_np(uv_thread_t ut, const char* name);

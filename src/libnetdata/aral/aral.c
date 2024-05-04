@@ -1052,7 +1052,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
 
     fprintf(stderr, "Waiting the threads to finish...\n");
     for(size_t i = 0; i < threads ; i++) {
-        netdata_thread_join(thread_ptrs[i], NULL);
+        nd_thread_join(thread_ptrs[i]);
     }
 
     usec_t ended_ut = now_monotonic_usec();

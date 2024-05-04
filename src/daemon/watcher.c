@@ -165,7 +165,7 @@ void watcher_thread_start() {
 }
 
 void watcher_thread_stop() {
-    netdata_thread_join(watcher_thread, NULL);
+    nd_thread_join(watcher_thread);
 
     for (size_t i = 0; i != WATCHER_STEP_ID_MAX; i++) {
         completion_destroy(&watcher_steps[i].p);

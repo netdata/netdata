@@ -790,9 +790,8 @@ int dyncfg_unittest(void) {
 //    if(rc == HTTP_RESP_OK)
 //        fprintf(stderr, "%s\n", buffer_tostring(wb));
 
-    void *ptr;
     netdata_thread_cancel(thread);
-    netdata_thread_join(thread, &ptr);
+    nd_thread_join(thread);
     dyncfg_unittest_cleanup_files();
     dictionary_destroy(dyncfg_unittest_data.nodes);
     buffer_free(wb);

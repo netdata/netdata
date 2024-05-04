@@ -94,7 +94,7 @@ static void proc_main_cleanup(void *ptr)
     collector_info("cleaning up...");
 
     if (netdev_thread) {
-        netdata_thread_join(*netdev_thread, NULL);
+        nd_thread_join(*netdev_thread, NULL);
         freez(netdev_thread);
     }
 

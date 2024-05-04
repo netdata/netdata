@@ -1860,7 +1860,7 @@ static void replication_main_cleanup(void *ptr) {
 
     int threads = (int)replication_globals.main_thread.threads;
     for(int i = 0; i < threads ;i++) {
-        netdata_thread_join(*replication_globals.main_thread.threads_ptrs[i], NULL);
+        nd_thread_join(*replication_globals.main_thread.threads_ptrs[i]);
         freez(replication_globals.main_thread.threads_ptrs[i]);
         __atomic_sub_fetch(&replication_buffers_allocated, sizeof(netdata_thread_t), __ATOMIC_RELAXED);
     }

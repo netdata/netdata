@@ -2668,13 +2668,13 @@ void unittest_stress_test(void) {
     netdata_log_info("Waiting for threads to stop...");
     __atomic_store_n(&pgc_uts.stop, true, __ATOMIC_RELAXED);
 
-    netdata_thread_join(service_thread, NULL);
+    nd_thread_join(service_thread, NULL);
 
     for(size_t i = 0; i < pgc_uts.collect_threads ;i++)
-        netdata_thread_join(collect_threads[i],NULL);
+        nd_thread_join(collect_threads[i],NULL);
 
     for(size_t i = 0; i < pgc_uts.query_threads ;i++)
-        netdata_thread_join(queries_threads[i],NULL);
+        nd_thread_join(queries_threads[i],NULL);
 
     pgc_destroy(pgc_uts.cache);
 

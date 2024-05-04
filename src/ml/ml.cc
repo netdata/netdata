@@ -1853,7 +1853,7 @@ void ml_stop_threads()
     if (!Cfg.detection_thread)
         return;
 
-    netdata_thread_join(Cfg.detection_thread, NULL);
+    nd_thread_join(Cfg.detection_thread);
     Cfg.detection_thread = 0;
 
     // signal the training queue of each thread
@@ -1874,7 +1874,7 @@ void ml_stop_threads()
     for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
         ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
 
-        netdata_thread_join(training_thread->nd_thread, NULL);
+        nd_thread_join(training_thread->nd_thread);
     }
 
     // clear training thread data
