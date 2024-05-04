@@ -739,7 +739,7 @@ close_and_send:
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     clocks_init();
-    netdata_thread_set_tag("NETWORK-VIEWER");
+    nd_thread_tag_set("NETWORK-VIEWER");
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");

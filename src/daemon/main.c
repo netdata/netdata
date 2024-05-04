@@ -42,7 +42,7 @@ typedef struct service_thread {
     pid_t tid;
     SERVICE_THREAD_TYPE type;
     SERVICE_TYPE services;
-    char name[NETDATA_THREAD_NAME_MAX + 1];
+    char name[ND_THREAD_TAG_MAX + 1];
     bool stop_immediately;
     bool cancelled;
 
@@ -76,7 +76,6 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
         sth->request_quit_callback = request_quit_callback;
         sth->force_quit_callback = force_quit_callback;
         sth->data = data;
-        os_thread_get_current_name_np(sth->name);
         *PValue = sth;
 
         switch(thread_type) {

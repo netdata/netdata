@@ -33,8 +33,7 @@ inline void netdata_thread_disable_cancelability(void) {
         int ret = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old);
 
         if(ret != 0)
-            netdata_log_error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d",
-                  netdata_thread_tag(), ret);
+            netdata_log_error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d", nd_thread_tag(), ret);
 
         netdata_thread_first_cancelability = old;
     }
@@ -48,7 +47,8 @@ inline void netdata_thread_enable_cancelability(void) {
 
         netdata_log_error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): invalid thread cancelability count %d "
                           "on thread %s - results will be undefined - please report this!",
-                          netdata_thread_nested_disables, netdata_thread_tag());
+                          netdata_thread_nested_disables,
+            nd_thread_tag());
 
         netdata_thread_nested_disables = 1;
     }
@@ -57,8 +57,7 @@ inline void netdata_thread_enable_cancelability(void) {
         int old = 1;
         int ret = pthread_setcancelstate(netdata_thread_first_cancelability, &old);
         if(ret != 0)
-            netdata_log_error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d",
-                              netdata_thread_tag(),
+            netdata_log_error("THREAD_CANCELABILITY: pthread_setcancelstate() on thread %s returned error %d", nd_thread_tag(),
                               ret);
         else {
             if(old != PTHREAD_CANCEL_DISABLE) {
@@ -66,7 +65,7 @@ inline void netdata_thread_enable_cancelability(void) {
 
                 netdata_log_error("THREAD_CANCELABILITY: netdata_thread_enable_cancelability(): old thread cancelability "
                                   "on thread %s was changed, expected DISABLED (%d), found %s (%d) - please report this!",
-                                  netdata_thread_tag(), PTHREAD_CANCEL_DISABLE,
+                    nd_thread_tag(), PTHREAD_CANCEL_DISABLE,
                                   (old == PTHREAD_CANCEL_ENABLE) ? "ENABLED" : "UNKNOWN",
                                   old);
             }

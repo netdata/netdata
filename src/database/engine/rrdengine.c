@@ -1690,7 +1690,7 @@ static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_w
 
 void dbengine_event_loop(void* arg) {
     sanity_check();
-    uv_thread_set_name_np(pthread_self(), "DBENGINE");
+    uv_thread_set_name_np(NULL, "DBENGINE");
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
     worker_register("DBENGINE");

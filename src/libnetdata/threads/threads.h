@@ -21,7 +21,7 @@ typedef enum __attribute__((packed)) {
 #define netdata_thread_cleanup_push(func, arg) pthread_cleanup_push(func, arg)
 #define netdata_thread_cleanup_pop(execute) pthread_cleanup_pop(execute)
 
-void netdata_thread_set_tag(const char *tag);
+void nd_thread_tag_set(const char *tag);
 
 typedef struct nd_thread ND_THREAD;
 
@@ -59,8 +59,8 @@ struct netdata_static_thread {
 #define NETDATA_MAIN_THREAD_EXITED      CONFIG_BOOLEAN_NO
 
 #define NETDATA_THREAD_TAG_MAX 100
-const char *netdata_thread_tag(void);
-int netdata_thread_tag_exists(void);
+const char *nd_thread_tag(void);
+int nd_thread_has_tag(void);
 
 #define THREAD_TAG_STREAM_RECEIVER "RCVR"
 #define THREAD_TAG_STREAM_SENDER "SNDR"
@@ -82,10 +82,8 @@ int nd_thread_cancel(ND_THREAD *nti);
 #endif
 void nd_thread_testcancel(void);
 
-#define NETDATA_THREAD_NAME_MAX 15
+#define ND_THREAD_TAG_MAX 15
 void uv_thread_set_name_np(uv_thread_t ut, const char* name);
-void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1]);
-
 void webrtc_set_thread_name(void);
 
 #endif //NETDATA_THREADS_H

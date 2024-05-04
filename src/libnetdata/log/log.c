@@ -2155,15 +2155,8 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     if(likely(!thread_log_fields[NDF_TID].entry.set))
         thread_log_fields[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid_cached());
 
-    char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
     if(likely(!thread_log_fields[NDF_THREAD_TAG].entry.set)) {
-        const char *thread_tag = netdata_thread_tag();
-        if (!netdata_thread_tag_exists()) {
-            os_thread_get_current_name_np(os_threadname);
-            if ('\0' != os_threadname[0])
-                /* If it is not an empty string replace "MAIN" thread_tag */
-                thread_tag = os_threadname;
-        }
+        const char *thread_tag = nd_thread_tag();
         thread_log_fields[NDF_THREAD_TAG].entry = ND_LOG_FIELD_TXT(NDF_THREAD_TAG, thread_tag);
 
         // TODO: fix the ND_MODULE in logging by setting proper module name in threads
@@ -2303,17 +2296,7 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
     char action_data[70+1];
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
 
-    char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
-    const char *thread_tag = netdata_thread_tag();
-    if (!netdata_thread_tag_exists()) {
-        os_thread_get_current_name_np(os_threadname);
-        if ('\0' != os_threadname[0])
-            /* If it is not an empty string replace "MAIN" thread_tag */
-            thread_tag = os_threadname;
-    }
-    if(!thread_tag)
-        thread_tag = "UNKNOWN";
-
+    const char *thread_tag = nd_thread_tag();
     const char *tag_to_send =  thread_tag;
 
     // anonymize thread names
