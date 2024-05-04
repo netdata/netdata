@@ -24,6 +24,7 @@ typedef enum __attribute__((packed)) {
 
 void netdata_thread_set_tag(const char *tag);
 
+typedef struct nd_thread ND_THREAD;
 typedef pthread_t netdata_thread_t;
 
 struct netdata_static_thread {

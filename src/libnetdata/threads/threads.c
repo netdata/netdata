@@ -7,7 +7,7 @@
 #define nd_thread_status_set(nti, flag)     __atomic_or_fetch(&((nti)->options), flag, __ATOMIC_RELEASE)
 #define nd_thread_status_clear(nti, flag)   __atomic_and_fetch(&((nti)->options), ~(flag), __ATOMIC_RELEASE)
 
-typedef struct netdata_thread {
+struct nd_thread {
     void *arg;
     pid_t tid;
     char tag[NETDATA_THREAD_NAME_MAX + 1];
@@ -15,23 +15,27 @@ typedef struct netdata_thread {
     void *(*start_routine) (void *);
     NETDATA_THREAD_OPTIONS options;
     pthread_t thread;
-    struct netdata_thread *prev, *next;
-} NETDATA_THREAD;
+    struct nd_thread *prev, *next;
+};
 
 static struct {
     struct {
         SPINLOCK spinlock;
-        NETDATA_THREAD *list;
+        ND_THREAD *list;
     } exited;
 
     struct {
         SPINLOCK spinlock;
-        NETDATA_THREAD *list;
+        ND_THREAD *list;
     } running;
 
     pthread_attr_t *attr;
 } threads_globals = {
     .exited = {
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .list = NULL,
+    },
+    .running = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .list = NULL,
     },
@@ -41,7 +45,7 @@ static struct {
 // ----------------------------------------------------------------------------
 // per thread data
 
-static __thread NETDATA_THREAD *_nd_thread_info = NULL;
+static __thread ND_THREAD *_nd_thread_info = NULL;
 
 inline int netdata_thread_tag_exists(void) {
     return (_nd_thread_info && _nd_thread_info->tag[0]);
@@ -230,7 +234,7 @@ void os_thread_get_current_name_np(char threadname[NETDATA_THREAD_NAME_MAX + 1])
 
 static void join_exited_detached_threads(void) {
     while(1) {
-        NETDATA_THREAD *nti;
+        ND_THREAD *nti;
 
         spinlock_lock(&threads_globals.exited.spinlock);
 
@@ -253,10 +257,10 @@ static void join_exited_detached_threads(void) {
 }
 
 static void thread_cleanup(void *ptr) {
-    NETDATA_THREAD *nti = _nd_thread_info;
+    ND_THREAD *nti = _nd_thread_info;
 
     if(nti != ptr) {
-        NETDATA_THREAD *info = (NETDATA_THREAD *)ptr;
+        ND_THREAD *info = (ND_THREAD *)ptr;
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "THREADS: internal error - thread local variable does not match the one passed to this function. "
                "Expected thread '%s', passed thread '%s'",
@@ -288,7 +292,7 @@ static void thread_cleanup(void *ptr) {
 }
 
 static void *netdata_thread_starting_point(void *ptr) {
-    NETDATA_THREAD *nti = _nd_thread_info = (NETDATA_THREAD *)ptr;
+    ND_THREAD *nti = _nd_thread_info = (ND_THREAD *)ptr;
     nd_thread_status_set(nti, NETDATA_THREAD_STATUS_STARTED);
 
     nti->thread = pthread_self();
@@ -316,7 +320,7 @@ static void *netdata_thread_starting_point(void *ptr) {
 int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THREAD_OPTIONS options, void *(*start_routine) (void *), void *arg) {
     join_exited_detached_threads();
 
-    NETDATA_THREAD *nti = callocz(1, sizeof(*nti));
+    ND_THREAD *nti = callocz(1, sizeof(*nti));
     nti->arg = arg;
     nti->start_routine = start_routine;
     nti->options = options & NETDATA_THREAD_OPTIONS_ALL;
@@ -368,7 +372,7 @@ void nd_thread_join(netdata_thread_t thread) {
     if(ret != 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot join thread. pthread_join() failed with code %d.", ret);
     else if(ptr) {
-        NETDATA_THREAD *nti = (NETDATA_THREAD *)ptr;
+        ND_THREAD *nti = (ND_THREAD *)ptr;
         nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
 
         nd_log(NDLS_DAEMON, NDLP_WARNING, "joined thread '%s', tid %d", nti->tag, nti->tid);
