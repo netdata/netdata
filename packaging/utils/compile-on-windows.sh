@@ -47,7 +47,7 @@ fi
     -G Ninja \
     -DCMAKE_INSTALL_PREFIX="${WT_PREFIX}" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-    -DCMAKE_C_FLAGS="-O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1" \
+    -DCMAKE_C_FLAGS="-O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64" \
     -DNETDATA_USER="${USER}" \
     -DDEFAULT_FEATURE_STATE=Off \
     -DENABLE_H2O=Off \

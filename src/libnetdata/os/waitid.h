@@ -5,8 +5,11 @@
 
 #include "config.h"
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <signal.h>
+
+#ifdef HAVE_SYS_WAIT_H
+#include <sys/wait.h>
+#endif
 
 #ifndef WNOWAIT
 #define WNOWAIT 0x01000000

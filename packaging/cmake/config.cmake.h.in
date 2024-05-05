@@ -30,6 +30,20 @@
 #cmakedefine HAVE_INTTYPES_H
 #cmakedefine HAVE_STDINT_H
 #cmakedefine HAVE_SYS_CAPABILITY_H
+#cmakedefine HAVE_ARPA_INET_H
+#cmakedefine HAVE_NETINET_TCP_H
+#cmakedefine HAVE_SYS_IOCTL_H
+#cmakedefine HAVE_GRP_H
+#cmakedefine HAVE_PWD_H
+#cmakedefine HAVE_NET_IF_H
+#cmakedefine HAVE_POLL_H
+#cmakedefine HAVE_SYSLOG_H
+#cmakedefine HAVE_SYS_MMAN_H
+#cmakedefine HAVE_SYS_RESOURCE_H
+#cmakedefine HAVE_SYS_SOCKET_H
+#cmakedefine HAVE_SYS_WAIT_H
+#cmakedefine HAVE_SYS_UN_H
+#cmakedefine HAVE_SPAWN_H
 
 #cmakedefine HAVE_CAPABILITY
 #cmakedefine HAVE_PROTOBUF

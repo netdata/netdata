@@ -21,7 +21,7 @@
 // logging
 
 // enable the compiler to check for printf like errors on our log2stderr() function
-static inline void log2stderr(const char *format, ...) __attribute__ ((format(__printf__, 1, 2)));
+static inline void log2stderr(const char *format, ...) __attribute__ ((format(gnu_printf, 1, 2)));
 static inline void log2stderr(const char *format, ...) {
     va_list args;
     va_start(args, format);
