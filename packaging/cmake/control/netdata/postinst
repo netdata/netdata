@@ -36,13 +36,18 @@ case "$1" in
 esac
 
 if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
-	deb-systemd-helper unmask 'netdata.service' >/dev/null || true
+    deb-systemd-helper unmask 'netdata.service' >/dev/null || true
 
-	if deb-systemd-helper --quiet was-enabled 'netdata.service'; then
-		deb-systemd-helper enable 'netdata.service' >/dev/null || true
-	else
-		deb-systemd-helper update-state 'netdata.service' >/dev/null || true
-	fi
+    if deb-systemd-helper --quiet was-enabled 'netdata.service'; then
+        deb-systemd-helper enable 'netdata.service' >/dev/null || true
+    else
+        deb-systemd-helper update-state 'netdata.service' >/dev/null || true
+    fi
+
+    if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload >/dev/null || true
+        deb-systemd-invoke restart 'netdata.service' >/dev/null || true
+    fi
 fi
 
 exit 0

@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Bump github.com/docker/docker from 26.1.0+incompatible to 26.1.1+incompatible in /src/go/collectors/go.d.plugin [\#17592](https://github.com/netdata/netdata/pull/17592) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Fix handling of service startup in DEB packages. [\#17589](https://github.com/netdata/netdata/pull/17589) ([Ferroin](https://github.com/Ferroin))
+- go.d/python.d respect all netdata log levels [\#17587](https://github.com/netdata/netdata/pull/17587) ([ilyam8](https://github.com/ilyam8))
 - Fix DEB package conflict entries. [\#17584](https://github.com/netdata/netdata/pull/17584) ([Ferroin](https://github.com/Ferroin))
 - fix ndsudo setuid bit for static builds [\#17583](https://github.com/netdata/netdata/pull/17583) ([ilyam8](https://github.com/ilyam8))
 - fix table [\#17581](https://github.com/netdata/netdata/pull/17581) ([hugovalente-pm](https://github.com/hugovalente-pm))
@@ -32,6 +35,7 @@
 - refresh the ML documentation and consolidate the two docs [\#17543](https://github.com/netdata/netdata/pull/17543) ([Ancairon](https://github.com/Ancairon))
 - Bump github.com/likexian/whois from 1.15.2 to 1.15.3 in /src/go/collectors/go.d.plugin [\#17542](https://github.com/netdata/netdata/pull/17542) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Additional code cleanup [\#17541](https://github.com/netdata/netdata/pull/17541) ([stelfrag](https://github.com/stelfrag))
+- docs: Add Ubuntu AArch64 that is missing from the list [\#17538](https://github.com/netdata/netdata/pull/17538) ([dgibbs64](https://github.com/dgibbs64))
 - go.d smartctl [\#17536](https://github.com/netdata/netdata/pull/17536) ([ilyam8](https://github.com/ilyam8))
 - Detect and use ld.mold instead of the system linker. [\#17534](https://github.com/netdata/netdata/pull/17534) ([Ferroin](https://github.com/Ferroin))
 - Significantly simplify the protobuf handling in CMake. [\#17533](https://github.com/netdata/netdata/pull/17533) ([Ferroin](https://github.com/Ferroin))
@@ -417,15 +421,6 @@
 - Netdata Agent: Backup restore documentation [\#17006](https://github.com/netdata/netdata/pull/17006) ([luisj1983](https://github.com/luisj1983))
 - Integrate Go plugin with build system. [\#17005](https://github.com/netdata/netdata/pull/17005) ([Ferroin](https://github.com/Ferroin))
 - Bump the version of the installed Go toolchain to 1.22.0. [\#17004](https://github.com/netdata/netdata/pull/17004) ([Ferroin](https://github.com/Ferroin))
-- Misc improvements [\#17001](https://github.com/netdata/netdata/pull/17001) ([stelfrag](https://github.com/stelfrag))
-- Adjust storage tiers if we fail to create the requested number of tiers [\#16999](https://github.com/netdata/netdata/pull/16999) ([stelfrag](https://github.com/stelfrag))
-- Move diagrams/ under docs/ [\#16998](https://github.com/netdata/netdata/pull/16998) ([vkalintiris](https://github.com/vkalintiris))
-- Include Go plugin sources in main repository. [\#16997](https://github.com/netdata/netdata/pull/16997) ([Ferroin](https://github.com/Ferroin))
-- Small cleanup [\#16996](https://github.com/netdata/netdata/pull/16996) ([vkalintiris](https://github.com/vkalintiris))
-- Remove historical changelog and cppcheck [\#16995](https://github.com/netdata/netdata/pull/16995) ([vkalintiris](https://github.com/vkalintiris))
-- Remove config macros that are always set. [\#16994](https://github.com/netdata/netdata/pull/16994) ([vkalintiris](https://github.com/vkalintiris))
-- Use changed files in check-files workflow [\#16993](https://github.com/netdata/netdata/pull/16993) ([tkatsoulas](https://github.com/tkatsoulas))
-- Move web/ under src/ [\#16992](https://github.com/netdata/netdata/pull/16992) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
