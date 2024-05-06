@@ -27,6 +27,8 @@ fi
 
 STARTIT=1
 REINSTALL_OPTIONS=""
+NETDATA_CERT_MODE="${NETDATA_CERT_MODE:-auto}"
+NETDATA_CERT_TEST_URL="${NETDATA_CERT_TEST_URL:-https://app.netdata.cloud}"
 RELEASE_CHANNEL="nightly"
 
 while [ "${1}" ]; do
@@ -48,6 +50,15 @@ while [ "${1}" ]; do
       NETDATA_DISABLE_TELEMETRY=1
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
+    "--certificates")
+      case "${2}" in
+        auto|system) NETDATA_CERT_MODE="auto" ;;
+        check) NETDATA_CERT_MODE="check" ;;
+        bundled) NETDATA_CERT_MODE="bundled" ;;
+        *) run_failed "Unknown certificate handling mode '${2}'. Supported modes are auto, check, system, and bundled."; exit 1 ;;
+      esac
+      ;;
+    "--certificate-test-url") NETDATA_CERT_TEST_URL="${2}" ;;
 
     *) echo >&2 "Unknown option '${1}'. Ignoring it." ;;
   esac
@@ -208,20 +219,50 @@ done
 
 # -----------------------------------------------------------------------------
 
-echo "Configure TLS certificate paths"
+select_system_certs() {
+  if [ -d /etc/pki/tls ] ; then
+    echo "${1} /etc/pki/tls for TLS configuration and certificates"
+    ln -sf /etc/pki/tls /opt/netdata/etc/ssl
+  elif [ -d /etc/ssl ] ; then
+    echo "${1} /etc/ssl for TLS configuration and certificates"
+    ln -sf /etc/ssl /opt/netdata/etc/ssl
+  fi
+}
+
+select_internal_certs() {
+  echo "Using bundled TLS configuration and certificates"
+  ln -sf /opt/netdata/share/ssl /opt/netdata/etc/ssl
+}
+
+certs_selected() {
+  [ -L /opt/netdata/etc/ssl ] || return 1
+}
+
+test_certs() {
+  /opt/netdata/bin/curl --fail --silent --output /dev/null "${NETDATA_CERT_TEST_URL}" || return 1
+}
+
 if [ ! -L /opt/netdata/etc/ssl ] && [ -d /opt/netdata/etc/ssl ] ; then
   echo "Preserving existing user configuration for TLS"
 else
-  if [ -d /etc/pki/tls ] ; then
-    echo "Using /etc/pki/tls for TLS configuration and certificates"
-    ln -sf /etc/pki/tls /opt/netdata/etc/ssl
-  elif [ -d /etc/ssl ] ; then
-    echo "Using /etc/ssl for TLS configuration and certificates"
-    ln -sf /etc/ssl /opt/netdata/etc/ssl
-  else
-    echo "Using bundled TLS configuration and certificates"
-    ln -sf /opt/netdata/share/ssl /opt/netdata/etc/ssl
-  fi
+  echo "Configure TLS certificate paths (mode: ${NETDATA_CERT_MODE})"
+  case "${NETDATA_CERT_MODE}" in
+    check)
+      select_system_certs "Testing"
+      if certs_selected && test_certs; then
+        select_system_certs "Using"
+      else
+        select_internal_certs
+      fi
+      ;;
+    bundled) select_internal_certs ;;
+    *)
+      select_system_certs "Using"
+      if ! certs_selected; then
+        select_internal_certs
+      fi
+      ;;
+  esac
 fi
 
 # -----------------------------------------------------------------------------
