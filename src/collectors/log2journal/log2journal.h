@@ -18,6 +18,21 @@
 #include <assert.h>
 
 // ----------------------------------------------------------------------------
+// compatibility
+
+#ifndef HAVE_STRNDUP
+// strndup() is not available on Windows
+static inline char *os_strndup( const char *s1, size_t n)
+{
+    char *copy= (char*)malloc( n+1 );
+    memcpy( copy, s1, n );
+    copy[n] = 0;
+    return copy;
+};
+#define strndup(s, n) os_strndup(s, n)
+#endif
+
+// ----------------------------------------------------------------------------
 // logging
 
 // enable the compiler to check for printf like errors on our log2stderr() function
@@ -82,18 +97,6 @@ static inline void freez(void *ptr) {
     if (ptr)
         free(ptr);
 }
-
-#ifdef COMPILED_FOR_WINDOWS
-// strndup() is not available on Windows
-static inline char *os_strndup( const char *s1, size_t n)
-{
-    char *copy= (char*)malloc( n+1 );
-    memcpy( copy, s1, n );
-    copy[n] = 0;
-    return copy;
-};
-#define strndup(s, n) os_strndup(s, n)
-#endif
 
 // ----------------------------------------------------------------------------
 

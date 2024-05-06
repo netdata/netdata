@@ -91,6 +91,7 @@
 #cmakedefine HAVE_C__GENERIC
 #cmakedefine HAVE_C_MALLOPT
 #cmakedefine HAVE_SETNS
+#cmakedefine HAVE_STRNDUP
 
 #cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT
 #cmakedefine HAVE_FUNC_ATTRIBUTE_MALLOC

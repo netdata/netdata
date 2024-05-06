@@ -369,6 +369,7 @@ check_function_exists(nice HAVE_NICE)
 check_function_exists(recvmmsg HAVE_RECVMMSG)
 check_function_exists(getpriority HAVE_GETPRIORITY)
 check_function_exists(setenv HAVE_SETENV)
+check_function_exists(strndup HAVE_STRNDUP)
 
 check_function_exists(sched_getscheduler HAVE_SCHED_GETSCHEDULER)
 check_function_exists(sched_setscheduler HAVE_SCHED_SETSCHEDULER)
@@ -734,6 +735,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/uuid_generate.h
         src/libnetdata/os/setenv.c
         src/libnetdata/os/setenv.h
+        src/libnetdata/os/strndup.c
+        src/libnetdata/os/strndup.h
 )
 
 if(ENABLE_PLUGIN_EBPF)
