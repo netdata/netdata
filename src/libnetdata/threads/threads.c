@@ -344,7 +344,7 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
 #ifdef NETDATA_INTERNAL_CHECKS
 int nd_thread_cancel_with_trace(ND_THREAD *nti, int line, const char *file, const char *function) {
 #else
-int nd_thread_cancel(ND_THREAD * thread) {
+int nd_thread_cancel(ND_THREAD * nti) {
 #endif
     int ret = pthread_cancel(nti->thread);
     if(ret != 0)
