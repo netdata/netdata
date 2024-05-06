@@ -1,1 +1,0 @@
-integrations/s.m.a.r.t..md

@@ -246,7 +246,9 @@ HEREDOC
 }
 
 if [ "$(uname -s)" = "Linux" ]; then
-    ENABLE_EBPF=1
+  case "$(uname -m)" in
+    x86_64|i?86) ENABLE_EBPF=1 ;;
+  esac
 fi
 
 DONOTSTART=0
