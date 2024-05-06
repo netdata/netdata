@@ -22,8 +22,6 @@
 #include <systemd/sd-journal.h>
 #endif
 
-#include <syslog.h>
-
 const char *program_name = "";
 
 uint64_t debug_flags = 0;
