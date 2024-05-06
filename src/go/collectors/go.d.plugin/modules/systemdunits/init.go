@@ -19,7 +19,7 @@ func (s *SystemdUnits) validateConfig() error {
 	return nil
 }
 
-func (s *SystemdUnits) initSelector() (matcher.Matcher, error) {
+func (s *SystemdUnits) initUnitSelector() (matcher.Matcher, error) {
 	if len(s.Include) == 0 {
 		return matcher.TRUE(), nil
 	}

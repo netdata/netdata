@@ -13,6 +13,8 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
+
+	"github.com/coreos/go-systemd/v22/dbus"
 )
 
 //go:embed "config_schema.json"
@@ -31,22 +33,26 @@ func init() {
 func New() *SystemdUnits {
 	return &SystemdUnits{
 		Config: Config{
-			Timeout: web.Duration(time.Second * 2),
-			Include: []string{
-				"*.service",
-			},
+			Timeout:               web.Duration(time.Second * 2),
+			Include:               []string{"*.service"},
+			CollectUnitFiles:      false,
+			IncludeUnitFiles:      []string{"*.service"},
+			CollectUnitFilesEvery: web.Duration(time.Minute * 5),
 		},
-
-		charts: &module.Charts{},
-		client: newSystemdDBusClient(),
-		units:  make(map[string]bool),
+		charts:        &module.Charts{},
+		client:        newSystemdDBusClient(),
+		seenUnits:     make(map[string]bool),
+		seenUnitFiles: make(map[string]bool),
 	}
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
-	Include     []string     `yaml:"include" json:"include"`
+	UpdateEvery           int          `yaml:"update_every" json:"update_every"`
+	Timeout               web.Duration `yaml:"timeout" json:"timeout"`
+	Include               []string     `yaml:"include" json:"include"`
+	CollectUnitFiles      bool         `yaml:"collect_unit_files" json:"collect_unit_files"`
+	IncludeUnitFiles      []string     `yaml:"include_unit_files" json:"include_unit_files"`
+	CollectUnitFilesEvery web.Duration `yaml:"collect_unit_files_every" json:"collect_unit_files_every"`
 }
 
 type SystemdUnits struct {
@@ -57,8 +63,13 @@ type SystemdUnits struct {
 	conn   systemdConnection
 
 	systemdVersion int
-	units          map[string]bool
-	sr             matcher.Matcher
+
+	seenUnits map[string]bool
+	unitSr    matcher.Matcher
+
+	lastListUnitFilesTime time.Time
+	cachedUnitFiles       []dbus.UnitFile
+	seenUnitFiles         map[string]bool
 
 	charts *module.Charts
 }
@@ -68,21 +79,22 @@ func (s *SystemdUnits) Configuration() any {
 }
 
 func (s *SystemdUnits) Init() error {
-	err := s.validateConfig()
-	if err != nil {
+	if err := s.validateConfig(); err != nil {
 		s.Errorf("config validation: %v", err)
 		return err
 	}
 
-	sr, err := s.initSelector()
+	sr, err := s.initUnitSelector()
 	if err != nil {
-		s.Errorf("init selector: %v", err)
+		s.Errorf("init unit selector: %v", err)
 		return err
 	}
-	s.sr = sr
+	s.unitSr = sr
 
-	s.Debugf("unit names patterns: %v", s.Include)
 	s.Debugf("timeout: %s", s.Timeout)
+	s.Debugf("units: patterns '%v'", s.Include)
+	s.Debugf("unit files: enabled '%v', every '%s', patterns: %v",
+		s.CollectUnitFiles, s.CollectUnitFilesEvery, s.IncludeUnitFiles)
 
 	return nil
 }
@@ -93,9 +105,11 @@ func (s *SystemdUnits) Check() error {
 		s.Error(err)
 		return err
 	}
+
 	if len(mx) == 0 {
 		return errors.New("no metrics collected")
 	}
+
 	return nil
 }
 
