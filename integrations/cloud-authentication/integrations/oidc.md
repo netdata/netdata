@@ -30,11 +30,12 @@ Integrate your organization's Authorization Servers with Netdata to better manag
 Your server should follow the [full specification for OIDC](https://openid.net/specs/openid-connect-core-1_0.html).
 In order to integrate your Authorization Server with Netdata the creation of a client is required. Clients are applications and services that can request authentication of a user.
 The access settings for your client are the following:
-| field                    | value                                                                                                                                                                                        |
-| :--                      | :--                                                                                                                                                                                          |
-| Root URL                 | https://app.netdata.cloud/                                                                                                                                                                   |
+
+| field                    | value                                                 |
+| :--                      | :--                                                   |
+| Root URL                 | https://app.netdata.cloud/                            |
 | Home/Initiate login URL  | https://app.netdata.cloud/api/v2/auth/account/auth-server?iss={your-server-issuer-url}&redirect_uri=https://app.netdata.cloud/sign-in&register_uri=https://app.netdata.cloud/sign-up/verify  |
-| Redirect URL             | https://app.netdata.cloud/api/v2/auth/account/auth-server/callback                                                                                                                           |
+| Redirect URL             | https://app.netdata.cloud/api/v2/auth/account/auth-server/callback  |
 
 ### Netdata Configuration Steps
 1. Click on the Space settings cog (located above your profile icon)
