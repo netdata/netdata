@@ -79,7 +79,7 @@ static inline void os_set_pthread_name(pthread_t thread, const char *name) {
     pthread_set_name_np(thread, name);
 #elif defined(__APPLE__)
     // Apple can only set the name from the same thread
-    UNUSED(ut);
+    UNUSED(thread);
 #else
     pthread_setname_np(thread, name);
 #endif
