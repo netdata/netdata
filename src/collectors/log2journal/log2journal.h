@@ -32,11 +32,19 @@ static inline char *os_strndup( const char *s1, size_t n)
 #define strndup(s, n) os_strndup(s, n)
 #endif
 
+#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT) && !defined(COMPILED_FOR_MACOS)
+#define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
+#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT)
+#define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
+#else
+#define PRINTFLIKE(f, a)
+#endif
+
 // ----------------------------------------------------------------------------
 // logging
 
 // enable the compiler to check for printf like errors on our log2stderr() function
-static inline void log2stderr(const char *format, ...) __attribute__ ((format(gnu_printf, 1, 2)));
+static inline void log2stderr(const char *format, ...) PRINTFLIKE(1, 2);
 static inline void log2stderr(const char *format, ...) {
     va_list args;
     va_start(args, format);

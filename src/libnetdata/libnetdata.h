@@ -249,8 +249,10 @@ extern "C" {
 #define MALLOCLIKE
 #endif
 
-#ifdef HAVE_FUNC_ATTRIBUTE_FORMAT
+#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT) && !defined(COMPILED_FOR_MACOS)
 #define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
+#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT)
+#define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
 #else
 #define PRINTFLIKE(f, a)
 #endif
