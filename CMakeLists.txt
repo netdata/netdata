@@ -171,7 +171,7 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
-cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_LIBBPF" False)
+cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)

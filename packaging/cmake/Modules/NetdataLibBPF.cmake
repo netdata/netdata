@@ -34,12 +34,20 @@ function(netdata_bundle_libbpf)
         set(_libbpf_tag b981a3a138e3a30024e4e143d62cff2dc307121e) # v1.4.0p_netdata
     endif()
 
-    netdata_identify_libc(_libc)
+    if(DEFINED BUILD_SHARED_LIBS)
+        if(NOT BUILD_SHARED_LIBS)
+            set(need_static TRUE)
+        endif()
+    endif()
 
-    string(REGEX MATCH "glibc|musl" _libc_supported "${_libc}")
+    if(NOT need_static)
+        netdata_identify_libc(_libc)
 
-    if(NOT _libc_supported)
-        message(FATAL_ERROR "This system’s libc (detected: ${_libc}) is not not supported by the eBPF plugin.")
+        string(REGEX MATCH "glibc|musl" _libc_supported "${_libc}")
+
+        if(NOT _libc_supported)
+            message(FATAL_ERROR "This system’s libc (detected: ${_libc}) is not not supported by the eBPF plugin.")
+        endif()
     endif()
 
     find_program(MAKE_COMMAND make)
@@ -65,7 +73,7 @@ function(netdata_bundle_libbpf)
         GIT_TAG ${_libbpf_tag}
         SOURCE_DIR "${libbpf_SOURCE_DIR}"
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND ${MAKE_COMMAND} -C src BUILD_STATIC_ONLY=1 OBJDIR=build/ DESTDIR=../ install
+        BUILD_COMMAND ${MAKE_COMMAND} -C src CC=${CMAKE_C_COMPILER} BUILD_STATIC_ONLY=1 OBJDIR=build/ DESTDIR=../ install
         BUILD_IN_SOURCE 1
         BUILD_BYPRODUCTS "${_libbpf_library}"
         INSTALL_COMMAND ""
