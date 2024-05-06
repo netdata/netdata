@@ -2022,7 +2022,7 @@ prepare_offline_install_source() {
       fi
 
       if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-        for arch in ${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}; do
+        for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
           set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
           if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
