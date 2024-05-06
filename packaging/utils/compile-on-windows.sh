@@ -3,7 +3,7 @@
 # On MSYS2, install these dependencies to build netdata:
 install_dependencies() {
     pacman -S \
-       git cmake ninja \
+       git cmake ninja base-devel \
         base-devel msys2-devel libyaml-devel libzstd-devel libutil-linux libutil-linux-devel \
         mingw-w64-x86_64-toolchain mingw-w64-ucrt-x86_64-toolchain \
         mingw64/mingw-w64-x86_64-mold ucrt64/mingw-w64-ucrt-x86_64-mold \
