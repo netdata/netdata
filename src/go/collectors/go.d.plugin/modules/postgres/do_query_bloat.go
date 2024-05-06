@@ -22,6 +22,23 @@ func (p *Postgres) doQueryBloat() error {
 func (p *Postgres) doDBQueryBloat(db *sql.DB) error {
 	q := queryBloat()
 
+	for _, m := range p.mx.tables {
+		if m.bloatSize != nil {
+			m.bloatSize = newInt(0)
+		}
+		if m.bloatSizePerc != nil {
+			m.bloatSizePerc = newInt(0)
+		}
+	}
+	for _, m := range p.mx.indexes {
+		if m.bloatSize != nil {
+			m.bloatSize = newInt(0)
+		}
+		if m.bloatSizePerc != nil {
+			m.bloatSizePerc = newInt(0)
+		}
+	}
+
 	var dbname, schema, table, iname string
 	var tableWasted, idxWasted int64
 	return p.doDBQuery(db, q, func(column, value string, rowEnd bool) {
