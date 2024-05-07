@@ -19,6 +19,7 @@ type systemdConnection interface {
 	GetManagerProperty(string) (string, error)
 	ListUnitsContext(ctx context.Context) ([]dbus.UnitStatus, error)
 	ListUnitsByPatternsContext(ctx context.Context, states []string, patterns []string) ([]dbus.UnitStatus, error)
+	ListUnitFilesByPatternsContext(ctx context.Context, states []string, patterns []string) ([]dbus.UnitFile, error)
 }
 
 type systemdDBusClient struct{}

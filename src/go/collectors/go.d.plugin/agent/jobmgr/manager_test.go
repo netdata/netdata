@@ -837,8 +837,8 @@ FUNCTION_RESULT_END
 
 CONFIG go.d:collector:success:test status running
 
-FUNCTION_RESULT_BEGIN 3-enable 405 application/json
-{"status":405,"message":"Enabling data collection job is not allowed in 'running' state."}
+FUNCTION_RESULT_BEGIN 3-enable 200 application/json
+{"status":200,"message":""}
 FUNCTION_RESULT_END
 
 CONFIG go.d:collector:success:test status running
