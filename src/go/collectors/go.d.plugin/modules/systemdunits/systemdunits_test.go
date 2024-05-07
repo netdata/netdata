@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -168,7 +169,7 @@ func TestSystemdUnits_Collect(t *testing.T) {
 		prepare       func() *SystemdUnits
 		wantCollected map[string]int64
 	}{
-		"success on systemd v230+ on collecting all unit type": {
+		"success v230+ on collecting all unit type": {
 			prepare: func() *SystemdUnits {
 				systemd := New()
 				systemd.Include = []string{"*"}
@@ -383,7 +384,7 @@ func TestSystemdUnits_Collect(t *testing.T) {
 				"unit_var-lib-nfs-rpc_pipefs_mount_state_inactive":                 1,
 			},
 		},
-		"success on systemd v230- on collecting all unit types": {
+		"success v230- on collecting all unit types": {
 			prepare: func() *SystemdUnits {
 				systemd := New()
 				systemd.Include = []string{"*"}
@@ -598,7 +599,7 @@ func TestSystemdUnits_Collect(t *testing.T) {
 				"unit_var-lib-nfs-rpc_pipefs_mount_state_inactive":                 1,
 			},
 		},
-		"success on systemd v230+ on collecting only 'service' unit type": {
+		"success v230+ on collecting only 'service' units": {
 			prepare: func() *SystemdUnits {
 				systemd := New()
 				systemd.Include = []string{"*.service"}
@@ -628,7 +629,7 @@ func TestSystemdUnits_Collect(t *testing.T) {
 				"unit_user@1000_service_state_inactive":                     0,
 			},
 		},
-		"success on systemd v230- on collecting only 'service' unit type": {
+		"success v230- on collecting only 'service' units": {
 			prepare: func() *SystemdUnits {
 				systemd := New()
 				systemd.Include = []string{"*.service"}
@@ -656,6 +657,89 @@ func TestSystemdUnits_Collect(t *testing.T) {
 				"unit_user@1000_service_state_deactivating":                 0,
 				"unit_user@1000_service_state_failed":                       0,
 				"unit_user@1000_service_state_inactive":                     0,
+			},
+		},
+		"success v230+ on collecting only 'service' units and files": {
+			prepare: func() *SystemdUnits {
+				systemd := New()
+				systemd.Include = []string{"*.service"}
+				systemd.CollectUnitFiles = true
+				systemd.client = prepareOKClient(230)
+				return systemd
+			},
+			wantCollected: map[string]int64{
+				"unit_file_/lib/systemd/system/uuidd.service_state_alias":                      0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_bad":                        0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_disabled":                   0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_enabled":                    0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_enabled-runtime":            0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_generated":                  0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_indirect":                   1,
+				"unit_file_/lib/systemd/system/uuidd.service_state_linked":                     0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_linked-runtime":             0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_masked":                     0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_masked-runtime":             0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_static":                     0,
+				"unit_file_/lib/systemd/system/uuidd.service_state_transient":                  0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_alias":                 0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_bad":                   0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_disabled":              0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_enabled":               0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_enabled-runtime":       0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_generated":             0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_indirect":              0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_linked":                0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_linked-runtime":        0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_masked":                1,
+				"unit_file_/lib/systemd/system/x11-common.service_state_masked-runtime":        0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_static":                0,
+				"unit_file_/lib/systemd/system/x11-common.service_state_transient":             0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_alias":              0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_bad":                0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_disabled":           0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_enabled":            0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_enabled-runtime":    0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_generated":          1,
+				"unit_file_/run/systemd/generator.late/monit.service_state_indirect":           0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_linked":             0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_linked-runtime":     0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_masked":             0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_masked-runtime":     0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_static":             0,
+				"unit_file_/run/systemd/generator.late/monit.service_state_transient":          0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_alias":           0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_bad":             0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_disabled":        0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_enabled":         0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_enabled-runtime": 0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_generated":       1,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_indirect":        0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_linked":          0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_linked-runtime":  0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_masked":          0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_masked-runtime":  0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_static":          0,
+				"unit_file_/run/systemd/generator.late/sendmail.service_state_transient":       0,
+				"unit_systemd-ask-password-wall_service_state_activating":                      0,
+				"unit_systemd-ask-password-wall_service_state_active":                          0,
+				"unit_systemd-ask-password-wall_service_state_deactivating":                    0,
+				"unit_systemd-ask-password-wall_service_state_failed":                          0,
+				"unit_systemd-ask-password-wall_service_state_inactive":                        1,
+				"unit_systemd-fsck-root_service_state_activating":                              0,
+				"unit_systemd-fsck-root_service_state_active":                                  0,
+				"unit_systemd-fsck-root_service_state_deactivating":                            0,
+				"unit_systemd-fsck-root_service_state_failed":                                  0,
+				"unit_systemd-fsck-root_service_state_inactive":                                1,
+				"unit_user-runtime-dir@1000_service_state_activating":                          0,
+				"unit_user-runtime-dir@1000_service_state_active":                              1,
+				"unit_user-runtime-dir@1000_service_state_deactivating":                        0,
+				"unit_user-runtime-dir@1000_service_state_failed":                              0,
+				"unit_user-runtime-dir@1000_service_state_inactive":                            0,
+				"unit_user@1000_service_state_activating":                                      0,
+				"unit_user@1000_service_state_active":                                          1,
+				"unit_user@1000_service_state_deactivating":                                    0,
+				"unit_user@1000_service_state_failed":                                          0,
+				"unit_user@1000_service_state_inactive":                                        0,
 			},
 		},
 		"fails when all unites are filtered": {
@@ -698,15 +782,15 @@ func TestSystemdUnits_Collect(t *testing.T) {
 			systemd := test.prepare()
 			require.NoError(t, systemd.Init())
 
-			var collected map[string]int64
+			var mx map[string]int64
 
 			for i := 0; i < 10; i++ {
-				collected = systemd.Collect()
+				mx = systemd.Collect()
 			}
 
-			assert.Equal(t, test.wantCollected, collected)
+			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				ensureCollectedHasAllChartsDimsVarsIDs(t, systemd, collected)
+				ensureCollectedHasAllChartsDimsVarsIDs(t, systemd, mx)
 			}
 		})
 	}
@@ -747,8 +831,9 @@ func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, sd *SystemdUnits, coll
 func prepareOKClient(ver int) *mockClient {
 	return &mockClient{
 		conn: &mockConn{
-			version: ver,
-			units:   mockSystemdUnits,
+			version:   ver,
+			units:     mockSystemdUnits,
+			unitFiles: mockSystemdUnitFiles,
 		},
 	}
 }
@@ -795,10 +880,15 @@ func (m *mockClient) connect() (systemdConnection, error) {
 
 type mockConn struct {
 	version                 int
-	units                   []dbus.UnitStatus
 	errOnGetManagerProperty bool
-	errOnListUnits          bool
-	closeCalled             bool
+
+	units          []dbus.UnitStatus
+	errOnListUnits bool
+
+	unitFiles          []dbus.UnitFile
+	errOnListUnitFiles bool
+
+	closeCalled bool
 }
 
 func (m *mockConn) Close() {
@@ -812,6 +902,7 @@ func (m *mockConn) GetManagerProperty(prop string) (string, error) {
 	if prop != versionProperty {
 		return "", fmt.Errorf("'GetManagerProperty' unkown property: %s", prop)
 	}
+
 	return fmt.Sprintf("%d.6-1-manjaro", m.version), nil
 }
 
@@ -822,10 +913,11 @@ func (m *mockConn) ListUnitsContext(_ context.Context) ([]dbus.UnitStatus, error
 	if m.version >= 230 {
 		return nil, errors.New("'ListUnits' unsupported function error")
 	}
+
 	return append([]dbus.UnitStatus{}, m.units...), nil
 }
 
-func (m *mockConn) ListUnitsByPatternsContext(_ context.Context, _ []string, ps []string) ([]dbus.UnitStatus, error) {
+func (m *mockConn) ListUnitsByPatternsContext(_ context.Context, _ []string, patterns []string) ([]dbus.UnitStatus, error) {
 	if m.errOnListUnits {
 		return nil, errors.New("'ListUnitsByPatterns' call error")
 	}
@@ -833,22 +925,50 @@ func (m *mockConn) ListUnitsByPatternsContext(_ context.Context, _ []string, ps 
 		return nil, errors.New("'ListUnitsByPatterns' unsupported function error")
 	}
 
-	matches := func(name string) bool {
-		for _, p := range ps {
-			if ok, _ := filepath.Match(p, name); ok {
-				return true
-			}
-		}
-		return false
+	if len(m.units) == 0 {
+		return nil, nil
 	}
 
-	var units []dbus.UnitStatus
-	for _, unit := range m.units {
-		if matches(unit.Name) {
-			units = append(units, unit)
+	units := append([]dbus.UnitStatus{}, m.units...)
+
+	units = slices.DeleteFunc(units, func(u dbus.UnitStatus) bool {
+		name := cleanUnitName(u.Name)
+		for _, p := range patterns {
+			if ok, _ := filepath.Match(p, name); ok {
+				return false
+			}
 		}
-	}
+		return true
+	})
+
 	return units, nil
+}
+
+func (m *mockConn) ListUnitFilesByPatternsContext(_ context.Context, _ []string, patterns []string) ([]dbus.UnitFile, error) {
+	if m.errOnListUnitFiles {
+		return nil, errors.New("'ListUnitFilesByPatternsContex' call error")
+	}
+	if m.version < 230 {
+		return nil, errors.New("'ListUnitFilesByPatternsContex' unsupported function error")
+	}
+
+	if len(m.unitFiles) == 0 {
+		return nil, nil
+	}
+
+	unitFiles := append([]dbus.UnitFile{}, m.unitFiles...)
+
+	unitFiles = slices.DeleteFunc(unitFiles, func(file dbus.UnitFile) bool {
+		_, name := filepath.Split(file.Path)
+		for _, p := range patterns {
+			if ok, _ := filepath.Match(p, name); ok {
+				return false
+			}
+		}
+		return true
+	})
+
+	return unitFiles, nil
 }
 
 var mockSystemdUnits = []dbus.UnitStatus{
@@ -903,4 +1023,44 @@ var mockSystemdUnits = []dbus.UnitStatus{
 	{Name: `pamac-cleancache.timer`, LoadState: "loaded", ActiveState: "active"},
 	{Name: `shadow.timer`, LoadState: "loaded", ActiveState: "active"},
 	{Name: `logrotate.timer`, LoadState: "loaded", ActiveState: "active"},
+}
+
+var mockSystemdUnitFiles = []dbus.UnitFile{
+	{Path: "/lib/systemd/system/systemd-tmpfiles-clean.timer", Type: "static"},
+	{Path: "/lib/systemd/system/sysstat-summary.timer", Type: "disabled"},
+	{Path: "/lib/systemd/system/sysstat-collect.timer", Type: "disabled"},
+	{Path: "/lib/systemd/system/pg_dump@.timer", Type: "disabled"},
+
+	{Path: "/lib/systemd/system/veritysetup.target", Type: "static"},
+	{Path: "/lib/systemd/system/veritysetup-pre.target", Type: "static"},
+	{Path: "/lib/systemd/system/usb-gadget.target", Type: "static"},
+	{Path: "/lib/systemd/system/umount.target", Type: "static"},
+
+	{Path: "/lib/systemd/system/syslog.socket", Type: "static"},
+	{Path: "/lib/systemd/system/ssh.socket", Type: "disabled"},
+	{Path: "/lib/systemd/system/docker.socket", Type: "enabled"},
+	{Path: "/lib/systemd/system/dbus.socket", Type: "static"},
+
+	{Path: "/lib/systemd/system/user.slice", Type: "static"},
+	{Path: "/lib/systemd/system/system-systemd\x2dcryptsetup.slice", Type: "static"},
+	{Path: "/lib/systemd/system/machine.slice", Type: "static"},
+
+	{Path: "/run/systemd/generator.late/sendmail.service", Type: "generated"},
+	{Path: "/run/systemd/generator.late/monit.service", Type: "generated"},
+	{Path: "/lib/systemd/system/x11-common.service", Type: "masked"},
+	{Path: "/lib/systemd/system/uuidd.service", Type: "indirect"},
+
+	{Path: "/run/systemd/transient/session-144.scope", Type: "transient"},
+	{Path: "/run/systemd/transient/session-139.scope", Type: "transient"},
+	{Path: "/run/systemd/transient/session-132.scope", Type: "transient"},
+
+	{Path: "/lib/systemd/system/systemd-ask-password-wall.path", Type: "static"},
+	{Path: "/lib/systemd/system/systemd-ask-password-console.path", Type: "static"},
+	{Path: "/lib/systemd/system/postfix-resolvconf.path", Type: "disabled"},
+	{Path: "/lib/systemd/system/ntpsec-systemd-netif.path", Type: "enabled"},
+
+	{Path: "/run/systemd/generator/media-cdrom0.mount", Type: "generated"},
+	{Path: "/run/systemd/generator/boot.mount", Type: "generated"},
+	{Path: "/run/systemd/generator/-.mount", Type: "generated"},
+	{Path: "/lib/systemd/system/sys-kernel-tracing.mount", Type: "static"},
 }

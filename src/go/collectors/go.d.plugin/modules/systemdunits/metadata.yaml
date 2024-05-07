@@ -21,7 +21,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Systemd units state.
+          This collector monitors the state of Systemd units and unit files.
         method_description: ""
       supported_platforms:
         include: []
@@ -57,8 +57,12 @@ modules:
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
+            - name: timeout
+              description: System bus requests timeout.
+              default_value: 1
+              required: false
             - name: include
-              description: Systemd units filter.
+              description: Systemd units selector.
               default_value: "*.service"
               required: false
               detailed_description: |
@@ -73,10 +77,30 @@ modules:
                   - pattern1
                   - pattern2
                 ```
-            - name: timeout
-              description: System bus requests timeout.
-              default_value: 1
+            - name: collect_unit_files
+              description: If set to true, collect the state of installed unit files. Enabling this may increase system overhead.
+              default_value: "false"
               required: false
+            - name: collect_unit_files_every
+              description: Interval for querying systemd about unit files and their enablement state, measured in seconds. Data is cached for this interval to reduce system overhead.
+              default_value: 300
+              required: false
+            - name: include_unit_files
+              description: Systemd unit files selector.
+              default_value: "*.service"
+              required: false
+              detailed_description: |
+                Systemd unit files matching the selector will be monitored.
+
+                - Logic: (pattern1 OR pattern2)
+                - Pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match)
+                - Syntax:
+
+                ```yaml
+                includes:
+                  - pattern1
+                  - pattern2
+                ```
         examples:
           folding:
             title: Config
@@ -288,3 +312,29 @@ modules:
                 - name: activating
                 - name: deactivating
                 - name: failed
+        - name: unit file
+          description: These metrics refer to the systemd unit file.
+          labels:
+            - name: unit_file_name
+              description: systemd unit file name
+            - name: unit_file_type
+              description: systemd unit file type
+          metrics:
+            - name: systemd.unit_file_state
+              description: Unit File State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: enabled-runtime
+                - name: linked
+                - name: linked-runtime
+                - name: alias
+                - name: masked
+                - name: masked-runtime
+                - name: static
+                - name: disabled
+                - name: indirect
+                - name: generated
+                - name: transient
+                - name: bad
