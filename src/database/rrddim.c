@@ -150,10 +150,6 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
-    rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-    rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
 
@@ -259,13 +255,8 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
                     storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
     }
 
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED))
         rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-
-        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-    }
 
     if(unlikely(rc))
         ctr->react_action = RRDDIM_REACT_UPDATED;
