@@ -287,6 +287,7 @@ static void health_event_loop(void) {
                 if (unlikely(rc->rrdset && rc->status != RRDCALC_STATUS_REMOVED &&
                              rrdset_flag_check(rc->rrdset, RRDSET_FLAG_OBSOLETE) &&
                              now > (rc->rrdset->last_collected_time.tv_sec + 60))) {
+
                     if (!rrdcalc_isrepeating(rc)) {
                         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                         time_t now_tmp = now_realtime_sec();

@@ -463,6 +463,17 @@ void rrdcalc_delete_all(RRDHOST *host) {
     dictionary_flush(host->rrdcalc_root_index);
 }
 
+void rrdcalc_child_disconnected(RRDHOST *host) {
+    rrdcalc_delete_all(host);
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+    }
+    rrdset_foreach_done(st);
+}
+
 void rrd_alert_match_cleanup(struct rrd_alert_match *am) {
     if(am->is_template)
         string_freez(am->on.context);
