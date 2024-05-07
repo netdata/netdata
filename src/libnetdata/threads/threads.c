@@ -15,6 +15,7 @@ struct nd_thread {
     void *(*start_routine) (void *);
     NETDATA_THREAD_OPTIONS options;
     pthread_t thread;
+    bool cancel_atomic;
     struct nd_thread *prev, *next;
 };
 
@@ -337,6 +338,17 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
     }
 
     return nti;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+void nd_thread_signal_cancel(ND_THREAD *nti) {
+    __atomic_store_n(&nti->cancel_atomic, true, __ATOMIC_RELAXED);
+}
+
+bool nd_thread_signaled_to_cancel(void) {
+    if(!_nd_thread_info) return false;
+    return __atomic_load_n(&_nd_thread_info->cancel_atomic, __ATOMIC_RELAXED);
 }
 
 // ----------------------------------------------------------------------------
