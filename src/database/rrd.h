@@ -226,7 +226,6 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
 // flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum __attribute__ ((__packed__)) rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
-    RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
 
     RRDDIM_FLAG_OBSOLETE                        = (1 << 1),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at

@@ -466,10 +466,10 @@ void rrdcalc_delete_all(RRDHOST *host) {
 void rrdcalc_child_disconnected(RRDHOST *host) {
     rrdcalc_delete_all(host);
 
-    rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
     rrdset_foreach_done(st);
 }

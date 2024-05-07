@@ -478,10 +478,8 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     st->last_accessed_time_s = now_realtime_sec();
 
-    if(host->health.health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
-        rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-    }
+    rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 
     if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         if (ctr->react_action & RRDSET_REACT_NEW) {
