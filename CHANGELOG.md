@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations.js [\#17603](https://github.com/netdata/netdata/pull/17603) ([netdatabot](https://github.com/netdatabot))
+- Make offline installs properly offline again. [\#17602](https://github.com/netdata/netdata/pull/17602) ([Ferroin](https://github.com/Ferroin))
+- remove python.d/smartd\_log [\#17600](https://github.com/netdata/netdata/pull/17600) ([ilyam8](https://github.com/ilyam8))
+- go.d postgres: reset table/index bloat stats before querying [\#17598](https://github.com/netdata/netdata/pull/17598) ([ilyam8](https://github.com/ilyam8))
+- Bump golang.org/x/text from 0.14.0 to 0.15.0 in /src/go/collectors/go.d.plugin [\#17596](https://github.com/netdata/netdata/pull/17596) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump github.com/docker/docker from 26.1.0+incompatible to 26.1.1+incompatible in /src/go/collectors/go.d.plugin [\#17592](https://github.com/netdata/netdata/pull/17592) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Update eBPF code to v1.4.1. [\#17591](https://github.com/netdata/netdata/pull/17591) ([Ferroin](https://github.com/Ferroin))
 - Fix handling of service startup in DEB packages. [\#17589](https://github.com/netdata/netdata/pull/17589) ([Ferroin](https://github.com/Ferroin))
 - go.d/python.d respect all netdata log levels [\#17587](https://github.com/netdata/netdata/pull/17587) ([ilyam8](https://github.com/ilyam8))
 - Fix DEB package conflict entries. [\#17584](https://github.com/netdata/netdata/pull/17584) ([Ferroin](https://github.com/Ferroin))
@@ -28,6 +34,7 @@
 - Regenerate integrations.js [\#17561](https://github.com/netdata/netdata/pull/17561) ([netdatabot](https://github.com/netdatabot))
 - Regenerate integrations.js [\#17560](https://github.com/netdata/netdata/pull/17560) ([netdatabot](https://github.com/netdatabot))
 - Add OIDC docs [\#17557](https://github.com/netdata/netdata/pull/17557) ([car12o](https://github.com/car12o))
+- Fix handling of vendored eBPF code in CMake. [\#17556](https://github.com/netdata/netdata/pull/17556) ([Ferroin](https://github.com/Ferroin))
 - try hardcode docs links [\#17553](https://github.com/netdata/netdata/pull/17553) ([Ancairon](https://github.com/Ancairon))
 - Notification section updates [\#17551](https://github.com/netdata/netdata/pull/17551) ([Ancairon](https://github.com/Ancairon))
 - Adjust eBPF code. [\#17550](https://github.com/netdata/netdata/pull/17550) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -416,11 +423,6 @@
 - Documentation changes, new files and restructuring the hierarchy [\#17014](https://github.com/netdata/netdata/pull/17014) ([Ancairon](https://github.com/Ancairon))
 - eBPF & NV \(update packages\) [\#17012](https://github.com/netdata/netdata/pull/17012) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add watcher thread to report shutdown steps. [\#17010](https://github.com/netdata/netdata/pull/17010) ([vkalintiris](https://github.com/vkalintiris))
-- dyncfg: fix support for testing new jobs [\#17009](https://github.com/netdata/netdata/pull/17009) ([ktsaou](https://github.com/ktsaou))
-- Abort on non-zero rc. [\#17008](https://github.com/netdata/netdata/pull/17008) ([vkalintiris](https://github.com/vkalintiris))
-- Netdata Agent: Backup restore documentation [\#17006](https://github.com/netdata/netdata/pull/17006) ([luisj1983](https://github.com/luisj1983))
-- Integrate Go plugin with build system. [\#17005](https://github.com/netdata/netdata/pull/17005) ([Ferroin](https://github.com/Ferroin))
-- Bump the version of the installed Go toolchain to 1.22.0. [\#17004](https://github.com/netdata/netdata/pull/17004) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
