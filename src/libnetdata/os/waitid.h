@@ -33,11 +33,8 @@ struct pid_status {
     int status;
 };
 
-#ifndef __id_t_defined
+#if defined(COMPILED_FOR_WINDOWS) && !defined(__CYGWIN__)
 typedef uint32_t id_t;
-#endif
-
-#ifndef __siginfo_t_defined
 typedef struct {
     int si_code;	/* Signal code.  */
     int si_status;	/* Exit value or signal.  */
