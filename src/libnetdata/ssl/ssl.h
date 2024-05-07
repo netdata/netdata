@@ -11,17 +11,7 @@
 #define OPENSSL_VERSION_111 0x10101000L
 #define OPENSSL_VERSION_300 0x30000000L
 
-#if defined(ENABLE_WOLFSSL)
-#include <wolfssl/options.h>
-#include <wolfssl/version.h>
-#include <wolfssl/ssl.h>
-#include <wolfssl/error-ssl.h>
-
-#include <wolfssl/openssl/ssl.h>
-#include <wolfssl/openssl/err.h>
-#include <wolfssl/openssl/sha.h>
-#include <wolfssl/openssl/evp.h>
-#elif defined(ENABLE_OPENSSL)
+#ifdef ENABLE_OPENSSL
 
 #  include <openssl/ssl.h>
 #  include <openssl/err.h>
@@ -36,6 +26,16 @@
 #include <openssl/core_names.h>
 #include <openssl/decoder.h>
 #endif
+#elif defined(ENABLE_WOLFSSL)
+#include <wolfssl/options.h>
+#include <wolfssl/version.h>
+#include <wolfssl/ssl.h>
+#include <wolfssl/error-ssl.h>
+
+#include <wolfssl/openssl/ssl.h>
+#include <wolfssl/openssl/err.h>
+#include <wolfssl/openssl/sha.h>
+#include <wolfssl/openssl/evp.h>
 #endif // ENABLE_OPENSSL
 
 #endif // ENABLE_HTTPS

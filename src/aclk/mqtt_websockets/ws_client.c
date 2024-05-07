@@ -17,11 +17,11 @@
 #include <errno.h>
 #include <ctype.h>
 
-#if defined(ENABLE_WOLFSSL)
+#ifdef ENABLE_OPENSSL
+#include <openssl/evp.h>
+#elif defined(ENABLE_WOLFSSL)
 #include <wolfssl/options.h>
 #include <wolfssl/openssl/evp.h>
-#elif defined(ENABLE_OPENSSL)
-#include <openssl/evp.h>
 #endif
 
 #include "ws_client.h"

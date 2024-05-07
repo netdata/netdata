@@ -694,7 +694,7 @@ void netdata_ssl_cleanup()
 
 #if defined(ENABLE_OPENSSL) && (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110)
     ERR_free_strings();
-#elif defined(ENABLEENABLE_WOLFSSL)
+#elif defined(ENABLE_WOLFSSL)
     wolfSSL_Cleanup();
 #endif
 }
