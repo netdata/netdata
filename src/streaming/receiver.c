@@ -445,6 +445,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             host->child_connect_time = 0;
             host->child_disconnected_time = now_realtime_sec();
 
+            bool cleanup_health = rpt->config.health_enabled != CONFIG_BOOLEAN_NO;
             if (rpt->config.health_enabled == CONFIG_BOOLEAN_AUTO)
                 host->health.health_enabled = 0;
 
@@ -457,7 +458,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             host->receiver = NULL;
             host->rrdpush_last_receiver_exit_reason = rpt->exit.reason;
 
-            if(rpt->config.health_enabled)
+            if(cleanup_health)
                 rrdcalc_child_disconnected(host);
         }
 
