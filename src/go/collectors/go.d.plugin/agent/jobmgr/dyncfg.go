@@ -375,6 +375,11 @@ func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 
 	switch ecfg.status {
 	case dyncfgAccepted, dyncfgDisabled, dyncfgFailed:
+	case dyncfgRunning:
+		// non-dyncfg update triggers enable/disable
+		m.dyncfgRespf(fn, 200, "")
+		m.dyncfgJobStatus(ecfg.cfg, ecfg.status)
+		return
 	default:
 		m.Warningf("dyncfg: enable: module %s job %s: enabling not allowed in %s state", mn, jn, ecfg.status)
 		m.dyncfgRespf(fn, 405, "Enabling data collection job is not allowed in '%s' state.", ecfg.status)
