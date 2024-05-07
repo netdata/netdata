@@ -32,6 +32,18 @@ struct pid_status {
     pid_t pid;
     int status;
 };
+
+#ifndef __id_t_defined
+typedef uint32_t id_t;
+#endif
+
+#ifndef __siginfo_t_defined
+typedef struct {
+    int si_code;	/* Signal code.  */
+    int si_status;	/* Exit value or signal.  */
+    pid_t si_pid;	/* Sending process ID.  */
+} siginfo_t;
+#endif
 #endif
 
 int os_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
