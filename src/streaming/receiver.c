@@ -430,10 +430,9 @@ static bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 }
 
 static void rrdhost_clear_receiver(struct receiver_state *rpt) {
-    bool signal_rrdcontext = false;
-
     RRDHOST *host = rpt->host;
     if(host) {
+        bool signal_rrdcontext = false;
         netdata_mutex_lock(&host->receiver_lock);
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
@@ -445,9 +444,8 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             host->child_connect_time = 0;
             host->child_disconnected_time = now_realtime_sec();
 
-            bool cleanup_health = rpt->config.health_enabled != CONFIG_BOOLEAN_NO;
-            if (rpt->config.health_enabled == CONFIG_BOOLEAN_AUTO)
-                host->health.health_enabled = 0;
+            const bool cleanup_health = rpt->config.health_enabled != CONFIG_BOOLEAN_NO;
+            host->health.health_enabled = 0;
 
             rrdpush_sender_thread_stop(host, STREAM_HANDSHAKE_DISCONNECT_RECEIVER_LEFT, false);
 
