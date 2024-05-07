@@ -2451,7 +2451,7 @@ parse_args() {
         fi
         ;;
       "--offline-architecture")
-        if echo "${2}" | grep -q "$(echo "${STATIC_INSTALL_ARCHES}" | tr " " "\n")"; then
+        if echo "${STATIC_INSTALL_ARCHES}" | grep -qw "${2}"; then
           NETDATA_OFFLINE_ARCHES="${NETDATA_OFFLINE_ARCHES} ${2}"
         else
           fatal "${2} is not a recognized static build architecture (supported architectures are ${STATIC_INSTALL_ARCHES})" F0518
