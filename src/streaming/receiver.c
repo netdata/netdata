@@ -456,6 +456,9 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
             host->receiver = NULL;
             host->rrdpush_last_receiver_exit_reason = rpt->exit.reason;
+
+            if(rpt->config.health_enabled)
+                rrdcalc_child_disconnected(host);
         }
 
         netdata_mutex_unlock(&host->receiver_lock);
