@@ -21,7 +21,7 @@ Module: systemdunits
 
 ## Overview
 
-This collector monitors Systemd units state.
+This collector monitors the state of Systemd units and unit files.
 
 
 
@@ -80,6 +80,23 @@ Metrics:
 | systemd.scope_unit_state | active, inactive, activating, deactivating, failed | state |
 | systemd.slice_unit_state | active, inactive, activating, deactivating, failed | state |
 
+### Per unit file
+
+These metrics refer to the systemd unit file.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| unit_file_name | systemd unit file name |
+| unit_file_type | systemd unit file type |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| systemd.unit_file_state | enabled, enabled-runtime, linked, linked-runtime, alias, masked, masked-runtime, static, disabled, indirect, generated, transient, bad | state |
+
 
 
 ## Alerts
@@ -133,12 +150,30 @@ The following options can be defined globally: update_every, autodetection_retry
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| include | Systemd units filter. | *.service | no |
 | timeout | System bus requests timeout. | 1 | no |
+| include | Systemd units selector. | *.service | no |
+| collect_unit_files | If set to true, collect the state of installed unit files. Enabling this may increase system overhead. | false | no |
+| collect_unit_files_every | Interval for querying systemd about unit files and their enablement state, measured in seconds. Data is cached for this interval to reduce system overhead. | 300 | no |
+| include_unit_files | Systemd unit files selector. | *.service | no |
 
 ##### include
 
 Systemd units matching the selector will be monitored.
+
+- Logic: (pattern1 OR pattern2)
+- Pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match)
+- Syntax:
+
+```yaml
+includes:
+  - pattern1
+  - pattern2
+```
+
+
+##### include_unit_files
+
+Systemd unit files matching the selector will be monitored.
 
 - Logic: (pattern1 OR pattern2)
 - Pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match)
