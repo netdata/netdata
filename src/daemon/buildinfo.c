@@ -1060,8 +1060,10 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #endif
 #ifdef COMPILED_FOR_WINDOWS
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
-#ifdef __CYGWIN__
-    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows (cygwin)");
+#if defined(__CYGWIN__) && defined(__MSYS__)
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows (MSYS)");
+#elif defined(__CYGWIN__)
+    build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows (CYGWIN)");
 #else
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows");
 #endif
