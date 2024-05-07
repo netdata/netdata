@@ -18,7 +18,7 @@ struct rrdengine_instance;
 extern struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats;
 
 struct page_descr_with_data {
-    uuid_t *id;
+    nd_uuid_t *id;
     Word_t metric_id;
     usec_t start_time_ut;
     usec_t end_time_ut;

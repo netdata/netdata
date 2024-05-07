@@ -3,13 +3,13 @@
 #ifndef NETDATA_PERFLIB_H
 #define NETDATA_PERFLIB_H
 
-#include "windows_plugin.h"
-#include "windows-internals.h"
+#include "libnetdata/libnetdata.h"
+#include <windows.h>
 
 const char *RegistryFindNameByID(DWORD id);
 const char *RegistryFindHelpByID(DWORD id);
 DWORD RegistryFindIDByName(const char *name);
-#define REGISTRY_NAME_NOT_FOUND (DWORD)-1
+#define PERFLIB_REGISTRY_NAME_NOT_FOUND (DWORD)-1
 
 PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id);
 void perflibFreePerformanceData(void);
@@ -34,9 +34,6 @@ typedef struct _counterdata {
 } COUNTER_DATA;
 
 #define RAW_DATA_EMPTY (RAW_DATA){ 0 }
-
-RRDDIM *perflib_rrddim_add(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divider, COUNTER_DATA *cd);
-collected_number perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_DATA *cd);
 
 bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd);
 bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, COUNTER_DATA *cd);
@@ -68,5 +65,8 @@ PERF_INSTANCE_DEFINITION *getInstanceByPosition(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
     DWORD instancePosition);
+
+void PerflibNamesRegistryInitialize(void);
+void PerflibNamesRegistryUpdate(void);
 
 #endif //NETDATA_PERFLIB_H

@@ -13,5 +13,6 @@ static inline ULONGLONG FileTimeToULL(FILETIME ft) {
 }
 
 #include "perflib.h"
+#include "perflib-rrd.h"
 
 #endif //NETDATA_WINDOWS_INTERNALS_H

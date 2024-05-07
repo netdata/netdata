@@ -21,7 +21,7 @@ ND_UUID UUID_generate_from_hash(const void *payload, size_t payload_len) {
     return uuid;
 }
 
-void uuid_unparse_lower_compact(const uuid_t uuid, char *out) {
+void uuid_unparse_lower_compact(const nd_uuid_t uuid, char *out) {
     static const char *hex_chars = "0123456789abcdef";
     for (int i = 0; i < 16; i++) {
         out[i * 2] = hex_chars[(uuid[i] >> 4) & 0x0F];
@@ -30,7 +30,7 @@ void uuid_unparse_lower_compact(const uuid_t uuid, char *out) {
     out[32] = '\0'; // Null-terminate the string
 }
 
-static inline void nd_uuid_unparse_full(const uuid_t uuid, char *out, const char *hex_chars) {
+static inline void nd_uuid_unparse_full(const nd_uuid_t uuid, char *out, const char *hex_chars) {
     int shifts = 0;
     for (int i = 0; i < 16; i++) {
         if (i == 4 || i == 6 || i == 8 || i == 10) {
@@ -44,15 +44,15 @@ static inline void nd_uuid_unparse_full(const uuid_t uuid, char *out, const char
 }
 
 // Wrapper functions for lower and upper case hexadecimal representation
-void nd_uuid_unparse_lower(const uuid_t uuid, char *out) {
+void nd_uuid_unparse_lower(const nd_uuid_t uuid, char *out) {
     nd_uuid_unparse_full(uuid, out, "0123456789abcdef");
 }
 
-void nd_uuid_unparse_upper(const uuid_t uuid, char *out) {
+void nd_uuid_unparse_upper(const nd_uuid_t uuid, char *out) {
     nd_uuid_unparse_full(uuid, out, "0123456789ABCDEF");
 }
 
-inline int uuid_parse_compact(const char *in, uuid_t uuid) {
+inline int uuid_parse_compact(const char *in, nd_uuid_t uuid) {
     if (strlen(in) != 32)
         return -1; // Invalid input length
 
@@ -69,7 +69,7 @@ inline int uuid_parse_compact(const char *in, uuid_t uuid) {
     return 0; // Success
 }
 
-int uuid_parse_flexi(const char *in, uuid_t uu) {
+int uuid_parse_flexi(const char *in, nd_uuid_t uu) {
     if(!in || !*in)
         return -1;
 
@@ -77,7 +77,7 @@ int uuid_parse_flexi(const char *in, uuid_t uu) {
     size_t hyphenCount = 0;
     const char *s = in;
     int byteIndex = 0;
-    uuid_t uuid; // work on a temporary place, to not corrupt the previous value of uu if we fail
+    nd_uuid_t uuid; // work on a temporary place, to not corrupt the previous value of uu if we fail
 
     while (*s && byteIndex < 16) {
         if (*s == '-') {
@@ -121,7 +121,7 @@ int uuid_parse_flexi(const char *in, uuid_t uu) {
         return -7;
 
     // copy the final value
-    memcpy(uu, uuid, sizeof(uuid_t));
+    memcpy(uu, uuid, sizeof(nd_uuid_t));
 
     return 0;
 }
@@ -146,7 +146,7 @@ int uuid_unittest(void) {
 
     int i;
     for (i = 0; i < num_tests; i++) {
-        uuid_t original_uuid, parsed_uuid;
+        nd_uuid_t original_uuid, parsed_uuid;
         char uuid_str_with_hyphens[UUID_STR_LEN], uuid_str_without_hyphens[UUID_COMPACT_STR_LEN];
 
         // Generate a random UUID

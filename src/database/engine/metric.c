@@ -8,7 +8,7 @@ typedef int32_t REFCOUNT;
 #define REFCOUNT_DELETING (-100)
 
 struct metric {
-    uuid_t uuid;                    // never changes
+    nd_uuid_t uuid;                    // never changes
     Word_t section;                 // never changes
 
     time_t first_time_s;            // the timestamp of the oldest point in the database
@@ -98,14 +98,14 @@ static inline void mrg_stats_size_judyl_change(MRG *mrg, size_t mem_before_judyl
 }
 
 static inline void mrg_stats_size_judyhs_added_uuid(MRG *mrg, size_t partition) {
-    __atomic_add_fetch(&mrg->index[partition].stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(nd_uuid_t)), __ATOMIC_RELAXED);
 }
 
 static inline void mrg_stats_size_judyhs_removed_uuid(MRG *mrg, size_t partition) {
-    __atomic_sub_fetch(&mrg->index[partition].stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&mrg->index[partition].stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(nd_uuid_t)), __ATOMIC_RELAXED);
 }
 
-static inline size_t uuid_partition(MRG *mrg __maybe_unused, uuid_t *uuid) {
+static inline size_t uuid_partition(MRG *mrg __maybe_unused, nd_uuid_t *uuid) {
     uint8_t *u = (uint8_t *)uuid;
 
     size_t n;
@@ -167,7 +167,7 @@ static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric)
 
     mrg_index_write_lock(mrg, partition);
 
-    Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index[partition].uuid_judy, &metric->uuid, sizeof(uuid_t));
+    Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index[partition].uuid_judy, &metric->uuid, sizeof(nd_uuid_t));
     if(unlikely(!sections_judy_pptr || !*sections_judy_pptr)) {
         MRG_STATS_DELETE_MISS(mrg, partition);
         mrg_index_write_unlock(mrg, partition);
@@ -186,7 +186,7 @@ static inline void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric)
     }
 
     if(!*sections_judy_pptr) {
-        rc = JudyHSDel(&mrg->index[partition].uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0);
+        rc = JudyHSDel(&mrg->index[partition].uuid_judy, &metric->uuid, sizeof(nd_uuid_t), PJE0);
         if(unlikely(!rc))
             fatal("DBENGINE METRIC: cannot delete UUID from JudyHS");
         mrg_stats_size_judyhs_removed_uuid(mrg, partition);
@@ -264,7 +264,7 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
 
         size_t mem_before_judyl, mem_after_judyl;
 
-        Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index[partition].uuid_judy, entry->uuid, sizeof(uuid_t), PJE0);
+        Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index[partition].uuid_judy, entry->uuid, sizeof(nd_uuid_t), PJE0);
         if (unlikely(!sections_judy_pptr || sections_judy_pptr == PJERR))
             fatal("DBENGINE METRIC: corrupted UUIDs JudyHS array");
 
@@ -323,13 +323,13 @@ static inline METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *r
     return metric;
 }
 
-static inline METRIC *metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t section) {
+static inline METRIC *metric_get_and_acquire(MRG *mrg, nd_uuid_t *uuid, Word_t section) {
     size_t partition = uuid_partition(mrg, uuid);
 
     while(1) {
         mrg_index_read_lock(mrg, partition);
 
-        Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index[partition].uuid_judy, uuid, sizeof(uuid_t));
+        Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index[partition].uuid_judy, uuid, sizeof(nd_uuid_t));
         if (unlikely(!sections_judy_pptr)) {
             mrg_index_read_unlock(mrg, partition);
             MRG_STATS_SEARCH_MISS(mrg, partition);
@@ -404,7 +404,7 @@ inline METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) 
     return metric_add_and_acquire(mrg, &entry, ret);
 }
 
-inline METRIC *mrg_metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t section) {
+inline METRIC *mrg_metric_get_and_acquire(MRG *mrg, nd_uuid_t *uuid, Word_t section) {
     return metric_get_and_acquire(mrg, uuid, section);
 }
 
@@ -425,7 +425,7 @@ inline Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
     return (Word_t)metric;
 }
 
-inline uuid_t *mrg_metric_uuid(MRG *mrg __maybe_unused, METRIC *metric) {
+inline nd_uuid_t *mrg_metric_uuid(MRG *mrg __maybe_unused, METRIC *metric) {
     return &metric->uuid;
 }
 
@@ -639,7 +639,7 @@ inline bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
 }
 
 inline void mrg_update_metric_retention_and_granularity_by_uuid(
-        MRG *mrg, Word_t section, uuid_t *uuid,
+        MRG *mrg, Word_t section, nd_uuid_t *uuid,
         time_t first_time_s, time_t last_time_s,
         uint32_t update_every_s, time_t now_s)
 {
@@ -736,7 +736,7 @@ inline void mrg_get_statistics(MRG *mrg, struct mrg_statistics *s) {
 // unit test
 
 struct mrg_stress_entry {
-    uuid_t uuid;
+    nd_uuid_t uuid;
     time_t after;
     time_t before;
 };
@@ -791,7 +791,7 @@ int mrg_unittest(void) {
     METRIC *m1_t1, *m2_t1, *m3_t1, *m4_t1;
     bool ret;
 
-    uuid_t test_uuid;
+    nd_uuid_t test_uuid;
     uuid_generate(test_uuid);
     MRG_ENTRY entry = {
             .uuid = &test_uuid,

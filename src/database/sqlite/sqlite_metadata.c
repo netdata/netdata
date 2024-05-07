@@ -230,7 +230,7 @@ int sql_metadata_cache_stats(int op)
     return count;
 }
 
-static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
+static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
 {
     if (unlikely(!host))
         return;
@@ -244,7 +244,7 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
     struct aclk_sync_cfg_t  *wc = host->aclk_config;
 
     if (unlikely(!host->node_id)) {
-        uuid_t *t = mallocz(sizeof(*host->node_id));
+        nd_uuid_t *t = mallocz(sizeof(*host->node_id));
         uuid_copy(*t, *node_id);
         __atomic_store_n(&host->node_id, t, __ATOMIC_RELAXED);
     }
@@ -260,7 +260,7 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
 
 #define SQL_UPDATE_NODE_ID  "UPDATE node_instance SET node_id = @node_id WHERE host_id = @host_id"
 
-int update_node_id(uuid_t *host_id, uuid_t *node_id)
+int update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
 {
     sqlite3_stmt *res = NULL;
     RRDHOST *host = NULL;
@@ -298,7 +298,7 @@ done:
 
 #define SQL_SELECT_NODE_ID  "SELECT node_id FROM node_instance WHERE host_id = @host_id AND node_id IS NOT NULL"
 
-int get_node_id(uuid_t *host_id, uuid_t *node_id)
+int get_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
 {
     sqlite3_stmt *res = NULL;
 
@@ -314,7 +314,7 @@ int get_node_id(uuid_t *host_id, uuid_t *node_id)
     param = 0;
     rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW && node_id))
-        uuid_copy(*node_id, *((uuid_t *) sqlite3_column_blob(res, 0)));
+        uuid_copy(*node_id, *((nd_uuid_t *) sqlite3_column_blob(res, 0)));
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -326,7 +326,7 @@ done:
     "UPDATE node_instance SET node_id = NULL WHERE EXISTS "                                                            \
     "(SELECT host_id FROM node_instance WHERE host_id = @host_id AND (@claim_id IS NULL OR claim_id <> @claim_id))"
 
-void invalidate_node_instances(uuid_t *host_id, uuid_t *claim_id)
+void invalidate_node_instances(nd_uuid_t *host_id, nd_uuid_t *claim_id)
 {
     sqlite3_stmt *res = NULL;
 
@@ -384,10 +384,10 @@ struct node_instance_list *get_node_list(void)
     // TODO: Check to remove lock
     rrd_rdlock();
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        if (sqlite3_column_bytes(res, 0) == sizeof(uuid_t))
-            uuid_copy(node_list[row].node_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
-        if (sqlite3_column_bytes(res, 1) == sizeof(uuid_t)) {
-            uuid_t *host_id = (uuid_t *)sqlite3_column_blob(res, 1);
+        if (sqlite3_column_bytes(res, 0) == sizeof(nd_uuid_t))
+            uuid_copy(node_list[row].node_id, *((nd_uuid_t *)sqlite3_column_blob(res, 0)));
+        if (sqlite3_column_bytes(res, 1) == sizeof(nd_uuid_t)) {
+            nd_uuid_t *host_id = (nd_uuid_t *)sqlite3_column_blob(res, 1);
             uuid_unparse_lower(*host_id, host_guid);
             RRDHOST *host = rrdhost_find_by_guid(host_guid);
             if (!host)
@@ -404,7 +404,7 @@ struct node_instance_list *get_node_list(void)
             node_list[row].live =
                 (host == localhost || host->receiver || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN))) ? 1 : 0;
             node_list[row].hops = host->system_info ? host->system_info->hops :
-                                  uuid_memcmp(host_id, &localhost->host_uuid) ? 1 : 0;
+                                  uuid_eq(*host_id, localhost->host_uuid) ? 0 : 1;
             node_list[row].hostname =
                 sqlite3_column_bytes(res, 2) ? strdupz((char *)sqlite3_column_text(res, 2)) : NULL;
         }
@@ -438,8 +438,8 @@ void sql_load_node_id(RRDHOST *host)
     param = 0;
     int rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW)) {
-        if (likely(sqlite3_column_bytes(res, 0) == sizeof(uuid_t)))
-            set_host_node_id(host, (uuid_t *)sqlite3_column_blob(res, 0));
+        if (likely(sqlite3_column_bytes(res, 0) == sizeof(nd_uuid_t)))
+            set_host_node_id(host, (nd_uuid_t *)sqlite3_column_blob(res, 0));
         else
             set_host_node_id(host, NULL);
     }
@@ -451,7 +451,7 @@ done:
 
 #define SELECT_HOST_INFO "SELECT system_key, system_value FROM host_info WHERE host_id = @host_id"
 
-void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info)
+void sql_build_host_system_info(nd_uuid_t *host_id, struct rrdhost_system_info *system_info)
 {
     sqlite3_stmt *res = NULL;
 
@@ -475,7 +475,7 @@ done:
 #define SELECT_HOST_LABELS "SELECT label_key, label_value, source_type FROM host_label WHERE host_id = @host_id " \
     "AND label_key IS NOT NULL AND label_value IS NOT NULL"
 
-RRDLABELS *sql_load_host_labels(uuid_t *host_id)
+RRDLABELS *sql_load_host_labels(nd_uuid_t *host_id)
 {
     RRDLABELS *labels = NULL;
     sqlite3_stmt *res = NULL;
@@ -503,7 +503,7 @@ done:
     return labels;
 }
 
-static int exec_statement_with_uuid(const char *sql, uuid_t *uuid)
+static int exec_statement_with_uuid(const char *sql, nd_uuid_t *uuid)
 {
     int result = 1;
     sqlite3_stmt *res = NULL;
@@ -573,7 +573,7 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
 
 static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value **argv)
 {
-    uuid_t  uuid;
+    nd_uuid_t  uuid;
 
     if ( argc != 1 ){
         sqlite3_result_null(context);
@@ -585,7 +585,7 @@ static void sqlite_uuid_parse(sqlite3_context *context, int argc, sqlite3_value 
         return ;
     }
 
-    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+    sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
 }
 
 void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv)
@@ -608,9 +608,9 @@ void sqlite_uuid_random(sqlite3_context *context, int argc, sqlite3_value **argv
     (void)argc;
     (void)argv;
 
-    uuid_t uuid;
+    nd_uuid_t uuid;
     uuid_generate_random(uuid);
-    sqlite3_result_blob(context, &uuid, sizeof(uuid_t), SQLITE_TRANSIENT);
+    sqlite3_result_blob(context, &uuid, sizeof(nd_uuid_t), SQLITE_TRANSIENT);
 }
 
 // Init
@@ -726,7 +726,7 @@ struct query_build {
 #define SQL_DELETE_CHART_LABELS_BY_HOST                                                                                \
     "DELETE FROM chart_label WHERE chart_id in (SELECT chart_id FROM chart WHERE host_id = @host_id)"
 
-static void delete_host_chart_labels(uuid_t *host_uuid)
+static void delete_host_chart_labels(nd_uuid_t *host_uuid)
 {
     sqlite3_stmt *res = NULL;
 
@@ -809,7 +809,7 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t
 }
 
 // If the machine guid has changed, then existing one with hops 0 will be marked as hops 1 (child)
-void detect_machine_guid_change(uuid_t *host_uuid)
+void detect_machine_guid_change(nd_uuid_t *host_uuid)
 {
     int rc;
 
@@ -820,7 +820,7 @@ void detect_machine_guid_change(uuid_t *host_uuid)
     }
 }
 
-static int store_claim_id(uuid_t *host_id, uuid_t *claim_id)
+static int store_claim_id(nd_uuid_t *host_id, nd_uuid_t *claim_id)
 {
     sqlite3_stmt *res = NULL;
     int rc = 0;
@@ -850,7 +850,7 @@ done:
     return rc != SQLITE_DONE;
 }
 
-static void delete_dimension_uuid(uuid_t *dimension_uuid, sqlite3_stmt **action_res __maybe_unused, bool flag __maybe_unused)
+static void delete_dimension_uuid(nd_uuid_t *dimension_uuid, sqlite3_stmt **action_res __maybe_unused, bool flag __maybe_unused)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc;
@@ -913,7 +913,7 @@ bind_fail:
     return 1;
 }
 
-static int add_host_sysinfo_key_value(const char *name, const char *value, uuid_t *uuid)
+static int add_host_sysinfo_key_value(const char *name, const char *value, nd_uuid_t *uuid)
 {
     static __thread sqlite3_stmt *res = NULL;
 
@@ -1065,7 +1065,7 @@ bind_fail:
     return 1;
 }
 
-static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused, sqlite3_stmt **res __maybe_unused, bool flag __maybe_unused)
+static bool dimension_can_be_deleted(nd_uuid_t *dim_uuid __maybe_unused, sqlite3_stmt **res __maybe_unused, bool flag __maybe_unused)
 {
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {
@@ -1093,8 +1093,8 @@ static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused, sqlite3_st
 static bool run_cleanup_loop(
     sqlite3_stmt *res,
     struct metadata_wc *wc,
-    bool (*check_cb)(uuid_t *, sqlite3_stmt **, bool),
-    void (*action_cb)(uuid_t *, sqlite3_stmt **, bool),
+    bool (*check_cb)(nd_uuid_t *, sqlite3_stmt **, bool),
+    void (*action_cb)(nd_uuid_t *, sqlite3_stmt **, bool),
     uint32_t *total_checked,
     uint32_t *total_deleted,
     uint64_t *row_id,
@@ -1118,10 +1118,10 @@ static bool run_cleanup_loop(
             break;
 
         *row_id = sqlite3_column_int64(res, 1);
-        rc = check_cb((uuid_t *)sqlite3_column_blob(res, 0), check_stmt, check_flag);
+        rc = check_cb((nd_uuid_t *)sqlite3_column_blob(res, 0), check_stmt, check_flag);
 
         if (rc == true) {
-            action_cb((uuid_t *)sqlite3_column_blob(res, 0), action_stmt, action_flag);
+            action_cb((nd_uuid_t *)sqlite3_column_blob(res, 0), action_stmt, action_flag);
             (*total_deleted)++;
         }
 
@@ -1135,7 +1135,7 @@ static bool run_cleanup_loop(
 #define SQL_CHECK_CHART_EXISTENCE_IN_DIMENSION "SELECT count(1) FROM dimension WHERE chart_id = @chart_id"
 #define SQL_CHECK_CHART_EXISTENCE_IN_CHART "SELECT count(1) FROM chart WHERE chart_id = @chart_id"
 
-static bool chart_can_be_deleted(uuid_t *chart_uuid, sqlite3_stmt **check_res, bool check_in_dimension)
+static bool chart_can_be_deleted(nd_uuid_t *chart_uuid, sqlite3_stmt **check_res, bool check_in_dimension)
 {
     int rc, result = 1;
     sqlite3_stmt *res = check_res ? *check_res : NULL;
@@ -1173,7 +1173,7 @@ skip:
 #define SQL_DELETE_CHART_BY_UUID        "DELETE FROM chart WHERE chart_id = @chart_id"
 #define SQL_DELETE_CHART_LABEL_BY_UUID  "DELETE FROM chart_label WHERE chart_id = @chart_id"
 
-static void delete_chart_uuid(uuid_t *chart_uuid, sqlite3_stmt **action_res, bool label_only)
+static void delete_chart_uuid(nd_uuid_t *chart_uuid, sqlite3_stmt **action_res, bool label_only)
 {
     int rc;
     sqlite3_stmt *res = action_res ? *action_res : NULL;
@@ -1812,7 +1812,7 @@ static void do_chart_label_cleanup(struct host_chart_label_cleanup *cl_cleanup_d
 
         RRDHOST *host = rrdhost_find_by_guid(machine_guid);
         if (likely(!host)) {
-            uuid_t host_uuid;
+            nd_uuid_t host_uuid;
             if (!uuid_parse(machine_guid, host_uuid))
                 delete_host_chart_labels(&host_uuid);
         }
@@ -1883,7 +1883,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_CLAIMID);
-            uuid_t uuid;
+            nd_uuid_t uuid;
             int rc;
             if (likely(host->aclk_state.claimed_id && !uuid_parse(host->aclk_state.claimed_id, uuid)))
                 rc = store_claim_id(&host->host_uuid, &uuid);
@@ -1991,7 +1991,7 @@ static void metadata_event_loop(void *arg)
     struct host_chart_label_cleanup *cl_cleanup_data = NULL;
 
     while (shutdown == 0 || (wc->flags & METADATA_FLAG_PROCESSING)) {
-        uuid_t  *uuid;
+        nd_uuid_t  *uuid;
         RRDHOST *host = NULL;
 
         worker_is_idle();
@@ -2021,13 +2021,13 @@ static void metadata_event_loop(void *arg)
                 case METADATA_DATABASE_TIMER:
                     break;
                 case METADATA_DEL_DIMENSION:
-                    uuid = (uuid_t *) cmd.param[0];
+                    uuid = (nd_uuid_t *) cmd.param[0];
                     if (likely(dimension_can_be_deleted(uuid, NULL, false)))
                         delete_dimension_uuid(uuid, NULL, false);
                     freez(uuid);
                     break;
                 case METADATA_STORE_CLAIM_ID:
-                    store_claim_id((uuid_t *) cmd.param[0], (uuid_t *) cmd.param[1]);
+                    store_claim_id((nd_uuid_t *) cmd.param[0], (nd_uuid_t *) cmd.param[1]);
                     freez((void *) cmd.param[0]);
                     freez((void *) cmd.param[1]);
                     break;
@@ -2217,22 +2217,22 @@ static inline void queue_metadata_cmd(enum metadata_opcode opcode, const void *p
 }
 
 // Public
-void metaqueue_delete_dimension_uuid(uuid_t *uuid)
+void metaqueue_delete_dimension_uuid(nd_uuid_t *uuid)
 {
     if (unlikely(!metasync_worker.loop))
         return;
-    uuid_t *use_uuid = mallocz(sizeof(*uuid));
+    nd_uuid_t *use_uuid = mallocz(sizeof(*uuid));
     uuid_copy(*use_uuid, *uuid);
     queue_metadata_cmd(METADATA_DEL_DIMENSION, use_uuid, NULL);
 }
 
-void metaqueue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid)
+void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid)
 {
     if (unlikely(!host_uuid))
         return;
 
-    uuid_t *local_host_uuid = mallocz(sizeof(*host_uuid));
-    uuid_t *local_claim_uuid = NULL;
+    nd_uuid_t *local_host_uuid = mallocz(sizeof(*host_uuid));
+    nd_uuid_t *local_claim_uuid = NULL;
 
     uuid_copy(*local_host_uuid, *host_uuid);
     if (likely(claim_uuid)) {

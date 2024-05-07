@@ -504,12 +504,12 @@ int windows_perflib_dump(const char *key) {
     if(key && !*key)
         key = NULL;
 
-    RegistryInitialize();
+    PerflibNamesRegistryInitialize();
 
     DWORD id = 0;
     if(key) {
         id = RegistryFindIDByName(key);
-        if(id == REGISTRY_NAME_NOT_FOUND) {
+        if(id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
             fprintf(stderr, "Cannot find key '%s' in Windows Performance Counters Registry.\n", key);
             exit(1);
         }

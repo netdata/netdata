@@ -8,7 +8,7 @@ bool netdata_is_protected_by_bearer = false; // this is controlled by cloud, at 
 static DICTIONARY *netdata_authorized_bearers = NULL;
 
 struct bearer_token {
-    uuid_t cloud_account_id;
+    nd_uuid_t cloud_account_id;
     char cloud_user_name[CLOUD_USER_NAME_LENGTH];
     HTTP_ACCESS access;
     HTTP_USER_ROLE user_role;
@@ -59,7 +59,7 @@ void bearer_tokens_init(void) {
         NULL, sizeof(struct bearer_token));
 }
 
-time_t bearer_create_token(uuid_t *uuid, struct web_client *w) {
+time_t bearer_create_token(nd_uuid_t *uuid, struct web_client *w) {
     char uuid_str[UUID_COMPACT_STR_LEN];
 
     uuid_generate_random(*uuid);

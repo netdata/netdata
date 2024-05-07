@@ -121,7 +121,7 @@ RRDCALC *rrdcalc_acquired_to_rrdcalc(const RRDCALC_ACQUIRED *rca);
 
 const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
-uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id);
+uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, nd_uuid_t *config_hash_id);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->config.warn_repeat_every > 0 || rc->config.crit_repeat_every > 0)) {

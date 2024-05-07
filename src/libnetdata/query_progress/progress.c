@@ -12,7 +12,7 @@
 
 struct query;
 #define SIMPLE_HASHTABLE_VALUE_TYPE struct query
-#define SIMPLE_HASHTABLE_KEY_TYPE uuid_t
+#define SIMPLE_HASHTABLE_KEY_TYPE nd_uuid_t
 #define SIMPLE_HASHTABLE_NAME _QUERY
 #define SIMPLE_HASHTABLE_VALUE2KEY_FUNCTION query_transaction
 #define SIMPLE_HASHTABLE_COMPARE_KEYS_FUNCTION query_compare_keys
@@ -21,7 +21,7 @@ struct query;
 // ----------------------------------------------------------------------------
 
 typedef struct query {
-    uuid_t transaction;
+    nd_uuid_t transaction;
 
     BUFFER *query;
     BUFFER *payload;
@@ -48,12 +48,12 @@ typedef struct query {
     struct query *prev, *next;
 } QUERY_PROGRESS;
 
-static inline uuid_t *query_transaction(QUERY_PROGRESS *qp) {
+static inline nd_uuid_t *query_transaction(QUERY_PROGRESS *qp) {
     return qp ? &qp->transaction : NULL;
 }
 
-static inline bool query_compare_keys(uuid_t *t1, uuid_t *t2) {
-    if(t1 == t2 || (t1 && t2 && memcmp(t1, t2, sizeof(uuid_t)) == 0))
+static inline bool query_compare_keys(nd_uuid_t *t1, nd_uuid_t *t2) {
+    if(t1 == t2 || (t1 && t2 && memcmp(t1, t2, sizeof(nd_uuid_t)) == 0))
         return true;
 
     return false;
@@ -75,7 +75,7 @@ static struct progress {
     .spinlock = NETDATA_SPINLOCK_INITIALIZER,
 };
 
-SIMPLE_HASHTABLE_HASH query_hash(uuid_t *transaction) {
+SIMPLE_HASHTABLE_HASH query_hash(nd_uuid_t *transaction) {
     struct uuid_hi_lo_t {
         uint64_t hi;
         uint64_t lo;
@@ -93,7 +93,7 @@ static void query_progress_init_unsafe(void) {
 
 // ----------------------------------------------------------------------------
 
-static inline QUERY_PROGRESS *query_progress_find_in_hashtable_unsafe(uuid_t *transaction) {
+static inline QUERY_PROGRESS *query_progress_find_in_hashtable_unsafe(nd_uuid_t *transaction) {
     SIMPLE_HASHTABLE_HASH hash = query_hash(transaction);
     SIMPLE_HASHTABLE_SLOT_QUERY *slot = simple_hashtable_get_slot_QUERY(&progress.hashtable, hash, transaction, true);
     QUERY_PROGRESS *qp = SIMPLE_HASHTABLE_SLOT_DATA(slot);
@@ -136,7 +136,7 @@ static inline void query_progress_remove_from_hashtable_unsafe(QUERY_PROGRESS *q
 
 // ----------------------------------------------------------------------------
 
-static QUERY_PROGRESS *query_progress_alloc(uuid_t *transaction) {
+static QUERY_PROGRESS *query_progress_alloc(nd_uuid_t *transaction) {
     QUERY_PROGRESS *qp;
     qp = callocz(1, sizeof(*qp));
     uuid_copy(qp->transaction, *transaction);
@@ -155,7 +155,7 @@ static void query_progress_free(QUERY_PROGRESS *qp) {
     freez(qp);
 }
 
-static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, uuid_t *transaction) {
+static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, nd_uuid_t *transaction) {
     assert(qp && qp->prev == NULL && qp->next == NULL);
     assert(!transaction || !qp->indexed);
 
@@ -210,7 +210,7 @@ static inline void query_progress_unlink_from_cache_unsafe(QUERY_PROGRESS *qp) {
 // ----------------------------------------------------------------------------
 // Progress API
 
-void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, BUFFER *payload, const char *client) {
+void query_progress_start_or_update(nd_uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, BUFFER *payload, const char *client) {
     if(!transaction)
         return;
 
@@ -246,7 +246,7 @@ void query_progress_start_or_update(uuid_t *transaction, usec_t started_ut, HTTP
     spinlock_unlock(&progress.spinlock);
 }
 
-void query_progress_set_finish_line(uuid_t *transaction, size_t all) {
+void query_progress_set_finish_line(nd_uuid_t *transaction, size_t all) {
     if(!transaction)
         return;
 
@@ -264,7 +264,7 @@ void query_progress_set_finish_line(uuid_t *transaction, size_t all) {
     spinlock_unlock(&progress.spinlock);
 }
 
-void query_progress_done_step(uuid_t *transaction, size_t done) {
+void query_progress_done_step(nd_uuid_t *transaction, size_t done) {
     if(!transaction)
         return;
 
@@ -280,7 +280,7 @@ void query_progress_done_step(uuid_t *transaction, size_t done) {
     spinlock_unlock(&progress.spinlock);
 }
 
-void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int response_code, usec_t duration_ut, size_t response_size, size_t sent_size) {
+void query_progress_finished(nd_uuid_t *transaction, usec_t finished_ut, short int response_code, usec_t duration_ut, size_t response_size, size_t sent_size) {
     if(!transaction)
         return;
 
@@ -319,7 +319,7 @@ void query_progress_finished(uuid_t *transaction, usec_t finished_ut, short int 
     }
 }
 
-void query_progress_functions_update(uuid_t *transaction, size_t done, size_t all) {
+void query_progress_functions_update(nd_uuid_t *transaction, size_t done, size_t all) {
     // functions send to the total 'done', not the increment
 
     if(!transaction)
@@ -346,7 +346,7 @@ void query_progress_functions_update(uuid_t *transaction, size_t done, size_t al
 // ----------------------------------------------------------------------------
 // /api/v2/progress - to get the progress of a transaction
 
-int web_api_v2_report_progress(uuid_t *transaction, BUFFER *wb) {
+int web_api_v2_report_progress(nd_uuid_t *transaction, BUFFER *wb) {
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
@@ -622,7 +622,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
 int progress_unittest(void) {
     size_t permanent = 100;
-    uuid_t valid[permanent];
+    nd_uuid_t valid[permanent];
 
     usec_t started = now_monotonic_usec();
 
@@ -632,7 +632,7 @@ int progress_unittest(void) {
     }
 
     for(size_t n = 0; n < 5000000 ;n++) {
-        uuid_t t;
+        nd_uuid_t t;
         uuid_generate_random(t);
         query_progress_start_or_update(&t, 0, HTTP_REQUEST_MODE_OPTIONS, HTTP_ACL_WEBRTC, "ephemeral", NULL, "test");
         query_progress_finished(&t, 0, 200, 1234, 123, 12);

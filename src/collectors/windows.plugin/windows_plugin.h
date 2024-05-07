@@ -19,7 +19,6 @@ int do_PerflibNetwork(int update_every, usec_t dt);
 int do_PerflibProcessor(int update_every, usec_t dt);
 int do_PerflibMemory(int update_every, usec_t dt);
 
-void RegistryInitialize(void);
-void RegistryUpdate(void);
+#include "perflib.h"
 
 #endif //NETDATA_WINDOWS_PLUGIN_H

@@ -1285,6 +1285,8 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSystemCPU.c
         src/collectors/windows.plugin/perflib.c
         src/collectors/windows.plugin/perflib.h
+        src/collectors/windows.plugin/perflib-rrd.c
+        src/collectors/windows.plugin/perflib-rrd.h
         src/collectors/windows.plugin/perflib-names.c
         src/collectors/windows.plugin/perflib-dump.c
         src/collectors/windows.plugin/perflib-storage.c

@@ -255,7 +255,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
 
     netdata_log_debug(D_ACLK, "CreateNodeInstanceResult: guid:%s nodeid:%s", res.machine_guid, res.node_id);
 
-    uuid_t host_id, node_id;
+    nd_uuid_t host_id, node_id;
     if (uuid_parse(res.machine_guid, host_id)) {
         netdata_log_error("Error parsing machine_guid provided by CreateNodeInstanceResult");
         freez(res.machine_guid);

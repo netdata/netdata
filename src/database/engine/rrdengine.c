@@ -111,7 +111,7 @@ static void sanity_check(void)
     /* Data file super-block cannot be larger than RRDENG_BLOCK_SIZE */
     BUILD_BUG_ON(RRDENG_DF_SB_PADDING_SZ < 0);
 
-    BUILD_BUG_ON(sizeof(uuid_t) != UUID_SZ); /* check UUID size */
+    BUILD_BUG_ON(sizeof(nd_uuid_t) != UUID_SZ); /* check UUID size */
 
     /* page count must fit in 8 bits */
     BUILD_BUG_ON(MAX_PAGES_PER_EXTENT > 255);
@@ -824,7 +824,7 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
         header->descr[i].type = descr->type;
-        uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
+        uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time_ut = descr->start_time_ut;
 
@@ -935,7 +935,7 @@ static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused,
 }
 
 struct uuid_first_time_s {
-    uuid_t *uuid;
+    nd_uuid_t *uuid;
     time_t first_time_s;
     METRIC *metric;
     size_t pages_found;

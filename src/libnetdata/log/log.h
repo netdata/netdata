@@ -170,7 +170,7 @@ struct log_stack_entry {
         uint64_t u64;
         int64_t i64;
         double dbl;
-        const uuid_t *uuid;
+        const nd_uuid_t *uuid;
         struct {
             log_formatter_callback_t formatter;
             void *formatter_data;

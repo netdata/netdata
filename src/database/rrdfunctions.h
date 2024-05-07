@@ -19,7 +19,7 @@ typedef void (*rrd_function_progresser_cb_t)(void *data);
 typedef void (*rrd_function_register_progresser_cb_t)(void *register_progresser_cb_data, rrd_function_progresser_cb_t progresser_cb, void *progresser_cb_data);
 
 struct rrd_function_execute {
-    uuid_t *transaction;
+    nd_uuid_t *transaction;
     const char *function;
     BUFFER *payload;
     const char *source;
@@ -85,7 +85,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
 
 bool rrd_function_available(RRDHOST *host, const char *function);
 
-bool rrd_function_has_this_original_result_callback(uuid_t *transaction, rrd_function_result_callback_t cb);
+bool rrd_function_has_this_original_result_callback(nd_uuid_t *transaction, rrd_function_result_callback_t cb);
 
 #include "rrdfunctions-inline.h"
 #include "rrdfunctions-inflight.h"

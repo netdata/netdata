@@ -35,13 +35,13 @@ time_t rrdhost_free_ephemeral_time_s = 86400;
 
 RRDHOST *find_host_by_node_id(char *node_id) {
 
-    uuid_t node_uuid;
+    nd_uuid_t node_uuid;
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
         return NULL;
 
     RRDHOST *host, *ret = NULL;
     dfe_start_read(rrdhost_root_index, host) {
-        if (host->node_id && !(uuid_memcmp(host->node_id, &node_uuid))) {
+        if (host->node_id && !uuid_eq(*host->node_id, node_uuid)) {
             ret = host;
             break;
         }

@@ -60,13 +60,13 @@ inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     }
 }
 
-uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, uuid_t *config_hash_id) {
+uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, nd_uuid_t *config_hash_id) {
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
     // re-use old IDs, by looking them up in the alarm log
     ALARM_ENTRY *ae = NULL;
     for(ae = host->health_log.alarms; ae ;ae = ae->next) {
-        if(unlikely(name == ae->name && chart == ae->chart && !uuid_memcmp(&ae->config_hash_id, config_hash_id))) {
+        if(unlikely(name == ae->name && chart == ae->chart && uuid_eq(ae->config_hash_id, *config_hash_id))) {
             if(next_event_id) *next_event_id = ae->alarm_event_id + 1;
             break;
         }

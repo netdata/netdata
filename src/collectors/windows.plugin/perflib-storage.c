@@ -304,7 +304,7 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused) {
     }
 
     DWORD id = RegistryFindIDByName("LogicalDisk");
-    if(id == REGISTRY_NAME_NOT_FOUND)
+    if(id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
 
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);

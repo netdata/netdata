@@ -121,7 +121,7 @@ static void pluginsd_host_define_cleanup(PARSER *parser) {
     parser->user.host_define.parsing_host = false;
 }
 
-static inline bool pluginsd_validate_machine_guid(const char *guid, uuid_t *uuid, char *output) {
+static inline bool pluginsd_validate_machine_guid(const char *guid, nd_uuid_t *uuid, char *output) {
     if(uuid_parse(guid, *uuid))
         return false;
 
@@ -231,7 +231,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         return PARSER_RC_OK;
     }
 
-    uuid_t uuid;
+    nd_uuid_t uuid;
     char uuid_str[UUID_STR_LEN];
     if(!pluginsd_validate_machine_guid(guid, &uuid, uuid_str))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST, "cannot parse MACHINE_GUID - is it a valid UUID?");
@@ -1088,7 +1088,7 @@ static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PAR
         return PARSER_RC_ERROR;
     }
 
-    uuid_t uuid;
+    nd_uuid_t uuid;
     RRDHOST *host = parser->user.host;
 
     // We don't need the parsed UUID

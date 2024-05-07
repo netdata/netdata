@@ -179,7 +179,7 @@ int do_PerflibProcessor(int update_every, usec_t dt __maybe_unused) {
     }
 
     DWORD id = RegistryFindIDByName("Processor");
-    if(id == REGISTRY_NAME_NOT_FOUND)
+    if(id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
         return -1;
 
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);

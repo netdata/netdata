@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "perflib.h"
-#include "windows-internals.h"
 
 #define REGISTRY_KEY "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Perflib\\009"
 
@@ -39,7 +38,7 @@ static struct {
 };
 
 DWORD RegistryFindIDByName(const char *name) {
-    DWORD rc = REGISTRY_NAME_NOT_FOUND;
+    DWORD rc = PERFLIB_REGISTRY_NAME_NOT_FOUND;
 
     spinlock_lock(&names_globals.spinlock);
     XXH64_hash_t hash = XXH3_64bits((void *)name, strlen(name));
@@ -220,7 +219,7 @@ static inline void RegistryFetchAll_unsafe(void) {
     readRegistryKeys_unsafe(TRUE);
 }
 
-void RegistryInitialize(void) {
+void PerflibNamesRegistryInitialize(void) {
     spinlock_lock(&names_globals.spinlock);
     simple_hashtable_init_PERFLIB(&names_globals.hashtable, 20000);
     RegistryKeyModification(&names_globals.lastWriteTime);
@@ -228,7 +227,7 @@ void RegistryInitialize(void) {
     spinlock_unlock(&names_globals.spinlock);
 }
 
-void RegistryUpdate(void) {
+void PerflibNamesRegistryUpdate(void) {
     FILETIME lastWriteTime = { 0 };
     RegistryKeyModification(&lastWriteTime);
 

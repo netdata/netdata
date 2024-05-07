@@ -915,7 +915,7 @@ exit:
 
 void aclk_host_state_update(RRDHOST *host, int cmd, int queryable)
 {
-    uuid_t node_id;
+    nd_uuid_t node_id;
     int ret = 0;
 
     if (!aclk_connected)

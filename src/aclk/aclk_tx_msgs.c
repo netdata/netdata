@@ -101,7 +101,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
  */
 static struct json_object *create_hdr(const char *type, const char *msg_id, time_t ts_secs, usec_t ts_us, int version)
 {
-    uuid_t uuid;
+    nd_uuid_t uuid;
     char uuid_str[36 + 1];
     json_object *tmp;
     json_object *obj = json_object_new_object();

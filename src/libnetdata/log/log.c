@@ -366,7 +366,7 @@ struct nd_log_source {
 };
 
 static struct {
-    uuid_t invocation_id;
+    nd_uuid_t invocation_id;
 
     ND_LOG_SOURCES overwrite_process_source;
 

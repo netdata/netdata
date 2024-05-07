@@ -4,5 +4,7 @@
 #define NETDATA_UUID_GENERATE_H
 
 void os_uuid_generate(void *out);
+void os_uuid_generate_random(void *out);
+void os_uuid_generate_time(void *out);
 
 #endif //NETDATA_UUID_GENERATE_H

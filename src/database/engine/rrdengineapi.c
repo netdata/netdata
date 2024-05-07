@@ -89,7 +89,7 @@ static inline bool rrdeng_page_alignment_release(struct pg_alignment *pa) {
 }
 
 // charts call this
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid __maybe_unused) {
     struct pg_alignment *pa = callocz(1, sizeof(struct pg_alignment));
     rrdeng_page_alignment_acquire(pa);
     return (STORAGE_METRICS_GROUP *)pa;
@@ -107,7 +107,7 @@ void rrdeng_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_M
 // metric handle for legacy dbs
 
 /* This UUID is not unique across hosts */
-void rrdeng_generate_unittest_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid)
+void rrdeng_generate_unittest_uuid(const char *dim_id, const char *chart_id, nd_uuid_t *ret_uuid)
 {
     CLEAN_BUFFER *wb = buffer_create(100, NULL);
     buffer_sprintf(wb,"%s.%s", dim_id, chart_id);
@@ -117,7 +117,7 @@ void rrdeng_generate_unittest_uuid(const char *dim_id, const char *chart_id, uui
 
 static METRIC *rrdeng_metric_unittest(STORAGE_INSTANCE *si, const char *rd_id, const char *st_id) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    uuid_t legacy_uuid;
+    nd_uuid_t legacy_uuid;
     rrdeng_generate_unittest_uuid(rd_id, st_id, &legacy_uuid);
     return mrg_metric_get_and_acquire(main_mrg, &legacy_uuid, (Word_t) ctx);
 }
@@ -135,12 +135,12 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *smh) {
     return (STORAGE_METRIC_HANDLE *) mrg_metric_dup(main_mrg, metric);
 }
 
-STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, uuid_t *uuid) {
+STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     return (STORAGE_METRIC_HANDLE *) mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
 }
 
-static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, uuid_t *uuid) {
+static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     internal_fatal(!si, "DBENGINE: STORAGE_INSTANCE is NULL");
 
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
@@ -177,7 +177,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(uuid_memcmp(&rd->metric_uuid, mrg_metric_uuid(main_mrg, metric)) != 0) {
+    if(!uuid_eq(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric))) {
         char uuid1[UUID_STR_LEN + 1];
         char uuid2[UUID_STR_LEN + 1];
 
@@ -217,7 +217,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
 
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
-    uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
+    nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
     time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
     time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
     uint32_t update_every_s = pgc_page_update_every_s(handle->pgc_page);
@@ -955,7 +955,7 @@ time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *smh) {
     return oldest_time_s;
 }
 
-bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s)
+bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s)
 {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
     if (unlikely(!ctx)) {

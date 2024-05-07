@@ -443,7 +443,7 @@ const char *db_models_prune =
     "WHERE after < @after LIMIT @n;";
 
 static int
-ml_dimension_add_model(const uuid_t *metric_uuid, const ml_kmeans_t *km)
+ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_t *km)
 {
     static __thread sqlite3_stmt *res = NULL;
     int param = 0;
@@ -520,7 +520,7 @@ bind_fail:
 }
 
 static int
-ml_dimension_delete_models(const uuid_t *metric_uuid, time_t before)
+ml_dimension_delete_models(const nd_uuid_t *metric_uuid, time_t before)
 {
     static __thread sqlite3_stmt *res = NULL;
     int rc = 0;

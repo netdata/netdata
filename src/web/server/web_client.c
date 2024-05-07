@@ -1065,7 +1065,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         if(!host) {
             // we didn't find it, but it may be a uuid case mismatch for MACHINE_GUID
             // so, recreate the machine guid in lower-case.
-            uuid_t uuid;
+            nd_uuid_t uuid;
             char txt[UUID_STR_LEN];
             if (uuid_parse(tok, uuid) == 0) {
                 uuid_unparse_lower(uuid, txt);

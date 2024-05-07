@@ -53,7 +53,7 @@ void *win_plugin_main(void *ptr) {
     worker_register("WIN");
 
     rrd_collector_started();
-    RegistryInitialize();
+    PerflibNamesRegistryInitialize();
 
     netdata_thread_cleanup_push(windows_main_cleanup, ptr)
     {
@@ -87,7 +87,7 @@ void *win_plugin_main(void *ptr) {
             if(unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
-            RegistryUpdate();
+            PerflibNamesRegistryUpdate();
 
             for(i = 0; win_modules[i].name; i++) {
                 if(unlikely(!service_running(SERVICE_COLLECTORS)))

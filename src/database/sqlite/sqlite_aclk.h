@@ -9,7 +9,7 @@
 #define ACLK_DELETE_ACK_ALERTS_INTERNAL (86400)
 #define ACLK_SYNC_QUERY_SIZE 512
 
-static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
+static inline void uuid_unparse_lower_fix(nd_uuid_t *uuid, char *out)
 {
     uuid_unparse_lower(*uuid, out);
     out[8] = '_';
@@ -18,7 +18,7 @@ static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
     out[23] = '_';
 }
 
-static inline int uuid_parse_fix(char *in, uuid_t uuid)
+static inline int uuid_parse_fix(char *in, nd_uuid_t uuid)
 {
     in[8] = '-';
     in[13] = '-';
@@ -80,7 +80,7 @@ typedef struct aclk_sync_cfg_t {
     uint64_t alerts_log_last_sequence_id;
 } aclk_sync_cfg_t;
 
-void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
+void sql_create_aclk_table(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);
 void sql_aclk_sync_init(void);
 void aclk_push_alert_config(const char *node_id, const char *config_hash);
 void aclk_push_node_alert_snapshot(const char *node_id);

@@ -118,7 +118,7 @@ REGISTRY_PERSON *registry_person_allocate(const char *person_guid, time_t when) 
     REGISTRY_PERSON *p = aral_mallocz(registry.persons_aral);
     if(!person_guid) {
         for(;;) {
-            uuid_t uuid;
+            nd_uuid_t uuid;
             uuid_generate(uuid);
             uuid_unparse_lower(uuid, p->guid);
 

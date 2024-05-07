@@ -269,7 +269,7 @@ typedef struct {
 } ml_host_t;
 
 typedef struct {
-    uuid_t metric_uuid;
+    nd_uuid_t metric_uuid;
     ml_kmeans_t kmeans;
 } ml_model_info_t;
 

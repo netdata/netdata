@@ -99,7 +99,7 @@ int api_v2_bearer_token(RRDHOST *host __maybe_unused, struct web_client *w __may
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    uuid_t uuid;
+    nd_uuid_t uuid;
     time_t expires_s = bearer_create_token(&uuid, w);
 
     BUFFER *wb = w->response.data;
@@ -575,7 +575,7 @@ static int web_client_api_request_v2_progress(RRDHOST *host __maybe_unused, stru
         if(!strcmp(name, "transaction")) transaction = value;
     }
 
-    uuid_t tr;
+    nd_uuid_t tr;
     uuid_parse_flexi(transaction, tr);
 
     rrd_function_call_progresser(&tr);

@@ -11,7 +11,7 @@ struct registry registry;
 // parse a GUID and re-generated to be always lower case
 // this is used as a protection against the variations of GUIDs
 int regenerate_guid(const char *guid, char *result) {
-    uuid_t uuid;
+    nd_uuid_t uuid;
     if(unlikely(uuid_parse(guid, uuid) == -1)) {
         netdata_log_info("Registry: GUID '%s' is not a valid GUID.", guid);
         return -1;
@@ -298,7 +298,7 @@ const char *registry_get_this_machine_guid(void) {
 
     // generate a new one?
     if(!guid[0]) {
-        uuid_t uuid;
+        nd_uuid_t uuid;
 
         uuid_generate_time(uuid);
         uuid_unparse_lower(uuid, guid);

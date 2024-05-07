@@ -142,7 +142,7 @@ void web_client_api_v1_init(void) {
 
     time_grouping_init();
 
-	uuid_t uuid;
+    nd_uuid_t uuid;
 
 	// generate
 	uuid_generate(uuid);
@@ -181,7 +181,7 @@ char *get_mgmt_api_key(void) {
 
     // generate a new one?
     if(!guid[0]) {
-        uuid_t uuid;
+        nd_uuid_t uuid;
 
         uuid_generate_time(uuid);
         uuid_unparse_lower(uuid, guid);

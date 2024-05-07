@@ -57,7 +57,7 @@ struct rrd_alert_match {
 void rrd_alert_match_cleanup(struct rrd_alert_match *am);
 
 struct rrd_alert_config {
-    uuid_t hash_id;
+    nd_uuid_t hash_id;
 
     STRING *name;                   // the name of this alarm
 

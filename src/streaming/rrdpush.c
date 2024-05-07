@@ -192,7 +192,7 @@ int configured_as_parent() {
 
     appconfig_wrlock(&stream_config);
     for (section = stream_config.first_section; section; section = section->next) {
-        uuid_t uuid;
+        nd_uuid_t uuid;
 
         if (uuid_parse(section->name, uuid) != -1 &&
                 appconfig_get_boolean_by_section(section, "enabled", 0)) {
