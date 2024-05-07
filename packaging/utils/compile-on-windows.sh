@@ -26,7 +26,6 @@ fi
 export PATH="/usr/local/bin:${PATH}"
 
 WT_ROOT="$(pwd)"
-WT_PREFIX="/opt/netdata"
 BUILD_TYPE="Debug"
 NULL=""
 
@@ -45,7 +44,7 @@ fi
 
 /usr/bin/cmake -S "${WT_ROOT}" -B "${build}" \
     -G Ninja \
-    -DCMAKE_INSTALL_PREFIX="${WT_PREFIX}" \
+    -DCMAKE_INSTALL_PREFIX="/opt/netdata" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
     -DCMAKE_C_FLAGS="-O0 -ggdb -Wall -Wextra -Wno-char-subscripts -Wa,-mbig-obj -pipe -DNETDATA_INTERNAL_CHECKS=1 -D_FILE_OFFSET_BITS=64" \
     -DNETDATA_USER="${USER}" \
@@ -53,7 +52,9 @@ fi
     -DENABLE_H2O=Off \
     -DENABLE_LOGS_MANAGEMENT_TESTS=Off \
     -DENABLE_ACLK=On \
+    -DENABLE_CLOUD=On \
     -DENABLE_ML=On \
+    -DENABLE_BUNDLED_JSONC=On \
     -DENABLE_BUNDLED_PROTOBUF=Off \
     ${NULL}
 
