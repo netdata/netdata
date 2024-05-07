@@ -26,7 +26,9 @@ void os_uuid_generate_time(void *out) {
 
 #else
 
+#if !defined(COMPILED_FOR_MACOS)
 #include <uuid.h>
+#endif
 
 void os_uuid_generate(void *out) {
     uuid_generate(out);
