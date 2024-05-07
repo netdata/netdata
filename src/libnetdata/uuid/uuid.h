@@ -3,6 +3,10 @@
 #ifndef NETDATA_UUID_H
 #define NETDATA_UUID_H
 
+#ifdef uuid_t
+// windows defines this
+#undef uuid_t
+#endif
 typedef unsigned char uuid_t[16];
 
 #ifdef __GNUC__

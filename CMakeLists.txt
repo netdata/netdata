@@ -244,6 +244,14 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
         set(WINDOWS True)
         set(COMPILED_FOR_WINDOWS True)
         add_definitions(-D_GNU_SOURCE)
+
+        # clion needs this to find the includes
+        if("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
+                include_directories(c:/cygwin64/usr/include)
+        elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+                include_directories(c:/msys64/usr/include)
+        endif()
+
         message(INFO " Compiling for Windows (${CMAKE_SYSTEM_NAME})... ")
 else()
         set(FOREIGN_OS True)
