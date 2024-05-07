@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0518
+# Next unused error code: F0519
 
 # ======================================================================
 # Constants
@@ -196,6 +196,7 @@ USAGE: kickstart.sh [options]
   --no-cleanup                     Don't do any cleanup steps. This is intended to help with debugging the installer.
   --local-build-options            Specify additional options to pass to the installer code when building locally. Only valid if --build-only is also specified.
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
+  --offline-architecture           Limit an offline install source being prepared with --prepare-offline-install-source to only include the specified static build architecture.
 
 The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
 
@@ -2021,7 +2022,7 @@ prepare_offline_install_source() {
       fi
 
       if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-        for arch in ${STATIC_INSTALL_ARCHES}; do
+        for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
           set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
           if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
@@ -2448,6 +2449,14 @@ parse_args() {
         else
           fatal "A target directory must be specified with the --prepare-offline-install-source option." F0500
         fi
+        ;;
+      "--offline-architecture")
+        if echo "${STATIC_INSTALL_ARCHES}" | grep -qw "${2}"; then
+          NETDATA_OFFLINE_ARCHES="${NETDATA_OFFLINE_ARCHES} ${2}"
+        else
+          fatal "${2} is not a recognized static build architecture (supported architectures are ${STATIC_INSTALL_ARCHES})" F0518
+        fi
+        shift 1
         ;;
       "--offline-install-source")
         if [ -d "${2}" ]; then
