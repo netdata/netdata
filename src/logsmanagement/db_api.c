@@ -617,7 +617,7 @@ int db_init() {
                                         
                     /* Create directory of collection of logs for the particular 
                      * log source (in the form of a UUID) and bind it. */
-                    uuid_t uuid;
+                    nd_uuid_t uuid;
                     uuid_generate(uuid);
                     char uuid_str[UUID_STR_LEN];      // ex. "1b4e28ba-2fa1-11d2-883f-0016d3cca427" + "\0"
                     uuid_unparse_lower(uuid, uuid_str);
