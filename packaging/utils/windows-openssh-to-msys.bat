@@ -81,5 +81,8 @@ echo @%MSYS2_PATH%\msys2_shell.cmd -defterm -here -no-start -msys > %MSYS2_PATH%
 :: Run PowerShell command to set default shell
 powershell -Command "New-ItemProperty -Path 'HKLM:\SOFTWARE\OpenSSH' -Name 'DefaultShell' -Value '%MSYS2_PATH%\msys2.bat' -PropertyType String -Force"
 
-echo "OpenSSH has been successfully configured with MSYS2 as the default shell."
+:: Open the Windows Firewall for sshd (using PowerShell)
+powershell -Command "New-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -DisplayName 'OpenSSH Server (sshd) Incoming' -Description 'Allow incoming SSH traffic via OpenSSH server' -Enabled True -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow"
+
+echo "OpenSSH has been successfully configured with MSYS2 as the default shell, and the firewall has been opened for sshd."
 pause
