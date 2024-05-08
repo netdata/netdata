@@ -41,11 +41,8 @@ powershell -Command "Expand-Archive -Path '%DOWNLOAD_FILE%' -DestinationPath '%I
 :: Add the OpenSSH binaries to the system PATH
 setx /M PATH "%INSTALL_DIR%;%PATH%"
 
-:: Install and configure the OpenSSH service
-powershell -Command "New-Service -Name 'sshd' -BinaryPathName '%INSTALL_DIR%\sshd.exe' -StartupType Automatic" >nul 2>&1
-
-:: Register OpenSSH utilities as services
-powershell -Command "%INSTALL_DIR%\install-sshd.ps1" >nul 2>&1
+:: Register OpenSSH utilities as services using PowerShell
+powershell -ExecutionPolicy Bypass -Command "& '%INSTALL_DIR%\install-sshd.ps1'"
 
 :: Verify if manual installation succeeded
 sc query sshd >nul 2>&1
