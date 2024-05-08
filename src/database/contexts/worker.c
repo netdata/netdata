@@ -1060,8 +1060,10 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
 // ----------------------------------------------------------------------------
 // worker thread
 
-static void rrdcontext_main_cleanup(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+static void rrdcontext_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     // custom code
@@ -1071,83 +1073,82 @@ static void rrdcontext_main_cleanup(void *ptr) {
 }
 
 void *rrdcontext_main(void *ptr) {
-    netdata_thread_cleanup_push(rrdcontext_main_cleanup, ptr);
+    CLEANUP_FUNCTION_REGISTER(rrdcontext_main_cleanup) cleanup_ptr = ptr;
 
-            worker_register("RRDCONTEXT");
-            worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
-            worker_register_job_name(WORKER_JOB_CHECK, "dedup checks");
-            worker_register_job_name(WORKER_JOB_SEND, "sent contexts");
-            worker_register_job_name(WORKER_JOB_DEQUEUE, "deduplicated contexts");
-            worker_register_job_name(WORKER_JOB_RETENTION, "metrics retention");
-            worker_register_job_name(WORKER_JOB_QUEUED, "queued contexts");
-            worker_register_job_name(WORKER_JOB_CLEANUP, "cleanups");
-            worker_register_job_name(WORKER_JOB_CLEANUP_DELETE, "deletes");
-            worker_register_job_name(WORKER_JOB_PP_METRIC, "check metrics");
-            worker_register_job_name(WORKER_JOB_PP_INSTANCE, "check instances");
-            worker_register_job_name(WORKER_JOB_PP_CONTEXT, "check contexts");
+    worker_register("RRDCONTEXT");
+    worker_register_job_name(WORKER_JOB_HOSTS, "hosts");
+    worker_register_job_name(WORKER_JOB_CHECK, "dedup checks");
+    worker_register_job_name(WORKER_JOB_SEND, "sent contexts");
+    worker_register_job_name(WORKER_JOB_DEQUEUE, "deduplicated contexts");
+    worker_register_job_name(WORKER_JOB_RETENTION, "metrics retention");
+    worker_register_job_name(WORKER_JOB_QUEUED, "queued contexts");
+    worker_register_job_name(WORKER_JOB_CLEANUP, "cleanups");
+    worker_register_job_name(WORKER_JOB_CLEANUP_DELETE, "deletes");
+    worker_register_job_name(WORKER_JOB_PP_METRIC, "check metrics");
+    worker_register_job_name(WORKER_JOB_PP_INSTANCE, "check instances");
+    worker_register_job_name(WORKER_JOB_PP_CONTEXT, "check contexts");
 
-            worker_register_job_custom_metric(WORKER_JOB_HUB_QUEUE_SIZE, "hub queue size", "contexts", WORKER_METRIC_ABSOLUTE);
-            worker_register_job_custom_metric(WORKER_JOB_PP_QUEUE_SIZE, "post processing queue size", "contexts", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_JOB_HUB_QUEUE_SIZE, "hub queue size", "contexts", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(WORKER_JOB_PP_QUEUE_SIZE, "post processing queue size", "contexts", WORKER_METRIC_ABSOLUTE);
 
-            heartbeat_t hb;
-            heartbeat_init(&hb);
-            usec_t step = RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC;
 
-            while (service_running(SERVICE_CONTEXT)) {
-                worker_is_idle();
-                heartbeat_next(&hb, step);
+    while (service_running(SERVICE_CONTEXT)) {
+        worker_is_idle();
+        heartbeat_next(&hb, step);
 
-                if(unlikely(!service_running(SERVICE_CONTEXT))) break;
+        if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
-                usec_t now_ut = now_realtime_usec();
+        usec_t now_ut = now_realtime_usec();
 
-                if(rrdcontext_next_db_rotation_ut && now_ut > rrdcontext_next_db_rotation_ut) {
-                    rrdcontext_recalculate_retention_all_hosts();
-                    rrdcontext_garbage_collect_for_all_hosts();
-                    rrdcontext_next_db_rotation_ut = 0;
-                }
+        if(rrdcontext_next_db_rotation_ut && now_ut > rrdcontext_next_db_rotation_ut) {
+            rrdcontext_recalculate_retention_all_hosts();
+            rrdcontext_garbage_collect_for_all_hosts();
+            rrdcontext_next_db_rotation_ut = 0;
+        }
 
-                size_t hub_queued_contexts_for_all_hosts = 0;
-                size_t pp_queued_contexts_for_all_hosts = 0;
+        size_t hub_queued_contexts_for_all_hosts = 0;
+        size_t pp_queued_contexts_for_all_hosts = 0;
 
-                RRDHOST *host;
-                dfe_start_reentrant(rrdhost_root_index, host) {
-                    if(unlikely(!service_running(SERVICE_CONTEXT))) break;
+        RRDHOST *host;
+        dfe_start_reentrant(rrdhost_root_index, host) {
+            if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
-                    worker_is_busy(WORKER_JOB_HOSTS);
+            worker_is_busy(WORKER_JOB_HOSTS);
 
-                    if(host->rrdctx.pp_queue) {
-                        pp_queued_contexts_for_all_hosts += dictionary_entries(host->rrdctx.pp_queue);
-                        rrdcontext_post_process_queued_contexts(host);
-                        dictionary_garbage_collect(host->rrdctx.pp_queue);
-                    }
-
-                    if(host->rrdctx.hub_queue) {
-                        hub_queued_contexts_for_all_hosts += dictionary_entries(host->rrdctx.hub_queue);
-                        rrdcontext_dispatch_queued_contexts_to_hub(host, now_ut);
-                        dictionary_garbage_collect(host->rrdctx.hub_queue);
-                    }
-
-                    if (host->rrdctx.contexts)
-                        dictionary_garbage_collect(host->rrdctx.contexts);
-
-                    // calculate the number of metrics and instances in the host
-                    RRDCONTEXT *rc;
-                    uint32_t metrics = 0, instances = 0;
-                    dfe_start_read(host->rrdctx.contexts, rc) {
-                        metrics += rc->stats.metrics;
-                        instances += dictionary_entries(rc->rrdinstances);
-                    }
-                    dfe_done(rc);
-                    host->rrdctx.metrics = metrics;
-                    host->rrdctx.instances = instances;
-                }
-                dfe_done(host);
-
-                worker_set_metric(WORKER_JOB_HUB_QUEUE_SIZE, (NETDATA_DOUBLE)hub_queued_contexts_for_all_hosts);
-                worker_set_metric(WORKER_JOB_PP_QUEUE_SIZE, (NETDATA_DOUBLE)pp_queued_contexts_for_all_hosts);
+            if(host->rrdctx.pp_queue) {
+                pp_queued_contexts_for_all_hosts += dictionary_entries(host->rrdctx.pp_queue);
+                rrdcontext_post_process_queued_contexts(host);
+                dictionary_garbage_collect(host->rrdctx.pp_queue);
             }
 
-    netdata_thread_cleanup_pop(1);
+            if(host->rrdctx.hub_queue) {
+                hub_queued_contexts_for_all_hosts += dictionary_entries(host->rrdctx.hub_queue);
+                rrdcontext_dispatch_queued_contexts_to_hub(host, now_ut);
+                dictionary_garbage_collect(host->rrdctx.hub_queue);
+            }
+
+            if (host->rrdctx.contexts)
+                dictionary_garbage_collect(host->rrdctx.contexts);
+
+            // calculate the number of metrics and instances in the host
+            RRDCONTEXT *rc;
+            uint32_t metrics = 0, instances = 0;
+            dfe_start_read(host->rrdctx.contexts, rc) {
+                metrics += rc->stats.metrics;
+                instances += dictionary_entries(rc->rrdinstances);
+            }
+            dfe_done(rc);
+            host->rrdctx.metrics = metrics;
+            host->rrdctx.instances = instances;
+        }
+        dfe_done(host);
+
+        worker_set_metric(WORKER_JOB_HUB_QUEUE_SIZE, (NETDATA_DOUBLE)hub_queued_contexts_for_all_hosts);
+        worker_set_metric(WORKER_JOB_PP_QUEUE_SIZE, (NETDATA_DOUBLE)pp_queued_contexts_for_all_hosts);
+    }
+
     return NULL;
 }

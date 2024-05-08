@@ -4216,13 +4216,14 @@ static void global_statistics_register_workers(void) {
     worker_register_job_name(WORKER_JOB_SQLITE3, "sqlite3");
 }
 
-static void global_statistics_cleanup(void *ptr)
+static void global_statistics_cleanup(void *pptr)
 {
-    worker_unregister();
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
+    worker_unregister();
     netdata_log_info("cleaning up...");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -4230,9 +4231,9 @@ static void global_statistics_cleanup(void *ptr)
 
 void *global_statistics_main(void *ptr)
 {
-    global_statistics_register_workers();
+    CLEANUP_FUNCTION_REGISTER(global_statistics_cleanup) cleanup_ptr = ptr;
 
-    netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
+    global_statistics_register_workers();
 
     int update_every =
         (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
@@ -4281,7 +4282,6 @@ void *global_statistics_main(void *ptr)
 #endif
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -4289,15 +4289,16 @@ void *global_statistics_main(void *ptr)
 // ---------------------------------------------------------------------------------------------------------------------
 // workers thread
 
-static void global_statistics_workers_cleanup(void *ptr)
+static void global_statistics_workers_cleanup(void *pptr)
 {
-    worker_unregister();
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     netdata_log_info("cleaning up...");
 
+    worker_unregister();
     worker_utilization_finish();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -4305,41 +4306,41 @@ static void global_statistics_workers_cleanup(void *ptr)
 
 void *global_statistics_workers_main(void *ptr)
 {
+    CLEANUP_FUNCTION_REGISTER(global_statistics_workers_cleanup) cleanup_ptr = ptr;
+
     global_statistics_register_workers();
 
-    netdata_thread_cleanup_push(global_statistics_workers_cleanup, ptr)
-    {
-        int update_every =
-                (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
-        if (update_every < localhost->rrd_update_every)
-            update_every = localhost->rrd_update_every;
+    int update_every =
+            (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every)
+        update_every = localhost->rrd_update_every;
 
-        usec_t step = update_every * USEC_PER_SEC;
-        heartbeat_t hb;
-        heartbeat_init(&hb);
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
 
-        while (service_running(SERVICE_COLLECTORS)) {
-            worker_is_idle();
-            heartbeat_next(&hb, step);
+    while (service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        heartbeat_next(&hb, step);
 
-            worker_is_busy(WORKER_JOB_WORKERS);
-            worker_utilization_charts();
-        }
+        worker_is_busy(WORKER_JOB_WORKERS);
+        worker_utilization_charts();
     }
-    netdata_thread_cleanup_pop(1);
+
     return NULL;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // sqlite3 thread
 
-static void global_statistics_sqlite3_cleanup(void *ptr)
+static void global_statistics_sqlite3_cleanup(void *pptr)
 {
-    worker_unregister();
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
+    worker_unregister();
     netdata_log_info("cleaning up...");
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -4347,29 +4348,27 @@ static void global_statistics_sqlite3_cleanup(void *ptr)
 
 void *global_statistics_sqlite3_main(void *ptr)
 {
+    CLEANUP_FUNCTION_REGISTER(global_statistics_sqlite3_cleanup) cleanup_ptr = ptr;
+
     global_statistics_register_workers();
 
-    netdata_thread_cleanup_push(global_statistics_sqlite3_cleanup, ptr)
-    {
+    int update_every =
+            (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+    if (update_every < localhost->rrd_update_every)
+        update_every = localhost->rrd_update_every;
 
-        int update_every =
-                (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
-        if (update_every < localhost->rrd_update_every)
-            update_every = localhost->rrd_update_every;
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
 
-        usec_t step = update_every * USEC_PER_SEC;
-        heartbeat_t hb;
-        heartbeat_init(&hb);
+    while (service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        heartbeat_next(&hb, step);
 
-        while (service_running(SERVICE_COLLECTORS)) {
-            worker_is_idle();
-            heartbeat_next(&hb, step);
-
-            worker_is_busy(WORKER_JOB_SQLITE3);
-            sqlite3_statistics_charts();
-        }
+        worker_is_busy(WORKER_JOB_SQLITE3);
+        sqlite3_statistics_charts();
     }
-    netdata_thread_cleanup_pop(1);
+
     return NULL;
 }
 

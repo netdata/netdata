@@ -86,18 +86,19 @@ static struct proc_module {
 
 static ND_THREAD *netdev_thread = NULL;
 
-static void proc_main_cleanup(void *ptr)
+static void proc_main_cleanup(void *pptr)
 {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
 
     nd_thread_join(netdev_thread);
+    worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
-
-    worker_unregister();
 }
 
 bool inside_lxc_container = false;
@@ -143,6 +144,8 @@ static bool log_proc_module(BUFFER *wb, void *data) {
 
 void *proc_main(void *ptr)
 {
+    CLEANUP_FUNCTION_REGISTER(proc_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("PROC");
 
     rrd_collector_started();
@@ -152,59 +155,56 @@ void *proc_main(void *ptr)
         netdev_thread = nd_thread_create(THREAD_NETDEV_NAME, NETDATA_THREAD_OPTION_JOINABLE, netdev_main, NULL);
     }
 
-    netdata_thread_cleanup_push(proc_main_cleanup, ptr)
-    {
-        config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
-        config_get_boolean("plugin:proc", "/proc/spl/kstat/zfs/pool/state", CONFIG_BOOLEAN_NO);
+    config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
+    config_get_boolean("plugin:proc", "/proc/spl/kstat/zfs/pool/state", CONFIG_BOOLEAN_NO);
 
-        // check the enabled status for each module
-        int i;
-        for(i = 0; proc_modules[i].name; i++) {
-            struct proc_module *pm = &proc_modules[i];
+    // check the enabled status for each module
+    int i;
+    for(i = 0; proc_modules[i].name; i++) {
+        struct proc_module *pm = &proc_modules[i];
 
-            pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
-            pm->rd = NULL;
+        pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
+        pm->rd = NULL;
 
-            worker_register_job_name(i, proc_modules[i].dim);
-        }
+        worker_register_job_name(i, proc_modules[i].dim);
+    }
 
-        usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
-        heartbeat_t hb;
-        heartbeat_init(&hb);
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
 
-        inside_lxc_container = is_lxcfs_proc_mounted();
+    inside_lxc_container = is_lxcfs_proc_mounted();
 
 #define LGS_MODULE_ID 0
 
-        ND_LOG_STACK lgs[] = {
-                [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin"),
-                ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
+    ND_LOG_STACK lgs[] = {
+            [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin"),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
-        while(service_running(SERVICE_COLLECTORS)) {
-            worker_is_idle();
-            usec_t hb_dt = heartbeat_next(&hb, step);
+    while(service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        usec_t hb_dt = heartbeat_next(&hb, step);
 
+        if(unlikely(!service_running(SERVICE_COLLECTORS)))
+            break;
+
+        for(i = 0; proc_modules[i].name; i++) {
             if(unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
-            for(i = 0; proc_modules[i].name; i++) {
-                if(unlikely(!service_running(SERVICE_COLLECTORS)))
-                    break;
+            struct proc_module *pm = &proc_modules[i];
+            if(unlikely(!pm->enabled))
+                continue;
 
-                struct proc_module *pm = &proc_modules[i];
-                if(unlikely(!pm->enabled))
-                    continue;
-
-                worker_is_busy(i);
-                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_proc_module, pm);
-                pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin");
-            }
+            worker_is_busy(i);
+            lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_proc_module, pm);
+            pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
+            lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, "proc.plugin");
         }
     }
-    netdata_thread_cleanup_pop(1);
+
     return NULL;
 }
 

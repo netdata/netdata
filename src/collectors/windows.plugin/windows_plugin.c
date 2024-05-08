@@ -32,8 +32,10 @@ static struct proc_module {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 36
 #endif
 
-static void windows_main_cleanup(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+static void windows_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
@@ -55,55 +57,53 @@ void *win_plugin_main(void *ptr) {
     rrd_collector_started();
     PerflibNamesRegistryInitialize();
 
-    netdata_thread_cleanup_push(windows_main_cleanup, ptr)
-    {
-        // check the enabled status for each module
-        int i;
-        for(i = 0; win_modules[i].name; i++) {
-            struct proc_module *pm = &win_modules[i];
+    CLEANUP_FUNCTION_REGISTER(windows_main_cleanup) cleanup_ptr = ptr;
 
-            pm->enabled = config_get_boolean("plugin:windows", pm->name, CONFIG_BOOLEAN_YES);
-            pm->rd = NULL;
+    // check the enabled status for each module
+    int i;
+    for(i = 0; win_modules[i].name; i++) {
+        struct proc_module *pm = &win_modules[i];
 
-            worker_register_job_name(i, win_modules[i].dim);
-        }
+        pm->enabled = config_get_boolean("plugin:windows", pm->name, CONFIG_BOOLEAN_YES);
+        pm->rd = NULL;
 
-        usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
-        heartbeat_t hb;
-        heartbeat_init(&hb);
+        worker_register_job_name(i, win_modules[i].dim);
+    }
+
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
 
 #define LGS_MODULE_ID 0
 
-        ND_LOG_STACK lgs[] = {
-            [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, PLUGIN_WINDOWS_NAME),
-            ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
+    ND_LOG_STACK lgs[] = {
+        [LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, PLUGIN_WINDOWS_NAME),
+        ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
-        while(service_running(SERVICE_COLLECTORS)) {
-            worker_is_idle();
-            usec_t hb_dt = heartbeat_next(&hb, step);
+    while(service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        usec_t hb_dt = heartbeat_next(&hb, step);
 
+        if(unlikely(!service_running(SERVICE_COLLECTORS)))
+            break;
+
+        PerflibNamesRegistryUpdate();
+
+        for(i = 0; win_modules[i].name; i++) {
             if(unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
-            PerflibNamesRegistryUpdate();
+            struct proc_module *pm = &win_modules[i];
+            if(unlikely(!pm->enabled))
+                continue;
 
-            for(i = 0; win_modules[i].name; i++) {
-                if(unlikely(!service_running(SERVICE_COLLECTORS)))
-                    break;
-
-                struct proc_module *pm = &win_modules[i];
-                if(unlikely(!pm->enabled))
-                    continue;
-
-                worker_is_busy(i);
-                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_windows_module, pm);
-                pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
-                lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, PLUGIN_WINDOWS_NAME);
-            }
+            worker_is_busy(i);
+            lgs[LGS_MODULE_ID] = ND_LOG_FIELD_CB(NDF_MODULE, log_windows_module, pm);
+            pm->enabled = !pm->func(localhost->rrd_update_every, hb_dt);
+            lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, PLUGIN_WINDOWS_NAME);
         }
     }
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -47,8 +47,9 @@ static inline bool plugin_is_running(struct plugind *cd) {
     return ret;
 }
 
-static void pluginsd_worker_thread_cleanup(void *arg) {
-    struct plugind *cd = (struct plugind *)arg;
+static void pluginsd_worker_thread_cleanup(void *pptr) {
+    struct plugind *cd = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!cd) return;
 
     worker_unregister();
 
@@ -138,73 +139,73 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
 #undef SERIAL_FAILURES_THRESHOLD
 
 static void *pluginsd_worker_thread(void *arg) {
+    CLEANUP_FUNCTION_REGISTER(pluginsd_worker_thread_cleanup) cleanup_ptr = arg;
+
     worker_register("PLUGINSD");
 
-    netdata_thread_cleanup_push(pluginsd_worker_thread_cleanup, arg)
-    {
-        struct plugind *cd = (struct plugind *) arg;
-        plugin_set_running(cd);
+    struct plugind *cd = (struct plugind *) arg;
+    plugin_set_running(cd);
 
-        size_t count = 0;
+    size_t count = 0;
 
-        while(service_running(SERVICE_COLLECTORS)) {
-            FILE *fp_child_input = NULL;
-            FILE *fp_child_output = netdata_popen(cd->cmd, &cd->unsafe.pid, &fp_child_input);
+    while(service_running(SERVICE_COLLECTORS)) {
+        FILE *fp_child_input = NULL;
+        FILE *fp_child_output = netdata_popen(cd->cmd, &cd->unsafe.pid, &fp_child_input);
 
-            if(unlikely(!fp_child_input || !fp_child_output)) {
-                netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").",
-                                  rrdhost_hostname(cd->host), cd->cmd);
-                break;
-            }
-
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
-                   rrdhost_hostname(cd->host),
-                   cd->fullfilename, cd->unsafe.pid);
-
-            const char *plugin = strrchr(cd->fullfilename, '/');
-            if(plugin)
-                plugin++;
-            else
-                plugin = cd->fullfilename;
-
-            char module[100];
-            snprintfz(module, sizeof(module), "plugins.d[%s]", plugin);
-            ND_LOG_STACK lgs[] = {
-                    ND_LOG_FIELD_TXT(NDF_MODULE, module),
-                    ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rrdhost_hostname(cd->host)),
-                    ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "pluginsd"),
-                    ND_LOG_FIELD_END(),
-            };
-            ND_LOG_STACK_PUSH(lgs);
-
-            count = pluginsd_process(cd->host, cd, fp_child_input, fp_child_output, 0);
-
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
-                   rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
-
-            killpid(cd->unsafe.pid);
-
-            int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->unsafe.pid);
-
-            if(likely(worker_ret_code == 0))
-                pluginsd_worker_thread_handle_success(cd);
-            else
-                pluginsd_worker_thread_handle_error(cd, worker_ret_code);
-
-            cd->unsafe.pid = 0;
-
-            if(unlikely(!plugin_is_enabled(cd)))
-                break;
+        if(unlikely(!fp_child_input || !fp_child_output)) {
+            netdata_log_error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").",
+                              rrdhost_hostname(cd->host), cd->cmd);
+            break;
         }
+
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
+               rrdhost_hostname(cd->host),
+               cd->fullfilename, cd->unsafe.pid);
+
+        const char *plugin = strrchr(cd->fullfilename, '/');
+        if(plugin)
+            plugin++;
+        else
+            plugin = cd->fullfilename;
+
+        char module[100];
+        snprintfz(module, sizeof(module), "plugins.d[%s]", plugin);
+        ND_LOG_STACK lgs[] = {
+                ND_LOG_FIELD_TXT(NDF_MODULE, module),
+                ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rrdhost_hostname(cd->host)),
+                ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "pluginsd"),
+                ND_LOG_FIELD_END(),
+        };
+        ND_LOG_STACK_PUSH(lgs);
+
+        count = pluginsd_process(cd->host, cd, fp_child_input, fp_child_output, 0);
+
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
+               rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
+
+        killpid(cd->unsafe.pid);
+
+        int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->unsafe.pid);
+
+        if(likely(worker_ret_code == 0))
+            pluginsd_worker_thread_handle_success(cd);
+        else
+            pluginsd_worker_thread_handle_error(cd, worker_ret_code);
+
+        cd->unsafe.pid = 0;
+
+        if(unlikely(!plugin_is_enabled(cd)))
+            break;
     }
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
-static void pluginsd_main_cleanup(void *data) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+static void pluginsd_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     netdata_log_info("PLUGINSD: cleaning up...");
 
@@ -226,9 +227,8 @@ static void pluginsd_main_cleanup(void *data) {
     worker_unregister();
 }
 
-void *pluginsd_main(void *ptr)
-{
-    netdata_thread_cleanup_push(pluginsd_main_cleanup, ptr);
+void *pluginsd_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(pluginsd_main_cleanup) cleanup_ptr = ptr;
 
     int automatic_run = config_get_boolean(CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
     int scan_frequency = (int)config_get_number(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
@@ -352,6 +352,5 @@ void *pluginsd_main(void *ptr)
         sleep((unsigned int)scan_frequency);
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

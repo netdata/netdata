@@ -1830,30 +1830,32 @@ static int replication_pipeline_execute_next(void) {
     return REQUEST_OK;
 }
 
-static void replication_worker_cleanup(void *ptr __maybe_unused) {
+static void replication_worker_cleanup(void *pptr) {
+    if(CLEANUP_FUNCTION_GET_PTR(pptr) != (void *)0x01) return;
     replication_pipeline_cancel_and_cleanup();
     worker_unregister();
 }
 
 static void *replication_worker_thread(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(replication_worker_cleanup) cleanup_ptr = (void *)0x1;
     replication_initialize_workers(false);
 
-    netdata_thread_cleanup_push(replication_worker_cleanup, ptr) {
-        while (service_running(SERVICE_REPLICATION)) {
-            if (unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
-                sender_thread_buffer_free();
-                worker_is_busy(WORKER_JOB_WAIT);
-                worker_is_idle();
-                sleep_usec(1 * USEC_PER_SEC);
-            }
+    while (service_running(SERVICE_REPLICATION)) {
+        if (unlikely(replication_pipeline_execute_next() == REQUEST_QUEUE_EMPTY)) {
+            sender_thread_buffer_free();
+            worker_is_busy(WORKER_JOB_WAIT);
+            worker_is_idle();
+            sleep_usec(1 * USEC_PER_SEC);
         }
     }
-    netdata_thread_cleanup_pop(1);
+
     return NULL;
 }
 
-static void replication_main_cleanup(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+static void replication_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     replication_pipeline_cancel_and_cleanup();
@@ -1906,7 +1908,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         }
     }
 
-    netdata_thread_cleanup_push(replication_main_cleanup, ptr);
+    CLEANUP_FUNCTION_REGISTER(replication_main_cleanup) cleanup_ptr = ptr;
 
     // start from 100% completed
     worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, 100.0);
@@ -2029,6 +2031,5 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         }
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

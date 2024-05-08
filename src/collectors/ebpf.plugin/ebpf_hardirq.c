@@ -244,9 +244,10 @@ static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void hardirq_exit(void *ptr)
+static void hardirq_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -658,9 +659,10 @@ static int ebpf_hardirq_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_hardirq_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(hardirq_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(hardirq_exit) cleanup_ptr = em;
+
     em->maps = hardirq_maps;
 
     if (ebpf_enable_tracepoints(hardirq_tracepoints) == 0) {
@@ -679,8 +681,6 @@ void *ebpf_hardirq_thread(void *ptr)
 
 endhardirq:
     ebpf_update_disabled_plugin_stats(em);
-
-    netdata_thread_cleanup_pop(1);
 
     return NULL;
 }

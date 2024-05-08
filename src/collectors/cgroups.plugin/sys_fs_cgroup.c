@@ -1513,13 +1513,14 @@ void update_cgroup_charts() {
 // ----------------------------------------------------------------------------
 // cgroups main
 
-static void cgroup_main_cleanup(void *ptr) {
-    worker_unregister();
+static void cgroup_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
+    worker_unregister();
 
     usec_t max = 2 * USEC_PER_SEC, step = 50000;
 
@@ -1554,12 +1555,12 @@ void cgroup_read_host_total_ram() {
 }
 
 void *cgroups_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(cgroup_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("CGROUPS");
     worker_register_job_name(WORKER_CGROUPS_LOCK, "lock");
     worker_register_job_name(WORKER_CGROUPS_READ, "read");
     worker_register_job_name(WORKER_CGROUPS_CHART, "chart");
-
-    netdata_thread_cleanup_push(cgroup_main_cleanup, ptr);
 
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
         is_inside_k8s = 1;
@@ -1658,6 +1659,5 @@ void *cgroups_main(void *ptr) {
     }
 
 exit:
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -562,9 +562,11 @@ void analytics_gather_mutable_meta_data(void)
     }
 }
 
-void analytics_main_cleanup(void *ptr)
+void analytics_main_cleanup(void *pptr)
 {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     netdata_log_debug(D_ANALYTICS, "Cleaning up...");
@@ -581,7 +583,7 @@ void analytics_main_cleanup(void *ptr)
  */
 void *analytics_main(void *ptr)
 {
-    netdata_thread_cleanup_push(analytics_main_cleanup, ptr);
+    CLEANUP_FUNCTION_REGISTER(analytics_main_cleanup) cleanup_ptr = ptr;
     unsigned int sec = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -626,7 +628,6 @@ void *analytics_main(void *ptr)
     }
 
 cleanup:
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 

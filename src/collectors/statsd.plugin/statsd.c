@@ -1078,8 +1078,10 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
 // --------------------------------------------------------------------------------------------------------------------
 // statsd child thread to collect metrics from network
 
-void statsd_collector_thread_cleanup(void *data) {
-    struct statsd_udp *d = data;
+void statsd_collector_thread_cleanup(void *pptr) {
+    struct statsd_udp *d = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!d) return;
+
     spinlock_lock(&d->status->spinlock);
     d->status->running = false;
     spinlock_unlock(&d->status->spinlock);
@@ -1120,7 +1122,7 @@ void *statsd_collector_thread(void *ptr) {
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
     d->status = status;
 
-    netdata_thread_cleanup_push(statsd_collector_thread_cleanup, d);
+    CLEANUP_FUNCTION_REGISTER(statsd_collector_thread_cleanup) cleanup_ptr = d;
 
 #ifdef HAVE_RECVMMSG
     d->type = STATSD_SOCKET_DATA_TYPE_UDP;
@@ -1154,7 +1156,6 @@ void *statsd_collector_thread(void *ptr) {
             , status->max_sockets
     );
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -2393,8 +2394,10 @@ static int statsd_listen_sockets_setup(void) {
     return listen_sockets_setup(&statsd.sockets);
 }
 
-static void statsd_main_cleanup(void *data) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
+static void statsd_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     collector_info("cleaning up...");
 
@@ -2445,6 +2448,8 @@ static void statsd_main_cleanup(void *data) {
 #endif
 
 void *statsd_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(statsd_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("STATSDFLUSH");
     worker_register_job_name(WORKER_STATSD_FLUSH_GAUGES, "gauges");
     worker_register_job_name(WORKER_STATSD_FLUSH_COUNTERS, "counters");
@@ -2454,8 +2459,6 @@ void *statsd_main(void *ptr) {
     worker_register_job_name(WORKER_STATSD_FLUSH_SETS, "sets");
     worker_register_job_name(WORKER_STATSD_FLUSH_DICTIONARIES, "dictionaries");
     worker_register_job_name(WORKER_STATSD_FLUSH_STATS, "statistics");
-
-    netdata_thread_cleanup_push(statsd_main_cleanup, ptr);
 
     statsd.gauges.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
     statsd.meters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
@@ -2888,6 +2891,5 @@ void *statsd_main(void *ptr) {
     }
 
 cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

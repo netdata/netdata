@@ -513,8 +513,9 @@ cleanup:
     dictionary_acquired_item_release(dict_mountpoints, item);
 }
 
-static void diskspace_slow_worker_cleanup(void *ptr) {
-    UNUSED(ptr);
+static void diskspace_slow_worker_cleanup(void *pptr) {
+    struct slow_worker_data *data = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(data) return;
 
     collector_info("cleaning up...");
 
@@ -531,7 +532,8 @@ struct slow_worker_data {
 void *diskspace_slow_worker(void *ptr)
 {
     struct slow_worker_data *data = (struct slow_worker_data *)ptr;
-    
+    CLEANUP_FUNCTION_REGISTER(diskspace_slow_worker_cleanup) cleanup_ptr = data;
+
     worker_register("DISKSPACE_SLOW");
     worker_register_job_name(WORKER_JOB_SLOW_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_SLOW_CLEANUP, "cleanup");
@@ -539,8 +541,6 @@ void *diskspace_slow_worker(void *ptr)
     struct basic_mountinfo *slow_mountinfo_root = NULL;
 
     int slow_update_every = data->update_every > SLOW_UPDATE_EVERY ? data->update_every : SLOW_UPDATE_EVERY;
-
-    netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, data);
 
     usec_t step = slow_update_every * USEC_PER_SEC;
     usec_t real_step = USEC_PER_SEC;
@@ -598,21 +598,21 @@ void *diskspace_slow_worker(void *ptr)
         }
     }
 
-    netdata_thread_cleanup_pop(1);
-
     free_basic_mountinfo_list(slow_mountinfo_root);
 
     return NULL;
 }
 
-static void diskspace_main_cleanup(void *ptr) {
-    rrd_collector_finished();
-    worker_unregister();
+static void diskspace_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
+
+    rrd_collector_finished();
+    worker_unregister();
 
     if (diskspace_slow_thread) {
         nd_thread_join(diskspace_slow_thread);
@@ -844,6 +844,8 @@ int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unu
 }
 
 void *diskspace_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(diskspace_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("DISKSPACE");
     worker_register_job_name(WORKER_JOB_MOUNTINFO, "mountinfo");
     worker_register_job_name(WORKER_JOB_MOUNTPOINT, "mountpoint");
@@ -853,8 +855,6 @@ void *diskspace_main(void *ptr) {
                             RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSPACE_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             diskspace_function_mount_points);
-
-    netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
@@ -921,8 +921,5 @@ void *diskspace_main(void *ptr) {
             mount_points_cleanup(false);
         }
     }
-    worker_unregister();
-
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

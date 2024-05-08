@@ -180,8 +180,10 @@ static void *subprofile_main(void* Arg) {
     return nullptr;
 }
 
-static void profile_main_cleanup(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *) ptr;
+static void profile_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     netdata_log_info("cleaning up...");
@@ -190,7 +192,7 @@ static void profile_main_cleanup(void *ptr) {
 }
 
 extern "C" void *profile_main(void *ptr) {
-    netdata_thread_cleanup_push(profile_main_cleanup, ptr);
+    CLEANUP_FUNCTION_REGISTER(profile_main_cleanup) cleanup_ptr = ptr;
 
     int UpdateEvery = (int) config_get_number(CONFIG_SECTION_PROFILE, "update every", 1);
     if (UpdateEvery < localhost->rrd_update_every)
@@ -222,6 +224,5 @@ extern "C" void *profile_main(void *ptr) {
     for (size_t Idx = 0; Idx != NumThreads; Idx++)
         nd_thread_join(Threads[Idx]);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

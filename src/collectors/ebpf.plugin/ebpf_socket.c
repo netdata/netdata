@@ -881,9 +881,10 @@ static void ebpf_socket_obsolete_global_charts(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void ebpf_socket_exit(void *ptr)
+static void ebpf_socket_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (ebpf_read_socket.thread)
         nd_thread_cancel(ebpf_read_socket.thread);
@@ -2876,9 +2877,10 @@ static int ebpf_socket_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_socket_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_socket_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_socket_exit) cleanup_ptr = em;
+
     if (em->enabled > NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         collector_error("There is already a thread %s running", em->info.thread_name);
         return NULL;
@@ -2933,7 +2935,5 @@ void *ebpf_socket_thread(void *ptr)
 
 endsocket:
     ebpf_update_disabled_plugin_stats(em);
-
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

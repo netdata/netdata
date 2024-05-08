@@ -881,9 +881,10 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
 **/
-static void ebpf_vfs_exit(void *ptr)
+static void ebpf_vfs_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (ebpf_read_vfs.thread)
         nd_thread_cancel(ebpf_read_vfs.thread);
@@ -2606,9 +2607,10 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_vfs_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_vfs_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_vfs_exit) cleanup_ptr = em;
+
     em->maps = vfs_maps;
 
     ebpf_update_pid_table(&vfs_maps[NETDATA_VFS_PID], em);
@@ -2644,6 +2646,5 @@ void *ebpf_vfs_thread(void *ptr)
 endvfs:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -394,8 +394,9 @@ cleanup:
 // ----------------------------------------------------------------------------
 // web server worker thread
 
-static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
-    worker_private = (struct web_server_static_threaded_worker *)ptr;
+static void socket_listen_main_static_threaded_worker_cleanup(void *pptr) {
+    worker_private = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!worker_private) return;
 
     netdata_log_info("stopped after %zu connects, %zu disconnects (max concurrent %zu), %zu receptions and %zu sends",
             worker_private->connected,
@@ -414,7 +415,7 @@ static bool web_server_should_stop(void) {
 }
 
 void *socket_listen_main_static_threaded_worker(void *ptr) {
-    worker_private = (struct web_server_static_threaded_worker *)ptr;
+    worker_private = ptr;
     worker_private->running = 1;
     worker_register("WEB");
     worker_register_job_name(WORKER_JOB_ADD_CONNECTION, "connect");
@@ -427,26 +428,24 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
     worker_register_job_name(WORKER_JOB_SND_DATA, "send");
     worker_register_job_name(WORKER_JOB_PROCESS, "process");
 
-    netdata_thread_cleanup_push(socket_listen_main_static_threaded_worker_cleanup, ptr);
+    CLEANUP_FUNCTION_REGISTER(socket_listen_main_static_threaded_worker_cleanup) cleanup_ptr = worker_private;
+    poll_events(&api_sockets
+                , web_server_add_callback
+                , web_server_del_callback
+                , web_server_rcv_callback
+                , web_server_snd_callback
+                , NULL
+                , web_server_should_stop
+                , web_allow_connections_from
+                , web_allow_connections_dns
+                , NULL
+                , web_client_first_request_timeout
+                , web_client_timeout
+                , default_rrd_update_every * 1000 // timer_milliseconds
+                , ptr // timer_data
+                , worker_private->max_sockets
+    );
 
-            poll_events(&api_sockets
-                        , web_server_add_callback
-                        , web_server_del_callback
-                        , web_server_rcv_callback
-                        , web_server_snd_callback
-                        , NULL
-                        , web_server_should_stop
-                        , web_allow_connections_from
-                        , web_allow_connections_dns
-                        , NULL
-                        , web_client_first_request_timeout
-                        , web_client_timeout
-                        , default_rrd_update_every * 1000 // timer_milliseconds
-                        , ptr // timer_data
-                        , worker_private->max_sockets
-            );
-
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -454,8 +453,10 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
 // ----------------------------------------------------------------------------
 // web server main thread - also becomes a worker
 
-static void socket_listen_main_static_threaded_cleanup(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+static void socket_listen_main_static_threaded_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
 //    int i, found = 0;
@@ -496,7 +497,7 @@ static void socket_listen_main_static_threaded_cleanup(void *ptr) {
 }
 
 void *socket_listen_main_static_threaded(void *ptr) {
-    netdata_thread_cleanup_push(socket_listen_main_static_threaded_cleanup, ptr);
+    CLEANUP_FUNCTION_REGISTER(socket_listen_main_static_threaded_cleanup) cleanup_ptr = ptr;
     web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 
     if(!api_sockets.opened)
@@ -557,6 +558,5 @@ void *socket_listen_main_static_threaded(void *ptr) {
     static_workers_private_data[0].max_sockets = max_sockets / static_threaded_workers_count;
     socket_listen_main_static_threaded_worker((void *)&static_workers_private_data[0]);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

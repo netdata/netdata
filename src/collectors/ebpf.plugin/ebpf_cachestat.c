@@ -523,9 +523,10 @@ void ebpf_obsolete_cachestat_apps_charts(struct ebpf_module *em)
  *
  * @param ptr thread data.
  */
-static void ebpf_cachestat_exit(void *ptr)
+static void ebpf_cachestat_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (ebpf_read_cachestat.thread)
         nd_thread_cancel(ebpf_read_cachestat.thread);
@@ -1593,9 +1594,10 @@ static int ebpf_cachestat_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_cachestat_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_cachestat_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_cachestat_exit) cleanup_ptr = em;
+
     em->maps = cachestat_maps;
 
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
@@ -1639,6 +1641,5 @@ void *ebpf_cachestat_thread(void *ptr)
 endcachestat:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

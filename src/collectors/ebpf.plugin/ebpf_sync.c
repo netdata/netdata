@@ -351,9 +351,10 @@ static void ebpf_obsolete_sync_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void ebpf_sync_exit(void *ptr)
+static void ebpf_sync_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -703,9 +704,9 @@ static void ebpf_set_sync_maps()
  */
 void *ebpf_sync_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_sync_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_sync_exit) cleanup_ptr = em;
 
     ebpf_set_sync_maps();
     ebpf_sync_parse_syscalls();
@@ -734,6 +735,5 @@ void *ebpf_sync_thread(void *ptr)
 endsync:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

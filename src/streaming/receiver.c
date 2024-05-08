@@ -307,60 +307,58 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
 
     // this keeps the parser with its current value
     // so, parser needs to be allocated before pushing it
-    netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser) {
-        bool compressed_connection = rrdpush_decompression_initialize(rpt);
-        buffered_reader_init(&rpt->reader);
+    CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) parser_ptr = parser;
+
+    bool compressed_connection = rrdpush_decompression_initialize(rpt);
+    buffered_reader_init(&rpt->reader);
 
 #ifdef NETDATA_LOG_STREAM_RECEIVE
-        {
-            char filename[FILENAME_MAX + 1];
-            snprintfz(filename, FILENAME_MAX, "/tmp/stream-receiver-%s.txt", rpt->host ? rrdhost_hostname(
-                            rpt->host) : "unknown"
-                     );
-            parser->user.stream_log_fp = fopen(filename, "w");
-            parser->user.stream_log_repertoire = PARSER_REP_METADATA;
-        }
+    {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "/tmp/stream-receiver-%s.txt", rpt->host ? rrdhost_hostname(
+                        rpt->host) : "unknown"
+                 );
+        parser->user.stream_log_fp = fopen(filename, "w");
+        parser->user.stream_log_repertoire = PARSER_REP_METADATA;
+    }
 #endif
 
-        CLEAN_BUFFER *buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
+    CLEAN_BUFFER *buffer = buffer_create(sizeof(rpt->reader.read_buffer), NULL);
 
-        ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
-                ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
-                ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
-                ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
-                ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
+            ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
-        while(!receiver_should_stop(rpt)) {
+    while(!receiver_should_stop(rpt)) {
 
-            if(!buffered_reader_next_line(&rpt->reader, buffer)) {
-                STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
+        if(!buffered_reader_next_line(&rpt->reader, buffer)) {
+            STREAM_HANDSHAKE reason = STREAM_HANDSHAKE_DISCONNECT_UNKNOWN_SOCKET_READ_ERROR;
 
-                bool have_new_data = compressed_connection ? receiver_read_compressed(rpt, &reason)
-                                                           : receiver_read_uncompressed(rpt, &reason);
+            bool have_new_data = compressed_connection ? receiver_read_compressed(rpt, &reason)
+                                                       : receiver_read_uncompressed(rpt, &reason);
 
-                if(unlikely(!have_new_data)) {
-                    receiver_set_exit_reason(rpt, reason, false);
-                    break;
-                }
-
-                continue;
-            }
-
-            if(unlikely(parser_action(parser, buffer->buffer))) {
-                receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
+            if(unlikely(!have_new_data)) {
+                receiver_set_exit_reason(rpt, reason, false);
                 break;
             }
 
-            buffer->len = 0;
-            buffer->buffer[0] = '\0';
+            continue;
         }
-        result = parser->user.data_collections_count;
-    }
-    netdata_thread_cleanup_pop(1); // free parser with the pop function
 
+        if(unlikely(parser_action(parser, buffer->buffer))) {
+            receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_PARSER_FAILED, false);
+            break;
+        }
+
+        buffer->len = 0;
+        buffer->buffer[0] = '\0';
+    }
+    result = parser->user.data_collections_count;
     return result;
 }
 
@@ -844,7 +842,7 @@ cleanup:
 }
 
 static void rrdpush_receiver_thread_cleanup(void *pptr) {
-    struct receiver_state *rpt = CLEANUP_FUNCTION_PTR(pptr);
+    struct receiver_state *rpt = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!rpt) return;
 
     netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
@@ -881,7 +879,7 @@ static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
 }
 
 void *rrdpush_receiver_thread(void *ptr) {
-    CLEANUP_FUNCTION(rrdpush_receiver_thread_cleanup) cleanup_ptr = ptr;
+    CLEANUP_FUNCTION_REGISTER(rrdpush_receiver_thread_cleanup) cleanup_ptr = ptr;
     worker_register("STREAMRCV");
 
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ,

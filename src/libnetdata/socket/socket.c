@@ -1692,11 +1692,11 @@ void poll_default_tmr_callback(void *timer_data) {
     (void)timer_data;
 }
 
-static void poll_events_cleanup(void *data) {
-    POLLJOB *p = (POLLJOB *)data;
+static void poll_events_cleanup(void *pptr) {
+    POLLJOB *p = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!p) return;
 
-    size_t i;
-    for(i = 0 ; i <= p->max ; i++) {
+    for(size_t i = 0 ; i <= p->max ; i++) {
         POLLINFO *pi = &p->inf[i];
         poll_close_fd(pi);
     }
@@ -1945,7 +1945,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         next_timer_usec = now_usec - (now_usec % timer_usec) + timer_usec;
     }
 
-    netdata_thread_cleanup_push(poll_events_cleanup, &p);
+    CLEANUP_FUNCTION_REGISTER(poll_events_cleanup) cleanup_ptr = &p;
 
     while(!check_to_stop_callback()) {
         if(unlikely(timer_usec)) {
@@ -2151,6 +2151,4 @@ void poll_events(LISTEN_SOCKETS *sockets
             }
         }
     }
-
-    netdata_thread_cleanup_pop(1);
 }

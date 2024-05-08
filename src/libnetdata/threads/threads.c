@@ -243,15 +243,14 @@ static void nd_thread_join_exited_detached_threads(void) {
     }
 }
 
-static void nd_thread_exit(void *ptr) {
-    ND_THREAD *nti = _nd_thread_info;
+static void nd_thread_exit(void *pptr) {
+    ND_THREAD *nti = CLEANUP_FUNCTION_GET_PTR(pptr);
 
-    if(nti != ptr) {
-        ND_THREAD *info = (ND_THREAD *)ptr;
+    if(nti != _nd_thread_info || !nti || !_nd_thread_info) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "THREADS: internal error - thread local variable does not match the one passed to this function. "
                "Expected thread '%s', passed thread '%s'",
-               nti->tag, info->tag);
+               _nd_thread_info ? _nd_thread_info->tag : "(null)", nti ? nti->tag : "(null)");
     }
 
     if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP) != NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
@@ -294,11 +293,10 @@ static void *nd_thread_starting_point(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot set pthread cancel state to ENABLE.");
 
-    pthread_cleanup_push(nd_thread_exit, ptr) {
-        // run the thread code
-        nti->ret = nti->start_routine(nti->arg);
-    }
-    pthread_cleanup_pop(1);
+    CLEANUP_FUNCTION_REGISTER(nd_thread_exit) cleanup_ptr = nti;
+
+    // run the thread code
+    nti->ret = nti->start_routine(nti->arg);
 
     return nti;
 }

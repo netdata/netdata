@@ -1131,9 +1131,10 @@ static int ebpf_swap_set_internal_value()
  */
 void *ebpf_swap_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_swap_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_swap_exit) cleanup_ptr = em;
+
     em->maps = swap_maps;
 
     ebpf_update_pid_table(&swap_maps[NETDATA_PID_SWAP_TABLE], em);
@@ -1169,6 +1170,5 @@ void *ebpf_swap_thread(void *ptr)
 endswap:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

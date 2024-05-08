@@ -740,16 +740,16 @@ static void health_event_loop(void) {
 }
 
 
-static void health_main_cleanup(void *ptr) {
-    worker_unregister();
+static void health_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    worker_unregister();
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
     netdata_log_info("cleaning up...");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "Health thread ended.");
+    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Health thread ended.");
 }
 
 void *health_main(void *ptr) {
@@ -765,10 +765,7 @@ void *health_main(void *ptr) {
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET, "rrdset init");
     worker_register_job_name(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM, "rrddim init");
 
-    netdata_thread_cleanup_push(health_main_cleanup, ptr);
-    {
-        health_event_loop();
-    }
-    netdata_thread_cleanup_pop(1);
+    CLEANUP_FUNCTION_REGISTER(health_main_cleanup) cleanup_ptr = ptr;
+    health_event_loop();
     return NULL;
 }

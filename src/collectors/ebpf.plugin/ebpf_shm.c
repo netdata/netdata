@@ -448,9 +448,10 @@ static void ebpf_obsolete_shm_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void ebpf_shm_exit(void *ptr)
+static void ebpf_shm_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (ebpf_read_shm.thread)
         nd_thread_cancel(ebpf_read_shm.thread);
@@ -1327,9 +1328,10 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_shm_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_shm_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_shm_exit) cleanup_ptr = em;
+
     em->maps = shm_maps;
 
     ebpf_update_pid_table(&shm_maps[NETDATA_PID_SHM_TABLE], em);
@@ -1371,6 +1373,5 @@ void *ebpf_shm_thread(void *ptr)
 endshm:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

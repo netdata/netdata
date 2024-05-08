@@ -1469,8 +1469,10 @@ static bool rrdhost_sender_should_exit(struct sender_state *s) {
     return false;
 }
 
-static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
-    struct rrdpush_sender_thread_data *s = ptr;
+static void rrdpush_sender_thread_cleanup_callback(void *pptr) {
+    struct rrdpush_sender_thread_data *s = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!s) return;
+
     worker_unregister();
 
     RRDHOST *host = s->host;
@@ -1670,7 +1672,7 @@ void *rrdpush_sender_thread(void *ptr) {
     thread_data->pipe_buffer = mallocz(pipe_buffer_size);
     thread_data->host = s->host;
 
-    netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
+    CLEANUP_FUNCTION_REGISTER(rrdpush_sender_thread_cleanup_callback) cleanup_ptr = thread_data;
 
     size_t iterations = 0;
     time_t now_s = now_monotonic_sec();
@@ -1888,6 +1890,5 @@ void *rrdpush_sender_thread(void *ptr) {
         worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE) dictionary_entries(s->replication.requests));
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

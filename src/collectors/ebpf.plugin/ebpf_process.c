@@ -689,9 +689,10 @@ static void ebpf_process_disable_tracepoints()
  *
  * @param ptr thread data.
  */
-static void ebpf_process_exit(void *ptr)
+static void ebpf_process_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -1279,9 +1280,10 @@ static int ebpf_process_enable_tracepoints()
  */
 void *ebpf_process_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_process_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_process_exit) cleanup_ptr = em;
+
     em->maps = process_maps;
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
@@ -1322,6 +1324,5 @@ void *ebpf_process_thread(void *ptr)
     ebpf_update_disabled_plugin_stats(em);
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

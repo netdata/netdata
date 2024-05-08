@@ -451,9 +451,10 @@ static void ebpf_obsolete_dc_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void ebpf_dcstat_exit(void *ptr)
+static void ebpf_dcstat_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (ebpf_read_dcstat.thread)
         nd_thread_cancel(ebpf_read_dcstat.thread);
@@ -1403,9 +1404,9 @@ static int ebpf_dcstat_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_dcstat_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_dcstat_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    CLEANUP_FUNCTION_REGISTER(ebpf_dcstat_exit) cleanup_ptr = em;
+
     em->maps = dcstat_maps;
 
     ebpf_update_pid_table(&dcstat_maps[NETDATA_DCSTAT_PID_STATS], em);
@@ -1445,6 +1446,5 @@ void *ebpf_dcstat_thread(void *ptr)
 enddcstat:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
