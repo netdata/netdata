@@ -226,16 +226,16 @@ typedef enum __attribute__ ((__packed__)) rrddim_options {
 // flags are runtime changing status flags (atomics are required to alter/access them)
 typedef enum __attribute__ ((__packed__)) rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
-    RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
 
-    RRDDIM_FLAG_OBSOLETE                        = (1 << 1),  // this is marked by the collector/module as obsolete
+    RRDDIM_FLAG_OBSOLETE                        = (1 << 0),  // this is marked by the collector/module as obsolete
     // No new values have been collected for this dimension since agent start, or it was marked RRDDIM_FLAG_OBSOLETE at
     // least rrdset_free_obsolete_time seconds ago.
-    RRDDIM_FLAG_ARCHIVED                        = (1 << 2),
-    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 3),  // Metadata needs to go to the database
 
-    RRDDIM_FLAG_META_HIDDEN                     = (1 << 4),  // Status of hidden option in the metadata database
-    RRDDIM_FLAG_ML_MODEL_LOAD                   = (1 << 5),  // Do ML LOAD for this dimension
+    RRDDIM_FLAG_ARCHIVED                        = (1 << 1),
+    RRDDIM_FLAG_METADATA_UPDATE                 = (1 << 2),  // Metadata needs to go to the database
+
+    RRDDIM_FLAG_META_HIDDEN                     = (1 << 3),  // Status of hidden option in the metadata database
+    RRDDIM_FLAG_ML_MODEL_LOAD                   = (1 << 4),  // Do ML LOAD for this dimension
 
     // this is 8 bit
 } RRDDIM_FLAGS;
