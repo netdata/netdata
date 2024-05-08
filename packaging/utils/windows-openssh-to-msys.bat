@@ -33,10 +33,20 @@ set DOWNLOAD_URL=https://github.com/PowerShell/Win32-OpenSSH/releases/download/v
 set DOWNLOAD_FILE=%temp%\OpenSSH-Win64.zip
 set INSTALL_DIR=C:\Program Files\OpenSSH-Win64
 
+:: Create the installation directory if it doesn't exist
+if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
+
+:: Download and extract OpenSSH
 powershell -Command "(New-Object Net.WebClient).DownloadFile('%DOWNLOAD_URL%', '%DOWNLOAD_FILE%')"
 
-:: Unzip the downloaded file
+:: Unzip directly to INSTALL_DIR (flatten the folder structure)
 powershell -Command "Expand-Archive -Path '%DOWNLOAD_FILE%' -DestinationPath '%INSTALL_DIR%' -Force"
+
+:: Move inner contents to INSTALL_DIR if nested OpenSSH-Win64 folder exists
+if exist "%INSTALL_DIR%\OpenSSH-Win64" (
+    xcopy "%INSTALL_DIR%\OpenSSH-Win64\*" "%INSTALL_DIR%\" /s /e /y
+    rmdir "%INSTALL_DIR%\OpenSSH-Win64" /s /q
+)
 
 :: Add the OpenSSH binaries to the system PATH
 setx /M PATH "%INSTALL_DIR%;%PATH%"
