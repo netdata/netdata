@@ -1411,8 +1411,11 @@ time_t get_datafile_end_time(struct rrdengine_instance *ctx)
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
 
-    if (datafile)
+    if (datafile) {
         last_time_s = datafile->journalfile->v2.last_time_s;
+        if (!last_time_s)
+            last_time_s = datafile->journalfile->v2.first_time_s;
+    }
 
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
     return last_time_s;
@@ -1813,6 +1816,9 @@ void dbengine_retention_statistics(void)
         collected_number retention_percentage = (collected_number)multidb_ctx[tier]->config.max_retention_s ?
                                                     100 * retention / multidb_ctx[tier]->config.max_retention_s :
                                                     0;
+
+        if (retention_percentage > 100.0)
+            retention_percentage = 100.0;
 
         rrddim_set_by_pointer(stats[tier].st, stats[tier].rd_space, (collected_number) disk_percentage);
         rrddim_set_by_pointer(stats[tier].st, stats[tier].rd_time, (collected_number) retention_percentage);
