@@ -1,4 +1,22 @@
 @echo off
+::
+:: This script will:
+::
+:: 1. install the windows OpenSSH server (either via dsim or download it)
+:: 2. activate the windows OpenSSH service
+:: 3. open OpenSSH TCP port at windows firewall
+:: 4. create a small batch file to start an MSYS session
+:: 5. Set the default OpenSSH startup script to start the MSYS session
+::
+:: Problems:
+:: On older windows versions, terminal emulation is broken.
+:: So, on windows 10 or windows server before 2019, the ssh session
+:: will not have proper terminal emulation and will be not be able to
+:: be used for editing files.
+:: For more info check:
+:: https://github.com/PowerShell/Win32-OpenSSH/issues/1260
+::
+
 :: Check if OpenSSH Server is already installed
 sc query sshd >nul 2>&1
 if %errorlevel% neq 0 (
