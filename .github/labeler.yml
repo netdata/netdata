@@ -252,7 +252,6 @@ area/packaging:
   - any:
       - changed-files:
           - any-glob-to-any-file:
-              - contrib/**
               - packaging/**
               - system/**
               - Dockerfile*
