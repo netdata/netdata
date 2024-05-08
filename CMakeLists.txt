@@ -66,14 +66,20 @@ project(netdata
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/packaging/cmake/Modules")
 include(CMakeDependentOption)
 
-if(NOT BUILD_SHARED_LIBS)
+if(DEFINED BUILD_SHARED_LIBS)
+    if(NOT BUILD_SHARED_LIBS)
+        set(STATIC_BUILD TRUE)
+    endif()
+endif()
+
+if(STATIC_BUILD)
     set(CMAKE_FIND_LIBRARY_PREFIXES "${CMAKE_STATIC_LIBRARY_PREFIX}")
     set(CMAKE_FIND_LIBRARY_SUFFIXES "${CMAKE_STATIC_LIBRARY_SUFFIX}")
 endif()
 
 find_package(PkgConfig REQUIRED)
 
-if(NOT BUILD_SHARED_LIBS)
+if(STATIC_BUILD)
     list(APPEND PKG_CONFIG_EXECUTABLE "--static")
 endif()
 
