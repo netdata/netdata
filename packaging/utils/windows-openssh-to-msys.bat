@@ -1,11 +1,20 @@
 @echo off
-:: Function to Install OpenSSH using dism
-:install_openssh_dism
-echo "Attempting to install OpenSSH using dism..."
-dism /online /Enable-Feature /FeatureName:OpenSSH-Client /All
-dism /online /Enable-Feature /FeatureName:OpenSSH-Server /All
+:: Check if OpenSSH Server is already installed
+sc query sshd >nul 2>&1
+if %errorlevel% neq 0 (
+    echo "OpenSSH Server not found. Attempting to install via dism..."
+    goto :install_openssh_dism
+) else (
+    echo "OpenSSH Server is already installed."
+    goto :configure_openssh
+)
 
-:: Check if installation succeeded
+:: Install OpenSSH using dism
+:install_openssh_dism
+dism /online /Enable-Feature /FeatureName:OpenSSH-Client /All >nul 2>&1
+dism /online /Enable-Feature /FeatureName:OpenSSH-Server /All >nul 2>&1
+
+:: Check if dism succeeded in installing OpenSSH
 sc query sshd >nul 2>&1
 if %errorlevel% neq 0 (
     echo "OpenSSH installation via dism failed or is unavailable."
@@ -33,16 +42,20 @@ powershell -Command "Expand-Archive -Path '%DOWNLOAD_FILE%' -DestinationPath '%I
 setx /M PATH "%INSTALL_DIR%;%PATH%"
 
 :: Install and configure the OpenSSH service
-powershell -Command "New-Service -Name 'sshd' -BinaryPathName '%INSTALL_DIR%\sshd.exe' -StartupType Automatic"
+powershell -Command "New-Service -Name 'sshd' -BinaryPathName '%INSTALL_DIR%\sshd.exe' -StartupType Automatic" >nul 2>&1
 
 :: Register OpenSSH utilities as services
-%INSTALL_DIR%\install-sshd.ps1
+powershell -Command "%INSTALL_DIR%\install-sshd.ps1" >nul 2>&1
 
-:: Ensure OpenSSH Server service is set to start automatically and start the service
-sc config sshd start= auto
-net start sshd
-
-goto :configure_openssh
+:: Verify if manual installation succeeded
+sc query sshd >nul 2>&1
+if %errorlevel% neq 0 (
+    echo "Manual OpenSSH installation failed. Exiting..."
+    exit /b 1
+) else (
+    echo "OpenSSH installed successfully manually."
+    goto :configure_openssh
+)
 
 :configure_openssh
 :: Ensure OpenSSH Server service is set to start automatically and start the service
