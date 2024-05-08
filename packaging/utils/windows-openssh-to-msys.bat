@@ -28,6 +28,9 @@ if %errorlevel% neq 0 (
 :install_openssh_manual
 echo "Installing OpenSSH manually..."
 
+:: Enable TLS 1.2 for secure downloads
+powershell -Command "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12"
+
 :: Download the latest OpenSSH release
 set DOWNLOAD_URL=https://github.com/PowerShell/Win32-OpenSSH/releases/download/v9.5.0.0p1-Beta/OpenSSH-Win64.zip
 set DOWNLOAD_FILE=%temp%\OpenSSH-Win64.zip
@@ -36,11 +39,27 @@ set INSTALL_DIR=C:\Program Files\OpenSSH-Win64
 :: Create the installation directory if it doesn't exist
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
-:: Download and extract OpenSSH
+:: Attempt to download OpenSSH manually up to 3 times
+set /a attempts=0
+:download_openssh
 powershell -Command "(New-Object Net.WebClient).DownloadFile('%DOWNLOAD_URL%', '%DOWNLOAD_FILE%')"
+if %errorlevel% neq 0 (
+    set /a attempts+=1
+    if %attempts% lss 3 (
+        echo "Retrying download attempt %attempts%..."
+        goto :download_openssh
+    ) else (
+        echo "Failed to download OpenSSH after 3 attempts."
+        exit /b 1
+    )
+)
 
 :: Unzip directly to INSTALL_DIR (flatten the folder structure)
 powershell -Command "Expand-Archive -Path '%DOWNLOAD_FILE%' -DestinationPath '%INSTALL_DIR%' -Force"
+if %errorlevel% neq 0 (
+    echo "Failed to unzip OpenSSH package."
+    exit /b 1
+)
 
 :: Move inner contents to INSTALL_DIR if nested OpenSSH-Win64 folder exists
 if exist "%INSTALL_DIR%\OpenSSH-Win64" (
