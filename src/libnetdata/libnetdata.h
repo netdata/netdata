@@ -675,6 +675,33 @@ static inline void freez_const_charp(const char **p) {
 #define CLEAN_CONST_CHAR_P _cleanup_(freez_const_charp) const char
 #define CLEAN_CHAR_P _cleanup_(freez_charp) char
 
+// --------------------------------------------------------------------------------------------------------------------
+// automatic cleanup function, instead of pthread pop/push
+
+// volatile: Tells the compiler that the variable defined might be accessed in unexpected ways
+// (e.g., by the cleanup function). This prevents it from being optimized out.
+#define CLEANUP_FUNCTION(func) volatile void * __attribute__((cleanup(func)))
+
+static inline void *CLEANUP_FUNCTION_PTR(void *pptr) {
+    void *ret;
+    void **p = (void **)pptr;
+    if(p) {
+        ret = *p;
+        *p = NULL; // use it only once - this will prevent using it again
+
+        if(!ret)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "cleanup function called multiple times!");
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "cleanup function called with NULL pptr!");
+        ret = NULL;
+    }
+
+    return ret;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 # ifdef __cplusplus
 }
 # endif

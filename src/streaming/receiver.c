@@ -843,20 +843,18 @@ cleanup:
     ;
 }
 
-static void rrdpush_receiver_thread_cleanup(void *ptr) {
-    struct receiver_state *rpt = (struct receiver_state *) ptr;
-    worker_unregister();
-
-    rrdhost_clear_receiver(rpt);
+static void rrdpush_receiver_thread_cleanup(void *pptr) {
+    struct receiver_state *rpt = CLEANUP_FUNCTION_PTR(pptr);
+    if(!rpt) return;
 
     netdata_log_info("STREAM '%s' [receive from [%s]:%s]: "
          "receive thread ended (task id %d)"
-    , rpt->hostname ? rpt->hostname : "-"
-    , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-"
-    , gettid_cached());
+         , rpt->hostname ? rpt->hostname : "-"
+         , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-", gettid_cached());
 
+    worker_unregister();
+    rrdhost_clear_receiver(rpt);
     receiver_state_free(rpt);
-
     rrdhost_set_is_parent_label();
 }
 
@@ -883,42 +881,37 @@ static bool stream_receiver_log_transport(BUFFER *wb, void *ptr) {
 }
 
 void *rrdpush_receiver_thread(void *ptr) {
-    netdata_thread_cleanup_push(rrdpush_receiver_thread_cleanup, ptr);
+    CLEANUP_FUNCTION(rrdpush_receiver_thread_cleanup) cleanup_ptr = ptr;
+    worker_register("STREAMRCV");
 
-            {
-                worker_register("STREAMRCV");
+    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ,
+                                      "received bytes", "bytes/s",
+                                      WORKER_METRIC_INCREMENT);
 
-                worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ,
-                                                  "received bytes", "bytes/s",
-                                                  WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED,
+                                      "uncompressed bytes", "bytes/s",
+                                      WORKER_METRIC_INCREMENT);
 
-                worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED,
-                                                  "uncompressed bytes", "bytes/s",
-                                                  WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
+                                      "replication completion", "%",
+                                      WORKER_METRIC_ABSOLUTE);
 
-                worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
-                                                  "replication completion", "%",
-                                                  WORKER_METRIC_ABSOLUTE);
+    struct receiver_state *rpt = (struct receiver_state *) ptr;
+    rpt->tid = gettid_cached();
 
-                struct receiver_state *rpt = (struct receiver_state *) ptr;
-                rpt->tid = gettid_cached();
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
+            ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
+            ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
+            ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
+            ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
-                ND_LOG_STACK lgs[] = {
-                        ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->client_ip),
-                        ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->client_port),
-                        ND_LOG_FIELD_TXT(NDF_NIDL_NODE, rpt->hostname),
-                        ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
-                        ND_LOG_FIELD_CB(NDF_SRC_CAPABILITIES, stream_receiver_log_capabilities, rpt),
-                        ND_LOG_FIELD_END(),
-                };
-                ND_LOG_STACK_PUSH(lgs);
+    netdata_log_info("STREAM %s [%s]:%s: receive thread started", rpt->hostname, rpt->client_ip
+                     , rpt->client_port);
 
-                netdata_log_info("STREAM %s [%s]:%s: receive thread started", rpt->hostname, rpt->client_ip
-                                 , rpt->client_port);
-
-                rrdpush_receive(rpt);
-            }
-
-    netdata_thread_cleanup_pop(1);
+    rrdpush_receive(rpt);
     return NULL;
 }
