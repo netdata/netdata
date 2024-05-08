@@ -614,10 +614,8 @@ static void diskspace_main_cleanup(void *pptr) {
     rrd_collector_finished();
     worker_unregister();
 
-    if (diskspace_slow_thread) {
+    if (diskspace_slow_thread)
         nd_thread_join(diskspace_slow_thread);
-        freez(diskspace_slow_thread);
-    }
 
     free_basic_mountinfo_list(slow_mountinfo_tmp_root);
 
