@@ -274,6 +274,13 @@
             "type": "string",
             "title": "Unit",
             "description": "of measurement"
+          },
+          "update_every": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "title": "Frequency",
+            "description": "of evaluation"
           }
         }
       },
@@ -590,11 +597,15 @@
             },
             "calculation": {
               "ui:help": "The database value is available as '$this'. This expression can utilize variables to transform the value of the alert.",
-              "ui:classNames": "dyncfg-grid-col-span-1-5",
+              "ui:classNames": "dyncfg-grid-col-span-1-4",
               "ui:placeholder": "$this * 1"
             },
             "units": {
               "ui:help": "The unit of measurement the alert value is expressed with. If unset, the units of the instance the alert is attached to will be used.",
+              "ui:classNames": "dyncfg-grid-col-span-5-1"
+            },
+            "update_every": {
+              "ui:help": "The frequency this alarm is to be evaluated, in seconds.",
               "ui:classNames": "dyncfg-grid-col-span-6-1"
             }
           },
