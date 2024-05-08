@@ -28,9 +28,6 @@ if %errorlevel% neq 0 (
 :install_openssh_manual
 echo "Installing OpenSSH manually..."
 
-:: Enable TLS 1.2 for secure downloads
-powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12"
-
 :: Download the latest OpenSSH release
 set DOWNLOAD_URL=https://github.com/PowerShell/Win32-OpenSSH/releases/download/v9.5.0.0p1-Beta/OpenSSH-Win64.zip
 set DOWNLOAD_FILE=%temp%\OpenSSH-Win64.zip
@@ -39,11 +36,15 @@ set INSTALL_DIR=C:\Program Files\OpenSSH-Win64
 :: Create the installation directory if it doesn't exist
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
-:: Attempt to download OpenSSH using Invoke-WebRequest
-powershell -Command "try { Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%DOWNLOAD_FILE%' -UseBasicParsing; exit 0 } catch { exit 1 }"
+:: Attempt to download OpenSSH using Invoke-WebRequest and TLS configuration
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; try { Invoke-WebRequest -Uri '%DOWNLOAD_URL%' -OutFile '%DOWNLOAD_FILE%' -UseBasicParsing; exit 0 } catch { exit 1 }"
 if %errorlevel% neq 0 (
-    echo "Failed to download OpenSSH. Exiting..."
-    exit /b 1
+    echo "Invoke-WebRequest download failed. Attempting to download using curl..."
+    curl -L -o "%DOWNLOAD_FILE%" "%DOWNLOAD_URL%"
+    if %errorlevel% neq 0 (
+        echo "Failed to download OpenSSH using curl. Exiting..."
+        exit /b 1
+    )
 )
 
 :: Unzip directly to INSTALL_DIR (flatten the folder structure)
