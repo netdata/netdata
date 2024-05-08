@@ -10,6 +10,8 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function) {
+    if(!host || !ae) return;
+    
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &health_alert_transition_msgid),
             ND_LOG_FIELD_STR(NDF_NIDL_NODE, host->hostname),
