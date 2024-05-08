@@ -3028,10 +3028,12 @@ install(FILES
         COMPONENT netdata
         DESTINATION ${WEB_DEST}/.well-known/dnt)
 
-# v0 dashboard
-install(FILES
-        src/web/gui/v0/index.html
-        COMPONENT netdata
-        DESTINATION ${WEB_DEST}/v0)
+if(NOT WINDOWS)
+        # v0 dashboard
+        install(FILES
+                src/web/gui/v0/index.html
+                COMPONENT netdata
+                DESTINATION ${WEB_DEST}/v0)
+endif()
 
 include(Packaging)
