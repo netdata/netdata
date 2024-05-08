@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- reset health when children disconnect [\#17612](https://github.com/netdata/netdata/pull/17612) ([ktsaou](https://github.com/ktsaou))
+- go.d dyncfg return 200 on Enable for running jobs [\#17611](https://github.com/netdata/netdata/pull/17611) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17610](https://github.com/netdata/netdata/pull/17610) ([netdatabot](https://github.com/netdatabot))
+- Bump golang.org/x/net from 0.24.0 to 0.25.0 in /src/go/collectors/go.d.plugin [\#17609](https://github.com/netdata/netdata/pull/17609) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Bump jinja2 from 3.1.3 to 3.1.4 in /packaging/dag [\#17607](https://github.com/netdata/netdata/pull/17607) ([dependabot[bot]](https://github.com/apps/dependabot))
+- go.d systemdunits add unit files state [\#17606](https://github.com/netdata/netdata/pull/17606) ([ilyam8](https://github.com/ilyam8))
+- Add option to limit architectures for offline installs. [\#17604](https://github.com/netdata/netdata/pull/17604) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17603](https://github.com/netdata/netdata/pull/17603) ([netdatabot](https://github.com/netdatabot))
 - Make offline installs properly offline again. [\#17602](https://github.com/netdata/netdata/pull/17602) ([Ferroin](https://github.com/Ferroin))
 - remove python.d/smartd\_log [\#17600](https://github.com/netdata/netdata/pull/17600) ([ilyam8](https://github.com/ilyam8))
@@ -418,11 +425,6 @@
 - More concretely utilize local modules in our CMake code. [\#17022](https://github.com/netdata/netdata/pull/17022) ([Ferroin](https://github.com/Ferroin))
 - Correctly mark protobuf as required in find\_package. [\#17021](https://github.com/netdata/netdata/pull/17021) ([Ferroin](https://github.com/Ferroin))
 - Protect metric release in dimension delete callback [\#17020](https://github.com/netdata/netdata/pull/17020) ([stelfrag](https://github.com/stelfrag))
-- eBPF - Network Viewer \(Move code\) [\#17018](https://github.com/netdata/netdata/pull/17018) ([thiagoftsm](https://github.com/thiagoftsm))
-- dyncfg: allow tree for individual IDs [\#17017](https://github.com/netdata/netdata/pull/17017) ([ktsaou](https://github.com/ktsaou))
-- Documentation changes, new files and restructuring the hierarchy [\#17014](https://github.com/netdata/netdata/pull/17014) ([Ancairon](https://github.com/Ancairon))
-- eBPF & NV \(update packages\) [\#17012](https://github.com/netdata/netdata/pull/17012) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add watcher thread to report shutdown steps. [\#17010](https://github.com/netdata/netdata/pull/17010) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
