@@ -482,6 +482,37 @@ If you are certain firewall and proxy settings are not the issue, you should con
 GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=ACLK-available-is-false)
 with details about your system and relevant output from `error.log`.
 
+### Delete a node from Space
+
+At the moment Netdata Cloud only allows you to **Offline** nodes.
+
+#### How can I delete Offline nodes? 
+ 
+
+On Netdata Cloud you can delete any **Offline** node from your space. To be able to do that you need to:
+- Be an Administrator on the Space
+- Go to the Space Settings (cogwheel above your profile icon on the left-hand bar)
+- Go to the Node tab
+- Then you can either:
+   - Single Node delete:
+      - Press the garbage bin icon at the end of the row to directly delete the Offline node(s) you want to delete (if these are visible to you)
+   - Multi-Node delete:
+      - Filter the Nodes by Status Offline and select those you want to delete
+      - Press the garbage bin icon on the top of the table
+
+
+#### How can I delete non-offline nodes? 
+
+ You can get a **Live** node to become **Offline** by deleting the `cloud.d/` directory in your Netdata library directory.
+
+```
+cd /var/lib/netdata   # Replace with your Netdata library directory, if not /var/lib/netdata/
+sudo rm -rf cloud.d/
+```
+
+After this your node will become **Offline** in your space, with the exception if you were streaming its data to a Netdata Parent agent. In this case, 
+this node would be seen as Stale in Netdata Cloud. Please reach out to us for help in these cases.
+
 ### Remove and reconnect a node
 
 #### Linux based installations
