@@ -753,6 +753,11 @@ declare -A pkg_libsystemd_dev=(
   ['default']="systemd-devel"
 )
 
+declare -A pkg_pcre2=(
+  ['macos']="pcre2"
+  ['default']="NOTREQUIRED"
+)
+
 declare -A pkg_bridge_utils=(
   ['gentoo']="net-misc/bridge-utils"
   ['clearlinux']="network-basic"
@@ -1310,6 +1315,7 @@ packages() {
     suitable_package fts-dev
     suitable_package libyaml-dev
     suitable_package libsystemd-dev
+    suitable_package pcre2
   fi
 
   # -------------------------------------------------------------------------
