@@ -37,22 +37,22 @@ func TestFilecheck_Cleanup(t *testing.T) {
 
 func TestFilecheck_Init(t *testing.T) {
 	tests := map[string]struct {
-		config          Config
-		wantNumOfCharts int
-		wantFail        bool
+		config   Config
+		wantFail bool
 	}{
 		"default": {
-			config:   New().Config,
 			wantFail: true,
+			config:   New().Config,
 		},
 		"empty files->include and dirs->include": {
+			wantFail: true,
 			config: Config{
 				Files: filesConfig{},
 				Dirs:  dirsConfig{},
 			},
-			wantFail: true,
 		},
 		"files->include and dirs->include": {
+			wantFail: false,
 			config: Config{
 				Files: filesConfig{
 					Include: []string{
@@ -68,9 +68,9 @@ func TestFilecheck_Init(t *testing.T) {
 					CollectDirSize: true,
 				},
 			},
-			wantNumOfCharts: len(fileCharts) + len(dirCharts),
 		},
 		"only files->include": {
+			wantFail: false,
 			config: Config{
 				Files: filesConfig{
 					Include: []string{
@@ -79,9 +79,9 @@ func TestFilecheck_Init(t *testing.T) {
 					},
 				},
 			},
-			wantNumOfCharts: len(fileCharts),
 		},
 		"only dirs->include": {
+			wantFail: false,
 			config: Config{
 				Dirs: dirsConfig{
 					Include: []string{
@@ -91,7 +91,6 @@ func TestFilecheck_Init(t *testing.T) {
 					CollectDirSize: true,
 				},
 			},
-			wantNumOfCharts: len(dirCharts),
 		},
 	}
 
@@ -104,7 +103,6 @@ func TestFilecheck_Init(t *testing.T) {
 				assert.Error(t, fc.Init())
 			} else {
 				require.NoError(t, fc.Init())
-				assert.Equal(t, test.wantNumOfCharts, len(*fc.Charts()))
 			}
 		})
 	}
@@ -142,98 +140,98 @@ func TestFilecheck_Collect(t *testing.T) {
 		"collect files": {
 			prepare: prepareFilecheckFiles,
 			wantCollected: map[string]int64{
-				"file_testdata/empty_file.log_exists":        1,
-				"file_testdata/empty_file.log_mtime_ago":     5081,
-				"file_testdata/empty_file.log_size_bytes":    0,
-				"file_testdata/file.log_exists":              1,
-				"file_testdata/file.log_mtime_ago":           4161,
-				"file_testdata/file.log_size_bytes":          5707,
-				"file_testdata/non_existent_file.log_exists": 0,
-				"num_of_files": 3,
-				"num_of_dirs":  0,
+				"file_testdata/empty_file.log_existence_status_exist":            1,
+				"file_testdata/empty_file.log_existence_status_not_exist":        0,
+				"file_testdata/empty_file.log_mtime_ago":                         517996,
+				"file_testdata/empty_file.log_size_bytes":                        0,
+				"file_testdata/file.log_existence_status_exist":                  1,
+				"file_testdata/file.log_existence_status_not_exist":              0,
+				"file_testdata/file.log_mtime_ago":                               517996,
+				"file_testdata/file.log_size_bytes":                              5707,
+				"file_testdata/non_existent_file.log_existence_status_exist":     0,
+				"file_testdata/non_existent_file.log_existence_status_not_exist": 1,
 			},
 		},
 		"collect files filepath pattern": {
 			prepare: prepareFilecheckGlobFiles,
 			wantCollected: map[string]int64{
-				"file_testdata/empty_file.log_exists":     1,
-				"file_testdata/empty_file.log_mtime_ago":  5081,
-				"file_testdata/empty_file.log_size_bytes": 0,
-				"file_testdata/file.log_exists":           1,
-				"file_testdata/file.log_mtime_ago":        4161,
-				"file_testdata/file.log_size_bytes":       5707,
-				"num_of_files":                            2,
-				"num_of_dirs":                             0,
+				"file_testdata/empty_file.log_existence_status_exist":     1,
+				"file_testdata/empty_file.log_existence_status_not_exist": 0,
+				"file_testdata/empty_file.log_mtime_ago":                  517985,
+				"file_testdata/empty_file.log_size_bytes":                 0,
+				"file_testdata/file.log_existence_status_exist":           1,
+				"file_testdata/file.log_existence_status_not_exist":       0,
+				"file_testdata/file.log_mtime_ago":                        517985,
+				"file_testdata/file.log_size_bytes":                       5707,
 			},
 		},
 		"collect only non existent files": {
 			prepare: prepareFilecheckNonExistentFiles,
 			wantCollected: map[string]int64{
-				"file_testdata/non_existent_file.log_exists": 0,
-				"num_of_files": 1,
-				"num_of_dirs":  0,
+				"file_testdata/non_existent_file.log_existence_status_exist":     0,
+				"file_testdata/non_existent_file.log_existence_status_not_exist": 1,
 			},
 		},
 		"collect dirs": {
 			prepare: prepareFilecheckDirs,
 			wantCollected: map[string]int64{
-				"dir_testdata/dir_exists":              1,
-				"dir_testdata/dir_mtime_ago":           4087,
-				"dir_testdata/dir_num_of_files":        3,
-				"dir_testdata/dir_size_bytes":          8160,
-				"dir_testdata/non_existent_dir_exists": 0,
-				"num_of_files":                         0,
-				"num_of_dirs":                          2,
+				"dir_testdata/dir_existence_status_exist":                  1,
+				"dir_testdata/dir_existence_status_not_exist":              0,
+				"dir_testdata/dir_files_count":                             3,
+				"dir_testdata/dir_mtime_ago":                               517914,
+				"dir_testdata/non_existent_dir_existence_status_exist":     0,
+				"dir_testdata/non_existent_dir_existence_status_not_exist": 1,
 			},
 		},
 		"collect dirs filepath pattern": {
 			prepare: prepareFilecheckGlobDirs,
 			wantCollected: map[string]int64{
-				"dir_testdata/dir_exists":              1,
-				"dir_testdata/dir_mtime_ago":           4087,
-				"dir_testdata/dir_num_of_files":        3,
-				"dir_testdata/dir_size_bytes":          8160,
-				"dir_testdata/non_existent_dir_exists": 0,
-				"num_of_files":                         0,
-				"num_of_dirs":                          2,
+				"dir_testdata/dir_existence_status_exist":                  1,
+				"dir_testdata/dir_existence_status_not_exist":              0,
+				"dir_testdata/dir_files_count":                             3,
+				"dir_testdata/dir_mtime_ago":                               517902,
+				"dir_testdata/non_existent_dir_existence_status_exist":     0,
+				"dir_testdata/non_existent_dir_existence_status_not_exist": 1,
 			},
 		},
 		"collect dirs w/o size": {
 			prepare: prepareFilecheckDirsWithoutSize,
 			wantCollected: map[string]int64{
-				"dir_testdata/dir_exists":              1,
-				"dir_testdata/dir_mtime_ago":           4087,
-				"dir_testdata/dir_num_of_files":        3,
-				"dir_testdata/non_existent_dir_exists": 0,
-				"num_of_files":                         0,
-				"num_of_dirs":                          2,
+				"dir_testdata/dir_existence_status_exist":                  1,
+				"dir_testdata/dir_existence_status_not_exist":              0,
+				"dir_testdata/dir_files_count":                             3,
+				"dir_testdata/dir_mtime_ago":                               517892,
+				"dir_testdata/non_existent_dir_existence_status_exist":     0,
+				"dir_testdata/non_existent_dir_existence_status_not_exist": 1,
 			},
 		},
 		"collect only non existent dirs": {
 			prepare: prepareFilecheckNonExistentDirs,
 			wantCollected: map[string]int64{
-				"dir_testdata/non_existent_dir_exists": 0,
-				"num_of_files":                         0,
-				"num_of_dirs":                          1,
+				"dir_testdata/non_existent_dir_existence_status_exist":     0,
+				"dir_testdata/non_existent_dir_existence_status_not_exist": 1,
 			},
 		},
 		"collect files and dirs": {
 			prepare: prepareFilecheckFilesDirs,
 			wantCollected: map[string]int64{
-				"dir_testdata/dir_exists":                    1,
-				"dir_testdata/dir_mtime_ago":                 4120,
-				"dir_testdata/dir_num_of_files":              3,
-				"dir_testdata/dir_size_bytes":                8160,
-				"dir_testdata/non_existent_dir_exists":       0,
-				"file_testdata/empty_file.log_exists":        1,
-				"file_testdata/empty_file.log_mtime_ago":     5176,
-				"file_testdata/empty_file.log_size_bytes":    0,
-				"file_testdata/file.log_exists":              1,
-				"file_testdata/file.log_mtime_ago":           4256,
-				"file_testdata/file.log_size_bytes":          5707,
-				"file_testdata/non_existent_file.log_exists": 0,
-				"num_of_files":                               3,
-				"num_of_dirs":                                2,
+				"dir_testdata/dir_existence_status_exist":                        1,
+				"dir_testdata/dir_existence_status_not_exist":                    0,
+				"dir_testdata/dir_files_count":                                   3,
+				"dir_testdata/dir_mtime_ago":                                     517858,
+				"dir_testdata/dir_size_bytes":                                    8160,
+				"dir_testdata/non_existent_dir_existence_status_exist":           0,
+				"dir_testdata/non_existent_dir_existence_status_not_exist":       1,
+				"file_testdata/empty_file.log_existence_status_exist":            1,
+				"file_testdata/empty_file.log_existence_status_not_exist":        0,
+				"file_testdata/empty_file.log_mtime_ago":                         517858,
+				"file_testdata/empty_file.log_size_bytes":                        0,
+				"file_testdata/file.log_existence_status_exist":                  1,
+				"file_testdata/file.log_existence_status_not_exist":              0,
+				"file_testdata/file.log_mtime_ago":                               517858,
+				"file_testdata/file.log_size_bytes":                              5707,
+				"file_testdata/non_existent_file.log_existence_status_exist":     0,
+				"file_testdata/non_existent_file.log_existence_status_not_exist": 1,
 			},
 		},
 	}
@@ -243,31 +241,23 @@ func TestFilecheck_Collect(t *testing.T) {
 			fc := test.prepare()
 			require.NoError(t, fc.Init())
 
-			collected := fc.Collect()
+			mx := fc.Collect()
 
-			copyModTime(test.wantCollected, collected)
-			assert.Equal(t, test.wantCollected, collected)
-			ensureCollectedHasAllChartsDimsVarsIDs(t, fc, collected)
+			copyModTime(test.wantCollected, mx)
+			assert.Equal(t, test.wantCollected, mx)
+			testMetricsHasAllChartsDims(t, fc, mx)
 		})
 	}
 }
 
-func ensureCollectedHasAllChartsDimsVarsIDs(t *testing.T, fc *Filecheck, collected map[string]int64) {
-	// TODO: check other charts
+func testMetricsHasAllChartsDims(t *testing.T, fc *Filecheck, mx map[string]int64) {
 	for _, chart := range *fc.Charts() {
 		if chart.Obsolete {
 			continue
 		}
-		switch chart.ID {
-		case fileExistenceChart.ID, dirExistenceChart.ID:
-			for _, dim := range chart.Dims {
-				_, ok := collected[dim.ID]
-				assert.Truef(t, ok, "collected metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
-			}
-			for _, v := range chart.Vars {
-				_, ok := collected[v.ID]
-				assert.Truef(t, ok, "collected metrics has no data for var '%s' chart '%s'", v.ID, chart.ID)
-			}
+		for _, dim := range chart.Dims {
+			_, ok := mx[dim.ID]
+			assert.Truef(t, ok, "mx metrics has no data for dim '%s' chart '%s'", dim.ID, chart.ID)
 		}
 	}
 }
@@ -322,7 +312,6 @@ func prepareFilecheckDirsWithoutSize() *Filecheck {
 		"testdata/dir",
 		"testdata/non_existent_dir",
 	}
-	fc.Config.Dirs.CollectDirSize = false
 	return fc
 }
 
@@ -336,6 +325,7 @@ func prepareFilecheckNonExistentDirs() *Filecheck {
 
 func prepareFilecheckFilesDirs() *Filecheck {
 	fc := New()
+	fc.Config.Dirs.CollectDirSize = true
 	fc.Config.Files.Include = []string{
 		"testdata/empty_file.log",
 		"testdata/file.log",
