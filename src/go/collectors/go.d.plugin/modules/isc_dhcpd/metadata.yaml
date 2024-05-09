@@ -115,15 +115,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: active
-            - name: isc_dhcpd.pool_active_leases
-              description: Pool Active Leases
+        - name: global
+          description: These metrics refer to the DHCP pool.
+          labels:
+            - name: dhcp_pool_name
+              description: The DHCP pool name defined in the collector configuration.
+          metrics:
+            - name: isc_dhcpd.dhcp_pool_utilization
+              description: DHCP Pool Utilization
+              unit: percent
+              chart_type: area
+              dimensions:
+                - name: utilization
+            - name: isc_dhcpd.dhcp_pool_active_leases
+              description: Active Leases Total
               unit: leases
               chart_type: line
               dimensions:
-                - name: a dimension per DHCP pool
-            - name: isc_dhcpd.pool_utilization
-              description: Pool Utilization
-              unit: percentage
-              chart_type: line
-              dimensions:
-                - name: a dimension per DHCP pool
+                - name: active
