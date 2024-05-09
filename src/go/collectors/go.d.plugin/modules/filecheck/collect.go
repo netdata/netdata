@@ -3,38 +3,38 @@
 package filecheck
 
 import (
-	"regexp"
-	"runtime"
-	"strings"
+	"errors"
+	"io/fs"
+	"os"
 )
 
-func (fc *Filecheck) collect() (map[string]int64, error) {
-	ms := make(map[string]int64)
+func (f *Filecheck) collect() (map[string]int64, error) {
+	mx := make(map[string]int64)
 
-	fc.collectFiles(ms)
-	fc.collectDirs(ms)
+	f.collectFiles(mx)
+	f.collectDirs(mx)
 
-	return ms, nil
+	return mx, nil
 }
 
-func hasMeta(path string) bool {
-	magicChars := `*?[`
-	if runtime.GOOS != "windows" {
-		magicChars = `*?[\`
-	}
-	return strings.ContainsAny(path, magicChars)
+type statInfo struct {
+	path   string
+	exists bool
+	fi     fs.FileInfo
 }
 
-func removeDuplicates(s []string) []string {
-	set := make(map[string]bool, len(s))
-	uniq := s[:0]
-	for _, v := range s {
-		if !set[v] {
-			set[v] = true
-			uniq = append(uniq, v)
+func getStatInfo(path string) *statInfo {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return &statInfo{
+			path:   path,
+			exists: !errors.Is(err, fs.ErrNotExist),
 		}
 	}
-	return uniq
-}
 
-var reSpace = regexp.MustCompile(`\s`)
+	return &statInfo{
+		path:   path,
+		exists: true,
+		fi:     fi,
+	}
+}

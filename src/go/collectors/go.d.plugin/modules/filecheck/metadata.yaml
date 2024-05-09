@@ -60,7 +60,7 @@ modules:
               default_value: 0
               required: false
             - name: files
-              description: Files matching the selector will be monitored.
+              description: List of files to monitor.
               default_value: ""
               required: true
               detailed_description: |
@@ -140,49 +140,59 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: global
-          description: TBD
-          labels: []
+        - name: file
+          description: These metrics refer to the File.
+          labels:
+            - name: file_path
+              description: File absolute path
           metrics:
-            - name: filecheck.file_existence
-              description: 'File Existence (0: not exists, 1: exists)'
-              unit: boolean
+            - name: filecheck.file_existence_status
+              description: File existence
+              unit: status
               chart_type: line
               dimensions:
-                - name: a dimension per file
-            - name: filecheck.file_mtime_ago
-              description: File Time Since the Last Modification
+                - name: exist
+                - name: not_exist
+            - name: filecheck.file_modification_time_ago
+              description: File time since the last modification
               unit: seconds
               chart_type: line
               dimensions:
-                - name: a dimension per file
-            - name: filecheck.file_size
-              description: File Size
+                - name: mtime_ago
+            - name: filecheck.file_size_bytes
+              description: File size
               unit: bytes
               chart_type: line
               dimensions:
-                - name: a dimension per file
-            - name: filecheck.dir_existence
-              description: 'Dir Existence (0: not exists, 1: exists)'
-              unit: boolean
+                - name: size
+        - name: directory
+          description: These metrics refer to the Directory.
+          labels:
+            - name: dir_path
+              description: Directory absolute path
+          metrics:
+            - name: filecheck.dir_existence_status
+              description: Directory existence
+              unit: status
               chart_type: line
               dimensions:
-                - name: a dimension per directory
-            - name: filecheck.dir_mtime_ago
-              description: Dir Time Since the Last Modification
+                - name: exist
+                - name: not_exist
+            - name: filecheck.dir_modification_time_ago
+              description: Directory time since the last modification
               unit: seconds
               chart_type: line
               dimensions:
-                - name: a dimension per directory
-            - name: filecheck.dir_num_of_files
-              description: Dir Number of Files
+                - name: mtime_ago
+            - name: filecheck.dir_size_bytes
+              description: Directory size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: filecheck.dir_files count
+              description: Directory files count
               unit: files
               chart_type: line
               dimensions:
-                - name: a dimension per directory
-            - name: filecheck.dir_size
-              description: Dir Size
-              unit: bytes
-              chart_type: line
-              dimensions:
-                - name: a dimension per directory
+                - name: files
