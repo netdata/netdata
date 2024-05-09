@@ -223,7 +223,7 @@ void analytics_mirrored_hosts(void)
 
         count++;
     }
-    rrd_unlock();
+    rrd_rdunlock();
 
     snprintfz(b, sizeof(b) - 1, "%zu", count);
     analytics_set_data(&analytics_data.netdata_mirrored_host_count, b);

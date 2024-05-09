@@ -1175,7 +1175,7 @@ ml_acquired_dimension_get(char *machine_guid, STRING *chart_id, STRING *dimensio
         }
     }
 
-    rrd_unlock();
+    rrd_rdunlock();
 
     ml_acquired_dimension_t acq_dim = {
         acq_rh, acq_rs, acq_rd, dim
@@ -1232,7 +1232,7 @@ ml_detect_main(void *arg)
 
             ml_host_detect_once((ml_host_t *) rh->ml_host);
         }
-        rrd_unlock();
+        rrd_rdunlock();
 
         if (Cfg.enable_statistics_charts) {
             // collect and update training thread stats

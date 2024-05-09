@@ -16,6 +16,16 @@ struct nd_thread {
     NETDATA_THREAD_OPTIONS options;
     pthread_t thread;
     bool cancel_atomic;
+
+    // keep track of the locks currently held
+    // used to detect locks that are left locked during exit
+    int rwlocks_read_locks;
+    int rwlocks_write_locks;
+    int mutex_locks;
+    int spinlock_locks;
+    int rwspinlock_read_locks;
+    int rwspinlock_write_locks;
+
     struct nd_thread *prev, *next;
 };
 
@@ -161,6 +171,27 @@ void webrtc_set_thread_name(void) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// locks tracking
+
+void nd_thread_rwlock_read_locked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_read_locks++; }
+void nd_thread_rwlock_read_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_read_locks--; }
+
+void nd_thread_rwlock_write_locked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_write_locks++; }
+void nd_thread_rwlock_write_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_write_locks--; }
+
+void nd_thread_mutex_locked(void) { if(_nd_thread_info) _nd_thread_info->mutex_locks++; }
+void nd_thread_mutex_unlocked(void) { if(_nd_thread_info) _nd_thread_info->mutex_locks--; }
+
+void nd_thread_spinlock_locked(void) { if(_nd_thread_info) _nd_thread_info->spinlock_locks++; }
+void nd_thread_spinlock_unlocked(void) { if(_nd_thread_info) _nd_thread_info->spinlock_locks--; }
+
+void nd_thread_rwspinlock_read_locked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_read_locks++; }
+void nd_thread_rwspinlock_read_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_read_locks--; }
+
+void nd_thread_rwspinlock_write_locked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_write_locks++; }
+void nd_thread_rwspinlock_write_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_write_locks--; }
+
+// --------------------------------------------------------------------------------------------------------------------
 // early initialization
 
 size_t netdata_threads_init(void) {
@@ -251,7 +282,29 @@ static void nd_thread_exit(void *pptr) {
                "THREADS: internal error - thread local variable does not match the one passed to this function. "
                "Expected thread '%s', passed thread '%s'",
                _nd_thread_info ? _nd_thread_info->tag : "(null)", nti ? nti->tag : "(null)");
+
+        if(!nti) nti = _nd_thread_info;
     }
+
+    if(!nti) return;
+
+    if(nti->rwlocks_read_locks)
+        fatal("THREAD '%s' WITH PID %d HAS %d RWLOCKS READ ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+
+    if(nti->rwlocks_write_locks)
+        fatal("THREAD '%s' WITH PID %d HAS %d RWLOCKS WRITE ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+
+    if(nti->mutex_locks)
+        fatal("THREAD '%s' WITH PID %d HAS %d MUTEXES ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+
+    if(nti->spinlock_locks)
+        fatal("THREAD '%s' WITH PID %d HAS %d SPINLOCKS ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+
+    if(nti->rwspinlock_read_locks)
+        fatal("THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS READ ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+
+    if(nti->rwspinlock_write_locks)
+        fatal("THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS WRITE ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
 
     if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP) != NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", nti->tid);

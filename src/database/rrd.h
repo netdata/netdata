@@ -1365,7 +1365,8 @@ extern netdata_rwlock_t rrd_rwlock;
 
 #define rrd_rdlock() netdata_rwlock_rdlock(&rrd_rwlock)
 #define rrd_wrlock() netdata_rwlock_wrlock(&rrd_rwlock)
-#define rrd_unlock() netdata_rwlock_unlock(&rrd_rwlock)
+#define rrd_rdunlock() netdata_rwlock_rdunlock(&rrd_rwlock)
+#define rrd_wrunlock() netdata_rwlock_wrunlock(&rrd_rwlock)
 
 // ----------------------------------------------------------------------------
 

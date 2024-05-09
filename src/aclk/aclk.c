@@ -1161,7 +1161,7 @@ char *aclk_state(void)
             buffer_strcat(wb, "\n\tAlert Streaming Status:");
             fill_alert_status_for_host(wb, host);
         }
-        rrd_unlock();
+        rrd_rdunlock();
     }
 
     ret = strdupz(buffer_tostring(wb));
@@ -1311,7 +1311,7 @@ char *aclk_state_json(void)
 
         json_object_array_add(grp, nodeinstance);
     }
-    rrd_unlock();
+    rrd_rdunlock();
     json_object_object_add(msg, "node-instances", grp);
 
     char *str = strdupz(json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN));

@@ -319,7 +319,7 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
 
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
-        rrd_unlock();
+        rrd_wrunlock();
         return NULL;
     }
     return host;
@@ -492,7 +492,7 @@ static RRDHOST *rrdhost_create(
         if (!is_localhost)
             rrdhost_free___while_having_rrd_wrlock(host, true);
 
-        rrd_unlock();
+        rrd_wrunlock();
         return NULL;
     }
 
@@ -503,7 +503,7 @@ static RRDHOST *rrdhost_create(
     else
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(localhost, host, prev, next);
 
-    rrd_unlock();
+    rrd_wrunlock();
 
     // ------------------------------------------------------------------------
 
@@ -732,7 +732,7 @@ RRDHOST *rrdhost_find_or_create(
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
         host = NULL;
-        rrd_unlock();
+        rrd_wrunlock();
     }
 
     if(!host) {
@@ -1286,7 +1286,7 @@ void rrdhost_free_all(void) {
     if(localhost)
         rrdhost_free___while_having_rrd_wrlock(localhost, true);
 
-    rrd_unlock();
+    rrd_wrunlock();
 }
 
 void rrd_finalize_collection_for_all_hosts(void) {

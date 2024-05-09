@@ -1233,7 +1233,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     }
     buffer_json_array_close(wb);
 
-    rrd_unlock();
+    rrd_rdunlock();
 }
 
 void host_labels2json(RRDHOST *host, BUFFER *wb, const char *key) {

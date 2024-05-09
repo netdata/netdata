@@ -186,7 +186,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     freez(thread_info);
     rrd_wrlock();
     rrdhost_free___while_having_rrd_wrlock(localhost, true);
-    rrd_unlock();
+    rrd_wrunlock();
 }
 
 struct dbengine_query_thread {
@@ -450,7 +450,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     rrdeng_prepare_exit((struct rrdengine_instance *)host->db[0].si);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
-    rrd_unlock();
+    rrd_wrunlock();
 }
 
 #endif

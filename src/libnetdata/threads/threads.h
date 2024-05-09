@@ -86,4 +86,22 @@ void nd_thread_testcancel(void);
 void uv_thread_set_name_np(uv_thread_t ut, const char* name);
 void webrtc_set_thread_name(void);
 
+void nd_thread_rwlock_read_locked(void);
+void nd_thread_rwlock_read_unlocked(void);
+
+void nd_thread_rwlock_write_locked(void);
+void nd_thread_rwlock_write_unlocked(void);
+
+void nd_thread_mutex_locked(void);
+void nd_thread_mutex_unlocked(void);
+
+void nd_thread_spinlock_locked(void);
+void nd_thread_spinlock_unlocked(void);
+
+void nd_thread_rwspinlock_read_locked(void);
+void nd_thread_rwspinlock_read_unlocked(void);
+
+void nd_thread_rwspinlock_write_locked(void);
+void nd_thread_rwspinlock_write_unlocked(void);
+
 #endif //NETDATA_THREADS_H

@@ -66,7 +66,7 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *si __maybe_unused) {
             if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
                 mh = NULL;
         }
-        netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
+        netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
     }
 
     internal_fatal(mh->rd != rd, "RRDDIM_MEM: incorrect pointer returned from index.");
@@ -84,7 +84,7 @@ rrddim_metric_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid) {
         if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
             mh = NULL;
     }
-    netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
+    netdata_rwlock_rdunlock(&rrddim_JudyHS_rwlock);
 
     return (STORAGE_METRIC_HANDLE *)mh;
 }
@@ -108,7 +108,7 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *smh __maybe_unused) {
             RRDDIM *rd = mh->rd;
             netdata_rwlock_wrlock(&rrddim_JudyHS_rwlock);
             JudyHSDel(&rrddim_JudyHS_array, &rd->metric_uuid, sizeof(nd_uuid_t), PJE0);
-            netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
+            netdata_rwlock_wrunlock(&rrddim_JudyHS_rwlock);
 
             freez(mh);
             __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(nd_uuid_t)), __ATOMIC_RELAXED);

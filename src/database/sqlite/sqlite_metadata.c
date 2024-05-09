@@ -272,7 +272,7 @@ int update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)
     host = rrdhost_find_by_guid(host_guid);
     if (likely(host))
         set_host_node_id(host, node_id);
-    rrd_unlock();
+    rrd_wrunlock();
 
     if (!REQUIRE_DB(db_meta))
         return 1;
@@ -412,7 +412,7 @@ struct node_instance_list *get_node_list(void)
         if (row == max_rows)
             break;
     }
-    rrd_unlock();
+    rrd_rdunlock();
 
 failed:
     SQLITE_FINALIZE(res);

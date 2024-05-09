@@ -1157,7 +1157,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_stri
             }
             netdata_mutex_unlock(&host->receiver_lock);
         }
-        rrd_unlock();
+        rrd_rdunlock();
 
         if (receiver_stale && stop_streaming_receiver(host, STREAM_HANDSHAKE_DISCONNECT_STALE_RECEIVER)) {
             // we stopped the receiver

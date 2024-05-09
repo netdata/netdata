@@ -218,7 +218,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         netdata_mutex_unlock(&host->receiver_lock);
     }
 
-    rrd_unlock();
+    rrd_rdunlock();
 }
 
 static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
@@ -259,7 +259,7 @@ restart_after_removal:
         goto restart_after_removal;
     }
 
-    rrd_unlock();
+    rrd_wrunlock();
 }
 
 static void service_main_cleanup(void *pptr)

@@ -24,9 +24,6 @@
 static __thread int netdata_thread_first_cancelability = 0;
 static __thread int netdata_thread_nested_disables = 0;
 
-static __thread size_t netdata_locks_acquired_rwlocks = 0;
-static __thread size_t netdata_locks_acquired_mutexes = 0;
-
 inline void netdata_thread_disable_cancelability(void) {
     if(!netdata_thread_nested_disables) {
         int old;
@@ -101,7 +98,7 @@ int __netdata_mutex_lock(netdata_mutex_t *mutex) {
         netdata_log_error("MUTEX_LOCK: failed to get lock (code %d)", ret);
     }
     else
-        netdata_locks_acquired_mutexes++;
+        nd_thread_mutex_locked();
 
     return ret;
 }
@@ -113,7 +110,7 @@ int __netdata_mutex_trylock(netdata_mutex_t *mutex) {
     if(ret != 0)
         netdata_thread_enable_cancelability();
     else
-        netdata_locks_acquired_mutexes++;
+        nd_thread_mutex_locked();
 
     return ret;
 }
@@ -123,7 +120,7 @@ int __netdata_mutex_unlock(netdata_mutex_t *mutex) {
     if(unlikely(ret != 0))
         netdata_log_error("MUTEX_LOCK: failed to unlock (code %d).", ret);
     else {
-        netdata_locks_acquired_mutexes--;
+        nd_thread_mutex_unlocked();
         netdata_thread_enable_cancelability();
     }
 
@@ -233,7 +230,7 @@ int __netdata_rwlock_rdlock(netdata_rwlock_t *rwlock) {
         netdata_log_error("RW_LOCK: failed to obtain read lock (code %d)", ret);
     }
     else
-        netdata_locks_acquired_rwlocks++;
+        nd_thread_rwlock_read_locked();
 
     return ret;
 }
@@ -247,18 +244,30 @@ int __netdata_rwlock_wrlock(netdata_rwlock_t *rwlock) {
         netdata_thread_enable_cancelability();
     }
     else
-        netdata_locks_acquired_rwlocks++;
+        nd_thread_rwlock_write_locked();
 
     return ret;
 }
 
-int __netdata_rwlock_unlock(netdata_rwlock_t *rwlock) {
+int __netdata_rwlock_rdunlock(netdata_rwlock_t *rwlock) {
     int ret = pthread_rwlock_unlock(&rwlock->rwlock_t);
     if(unlikely(ret != 0))
         netdata_log_error("RW_LOCK: failed to release lock (code %d)", ret);
     else {
         netdata_thread_enable_cancelability();
-        netdata_locks_acquired_rwlocks--;
+        nd_thread_rwlock_read_unlocked();
+    }
+
+    return ret;
+}
+
+int __netdata_rwlock_wrunlock(netdata_rwlock_t *rwlock) {
+    int ret = pthread_rwlock_unlock(&rwlock->rwlock_t);
+    if(unlikely(ret != 0))
+        netdata_log_error("RW_LOCK: failed to release lock (code %d)", ret);
+    else {
+        netdata_thread_enable_cancelability();
+        nd_thread_rwlock_write_unlocked();
     }
 
     return ret;
@@ -271,7 +280,7 @@ int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock) {
     if(ret != 0)
         netdata_thread_enable_cancelability();
     else
-        netdata_locks_acquired_rwlocks++;
+        nd_thread_rwlock_read_locked();
 
     return ret;
 }
@@ -283,7 +292,7 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
     if(ret != 0)
         netdata_thread_enable_cancelability();
     else
-        netdata_locks_acquired_rwlocks++;
+        nd_thread_rwlock_write_locked();
 
     return ret;
 }
@@ -325,6 +334,8 @@ static inline void spinlock_lock_internal(SPINLOCK *spinlock, bool cancelable) {
     spinlock->spins += spins;
     spinlock->locker_pid = gettid_cached();
 #endif
+
+    nd_thread_spinlock_locked();
 }
 
 static inline void spinlock_unlock_internal(SPINLOCK *spinlock, bool cancelable) {
@@ -335,6 +346,8 @@ static inline void spinlock_unlock_internal(SPINLOCK *spinlock, bool cancelable)
 
     if (!cancelable)
         netdata_thread_enable_cancelability();
+
+    nd_thread_spinlock_unlocked();
 }
 
 static inline bool spinlock_trylock_internal(SPINLOCK *spinlock, bool cancelable) {
@@ -342,13 +355,16 @@ static inline bool spinlock_trylock_internal(SPINLOCK *spinlock, bool cancelable
         netdata_thread_disable_cancelability();
 
     if(!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
-        !__atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE))
+        !__atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE)) {
         // we got the lock
+        nd_thread_spinlock_locked();
         return true;
+    }
 
     // we didn't get the lock
     if (!cancelable)
         netdata_thread_enable_cancelability();
+
     return false;
 }
 
@@ -396,6 +412,8 @@ void rw_spinlock_read_lock(RW_SPINLOCK *rw_spinlock) {
     spinlock_lock(&rw_spinlock->spinlock);
     __atomic_add_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
     spinlock_unlock(&rw_spinlock->spinlock);
+
+    nd_thread_rwspinlock_read_locked();
 }
 
 void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock) {
@@ -408,6 +426,7 @@ void rw_spinlock_read_unlock(RW_SPINLOCK *rw_spinlock) {
 #endif
 
     netdata_thread_enable_cancelability();
+    nd_thread_rwspinlock_read_unlocked();
 }
 
 void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
@@ -425,10 +444,13 @@ void rw_spinlock_write_lock(RW_SPINLOCK *rw_spinlock) {
     }
 
     (void)spins;
+
+    nd_thread_rwspinlock_write_locked();
 }
 
 void rw_spinlock_write_unlock(RW_SPINLOCK *rw_spinlock) {
     spinlock_unlock(&rw_spinlock->spinlock);
+    nd_thread_rwspinlock_write_unlocked();
 }
 
 bool rw_spinlock_tryread_lock(RW_SPINLOCK *rw_spinlock) {
@@ -436,6 +458,7 @@ bool rw_spinlock_tryread_lock(RW_SPINLOCK *rw_spinlock) {
         __atomic_add_fetch(&rw_spinlock->readers, 1, __ATOMIC_RELAXED);
         spinlock_unlock(&rw_spinlock->spinlock);
         netdata_thread_disable_cancelability();
+        nd_thread_rwspinlock_read_locked();
         return true;
     }
 
@@ -446,6 +469,7 @@ bool rw_spinlock_trywrite_lock(RW_SPINLOCK *rw_spinlock) {
     if(spinlock_trylock(&rw_spinlock->spinlock)) {
         if (__atomic_load_n(&rw_spinlock->readers, __ATOMIC_RELAXED) == 0) {
             // No readers, we've successfully acquired the write lock
+            nd_thread_rwspinlock_write_locked();
             return true;
         }
         else {
@@ -578,7 +602,7 @@ int netdata_rwlock_wrlock_debug(const char *file __maybe_unused, const char *fun
     return ret;
 }
 
-int netdata_rwlock_unlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+int netdata_rwlock_rdunlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
                                 const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
 
     netdata_rwlock_locker *locker = find_rwlock_locker(file, function, line, rwlock);
@@ -586,7 +610,22 @@ int netdata_rwlock_unlock_debug(const char *file __maybe_unused, const char *fun
     if(unlikely(!locker))
         fatal("UNLOCK WITHOUT LOCK");
 
-    int ret = __netdata_rwlock_unlock(rwlock);
+    int ret = __netdata_rwlock_rdunlock(rwlock);
+    if(likely(!ret))
+        remove_rwlock_locker(file, function, line, rwlock, locker);
+
+    return ret;
+}
+
+int netdata_rwlock_wrunlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                                const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
+
+    netdata_rwlock_locker *locker = find_rwlock_locker(file, function, line, rwlock);
+
+    if(unlikely(!locker))
+        fatal("UNLOCK WITHOUT LOCK");
+
+    int ret = __netdata_rwlock_wrunlock(rwlock);
     if(likely(!ret))
         remove_rwlock_locker(file, function, line, rwlock, locker);
 

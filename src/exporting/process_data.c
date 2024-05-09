@@ -358,7 +358,7 @@ void prepare_buffers(struct engine *engine)
         variables_formatting(engine, host);
         end_host_formatting(engine, host);
     }
-    rrd_unlock();
+    rrd_rdunlock();
     netdata_thread_enable_cancelability();
 
     end_batch_formatting(engine);

@@ -2576,7 +2576,7 @@ static void dbengine2_statistics_charts(void) {
                 }
             }
         }
-        rrd_unlock();
+        rrd_rdunlock();
 
         if (dbengine_contexts) {
             /* deduplicate global statistics by getting the ones from the last context */
