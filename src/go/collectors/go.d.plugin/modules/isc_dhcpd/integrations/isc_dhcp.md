@@ -65,8 +65,23 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | isc_dhcpd.active_leases_total | active | leases |
-| isc_dhcpd.pool_active_leases | a dimension per DHCP pool | leases |
-| isc_dhcpd.pool_utilization | a dimension per DHCP pool | percentage |
+
+### Per ISC DHCP instance
+
+These metrics refer to the DHCP pool.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| dhcp_pool_name | The DHCP pool name defined in the collector configuration. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| isc_dhcpd.dhcp_pool_utilization | utilization | percent |
+| isc_dhcpd.dhcp_pool_active_leases | active | leases |
 
 
 
