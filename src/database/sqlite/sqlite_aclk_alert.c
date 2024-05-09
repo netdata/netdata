@@ -80,7 +80,9 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 {
     sqlite3_stmt *res = NULL;
 
-    if (ae->new_status == RRDCALC_STATUS_REMOVED || ae->new_status == RRDCALC_STATUS_UNINITIALIZED)
+    if (ae->new_status == RRDCALC_STATUS_UNINITIALIZED ||
+        (ae->new_status == RRDCALC_STATUS_REMOVED &&
+         !(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)))
         return 0;
 
     if (unlikely(uuid_is_null(ae->config_hash_id) || !host->aclk_config))
