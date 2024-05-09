@@ -79,7 +79,7 @@ func (s *SystemdUnits) getUnitFilesByPatterns(conn systemdConnection) ([]dbus.Un
 
 	s.Debugf("calling function 'ListUnitFilesByPatterns'")
 
-	unitFiles, err := conn.ListUnitFilesByPatternsContext(ctx, nil, []string{"*.service"})
+	unitFiles, err := conn.ListUnitFilesByPatternsContext(ctx, nil, s.IncludeUnitFiles)
 	if err != nil {
 		return nil, fmt.Errorf("error on ListUnitFilesByPatterns: %v", err)
 	}
