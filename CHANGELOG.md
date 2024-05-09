@@ -2,10 +2,13 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.4...HEAD)
 
 **Merged pull requests:**
 
+- log to journal all transitions [\#17618](https://github.com/netdata/netdata/pull/17618) ([ktsaou](https://github.com/ktsaou))
+- Remove contrib now that we use cpack for DEB packages [\#17614](https://github.com/netdata/netdata/pull/17614) ([vkalintiris](https://github.com/vkalintiris))
+- add update every to json schema [\#17613](https://github.com/netdata/netdata/pull/17613) ([ktsaou](https://github.com/ktsaou))
 - reset health when children disconnect [\#17612](https://github.com/netdata/netdata/pull/17612) ([ktsaou](https://github.com/ktsaou))
 - go.d dyncfg return 200 on Enable for running jobs [\#17611](https://github.com/netdata/netdata/pull/17611) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17610](https://github.com/netdata/netdata/pull/17610) ([netdatabot](https://github.com/netdatabot))
@@ -292,6 +295,10 @@
 - Fix conditional for Amazon Linux 2023 in repoconfig spec file. [\#17056](https://github.com/netdata/netdata/pull/17056) ([PaulSzymanski](https://github.com/PaulSzymanski))
 - Add fallback logic in installer for fetching files. [\#17045](https://github.com/netdata/netdata/pull/17045) ([Ferroin](https://github.com/Ferroin))
 
+## [v1.45.4](https://github.com/netdata/netdata/tree/v1.45.4) (2024-05-08)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.45.3...v1.45.4)
+
 ## [v1.45.3](https://github.com/netdata/netdata/tree/v1.45.3) (2024-04-12)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.45.2...v1.45.3)
@@ -420,11 +427,6 @@
 - Bump go.mongodb.org/mongo-driver from 1.13.1 to 1.14.0 in /src/go/collectors/go.d.plugin [\#17030](https://github.com/netdata/netdata/pull/17030) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Bump k8s.io/client-go from 0.29.1 to 0.29.2 in /src/go/collectors/go.d.plugin [\#17029](https://github.com/netdata/netdata/pull/17029) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Increase RRD\_ID\_LENGTH\_MAX to 1200 [\#17028](https://github.com/netdata/netdata/pull/17028) ([stelfrag](https://github.com/stelfrag))
-- Fix determining repo root in Coverity scan script. [\#17024](https://github.com/netdata/netdata/pull/17024) ([Ferroin](https://github.com/Ferroin))
-- DYNCFG support deleting orphan configurations [\#17023](https://github.com/netdata/netdata/pull/17023) ([ktsaou](https://github.com/ktsaou))
-- More concretely utilize local modules in our CMake code. [\#17022](https://github.com/netdata/netdata/pull/17022) ([Ferroin](https://github.com/Ferroin))
-- Correctly mark protobuf as required in find\_package. [\#17021](https://github.com/netdata/netdata/pull/17021) ([Ferroin](https://github.com/Ferroin))
-- Protect metric release in dimension delete callback [\#17020](https://github.com/netdata/netdata/pull/17020) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
