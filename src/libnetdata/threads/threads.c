@@ -289,22 +289,28 @@ static void nd_thread_exit(void *pptr) {
     if(!nti) return;
 
     if(nti->rwlocks_read_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d RWLOCKS READ ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+        fatal("THREAD '%s' WITH PID %d HAS %d RWLOCKS READ ACQUIRED WHILE EXITING !!!",
+         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwlocks_read_locks);
 
     if(nti->rwlocks_write_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d RWLOCKS WRITE ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+        fatal("THREAD '%s' WITH PID %d HAS %d RWLOCKS WRITE ACQUIRED WHILE EXITING !!!",
+         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwlocks_write_locks);
 
     if(nti->mutex_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d MUTEXES ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+        fatal("THREAD '%s' WITH PID %d HAS %d MUTEXES ACQUIRED WHILE EXITING !!!",
+         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->mutex_locks);
 
     if(nti->spinlock_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d SPINLOCKS ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+        fatal("THREAD '%s' WITH PID %d HAS %d SPINLOCKS ACQUIRED WHILE EXITING !!!",
+         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->spinlock_locks);
 
     if(nti->rwspinlock_read_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS READ ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+        fatal("THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS READ ACQUIRED WHILE EXITING !!!",
+         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwspinlock_read_locks);
 
     if(nti->rwspinlock_write_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS WRITE ACQUIRED WHILE EXITING !!!", (nti) ? nti->tag : "(unset)", gettid_cached());
+        fatal("THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS WRITE ACQUIRED WHILE EXITING !!!",
+         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwspinlock_write_locks);
 
     if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP) != NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", nti->tid);
