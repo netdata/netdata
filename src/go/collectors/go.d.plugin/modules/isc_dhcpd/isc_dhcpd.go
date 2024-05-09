@@ -35,9 +35,10 @@ func New() *DHCPd {
 
 type (
 	Config struct {
-		UpdateEvery int          `yaml:"update_every" json:"update_every"`
-		LeasesPath  string       `yaml:"leases_path" json:"leases_path"`
-		Pools       []PoolConfig `yaml:"pools" json:"pools"`
+		UpdateEvery int    `yaml:"update_every" json:"update_every"`
+		LeasesPath  string `yaml:"leases_path" json:"leases_path"`
+		// TODO: parse config file to extract configured pool
+		Pools []PoolConfig `yaml:"pools" json:"pools"`
 	}
 	PoolConfig struct {
 		Name     string `yaml:"name" json:"name"`

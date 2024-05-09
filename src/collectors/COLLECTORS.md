@@ -317,8 +317,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Dnsmasq](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/dnsmasq/integrations/dnsmasq.md)
 
-- [ISC Bind (RNDC)](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/bind_rndc/integrations/isc_bind_rndc.md)
-
 - [ISC DHCP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/isc_dhcpd/integrations/isc_dhcp.md)
 
 - [Name Server Daemon](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/nsd/integrations/name_server_daemon.md)

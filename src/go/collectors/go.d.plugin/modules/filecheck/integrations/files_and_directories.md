@@ -56,23 +56,42 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per Files and directories instance
+### Per file
 
-TBD
+These metrics refer to the File.
 
-This scope has no labels.
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| file_path | File absolute path |
 
 Metrics:
 
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
-| filecheck.file_existence | a dimension per file | boolean |
-| filecheck.file_mtime_ago | a dimension per file | seconds |
-| filecheck.file_size | a dimension per file | bytes |
-| filecheck.dir_existence | a dimension per directory | boolean |
-| filecheck.dir_mtime_ago | a dimension per directory | seconds |
-| filecheck.dir_num_of_files | a dimension per directory | files |
-| filecheck.dir_size | a dimension per directory | bytes |
+| filecheck.file_existence_status | exist, not_exist | status |
+| filecheck.file_modification_time_ago | mtime_ago | seconds |
+| filecheck.file_size_bytes | size | bytes |
+
+### Per directory
+
+These metrics refer to the Directory.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| dir_path | Directory absolute path |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| filecheck.dir_existence_status | exist, not_exist | status |
+| filecheck.dir_modification_time_ago | mtime_ago | seconds |
+| filecheck.dir_size_bytes | size | bytes |
+| filecheck.dir_files count | files | files |
 
 
 
@@ -112,7 +131,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:----|:-----------|:-------|:--------:|
 | update_every | Data collection frequency. | 10 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| files | Files matching the selector will be monitored. |  | yes |
+| files | List of files to monitor. |  | yes |
 | dirs | List of directories to monitor. |  | yes |
 | discovery_every | Files and directories discovery interval. | 60 | no |
 

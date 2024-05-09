@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
+	"github.com/netdata/netdata/go/go.d.plugin/pkg/matcher"
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
@@ -26,14 +27,13 @@ func init() {
 func New() *Filecheck {
 	return &Filecheck{
 		Config: Config{
-			DiscoveryEvery: web.Duration(time.Second * 30),
+			DiscoveryEvery: web.Duration(time.Minute * 1),
 			Files:          filesConfig{},
-			Dirs: dirsConfig{
-				CollectDirSize: true,
-			},
+			Dirs:           dirsConfig{CollectDirSize: false},
 		},
-		collectedFiles: make(map[string]bool),
-		collectedDirs:  make(map[string]bool),
+		charts:    &module.Charts{},
+		seenFiles: newSeenItems(),
+		seenDirs:  newSeenItems(),
 	}
 }
 
@@ -61,58 +61,67 @@ type Filecheck struct {
 
 	charts *module.Charts
 
-	lastDiscoveryFiles time.Time
-	curFiles           []string
-	collectedFiles     map[string]bool
+	filesFilter       matcher.Matcher
+	lastDiscFilesTime time.Time
+	curFiles          []string
+	seenFiles         *seenItems
 
-	lastDiscoveryDirs time.Time
-	curDirs           []string
-	collectedDirs     map[string]bool
+	dirsFilter       matcher.Matcher
+	lastDiscDirsTime time.Time
+	curDirs          []string
+	seenDirs         *seenItems
 }
 
-func (fc *Filecheck) Configuration() any {
-	return fc.Config
+func (f *Filecheck) Configuration() any {
+	return f.Config
 }
 
-func (fc *Filecheck) Init() error {
-	err := fc.validateConfig()
+func (f *Filecheck) Init() error {
+	err := f.validateConfig()
 	if err != nil {
-		fc.Errorf("error on validating config: %v", err)
+		f.Errorf("config validation: %v", err)
 		return err
 	}
 
-	charts, err := fc.initCharts()
+	ff, err := f.initFilesFilter()
 	if err != nil {
-		fc.Errorf("error on charts initialization: %v", err)
+		f.Errorf("files filter initialization: %v", err)
 		return err
 	}
-	fc.charts = charts
+	f.filesFilter = ff
 
-	fc.Debugf("monitored files: %v", fc.Files.Include)
-	fc.Debugf("monitored dirs: %v", fc.Dirs.Include)
+	df, err := f.initDirsFilter()
+	if err != nil {
+		f.Errorf("dirs filter initialization: %v", err)
+		return err
+	}
+	f.dirsFilter = df
+
+	f.Debugf("monitored files: %v", f.Files.Include)
+	f.Debugf("monitored dirs: %v", f.Dirs.Include)
 
 	return nil
 }
 
-func (fc *Filecheck) Check() error {
+func (f *Filecheck) Check() error {
 	return nil
 }
 
-func (fc *Filecheck) Charts() *module.Charts {
-	return fc.charts
+func (f *Filecheck) Charts() *module.Charts {
+	return f.charts
 }
 
-func (fc *Filecheck) Collect() map[string]int64 {
-	ms, err := fc.collect()
+func (f *Filecheck) Collect() map[string]int64 {
+	mx, err := f.collect()
 	if err != nil {
-		fc.Error(err)
+		f.Error(err)
 	}
 
-	if len(ms) == 0 {
+	if len(mx) == 0 {
 		return nil
 	}
-	return ms
+
+	return mx
 }
 
-func (fc *Filecheck) Cleanup() {
-}
+func (f *Filecheck) Cleanup() {}
