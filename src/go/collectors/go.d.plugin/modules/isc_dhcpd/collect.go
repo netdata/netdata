@@ -54,8 +54,8 @@ const precision = 100
 
 func collectPool(collected map[string]int64, pool ipPool, leases []leaseEntry) {
 	n := calcPoolActiveLeases(pool, leases)
-	collected["pool_"+pool.name+"_active_leases"] = n
-	collected["pool_"+pool.name+"_utilization"] = int64(calcPoolUtilizationPercentage(pool, n) * precision)
+	collected["dhcp_pool_"+pool.name+"_active_leases"] = n
+	collected["dhcp_pool_"+pool.name+"_utilization"] = int64(calcPoolUtilizationPercentage(pool, n) * precision)
 }
 
 func calcPoolActiveLeases(pool ipPool, leases []leaseEntry) (num int64) {
