@@ -1289,6 +1289,7 @@ static inline void discovery_find_all_cgroups() {
 void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
+    uv_thread_set_name_np("P[cgroupsdisc]");
 
     worker_register("CGROUPSDISC");
     worker_register_job_name(WORKER_DISCOVERY_INIT,               "init");

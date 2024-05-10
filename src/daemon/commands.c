@@ -596,8 +596,9 @@ static void async_cb(uv_async_t *handle)
     uv_stop(handle->loop);
 }
 
-static void command_thread(void *arg)
-{
+static void command_thread(void *arg) {
+    uv_thread_set_name_np("DAEMON_COMMAND");
+
     int ret;
     uv_fs_t req;
 
@@ -714,7 +715,6 @@ void commands_init(void)
     /* wait for worker thread to initialize */
     completion_wait_for(&completion);
     completion_destroy(&completion);
-    uv_thread_set_name_np(thread, "DAEMON_COMMAND");
 
     if (command_thread_error) {
         error = uv_thread_join(&thread);

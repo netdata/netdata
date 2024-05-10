@@ -1593,8 +1593,6 @@ void *cgroups_main(void *ptr) {
         goto exit;
     }
 
-    uv_thread_set_name_np(discovery_thread.thread, "P[cgroups]");
-
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     cgroup_netdev_link_init();

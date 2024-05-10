@@ -80,7 +80,7 @@ void nd_thread_signal_cancel(ND_THREAD *nti);
 bool nd_thread_signaled_to_cancel(void);
 
 #define ND_THREAD_TAG_MAX 15
-void uv_thread_set_name_np(uv_thread_t ut, const char* name);
+void uv_thread_set_name_np(const char* name);
 void webrtc_set_thread_name(void);
 
 #ifdef NETDATA_INTERNAL_CHECKS

@@ -146,17 +146,12 @@ void nd_thread_tag_set(const char *tag) {
 // --------------------------------------------------------------------------------------------------------------------
 
 static __thread bool libuv_name_set = false;
-void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
-    if(!ut && libuv_name_set) return;
+void uv_thread_set_name_np(const char* name) {
+    if(libuv_name_set) return;
 
     strncpyz(_nd_thread_os_name, name, sizeof(_nd_thread_os_name) - 1);
-
-    if(!ut) {
-        os_set_thread_name_of_self(_nd_thread_os_name);
-        libuv_name_set = true;
-    }
-    else
-        os_set_pthread_name(ut, _nd_thread_os_name);
+    os_set_thread_name_of_self(_nd_thread_os_name);
+    libuv_name_set = true;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

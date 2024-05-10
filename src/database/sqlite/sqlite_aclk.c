@@ -374,7 +374,7 @@ static void timer_cb(uv_timer_t *handle)
 static void aclk_synchronization(void *arg __maybe_unused)
 {
     struct aclk_sync_config_s *config = arg;
-    uv_thread_set_name_np(config->thread,  "ACLKSYNC");
+    uv_thread_set_name_np("ACLKSYNC");
     worker_register("ACLKSYNC");
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 

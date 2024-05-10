@@ -1950,7 +1950,7 @@ static void metadata_event_loop(void *arg)
     struct metadata_wc *wc = arg;
     enum metadata_opcode opcode;
 
-    uv_thread_set_name_np(wc->thread, "METASYNC");
+    uv_thread_set_name_np("METASYNC");
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
     if (ret) {

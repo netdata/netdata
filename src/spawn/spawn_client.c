@@ -170,6 +170,8 @@ static void spawn_process_cmd(struct spawn_cmd_info *cmdinfo)
 
 void spawn_client(void *arg)
 {
+    uv_thread_set_name_np("DAEMON_SPAWN");
+
     int ret;
     struct completion *completion = (struct completion *)arg;
 
