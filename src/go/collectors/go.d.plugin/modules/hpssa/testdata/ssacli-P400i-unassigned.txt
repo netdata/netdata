@@ -1,0 +1,207 @@
+Smart Array P400i in Slot 0 (Embedded)
+   Bus Interface: PCI
+   Slot: 0
+   Serial Number: REDACTED
+   Cache Serial Number: REDACTED
+   RAID 6 (ADG) Status: Enabled
+   Controller Status: OK
+   Hardware Revision: E
+   Firmware Version: 7.24-0
+   Rebuild Priority: Medium
+   Expand Priority: Medium
+   Surface Scan Delay: 15 secs
+   Surface Scan Mode: Idle
+   Parallel Surface Scan Supported: No
+   Elevator Sort: Enabled
+   Wait for Cache Room: Disabled
+   Surface Analysis Inconsistency Notification: Disabled
+   Post Prompt Timeout: 0 secs
+   Cache Board Present: True
+   Cache Status: Temporarily Disabled
+   Cache Status Details: Cache disabled; low batteries.
+   Cache Ratio: 25% Read / 75% Write
+   Drive Write Cache: Disabled
+   Total Cache Size: 256 MB
+   Total Cache Memory Available: 208 MB
+   No-Battery Write Cache: Disabled
+   Cache Backup Power Source: Batteries
+   Battery/Capacitor Count: 1
+   Battery/Capacitor Status: Failed (Replace Batteries)
+   SATA NCQ Supported: True
+   Number of Ports: 2 Internal only
+   Driver Name: cciss
+   Driver Version: 3.6.26
+   PCI Address (Domain:Bus:Device.Function): 0000:06:00.0
+   Port Max Phy Rate Limiting Supported: False
+   Host Serial Number: REDACTED
+   Sanitize Erase Supported: False
+   Primary Boot Volume: None
+   Secondary Boot Volume: None
+
+
+   Port Name: 1I
+         Port ID: 0
+         Port Connection Number: 0
+         SAS Address: 0000000000000000
+         Port Location: Internal
+
+   Port Name: 2I
+         Port ID: 1
+         Port Connection Number: 1
+         SAS Address: 0000000000000000
+         Port Location: Internal
+
+
+   Internal Drive Cage at Port 1I, Box 1, OK
+
+      Power Supply Status: Not Redundant
+      Drive Bays: 4
+      Port: 1I
+      Box: 1
+      Location: Internal
+
+   Physical Drives
+      physicaldrive 1I:1:1 (port 1I:box 1:bay 1, SATA HDD, 250 GB, OK)
+      physicaldrive 1I:1:2 (port 1I:box 1:bay 2, SATA HDD, 250 GB, OK)
+      physicaldrive 1I:1:3 (port 1I:box 1:bay 3, SATA HDD, 100 GB, OK)
+      physicaldrive 1I:1:4 (port 1I:box 1:bay 4, SATA HDD, 100 GB, OK)
+
+
+
+   Internal Drive Cage at Port 2I, Box 1, OK
+
+      Power Supply Status: Not Redundant
+      Drive Bays: 2
+      Port: 2I
+      Box: 1
+      Location: Internal
+
+   Physical Drives
+      None attached
+
+
+   Array: A
+      Interface Type: SATA
+      Unused Space: 0  MB (0.0%)
+      Used Space: 186.3 GB (100.0%)
+      Status: OK
+      Array Type: Data
+
+
+      Logical Drive: 1
+         Size: 93.1  GB
+         Fault Tolerance: 1
+         Heads: 255
+         Sectors Per Track: 32
+         Cylinders: 23934
+         Strip Size: 128 KB
+         Full Stripe Size: 128 KB
+         Status: OK
+         Caching:  Enabled
+         Unique Identifier: 600508B1001038333220202020200004
+         Disk Name: /dev/cciss/c0d0
+         Mount Points: /boot 94 MB Partition Number 1, / 91.2 GB Partition Number 3
+         OS Status: LOCKED
+         Logical Drive Label: A00AD958PH89MQ7832     7E6D
+         Mirror Group 1:
+            physicaldrive 1I:1:3 (port 1I:box 1:bay 3, SATA HDD, 100 GB, OK)
+         Mirror Group 2:
+            physicaldrive 1I:1:4 (port 1I:box 1:bay 4, SATA HDD, 100 GB, OK)
+         Drive Type: Data
+         LD Acceleration Method: Controller Cache
+
+
+      physicaldrive 1I:1:3
+         Port: 1I
+         Box: 1
+         Bay: 3
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 100 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Firmware Revision: 6PB10362
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     INTEL SSDSA2BZ10
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 23
+         Maximum Temperature (C): 32
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 1I:1:4
+         Port: 1I
+         Box: 1
+         Bay: 4
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 100 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Firmware Revision: 6PB10362
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     INTEL SSDSA2BZ10
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 23
+         Maximum Temperature (C): 33
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+
+   Unassigned
+
+      physicaldrive 1I:1:1
+         Port: 1I
+         Box: 1
+         Bay: 1
+         Status: OK
+         Drive Type: Unassigned Drive
+         Interface Type: SATA
+         Size: 250 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Firmware Revision: 0001EXM1
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     ST250LT021-1AF14
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 28
+         Maximum Temperature (C): 36
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 1I:1:2
+         Port: 1I
+         Box: 1
+         Bay: 2
+         Status: OK
+         Drive Type: Unassigned Drive
+         Interface Type: SATA
+         Size: 250 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Firmware Revision: 0001EXM1
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     ST250LT021-1AF14
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 28
+         Maximum Temperature (C): 36
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
