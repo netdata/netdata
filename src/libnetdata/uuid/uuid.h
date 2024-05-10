@@ -7,7 +7,7 @@
 typedef unsigned char nd_uuid_t[16];
 
 // for quickly managing it as 2x 64-bit numbers
-typedef struct {
+typedef struct _uuid {
     union {
         nd_uuid_t uuid;
         struct {
@@ -36,9 +36,11 @@ ND_UUID UUID_generate_from_hash(const void *payload, size_t payload_len);
 
 #define UUIDeq(a, b) ((a).parts.hig64 == (b).parts.hig64 && (a).parts.low64 == (b).parts.low64)
 
-static inline ND_UUID uuid2UUID(nd_uuid_t uu1) {
-    ND_UUID *ret = (ND_UUID *)uu1;
-    return *ret;
+static inline ND_UUID uuid2UUID(const nd_uuid_t uu1) {
+    // uu1 may not be aligned, so copy it to the output
+    ND_UUID copy;
+    memcpy(copy.uuid, uu1, sizeof(nd_uuid_t));
+    return copy;
 }
 
 #ifndef UUID_STR_LEN
@@ -62,41 +64,25 @@ static inline int hex_char_to_int(char c) {
     return -1; // Invalid hexadecimal character
 }
 
-static inline int nd_uuid_is_null(const nd_uuid_t uu) {
-    const ND_UUID *u = (ND_UUID *)uu;
-    return u->parts.hig64 == 0 && u->parts.low64 == 0;
-}
-
 static inline void nd_uuid_clear(nd_uuid_t uu) {
-    ND_UUID *u = (ND_UUID *)uu;
-    u->parts.low64 = u->parts.hig64 = 0;
+    memset(uu, 0, sizeof(nd_uuid_t));
 }
 
 static inline int nd_uuid_compare(const nd_uuid_t uu1, const nd_uuid_t uu2) {
-    ND_UUID *u1 = (ND_UUID *)uu1;
-    ND_UUID *u2 = (ND_UUID *)uu2;
-
-    if(u1->parts.hig64 == u2->parts.hig64) {
-        if(u1->parts.low64 < u2->parts.low64) return -1;
-        if(u1->parts.low64 > u2->parts.low64) return 1;
-        return 0;
-    }
-
-    if(u1->parts.hig64 < u2->parts.hig64) return -1;
-    if(u1->parts.hig64 > u2->parts.hig64) return 1;
-    return 0;
+    return memcmp(uu1, uu2, sizeof(nd_uuid_t));
 }
 
 static inline void nd_uuid_copy(nd_uuid_t dst, const nd_uuid_t src) {
-    ND_UUID *d = (ND_UUID *)dst;
-    const ND_UUID *s = (const ND_UUID *)src;
-    *d = *s;
+    memcpy(dst, src, sizeof(nd_uuid_t));
 }
 
-static inline bool nd_uuid_eq(nd_uuid_t uu1, nd_uuid_t uu2) {
-    ND_UUID *u1 = (ND_UUID *)uu1;
-    ND_UUID *u2 = (ND_UUID *)uu2;
-    return (u1->parts.hig64 == u2->parts.hig64 && u1->parts.low64 == u2->parts.low64);
+static inline bool nd_uuid_eq(const nd_uuid_t uu1, const nd_uuid_t uu2) {
+    return nd_uuid_compare(uu1, uu2) == 0;
+}
+
+static inline int nd_uuid_is_null(const nd_uuid_t uu) {
+    static const ND_UUID zero = { 0 };
+    return nd_uuid_compare(uu, zero.uuid) == 0;
 }
 
 void nd_uuid_unparse_lower(const nd_uuid_t uuid, char *out);
