@@ -883,9 +883,8 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
     }
     
-    ssize_t bytes, len = (ssize_t)strlen(http);
-
-    bytes = send_timeout(
+    ssize_t len = (ssize_t)strlen(http);
+    ssize_t bytes = send_timeout(
 #ifdef ENABLE_HTTPS
         &host->sender->ssl,
 #endif
@@ -1015,8 +1014,10 @@ static bool attempt_to_connect(struct sender_state *state) {
     usec_t now_ut = now_monotonic_usec();
     usec_t end_ut = now_ut + USEC_PER_SEC * state->reconnect_delay;
     while(now_ut < end_ut) {
-        nd_thread_testcancel();
-        sleep_usec(500 * USEC_PER_MS); // seconds
+        if(nd_thread_signaled_to_cancel())
+            return false;
+
+        sleep_usec(100 * USEC_PER_MS); // seconds
         now_ut = now_monotonic_usec();
     }
 
@@ -1439,8 +1440,11 @@ static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
 }
 
 static bool rrdhost_sender_should_exit(struct sender_state *s) {
-    // check for outstanding cancellation requests
-    nd_thread_testcancel();
+    if(unlikely(nd_thread_signaled_to_cancel())) {
+        if(!s->exit.reason)
+            s->exit.reason = STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN;
+        return true;
+    }
 
     if(unlikely(!service_running(SERVICE_STREAMING))) {
         if(!s->exit.reason)

@@ -233,6 +233,14 @@ static inline bool is_handshake_complete(NETDATA_SSL *ssl, const char *op) {
  *     (These are often the same value, but can be different on some systems.)
  */
 
+ssize_t netdata_ssl_pending(NETDATA_SSL *ssl) {
+    return SSL_pending(ssl->conn);
+}
+
+bool netdata_ssl_has_pending(NETDATA_SSL *ssl) {
+    return SSL_has_pending(ssl->conn);
+}
+
 ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
     errno = 0;
     ssl->ssl_errno = 0;

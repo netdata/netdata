@@ -400,6 +400,7 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
 // --------------------------------------------------------------------------------------------------------------------
 
 void nd_thread_signal_cancel(ND_THREAD *nti) {
+    if(!nti) return;
     __atomic_store_n(&nti->cancel_atomic, true, __ATOMIC_RELAXED);
 }
 

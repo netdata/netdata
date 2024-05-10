@@ -58,8 +58,12 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
     }
 
 #ifdef ENABLE_H2O
-    if (is_h2o_rrdpush(r))
+    if (is_h2o_rrdpush(r)) {
+        if(nd_thread_signaled_to_cancel())
+            return -4;
+
         return (int)h2o_stream_read(r->h2o_ctx, buffer, size);
+    }
 #endif
 
     int tries = 100;
@@ -67,6 +71,29 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
 
     do {
         errno = 0;
+
+        switch(wait_on_socket_or_cancel_with_timeout(
+#ifdef ENABLE_HTTPS
+        &r->ssl,
+#endif
+        r->fd, 0, POLLIN))
+        {
+            case 0: // data are waiting
+                break;
+
+            case 1: // timeout reached
+                netdata_log_error("STREAM: %s(): timeout while waiting for data on socket!", __FUNCTION__);
+                return -3;
+
+            case -1: // thread cancelled
+                netdata_log_error("STREAM: %s(): thread has been cancelled timeout while waiting for data on socket!", __FUNCTION__);
+                return -4;
+
+            default:
+            case 2: // error on socket
+                netdata_log_error("STREAM: %s() socket error!", __FUNCTION__);
+                return -2;
+        }
 
 #ifdef ENABLE_HTTPS
         if (SSL_connection(&r->ssl))
@@ -115,6 +142,10 @@ static inline STREAM_HANDSHAKE read_stream_error_to_reason(int code) {
         case -3:
             // timeout
             return STREAM_HANDSHAKE_DISCONNECT_SOCKET_READ_TIMEOUT;
+
+        case -4:
+            // the thread is cancelled
+            return STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN;
 
         default:
             // anything else
@@ -478,7 +509,7 @@ bool stop_streaming_receiver(RRDHOST *host, STREAM_HANDSHAKE reason) {
             shutdown(host->receiver->fd, SHUT_RDWR);
         }
 
-        nd_thread_cancel(host->receiver->thread);
+        nd_thread_signal_cancel(host->receiver->thread);
     }
 
     int count = 2000;

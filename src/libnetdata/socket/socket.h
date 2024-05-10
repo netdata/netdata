@@ -40,9 +40,11 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 #ifdef ENABLE_HTTPS
 ssize_t recv_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 ssize_t send_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+int wait_on_socket_or_cancel_with_timeout(NETDATA_SSL *ssl, int fd, int timeout_s, short int poll_events);
 #else
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
+int wait_on_socket_or_cancel_with_timeout(int fd, int timeout_s, short int poll_events);
 #endif
 
 bool fd_is_socket(int fd);

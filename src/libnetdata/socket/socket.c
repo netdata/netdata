@@ -1177,38 +1177,85 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 // --------------------------------------------------------------------------------------------------------------------
 // helpers to send/receive data in one call, in blocking mode, with a timeout
 
+// returns: -1 = thread cancelled, 0 = proceed, 1 = timeout, 2 = error on socket
+// timeout parameter can be zero to wait forever
+inline int wait_on_socket_or_cancel_with_timeout(
 #ifdef ENABLE_HTTPS
-ssize_t recv_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
-#else
-ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+    NETDATA_SSL *ssl,
+#endif
+    int fd, int timeout_s, short int poll_events) {
+    struct pollfd pfd = {
+        .fd = fd,
+        .events = poll_events,
+        .revents = 0,
+    };
+
+    int timeout_ms = (timeout_s) ? (timeout_s * 1000) : 100;
+
+    while (timeout_ms > 0) {
+        if(nd_thread_signaled_to_cancel()) {
+            errno = ECANCELED;
+            return -1;
+        }
+
+#ifdef ENABLE_HTTPS
+        if(poll_events == POLLIN && SSL_connection(ssl) && netdata_ssl_has_pending(ssl))
+            return 0;
 #endif
 
-    for(;;) {
-        struct pollfd fd = {
-                .fd = sockfd,
-                .events = POLLIN,
-                .revents = 0
-        };
-
+        const int wait_ms = (timeout_ms >= 100) ? 100 : timeout_ms;
         errno = 0;
-        int retval = poll(&fd, 1, timeout * 1000);
 
-        if(retval == -1) {
-            // failed
+        // check every 100ms
+        const int ret = poll(&pfd, 1, wait_ms);
+        if(ret == -1) {
+            // poll failed
 
             if(errno == EINTR || errno == EAGAIN)
                 continue;
 
-            return -1;
+            return 2;
         }
 
-        if(!retval) {
+        if(ret == 0) {
             // timeout
-            return 0;
+            timeout_ms -= wait_ms;
+
+            // if zero timeout was given, wait forever
+            if(!timeout_s) timeout_ms = 100;
+
+            continue;
         }
 
-        if(fd.revents & POLLIN)
+        if(pfd.revents & poll_events)
+            return 0;
+    }
+
+    errno = ETIMEDOUT;
+    return 1;
+}
+
+ssize_t recv_timeout(
+#ifdef ENABLE_HTTPS
+    NETDATA_SSL *ssl,
+#endif
+    int sockfd, void *buf, size_t len, int flags, int timeout) {
+
+    switch(wait_on_socket_or_cancel_with_timeout(
+#ifdef ENABLE_HTTPS
+    ssl,
+#endif
+        sockfd, timeout, POLLIN)) {
+        case 0: // data are waiting
             break;
+
+        case 1: // timeout
+            return 0;
+
+        default:
+        case -1: // thread cancelled
+        case 2:  // error on socket
+            return -1;
     }
 
 #ifdef ENABLE_HTTPS
@@ -1220,37 +1267,27 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
     return recv(sockfd, buf, len, flags);
 }
 
+ssize_t send_timeout(
 #ifdef ENABLE_HTTPS
-ssize_t send_timeout(NETDATA_SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
-#else
-ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+    NETDATA_SSL *ssl,
 #endif
+    int sockfd, void *buf, size_t len, int flags, int timeout) {
 
-    for(;;) {
-        struct pollfd fd = {
-                .fd = sockfd,
-                .events = POLLOUT,
-                .revents = 0
-        };
+    switch(wait_on_socket_or_cancel_with_timeout(
+#ifdef ENABLE_HTTPS
+    ssl,
+#endif
+        sockfd, timeout, POLLOUT)) {
+        case 0: // data are waiting
+            break;
 
-        errno = 0;
-        int retval = poll(&fd, 1, timeout * 1000);
-
-        if(retval == -1) {
-            // failed
-
-            if(errno == EINTR || errno == EAGAIN)
-                continue;
-
-            return -1;
-        }
-
-        if(!retval) {
-            // timeout
+        case 1: // timeout
             return 0;
-        }
 
-        if(fd.revents & POLLOUT) break;
+        default:
+        case -1: // thread cancelled
+        case 2:  // error on socket
+            return -1;
     }
 
 #ifdef ENABLE_HTTPS

@@ -610,6 +610,9 @@ int connect_to_one_of_destinations(
     for (struct rrdpush_destinations *d = host->destinations; d; d = d->next) {
         time_t now = now_realtime_sec();
 
+        if(nd_thread_signaled_to_cancel())
+            return -1;
+
         if(d->postpone_reconnection_until > now)
             continue;
 
@@ -718,7 +721,7 @@ void rrdpush_sender_thread_stop(RRDHOST *host, STREAM_HANDSHAKE reason, bool wai
         host->sender->exit.reason = reason;
 
         // signal it to cancel
-        nd_thread_cancel(host->rrdpush_sender_thread);
+        nd_thread_signal_cancel(host->rrdpush_sender_thread);
     }
 
     sender_unlock(host->sender);
