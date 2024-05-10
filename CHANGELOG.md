@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- Bump github.com/docker/docker from 26.1.1+incompatible to 26.1.2+incompatible in /src/go/collectors/go.d.plugin [\#17631](https://github.com/netdata/netdata/pull/17631) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Regenerate integrations.js [\#17630](https://github.com/netdata/netdata/pull/17630) ([netdatabot](https://github.com/netdatabot))
+- go.d isc\_dhcpd create a chart for each pool [\#17629](https://github.com/netdata/netdata/pull/17629) ([ilyam8](https://github.com/ilyam8))
+- python.d remove bind\_rndc [\#17628](https://github.com/netdata/netdata/pull/17628) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17626](https://github.com/netdata/netdata/pull/17626) ([netdatabot](https://github.com/netdatabot))
+- go.d filecheck update to create a chart per instance [\#17624](https://github.com/netdata/netdata/pull/17624) ([ilyam8](https://github.com/ilyam8))
+- go.d systemdunits fix unit files selector [\#17622](https://github.com/netdata/netdata/pull/17622) ([ilyam8](https://github.com/ilyam8))
+- Improve handling of an alert that transitions to the REMOVED state [\#17621](https://github.com/netdata/netdata/pull/17621) ([stelfrag](https://github.com/stelfrag))
 - log to journal all transitions [\#17618](https://github.com/netdata/netdata/pull/17618) ([ktsaou](https://github.com/ktsaou))
 - Remove contrib now that we use cpack for DEB packages [\#17614](https://github.com/netdata/netdata/pull/17614) ([vkalintiris](https://github.com/vkalintiris))
 - add update every to json schema [\#17613](https://github.com/netdata/netdata/pull/17613) ([ktsaou](https://github.com/ktsaou))
@@ -417,16 +425,6 @@
 - Do not use backtrace when sentry is enabled. [\#17043](https://github.com/netdata/netdata/pull/17043) ([vkalintiris](https://github.com/vkalintiris))
 - Keep a count of metrics and samples collected [\#17042](https://github.com/netdata/netdata/pull/17042) ([stelfrag](https://github.com/stelfrag))
 - Fix links pointing to old go.d repo and update the integrations [\#17040](https://github.com/netdata/netdata/pull/17040) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#17039](https://github.com/netdata/netdata/pull/17039) ([netdatabot](https://github.com/netdatabot))
-- Improved query target cleanup [\#17038](https://github.com/netdata/netdata/pull/17038) ([stelfrag](https://github.com/stelfrag))
-- Liquify start-stop-restart doc [\#17037](https://github.com/netdata/netdata/pull/17037) ([Ancairon](https://github.com/Ancairon))
-- Code cleanup [\#17036](https://github.com/netdata/netdata/pull/17036) ([stelfrag](https://github.com/stelfrag))
-- Populate the SSL section in Observability and centralization points -… [\#17035](https://github.com/netdata/netdata/pull/17035) ([Ancairon](https://github.com/Ancairon))
-- Regenerate integrations.js [\#17034](https://github.com/netdata/netdata/pull/17034) ([netdatabot](https://github.com/netdatabot))
-- Metric release does not need to fetch retention [\#17033](https://github.com/netdata/netdata/pull/17033) ([stelfrag](https://github.com/stelfrag))
-- Bump go.mongodb.org/mongo-driver from 1.13.1 to 1.14.0 in /src/go/collectors/go.d.plugin [\#17030](https://github.com/netdata/netdata/pull/17030) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Bump k8s.io/client-go from 0.29.1 to 0.29.2 in /src/go/collectors/go.d.plugin [\#17029](https://github.com/netdata/netdata/pull/17029) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Increase RRD\_ID\_LENGTH\_MAX to 1200 [\#17028](https://github.com/netdata/netdata/pull/17028) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
