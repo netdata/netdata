@@ -76,7 +76,7 @@ static inline int read_stream(struct receiver_state *r, char* buffer, size_t siz
 #ifdef ENABLE_HTTPS
         &r->ssl,
 #endif
-        r->fd, 0, POLLIN))
+        r->fd, 0, POLLIN, NULL))
         {
             case 0: // data are waiting
                 break;

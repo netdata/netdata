@@ -139,11 +139,11 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
 #undef SERIAL_FAILURES_THRESHOLD
 
 static void *pluginsd_worker_thread(void *arg) {
-    CLEANUP_FUNCTION_REGISTER(pluginsd_worker_thread_cleanup) cleanup_ptr = arg;
+    struct plugind *cd = (struct plugind *) arg;
+    CLEANUP_FUNCTION_REGISTER(pluginsd_worker_thread_cleanup) cleanup_ptr = cd;
 
     worker_register("PLUGINSD");
 
-    struct plugind *cd = (struct plugind *) arg;
     plugin_set_running(cd);
 
     size_t count = 0;
@@ -216,7 +216,7 @@ static void pluginsd_main_cleanup(void *pptr) {
             netdata_log_info("PLUGINSD: 'host:%s', stopping plugin thread: %s",
                  rrdhost_hostname(cd->host), cd->id);
 
-            nd_thread_cancel(cd->unsafe.thread);
+            nd_thread_signal_cancel(cd->unsafe.thread);
         }
         spinlock_unlock(&cd->unsafe.spinlock);
     }

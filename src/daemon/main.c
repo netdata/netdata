@@ -133,6 +133,9 @@ void service_signal_exit(SERVICE_TYPE service) {
         if((sth->services & service)) {
             sth->stop_immediately = true;
 
+            // this does not harm - it just raises a flag
+            nd_thread_signal_cancel(sth->netdata_thread);
+
             if(sth->request_quit_callback) {
                 spinlock_unlock(&service_globals.lock);
                 sth->request_quit_callback(sth->data);
