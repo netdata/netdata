@@ -82,6 +82,8 @@ int nd_thread_cancel(ND_THREAD *nti);
 #endif
 void nd_thread_testcancel(void);
 
+typedef void (*nd_thread_canceller)(void *data);
+void nd_thread_register_canceller(nd_thread_canceller cb, void *data);
 void nd_thread_signal_cancel(ND_THREAD *nti);
 bool nd_thread_signaled_to_cancel(void);
 
@@ -89,22 +91,32 @@ bool nd_thread_signaled_to_cancel(void);
 void uv_thread_set_name_np(uv_thread_t ut, const char* name);
 void webrtc_set_thread_name(void);
 
+#ifdef NETDATA_INTERNAL_CHECKS
 void nd_thread_rwlock_read_locked(void);
 void nd_thread_rwlock_read_unlocked(void);
-
 void nd_thread_rwlock_write_locked(void);
 void nd_thread_rwlock_write_unlocked(void);
-
 void nd_thread_mutex_locked(void);
 void nd_thread_mutex_unlocked(void);
-
 void nd_thread_spinlock_locked(void);
 void nd_thread_spinlock_unlocked(void);
-
 void nd_thread_rwspinlock_read_locked(void);
 void nd_thread_rwspinlock_read_unlocked(void);
-
 void nd_thread_rwspinlock_write_locked(void);
 void nd_thread_rwspinlock_write_unlocked(void);
+#else
+#define nd_thread_rwlock_read_locked() debug_dummy()
+#define nd_thread_rwlock_read_unlocked() debug_dummy()
+#define nd_thread_rwlock_write_locked() debug_dummy()
+#define nd_thread_rwlock_write_unlocked() debug_dummy()
+#define nd_thread_mutex_locked() debug_dummy()
+#define nd_thread_mutex_unlocked() debug_dummy()
+#define nd_thread_spinlock_locked() debug_dummy()
+#define nd_thread_spinlock_unlocked() debug_dummy()
+#define nd_thread_rwspinlock_read_locked() debug_dummy()
+#define nd_thread_rwspinlock_read_unlocked() debug_dummy()
+#define nd_thread_rwspinlock_write_locked() debug_dummy()
+#define nd_thread_rwspinlock_write_unlocked() debug_dummy()
+#endif
 
 #endif //NETDATA_THREADS_H

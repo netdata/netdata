@@ -1865,13 +1865,6 @@ void ml_stop_threads()
         ml_queue_signal(training_thread->training_queue);
     }
 
-    // cancel training threads
-    for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
-        ml_training_thread_t *training_thread = &Cfg.training_threads[idx];
-
-        nd_thread_cancel(training_thread->nd_thread);
-    }
-
     // join training threads
     for (size_t idx = 0; idx != Cfg.num_training_threads; idx++) {
         ml_training_thread_t *training_thread = &Cfg.training_threads[idx];

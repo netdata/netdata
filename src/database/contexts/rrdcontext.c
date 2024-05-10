@@ -203,23 +203,6 @@ static bool rrdhost_check_our_claim_id(const char *claim_id) {
     return (strcasecmp(claim_id, localhost->aclk_state.claimed_id) == 0) ? true : false;
 }
 
-static RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
-    nd_uuid_t uuid;
-    if (uuid_parse(node_id, uuid))
-        return NULL;
-
-    RRDHOST *host = NULL;
-    dfe_start_read(rrdhost_root_index, host) {
-        if(!host->node_id) continue;
-
-        if(uuid_eq(uuid, *host->node_id))
-            break;
-    }
-    dfe_done(host);
-
-    return host;
-}
-
 void rrdcontext_hub_checkpoint_command(void *ptr) {
     struct ctxs_checkpoint *cmd = ptr;
 
@@ -234,7 +217,7 @@ void rrdcontext_hub_checkpoint_command(void *ptr) {
         return;
     }
 
-    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
+    RRDHOST *host = find_host_by_node_id(cmd->node_id);
     if(!host) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received checkpoint command for claim id '%s', node id '%s', "
@@ -308,7 +291,7 @@ void rrdcontext_hub_stop_streaming_command(void *ptr) {
         return;
     }
 
-    RRDHOST *host = rrdhost_find_by_node_id(cmd->node_id);
+    RRDHOST *host = find_host_by_node_id(cmd->node_id);
     if(!host) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "RRDCONTEXT: received stop streaming command for claim id '%s', node id '%s', "

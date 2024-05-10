@@ -1747,7 +1747,7 @@ static void netdev_main_cleanup(void *pptr) {
     worker_unregister();
 }
 
-void *netdev_main(void *ptr_is_null)
+void *netdev_main(void *ptr_is_null __maybe_unused)
 {
     CLEANUP_FUNCTION_REGISTER(netdev_main_cleanup) cleanup_ptr = (void *)0x01;
 

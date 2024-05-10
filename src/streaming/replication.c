@@ -1836,7 +1836,7 @@ static void replication_worker_cleanup(void *pptr) {
     worker_unregister();
 }
 
-static void *replication_worker_thread(void *ptr) {
+static void *replication_worker_thread(void *ptr __maybe_unused) {
     CLEANUP_FUNCTION_REGISTER(replication_worker_cleanup) cleanup_ptr = (void *)0x1;
     replication_initialize_workers(false);
 

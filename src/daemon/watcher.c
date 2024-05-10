@@ -39,13 +39,13 @@ static void watcher_wait_for_step(const watcher_step_id_t step_id)
 
     if (ok) {
         netdata_log_info("shutdown step: [%d/%d] - '%s' finished in %llu milliseconds",
-                         step_id + 1, WATCHER_STEP_ID_MAX,
+                         (int)step_id + 1, (int)WATCHER_STEP_ID_MAX,
                          watcher_steps[step_id].msg, step_duration / USEC_PER_MS);
     } else {
         // Do not call fatal() because it will try to execute the exit
         // sequence twice.
         netdata_log_error("shutdown step: [%d/%d] - '%s' took more than %u seconds (ie. %llu milliseconds)",
-              step_id + 1, WATCHER_STEP_ID_MAX, watcher_steps[step_id].msg,
+              (int)step_id + 1, (int)WATCHER_STEP_ID_MAX, watcher_steps[step_id].msg,
               timeout, step_duration / USEC_PER_MS);
 
         abort();

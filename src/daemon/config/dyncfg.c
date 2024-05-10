@@ -438,7 +438,7 @@ void dyncfg_add_streaming(BUFFER *wb) {
                    , 120
                    , "Dynamic configuration"
                    , "config"
-                   , HTTP_ACCESS_ANONYMOUS_DATA
+                   , (unsigned)HTTP_ACCESS_ANONYMOUS_DATA
                    , 1000
     );
 }

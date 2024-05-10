@@ -41,7 +41,7 @@ RRDHOST *find_host_by_node_id(char *node_id) {
 
     RRDHOST *host, *ret = NULL;
     dfe_start_read(rrdhost_root_index, host) {
-        if (host->node_id && !uuid_eq(*host->node_id, node_uuid)) {
+        if (host->node_id && uuid_eq(*host->node_id, node_uuid)) {
             ret = host;
             break;
         }

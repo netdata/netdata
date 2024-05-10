@@ -7,6 +7,8 @@
 #define nd_thread_status_set(nti, flag)     __atomic_or_fetch(&((nti)->options), flag, __ATOMIC_RELEASE)
 #define nd_thread_status_clear(nti, flag)   __atomic_and_fetch(&((nti)->options), ~(flag), __ATOMIC_RELEASE)
 
+typedef void (*nd_thread_canceller)(void *data);
+
 struct nd_thread {
     void *arg;
     pid_t tid;
@@ -17,6 +19,7 @@ struct nd_thread {
     pthread_t thread;
     bool cancel_atomic;
 
+#ifdef NETDATA_INTERNAL_CHECKS
     // keep track of the locks currently held
     // used to detect locks that are left locked during exit
     int rwlocks_read_locks;
@@ -25,6 +28,13 @@ struct nd_thread {
     int spinlock_locks;
     int rwspinlock_read_locks;
     int rwspinlock_write_locks;
+#endif
+
+    struct {
+        SPINLOCK spinlock;
+        nd_thread_canceller cb;
+        void *data;
+    } canceller;
 
     struct nd_thread *prev, *next;
 };
@@ -173,23 +183,20 @@ void webrtc_set_thread_name(void) {
 // --------------------------------------------------------------------------------------------------------------------
 // locks tracking
 
+#ifdef NETDATA_INTERNAL_CHECKS
 void nd_thread_rwlock_read_locked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_read_locks++; }
 void nd_thread_rwlock_read_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_read_locks--; }
-
 void nd_thread_rwlock_write_locked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_write_locks++; }
 void nd_thread_rwlock_write_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwlocks_write_locks--; }
-
 void nd_thread_mutex_locked(void) { if(_nd_thread_info) _nd_thread_info->mutex_locks++; }
 void nd_thread_mutex_unlocked(void) { if(_nd_thread_info) _nd_thread_info->mutex_locks--; }
-
 void nd_thread_spinlock_locked(void) { if(_nd_thread_info) _nd_thread_info->spinlock_locks++; }
 void nd_thread_spinlock_unlocked(void) { if(_nd_thread_info) _nd_thread_info->spinlock_locks--; }
-
 void nd_thread_rwspinlock_read_locked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_read_locks++; }
 void nd_thread_rwspinlock_read_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_read_locks--; }
-
 void nd_thread_rwspinlock_write_locked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_write_locks++; }
 void nd_thread_rwspinlock_write_unlocked(void) { if(_nd_thread_info) _nd_thread_info->rwspinlock_write_locks--; }
+#endif
 
 // --------------------------------------------------------------------------------------------------------------------
 // early initialization
@@ -252,11 +259,9 @@ void rrd_collector_finished(void);
 
 static void nd_thread_join_exited_detached_threads(void) {
     while(1) {
-        ND_THREAD *nti;
-
         spinlock_lock(&threads_globals.exited.spinlock);
 
-        nti = threads_globals.exited.list;
+        ND_THREAD *nti = threads_globals.exited.list;
         while (nti && nd_thread_status_check(nti, NETDATA_THREAD_OPTION_JOINABLE) == 0)
             nti = nti->next;
 
@@ -288,29 +293,29 @@ static void nd_thread_exit(void *pptr) {
 
     if(!nti) return;
 
-    if(nti->rwlocks_read_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d RWLOCKS READ ACQUIRED WHILE EXITING !!!",
-         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwlocks_read_locks);
+    internal_fatal(nti->rwlocks_read_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d RWLOCKS READ ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwlocks_read_locks);
 
-    if(nti->rwlocks_write_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d RWLOCKS WRITE ACQUIRED WHILE EXITING !!!",
-         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwlocks_write_locks);
+    internal_fatal(nti->rwlocks_write_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d RWLOCKS WRITE ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwlocks_write_locks);
 
-    if(nti->mutex_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d MUTEXES ACQUIRED WHILE EXITING !!!",
-         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->mutex_locks);
+    internal_fatal(nti->mutex_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d MUTEXES ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->mutex_locks);
 
-    if(nti->spinlock_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d SPINLOCKS ACQUIRED WHILE EXITING !!!",
-         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->spinlock_locks);
+    internal_fatal(nti->spinlock_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d SPINLOCKS ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->spinlock_locks);
 
-    if(nti->rwspinlock_read_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS READ ACQUIRED WHILE EXITING !!!",
-         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwspinlock_read_locks);
+    internal_fatal(nti->rwspinlock_read_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS READ ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwspinlock_read_locks);
 
-    if(nti->rwspinlock_write_locks)
-        fatal("THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS WRITE ACQUIRED WHILE EXITING !!!",
-         (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwspinlock_write_locks);
+    internal_fatal(nti->rwspinlock_write_locks != 0,
+        "THREAD '%s' WITH PID %d HAS %d RWSPINLOCKS WRITE ACQUIRED WHILE EXITING !!!",
+        (nti) ? nti->tag : "(unset)", gettid_cached(), nti->rwspinlock_write_locks);
 
     if(nd_thread_status_check(nti, NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP) != NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
         nd_log(NDLS_DAEMON, NDLP_DEBUG, "thread with task id %d finished", nti->tid);
@@ -372,6 +377,7 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
     nd_thread_join_exited_detached_threads();
 
     ND_THREAD *nti = callocz(1, sizeof(*nti));
+    spinlock_init(&nti->canceller.spinlock);
     nti->arg = arg;
     nti->start_routine = start_routine;
     nti->options = options & NETDATA_THREAD_OPTIONS_ALL;
@@ -399,9 +405,25 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
 
 // --------------------------------------------------------------------------------------------------------------------
 
+void nd_thread_register_canceller(nd_thread_canceller cb, void *data) {
+    ND_THREAD *nti = _nd_thread_info;
+    if(!nti) return;
+
+    spinlock_lock(&nti->canceller.spinlock);
+    nti->canceller.cb = cb;
+    nti->canceller.data = data;
+    spinlock_unlock(&nti->canceller.spinlock);
+}
+
 void nd_thread_signal_cancel(ND_THREAD *nti) {
     if(!nti) return;
+
     __atomic_store_n(&nti->cancel_atomic, true, __ATOMIC_RELAXED);
+
+    spinlock_lock(&nti->canceller.spinlock);
+    if(nti->canceller.cb)
+        nti->canceller.cb(nti->canceller.data);
+    spinlock_unlock(&nti->canceller.spinlock);
 }
 
 bool nd_thread_signaled_to_cancel(void) {
@@ -445,8 +467,6 @@ void nd_thread_join(ND_THREAD *nti) {
         nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot join thread. pthread_join() failed with code %d.", ret);
     else {
         nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
-
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "joined thread '%s', tid %d", nti->tag, nti->tid);
 
         spinlock_lock(&threads_globals.exited.spinlock);
         if(nti->prev)
