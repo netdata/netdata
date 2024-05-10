@@ -6,6 +6,16 @@
 char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { [0] = PLUGINS_DIR, };
 struct plugind *pluginsd_root = NULL;
 
+static inline void pluginsd_sleep(const int seconds) {
+    int timeout_ms = seconds * 1000;
+    int waited_ms = 0;
+    while(waited_ms < timeout_ms) {
+        if(!service_running(SERVICE_COLLECTORS)) break;
+        sleep_usec(ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS * USEC_PER_MS);
+        waited_ms += ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS;
+    }
+}
+
 inline size_t pluginsd_initialize_plugin_directories()
 {
     char plugins_dirs[(FILENAME_MAX * 2) + 1];
@@ -80,7 +90,7 @@ static void pluginsd_worker_thread_cleanup(void *pptr) {
 #define SERIAL_FAILURES_THRESHOLD 10
 static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
     if (likely(cd->successful_collections)) {
-        sleep((unsigned int)cd->update_every);
+        pluginsd_sleep(cd->update_every);
         return;
     }
 
@@ -89,7 +99,7 @@ static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
              rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid,
              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is now disabled.");
 
-        sleep((unsigned int)(cd->update_every * 10));
+        pluginsd_sleep(cd->update_every * 10);
         return;
     }
 
@@ -122,7 +132,8 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
         netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
               rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, worker_ret_code, cd->successful_collections,
               plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
-        sleep((unsigned int)(cd->update_every * 10));
+
+        pluginsd_sleep(cd->update_every * 10);
         return;
     }
 
@@ -349,7 +360,7 @@ void *pluginsd_main(void *ptr) {
             closedir(dir);
         }
 
-        sleep((unsigned int)scan_frequency);
+        pluginsd_sleep(scan_frequency);
     }
 
     return NULL;

@@ -165,8 +165,8 @@ static int dyncfg_unittest_action(struct dyncfg_unittest_action *a) {
     return rc;
 }
 
-static void *dyncfg_unittest_thread_action(void *ptr __maybe_unused) {
-    while(1) {
+static void *dyncfg_unittest_thread_action(void *ptr) {
+    while(!nd_thread_signaled_to_cancel()) {
         struct dyncfg_unittest_action *a = NULL;
         spinlock_lock(&dyncfg_unittest_data.spinlock);
         a = dyncfg_unittest_data.queue;
@@ -179,6 +179,8 @@ static void *dyncfg_unittest_thread_action(void *ptr __maybe_unused) {
         else
             sleep_usec(10 * USEC_PER_MS);
     }
+
+    return ptr;
 }
 
 static int dyncfg_unittest_execute_cb(struct rrd_function_execute *rfe, void *data) {
@@ -788,7 +790,7 @@ int dyncfg_unittest(void) {
 //    if(rc == HTTP_RESP_OK)
 //        fprintf(stderr, "%s\n", buffer_tostring(wb));
 
-    nd_thread_cancel(thread);
+    nd_thread_signal_cancel(thread);
     nd_thread_join(thread);
     dyncfg_unittest_cleanup_files();
     dictionary_destroy(dyncfg_unittest_data.nodes);

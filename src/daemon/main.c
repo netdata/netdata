@@ -89,6 +89,10 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
                 sth->uv_thread = uv_thread_self();
                 break;
         }
+
+        const char *name = nd_thread_tag();
+        if(!name) name = "";
+        strncpyz(sth->name, name, sizeof(sth->name) - 1);
     }
     else {
         sth = *PValue;
@@ -118,7 +122,7 @@ bool service_running(SERVICE_TYPE service) {
 
     sth->services |= service;
 
-    return !(sth->stop_immediately || netdata_exit);
+    return !sth->stop_immediately && !netdata_exit && !nd_thread_signaled_to_cancel();
 }
 
 void service_signal_exit(SERVICE_TYPE service) {
@@ -204,7 +208,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                 switch(sth->type) {
                     default:
                     case SERVICE_THREAD_TYPE_NETDATA:
-                        nd_thread_cancel(sth->netdata_thread);
+                        nd_thread_signal_cancel(sth->netdata_thread);
                         break;
 
                     case SERVICE_THREAD_TYPE_EVENT_LOOP:
@@ -669,7 +673,7 @@ void cancel_main_threads() {
         if (static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
             if (static_threads[i].thread) {
                 netdata_log_info("EXIT: Stopping main thread: %s", static_threads[i].name);
-                nd_thread_cancel(static_threads[i].thread);
+                nd_thread_signal_cancel(static_threads[i].thread);
             } else {
                 netdata_log_info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
                 static_threads[i].enabled = NETDATA_MAIN_THREAD_EXITED;

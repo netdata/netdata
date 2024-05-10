@@ -292,6 +292,11 @@ static void receiver_set_exit_reason(struct receiver_state *rpt, STREAM_HANDSHAK
 static inline bool receiver_should_stop(struct receiver_state *rpt) {
     static __thread size_t counter = 0;
 
+    if(nd_thread_signaled_to_cancel()) {
+        receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
+        return true;
+    }
+
     if(unlikely(rpt->exit.shutdown)) {
         receiver_set_exit_reason(rpt, STREAM_HANDSHAKE_DISCONNECT_SHUTDOWN, false);
         return true;
@@ -302,11 +307,8 @@ static inline bool receiver_should_stop(struct receiver_state *rpt) {
         return true;
     }
 
-    if(unlikely((counter++ % 1000) == 0)) {
-        // check every 1000 lines read
-        nd_thread_testcancel();
+    if(unlikely((counter++ % 1000) == 0))
         rpt->last_msg_t = now_monotonic_sec();
-    }
 
     return false;
 }

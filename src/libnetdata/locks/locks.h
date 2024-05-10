@@ -111,9 +111,6 @@ int __netdata_rwlock_wrunlock(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_tryrdlock(netdata_rwlock_t *rwlock);
 int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock);
 
-void netdata_thread_disable_cancelability(void);
-void netdata_thread_enable_cancelability(void);
-
 #ifdef NETDATA_TRACE_RWLOCKS
 
 int netdata_mutex_init_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex);

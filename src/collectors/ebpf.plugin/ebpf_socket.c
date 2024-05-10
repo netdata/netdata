@@ -887,7 +887,7 @@ static void ebpf_socket_exit(void *pptr)
     if(!em) return;
 
     if (ebpf_read_socket.thread)
-        nd_thread_cancel(ebpf_read_socket.thread);
+        nd_thread_signal_cancel(ebpf_read_socket.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -1679,7 +1679,6 @@ static void ebpf_socket_translate(netdata_socket_plus_t *dst, netdata_socket_idx
  */
 static void ebpf_update_array_vectors(ebpf_module_t *em)
 {
-    netdata_thread_disable_cancelability();
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
 
@@ -1777,7 +1776,6 @@ end_socket_loop:
         memset(values, 0, length);
         memcpy(&key, &next_key, sizeof(key));
     }
-    netdata_thread_enable_cancelability();
 }
 /**
  * Resume apps data
@@ -1839,9 +1837,9 @@ void *ebpf_read_socket_thread(void *ptr)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     usec_t period = update_every * USEC_PER_SEC;
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         pthread_mutex_lock(&collect_data_mutex);
@@ -2654,9 +2652,9 @@ static void socket_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;

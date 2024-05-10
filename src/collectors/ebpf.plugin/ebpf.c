@@ -935,7 +935,7 @@ void ebpf_stop_threads(int sig)
     int i;
     for (i = 0; ebpf_modules[i].info.thread_name != NULL; i++) {
         if (ebpf_modules[i].enabled < NETDATA_THREAD_EBPF_STOPPING) {
-            nd_thread_cancel(ebpf_modules[i].thread->thread);
+            nd_thread_signal_cancel(ebpf_modules[i].thread->thread);
 #ifdef NETDATA_DEV_MODE
             netdata_log_info("Sending cancel for thread %s", ebpf_modules[i].info.thread_name);
 #endif
@@ -951,7 +951,7 @@ void ebpf_stop_threads(int sig)
     ebpf_plugin_exit = true;
 
     pthread_mutex_lock(&mutex_cgroup_shm);
-    nd_thread_cancel(cgroup_integration_thread.thread);
+    nd_thread_signal_cancel(cgroup_integration_thread.thread);
 #ifdef NETDATA_DEV_MODE
     netdata_log_info("Sending cancel for thread %s", cgroup_integration_thread.name);
 #endif
@@ -4042,7 +4042,7 @@ int main(int argc, char **argv)
     int update_apps_list = update_apps_every - 1;
     int process_maps_per_core = ebpf_modules[EBPF_MODULE_PROCESS_IDX].maps_per_core;
     //Plugin will be killed when it receives a signal
-    for ( ; !ebpf_plugin_exit; global_iterations_counter++) {
+    for ( ; !ebpf_plugin_stop(); global_iterations_counter++) {
         (void)heartbeat_next(&hb, step);
 
         if (global_iterations_counter % EBPF_DEFAULT_UPDATE_EVERY == 0) {

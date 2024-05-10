@@ -729,8 +729,6 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *smh,
 {
     usec_t started_ut = now_monotonic_usec();
 
-    netdata_thread_disable_cancelability();
-
     METRIC *metric = (METRIC *)smh;
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
     struct rrdeng_query_handle *handle;
@@ -920,7 +918,6 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *seqh)
     unregister_query_handle(handle);
     rrdeng_query_handle_release(handle);
     seqh->handle = NULL;
-    netdata_thread_enable_cancelability();
 }
 
 time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *seqh) {

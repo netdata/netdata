@@ -1049,7 +1049,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
 
 //    fprintf(stderr, "Cancelling the threads...\n");
 //    for(size_t i = 0; i < threads ; i++) {
-//        nd_thread_cancel(thread_ptrs[i]);
+//        nd_thread_signal_cancel(thread_ptrs[i]);
 //    }
 
     fprintf(stderr, "Waiting the threads to finish...\n");

@@ -4156,17 +4156,13 @@ static void worker_utilization_charts(void) {
     for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_utilization_reset_statistics(&all_workers_utilization[i]);
 
-        netdata_thread_disable_cancelability();
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
-        netdata_thread_enable_cancelability();
 
         // skip the first iteration, so that we don't accumulate startup utilization to our charts
         if(likely(iterations > 1))
             workers_utilization_update_chart(&all_workers_utilization[i]);
 
-        netdata_thread_disable_cancelability();
         workers_threads_cleanup(&all_workers_utilization[i]);
-        netdata_thread_enable_cancelability();
     }
 
     workers_total_cpu_utilization_chart();

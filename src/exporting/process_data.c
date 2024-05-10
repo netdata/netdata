@@ -336,7 +336,6 @@ void end_batch_formatting(struct engine *engine)
  */
 void prepare_buffers(struct engine *engine)
 {
-    netdata_thread_disable_cancelability();
     start_batch_formatting(engine);
 
     rrd_rdlock();
@@ -359,7 +358,6 @@ void prepare_buffers(struct engine *engine)
         end_host_formatting(engine, host);
     }
     rrd_rdunlock();
-    netdata_thread_enable_cancelability();
 
     end_batch_formatting(engine);
 }

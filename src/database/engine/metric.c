@@ -763,7 +763,7 @@ static void *mrg_stress(void *ptr) {
         step = -1;
     }
 
-    while(!__atomic_load_n(&t->stop, __ATOMIC_RELAXED)) {
+    while(!__atomic_load_n(&t->stop, __ATOMIC_RELAXED) && !nd_thread_signaled_to_cancel()) {
         for (ssize_t i = start; i != end; i += step) {
             struct mrg_stress_entry *e = &t->array[i];
 
@@ -913,7 +913,7 @@ int mrg_unittest(void) {
     __atomic_store_n(&t.stop, true, __ATOMIC_RELAXED);
 
     for(size_t i = 0; i < threads ; i++)
-        nd_thread_cancel(th[i]);
+        nd_thread_signal_cancel(th[i]);
 
     for(size_t i = 0; i < threads ; i++)
         nd_thread_join(th[i]);

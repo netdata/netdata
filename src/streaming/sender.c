@@ -1800,7 +1800,6 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // Spurious wake-ups without error - loop again
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR))) {
-            nd_thread_testcancel();
             netdata_log_debug(D_STREAM, "Spurious wakeup");
             now_s = now_monotonic_sec();
             continue;

@@ -363,8 +363,6 @@ void *h2o_main(void *ptr) {
     h2o_pathconf_t *pathconf;
     h2o_hostconf_t *hostconf;
 
-    netdata_thread_disable_cancelability();
-
     const char *bind_addr = config_get(HTTPD_CONFIG_SECTION, "bind to", "127.0.0.1");
     int bind_port = config_get_number(HTTPD_CONFIG_SECTION, "port", 19998);
 

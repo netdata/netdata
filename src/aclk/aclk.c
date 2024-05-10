@@ -817,10 +817,6 @@ void *aclk_main(void *ptr)
 
     unsigned int proto_hdl_cnt = aclk_init_rx_msg_handlers();
 
-    // This thread is unusual in that it cannot be cancelled by cancel_main_threads()
-    // as it must notify the far end that it shutdown gracefully and avoid the LWT.
-    netdata_thread_disable_cancelability();
-
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
     nd_log(NDLS_DAEMON, NDLP_INFO,
            "Killing ACLK thread -> cloud functionality has been disabled");

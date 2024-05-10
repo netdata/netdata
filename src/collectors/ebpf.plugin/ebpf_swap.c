@@ -394,7 +394,7 @@ static void ebpf_swap_exit(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     if (ebpf_read_swap.thread)
-        nd_thread_cancel(ebpf_read_swap.thread);
+        nd_thread_signal_cancel(ebpf_read_swap.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -595,12 +595,10 @@ void *ebpf_read_swap_thread(void *ptr)
     usec_t period = update_every * USEC_PER_SEC;
     int max_period = update_every * EBPF_CLEANUP_FACTOR;
 
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
-
-        netdata_thread_disable_cancelability();
 
         pthread_mutex_lock(&collect_data_mutex);
         ebpf_read_swap_apps_table(maps_per_core, max_period);
@@ -617,7 +615,6 @@ void *ebpf_read_swap_thread(void *ptr)
 
         em->running_time = running_time;
         pthread_mutex_unlock(&ebpf_exit_cleanup);
-        netdata_thread_enable_cancelability();
     }
 
     return NULL;
@@ -920,9 +917,9 @@ static void swap_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;

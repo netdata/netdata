@@ -1261,7 +1261,7 @@ static inline void discovery_find_all_cgroups() {
         discovery_find_all_cgroups_v2();
     }
 
-    for (struct cgroup *cg = discovered_cgroup_root; cg; cg = cg->discovered_next) {
+    for (struct cgroup *cg = discovered_cgroup_root; cg && service_running(SERVICE_COLLECTORS); cg = cg->discovered_next) {
         worker_is_busy(WORKER_DISCOVERY_PROCESS);
         discovery_process_cgroup(cg);
     }

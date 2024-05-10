@@ -467,7 +467,7 @@ static void socket_listen_main_static_threaded_cleanup(void *pptr) {
 //        if(static_workers_private_data[i].running) {
 //            found++;
 //            netdata_log_info("stopping worker %d", i + 1);
-//            nd_thread_cancel(static_workers_private_data[i].thread);
+//            nd_thread_signal_cancel(static_workers_private_data[i].thread);
 //        }
 //        else
 //            netdata_log_info("found stopped worker %d", i + 1);

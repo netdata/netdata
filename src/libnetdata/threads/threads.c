@@ -432,31 +432,6 @@ bool nd_thread_signaled_to_cancel(void) {
 }
 
 // ----------------------------------------------------------------------------
-
-#ifdef NETDATA_INTERNAL_CHECKS
-int nd_thread_cancel_with_trace(ND_THREAD *nti, int line, const char *file, const char *function) {
-#else
-int nd_thread_cancel(ND_THREAD * nti) {
-#endif
-    int ret = pthread_cancel(nti->thread);
-    if(ret != 0)
-#ifdef NETDATA_INTERNAL_CHECKS
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot cancel thread. pthread_cancel() failed with code %d at %d@%s, function %s()", ret, line, file, function);
-#else
-        nd_log(NDLS_DAEMON, NDLP_WARNING, "cannot cancel thread. pthread_cancel() failed with code %d.", ret);
-#endif
-
-    return ret;
-}
-
-void nd_thread_testcancel(void) {
-    // work only on our own threads
-    if(!_nd_thread_info) return;
-
-    pthread_testcancel();
-}
-
-// ----------------------------------------------------------------------------
 // nd_thread_join
 
 void nd_thread_join(ND_THREAD *nti) {

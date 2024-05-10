@@ -2371,8 +2371,6 @@ void *unittest_stress_test_collector(void *ptr) {
     while(!__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
         // netdata_log_info("COLLECTOR %zu: collecting metrics %zu to %zu, from %ld to %lu", id, metric_start, metric_end, start_time_t, start_time_t + pgc_uts.points_per_page);
 
-        netdata_thread_disable_cancelability();
-
         for (size_t i = metric_start; i < metric_end; i++) {
             bool added;
 
@@ -2413,8 +2411,6 @@ void *unittest_stress_test_collector(void *ptr) {
                     pgc_page_hot_to_dirty_and_release(pgc_uts.cache, pgc_uts.metrics[i], false);
             }
         }
-
-        netdata_thread_enable_cancelability();
     }
 
     return ptr;
@@ -2428,8 +2424,6 @@ void *unittest_stress_test_queries(void *ptr) {
     size_t end = pgc_uts.clean_metrics + pgc_uts.hot_metrics;
 
     while(!__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
-        netdata_thread_disable_cancelability();
-
         int32_t random_number;
         random_r(random_data, &random_number);
 
@@ -2479,8 +2473,6 @@ void *unittest_stress_test_queries(void *ptr) {
             pgc_page_release(pgc_uts.cache, array[i]);
             array[i] = NULL;
         }
-
-        netdata_thread_enable_cancelability();
     }
 
     return ptr;

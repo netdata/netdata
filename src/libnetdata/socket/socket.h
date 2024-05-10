@@ -9,6 +9,8 @@
 #define MAX_LISTEN_FDS 50
 #endif
 
+#define ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS 100
+
 typedef struct listen_sockets {
     struct config *config;              // the config file to use
     const char *config_section;         // the netdata configuration section to read settings from

@@ -1445,8 +1445,6 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
         goto cleanup;
     }
 
-    netdata_thread_disable_cancelability();
-
     if(!rq->q) {
         if(likely(workers))
             worker_is_busy(WORKER_JOB_PREPARE_QUERY);
@@ -1468,7 +1466,6 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
             rq->q, (size_t)((unsigned long long)rq->sender->host->sender->buffer->max_size * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL));
 
     rq->q = NULL;
-    netdata_thread_enable_cancelability();
 
     __atomic_add_fetch(&replication_globals.atomic.executed, 1, __ATOMIC_RELAXED);
 

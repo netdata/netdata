@@ -74,14 +74,6 @@ void nd_thread_join(ND_THREAD * nti);
 ND_THREAD *nd_thread_self(void);
 bool nd_thread_is_me(ND_THREAD *nti);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-#define nd_thread_cancel(nti) nd_thread_cancel_with_trace(nti, __LINE__, __FILE__, __FUNCTION__)
-int nd_thread_cancel_with_trace(ND_THREAD *nti, int line, const char *file, const char *function);
-#else
-int nd_thread_cancel(ND_THREAD *nti);
-#endif
-void nd_thread_testcancel(void);
-
 typedef void (*nd_thread_canceller)(void *data);
 void nd_thread_register_canceller(nd_thread_canceller cb, void *data);
 void nd_thread_signal_cancel(ND_THREAD *nti);

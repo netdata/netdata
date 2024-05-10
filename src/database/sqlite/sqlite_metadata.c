@@ -224,9 +224,7 @@ int sql_metadata_cache_stats(int op)
     if (!REQUIRE_DB(db_meta))
         return 0;
 
-    netdata_thread_disable_cancelability();
     sqlite3_db_status(db_meta, op, &count, &dummy, 0);
-    netdata_thread_enable_cancelability();
     return count;
 }
 

@@ -1614,12 +1614,11 @@ void *cgroups_main(void *ptr) {
     usec_t step = cgroup_update_every * USEC_PER_SEC;
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
 
-    netdata_thread_disable_cancelability();
-
     while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
         usec_t hb_dt = heartbeat_next(&hb, step);
+
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 

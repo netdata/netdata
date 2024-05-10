@@ -53,14 +53,10 @@ static inline buffered_reader_ret_t buffered_reader_read(struct buffered_reader 
 }
 
 static inline buffered_reader_ret_t buffered_reader_read_timeout(struct buffered_reader *reader, int fd, int timeout_ms, bool log_error) {
-#ifdef ENABLE_HTTPS
-    static const NETDATA_SSL ssl = NETDATA_SSL_UNSET_CONNECTION;
-#endif
-
     short int revents = 0;
     switch(wait_on_socket_or_cancel_with_timeout(
 #ifdef ENABLE_HTTPS
-        (NETDATA_SSL *)&ssl,
+        NULL,
 #endif
         fd, timeout_ms, POLLIN, &revents)) {
 
