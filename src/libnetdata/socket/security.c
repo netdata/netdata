@@ -238,7 +238,13 @@ ssize_t netdata_ssl_pending(NETDATA_SSL *ssl) {
 }
 
 bool netdata_ssl_has_pending(NETDATA_SSL *ssl) {
+#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+    // this call was added on OpenSSL 1.1.0
+    // however, it is more accurate than SSL_pending()
     return SSL_has_pending(ssl->conn);
+#else
+    return SSL_pending(ssl->conn) > 0;
+#endif
 }
 
 ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num) {
