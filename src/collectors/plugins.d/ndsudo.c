@@ -14,6 +14,14 @@ struct command {
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
     {
+        .name = "ssacli-controllers-info",
+        .params = "ctrl all show config detail",
+        .search = {
+            [0] = "ssacli",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "smartctl-json-scan",
         .params = "--json --scan",
         .search = {

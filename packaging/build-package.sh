@@ -74,8 +74,31 @@ case "${PKG_TYPE}" in
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;
 esac
 
+if [ "${ENABLE_SENTRY}" = "true" ]; then
+    if [ -z "${SENTRY_DSN}" ]; then
+        echo "ERROR: Sentry enabled but no DSN specified, exiting."
+        exit 1
+    fi
+
+    add_cmake_option ENABLE_SENTRY On
+    add_cmake_option NETDATA_SENTRY_ENVIRONMENT "${RELEASE_PIPELINE:-Unknown}"
+    add_cmake_option NETDATA_SENTRY_DIST "${BUILD_DESTINATION:-Unknown}"
+    add_cmake_option NETDATA_SENTRY_DSN "${SENTRY_DSN}"
+
+    if [ -n "${VERSION}" ]; then
+        add_cmake_option NETDATA_SENTRY_RELEASE "${VERSION}"
+    fi
+else
+    add_cmake_option ENABLE_SENTRY Off
+fi
+
 # shellcheck disable=SC2086
 cmake ${CMAKE_ARGS}
 cmake --build "${BUILD_DIR}" --parallel "$(nproc)"
+
+if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then
+    sentry-cli debug-files upload -o netdata-inc -p netdata-agent --force-foreground --log-level=debug --wait --include-sources build/netdata
+fi
+
 cd "${BUILD_DIR}" || exit 1
 cpack -V -G "${PKG_TYPE}"

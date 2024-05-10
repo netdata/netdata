@@ -471,7 +471,7 @@ detect_package_manager_from_distribution() {
       package_installer="install_brew"
       tree="macos"
       if [ "${IGNORE_INSTALLED}" -eq 0 ] && [ -z "${brew}" ]; then
-        echo >&2 "command 'brew' is required to install packages on a '${distribution} ${version}' system."
+        echo >&2 "command 'brew' is required to install packages on a '${distribution} ${version}' system. Get instructions at https://brew.sh/"
         exit 1
       fi
       ;;
@@ -751,6 +751,11 @@ declare -A pkg_libsystemd_dev=(
   ['sabayon']="NOTREQUIRED" # inherently present on systems actually using systemd
   ['ubuntu']="libsystemd-dev"
   ['default']="systemd-devel"
+)
+
+declare -A pkg_pcre2=(
+  ['macos']="pcre2"
+  ['default']="NOTREQUIRED"
 )
 
 declare -A pkg_bridge_utils=(
@@ -1310,6 +1315,7 @@ packages() {
     suitable_package fts-dev
     suitable_package libyaml-dev
     suitable_package libsystemd-dev
+    suitable_package pcre2
   fi
 
   # -------------------------------------------------------------------------
