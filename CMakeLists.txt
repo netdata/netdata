@@ -1621,6 +1621,11 @@ if (ENABLE_WOLFSSL)
         target_include_directories(libnetdata BEFORE PUBLIC ${WOLFSSL_INCLUDE_DIRS})
         target_compile_options(libnetdata PUBLIC ${WOLFSSL_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${WOLFSSL_LDFLAGS})
+
+        check_function_exists(wolfSSL_set_alpn_protos HAVE_WOLFSSL_SET_ALPN_PROTOS)
+        if(NOT HAVE_WOLFSSL_SET_ALPN_PROTOS)
+                message(FATAL_ERROR "WolfSSl libray is not compiled with all necessary functions.")
+        endif()
 endif()
 
 # mnl
