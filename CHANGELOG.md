@@ -6,10 +6,14 @@
 
 **Merged pull requests:**
 
+- ndsudo add ssacli [\#17635](https://github.com/netdata/netdata/pull/17635) ([ilyam8](https://github.com/ilyam8))
+- health update isc dhcp alarms [\#17634](https://github.com/netdata/netdata/pull/17634) ([ilyam8](https://github.com/ilyam8))
+- add pcre2 to install-required-packages "netdata" for macOS [\#17633](https://github.com/netdata/netdata/pull/17633) ([ilyam8](https://github.com/ilyam8))
 - Bump github.com/docker/docker from 26.1.1+incompatible to 26.1.2+incompatible in /src/go/collectors/go.d.plugin [\#17631](https://github.com/netdata/netdata/pull/17631) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations.js [\#17630](https://github.com/netdata/netdata/pull/17630) ([netdatabot](https://github.com/netdatabot))
 - go.d isc\_dhcpd create a chart for each pool [\#17629](https://github.com/netdata/netdata/pull/17629) ([ilyam8](https://github.com/ilyam8))
 - python.d remove bind\_rndc [\#17628](https://github.com/netdata/netdata/pull/17628) ([ilyam8](https://github.com/ilyam8))
+- Add Sentry support to new CPack packages. [\#17627](https://github.com/netdata/netdata/pull/17627) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17626](https://github.com/netdata/netdata/pull/17626) ([netdatabot](https://github.com/netdatabot))
 - go.d filecheck update to create a chart per instance [\#17624](https://github.com/netdata/netdata/pull/17624) ([ilyam8](https://github.com/ilyam8))
 - go.d systemdunits fix unit files selector [\#17622](https://github.com/netdata/netdata/pull/17622) ([ilyam8](https://github.com/ilyam8))
@@ -301,7 +305,6 @@
 - Alert transitions code cleanup [\#17103](https://github.com/netdata/netdata/pull/17103) ([stelfrag](https://github.com/stelfrag))
 - Skip Go code in CI if it hasn’t changed. [\#17077](https://github.com/netdata/netdata/pull/17077) ([Ferroin](https://github.com/Ferroin))
 - Fix conditional for Amazon Linux 2023 in repoconfig spec file. [\#17056](https://github.com/netdata/netdata/pull/17056) ([PaulSzymanski](https://github.com/PaulSzymanski))
-- Add fallback logic in installer for fetching files. [\#17045](https://github.com/netdata/netdata/pull/17045) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.4](https://github.com/netdata/netdata/tree/v1.45.4) (2024-05-08)
 
@@ -421,10 +424,6 @@
 - Fix a few minor bits of build-related infrastructure. [\#17051](https://github.com/netdata/netdata/pull/17051) ([Ferroin](https://github.com/Ferroin))
 - HEALTH: eliminate fields that should be labels [\#17048](https://github.com/netdata/netdata/pull/17048) ([ktsaou](https://github.com/ktsaou))
 - fix alerts jsonschema prototype for latest dyncfg [\#17047](https://github.com/netdata/netdata/pull/17047) ([ktsaou](https://github.com/ktsaou))
-- Protect type anomaly rate map [\#17044](https://github.com/netdata/netdata/pull/17044) ([vkalintiris](https://github.com/vkalintiris))
-- Do not use backtrace when sentry is enabled. [\#17043](https://github.com/netdata/netdata/pull/17043) ([vkalintiris](https://github.com/vkalintiris))
-- Keep a count of metrics and samples collected [\#17042](https://github.com/netdata/netdata/pull/17042) ([stelfrag](https://github.com/stelfrag))
-- Fix links pointing to old go.d repo and update the integrations [\#17040](https://github.com/netdata/netdata/pull/17040) ([Ancairon](https://github.com/Ancairon))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
