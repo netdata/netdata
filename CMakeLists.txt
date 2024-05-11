@@ -1622,9 +1622,10 @@ if (ENABLE_WOLFSSL)
         target_compile_options(libnetdata PUBLIC ${WOLFSSL_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${WOLFSSL_LDFLAGS})
 
+        list(APPEND CMAKE_REQUIRED_LIBRARIES wolfssl)
         check_function_exists(wolfSSL_set_alpn_protos HAVE_WOLFSSL_SET_ALPN_PROTOS)
         if(NOT HAVE_WOLFSSL_SET_ALPN_PROTOS)
-                message(FATAL_ERROR "WolfSSl libray is not compiled with all necessary functions.")
+                message(FATAL_ERROR "Your WolfSSL library is not compiled with necessary symbols.")
         endif()
 endif()
 
