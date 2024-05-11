@@ -226,15 +226,26 @@ static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
     return true;
 }
 
-bool dyncfg_get_schema(const char *id, BUFFER *dst) {
+static bool dyncfg_get_schema_from(const char *dir, const char *id, BUFFER *dst) {
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", netdata_configured_user_config_dir, id);
+    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", dir, id);
     if(dyncfg_read_file_to_buffer(filename, dst))
         return true;
 
-    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", netdata_configured_stock_config_dir, id);
+    CLEAN_CHAR_P *escaped_id = dyncfg_escape_id_for_filename(id);
+    snprintfz(filename, sizeof(filename), "%s/schema.d/%s.json", dir, escaped_id);
     if(dyncfg_read_file_to_buffer(filename, dst))
+        return true;
+
+    return false;
+}
+
+bool dyncfg_get_schema(const char *id, BUFFER *dst) {
+    if(dyncfg_get_schema_from(netdata_configured_user_config_dir, id, dst))
+        return true;
+
+    if(dyncfg_get_schema_from(netdata_configured_stock_config_dir, id, dst))
         return true;
 
     return false;
