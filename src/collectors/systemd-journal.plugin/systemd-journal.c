@@ -176,6 +176,7 @@
     "|ND_ALERT_CLASS"                           \
     "|ND_ALERT_COMPONENT"                       \
     "|ND_ALERT_TYPE"                            \
+    "|ND_ALERT_STATUS"                          \
                                                 \
     ""
 
