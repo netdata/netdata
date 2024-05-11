@@ -123,7 +123,7 @@ set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
 # This is intended to make life easier for developers who are working on one
 # specific feature.
-option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
+option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" False)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
 # ssl
