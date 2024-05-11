@@ -532,7 +532,7 @@ static inline int journal_uuid_memcmp(const nd_uuid_t *uu1, const nd_uuid_t *uu2
 }
 
 static inline int journal_metric_uuid_compare(const void *key, const void *metric) {
-    return journal_uuid_memcmp((nd_uuid_t *)key, &(((struct journal_metric_list *) metric)->uuid));
+    return journal_uuid_memcmp((const nd_uuid_t *)key, (const nd_uuid_t *)&(((struct journal_metric_list *) metric)->uuid));
 }
 
 // --------------------------------------------------------------------------------------------------------------------
