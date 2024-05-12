@@ -12,13 +12,5 @@ learn_rel_path: "Developers/libnetdata"
 Support for WolfSSL is currently in the experimental stage, as it does not yet offer all the features available in the
 OpenSSL library.
 
-When linking against WolfSSL, it's crucial to ensure that the WolfSSL version has enabled support for the OpenSSL API.
-You can verify this support by checking the following lines inside `/usr/include/wolfssl/options.h`:
-
-```c
-#undef  OPENSSL_NO_EC
-#define OPENSSL_NO_EC
-
-#undef  WOLFSSL_OPENSSH
-#define WOLFSSL_OPENSSH
-```
+When integrating with WolfSSL, it's essential to confirm that the version of WolfSSL being used has enabled support for
+the OpenSSL API during compilation. Failure to do so will result in compilation errors.
