@@ -55,6 +55,12 @@
         "type": "number",
         "minimum": 0.1,
         "default": 0.1
+      },
+      "interface": {
+        "title": "Interface",
+        "description": "The name of the network interface whose IP address will be used as the source for sending ping packets.",
+        "type": "string",
+        "default": ""
       }
     },
     "required": [
@@ -81,6 +87,9 @@
     },
     "interval": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "hosts": {
+      "ui:listFlavour": "list"
     }
   }
 }
