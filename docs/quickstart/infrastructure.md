@@ -58,9 +58,6 @@ pane of glass.
 To [invite new users](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team), click on **Invite Users** in the
 Space management Area. Choose which War Rooms to add this user to, then click **Send**.
 
-If your team members have trouble signing in, direct them to the [Netdata Cloud sign
-in](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md) doc.
-
 ### See an overview of your infrastructure
 
 Netdata Cloud utilizes "tabs" in order to provide you with informative sections based on your infrastructure.  
@@ -193,7 +190,7 @@ collect from across your infrastructure with Netdata.
   <Box
     title="Management and settings">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md)" title="Sign in with email, Google, or GitHub" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/authentication-and-authorization.md)" title="Sign in with email, Google, GitHub or with an SSO tool" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team)" title="Invite your team" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md)" title="Choose your Netdata Cloud theme" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)" title="Role-Based Access" />
@@ -218,7 +215,7 @@ collect from across your infrastructure with Netdata.
   - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md)
   - [Events Feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 - Management and settings
-  - [Sign in with email, Google, or GitHub](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md)
+  - [Sign in with email, Google, GitHub or with an SSO tool](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/authentication-and-authorization.md)
   - [Invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team)
   - [Choose your Netdata Cloud theme](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md)
   - [Role-Based Access](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)
