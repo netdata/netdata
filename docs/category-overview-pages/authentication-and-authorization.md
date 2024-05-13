@@ -1,28 +1,27 @@
 # Authentication & Authorization
 
-This section contains documentation about the way Netdata allows users to Authenticate with Netdata Cloud and the Authorization flows controlling what their teammates can access and do on Netdata Cloud.
+This section contains documentation about how Netdata allows users to Authenticate with Netdata Cloud, as well as the Authorization flows that control the access and actions of their teammates in Netdata Cloud.
 
 ## Authentication
 
 ### Email
 
-To sign in/sign up with email, visit [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_email_section), enter your email address, and click the **Sign in by email** button.
+To sign in/sign up using email, visit [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_email_section), enter your email address, and click the **Sign in by email** button.
 
 Click the **Verify** button in the email you received to start using Netdata Cloud.
 
 ### Google and GitHub OAuth
 
-When you use Google/GitHub OAuth, your Netdata Cloud account is associated with the email address that Netdata Cloud
-receives via OAuth.
+When you use Google/GitHub OAuth, your Netdata Cloud account is associated with the email address that Netdata Cloud receives through OAuth.
 
-To sign in/sign up with Google or GitHub OAuth, visit [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_google_github_section) and select which method you want to use. After the verification steps, you will be signed in to Netdata Cloud.
+To sign in/sign up using Google or GitHub OAuth, visit [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=spaces?utm_source=docs&utm_content=sign_in_button_google_github_section) select the method you want to use. After the verification steps, you will be signed in to Netdata Cloud.
 
 ### Enterprise SSO Authentication
 
-Netdata integrates with SSO tools to allow you to control the way that your team can connect and authenticate with Netdata Cloud.
+Netdata integrates with SSO tools, allowing you to control how your team connects and authenticates to Netdata Cloud.
 
-Check the section regarding [Enterprise SSO Authentication](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/enterprise-sso-authentication.md) for more details.
+For more information, see [Enterprise SSO Authentication](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/enterprise-sso-authentication.md).
 
 ## Authorization
 
-After you are logged in, you can manage role-based access in your Space to provide each of your team members with the appropriate role. Read more about our RBAC model in the [corresponding section of our docs](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md).
+Once logged in, you can manage role-based access in your space to give each team member the appropriate role. For more information, see [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md).
