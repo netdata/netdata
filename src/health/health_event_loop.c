@@ -712,17 +712,11 @@ static void health_event_loop(void) {
                 if (unlikely(!wc))
                     continue;
 
-                if (wc->alert_queue_removed == 1) {
+                if (wc->alert_queue_removed && !--wc->alert_queue_removed)
                     sql_queue_removed_alerts_to_aclk(host);
-                } else if (wc->alert_queue_removed > 1) {
-                    wc->alert_queue_removed--;
-                }
 
-                if (wc->alert_checkpoint_req == 1) {
+                if (wc->alert_checkpoint_req && !--wc->alert_checkpoint_req)
                     aclk_push_alarm_checkpoint(host);
-                } else if (wc->alert_checkpoint_req > 1) {
-                    wc->alert_checkpoint_req--;
-                }
             }
 #endif
         }

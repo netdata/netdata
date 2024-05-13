@@ -219,6 +219,56 @@ static inline char *sqlite3_text_strdupz_empty(sqlite3_stmt *res, int iCol) {
     return strdupz(ret);
 }
 
+#define SQL_INSERT_ALERT_VERSION_HISTORY                                                                               \
+    "INSERT INTO health_log_version_history (health_log_id, alert_id, when_key) VALUES(@health_log_id, @alert_id, @when_key) "
+
+static void sql_insert_alert_version_history(int64_t health_log_id, uint64_t alert_id, uint64_t when_key)
+{
+    static __thread sqlite3_stmt *res = NULL;
+
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_VERSION_HISTORY, &res))
+        return;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, alert_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, when_key));
+
+    param = 0;
+    int rc = sqlite3_step_monitored(res);
+    if (rc != SQLITE_DONE)
+        error_report("Failed to execute sql_insert_alert_version_history");
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_RESET(res);
+}
+
+
+#define SQL_UPDATE_ALERT_VERSION                                                                                       \
+    "INSERT INTO health_log_version (health_log_id, version) VALUES(@health_log_id, @version) "                        \
+    "ON CONFLICT(health_log_id) DO UPDATE SET version = excluded.version"
+
+static void sql_update_alert_version(int64_t health_log_id, uint64_t version)
+{
+    static __thread sqlite3_stmt *res = NULL;
+
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_UPDATE_ALERT_VERSION, &res))
+        return;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, version));
+
+    param = 0;
+    int rc = sqlite3_step_monitored(res);
+    if (rc != SQLITE_DONE)
+        error_report("Failed to execute sql_update_alert_version");
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_RESET(res);
+}
 
 static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
 {
@@ -252,7 +302,7 @@ static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
         " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  "
         " hl.chart, hl.exec, hl.recipient, ha.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "
         " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id, "
-        " hld.alarm_event_id, hl.chart_name, hld.summary  "
+        " hld.alarm_event_id, hl.chart_name, hld.summary, hld.health_log_id "
         " FROM health_log hl, aclk_alert_%s aa, alert_hash ha, health_log_detail hld "
         " WHERE hld.unique_id = aa.alert_unique_id AND hl.config_hash_id = ha.hash_id AND aa.date_submitted IS NULL "
         " AND hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id "
@@ -277,15 +327,13 @@ static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
         }
     }
 
-    rc = sqlite3_bind_blob(res, 1, &wc->host->host_uuid, sizeof(wc->host->host_uuid), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id for pushing alert event.");
-        goto done;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &wc->host->host_uuid, sizeof(wc->host->host_uuid), SQLITE_STATIC));
 
     uint64_t first_sequence_id = 0;
     uint64_t last_sequence_id = 0;
 
+    param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         struct alarm_log_entry alarm_log;
         char old_value_string[100 + 1];
@@ -354,6 +402,11 @@ static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
 
         destroy_alarm_log_entry(&alarm_log);
         freez(edit_command);
+
+        int64_t health_log_id = sqlite3_column_int64(res, 30);
+        uint64_t version = sqlite3_column_int64(res, 2) + (sqlite3_column_int64(res, 5) - sqlite3_column_int64(res, 2));
+        sql_update_alert_version(health_log_id, version);
+        sql_insert_alert_version_history(health_log_id, sqlite3_column_int64(res, 2), sqlite3_column_int64(res, 5));
     }
 
     if (first_sequence_id) {
@@ -385,6 +438,7 @@ static void aclk_push_alert_event(struct aclk_sync_cfg_t *wc __maybe_unused)
     }
 
 done:
+    REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
 
     freez(claim_id);
@@ -589,6 +643,31 @@ done:
 #endif
 }
 
+#define SQL_ALERT_VERSION_CALC                                                                                         \
+    "SELECT SUM(version) FROM health_log hl, health_log_version hlv"                                                   \
+    " WHERE hl.host_id = @host_uuid AND hl.health_log_id = hlv.health_log_id "
+
+static uint64_t sql_calculate_alert_version(RRDHOST *host)
+{
+    static __thread sqlite3_stmt *res = NULL;
+
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_ALERT_VERSION_CALC, &res))
+        return 0;
+
+    uint64_t version = 0;
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+
+    param = 0;
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        version = (uint64_t)sqlite3_column_int64(res, 0);
+    }
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_RESET(res);
+    return version;
+}
 
 // Start streaming alerts
 void aclk_start_alert_streaming(char *node_id, bool resets)
@@ -612,8 +691,12 @@ void aclk_start_alert_streaming(char *node_id, bool resets)
     if (resets) {
         nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED (RESET REQUESTED)", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
         sql_queue_existing_alerts_to_aclk(host);
-    } else
+    } else {
         nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
+        // Calculate version of the alerts
+        uint64_t version = sql_calculate_alert_version(host);
+        netdata_log_info("DEBUG: CALCULATING ALERT VERSION %s = %zu", rrdhost_hostname(host), version);
+    }
 
     wc->alert_updates = 1;
     wc->alert_queue_removed = SEND_REMOVED_AFTER_HEALTH_LOOPS;
@@ -654,7 +737,6 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
     if (likely(rc == SQLITE_DONE)) {
         nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, rrdhost_hostname(wc->host));
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-        wc->alert_queue_removed = 0;
     }
 
 done:
@@ -664,7 +746,7 @@ done:
 
 void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
 {
-    if (unlikely(!host->aclk_config || !claimed() || !host->node_id))
+    if (!claimed() || !host->node_id)
         return;
 
     char node_id[UUID_STR_LEN];
@@ -781,7 +863,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     RRDHOST *host = find_host_by_node_id(node_id);
 
     if (unlikely(!host)) {
-    nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [%s (N/A)]: Node id not found", node_id);
+        nd_log(NDLS_ACCESS, NDLP_WARNING, "AC [%s (N/A)]: Node id not found", node_id);
         freez(node_id);
         return;
     }
@@ -805,7 +887,13 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     if (unlikely(!claim_id))
         return;
 
-    nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_uuid %s", wc->node_id, rrdhost_hostname(wc->host), wc->alerts_snapshot_uuid);
+    nd_log(
+        NDLS_ACCESS,
+        NDLP_DEBUG,
+        "ACLK REQ [%s (%s)]: Sending alerts snapshot, snapshot_uuid %s",
+        wc->node_id,
+        rrdhost_hostname(wc->host),
+        wc->alerts_snapshot_uuid);
 
     uint32_t cnt = 0;
 
@@ -829,6 +917,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         cnt++;
     }
 
+    char *snapshot_uuid = wc->alerts_snapshot_uuid;
     if (cnt) {
         uint32_t chunks;
 
@@ -839,7 +928,7 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
         struct alarm_snapshot alarm_snap;
         alarm_snap.node_id = wc->node_id;
         alarm_snap.claim_id = claim_id;
-        alarm_snap.snapshot_uuid = wc->alerts_snapshot_uuid;
+        alarm_snap.snapshot_uuid = snapshot_uuid;
         alarm_snap.chunks = chunks;
         alarm_snap.chunk = 1;
 
@@ -881,8 +970,9 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
             aclk_send_alarm_snapshot(snapshot_proto);
     }
 
-    rw_spinlock_read_unlock(&host->health_log.spinlock);
     wc->alerts_snapshot_uuid = NULL;
+    freez(snapshot_uuid);
+    rw_spinlock_read_unlock(&host->health_log.spinlock);
 
     freez(claim_id);
 #endif
@@ -952,8 +1042,14 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
 
 void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
 {
-    if (unlikely(!node_id))
+    if (unlikely(!node_id || !claim_id || !claimed()))
         return;
+
+    char *agent_claim_id = get_agent_claimid();
+    if (claim_id && agent_claim_id && strcmp(agent_claim_id, claim_id) != 0) {
+        nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED WITH INVALID CLAIM ID", node_id);
+        goto done;
+    }
 
     struct aclk_sync_cfg_t *wc;
     RRDHOST *host = find_host_by_node_id(node_id);
@@ -964,6 +1060,9 @@ void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
         nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK REQ [%s (%s)]: ALERTS CHECKPOINT REQUEST RECEIVED", node_id, rrdhost_hostname(host));
         wc->alert_checkpoint_req = SEND_CHECKPOINT_AFTER_HEALTH_LOOPS;
     }
+
+done:
+    freez(agent_claim_id);
 }
 
 typedef struct active_alerts {
@@ -988,10 +1087,6 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 {
 #ifdef ENABLE_ACLK
     struct aclk_sync_cfg_t *wc = host->aclk_config;
-    if (unlikely(!wc)) {
-        nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", rrdhost_hostname(host));
-        return;
-    }
 
     if (rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS)) {
         //postpone checkpoint send
@@ -1002,9 +1097,10 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
 
     RRDCALC *rc;
     uint32_t cnt = 0;
-    size_t len = 0;
 
-    active_alerts_t *active_alerts = callocz(BATCH_ALLOCATED, sizeof(active_alerts_t));
+    size_t entries = dictionary_entries(host->rrdcalc_root_index);
+    active_alerts_t *active_alerts = callocz(entries, sizeof(active_alerts_t));
+
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
@@ -1012,43 +1108,39 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
         if (rc->status == RRDCALC_STATUS_WARNING ||
             rc->status == RRDCALC_STATUS_CRITICAL) {
 
-            if (cnt && !(cnt % BATCH_ALLOCATED)) {
-                active_alerts = reallocz(active_alerts, (BATCH_ALLOCATED * ((cnt / BATCH_ALLOCATED) + 1)) * sizeof(active_alerts_t));
+            if (cnt == entries - 1) {
+                entries += 8;
+                active_alerts = reallocz(active_alerts, entries * sizeof(active_alerts_t));
             }
 
             active_alerts[cnt].name = (char *)rrdcalc_name(rc);
-            len += string_strlen(rc->config.name);
             active_alerts[cnt].chart = (char *)rrdcalc_chart_name(rc);
-            len += string_strlen(rc->chart);
             active_alerts[cnt].status = rc->status;
-            len++;
             cnt++;
         }
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 
-    BUFFER *alarms_to_hash;
-    if (cnt) {
-        qsort(active_alerts, cnt, sizeof(active_alerts_t), compare_active_alerts);
+    if (!cnt) {
+        nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK RES [%s (%s)]: NO ALERTS FOUND TO GENERATE CHECKPOINT HASH", wc->node_id, rrdhost_hostname(host));
+        return;
+    }
 
-        alarms_to_hash = buffer_create(len, NULL);
-        for (uint32_t i = 0; i < cnt; i++) {
-            buffer_strcat(alarms_to_hash, active_alerts[i].name);
-            buffer_strcat(alarms_to_hash, active_alerts[i].chart);
-            if (active_alerts[i].status == RRDCALC_STATUS_WARNING)
-                buffer_fast_strcat(alarms_to_hash, "W", 1);
-            else if (active_alerts[i].status == RRDCALC_STATUS_CRITICAL)
-                buffer_fast_strcat(alarms_to_hash, "C", 1);
-        }
-    } else {
-        alarms_to_hash = buffer_create(1, NULL);
-        buffer_strcat(alarms_to_hash, "");
-        len = 0;
+    BUFFER *alarms_to_hash = buffer_create(16384, NULL);
+    qsort(active_alerts, cnt, sizeof(active_alerts_t), compare_active_alerts);
+
+    for (uint32_t i = 0; i < cnt; i++) {
+        buffer_strcat(alarms_to_hash, active_alerts[i].name);
+        buffer_strcat(alarms_to_hash, active_alerts[i].chart);
+        if (active_alerts[i].status == RRDCALC_STATUS_WARNING)
+            buffer_fast_strcat(alarms_to_hash, "W", 1);
+        else if (active_alerts[i].status == RRDCALC_STATUS_CRITICAL)
+            buffer_fast_strcat(alarms_to_hash, "C", 1);
     }
     freez(active_alerts);
 
     char hash[SHA256_DIGEST_LENGTH + 1];
-    if (hash256_string((const unsigned char *)buffer_tostring(alarms_to_hash), len, hash)) {
+    if (hash256_string((const unsigned char *)buffer_tostring(alarms_to_hash), buffer_strlen(alarms_to_hash), hash)) {
         hash[SHA256_DIGEST_LENGTH] = 0;
 
         struct alarm_checkpoint alarm_checkpoint;
@@ -1063,7 +1155,6 @@ void aclk_push_alarm_checkpoint(RRDHOST *host __maybe_unused)
     } else
         nd_log(NDLS_ACCESS, NDLP_ERR, "ACLK RES [%s (%s)]: FAILED TO CREATE ALERTS CHECKPOINT HASH", wc->node_id, rrdhost_hostname(host));
 
-    wc->alert_checkpoint_req = 0;
     buffer_free(alarms_to_hash);
 #endif
 }

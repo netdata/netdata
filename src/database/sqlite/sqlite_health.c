@@ -500,23 +500,23 @@ void sql_health_alarm_log_load(RRDHOST *host)
     if (!PREPARE_STATEMENT(db_meta, SQL_LOAD_HEALTH_LOG, &res))
         return;
 
-    ret = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
-    if (unlikely(ret != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter for SQL_LOAD_HEALTH_LOG.");
-        SQLITE_FINALIZE(res);
-        return;
-    }
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
 
     DICTIONARY *all_rrdcalcs = dictionary_create(
         DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
+        netdata_log_info("DEBUG: CALC = %s", rrdcalc_name(rc));
         dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 
+    param = 0;
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
+    uint64_t version = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         ALARM_ENTRY *ae = NULL;
 
@@ -632,7 +632,8 @@ void sql_health_alarm_log_load(RRDHOST *host)
         if(unlikely(ae->alarm_id >= host->health_max_alarm_id))
             host->health_max_alarm_id = ae->alarm_id;
 
-        loaded++;
+        // alarm id is part of the version
+        version += alarm_id + (ae->when - alarm_id);
     }
 
     rw_spinlock_read_unlock(&host->health_log.spinlock);
@@ -648,9 +649,10 @@ void sql_health_alarm_log_load(RRDHOST *host)
         host->health_log.next_alarm_id = host->health_max_alarm_id + 1;
 
     nd_log(NDLS_DAEMON, errored ? NDLP_WARNING : NDLP_DEBUG,
-           "[%s]: Table health_log, loaded %zd alarm entries, errors in %zd entries.",
-           rrdhost_hostname(host), loaded, errored);
-
+           "[%s]: Table health_log, loaded %zd alarm entries, errors in %zd entries. version calculated %zu",
+           rrdhost_hostname(host), loaded, errored, version);
+done:
+    REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
 }
 
