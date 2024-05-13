@@ -10,7 +10,7 @@ The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts
 pods/containers, and [supported application-specific
 metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
 
-### Prerequisites
+## Prerequisites
 
 To deploy Kubernetes monitoring with Netdata, you need:
 
