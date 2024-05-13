@@ -43,7 +43,7 @@ require (
 	github.com/tidwall/gjson v1.17.1
 	github.com/tomasen/fcgi_client v0.0.0-20180423082037-2bb3d819fd19
 	github.com/valyala/fastjson v1.6.4
-	github.com/vmware/govmomi v0.37.1
+	github.com/vmware/govmomi v0.37.2
 	go.mongodb.org/mongo-driver v1.15.0
 	golang.org/x/net v0.25.0
 	golang.org/x/text v0.15.0
