@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix incorrect bind failure warning [\#17643](https://github.com/netdata/netdata/pull/17643) ([stelfrag](https://github.com/stelfrag))
+- go.d ping add missing setting to schema [\#17642](https://github.com/netdata/netdata/pull/17642) ([ilyam8](https://github.com/ilyam8))
 - logs: add ND\_ALERT\_STATUS to facets [\#17641](https://github.com/netdata/netdata/pull/17641) ([ktsaou](https://github.com/ktsaou))
 - Add valkey to apps\_groups.conf [\#17639](https://github.com/netdata/netdata/pull/17639) ([mohd-akram](https://github.com/mohd-akram))
 - ndsudo add ssacli [\#17635](https://github.com/netdata/netdata/pull/17635) ([ilyam8](https://github.com/ilyam8))
@@ -423,7 +425,6 @@
 - updated sizing netdata [\#17057](https://github.com/netdata/netdata/pull/17057) ([ktsaou](https://github.com/ktsaou))
 - fix zpool state chart family [\#17054](https://github.com/netdata/netdata/pull/17054) ([ilyam8](https://github.com/ilyam8))
 - DYNCFG: call the interceptor when a test is made on a new job [\#17052](https://github.com/netdata/netdata/pull/17052) ([ktsaou](https://github.com/ktsaou))
-- Fix a few minor bits of build-related infrastructure. [\#17051](https://github.com/netdata/netdata/pull/17051) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
