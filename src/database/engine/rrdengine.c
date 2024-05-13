@@ -1768,7 +1768,8 @@ uint64_t get_directory_free_bytes_space(struct rrdengine_instance *ctx)
     struct statvfs buff_statvfs;
     if (statvfs(ctx->config.dbfiles_path, &buff_statvfs) == 0)
         free_bytes = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
-    return free_bytes;
+
+    return (free_bytes - (free_bytes * 5 / 100));
 }
 
 void dbengine_retention_statistics(void)

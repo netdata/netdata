@@ -357,7 +357,7 @@ typedef struct tier_config_prototype {
     uint8_t page_type;                          // default page type for this context
     uint64_t max_disk_space;                    // the max disk space this ctx is allowed to use
     time_t max_retention_s;                     // The max retention in seconds
-    uint8_t disk_percentage;
+    uint8_t disk_percentage;                    // percentage of metadata that contribute towards tier space used
     uint8_t global_compress_alg;                // the wanted compression algorithm
     char dbfiles_path[FILENAME_MAX + 1];
 
@@ -370,16 +370,6 @@ typedef struct tier_config_prototype {
 } TIER_CONFIG_PROTOTYPE;
 
 struct rrdengine_instance {
-//    struct {
-//        int tier;                                   // the tier of this ctx
-//        uint8_t page_type;                          // default page type for this context
-//
-//        uint64_t max_disk_space;                    // the max disk space this ctx is allowed to use
-//        time_t max_retention_s;                     // The max retention in seconds
-//        uint8_t global_compress_alg;                // the wanted compression algorithm
-//
-//        char dbfiles_path[FILENAME_MAX + 1];
-//    } config;
     TIER_CONFIG_PROTOTYPE config;
 
     struct {
