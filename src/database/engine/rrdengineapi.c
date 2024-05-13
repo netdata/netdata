@@ -29,7 +29,7 @@ size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
 size_t tier_quota_mb[RRD_STORAGE_TIERS] = {512, 512, 512, 0, 0};
 #else
 size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
-size_t tier_quota_mb[RRD_STORAGE_TIERS] = {1024, 1024, 1024, 0, 0};
+size_t tier_quota_mb[RRD_STORAGE_TIERS] = {1024, 1024, 1024, 128, 64};
 #endif
 
 #if RRDENG_PAGE_TYPE_MAX != 2

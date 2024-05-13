@@ -14,7 +14,7 @@ size_t storage_tiers = 3;
 bool use_direct_io = true;
 size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60, 60, 60};
 size_t storage_tiers_collection_per_sec[RRD_STORAGE_TIERS] = {1, 60, 3600, 8 * 3600, 24 * 3600};
-double storage_tiers_retention_days[RRD_STORAGE_TIERS] = {14, 90, 2 * 365, 0, 0};
+double storage_tiers_retention_days[RRD_STORAGE_TIERS] = {14, 90, 2 * 365, 2 * 365, 2 * 365};
 
 size_t get_tier_grouping(size_t tier) {
     if(unlikely(tier >= storage_tiers)) tier = storage_tiers - 1;
@@ -961,8 +961,11 @@ void dbengine_init(char *hostname) {
             snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention days", tier);
             storage_tiers_retention_days[tier] = config_get_float(CONFIG_SECTION_DB, dbengineconfig, storage_tiers_retention_days[tier]);
 
-            snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu frequency", tier);
-            storage_tiers_collection_per_sec[tier] = config_get_number(CONFIG_SECTION_DB, dbengineconfig, storage_tiers_collection_per_sec[tier]);
+            if (tier) {
+                snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu frequency", tier);
+                storage_tiers_collection_per_sec[tier] =
+                    config_get_number(CONFIG_SECTION_DB, dbengineconfig, storage_tiers_collection_per_sec[tier]);
+            }
             storage_tiers_grouping_iterations[tier] = storage_tiers_collection_per_sec[tier] / grouping_iterations;
             grouping_iterations *= storage_tiers_grouping_iterations[tier];
         }
