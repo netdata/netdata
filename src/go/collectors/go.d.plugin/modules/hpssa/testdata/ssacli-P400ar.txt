@@ -1,0 +1,397 @@
+Smart Array P440ar in Slot 0 (Embedded)
+   Bus Interface: PCI
+   Slot: 0
+   Serial Number: REDACTED
+   Cache Serial Number: REDACTED
+   RAID 6 (ADG) Status: Enabled
+   Controller Status: OK
+   Hardware Revision: B
+   Firmware Version: 3.56-0
+   Rebuild Priority: Low
+   Expand Priority: Medium
+   Surface Scan Delay: 15 secs
+   Surface Scan Mode: Idle
+   Parallel Surface Scan Supported: Yes
+   Current Parallel Surface Scan Count: 4
+   Max Parallel Surface Scan Count: 16
+   Queue Depth: Automatic
+   Monitor and Performance Delay: 60  min
+   Elevator Sort: Enabled
+   Degraded Performance Optimization: Disabled
+   Inconsistency Repair Policy: Disabled
+   Wait for Cache Room: Disabled
+   Surface Analysis Inconsistency Notification: Disabled
+   Post Prompt Timeout: 0 secs
+   Cache Board Present: True
+   Cache Status: OK
+   Cache Ratio: 10% Read / 90% Write
+   Drive Write Cache: Enabled
+   Total Cache Size: 2.0 GB
+   Total Cache Memory Available: 1.8 GB
+   No-Battery Write Cache: Enabled
+   SSD Caching RAID5 WriteBack Enabled: True
+   SSD Caching Version: 2
+   Cache Backup Power Source: Batteries
+   Battery/Capacitor Count: 1
+   Battery/Capacitor Status: OK
+   SATA NCQ Supported: True
+   Spare Activation Mode: Activate on physical drive failure (default)
+   Controller Temperature (C): 47
+   Cache Module Temperature (C): 41
+   Number of Ports: 2 Internal only
+   Encryption: Disabled
+   Express Local Encryption: False
+   Driver Name: hpsa
+   Driver Version: 3.4.4
+   Driver Supports SSD Smart Path: True
+   PCI Address (Domain:Bus:Device.Function): 0000:03:00.0
+   Negotiated PCIe Data Rate: PCIe 3.0 x8 (7880 MB/s)
+   Controller Mode: RAID
+   Pending Controller Mode: RAID
+   Port Max Phy Rate Limiting Supported: False
+   Latency Scheduler Setting: Disabled
+   Current Power Mode: MaxPerformance
+   Survival Mode: Enabled
+   Host Serial Number: REDACTED
+   Sanitize Erase Supported: False
+   Primary Boot Volume: logicaldrive 1 (600508B1001C158B69C0104DA29E6FF7)
+   Secondary Boot Volume: logicaldrive 2 (600508B1001C6BBD22BCA12CEDF36CB0)
+
+
+   Port Name: 1I
+         Port ID: 0
+         Port Connection Number: 0
+         SAS Address: 5001438037D24990
+         Port Location: Internal
+         Managed Cable Connected: False
+
+   Port Name: 2I
+         Port ID: 1
+         Port Connection Number: 1
+         SAS Address: 5001438037D24994
+         Port Location: Internal
+         Managed Cable Connected: False
+
+
+   Internal Drive Cage at Port 1I, Box 1, OK
+
+      Power Supply Status: Not Redundant
+      Drive Bays: 4
+      Port: 1I
+      Box: 1
+      Location: Internal
+
+   Physical Drives
+      physicaldrive 1I:1:1 (port 1I:box 1:bay 1, SATA SSD, 1.9 TB, OK)
+      physicaldrive 1I:1:2 (port 1I:box 1:bay 2, SATA SSD, 1.9 TB, OK)
+      physicaldrive 1I:1:3 (port 1I:box 1:bay 3, SATA SSD, 1.9 TB, OK)
+      physicaldrive 1I:1:4 (port 1I:box 1:bay 4, SATA HDD, 1 TB, OK)
+
+
+
+   Internal Drive Cage at Port 2I, Box 1, OK
+
+      Power Supply Status: Not Redundant
+      Drive Bays: 4
+      Port: 2I
+      Box: 1
+      Location: Internal
+
+   Physical Drives
+      physicaldrive 2I:1:5 (port 2I:box 1:bay 5, SATA SSD, 1.9 TB, OK)
+      physicaldrive 2I:1:6 (port 2I:box 1:bay 6, SATA SSD, 1.9 TB, OK)
+      physicaldrive 2I:1:7 (port 2I:box 1:bay 7, SATA SSD, 1.9 TB, OK)
+      physicaldrive 2I:1:8 (port 2I:box 1:bay 8, SATA HDD, 1 TB, OK)
+
+
+   Array: A
+      Interface Type: Solid State SATA
+      Unused Space: 0  MB (0.0%)
+      Used Space: 10.5 TB (100.0%)
+      Status: OK
+      MultiDomain Status: OK
+      Array Type: Data
+      Smart Path: disable
+
+
+      Logical Drive: 1
+         Size: 5.2 TB
+         Fault Tolerance: 1+0
+         Heads: 255
+         Sectors Per Track: 32
+         Cylinders: 65535
+         Strip Size: 256 KB
+         Full Stripe Size: 768 KB
+         Status: OK
+         MultiDomain Status: OK
+         Caching:  Enabled
+         Unique Identifier: 600508B1001C158B69C0104DA29E6FF7
+         Disk Name: /dev/sda
+         Mount Points: / 18.6 GB Partition Number 2, /data 5.2 TB Partition Number 4
+         OS Status: LOCKED
+         Boot Volume: primary
+         Logical Drive Label: A9255E2C50123456789ABCDE7239
+         Mirror Group 1:
+            physicaldrive 1I:1:1 (port 1I:box 1:bay 1, SATA SSD, 1.9 TB, OK)
+            physicaldrive 1I:1:2 (port 1I:box 1:bay 2, SATA SSD, 1.9 TB, OK)
+            physicaldrive 1I:1:3 (port 1I:box 1:bay 3, SATA SSD, 1.9 TB, OK)
+         Mirror Group 2:
+            physicaldrive 2I:1:5 (port 2I:box 1:bay 5, SATA SSD, 1.9 TB, OK)
+            physicaldrive 2I:1:6 (port 2I:box 1:bay 6, SATA SSD, 1.9 TB, OK)
+            physicaldrive 2I:1:7 (port 2I:box 1:bay 7, SATA SSD, 1.9 TB, OK)
+         Drive Type: Data
+         LD Acceleration Method: Controller Cache
+
+
+      physicaldrive 1I:1:1
+         Port: 1I
+         Box: 1
+         Bay: 1
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 1.9 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: XCV10110
+         Serial Number:REDACTED
+         WWID: REDACTED
+         Model: ATA     INTEL SSDSC2KB01
+         SATA NCQ Capable: True
+         SATA NCQ En      physicaldriveabled: True
+         Current Temperature (C): 27
+         Maximum Temperature (C): 33
+         SSD Smart Trip Wearout: Not Supported
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 1I:1:2
+         Port: 1I
+         Box: 1
+         Bay: 2
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 1.9 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: XCV10110
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     INTEL SSDSC2KB01
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 28
+         Maximum Temperature (C): 33
+         SSD Smart Trip Wearout: Not Supported
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 1I:1:3
+         Port: 1I
+         Box: 1
+         Bay: 3
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 1.9 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: XCV10110
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     INTEL SSDSC2KB01
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 27
+         Maximum Temperature (C): 30
+         SSD Smart Trip Wearout: Not Supported
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2I:1:5
+         Port: 2I
+         Box: 1
+         Bay: 5
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 1.9 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: XCV10110
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     INTEL SSDSC2KB01
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 26
+         Maximum Temperature (C): 29
+         SSD Smart Trip Wearout: Not Supported
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2I:1:6
+         Port: 2I
+         Box: 1
+         Bay: 6
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 1.9 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: XCV10110
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     INTEL SSDSC2KB01
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 28
+         Maximum Temperature (C): 32
+         SSD Smart Trip Wearout: Not Supported
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2I:1:7
+         Port: 2I
+         Box: 1
+         Bay: 7
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: Solid State SATA
+         Size: 1.9 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Firmware Revision: XCV10110
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     INTEL SSDSC2KB01
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 27
+         Maximum Temperature (C): 32
+         SSD Smart Trip Wearout: Not Supported
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+
+
+   Array: B
+      Interface Type: SATA
+      Unused Space: 0  MB (0.0%)
+      Used Space: 1.8 TB (100.0%)
+      Status: OK
+      MultiDomain Status: OK
+      Array Type: Data
+      Smart Path: disable
+
+
+      Logical Drive: 2
+         Size: 931.5 GB
+         Fault Tolerance: 1
+         Heads: 255
+         Sectors Per Track: 32
+         Cylinders: 65535
+         Strip Size: 256 KB
+         Full Stripe Size: 256 KB
+         Status: OK
+         MultiDomain Status: OK
+         Caching:  Enabled
+         Unique Identifier: 600508B1001C6BBD22BCA12CEDF36CB0
+         Disk Name: /dev/sdb
+         Mount Points: /data/pgsql/spaces/big 931.5 GB Partition Number 1
+         OS Status: LOCKED
+         Boot Volume: secondary
+         Logical Drive Label: A9254E3850123456789ABCDE368D
+         Mirror Group 1:
+            physicaldrive 1I:1:4 (port 1I:box 1:bay 4, SATA HDD, 1 TB, OK)
+         Mirror Group 2:
+            physicaldrive 2I:1:8 (port 2I:box 1:bay 8, SATA HDD, 1 TB, OK)
+         Drive Type: Data
+         LD Acceleration Method: Controller Cache
+
+
+      physicaldrive 1I:1:4
+         Port: 1I
+         Box: 1
+         Bay: 4
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Rotational Speed: 5400
+         Firmware Revision: 2BA30001
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     ST1000LM024 HN-M
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 30
+         Maximum Temperature (C): 35
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2I:1:8
+         Port: 2I
+         Box: 1
+         Bay: 8
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/4096
+         Rotational Speed: 5400
+         Firmware Revision: 2BA30001
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     ST1000LM024 HN-M
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 29
+         Maximum Temperature (C): 34
+         PHY Count: 1
+         PHY Transfer Rate: 6.0Gbps
+         Drive Authentication Status: OK
+         Carrier Application Version: 11
+         Carrier Bootloader Version: 6
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None

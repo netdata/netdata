@@ -79,6 +79,7 @@ see the appropriate collector readme.
 | [haproxy](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/haproxy)                       |            HAProxy            |
 | [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hddtemp)                       |       Disks temperature       |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hdfs)                             |             HDFS              |
+| [hpssa](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hpssa)                           |        HPE Smart Array        |
 | [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/httpcheck)                   |       Any HTTP Endpoint       |
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/intelgpu)                     |     Intel integrated GPU      |
 | [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/isc_dhcpd)                   |           ISC DHCP            |
