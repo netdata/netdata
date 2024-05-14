@@ -40,11 +40,11 @@ const precision = 1000
 func collectScraped(scraped prometheus.Series, metricList []string) map[string]float64 {
 	mx := make(map[string]float64)
 	for _, name := range metricList {
-		if ms := scraped.FindByName(name); ms.Len() == 1 {
+		for _, m := range scraped.FindByName(name) {
 			if isMetricFloat(name) {
-				mx[name] = ms.Max() * precision
+				mx[name] += m.Value * precision
 			} else {
-				mx[name] = ms.Max()
+				mx[name] += m.Value
 			}
 		}
 	}
