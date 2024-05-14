@@ -81,7 +81,7 @@ beyond stored historical metrics, you'll see this message:
 
 ![image](https://user-images.githubusercontent.com/70198089/225851033-43b95164-a651-48f2-8915-6aac9739ed93.png)
 
-At any time, [configure the internal TSDB's storage capacity](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) to expand your
+At any time, [configure the internal TSDB's storage capacity](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md) to expand your
 depth of historical metrics.
 
 ### Timezone selector

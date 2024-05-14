@@ -49,7 +49,7 @@ The second table contains the top alerts in the last 24 hours, along with their 
 
 ## Netdata Assistant shortcut
 
-In the Home tab there is a shortcut button in order to start an instant conversation with the [Netdata Assistant](https://github.com/netdata/netdata/edit/master/docs/cloud/netdata-assistant.md).
+In the Home tab there is a shortcut button in order to start an instant conversation with the [Netdata Assistant](https://github.com/netdata/netdata/edit/master/docs/netdata-assistant.md).
 
 ## Space metrics
 

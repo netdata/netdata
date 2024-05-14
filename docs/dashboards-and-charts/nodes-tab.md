@@ -1,6 +1,6 @@
 # Nodes tab
 
-The nodes tab provides a summarized view of your [War Room](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms), allowing you to view quick information per node.
+The nodes tab provides a summarized view of your [War Room](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms), allowing you to view quick information per node.
 
 > **Tip**  
 >

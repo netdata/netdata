@@ -31,7 +31,7 @@ The Netdata dashboard consists of the following main sections:
 
 ### Netdata Cloud
 
-You can access the dashboard at <https://app.netdata.cloud/> and [sign-in with an account or sign-up](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/authentication-and-authorization.md) if you don't have an account yet.
+You can access the dashboard at <https://app.netdata.cloud/> and [sign-in with an account or sign-up](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/README.md) if you don't have an account yet.
 
 ### Netdata Agent
 

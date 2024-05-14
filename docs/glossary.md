@@ -27,11 +27,11 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## B
 
-- [**Bookmarks**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#manage-spaces): Netdata Cloud's bookmarks put your tools in one accessible place. Bookmarks are shared between all War Rooms in a Space, so any users in your Space will be able to see and use them.
+- [**Bookmarks**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#manage-spaces): Netdata Cloud's bookmarks put your tools in one accessible place. Bookmarks are shared between all War Rooms in a Space, so any users in your Space will be able to see and use them.
 
 ## C
 
-- [**Child**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md#streaming-basics): A node, running Netdata, that streams metric data to one or more parent.
+- [**Child**](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/metrics-centralization-points/README.md): A node, running Netdata, that streams metric data to one or more parent.
 
 - [**Cloud** or **Netdata Cloud**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
@@ -61,15 +61,11 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Flood Protection**](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud does not send notifications about this node
 
-- [**Functions** or **Netdata Functions**](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
+- [**Functions** or **Netdata Functions**](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
 ## G
 
 - [**Group by**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#group-by-dimension-node-or-chart): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
-
-## H
-
-- [**Headless Collector Streaming**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md#supported-streaming-configurations): Streaming configuration where child `A`, _without_ a database or web dashboard, streams metrics to parent `B`.
 
 - [**Health Configuration Files**](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#edit-health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
 
@@ -91,13 +87,13 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Metrics Collection**](https://github.com/netdata/netdata/blob/master/src/collectors/README.md):  With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects per-second metrics. Netdata can immediately collect metrics from these endpoints thanks to 300+ collectors, which all come pre-installed when you install Netdata.
 
-- [**Metric Correlations**](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md): A Netdata feature that lets you quickly find metrics and charts related to a particular window of interest that you want to explore further.
+- [**Metric Correlations**](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md): A Netdata feature that lets you quickly find metrics and charts related to a particular window of interest that you want to explore further.
 
 - [**Metrics Exporting**](https://github.com/netdata/netdata/blob/master/docs/exporting-metrics/README.md): Netdata allows you to export metrics to external time-series databases with the exporting engine. This system uses a number of connectors to initiate connections to more than thirty supported databases, including InfluxDB, Prometheus, Graphite, ElasticSearch, and much more.
 
-- [**Metrics Storage**](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md): Upon collection the collected metrics need to be either forwarded, exported or just stored for further treatment. The Agent is capable to store metrics both short and long-term, with or without the usage of non-volatile storage.
+- [**Metrics Storage**](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md): Upon collection the collected metrics need to be either forwarded, exported or just stored for further treatment. The Agent is capable to store metrics both short and long-term, with or without the usage of non-volatile storage.
 
-- [**Metrics Streaming Replication**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md): Each node running Netdata can stream the metrics it collects, in real time, to another node. Metric streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB).
+- [**Metrics Streaming Replication**](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md): Each node running Netdata can stream the metrics it collects, in real time, to another node. Metric streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB).
 
 - [**Module**](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module): A type of collector.
 
@@ -110,7 +106,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Netdata Cloud** or **Cloud**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
-- [**Netdata Functions** or **Functions**](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
+- [**Netdata Functions** or **Functions**](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
 <!-- No link for this keyword - **Netdata Logs** https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/check-netdata-logs.md: The three log files - `error.log`, `access.log` and `debug.log` - used by Netdata -->
 
@@ -120,17 +116,13 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## O
 
-- [**Obsoletion**(of nodes)](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#obsoleting-offline-nodes-from-a-space): Removing nodes from a space.
+- [**Obsoletion**(of nodes)](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#obsoleting-offline-nodes-from-a-space): Removing nodes from a space.
 
 - [**Orchestrators**](https://github.com/netdata/netdata/blob/master/src/collectors/README.md#collector-architecture-and-terminology): External plugins that run and manage one or more modules. They run as independent processes.
 
 ## P
 
-- [**Parent**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md#streaming-basics): A node, running Netdata, that receives streamed metric data.
-
-- [**Proxy**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md#streaming-basics): A node, running Netdata, that receives metric data from a child and "forwards" them on to a separate parent node.
-
-- [**Proxy Streaming**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md#supported-streaming-configurations): Streaming configuration where child `A`, _with or without_ a database, sends metrics to proxy `C`, also _with or without_ a database. `C` sends metrics to parent `B`
+- [**Parent**](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/metrics-centralization-points/README.md): A node, running Netdata, that receives streamed metric data.
 
 ## R
 
@@ -138,13 +130,13 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 - [**Replication Streaming**](https://github.com/netdata/netdata/blob/master/src/streaming/README.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`.
 
-- [**Room** or **War Room**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+- [**Room** or **War Room**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## S
 
 - [**Single Node Dashboard**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
 
-- [**Space**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
+- [**Space**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 
 ## T
 
@@ -163,7 +155,7 @@ even thousands of nodes. There are no actual bottlenecks especially if you retai
 
 ## W
 
-- [**War Room** or **Room**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+- [**War Room** or **Room**](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms): War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## Z
 

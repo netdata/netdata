@@ -21,7 +21,7 @@ The exporting engine has a modular structure and supports metric exporting via m
 the same time. You can have different update intervals and filters configured for every exporting connector instance. 
 
 When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
-restart its process_, not the entire [database of long-term metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
+restart its process_, not the entire [database of long-term metrics](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
 Since Netdata collects thousands of metrics per server per second, which would easily congest any database server when
 several Netdata servers are sending data to it, Netdata allows sending metrics at a lower frequency, by resampling them.
@@ -295,7 +295,7 @@ Configure individual connectors and override any global settings with the follow
 Netdata can send metrics to external databases using the TLS/SSL protocol. Unfortunately, some of
 them does not support encrypted connections, so you will have to configure a reverse proxy to enable
 HTTPS communication between Netdata and an external database. You can set up a reverse proxy with
-[Nginx](https://github.com/netdata/netdata/blob/master/docs/Running-behind-nginx.md).
+[Nginx](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md).
 
 ## Exporting engine monitoring
 

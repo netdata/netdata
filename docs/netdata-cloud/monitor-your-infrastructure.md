@@ -41,11 +41,11 @@ SRE team for the user-facing SaaS application, and a second IT team for managing
 don't monitor the same nodes, they can work in separate Spaces and then further organize their nodes into War Rooms.
 
 Next, set up War Rooms. Netdata Cloud creates dashboards and visualizations based on the nodes added to a given War
-Room. You can [organize War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#war-room-organization) in any way
+Room. You can [organize War Rooms](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#war-room-organization) in any way
 you want, such as by the application type, for end-to-end application monitoring, or as an incident response tool.
 
-Learn more about [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces) and [War
-Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms), including how to manage each, in their respective reference
+Learn more about [Spaces](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) and [War
+Rooms](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms), including how to manage each, in their respective reference
 documentation.
 
 ### Invite your team
@@ -55,7 +55,7 @@ inviting others, you can better synchronize with your team or colleagues to unde
 When something goes wrong, you'll be ready to collaboratively troubleshoot complex performance problems from a single
 pane of glass.
 
-To [invite new users](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team), click on **Invite Users** in the
+To [invite new users](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team), click on **Invite Users** in the
 Space management Area. Choose which War Rooms to add this user to, then click **Send**.
 
 ### See an overview of your infrastructure
@@ -80,7 +80,7 @@ These tabs can be separated into "static", meaning they are by default presented
 
 - The [Anomalies tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md) is dedicated to the Anomaly Advisor tool.
 
-- The [Functions tab](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) gives you the ability to visualize functions that the Netdata Agent collectors are able to expose.
+- The [Functions tab](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md) gives you the ability to visualize functions that the Netdata Agent collectors are able to expose.
 
 - The [Feed & events](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/events-feed.md) tab lets you investigate events that occurred in the past, which is invaluable for troubleshooting.
 
@@ -161,8 +161,8 @@ collect from across your infrastructure with Netdata.
   <Box
     title="Spaces and War Rooms">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces)" title="Spaces" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms)" title="War Rooms" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces)" title="Spaces" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms)" title="War Rooms" />
     </BoxList>
   </Box>
   <Box
@@ -183,25 +183,25 @@ collect from across your infrastructure with Netdata.
   </Box>
   <Box
     title="Troubleshooting with Netdata Cloud">
-    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)" title="Metric Correlations" />
+    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md)" title="Metric Correlations" />
     <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md)" title="Anomaly Advisor" />
     <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/events-feed.md)" title="Events Feed" />
   </Box>
   <Box
     title="Management and settings">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/authentication-and-authorization.md)" title="Sign in with email, Google, GitHub or with an SSO tool" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team)" title="Invite your team" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/README.md)" title="Sign in with email, Google, GitHub or with an SSO tool" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team)" title="Invite your team" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/themes.md)" title="Choose your Netdata Cloud theme" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)" title="Role-Based Access" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md)" title="Paid Plans" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md)" title="Role-Based Access" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-subscription-plans.md)" title="Paid Plans" />
     </BoxList>
   </Box>
 </Grid>
 
 - Spaces and War Rooms
-  - [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces)
-  - [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms)
+  - [Spaces](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces)
+  - [War Rooms](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms)
 - Dashboards
   - [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)
   - [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md)
@@ -211,12 +211,12 @@ collect from across your infrastructure with Netdata.
   - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md#netdata-cloud)
   - [Alert notifications](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md)
 - Troubleshooting with Netdata Cloud
-  - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
+  - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md)
   - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md)
   - [Events Feed](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/events-feed.md)
 - Management and settings
-  - [Sign in with email, Google, GitHub or with an SSO tool](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/authentication-and-authorization.md)
-  - [Invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team)
+  - [Sign in with email, Google, GitHub or with an SSO tool](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/README.md)
+  - [Invite your team](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team)
   - [Choose your Netdata Cloud theme](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/themes.md)
-  - [Role-Based Access](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)
-  - [Paid Plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md)
+  - [Role-Based Access](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md)
+  - [Paid Plans](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-subscription-plans.md)

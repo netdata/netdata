@@ -41,7 +41,7 @@ Charts also synchronize as you interact with them, even across contexts _or_ nod
 
 ### Text cards
 
-You can use text cards as notes to explain to other members of the [War Room](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-war-rooms) the purpose of the dashboard's arrangement.
+You can use text cards as notes to explain to other members of the [War Room](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms) the purpose of the dashboard's arrangement.
 
 By clicking the `T` icon on the text box, you can switch between font sizes.
 
@@ -93,4 +93,4 @@ Because of the visual complexity of individual charts, dashboards require a mini
 
 ## What's next?
 
-Once you've designed a dashboard or two, make sure to [invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#invite-your-team) if you haven't already. You can add these new users to the same War Room to let them see the same dashboards without any effort.
+Once you've designed a dashboard or two, make sure to [invite your team](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team) if you haven't already. You can add these new users to the same War Room to let them see the same dashboards without any effort.

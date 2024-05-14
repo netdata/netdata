@@ -225,7 +225,7 @@ we're not covering it here, but it _does_ work in a single-node setup. Just don'
 node crashed.
 
 If you're planning on managing more than one node, or want to take advantage of advanced features, like finding the
-source of issues faster with [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md),
+source of issues faster with [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md),
 [sign up](https://app.netdata.cloud/sign-up?cloudRoute=/spaces) for a free Netdata Cloud account.
 
 ### Related reference documentation

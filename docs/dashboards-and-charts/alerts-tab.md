@@ -41,11 +41,11 @@ By clicking on the name of an entry of the table you can access that alert's det
 - Configuration section
 - Instance values - Node Instances
 
-At the bottom of the panel you can click the green button "View alert page" to open a [dynamic tab](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md#dynamic-tabs) containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
+At the bottom of the panel you can click the green button "View alert page" to open a [dynamic tab](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/monitor-your-infrastructure.md#dynamic-tabs) containing all the info for this alert in a tab format, where you can also run correlations and go to the node's chart that raised the particular alert.
 
 ### Silence an alert
 
-From this tab, the "Silencing" column shows if there is any rule present for each alert, and from the "Actions" column you can create a new [silencing rule](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notifications-silencing-rules) for this alert, or get help and information about this alert from the [Netdata Assistant](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-assistant.md).
+From this tab, the "Silencing" column shows if there is any rule present for each alert, and from the "Actions" column you can create a new [silencing rule](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notifications-silencing-rules) for this alert, or get help and information about this alert from the [Netdata Assistant](https://github.com/netdata/netdata/blob/master/docs/netdata-assistant.md).
 
 ## Alert Configurations tab
 
@@ -55,7 +55,7 @@ By running alerts we mean alerts that are related to some metric that is or was 
 
 You can control which columns are visible by using the gear icon on the right-hand side.
 
-Similarly to the previous tab, you can see the silencing status of an alert, while also being able to dig deeper and show the configuration for the alert and ask the [Netdata Assistant](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-assistant.md) for help.
+Similarly to the previous tab, you can see the silencing status of an alert, while also being able to dig deeper and show the configuration for the alert and ask the [Netdata Assistant](https://github.com/netdata/netdata/blob/master/docs/netdata-assistant.md) for help.
 
 ### See the configuration for an alert
 

@@ -7,7 +7,7 @@ the OpenTSDB and Graphite connectors.
 
 > When you enable the exporting engine and a connector, the Netdata Agent exports metrics _beginning from the time you
 > restart its process_, not the entire
-> [database of long-term metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
+> [database of long-term metrics](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
 Once you understand the process of enabling a connector, you can translate that knowledge to any other connector.
 
@@ -84,7 +84,7 @@ the [exporting engine reference](https://github.com/netdata/netdata/blob/master/
 
 For a comprehensive example of using the Graphite connector, read our documentation on 
 [exporting metrics to Graphite providers](https://github.com/netdata/netdata/blob/master/src/exporting/graphite/README.md). Or, start
-[using host labels](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md) on exported metrics.
+[using host labels](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md) on exported metrics.
 
 ### Related reference documentation
 

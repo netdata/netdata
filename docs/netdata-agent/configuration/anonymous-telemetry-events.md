@@ -1,6 +1,6 @@
 <!--
 title: "Anonymous telemetry events"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-statistics.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md
 sidebar_label: "Anonymous telemetry events"
 learn_status: "Published"
 learn_rel_path: "Configuration"

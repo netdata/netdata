@@ -14,7 +14,7 @@ This section outlines how to view and manage your Space's plan, billing settings
 1. Navigate to **Space settings** (the cog above your profile icon).
 2. Select the **Plan & Billing** tab.
 3. You'll see:
-   - **Credit** amount, if applicable, usable for future invoices or subscription changes. More on this at [Plan changes and credit balance](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plan-changes-and-credit-balance).
+   - **Credit** amount, if applicable, usable for future invoices or subscription changes. More on this at [Plan changes and credit balance](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-subscription-plans.md#plan-changes-and-credit-balance).
    - **Billing email** linked to your subscription, where all related notifications are sent.
    - A link to the **Billing options and Invoices** in our billing provider's Customer Portal, where you can:
      - Manage subscriptions and payment methods.
@@ -33,7 +33,7 @@ This section outlines how to view and manage your Space's plan, billing settings
 > **Note**
 >
 > - Checkout is performed directly if there's an active plan.
-> - Plan changes, including downgrades or cancellations, may impact notification settings or user access. More details at [Plan changes and credit balance](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md#plan-changes-and-credit-balance).
+> - Plan changes, including downgrades or cancellations, may impact notification settings or user access. More details at [Plan changes and credit balance](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-subscription-plans.md#plan-changes-and-credit-balance).
 
 ## FAQ
 

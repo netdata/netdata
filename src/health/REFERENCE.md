@@ -10,7 +10,7 @@ applications in real time.
 
 While you can see active alerts both on the local dashboard and Netdata Cloud, all health alerts are configured _per
 node_ via individual Netdata Agents. If you want to deploy a new alert across your
-[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you must configure each node with the same health configuration
+[infrastructure](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/monitor-your-infrastructure.md), you must configure each node with the same health configuration
 files.
 
 ## Reload health configuration
@@ -600,7 +600,7 @@ good idea to tell Netdata to not clear the notification, by using the `no-clear-
 
 #### Alert line `host labels`
 
-Defines the list of labels present on a host. See our [host labels guide](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md) for
+Defines the list of labels present on a host. See our [host labels guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for
 an explanation of host labels and how to implement them.
 
 For example, let's suppose that `netdata.conf` is configured with the following labels:

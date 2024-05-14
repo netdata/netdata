@@ -144,12 +144,12 @@ dashboard in transit. The connection to Netdata Cloud is always secured with TLS
 Use one web server to provide authentication in front of **all your Netdata servers**. So, you will be accessing all your Netdata with 
 URLs like `http://{HOST}/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). 
 Instructions are provided on how to set the proxy configuration to have Netdata run behind 
-[nginx](https://github.com/netdata/netdata/blob/master/docs/Running-behind-nginx.md), 
-[HAproxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-haproxy.md), 
-[Apache](https://github.com/netdata/netdata/blob/master/docs/Running-behind-apache.md), 
-[lighthttpd](https://github.com/netdata/netdata/blob/master/docs/Running-behind-lighttpd.md), 
+[nginx](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md), 
+[HAproxy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md), 
+[Apache](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-apache.md), 
+[lighthttpd](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-lighttpd.md), 
 [caddy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-caddy.md), and
-[H2O](https://github.com/netdata/netdata/blob/master/docs/Running-behind-h2o.md).
+[H2O](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md).
 
 ## Use Netdata parents as Web Application Firewalls
 
@@ -159,7 +159,7 @@ your production systems from the rest of the world. Netdata
 Parents receive metric data from Netdata Agents or other Netdata Parents on one side, and serve most queries using their own 
 copy of the data to satisfy dashboard requests on the other side.
 
-For more information see [Streaming and replication](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md).
+For more information see [Streaming and replication](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md).
 
 ## Other methods
 

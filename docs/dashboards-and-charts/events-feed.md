@@ -61,7 +61,7 @@ At a high-level view, these are the domains from which the Events feed will prov
 
 ## Who can access the events?
 
-All users will be able to see events from the Topology and Alerts domain but Auditing events, once these are added, will only be accessible to administrators. For more details check the [Netdata Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md).
+All users will be able to see events from the Topology and Alerts domain but Auditing events, once these are added, will only be accessible to administrators. For more details check the [Netdata Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 ## How to use the events feed
 

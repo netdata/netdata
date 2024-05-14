@@ -1,7 +1,7 @@
 <!--
 title: "Common configuration changes"
 description: "See the most popular configuration changes to make to the Netdata Agent, including longer metrics retention, reduce sampling, and more."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/configure/common-changes.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/common-configuration-changes.md"
 sidebar_label: "Common configuration changes"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -30,9 +30,9 @@ changes reflected in those visualizations due to the way Netdata Cloud proxies m
 ### Increase the long-term metrics retention period
 
 Read our doc
-on [increasing long-term metrics storage](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md)
+on [increasing long-term metrics storage](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md)
 for details, including a
-[calculator](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
+[calculator](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 to help you determine the exact settings for your desired retention period.
 
 ### Reduce the data collection frequency
@@ -136,7 +136,7 @@ Learn more about the available options in the [security design documentation](ht
 ## Reduce resource usage
 
 Read
-our [performance optimization guide](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md)
+our [performance optimization guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md)
 for a long list of specific changes
 that can reduce the Netdata Agent's CPU/memory footprint and IO requirements.
 
@@ -147,7 +147,7 @@ and as metadata to Netdata Cloud, and help you organize the metrics coming from 
 defined in the section `[host labels]`.
 
 For a quick introduction, read
-the [host label guide](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md).
+the [host label guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md).
 
 The following restrictions apply to host label names:
 

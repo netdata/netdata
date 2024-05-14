@@ -2,7 +2,7 @@
 
 This document contains advanced streaming options and suggested deployment options for production. 
 If you haven't already done so, we suggest you first go through the 
-[quick introduction to streaming](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md)
+[quick introduction to streaming](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md)
 , for your first, basic parent child setup.
 
 ## Configuration
@@ -143,7 +143,7 @@ Valid settings are `dbengine`, `ram`, , or `none`.
 - `none`: No database.
 
 When using `default memory mode = dbengine`, the parent node creates a separate instance of the TSDB to store metrics
-from child nodes. The [size of _each_ instance is configurable](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) with the `page
+from child nodes. The [size of _each_ instance is configurable](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md) with the `page
 cache size` and `dbengine multihost disk space` settings in the `[global]` section in `netdata.conf`.
 
 ### `netdata.conf`

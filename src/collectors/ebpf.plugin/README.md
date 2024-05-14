@@ -994,7 +994,7 @@ required to run `ebpf.plugin`.
 
 ### ebpf_thread
 
-The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
+The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md) named
 `ebpf_thread` that controls its internal threads and helps to reduce the overhead on host. Using the function you
 can run the plugin with all threads disabled and enable them only when you want to take a look in specific areas.
 
@@ -1041,7 +1041,7 @@ dashboard
 
 ### ebpf_socket
 
-The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) named
+The eBPF plugin has a [function](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md) named
 `ebpf_socket` that shows the current status of open sockets on host.
 
 #### Families

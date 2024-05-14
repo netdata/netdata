@@ -1,6 +1,6 @@
 <!--
 title: "Running Netdata behind H2O"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-h2o.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md"
 sidebar_label: "Running Netdata behind H2O"
 learn_status: "Published"
 learn_topic_type: "Tasks"

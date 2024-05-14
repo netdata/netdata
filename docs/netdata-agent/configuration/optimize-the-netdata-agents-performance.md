@@ -22,7 +22,7 @@ The following table summarizes the effect of each optimization on the CPU, RAM a
 | [Use streaming and replication](#use-streaming-and-replication)                                                               | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | [Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors)                                             | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | [Reduce data collection frequency](#reduce-collection-frequency)                                                              | :heavy_check_mark: |                    | :heavy_check_mark: |
-| [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) |                    | :heavy_check_mark: | :heavy_check_mark: |
+| [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md) |                    | :heavy_check_mark: | :heavy_check_mark: |
 | [Use a different metric storage database](https://github.com/netdata/netdata/blob/master/src/database/README.md)              |                    | :heavy_check_mark: | :heavy_check_mark: |
 | [Disable machine learning](#disable-machine-learning)                                                                         | :heavy_check_mark: |                    |                    |
 | [Use a reverse proxy](#run-netdata-behind-a-proxy)                                                                            | :heavy_check_mark: |                    |                    |
@@ -72,7 +72,7 @@ The memory footprint of Netdata is mainly influenced by the number of metrics co
 To estimate and control memory consumption, you can (either one or a combination of the following actions):
 
 1. [Disable unneeded plugins or collectors](#disable-unneeded-plugins-or-collectors)
-2. [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md)
+2. [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md)
 3. [Use a different metric storage database](https://github.com/netdata/netdata/blob/master/src/database/README.md).
 
 ### Disk footprint and I/O
@@ -91,7 +91,7 @@ To optimize your disk footprint in any aspect described below you can:
 
 To configure retention, you can: 
 
-1. [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
+1. [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
 To control disk I/O:
 
@@ -108,7 +108,7 @@ Minimize deployment impact on the production system by optimizing disk footprint
 
 For all production environments, parent Netdata nodes outside the production infrastructure should be receiving all
 collected data from children Netdata nodes running on the production infrastructure,
-using [streaming and replication](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md).
+using [streaming and replication](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md).
 
 ### Disable health checks on the child nodes
 
@@ -216,13 +216,13 @@ update_every: 10
 ## Lower memory usage for metrics retention
 
 See how
-to [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md).
+to [change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
 ## Use a different metric storage database
 
 Consider [using a different metric storage database](https://github.com/netdata/netdata/blob/master/src/database/README.md)
 when running Netdata on IoT devices, and for children in a parent-child set up based
-on [streaming and replication](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md).
+on [streaming and replication](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md).
 
 ## Disable machine learning
 
@@ -241,7 +241,7 @@ internal [web server](https://github.com/netdata/netdata/blob/master/src/web/REA
 Nginx can handle more concurrent connections, reuse idle connections, and use fast gzip compression to reduce payloads.
 
 For details on installing another web server as a proxy for the local Agent dashboard,
-see [reverse proxies](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/reverse-proxies.md).
+see [reverse proxies](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/README.md).
 
 ## Disable/lower gzip compression for the dashboard
 

@@ -4,7 +4,7 @@ The Metrics tab is where all the time series [charts](https://github.com/netdata
 
 You can also see single-node dashboards, essentially the same dashboard the Metrics tab offers but only for one node. They are reached from most places in the UI, often by clicking the name of a node.
 
-From this tab, a user can also reach the Integrations tab and run [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
+From this tab, a user can also reach the Integrations tab and run [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md)
 
 ## Dashboard structure
 

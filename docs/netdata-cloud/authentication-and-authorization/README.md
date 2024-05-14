@@ -20,8 +20,8 @@ To sign in/sign up using Google or GitHub OAuth, visit [Netdata Cloud](https://a
 
 Netdata integrates with SSO tools, allowing you to control how your team connects and authenticates to Netdata Cloud.
 
-For more information, see [Enterprise SSO Authentication](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/enterprise-sso-authentication.md).
+For more information, see [Enterprise SSO Authentication](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md).
 
 ## Authorization
 
-Once logged in, you can manage role-based access in your space to give each team member the appropriate role. For more information, see [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md).
+Once logged in, you can manage role-based access in your space to give each team member the appropriate role. For more information, see [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).

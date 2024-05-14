@@ -6,7 +6,7 @@ Netdata Cloud sends alert notifications for nodes in warning, critical, or unrea
 
 - Consolidate health status views across all infrastructure in one place.
 - Set up and [manage your alert notifications easily](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md).
-- Expedite troubleshooting with tools like [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) and the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md).
+- Expedite troubleshooting with tools like [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md) and the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md).
 
 To avoid notification overload, **flood protection** is triggered when a node frequently disconnects or sends excessive alerts, highlighting potential issues.
 
@@ -38,7 +38,7 @@ Available to all plans, includes basic methods like Email and Discord.
 
 #### Business
 
-Exclusive to [paid plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md), includes advanced services like PagerDuty and Slack.
+Exclusive to [paid plans](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-subscription-plans.md), includes advanced services like PagerDuty and Slack.
 
 ## Alert Notification Silencing Rules
 

@@ -1,6 +1,6 @@
 # Top tab
 
-The Top tab allows you to run [Netdata Functions](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) on a node where a Netdata Agent is running. These routines are exposed by a given collector.
+The Top tab allows you to run [Netdata Functions](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md) on a node where a Netdata Agent is running. These routines are exposed by a given collector.
 They can be used to retrieve additional information to help you troubleshoot or to trigger some action to happen on the node itself.
 
 > **Tip**
@@ -9,7 +9,7 @@ They can be used to retrieve additional information to help you troubleshoot or 
 
 > **Note**
 >
-> If you get an error saying that your node can't execute Functions please check the [prerequisites](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md#prerequisites).
+> If you get an error saying that your node can't execute Functions please check the [prerequisites](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md#prerequisites).
 
 The main view of this tab provides you with (depending on the Function) two elements: a visualization on the top and a table on the bottom.
 

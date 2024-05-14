@@ -13,7 +13,7 @@ These charts provide a lot of useful information, so that you can:
 - View the combined anomaly rate of all underlying data with the [Anomaly Rate ribbon](#anomaly-rate-ribbon)
 - Explore even more details about a chart's metrics through [hovering over certain elements of it](#hover-over-the-chart)
 - Use intuitive tooling and shortcuts to pan, zoom or highlight areas of interest in your charts
-- On highlight, get easy access to [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) to see other metrics with similar patterns
+- On highlight, get easy access to [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md) to see other metrics with similar patterns
 - Have the dimensions sorted based on name or value
 - View information about the chart, its plugin, context, and type
 - View individual metric collection status about a chart
@@ -363,7 +363,7 @@ it like pushing the current timeframe off the screen to see what came before or 
 Selecting timeframes is useful when you see an interesting spike or change in a chart and want to investigate further by:
 
 - Looking at the same period of time on other charts/sections
-- Running [metric correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) to filter metrics that also show something different in the selected period, vs the previous one
+- Running [metric correlations](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md) to filter metrics that also show something different in the selected period, vs the previous one
 
 | Interaction                        | Keyboard/mouse                                           | Touchpad/touchscreen |
 |:-----------------------------------|:---------------------------------------------------------|:---------------------|

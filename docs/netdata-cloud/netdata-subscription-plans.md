@@ -29,7 +29,7 @@ Yearly plans require specifying a number of committed nodes, which receive a dis
 
 ## Plan Changes and Credit Balance
 
-You can change your plan, billing frequency, or committed nodes at any time. For guidance, see [updating your plan](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/view-plan-billing.md#update-a-subscription-plan).
+You can change your plan, billing frequency, or committed nodes at any time. For guidance, see [updating your plan](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/view-plan-and-billing.md#update-a-subscription-plan).
 
 > **Note**
 >

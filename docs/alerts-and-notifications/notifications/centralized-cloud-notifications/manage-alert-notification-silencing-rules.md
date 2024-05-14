@@ -33,7 +33,7 @@ To manage your **personal alert notification silencing rule settings**, you will
       - Define when it will be applied:
         - Immediately, from now till until it is turned off or until a specific duration (start and end date automatically set)
         - Scheduled, you specify the start and end time for when the rule becomes active and then inactive (time is set according to your browser local timezone)
-      Note: You are only able to add a rule if your space is on a [paid plan](https://github.com/netdata/netdata/edit/master/docs/cloud/manage/plans.md).
+      Note: You are only able to add a rule if your space is on a [paid plan](https://github.com/netdata/netdata/edit/master/docs/netdata-cloud/netdata-subscription-plans.md).
    1. **Edit an existing** alert notification silencing rule configurations. You will be able to change:
       - The name provided for it
       - Who it applies to

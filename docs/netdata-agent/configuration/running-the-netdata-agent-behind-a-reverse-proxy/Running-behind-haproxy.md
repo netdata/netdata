@@ -1,6 +1,6 @@
 <!--
 title: "Netdata via HAProxy"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-haproxy.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md"
 sidebar_label: "Netdata via HAProxy"
 learn_status: "Published"
 learn_topic_type: "Tasks"

@@ -19,7 +19,7 @@ you can access it through `http://localhost:19999`.
 Netdata uses an [internal, static-threaded web server](https://github.com/netdata/netdata/blob/master/src/web/server/README.md) to host the HTML, CSS, and JavaScript
 files that make up the local Agent dashboard. You don't have to configure anything to access it, although you can adjust
 [your settings](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#other-netdataconf-web-section-options) in the `netdata.conf` file, or run Netdata
-behind an [Nginx proxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-nginx.md), and so on.
+behind an [Nginx proxy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-nginx.md), and so on.
 
 ## Navigating the local dashboard
 
@@ -70,7 +70,7 @@ Use the calendar to select multiple days. Click on a date to begin the timeframe
 
 Click **Apply** to re-render all visualizations with new metrics data, or **Clear** to restore the default timeframe.
 
-[Increase the metrics retention policy](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) for your node to see more historical
+[Increase the metrics retention policy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md) for your node to see more historical
 timeframes.
 
 ### Metrics menus
