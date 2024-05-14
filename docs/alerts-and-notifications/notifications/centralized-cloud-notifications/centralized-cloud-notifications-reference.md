@@ -42,7 +42,7 @@ Exclusive to [paid plans](https://github.com/netdata/netdata/blob/master/docs/ne
 
 ## Alert Notification Silencing Rules
 
-Netdata Cloud offers a silencing rule engine to mute alert notifications based on specific conditions related to nodes or alert types. Learn how to manage these settings [here](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized/cloud/notifications/manage-alert-notification-silending-rules.md).
+Netdata Cloud offers a silencing rule engine to mute alert notifications based on specific conditions related to nodes or alert types. Learn how to manage these settings [here](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md).
 
 ## Flood Protection
 
