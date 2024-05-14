@@ -1654,8 +1654,6 @@ if(ENABLE_MQTTWEBSOCKETS)
         target_compile_options(mqttwebsockets PUBLIC -DMQTT_WSS_CUSTOM_ALLOC
                                                      -DRBUF_CUSTOM_MALLOC
                                                      -DMQTT_WSS_CPUSTATS
-                                                     "$<$<BOOL:${ENABLE_OPENSSL}>:-DENABLE_OPENSSL>"
-                                                     "$<$<BOOL:${ENABLE_WOLFSSL}>:-DENABLE_WOLFSSL>"
                 )
 
         target_include_directories(mqttwebsockets PUBLIC ${CMAKE_SOURCE_DIR}/aclk/helpers
