@@ -184,9 +184,6 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
-# checks link with cmake required libs
-cmake_policy(SET CMP0075 NEW)
-
 include(CheckFunctionExists)
 
 if(ENABLE_WOLFSSL)
