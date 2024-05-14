@@ -80,7 +80,7 @@ Metrics:
 | hpssa.controller_cache_module_presence_status | present, not_present | status |
 | hpssa.controller_cache_module_status | ok, nok | status |
 | hpssa.controller_cache_module_temperature | temperature | Celsius |
-| hpssa.controller_cache_module_battery status | ok, nok | status |
+| hpssa.controller_cache_module_battery_status | ok, nok | status |
 
 ### Per array
 
