@@ -173,6 +173,7 @@ option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" Fal
 mark_as_advanced(ENABLE_WEBRTC)
 
 cmake_dependent_option(ENABLE_H2O "Enable H2O web server (experimental)" True "NOT ENABLE_WOLFSSL" False)
+mark_as_advanced(ENABLE_H2O)
 
 # Other optional functionality
 option(ENABLE_SENTRY "Build with Sentry Native crash reporting" False)
