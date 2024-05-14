@@ -106,7 +106,7 @@ var (
 		Title:    "Controller cache module battery status",
 		Units:    "status",
 		Fam:      "cache",
-		Ctx:      "hpssa.controller_cache_module_battery status",
+		Ctx:      "hpssa.controller_cache_module_battery_status",
 		Type:     module.Line,
 		Priority: prioControllerCacheModuleBatteryStatus,
 		Dims: module.Dims{

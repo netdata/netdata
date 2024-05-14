@@ -133,7 +133,7 @@ modules:
               chart_type: line
               dimensions:
                 - name: temperature
-            - name: hpssa.controller_cache_module_battery status
+            - name: hpssa.controller_cache_module_battery_status
               description: Controller cache module battery status
               unit: status
               chart_type: line
