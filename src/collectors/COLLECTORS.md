@@ -1009,7 +1009,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [HDSentinel](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/hdsentinel.md)
 
-- [HP Smart Storage Arrays](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/hpssa/integrations/hp_smart_storage_arrays.md)
+- [HPE Smart Arrays](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/hpssa/integrations/hpe_smart_arrays.md)
 
 - [Hadoop Distributed File System (HDFS)](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/hdfs/integrations/hadoop_distributed_file_system_hdfs.md)
 

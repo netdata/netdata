@@ -1,0 +1,1 @@
+integrations/hpe_smart_arrays.md
