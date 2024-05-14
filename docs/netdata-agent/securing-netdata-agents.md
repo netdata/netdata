@@ -1,4 +1,4 @@
-# Secure your nodes
+# Securing Netdata Agents
 
 Netdata is a monitoring system. It should be protected, the same way you protect all your admin apps. We assume Netdata 
 will be installed privately, for your eyes only.

@@ -1,13 +1,3 @@
-<!--
-title: "Export metrics to external time-series databases"
-description: "Use the exporting engine to send Netdata metrics to popular external time series databases for long-term storage or further analysis."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/export/external-databases.md"
-sidebar_label: "Export metrics to external time-series databases"
-learn_status: "Published"
-learn_topic_type: "Concepts"
-learn_rel_path: "Concepts"
--->
-
 # Export metrics to external time-series databases
 
 Netdata allows you to export metrics to external time-series databases with the [exporting

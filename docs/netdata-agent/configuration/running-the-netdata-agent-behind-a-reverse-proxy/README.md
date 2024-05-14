@@ -1,4 +1,4 @@
-# Running Netdata behind a reverse proxy
+# Running the Netdata Agent behind a reverse proxy
 
 If you need to access a Netdata agent's user interface or API in a production environment we recommend you put Netdata behind
 another web server and secure access to the dashboard via SSL, user authentication and firewall rules. 
