@@ -5,7 +5,7 @@ They can be used to retrieve additional information to help you troubleshoot or 
 
 > **Tip**
 >
-> You can also execute a Function from the [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md), by pressing the `f(x)` button.
+> You can also execute a Function from the [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md), by pressing the `f(x)` button.
 
 > **Note**
 >

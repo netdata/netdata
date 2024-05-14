@@ -1,8 +1,8 @@
 # Kubernetes tab
 
-The Netdata dashboards feature enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) dashboard.
+The Netdata dashboards feature enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) dashboard.
 
-These visualizations include a health map for viewing the status of k8s pods/containers, in addition to [Netdata charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md) for viewing per-second CPU, memory, disk, and networking metrics from k8s nodes.
+These visualizations include a health map for viewing the status of k8s pods/containers, in addition to [Netdata charts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md) for viewing per-second CPU, memory, disk, and networking metrics from k8s nodes.
 
 See our [Kubernetes deployment instructions](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md) for details on deploying Netdata on your Kubernetes cluster.
 
@@ -35,7 +35,7 @@ their associated pods.
 
 At the top of the Kubernetes containers section there is a map, that with a given context colorizes the containers in terms of their utilization.
 
-The filtering of this map is controlled by using the [NIDL framework](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#nidl-framework) from the definition bar of the chart.
+The filtering of this map is controlled by using the [NIDL framework](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#nidl-framework) from the definition bar of the chart.
 
 ### Detailed information
 

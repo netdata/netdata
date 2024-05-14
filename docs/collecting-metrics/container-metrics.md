@@ -2,7 +2,7 @@
 title: "Collect container metrics with Netdata"
 sidebar_label: "Container metrics"
 description: "Use Netdata to collect per-second utilization and application-level metrics from Linux/Docker containers and Kubernetes clusters."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/collect/container-metrics.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/container-metrics.md"
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "Concepts"
@@ -61,7 +61,7 @@ a container. You may need to configure the target endpoint if it's not the appli
 Netdata can even [run in a Docker container](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md) itself, and then collect metrics about the
 host system, its own container with cgroups, and any applications you want to monitor.
 
-See our [application metrics doc](https://github.com/netdata/netdata/blob/master/docs/collect/application-metrics.md) for details about Netdata's application metrics
+See our [application metrics doc](https://github.com/netdata/netdata/blob/master/docs/collecting-metrics/application-metrics.md) for details about Netdata's application metrics
 collection capabilities.
 
 ## Collect Kubernetes metrics
@@ -88,14 +88,14 @@ your k8s infrastructure.
     each container running on your k8s cluster.
 
 For a holistic view of Netdata's Kubernetes monitoring capabilities, see our guide: [_Monitor a Kubernetes (k8s) cluster
-with Netdata_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/kubernetes-k8s-netdata.md).
+with Netdata_](https://github.com/netdata/netdata/blob/master/docs/developer-and-contributor-corner/kubernetes-k8s-netdata.md).
 
 ## What's next?
 
 Netdata is capable of collecting metrics from hundreds of applications, such as web servers, databases, messaging
-brokers, and more. See more in the [application metrics doc](https://github.com/netdata/netdata/blob/master/docs/collect/application-metrics.md).
+brokers, and more. See more in the [application metrics doc](https://github.com/netdata/netdata/blob/master/docs/collecting-metrics/application-metrics.md).
 
 If you already have all the information you need about collecting metrics, move into Netdata's meaningful visualizations
-with [seeing an overview of your infrastructure](https://github.com/netdata/netdata/blob/master/docs/dashboard/home-tab.md) using Netdata Cloud.
+with [seeing an overview of your infrastructure](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/home-tab.md) using Netdata Cloud.
 
 

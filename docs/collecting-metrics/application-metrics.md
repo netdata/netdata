@@ -2,7 +2,7 @@
 title: "Collect application metrics with Netdata"
 sidebar_label: "Application metrics"
 description: "Monitor and troubleshoot every application on your infrastructure with per-second metrics, zero configuration, and meaningful charts."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/collect/application-metrics.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/application-metrics.md"
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "Concepts"
@@ -78,6 +78,6 @@ collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d
 
 Collecting all the available metrics on your nodes, and across your entire infrastructure, is just one piece of the
 puzzle. Next, learn more about Netdata's famous real-time visualizations by [seeing an overview of your
-infrastructure](https://github.com/netdata/netdata/blob/master/docs/dashboard/home-tab.md) using Netdata Cloud.
+infrastructure](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/home-tab.md) using Netdata Cloud.
 
 

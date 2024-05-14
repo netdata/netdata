@@ -61,7 +61,7 @@ replacing `NODE` with the hostname or IP address of your system.
 
 ## Enable hardware and Linux system monitoring
 
-There's nothing you need to do to enable [system monitoring](https://github.com/netdata/netdata/blob/master/docs/collect/system-metrics.md) and Linux monitoring with
+There's nothing you need to do to enable [system monitoring](https://github.com/netdata/netdata/blob/master/docs/collecting-metrics/system-metrics.md) and Linux monitoring with
 the Netdata Agent, which autodetects metrics from CPUs, memory, disks, networking devices, and Linux processes like
 systemd without any configuration. If you're using containers, Netdata automatically collects resource utilization
 metrics from each using the [cgroups data collector](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/README.md).
@@ -164,7 +164,7 @@ If the Netdata Agent isn't already open in your browser, open a new tab and navi
 Netdata automatically organizes all metrics and charts onto a single page for easy navigation. Peek at gauges to see
 overall system performance, then scroll down to see more. Click-and-drag with your mouse to pan _all_ charts back and
 forth through different time intervals, or hold `SHIFT` and use the scrollwheel (or two-finger scroll) to zoom in and
-out. Check out our doc on [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md) for all the details.
+out. Check out our doc on [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md) for all the details.
 
 ![The Netdata dashboard](https://user-images.githubusercontent.com/1153921/109520555-98e17800-7a69-11eb-86ec-16f689da4527.png)
 
@@ -197,7 +197,7 @@ Here's a quick reference for what charts you might want to focus on after settin
 The Netdata Agent comes with hundreds of pre-configured alerts to help you keep tabs on your system, including 19 alerts
 designed for smarter LAMP stack monitoring.
 
-Click the 🔔 icon in the top navigation to [see active alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md). The **Active** tabs
+Click the 🔔 icon in the top navigation to [see active alerts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md). The **Active** tabs
 shows any alerts currently triggered, while the **All** tab displays a list of _every_ pre-configured alert. The 
 
 ![An example of LAMP stack
@@ -205,7 +205,7 @@ alerts](https://user-images.githubusercontent.com/1153921/109524120-5883f900-7a6
 
 [Tweak alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) based on your infrastructure monitoring needs, and to see these alerts
 in other places, like your inbox or a Slack channel, [enable a notification
-method](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
+method](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/README.md).
 
 ## What's next?
 

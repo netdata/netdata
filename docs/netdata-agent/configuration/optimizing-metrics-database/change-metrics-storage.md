@@ -156,7 +156,7 @@ setups, all the way to 100% in some edge cases.
 ## Configure metric retention
 
 Once you have decided how to size each tier, open `netdata.conf` with
-[`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) 
+[`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-netdataconf)
 and make your changes in the `[db]` subsection. 
 
 Save the file and restart the Agent with `sudo systemctl restart netdata`, or

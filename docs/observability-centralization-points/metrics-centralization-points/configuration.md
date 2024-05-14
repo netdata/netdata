@@ -61,7 +61,7 @@ While encrypting the connection between your parent and child nodes is recommend
 This example uses self-signed certificates. 
 
 > **Note**  
-> This section assumes you have read the documentation on [how to edit the Netdata configuration files](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md).  
+> This section assumes you have read the documentation on [how to edit the Netdata configuration files](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md).  
 <!-- here we need link to the section that will contain the restarting instructions -->
 
 1. **Parent node**  

@@ -13,15 +13,15 @@ By default, the Agent dashboard shows the latest version (matching Netdata Cloud
 
 The Netdata dashboard consists of the following main sections:
 
-- [Home tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/home-tab.md)
-- [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md)
-- [Netdata charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md)
-- [Metrics tab and single node tabs](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md)
-- [Top tab](https://github.com/netdata/netdata/blob/master/docs/cloud/runtime-troubleshooting-with-functions.md)
-- [Logs tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/logs-tab.md)
-- [Dashboards tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/dashboards-tab.md)
-- [Alerts tab](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md)
-- [Events tab](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
+- [Home tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/home-tab.md)
+- [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md)
+- [Netdata charts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md)
+- [Metrics tab and single node tabs](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)
+- [Top tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/top-tab.md)
+- [Logs tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/logs-tab.md)
+- [Dashboards tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dashboards-tab.md)
+- [Alerts tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md)
+- [Events tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/events-feed.md)
 
 > **Note**
 >

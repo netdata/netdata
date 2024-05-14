@@ -65,7 +65,7 @@ using `sudo systemctl
 restart netdata`. If you try to visit the local dashboard to `http://NODE:19999` again, the connection will fail because
 that node no longer serves its local dashboard.
 
-> See the [configuration basics doc](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) for details on how to find 
+> See the [configuration basics doc](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) for details on how to find 
 `netdata.conf` and use
 > `edit-config`.
 

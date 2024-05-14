@@ -20,7 +20,7 @@ To install Netdata in minutes on your platform:
 2. You will be presented with an empty space, and a prompt to "Connect Nodes" with the install command for each platform
 3. Select the platform you want to install Netdata to, copy and paste the script into your node's terminal, and run it
 
-Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts in the Overview tab. [Take a look at our Dashboards and Charts](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md) section to read more about Netdata's features.
+Upon installation completing successfully, you should be able to see the node live in your Netdata Space and live charts in the Overview tab. [Take a look at our Dashboards and Charts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md) section to read more about Netdata's features.
 
 ## Maintaining a Netdata Agent installation
 
@@ -28,7 +28,7 @@ For actions like starting, stopping, restarting, updating and uninstalling the N
 
 ## Configuration
 
-If you are looking to configure your Netdata Agent installation, refer to the [respective section in our Documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md).
+If you are looking to configure your Netdata Agent installation, refer to the [respective section in our Documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md).
 
 ## Data collection
 
@@ -36,7 +36,7 @@ If Netdata didn't autodetect all the hardware, containers, services, or applicat
 
 ## Alerts & notifications
 
-Netdata comes with hundreds of pre-configured alerts, designed by our monitoring gurus in parallel with our open-source community, but you may want to [edit alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) or [enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
+Netdata comes with hundreds of pre-configured alerts, designed by our monitoring gurus in parallel with our open-source community, but you may want to [edit alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) or [enable notifications](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/README.md) to customize your Netdata experience.
 
 ## Make your deployment production ready
 

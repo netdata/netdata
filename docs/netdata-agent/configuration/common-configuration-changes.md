@@ -15,12 +15,12 @@ systems, containers, and applications, but there are hundreds of settings to twe
 over your monitoring platform.
 
 This document assumes familiarity with
-using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) from the Netdata config
+using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) from the Netdata config
 directory.
 
 ## Change dashboards and visualizations
 
-The Netdata Agent's [local dashboard](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md), accessible
+The Netdata Agent's [local dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md), accessible
 at `http://NODE:19999` is highly configurable. If
 you use [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md)
 for infrastructure monitoring, you
@@ -94,7 +94,7 @@ Tweak existing alerts by editing files in the `health.d/` directory. For example
 the Agent responds to anomalies related to CPU utilization.
 
 To see which configuration file you need to edit to configure a specific
-alert, [view your active alerts](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alerts.md) in
+alert, [view your active alerts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md) in
 Netdata Cloud or the local Agent dashboard and look for the **source** line. For example, it might
 read `source  4@/usr/lib/netdata/conf.d/health.d/cpu.conf`.
 
@@ -122,7 +122,7 @@ section of `netdata.conf`.
 ### Enable alert notifications
 
 Open `health_alarm_notify.conf` for editing. First, read the [enabling
-notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md#netdata-agent) doc
+notifications](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/README.md#netdata-agent) doc
 for an example of the process using Slack, then
 click on the link to your preferred notification method to find documentation for that specific endpoint.
 

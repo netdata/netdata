@@ -86,7 +86,7 @@ RestartSec=5s
 WantedBy=multi-user.target
 ```
 
-You can edit the configuration file using the `edit-config` script from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+You can edit the configuration file using the `edit-config` script from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 - Edit `netdata.conf` and input:
 

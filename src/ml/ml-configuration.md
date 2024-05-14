@@ -4,7 +4,7 @@ Netdata's [Machine Learning](https://github.com/netdata/netdata/blob/master/src/
 
 To enable or disable Machine Learning capabilities on a node:
 
-1. [Edit `netdata.conf`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#edit-netdataconf)
+1. [Edit `netdata.conf`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-netdataconf)
 2. In the `[ml]` section, set `enabled = yes` to enable or `enabled = no` to disable
 3. [Restart Netdata](https://github.com/netdata/netdata/blob/master/docs/maintenance/start-stop-restart.md)
 

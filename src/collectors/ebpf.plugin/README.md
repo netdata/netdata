@@ -15,7 +15,7 @@ The Netdata Agent provides many [eBPF](https://ebpf.io/what-is-ebpf/) programs t
 > ❗ eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`, and all kernels on CentOS 7.6 or later. For kernels older than `4.11.0`, improved support is in active development.
 
 This document provides comprehensive details about the `ebpf.plugin`.
-For hands-on configuration and troubleshooting tips see our [tutorial on troubleshooting apps with eBPF metrics](https://github.com/netdata/netdata/blob/master/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md).
+For hands-on configuration and troubleshooting tips see our [tutorial on troubleshooting apps with eBPF metrics](https://github.com/netdata/netdata/blob/master/docs/developer-and-contributor-corner/monitor-debug-applications-ebpf.md).
 
 <figure>
   <img src="https://user-images.githubusercontent.com/1153921/74746434-ad6a1e00-5222-11ea-858a-a7882617ae02.png" alt="An example of VFS charts, made possible by the eBPF collector plugin" />

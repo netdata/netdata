@@ -1,6 +1,6 @@
 # Anomaly Advisor tab
 
-The Anomaly Advisor tab lets you focus on potentially anomalous metrics and charts related to a particular highlighted window of interest. In addition to this tab, each chart in the [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) also has an [Anomaly Rate ribbon](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#anomaly-rate-ribbon). 
+The Anomaly Advisor tab lets you focus on potentially anomalous metrics and charts related to a particular highlighted window of interest. In addition to this tab, each chart in the [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) also has an [Anomaly Rate ribbon](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#anomaly-rate-ribbon). 
 
 
 More details about configuration can be found in the [ML documentation](https://github.com/netdata/netdata/blob/master/src/ml/README.md#configuration).
@@ -17,7 +17,7 @@ Once you have highlighted a window of interest, you should see an ordered list o
 
 > **Tip**
 >
-> You can also use the [node filter](https://github.com/netdata/netdata/blob/master/docs/dashboard/node-filter.md) to select which nodes you want to include or exclude.
+> You can also use the [node filter](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/node-filter.md) to select which nodes you want to include or exclude.
 
 The right side of the page displays an anomaly index for the highlighted timeline of interest. The index is sorted from most anomalous (highest level of anomaly) to least (lowest level of anomaly). Clicking on an entry in the index will get you to the corresponding chart for the anomalous metric.
 

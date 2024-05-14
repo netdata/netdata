@@ -45,7 +45,7 @@ Configuration for this specific integration is located in the `[[ entry.setup.co
 [% endif %]
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata

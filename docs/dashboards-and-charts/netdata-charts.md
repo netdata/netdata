@@ -19,7 +19,7 @@ These charts provide a lot of useful information, so that you can:
 - View individual metric collection status about a chart
 
 These charts are available on Netdata Cloud's
-[Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md), [single sode tabs](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md) and
+[Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md), [single sode tabs](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) and
 on your [Custom Dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/dashboard/dashboards-tab.md).
 
 ## Overview
@@ -104,7 +104,7 @@ When you start interacting with a chart, you'll notice valuable information on t
 
 The elements that you can find on this top bar are:
 
-- **Netdata icon**: this indicates that data is continuously being updated, this happens if [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md#time-controls) are in Play or Force Play mode.
+- **Netdata icon**: this indicates that data is continuously being updated, this happens if [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md#time-controls) are in Play or Force Play mode.
 - **Chart title**: on the chart title you can see the title together with the metric being displayed, as well as the unit of measurement.
 - **Chart status icon**: possible values are: Loading, Timeout, Error or No data, otherwise this icon is not shown.
 
@@ -318,7 +318,7 @@ All these indicators are also visualized per dimension, in the pop-over that app
 
 ## Play, Pause and Reset
 
-Your charts are controlled using the available [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md#time-controls).
+Your charts are controlled using the available [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md#time-controls).
 Besides these, when interacting with the chart you can also activate these controls by:
 
 - Hovering over any chart to temporarily pause it - this momentarily switches time control to Pause, so that you can

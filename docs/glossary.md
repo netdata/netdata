@@ -17,13 +17,13 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Agent-cloud link** or **ACLK**](https://github.com/netdata/netdata/blob/master/src/aclk/README.md): The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser through Netdata Cloud.
 
-- [**Aggregate Function**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#aggregate-functions-over-time): A function applied When the granularity of the data collected is higher than the plotted points on the chart.
+- [**Aggregate Function**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#aggregate-functions-over-time): A function applied When the granularity of the data collected is higher than the plotted points on the chart.
 
-- [**Alerts** (formerly **Alarms**)](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
+- [**Alerts** (formerly **Alarms**)](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
 
 - [**Alarm Entity Type**](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#health-entity-reference): Entity types that are attached to specific charts and use the `alarm` label.
 
-- [**Anomaly Advisor**](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md): A Netdata feature that lets you focus on potentially anomalous metrics and charts related to a particular highlight window of interest.
+- [**Anomaly Advisor**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md): A Netdata feature that lets you focus on potentially anomalous metrics and charts related to a particular highlight window of interest.
 
 ## B
 
@@ -39,17 +39,17 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Community**](https://community.netdata.cloud/): As a company with a passion and genesis in open-source, we are not just very proud of our community, but we consider our users, fans, and chatters to be an imperative part of the Netdata experience and culture.
 
-- [**Context**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
+- [**Context**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
 
 - [**Custom dashboards**](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md) A dashboard that you can create using simple HTML (no javascript is required for basic dashboards).
 
 ## D
 
-- [**Dashboard**](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md): Out-of-the-box visual representation of metrics to provide insight into your infrastructure, its health and performance.
+- [**Dashboard**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md): Out-of-the-box visual representation of metrics to provide insight into your infrastructure, its health and performance.
 
-- [**Definition Bar**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md): Bar within a composite chart that provides important information and options about the metrics within the chart.
+- [**Definition Bar**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md): Bar within a composite chart that provides important information and options about the metrics within the chart.
 
-- [**Dimension**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#dimensions): A dimension is a value that gets shown on a chart.
+- [**Dimension**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#dimensions): A dimension is a value that gets shown on a chart.
 
 ## E
 
@@ -57,17 +57,15 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## F
 
-- [**Family**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
+- [**Family**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
 
-- [**Flood Protection**](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud does not send notifications about this node
+- [**Flood Protection**](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud does not send notifications about this node
 
 - [**Functions** or **Netdata Functions**](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
 ## G
 
-- [**Guided Troubleshooting**](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/troubleshooting-overview.md): Troubleshooting with our Machine-Learning-powered tools designed to give you a cutting edge advantage in your troubleshooting battles.
-
-- [**Group by**](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#group-by-dimension-node-or-chart): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
+- [**Group by**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#group-by-dimension-node-or-chart): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
 
 ## H
 
@@ -77,7 +75,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Health Entity Reference**](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#health-entity-reference):
 
-- [**Home** tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/home-tab.md): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the War Room.
+- [**Home** tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/home-tab.md): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the War Room.
 
 ## I
 
@@ -87,7 +85,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Kickstart** or **Kickstart Script**](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md): An automatic one-line installation script named 'kickstart.sh' that works on all Linux distributions and macOS.
 
-- [**Kubernetes Dashboard** or **Kubernetes Tab**](https://github.com/netdata/netdata/blob/master/docs/dashboard/kubernetes-tab.md): Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default Overview dashboard.
+- [**Kubernetes Dashboard** or **Kubernetes Tab**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/kubernetes-tab.md): Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in the default Overview dashboard.
 
 ## M
 
@@ -95,7 +93,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Metric Correlations**](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md): A Netdata feature that lets you quickly find metrics and charts related to a particular window of interest that you want to explore further.
 
-- [**Metrics Exporting**](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md): Netdata allows you to export metrics to external time-series databases with the exporting engine. This system uses a number of connectors to initiate connections to more than thirty supported databases, including InfluxDB, Prometheus, Graphite, ElasticSearch, and much more.
+- [**Metrics Exporting**](https://github.com/netdata/netdata/blob/master/docs/exporting-metrics/README.md): Netdata allows you to export metrics to external time-series databases with the exporting engine. This system uses a number of connectors to initiate connections to more than thirty supported databases, including InfluxDB, Prometheus, Graphite, ElasticSearch, and much more.
 
 - [**Metrics Storage**](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md): Upon collection the collected metrics need to be either forwarded, exported or just stored for further treatment. The Agent is capable to store metrics both short and long-term, with or without the usage of non-volatile storage.
 
@@ -105,7 +103,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 ## N
 
-- [**Netdata**](https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md): Netdata is a monitoring tool designed by system administrators, DevOps engineers, and developers to collect everything, help you visualize
+- [**Netdata**](https://www.netdata.cloud/): Netdata is a monitoring tool designed by system administrators, DevOps engineers, and developers to collect everything, help you visualize
 metrics, troubleshoot complex performance problems, and make data interoperable with the rest of your monitoring stack.
 
 - [**Netdata Agent** or **Agent**](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
@@ -144,7 +142,7 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 
 ## S
 
-- [**Single Node Dashboard**](https://github.com/netdata/netdata/blob/master/docs/dashboard/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
+- [**Single Node Dashboard**](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata agent, with thousand of metrics and hundreds of interactive charts that requires no set up.
 
 - [**Space**](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/organize-your-infrastrucutre-invite-your-team.md#netdata-cloud-spaces): A high-level container and virtual collaboration area where you can organize team members, access levels,and the nodes you want to monitor.
 
@@ -169,4 +167,4 @@ even thousands of nodes. There are no actual bottlenecks especially if you retai
 
 ## Z
 
-- [**Zero Configuration**](https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md#simple-to-deploy): Netdata is preconfigured and capable to autodetect and monitor any well known application that runs on your system. You just deploy and claim Netdata Agents in your Netdata space, and monitor them in seconds.
+- **Zero Configuration**: Netdata is preconfigured and capable to autodetect and monitor any well known application that runs on your system. You just deploy and claim Netdata Agents in your Netdata space, and monitor them in seconds.

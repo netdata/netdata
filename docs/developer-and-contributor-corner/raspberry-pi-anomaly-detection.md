@@ -23,8 +23,8 @@ Read on to learn all the steps and enable unsupervised anomaly detection on your
 
 First make sure Netdata is using Python 3 when it runs Python-based data collectors. 
 
-Next, open `netdata.conf` using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files)
-from within the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory). Scroll down to the
+Next, open `netdata.conf` using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-netdataconf)
+from within the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory). Scroll down to the
 `[plugin:python.d]` section to pass in the `-ppython3` command option. 
 
 ```conf

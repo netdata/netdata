@@ -2,7 +2,7 @@
 
 > ### Disclaimer
 >
-> This document is only applicable to the v1 version of the dashboard and doesn't affect the [Netdata Dashboard](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md).
+> This document is only applicable to the v1 version of the dashboard and doesn't affect the [Netdata Dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md).
 
 While the [Netdata dashboard](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md) comes preconfigured with hundreds of charts and
 thousands of metrics, you may want to alter your experience based on a particular use case or preferences.
@@ -22,7 +22,7 @@ Here are a few popular settings:
 ### Change chart legend position
 
 Find this setting under the **Visual** tab. By default, Netdata places the 
-[legend of dimensions](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md#dimension) _below_ charts. 
+[legend of dimensions](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dimensions-contexts-families.md#dimension) _below_ charts. 
 Click this toggle to move the legend to the _right_ of charts.
 
 
@@ -65,7 +65,7 @@ Edit the file with customizations to the `title`, `icon`, and `info` fields. Rep
 icon from [Font Awesome](https://fontawesome.com/cheatsheet) to customize the icons that appear throughout the
 dashboard.
 
-Save the file, then navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) to edit `netdata.conf`. Add
+Save the file, then navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) to edit `netdata.conf`. Add
 the following line to the `[web]` section to tell Netdata where to find your custom configuration.
 
 ```conf

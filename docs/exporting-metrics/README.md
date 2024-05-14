@@ -20,7 +20,7 @@ analysis, or correlation with other tools, such as application tracing.
 
 Netdata supports exporting metrics to the following databases through several
 [connectors](https://github.com/netdata/netdata/blob/master/src/exporting/README.md#features). Once you find the connector that works for your database, open its
-documentation and the [enabling a connector](https://github.com/netdata/netdata/blob/master/docs/export/enable-connector.md) doc for details on enabling it.
+documentation and the [enabling a connector](https://github.com/netdata/netdata/blob/master/docs/exporting-metrics/enable-an-exporting-connector.md) doc for details on enabling it.
 
 -   **AppOptics**: [Prometheus remote write](https://github.com/netdata/netdata/blob/master/src/exporting/prometheus/remote_write/README.md)
 -   **AWS Kinesis**: [AWS Kinesis Data Streams](https://github.com/netdata/netdata/blob/master/src/exporting/aws_kinesis/README.md)

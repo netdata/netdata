@@ -171,7 +171,7 @@ The fastest way to improve the Agent's resource utilization is to reduce how oft
 ### Global
 
 If you don't need per-second metrics, or if the Netdata Agent uses a lot of CPU even when no one is viewing that node's
-dashboard, [configure the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) to collect
+dashboard, [configure the Agent](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) to collect
 metrics less often.
 
 Open `netdata.conf` and edit the `update every` setting. The default is `1`, meaning that the Agent collects metrics

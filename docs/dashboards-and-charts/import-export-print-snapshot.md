@@ -5,7 +5,7 @@ description: >-
     they've already happened, and are interoperable with any other node 
     running Netdata."
 type: "how-to"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/dashboard/import-export-print-snapshot.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/import-export-print-snapshot.md"
 sidebar_label: "Import, export, and print a snapshot"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -15,7 +15,7 @@ learn_rel_path: "Operations"
 # Import, export, and print a snapshot
 
 >❗This feature is only available on v1 dashboards, it hasn't been port-forwarded to v2.
->  For more information on accessing dashboards check [this documentation](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md).
+>  For more information on accessing dashboards check [this documentation](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md).
 
 
 Netdata can export snapshots of the contents of your dashboard at a given time, which you can then import into any other
@@ -23,7 +23,7 @@ node running Netdata. Or, you can create a print-ready version of your dashboard
 paper.
 
 Snapshots can be incredibly useful for diagnosing anomalies after they've already happened. Let's say Netdata triggered a warning alert while you were asleep. In the morning, you can [select the
-timeframe](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md) when the alert triggered, export a snapshot, and send it to a
+timeframe](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md) when the alert triggered, export a snapshot, and send it to a
 
 colleague for further analysis.
 

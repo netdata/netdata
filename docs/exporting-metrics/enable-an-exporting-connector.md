@@ -1,7 +1,7 @@
 # Enable an exporting connector
 
 Now that you found the right connector for your [external time-series
-database](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md#supported-databases), you can now enable the exporting engine and the
+database](https://github.com/netdata/netdata/blob/master/docs/exporting-metrics/README.md#supported-databases), you can now enable the exporting engine and the
 connector itself. We'll walk through the process of enabling the exporting engine itself, followed by two examples using
 the OpenTSDB and Graphite connectors.
 
@@ -14,7 +14,7 @@ Once you understand the process of enabling a connector, you can translate that 
 ## Enable the exporting engine
 
 Use `edit-config` from your
-[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory)
+[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory)
 to open `exporting.conf`:
 
 ```bash

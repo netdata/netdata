@@ -90,11 +90,11 @@ modules:
               default_value: None
               required: true
             - name: chart_configs.family
-              description: "[family](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#families) of the chart to be displayed in the dashboard."
+              description: "[family](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#families) of the chart to be displayed in the dashboard."
               default_value: None
               required: true
             - name: chart_configs.context
-              description: "[context](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#contexts) of the chart to be displayed in the dashboard."
+              description: "[context](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#contexts) of the chart to be displayed in the dashboard."
               default_value: None
               required: true
             - name: chart_configs.type

@@ -50,7 +50,7 @@ modules:
               If [using our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure `netdata-plugin-chartsd` is installed.
           - title: "Enable the sensors collector"
             description: |
-              The `sensors` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md), which is typically at `/etc/netdata`, to edit the `charts.d.conf` file.
+              The `sensors` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`, to edit the `charts.d.conf` file.
 
               ```bash
               cd /etc/netdata   # Replace this path with your Netdata config directory, if different

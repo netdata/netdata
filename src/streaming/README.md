@@ -9,7 +9,7 @@ If you haven't already done so, we suggest you first go through the
 
 There are two files responsible for configuring Netdata's streaming capabilities: `stream.conf` and `netdata.conf`.
 
-From within your Netdata config directory (typically `/etc/netdata`), [use `edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) to
+From within your Netdata config directory (typically `/etc/netdata`), [use `edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) to
 open either `stream.conf` or `netdata.conf`.
 
 ```

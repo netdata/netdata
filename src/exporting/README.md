@@ -15,7 +15,7 @@ configuring, and monitoring Netdata's exporting engine, which allows you to send
 databases.
 
 For a quick introduction to the exporting engine's features, read our doc on [exporting metrics to time-series
-databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md), or jump in to [enabling a connector](https://github.com/netdata/netdata/blob/master/docs/export/enable-connector.md).
+databases](https://github.com/netdata/netdata/blob/master/docs/exporting-metrics/README.md), or jump in to [enabling a connector](https://github.com/netdata/netdata/blob/master/docs/exporting-metrics/enable-an-exporting-connector.md).
 
 The exporting engine has a modular structure and supports metric exporting via multiple exporting connector instances at
 the same time. You can have different update intervals and filters configured for every exporting connector instance. 
@@ -34,7 +34,7 @@ X seconds (though, it can send them per second if you need it to).
 ### Integration
 
 The exporting engine uses a number of connectors to send Netdata metrics to external time-series databases. See our
-[list of supported databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md#supported-databases) for information on which
+[list of supported databases](https://github.com/netdata/netdata/blob/master/docs/exporting-metrics/README.md#supported-databases) for information on which
 connector to enable and configure for your database of choice.
 
 -   [**AWS Kinesis Data Streams**](https://github.com/netdata/netdata/blob/master/src/exporting/aws_kinesis/README.md): Metrics are sent to the service in `JSON`

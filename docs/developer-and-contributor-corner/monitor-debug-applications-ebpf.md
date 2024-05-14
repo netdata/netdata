@@ -243,7 +243,7 @@ You can also read how to [monitor your infrastructure with Netdata Cloud](https:
 
 Once you've added one or more nodes to a Space in Netdata Cloud, you can see aggregated eBPF metrics in the Overview
 dashboard under the same **Applications** or **eBPF** sections that you
-find on the local Agent dashboard. Or, [create new dashboards](https://github.com/netdata/netdata/blob/master/docs/dashboard/dashboards-tab.md) using eBPF metrics
+find on the local Agent dashboard. Or, [create new dashboards](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dashboards-tab.md) using eBPF metrics
 from any number of distributed nodes to see how your application interacts with multiple Linux kernels on multiple Linux
 systems. 
 

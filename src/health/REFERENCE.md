@@ -40,7 +40,7 @@ You can configure the Agent's health watchdog service by editing files in two lo
     performing calculations on or their associated collector. You should edit these files using the `edit-config`
     script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
-Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) and
+Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) and
 use `edit-config` to make changes to any of these files.
 
 ### Edit individual alerts
@@ -134,7 +134,7 @@ your systems, containers, and applications work.
 Read the [health entity reference](#health-entity-reference) for a full listing of the format,
 syntax, and functionality of health entities.
 
-To write a new health entity into a new file, navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md),
+To write a new health entity into a new file, navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md),
 then use `touch` to create a new file in the `health.d/` directory. Use `edit-config` to start editing the file.
 
 As an example, let's create a `ram-usage.conf` file.

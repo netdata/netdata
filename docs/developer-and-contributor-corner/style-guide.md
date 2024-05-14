@@ -295,7 +295,7 @@ Netdata Agent installation will have commands under the same paths. When applica
 path, providing a recommendation or instructions on how to view the running configuration, which includes the correct
 paths.
 
-For example, the [configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) doc first
+For example, the [configuration](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) doc first
 teaches users how to find the Netdata config
 directory and navigate to it, then runs commands from the `/etc/netdata` path so that the instructions are more
 universal.
@@ -305,7 +305,7 @@ Don't include full paths, beginning from the system's root (`/`), as these might
 |                 |                                                                                                                                                                                                                                                                                                    |
 |-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Not recommended | Use `edit-config` to edit Netdata's configuration: `sudo /etc/netdata/edit-config netdata.conf`.                                                                                                                                                                                                   |
-| **Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
+| **Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
 
 ### `sudo`
 

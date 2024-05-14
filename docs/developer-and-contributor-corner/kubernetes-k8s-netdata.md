@@ -123,7 +123,7 @@ visualizations](https://user-images.githubusercontent.com/1153921/109049195-349f
 
 ### Health map
 
-The first visualization is the [health map](https://github.com/netdata/netdata/blob/master/docs/dashboard/kubernetes-tab.md#health-map),
+The first visualization is the [health map](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/kubernetes-tab.md#health-map),
 which places each container into its own box, then varies the intensity of their color to visualize the resource
 utilization. By default, the health map shows the **average CPU utilization as a percentage of the configured limit**
 for every container in your cluster.
@@ -156,7 +156,7 @@ different namespaces.
 ![Time-series Kubernetes monitoring in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/109075210-126a1680-76b6-11eb-918d-5acdcdac152d.png)
 
-Each composite chart has a [definition bar](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#definition-bar)
+Each composite chart has a [definition bar](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#definition-bar)
 for complete customization. For example, grouping the top chart by `k8s_container_name` reveals new information.
 
 ![Changing time-series charts](https://user-images.githubusercontent.com/1153921/109075212-139b4380-76b6-11eb-836f-939482ae55fc.png)

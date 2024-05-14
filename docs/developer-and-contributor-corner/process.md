@@ -39,7 +39,7 @@ With Netdata's process monitoring, you can:
 
 - One or more Linux nodes running [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
 - A general understanding of how
-  to [configure the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md)
+  to [configure the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md)
   using `edit-config`.
 - A Netdata Cloud account. [Sign up](https://app.netdata.cloud) if you don't have one already.
 
@@ -130,7 +130,7 @@ aware of hundreds of processes, and collects metrics from them automatically.
 But, if you want to change the grouping behavior, add an application that isn't yet supported in the Netdata Agent, or
 monitor a custom application, you need to edit the `apps_groups.conf` configuration file.
 
-Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) and
+Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) and
 use `edit-config` to edit the file.
 
 ```bash

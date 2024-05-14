@@ -27,7 +27,7 @@ The date and time selector allows you to change the visible timeframe and change
 
 ### Pick timeframes to visualize
 
-While [panning through time and zooming in/out](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md) from charts it is helpful when you're looking a recent history, or want to do granular troubleshooting, what if you want to see metrics from 6 hours ago? Or 6 days?
+While [panning through time and zooming in/out](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md) from charts it is helpful when you're looking a recent history, or want to do granular troubleshooting, what if you want to see metrics from 6 hours ago? Or 6 days?
 
 Netdata's dashboard features a **timeframe selector** to help you visualize specific timeframes in a few helpful ways.
 By default, it shows a certain number of minutes of historical metrics based on the your browser's viewport to ensure it's always showing per-second granularity.

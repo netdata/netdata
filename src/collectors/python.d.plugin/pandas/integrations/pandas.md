@@ -136,8 +136,8 @@ Every configuration JOB starts with a `job_name` value which will appear in the 
 | chart_configs | an array of chart configuration dictionaries | [] | yes |
 | chart_configs.name | name of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.title | title of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.family | [family](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#families) of the chart to be displayed in the dashboard. | None | yes |
-| chart_configs.context | [context](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md#contexts) of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.family | [family](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#families) of the chart to be displayed in the dashboard. | None | yes |
+| chart_configs.context | [context](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md#contexts) of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.type | the type of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.units | the units of the chart to be displayed in the dashboard. | None | yes |
 | chart_configs.df_steps | a series of pandas operations (one per line) that each returns a dataframe. | None | yes |

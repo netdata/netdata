@@ -67,7 +67,7 @@ You can enable/disable of the collection modules supported by `go.d`, `python.d`
 configuration file of that orchestrator. For example, you can change the behavior of the Go orchestrator, or any of its 
 collectors, by editing `go.d.conf`.
 
-Use `edit-config` from your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory) 
+Use `edit-config` from your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) 
 to open the orchestrator primary configuration file:
 
 ```bash
@@ -105,7 +105,7 @@ and open its documentation. Some software has collectors written in multiple lan
 pick the collector written in Go.
 
 Use `edit-config` from your 
-[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory) 
+[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory) 
 to open a collector's configuration file. For example, edit the Nginx collector with the following:
 
 ```bash

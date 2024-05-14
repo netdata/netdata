@@ -6,7 +6,7 @@ When preparing to backup a Netdata Agent it is worth considering that there are 
 
 | Data type           | Description                                          | Location                                                                                                                |
 |---------------------|------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
-| Agent configuration | Files controlling configuration of the Netdata Agent | [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md) |
+| Agent configuration | Files controlling configuration of the Netdata Agent | [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) |
 | Metrics             | Database files                                       | /var/cache/netdata                                                                                                      |
 | Identity            | Claim token, API key and some other files            | /var/lib/netdata                                                                                                        |
 
