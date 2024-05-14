@@ -1,1 +1,0 @@
-integrations/hp_smart_storage_arrays.md
