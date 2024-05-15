@@ -40,6 +40,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/k8s_kubeproxy"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/k8s_state"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/lighttpd"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/litespeed"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/logind"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/logstash"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/lvm"
