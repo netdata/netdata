@@ -122,7 +122,7 @@ If you don't have root access, you can still connect your node to Netdata Cloud 
    grep "run as user" /etc/netdata/netdata.conf
    # run as user = netdata
    ```
-2. Switch User: Use the `sudo su - <username> -s /bin/bash` command (replacing <username> with the identified user) to
+2. Switch User: Use the `sudo su - <username> -s /bin/bash` command (replacing `username` with the identified user) to
    switch to the
    Netdata Agent user account. For example, if the `run as user` setting pointed to `netdata`, you would
    use `sudo su - netdata -s /bin/bash`.
