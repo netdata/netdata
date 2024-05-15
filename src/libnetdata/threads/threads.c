@@ -85,24 +85,13 @@ static inline void os_get_thread_name(char *out, size_t size) {
 }
 
 // set the thread name to the operating system
-static inline void os_set_thread_name_of_self(const char *name) {
+static inline void os_set_thread_name(const char *name) {
 #if defined(__FreeBSD__)
     pthread_set_name_np(pthread_self(), name);
 #elif defined(__APPLE__)
     pthread_setname_np(name);
 #else
     pthread_setname_np(pthread_self(), name);
-#endif
-}
-
-static inline void os_set_pthread_name(pthread_t thread, const char *name) {
-#if defined(__FreeBSD__)
-    pthread_set_name_np(thread, name);
-#elif defined(__APPLE__)
-    // Apple can only set the name from the same thread
-    UNUSED(thread);
-#else
-    pthread_setname_np(thread, name);
 #endif
 }
 
@@ -140,7 +129,7 @@ void nd_thread_tag_set(const char *tag) {
 
     strncpyz(_nd_thread_os_name, tag, sizeof(_nd_thread_os_name) - 1);
 
-    os_set_thread_name_of_self(_nd_thread_os_name);
+    os_set_thread_name(_nd_thread_os_name);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -150,7 +139,7 @@ void uv_thread_set_name_np(const char* name) {
     if(libuv_name_set) return;
 
     strncpyz(_nd_thread_os_name, name, sizeof(_nd_thread_os_name) - 1);
-    os_set_thread_name_of_self(_nd_thread_os_name);
+    os_set_thread_name(_nd_thread_os_name);
     libuv_name_set = true;
 }
 
@@ -169,7 +158,7 @@ void webrtc_set_thread_name(void) {
     if(!tmp[0] || strcmp(tmp, "netdata") == 0) {
         char name[ND_THREAD_TAG_MAX + 1];
         snprintfz(name, ND_THREAD_TAG_MAX, "WEBRTC[%zu]", __atomic_fetch_add(&webrtc_id, 1, __ATOMIC_RELAXED));
-        os_set_thread_name_of_self(name);
+        os_set_thread_name(name);
     }
 
     nd_thread_get_name(true);
