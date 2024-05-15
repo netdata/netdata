@@ -524,9 +524,7 @@ static int handle_http_request(https_req_ctx_t *ctx) {
     buffer_strcat(hdr, HTTP_1_1 HTTP_ENDL);
 
     //TODO Headers!
-    if (ctx->request->request_type != HTTP_REQ_CONNECT) {
-        buffer_sprintf(hdr, "Host: %s\x0D\x0A", ctx->request->host);
-    }
+    buffer_sprintf(hdr, "Host: %s\x0D\x0A", ctx->request->host);
     buffer_strcat(hdr, "User-Agent: Netdata/rocks newhttpclient\x0D\x0A");
 
     if (ctx->request->request_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
