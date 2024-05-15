@@ -8,7 +8,7 @@ Netdata Agent on your node.
 ### Reinstalling with the same install type
 
 Run the one-line installer script with the `--reinstall` parameter to reinstall the Netdata Agent. This will preserve
-any [user configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) in `netdata.conf` or other files, and will keep the same install
+any [user configuration](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) in `netdata.conf` or other files, and will keep the same install
 type that was used for the original install.
 
 If you used any [optional

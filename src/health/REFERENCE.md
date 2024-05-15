@@ -10,7 +10,7 @@ applications in real time.
 
 While you can see active alerts both on the local dashboard and Netdata Cloud, all health alerts are configured _per
 node_ via individual Netdata Agents. If you want to deploy a new alert across your
-[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you must configure each node with the same health configuration
+[infrastructure](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/monitor-your-infrastructure.md), you must configure each node with the same health configuration
 files.
 
 ## Reload health configuration
@@ -40,7 +40,7 @@ You can configure the Agent's health watchdog service by editing files in two lo
     performing calculations on or their associated collector. You should edit these files using the `edit-config`
     script. For example: `sudo ./edit-config health.d/cpu.conf`.
 
-Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) and
+Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) and
 use `edit-config` to make changes to any of these files.
 
 ### Edit individual alerts
@@ -134,7 +134,7 @@ your systems, containers, and applications work.
 Read the [health entity reference](#health-entity-reference) for a full listing of the format,
 syntax, and functionality of health entities.
 
-To write a new health entity into a new file, navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md),
+To write a new health entity into a new file, navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md),
 then use `touch` to create a new file in the `health.d/` directory. Use `edit-config` to start editing the file.
 
 As an example, let's create a `ram-usage.conf` file.
@@ -600,7 +600,7 @@ good idea to tell Netdata to not clear the notification, by using the `no-clear-
 
 #### Alert line `host labels`
 
-Defines the list of labels present on a host. See our [host labels guide](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md) for
+Defines the list of labels present on a host. See our [host labels guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for
 an explanation of host labels and how to implement them.
 
 For example, let's suppose that `netdata.conf` is configured with the following labels:

@@ -23,9 +23,9 @@ Every collector has two primary jobs:
 
 If the collector finds compatible metrics exposed on the configured endpoint, it begins a per-second collection job. The
 Netdata Agent gathers these metrics, sends them to the 
-[database engine for storage](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md)
+[database engine for storage](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md)
 , and immediately 
-[visualizes them meaningfully](https://github.com/netdata/netdata/blob/master/docs/dashboard/netdata-charts.md) 
+[visualizes them meaningfully](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md) 
 on dashboards.
 
 Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint

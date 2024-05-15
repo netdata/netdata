@@ -2,7 +2,7 @@
 
 In observability, machine learning can be used to detect patterns and anomalies in large datasets, enabling users to identify potential issues before they become critical.
 
-At Netdata through understanding what useful insights ML can provide, we created a tool that can improve troubleshooting, reduce mean time to resolution and in many cases prevent issues from escalating. That tool is called the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboard/anomaly-advisor-tab.md), available at our [Netdata dashboard](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/accessing-netdata-dashboards.md).
+At Netdata through understanding what useful insights ML can provide, we created a tool that can improve troubleshooting, reduce mean time to resolution and in many cases prevent issues from escalating. That tool is called the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md), available at our [Netdata dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md).
 
 > **Note**
 >

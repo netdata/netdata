@@ -294,7 +294,7 @@ volumes:
 ### With SSL/TLS enabled HTTP Proxy
 
 For a permanent installation on a public server, you
-should [secure the Netdata instance](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/secure-nodes.md). This
+should [secure the Netdata instance](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/securing-netdata-agents.md). This
 section contains an example of how to install Netdata with an SSL reverse proxy and basic authentication.
 
 You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and
@@ -369,7 +369,7 @@ to Caddyfile.
 ### With Docker socket proxy
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-haproxy.md) or
+[HAProxy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md) or
 [CetusGuard](https://github.com/hectorm/cetusguard) so that it restricts connections to read-only access to
 the `/containers` endpoint.
 

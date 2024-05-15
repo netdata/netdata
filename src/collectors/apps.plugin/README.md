@@ -167,7 +167,7 @@ If you don't see charts under the **eBPF syscall** or **eBPF net** sections, you
 [`ebpf.d.conf`](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/README.md#configure-the-ebpf-collector) file to ensure the eBPF program is enabled.
 
 Also see our [guide on troubleshooting apps with eBPF
-metrics](https://github.com/netdata/netdata/blob/master/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md) for ideas on how to interpret these charts in a
+metrics](https://github.com/netdata/netdata/blob/master/docs/developer-and-contributor-corner/monitor-debug-applications-ebpf.md) for ideas on how to interpret these charts in a
 few scenarios.
 
 ## Permissions

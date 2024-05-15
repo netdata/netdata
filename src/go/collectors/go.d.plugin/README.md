@@ -79,6 +79,7 @@ see the appropriate collector readme.
 | [haproxy](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/haproxy)                       |            HAProxy            |
 | [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hddtemp)                       |       Disks temperature       |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hdfs)                             |             HDFS              |
+| [hpssa](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/hpssa)                           |        HPE Smart Array        |
 | [httpcheck](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/httpcheck)                   |       Any HTTP Endpoint       |
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/intelgpu)                     |     Intel integrated GPU      |
 | [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/isc_dhcpd)                   |           ISC DHCP            |
@@ -140,7 +141,7 @@ see the appropriate collector readme.
 ## Configuration
 
 Edit the `go.d.conf` configuration file using `edit-config` from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory), which is typically
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory), which is typically
 at `/etc/netdata`.
 
 ```bash

@@ -97,7 +97,7 @@ documentation](https://github.com/netdata/netdata/blob/master/packaging/installe
 
 If the above command fails, you can [reinstall
 Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md#one-line-installer-script-kickstartsh) to get the latest version. This
-also preserves your [configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) in `netdata.conf` or other files just like updating
+also preserves your [configuration](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) in `netdata.conf` or other files just like updating
 normally would, though you will need to specify any installation options you used originally again.
 
 ## Docker
@@ -196,7 +196,7 @@ located in the same directory as the main `netdata.conf` file. This file uses PO
 variables that are used by the updater.
 
 This configuration file can be edited [using our `edit-config`
-script](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
+script](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md).
 
 The following configuration options are currently supported:
 

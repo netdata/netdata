@@ -205,7 +205,7 @@ cd netdata
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--nightly-channel`: Automatically update on every new nightly build.
--   `--disable-telemetry`: Opt-out of [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md) we use to make
+-   `--disable-telemetry`: Opt-out of [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md) we use to make
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this

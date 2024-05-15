@@ -69,7 +69,7 @@ stateDiagram-v2
 
 2. **Automation**: Netdata is designed to automate most of the process of setting up and running an observability solution. It is designed to instantly provide comprehensive dashboards and fully automated alerts, with zero configuration.
 
-3. **High Fidelity Monitoring**: Netdata was born from our need to kill the console for observability. So, it provides metrics and logs in the same granularity and fidelity console tools do, but also comes with tools that go beyond metrics and logs, to provide a holistic view of the monitored infrastructure (e.g. check [Top Monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md)).  
+3. **High Fidelity Monitoring**: Netdata was born from our need to kill the console for observability. So, it provides metrics and logs in the same granularity and fidelity console tools do, but also comes with tools that go beyond metrics and logs, to provide a holistic view of the monitored infrastructure (e.g. check [Top Monitoring](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md)).  
 
 4. **Minimal impact on monitored systems and applications**: Netdata has been designed to have a minimal impact on the monitored systems and their applications. There are [independent studies](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf) reporting that Netdata excels in CPU usage, RAM utilization, Execution Time and the impact Netdata has on monitored applications and containers.
 
@@ -79,6 +79,6 @@ stateDiagram-v2
 
 The Netdata agents (Standalone, Children and Parents) **share the dashboard** of Netdata Cloud. However, when the user is logged-in and the Netdata agent is connected to Netdata Cloud, the following are enabled (which are otherwise disabled):
 
-1. **Access to Sensitive Data**: Some data, like systemd-journal logs and several [Top Monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) features expose sensitive data, like IPs, ports, process command lines and more. To access all these when the dashboard is served directly from a Netdata agent, Netdata Cloud is required to verify that the user accessing the dashboard has the required permissions.
+1. **Access to Sensitive Data**: Some data, like systemd-journal logs and several [Top Monitoring](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md) features expose sensitive data, like IPs, ports, process command lines and more. To access all these when the dashboard is served directly from a Netdata agent, Netdata Cloud is required to verify that the user accessing the dashboard has the required permissions.
 
 2. **Dynamic Configuration**: Netdata agents are configured via configuration files, manually or through some provisioning system. The latest Netdata includes a feature to allow users change some of the configuration (collectors, alerts) via the dashboard. This feature is only available to users of paid Netdata Cloud plan.

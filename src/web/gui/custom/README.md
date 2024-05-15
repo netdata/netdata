@@ -1,7 +1,7 @@
 # Build new dashboards with HTML
 
 >❗This feature is only available on v1 dashboards and is not currently supported on v2.
->  For more information on the new Custom Dashboards check [this documentation](https://github.com/netdata/netdata/blob/master/docs/dashboard/dashboards-tab.md).
+>  For more information on the new Custom Dashboards check [this documentation](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dashboards-tab.md).
 
 You can build dashboards with Netdata charts just with some basic HTML knowledge.
 

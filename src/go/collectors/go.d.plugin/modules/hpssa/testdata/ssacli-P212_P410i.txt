@@ -1,0 +1,748 @@
+Smart Array P212 in Slot 5
+   Bus Interface: PCI
+   Slot: 5
+   Serial Number: REDACTED
+   Cache Serial Number: REDACTED
+   Controller Status: OK
+   Hardware Revision: C
+   Firmware Version: 6.60-0
+   Rebuild Priority: Medium
+   Expand Priority: Medium
+   Surface Scan Delay: 15 secs
+   Surface Scan Mode: Idle
+   Parallel Surface Scan Supported: No
+   Queue Depth: Automatic
+   Monitor and Performance Delay: 60  min
+   Elevator Sort: Enabled
+   Degraded Performance Optimization: Disabled
+   Wait for Cache Room: Disabled
+   Surface Analysis Inconsistency Notification: Disabled
+   Post Prompt Timeout: 0 secs
+   Cache Board Present: True
+   Cache Status: OK
+   Cache Ratio: 100% Read / 0% Write
+   Drive Write Cache: Disabled
+   Total Cache Size: 0.2
+   Total Cache Memory Available: 0.1
+   No-Battery Write Cache: Disabled
+   SATA NCQ Supported: True
+   Number of Ports: 2 (1 Internal / 1 External )
+   Encryption: Not Set
+   Driver Name: hpsa
+   Driver Version: 3.4.20
+   Driver Supports SSD Smart Path: True
+   PCI Address (Domain:Bus:Device.Function): 0000:14:00.0
+   Port Max Phy Rate Limiting Supported: False
+   Host Serial Number: REDACTED
+   Sanitize Erase Supported: False
+   Primary Boot Volume: None
+   Secondary Boot Volume: None
+
+
+   Port Name: 1I
+         Port ID: 0
+         Port Connection Number: 0
+         SAS Address: 5001438014623D00
+         Port Location: Internal
+
+   Port Name: 2E
+         Port ID: 1
+         Port Connection Number: 1
+         SAS Address: 5001438014623D04
+         Port Location: External
+
+
+   StorageWorks MSA 60 at Port 2E, Box 1, OK
+
+      Fan Status: OK
+      Temperature Status: OK
+      Power Supply Status: Redundant
+      Vendor ID: HP
+      Serial Number:
+      Firmware Version: 2.16
+      Drive Bays: 12
+      Port: 2E
+      Box: 1
+      Location: External
+
+   Expander 249
+      Device Number: 249
+      Firmware Version: 2.16
+      WWID: REDACTED
+      Port: 2E
+      Box: 1
+      Vendor ID: HP
+
+   Enclosure SEP (Vendor ID HP, Model MSA60) 248
+      Device Number: 248
+      Firmware Version: 2.16
+      WWID: REDACTED
+      Port: 2E
+      Box: 1
+      Vendor ID: HP
+      Model: MSA60
+      SEP: (1) 2.16
+      Backplane Module (BPM): (1) 2.06, (2) 2.06
+      Fan Control Module (FCM): (1) 1.08, (2) 1.08
+      Health Monitor Module (HMM): (1) 1.10, (2) 1.10
+      Seven Segment LED Display: (1) 0.10
+
+   Physical Drives
+      physicaldrive 2E:1:1 (port 2E:box 1:bay 1, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:2 (port 2E:box 1:bay 2, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:3 (port 2E:box 1:bay 3, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:4 (port 2E:box 1:bay 4, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:5 (port 2E:box 1:bay 5, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:6 (port 2E:box 1:bay 6, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:7 (port 2E:box 1:bay 7, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:8 (port 2E:box 1:bay 8, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:9 (port 2E:box 1:bay 9, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:10 (port 2E:box 1:bay 10, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:11 (port 2E:box 1:bay 11, SATA HDD, 1 TB, OK)
+      physicaldrive 2E:1:12 (port 2E:box 1:bay 12, SATA HDD, 1 TB, OK)
+
+
+   Array: A
+      Interface Type: SATA
+      Unused Space: 0 MB (0.00%)
+      Used Space: 5.46 TB (100.00%)
+      Status: OK
+      Array Type: Data
+      Smart Path: disable
+
+
+      Logical Drive: 1
+         Size: 4.55 TB
+         Fault Tolerance: 5
+         Heads: 255
+         Sectors Per Track: 32
+         Cylinders: 65535
+         Strip Size: 256 KB
+         Full Stripe Size: 1280 KB
+         Status: OK
+         Unrecoverable Media Errors: None
+         Caching:  Enabled
+         Parity Initialization Status: Initialization Completed
+         Unique Identifier: 600508B1001C48AFDD414EB0F3004830
+         Disk Name: /dev/sdc
+         Mount Points: /srv/mnt2 4.5 TB Partition Number 1
+         OS Status: LOCKED
+         Logical Drive Label: A4A06DEEPACCPID11170BVJE8DB
+         Drive Type: Data
+         LD Acceleration Method: Controller Cache
+
+
+      physicaldrive 2E:1:1
+         Port: 2E
+         Box: 1
+         Bay: 1
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG2
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EBZQB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 33
+         Maximum Temperature (C): 51
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:2
+         Port: 2E
+         Box: 1
+         Bay: 2
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG3
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EAMZE
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 34
+         Maximum Temperature (C): 39
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:3
+         Port: 2E
+         Box: 1
+         Bay: 3
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG1
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000ECWCQ
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 35
+         Maximum Temperature (C): 41
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:4
+         Port: 2E
+         Box: 1
+         Bay: 4
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG4
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EAMZE
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 35
+         Maximum Temperature (C): 44
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:5
+         Port: 2E
+         Box: 1
+         Bay: 5
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG1
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EBZQB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 34
+         Maximum Temperature (C): 51
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:6
+         Port: 2E
+         Box: 1
+         Bay: 6
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG1
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EBZQB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 33
+         Maximum Temperature (C): 50
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+
+   Unassigned
+
+      physicaldrive 2E:1:7
+         Port: 2E
+         Box: 1
+         Bay: 7
+         Status: OK
+         Drive Type: Unassigned Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG2
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EBZQB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 30
+         Maximum Temperature (C): 50
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:8
+         Port: 2E
+         Box: 1
+         Bay: 8
+         Status: OK
+         Drive Type: Unassigned Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG1
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EAMZE
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 33
+         Maximum Temperature (C): 41
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:9
+         Port: 2E
+         Box: 1
+         Bay: 9
+         Status: OK
+         Drive Type: Unassigned Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG1
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EBZQB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 30
+         Maximum Temperature (C): 50
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:10
+         Port: 2E
+         Box: 1
+         Bay: 10
+         Status: OK
+         Drive Type: Unassigned Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG2
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EBNCF
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 35
+         Maximum Temperature (C): 41
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:11
+         Port: 2E
+         Box: 1
+         Bay: 11
+         Status: OK
+         Drive Type: Unassigned Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG1
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     ST31000524NS
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 34
+         Maximum Temperature (C): 42
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2E:1:12
+         Port: 2E
+         Box: 1
+         Bay: 12
+         Status: OK
+         Drive Type: Unassigned Drive
+         Interface Type: SATA
+         Size: 1 TB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 7200
+         Firmware Revision: HPG1
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: ATA     MB1000EBZQB
+         SATA NCQ Capable: True
+         SATA NCQ Enabled: True
+         Current Temperature (C): 31
+         Maximum Temperature (C): 50
+         PHY Count: 1
+         PHY Transfer Rate: 1.5Gbps
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+
+   Enclosure SEP (Vendor ID HP, Model MSA60) 248
+      Device Number: 248
+      Firmware Version: 2.16
+      WWID: REDACTED
+      Port: 2E
+      Box: 1
+      Vendor ID: HP
+      Model: MSA60
+      SEP: (1) 2.16
+      Backplane Module (BPM): (1) 2.06, (2) 2.06
+      Fan Control Module (FCM): (1) 1.08, (2) 1.08
+      Health Monitor Module (HMM): (1) 1.10, (2) 1.10
+      Seven Segment LED Display: (1) 0.10
+
+   Expander 249
+      Device Number: 249
+      Firmware Version: 2.16
+      WWID: REDACTED
+      Port: 2E
+      Box: 1
+      Vendor ID: HP
+
+   SEP (Vendor ID PMCSIERA, Model  SRC 8x6G) 250
+      Device Number: 250
+      Firmware Version: RevC
+      WWID: REDACTED
+      Vendor ID: PMCSIERA
+      Model: SRC 8x6G
+
+
+Smart Array P410i in Slot 0 (Embedded)
+   Bus Interface: PCI
+   Slot: 0
+   Serial Number: REDACTED
+   Cache Serial Number: REDACTED
+   Controller Status: OK
+   Hardware Revision: C
+   Firmware Version: 6.40-0
+   Rebuild Priority: Medium
+   Expand Priority: Medium
+   Surface Scan Delay: 15 secs
+   Surface Scan Mode: Idle
+   Parallel Surface Scan Supported: No
+   Queue Depth: Automatic
+   Monitor and Performance Delay: 60  min
+   Elevator Sort: Enabled
+   Degraded Performance Optimization: Disabled
+   Wait for Cache Room: Disabled
+   Surface Analysis Inconsistency Notification: Disabled
+   Post Prompt Timeout: 0 secs
+   Cache Board Present: True
+   Cache Status: OK
+   Cache Ratio: 100% Read / 0% Write
+   Drive Write Cache: Disabled
+   Total Cache Size: 0.2
+   Total Cache Memory Available: 0.1
+   No-Battery Write Cache: Disabled
+   SATA NCQ Supported: True
+   Number of Ports: 2 Internal only
+   Encryption: Not Set
+   Driver Name: hpsa
+   Driver Version: 3.4.20
+   Driver Supports SSD Smart Path: True
+   PCI Address (Domain:Bus:Device.Function): 0000:04:00.0
+   Port Max Phy Rate Limiting Supported: False
+   Host Serial Number: REDACTED
+   Sanitize Erase Supported: False
+   Primary Boot Volume: logicaldrive 1 (600508B1001C8CBE468FB9524F39E535)
+   Secondary Boot Volume: None
+
+
+
+   Internal Drive Cage at Port 1I, Box 1, OK
+
+      Power Supply Status: Not Redundant
+      Drive Bays: 4
+      Port: 1I
+      Box: 1
+      Location: Internal
+
+   Physical Drives
+      physicaldrive 1I:1:1 (port 1I:box 1:bay 1, SAS HDD, 146 GB, OK)
+      physicaldrive 1I:1:2 (port 1I:box 1:bay 2, SAS HDD, 146 GB, OK)
+      physicaldrive 1I:1:3 (port 1I:box 1:bay 3, SAS HDD, 146 GB, OK)
+      physicaldrive 1I:1:4 (port 1I:box 1:bay 4, SAS HDD, 146 GB, OK)
+
+
+
+   Internal Drive Cage at Port 2I, Box 1, OK
+
+      Power Supply Status: Not Redundant
+      Drive Bays: 4
+      Port: 2I
+      Box: 1
+      Location: Internal
+
+   Physical Drives
+      physicaldrive 2I:1:5 (port 2I:box 1:bay 5, SAS HDD, 146 GB, OK)
+      physicaldrive 2I:1:6 (port 2I:box 1:bay 6, SAS HDD, 146 GB, OK)
+
+
+   Port Name: 1I
+         Port ID: 0
+         Port Connection Number: 0
+         SAS Address: 50123456789ABCDE
+         Port Location: Internal
+
+   Port Name: 2I
+         Port ID: 1
+         Port Connection Number: 1
+         SAS Address: 50123456789ABCE2
+         Port Location: Internal
+
+   Array: A
+      Interface Type: SAS
+      Unused Space: 6 MB (0.00%)
+      Used Space: 273.40 GB (100.00%)
+      Status: OK
+      Array Type: Data
+      Smart Path: disable
+
+
+      Logical Drive: 1
+         Size: 136.70 GB
+         Fault Tolerance: 1
+         Heads: 255
+         Sectors Per Track: 32
+         Cylinders: 35132
+         Strip Size: 256 KB
+         Full Stripe Size: 256 KB
+         Status: OK
+         Unrecoverable Media Errors: None
+         Caching:  Enabled
+         Unique Identifier: 600508B1001C8CBE468FB9524F39E535
+         Disk Name: /dev/sda
+         Mount Points: /boot 243 MB Partition Number 1
+         OS Status: LOCKED
+         Boot Volume: Primary
+         Logical Drive Label: ADF758B150123456789ABCDEDC07
+         Mirror Group 1:
+            physicaldrive 2I:1:5 (port 2I:box 1:bay 5, SAS HDD, 146 GB, OK)
+         Mirror Group 2:
+            physicaldrive 2I:1:6 (port 2I:box 1:bay 6, SAS HDD, 146 GB, OK)
+         Drive Type: Data
+         LD Acceleration Method: Controller Cache
+
+
+      physicaldrive 2I:1:5
+         Port: 2I
+         Box: 1
+         Bay: 5
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SAS
+         Size: 146 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 15000
+         Firmware Revision: HPD5 (FW update is recommended to minimum version: HPDA)
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: HP      EH0146FARWD
+         Current Temperature (C): 38
+         Maximum Temperature (C): 38
+         PHY Count: 2
+         PHY Transfer Rate: 6.0Gbps, Unknown
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 2I:1:6
+         Port: 2I
+         Box: 1
+         Bay: 6
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SAS
+         Size: 146 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 15000
+         Firmware Revision: HPDF
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: HP      EH0146FAWJB
+         Current Temperature (C): 36
+         Maximum Temperature (C): 43
+         PHY Count: 2
+         PHY Transfer Rate: 6.0Gbps, Unknown
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+
+
+   Array: B
+      Interface Type: SAS
+      Unused Space: 0 MB (0.00%)
+      Used Space: 546.81 GB (100.00%)
+      Status: OK
+      Array Type: Data
+      Smart Path: disable
+
+
+      Logical Drive: 2
+         Size: 273.40 GB
+         Fault Tolerance: 1+0
+         Heads: 255
+         Sectors Per Track: 32
+         Cylinders: 65535
+         Strip Size: 256 KB
+         Full Stripe Size: 512 KB
+         Status: OK
+         Unrecoverable Media Errors: None
+         Caching:  Enabled
+         Unique Identifier: 600508B1001CE15640A74343E4DD1E18
+         Disk Name: /dev/sdb
+         Mount Points: /srv/mnt1 262.3 GB Partition Number 1
+         OS Status: LOCKED
+         Mirror Group 1:
+            physicaldrive 1I:1:1 (port 1I:box 1:bay 1, SAS HDD, 146 GB, OK)
+            physicaldrive 1I:1:2 (port 1I:box 1:bay 2, SAS HDD, 146 GB, OK)
+         Mirror Group 2:
+            physicaldrive 1I:1:3 (port 1I:box 1:bay 3, SAS HDD, 146 GB, OK)
+            physicaldrive 1I:1:4 (port 1I:box 1:bay 4, SAS HDD, 146 GB, OK)
+         Drive Type: Data
+         LD Acceleration Method: Controller Cache
+
+
+      physicaldrive 1I:1:1
+         Port: 1I
+         Box: 1
+         Bay: 1
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SAS
+         Size: 146 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 10000
+         Firmware Revision: HPDD
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: HP      EG0146FAWHU
+         Current Temperature (C): 37
+         Maximum Temperature (C): 43
+         PHY Count: 2
+         PHY Transfer Rate: 6.0Gbps, Unknown
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 1I:1:2
+         Port: 1I
+         Box: 1
+         Bay: 2
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SAS
+         Size: 146 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 10000
+         Firmware Revision: HPDD
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: HP      EG0146FAWHU
+         Current Temperature (C): 37
+         Maximum Temperature (C): 44
+         PHY Count: 2
+         PHY Transfer Rate: 6.0Gbps, Unknown
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 1I:1:3
+         Port: 1I
+         Box: 1
+         Bay: 3
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SAS
+         Size: 146 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 10000
+         Firmware Revision: HPDB
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: HP      DG146BAAJB
+         Current Temperature (C): 43
+         Maximum Temperature (C): 52
+         PHY Count: 2
+         PHY Transfer Rate: 3.0Gbps, Unknown
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+      physicaldrive 1I:1:4
+         Port: 1I
+         Box: 1
+         Bay: 4
+         Status: OK
+         Drive Type: Data Drive
+         Interface Type: SAS
+         Size: 146 GB
+         Drive exposed to OS: False
+         Logical/Physical Block Size: 512/512
+         Rotational Speed: 10000
+         Firmware Revision: HPDB
+         Serial Number: REDACTED
+         WWID: REDACTED
+         Model: HP      DG146BAAJB
+         Current Temperature (C): 44
+         Maximum Temperature (C): 55
+         PHY Count: 2
+         PHY Transfer Rate: 3.0Gbps, Unknown
+         Sanitize Erase Supported: False
+         Shingled Magnetic Recording Support: None
+
+
+   SEP (Vendor ID PMCSIERA, Model  SRC 8x6G) 250
+      Device Number: 250
+      Firmware Version: RevC
+      WWID: REDACTED
+      Vendor ID: PMCSIERA
+      Model: SRC 8x6G

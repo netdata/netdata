@@ -90,7 +90,7 @@ You can now access the Netdata dashboard by navigating to `http://NODE:19999`, r
 
 Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. To read
 more about the information collected and how to opt-out, check the [anonymous statistics
-page](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md).
+page](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md).
 
 ## Updating the Agent on FreeBSD
 If you have not passed the `--auto-update` or `-u` parameter for the installer to enable automatic updating, repeat the last step to update Netdata whenever a new version becomes available. 

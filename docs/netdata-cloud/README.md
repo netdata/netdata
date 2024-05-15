@@ -129,6 +129,6 @@ Netdata Cloud prefers:
 
 - The most distant (from the Child) Parent available, when doing metrics visualization queries (since usually these Parents have been added for this purpose).
 
-- The closest (to the Child) Parent available, for [Top Monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md) (since top-monitoring provides live data, like the processes running, the list of sockets open, etc). The streaming protocol of Netdata Parents and Children is able to forward such requests to the right child, via the Parents, to respond with live and accurate data.
+- The closest (to the Child) Parent available, for [Top Monitoring](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md) (since top-monitoring provides live data, like the processes running, the list of sockets open, etc). The streaming protocol of Netdata Parents and Children is able to forward such requests to the right child, via the Parents, to respond with live and accurate data.
 
 Netdata Children may be connected to Netdata Cloud for high-availability, in case the Netdata Parents are unreachable.
