@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0517
+# Next unused error code: F051A
 
 # ======================================================================
 # Constants
@@ -800,6 +800,10 @@ update() {
         opts="--non-interactive"
     else
         opts="--interactive"
+    fi
+
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      export NETDATA_OFFLINE_INSTALL_SOURCE="${NETDATA_OFFLINE_INSTALL_SOURCE}"
     fi
 
     if run_script "${updater}" ${opts} --not-running-from-cron; then
@@ -2134,6 +2138,10 @@ validate_args() {
     case "${NETDATA_FORCE_METHOD}" in
       native|build) fatal "Offline installs are only supported for static builds currently." F0502 ;;
     esac
+
+    if [ ! -d "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      fatal "Offline install source must be a directory." F0519
+    fi
   fi
 
   if [ -n "${LOCAL_BUILD_OPTIONS}" ]; then
