@@ -36,7 +36,7 @@ There are three main ways to connect your node to Netdata Cloud:
   right away.
 - From the [Space Management screen](#manage-space-or-war-room-area): Click "Connect Nodes" to add a new node to your
   existing Space.
-- From the [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md): While you can see
+- From the [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md): While you can see
   connected nodes here, the connection process itself happens in the Space Management screen.
 
 ### Empty War Room
