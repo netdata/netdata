@@ -63,12 +63,8 @@ initial onboarding process or afterward.
 
 Accessing Management screens:
 
-<<<<<<< HEAD
 - Space Management: Click the cogwheel icon in the bottom-left corner of the UI.
 - War Room Management: Click the cogwheel icon next to the War Room name at the top of the UI.
-=======
-When coming from the [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md) the room parameter is already defined to current War Room.
->>>>>>> 23acac4c2 (link fix pt.1)
 
 Connecting a Node to a War Room:
 
@@ -122,7 +118,7 @@ If you don't have root access, you can still connect your node to Netdata Cloud 
    grep "run as user" /etc/netdata/netdata.conf
    # run as user = netdata
    ```
-2. Switch User: Use the `sudo su - <username> -s /bin/bash` command (replacing <username> with the identified user) to
+2. Switch User: Use the `sudo su - username -s /bin/bash` command (replacing `username` with the identified user) to
    switch to the
    Netdata Agent user account. For example, if the `run as user` setting pointed to `netdata`, you would
    use `sudo su - netdata -s /bin/bash`.
