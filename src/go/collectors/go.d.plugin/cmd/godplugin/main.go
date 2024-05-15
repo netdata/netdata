@@ -5,6 +5,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/user"
@@ -25,7 +26,6 @@ import (
 )
 
 var (
-	cd, _       = os.Getwd()
 	name        = "go.d"
 	userDir     = os.Getenv("NETDATA_USER_CONFIG_DIR")
 	stockDir    = os.Getenv("NETDATA_STOCK_CONFIG_DIR")
@@ -39,47 +39,45 @@ func confDir(opts *cli.Option) multipath.MultiPath {
 	if len(opts.ConfDir) > 0 {
 		return opts.ConfDir
 	}
+
 	if userDir != "" || stockDir != "" {
-		return multipath.New(
-			userDir,
-			stockDir,
-		)
+		return multipath.New(userDir, stockDir)
 	}
-	if executable.Directory != "" {
-		return multipath.New(
-			filepath.Join(executable.Directory, "/../../../../etc/netdata"),
-			filepath.Join(executable.Directory, "/../../../../usr/lib/netdata/conf.d"),
-		)
+
+	var dirs []string
+
+	dirs = append(dirs, filepath.Join(executable.Directory, "/../../../../etc/netdata"))
+
+	for _, dir := range []string{"/etc/netdata", "/opt/netdata/etc/netdata"} {
+		if isDirExists(dir) {
+			dirs = append(dirs, dir)
+			break
+		}
 	}
-	return multipath.New(
-		filepath.Join(cd, "/../../../../etc/netdata"),
-		filepath.Join(cd, "/../../../../usr/lib/netdata/conf.d"),
-	)
+
+	dirs = append(dirs, filepath.Join(executable.Directory, "/../../../../usr/lib/netdata/conf.d"))
+
+	for _, dir := range []string{"/usr/lib/netdata/conf.d", "/opt/netdata/usr/lib/netdata/conf.d"} {
+		if isDirExists(dir) {
+			dirs = append(dirs, dir)
+			break
+		}
+	}
+
+	return multipath.New(dirs...)
 }
 
 func modulesConfDir(opts *cli.Option) (mpath multipath.MultiPath) {
 	if len(opts.ConfDir) > 0 {
 		return opts.ConfDir
 	}
-	if userDir != "" || stockDir != "" {
-		if userDir != "" {
-			mpath = append(mpath, filepath.Join(userDir, name))
-		}
-		if stockDir != "" {
-			mpath = append(mpath, filepath.Join(stockDir, name))
-		}
-		return multipath.New(mpath...)
+
+	dirs := confDir(opts)
+	for _, dir := range dirs {
+		mpath = append(mpath, filepath.Join(dir, name))
 	}
-	if executable.Directory != "" {
-		return multipath.New(
-			filepath.Join(executable.Directory, "/../../../../etc/netdata", name),
-			filepath.Join(executable.Directory, "/../../../../usr/lib/netdata/conf.d", name),
-		)
-	}
-	return multipath.New(
-		filepath.Join(cd, "/../../../../etc/netdata", name),
-		filepath.Join(cd, "/../../../../usr/lib/netdata/conf.d", name),
-	)
+
+	return multipath.New(mpath...)
 }
 
 func modulesConfSDDir(confDir multipath.MultiPath) (mpath multipath.MultiPath) {
@@ -163,4 +161,12 @@ func parseCLI() *cli.Option {
 		}
 	}
 	return opt
+}
+
+func isDirExists(dir string) bool {
+	fi, err := os.Stat(dir)
+	if err == nil {
+		return fi.Mode().IsDir()
+	}
+	return !errors.Is(err, fs.ErrNotExist)
 }
