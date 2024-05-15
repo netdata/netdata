@@ -2740,7 +2740,6 @@ install(FILES
         src/collectors/python.d.plugin/haproxy/haproxy.conf
         src/collectors/python.d.plugin/icecast/icecast.conf
         src/collectors/python.d.plugin/ipfs/ipfs.conf
-        src/collectors/python.d.plugin/litespeed/litespeed.conf
         src/collectors/python.d.plugin/memcached/memcached.conf
         src/collectors/python.d.plugin/monit/monit.conf
         src/collectors/python.d.plugin/nsd/nsd.conf
@@ -2782,7 +2781,6 @@ install(FILES
         src/collectors/python.d.plugin/haproxy/haproxy.chart.py
         src/collectors/python.d.plugin/icecast/icecast.chart.py
         src/collectors/python.d.plugin/ipfs/ipfs.chart.py
-        src/collectors/python.d.plugin/litespeed/litespeed.chart.py
         src/collectors/python.d.plugin/memcached/memcached.chart.py
         src/collectors/python.d.plugin/monit/monit.chart.py
         src/collectors/python.d.plugin/nsd/nsd.chart.py
