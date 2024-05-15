@@ -38,7 +38,7 @@ With both Parent Agents connected to Cloud, Cloud will route queries to either P
 
 ### Stand-alone Deployment
 
-The stand-alone setup is configured out of the box with reasonable defaults, but please consult our [configuration documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/cheatsheet.md) for details, including the overview of [common configuration changes](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/common-configuration-changes.md).
+The stand-alone setup is configured out of the box with reasonable defaults, but please consult our [configuration documentation](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/cheatsheet.md) for details, including the overview of [common configuration changes](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/common-configuration-changes.md).
 
 ### Parent – Child Deployment
 
