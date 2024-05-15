@@ -399,6 +399,11 @@ _safe_download() {
   succeeded=0
   checked=0
 
+  if echo "${url}" | grep -Eq "^file:///"; then
+    run cp "${url#file://}" "${dest}" || return 1
+    return 0
+  fi
+
   check_for_curl
 
   if [ -n "${curl}" ]; then
@@ -660,7 +665,11 @@ set_tarball_urls() {
     fi
   fi
 
-  if [ "$1" = "stable" ]; then
+  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
+    export NETDATA_TARBALL_URL="file://${path}/${filename}"
+    export NETDATA_TARBALL_CHECKSUM_URL="file://${path}/sha256sums.txt"
+  elif [ "$1" = "stable" ]; then
     latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
     export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/sha256sums.txt"
@@ -1044,6 +1053,10 @@ while [ -n "${1}" ]; do
     --force-update) NETDATA_FORCE_UPDATE=1 ;;
     --non-interactive) INTERACTIVE=0 ;;
     --interactive) INTERACTIVE=1 ;;
+    --offline-install-source)
+      NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
+      shift 1
+      ;;
     --tmpdir-path)
       NETDATA_TMPDIR_PATH="${2}"
       shift 1
@@ -1061,6 +1074,12 @@ while [ -n "${1}" ]; do
 
   shift 1
 done
+
+if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+  NETDATA_NO_UPDATER_SELF_UPDATE=1
+  NETDATA_UPDATER_JITTER=0
+  NETDATA_FORCE_UPDATE=1
+fi
 
 # Random sleep to alleviate stampede effect of Agents upgrading
 # and disconnecting/reconnecting at the same time (or near to).
