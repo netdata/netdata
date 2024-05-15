@@ -21,8 +21,7 @@ Here are a few popular settings:
 
 ### Change chart legend position
 
-Find this setting under the **Visual** tab. By default, Netdata places the 
-[legend of dimensions](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dimensions-contexts-families.md#dimension) _below_ charts. 
+Find this setting under the **Visual** tab. By default, Netdata places the legend of dimensions _below_ charts. 
 Click this toggle to move the legend to the _right_ of charts.
 
 
