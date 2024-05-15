@@ -37,6 +37,10 @@ else
    build="${WT_ROOT}/build-${OSTYPE}-${MSYSTEM}"
 fi
 
+if [ "$USER" = "vk" ]; then
+    build="${WT_ROOT}/build"
+fi
+
 set -exu -o pipefail
 
 if [ -d "${build}" ]
