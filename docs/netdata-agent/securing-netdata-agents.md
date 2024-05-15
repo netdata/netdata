@@ -148,7 +148,7 @@ Instructions are provided on how to set the proxy configuration to have Netdata 
 [HAproxy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md), 
 [Apache](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-apache.md), 
 [lighthttpd](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-lighttpd.md), 
-[caddy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-caddy.md), and
+[caddy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-caddy.md), and
 [H2O](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md).
 
 ## Use Netdata parents as Web Application Firewalls
