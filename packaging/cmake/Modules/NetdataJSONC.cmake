@@ -96,7 +96,7 @@ endmacro()
 # macro must have already been run at least once for this to work correctly.
 function(netdata_add_jsonc_to_target _target)
         target_include_directories(${_target} PUBLIC ${NETDATA_JSONC_INCLUDE_DIRS})
-        target_compile_definitions(${_target} PUBLIC ${NETDATA_JSONC_CFLAGS_OTHER})
+        target_compile_options(${_target} PUBLIC ${NETDATA_JSONC_CFLAGS_OTHER})
         target_link_libraries(${_target} PUBLIC ${NETDATA_JSONC_LDFLAGS})
         add_dependencies(${_target} json-c-compat-link)
 endfunction()

@@ -60,6 +60,6 @@ endmacro()
 # macro must have already been run at least once for this to work correctly.
 function(netdata_add_libyaml_to_target _target)
         target_include_directories(${_target} PUBLIC ${NETDATA_YAML_INCLUDE_DIRS})
-        target_compile_definitions(${_target} PUBLIC ${NETDATA_YAML_CFLAGS_OTHER})
+        target_compile_options(${_target} PUBLIC ${NETDATA_YAML_CFLAGS_OTHER})
         target_link_libraries(${_target} PUBLIC ${NETDATA_YAML_LDFLAGS})
 endfunction()
