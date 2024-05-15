@@ -22,7 +22,7 @@ In this standard scenario, you are backing up your Netdata Agent in case of a no
    > **Note**  
    > The specific paths may vary depending on installation method, Operating System, and whether it is a Docker/Kubernetes deployment.
 
-2. It is recommended that you [stop the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) when backing up the Metrics/database files.  
+2. It is recommended that you [stop the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/start-stop-restart.md) when backing up the Metrics/database files.  
    Backing up the Agent configuration and Identity folders is straightforward as they should not be changing very frequently.
 
 3. Using a backup tool such as `tar` you will need to run the backup as _root_ or as the _netdata_ user to access all the files in the directories.
