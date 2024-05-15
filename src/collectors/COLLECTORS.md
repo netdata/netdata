@@ -1153,7 +1153,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Lighttpd](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/lighttpd/integrations/lighttpd.md)
 
-- [Litespeed](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/litespeed/integrations/litespeed.md)
+- [Litespeed](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/litespeed/integrations/litespeed.md)
 
 - [NGINX Plus](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/nginxplus/integrations/nginx_plus.md)
 
