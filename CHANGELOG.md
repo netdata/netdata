@@ -6,12 +6,20 @@
 
 **Merged pull requests:**
 
+- go.d cockroachdb fix calculation [\#17659](https://github.com/netdata/netdata/pull/17659) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17655](https://github.com/netdata/netdata/pull/17655) ([netdatabot](https://github.com/netdatabot))
+- go.d hpssa fix cache battery chart ctx [\#17654](https://github.com/netdata/netdata/pull/17654) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17652](https://github.com/netdata/netdata/pull/17652) ([netdatabot](https://github.com/netdatabot))
+- Update libbpf [\#17650](https://github.com/netdata/netdata/pull/17650) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update the claim readme [\#17646](https://github.com/netdata/netdata/pull/17646) ([Ancairon](https://github.com/Ancairon))
 - remove doc and consolidate info to main section page [\#17645](https://github.com/netdata/netdata/pull/17645) ([Ancairon](https://github.com/Ancairon))
 - Bump github.com/vmware/govmomi from 0.37.1 to 0.37.2 in /src/go/collectors/go.d.plugin [\#17644](https://github.com/netdata/netdata/pull/17644) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix incorrect bind failure warning [\#17643](https://github.com/netdata/netdata/pull/17643) ([stelfrag](https://github.com/stelfrag))
 - go.d ping add missing setting to schema [\#17642](https://github.com/netdata/netdata/pull/17642) ([ilyam8](https://github.com/ilyam8))
 - logs: add ND\_ALERT\_STATUS to facets [\#17641](https://github.com/netdata/netdata/pull/17641) ([ktsaou](https://github.com/ktsaou))
 - Add valkey to apps\_groups.conf [\#17639](https://github.com/netdata/netdata/pull/17639) ([mohd-akram](https://github.com/mohd-akram))
+- python.d remove hpssa [\#17638](https://github.com/netdata/netdata/pull/17638) ([ilyam8](https://github.com/ilyam8))
+- go.d hpssa [\#17637](https://github.com/netdata/netdata/pull/17637) ([ilyam8](https://github.com/ilyam8))
 - ndsudo add ssacli [\#17635](https://github.com/netdata/netdata/pull/17635) ([ilyam8](https://github.com/ilyam8))
 - health update isc dhcp alarms [\#17634](https://github.com/netdata/netdata/pull/17634) ([ilyam8](https://github.com/ilyam8))
 - add pcre2 to install-required-packages "netdata" for macOS [\#17633](https://github.com/netdata/netdata/pull/17633) ([ilyam8](https://github.com/ilyam8))
@@ -310,7 +318,6 @@
 - Fix action lints [\#17120](https://github.com/netdata/netdata/pull/17120) ([tkatsoulas](https://github.com/tkatsoulas))
 - Alert transitions code cleanup [\#17103](https://github.com/netdata/netdata/pull/17103) ([stelfrag](https://github.com/stelfrag))
 - Skip Go code in CI if it hasn’t changed. [\#17077](https://github.com/netdata/netdata/pull/17077) ([Ferroin](https://github.com/Ferroin))
-- Fix conditional for Amazon Linux 2023 in repoconfig spec file. [\#17056](https://github.com/netdata/netdata/pull/17056) ([PaulSzymanski](https://github.com/PaulSzymanski))
 
 ## [v1.45.4](https://github.com/netdata/netdata/tree/v1.45.4) (2024-05-08)
 
@@ -419,12 +426,6 @@
 - add missing "gotify" to list of notification methods in alarm-notify.sh [\#17069](https://github.com/netdata/netdata/pull/17069) ([ilyam8](https://github.com/ilyam8))
 - Add CI checks for Go code. [\#17066](https://github.com/netdata/netdata/pull/17066) ([Ferroin](https://github.com/Ferroin))
 - go.d.plugin dyncfgv2 [\#17064](https://github.com/netdata/netdata/pull/17064) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17063](https://github.com/netdata/netdata/pull/17063) ([netdatabot](https://github.com/netdatabot))
-- go.d.plugin: set max chart id length to 1200 [\#17062](https://github.com/netdata/netdata/pull/17062) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17061](https://github.com/netdata/netdata/pull/17061) ([netdatabot](https://github.com/netdatabot))
-- Abort the agent if a single shutdown step takes more than 60 seconds. [\#17060](https://github.com/netdata/netdata/pull/17060) ([vkalintiris](https://github.com/vkalintiris))
-- Fix typo [\#17059](https://github.com/netdata/netdata/pull/17059) ([vkalintiris](https://github.com/vkalintiris))
-- updated sizing netdata [\#17057](https://github.com/netdata/netdata/pull/17057) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
