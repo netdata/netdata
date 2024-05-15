@@ -23,13 +23,13 @@ The default mode `[db].mode = dbengine` has been designed to scale for longer re
 for parent Agents in the _Parent - Child_ setups
 
 The other available database modes are designed to minimize resource utilization and should only be considered on
-[Parent - Child](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) setups at the children side and only when the
+[Parent - Child](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md) setups at the children side and only when the
 resource constraints are very strict.
 
 So,
 
 - On a single node setup, use `[db].mode = dbengine`.
-- On a [Parent - Child](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) setup, use `[db].mode = dbengine` on the
+- On a [Parent - Child](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md) setup, use `[db].mode = dbengine` on the
   parent to increase retention, and a more resource-efficient mode like, `dbengine` with light retention settings, `ram`, or `none` for the children to minimize resource utilization.
 
 ## Choose your database mode
@@ -48,7 +48,7 @@ Metrics retention is controlled only by the disk space allocated to storing metr
 CPU required by the agent to query longer timeframes.
 
 Since Netdata Agents usually run on the edge, on production systems, Netdata Agent **parents** should be considered.
-When having a [**parent - child**](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) setup, the child (the
+When having a [**parent - child**](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md) setup, the child (the
 Netdata Agent running on a production system) delegates all of its functions, including longer metrics retention and
 querying, to the parent node that can dedicate more resources to this task. A single Netdata Agent parent can centralize
 multiple children Netdata Agents (dozens, hundreds, or even thousands depending on its available resources).

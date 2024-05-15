@@ -380,7 +380,7 @@ Netdata supports 2 incoming streaming configurations:
 
 For option 1, please refer to the [syslog collector](#collector-configuration-syslog) section. This section will be focused on using option 2.
 
-A Netdata agent can be used as a logs aggregation parent to listen to `Forward` messages, using either Unix or network sockets. This option is separate to [Netdata's metrics streaming](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.md) and can be used independently of whether that's enabled or not (and it uses a different listening socket too). 
+A Netdata agent can be used as a logs aggregation parent to listen to `Forward` messages, using either Unix or network sockets. This option is separate to [Netdata's metrics streaming](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md) and can be used independently of whether that's enabled or not (and it uses a different listening socket too). 
 
 This setting can be enabled under the `[forward input]` section in `logsmanagement.d.conf`:
 

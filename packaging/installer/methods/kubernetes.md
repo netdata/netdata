@@ -3,7 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Install Netdata on Kubernetes
 
-This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud. Read our [Kubernetes visualizations](https://github.com/netdata/netdata/blob/master/docs/dashboard/kubernetes-tab.md) documentation, to see what you will get.
+This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud. Read our [Kubernetes visualizations](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/kubernetes-tab.md) documentation, to see what you will get.
 
 The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) installs one `parent` pod for storing metrics and managing alert notifications, plus an additional
 `child` pod for every node in the cluster, responsible for collecting metrics from the node, Kubernetes control planes,
@@ -191,10 +191,10 @@ helm upgrade netdata netdata/netdata
 
 ## What's next?
 
-[Start Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/dashboard/kubernetes-tab.md) in Netdata Cloud, which comes with meaningful visualizations out of the box.
+[Start Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/kubernetes-tab.md) in Netdata Cloud, which comes with meaningful visualizations out of the box.
 
 ### Related reference documentation
 
-- [Netdata Cloud · Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/dashboard/kubernetes-tab.md)
+- [Netdata Cloud · Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/kubernetes-tab.md)
 - [Netdata Helm chart](https://github.com/netdata/helmchart)
 - [Netdata service discovery](https://github.com/netdata/agent-service-discovery/)
