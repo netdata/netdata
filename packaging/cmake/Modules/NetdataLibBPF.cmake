@@ -90,13 +90,13 @@ function(netdata_bundle_libbpf)
         PROPERTY INTERFACE_LINK_LIBRARIES "${ELF_LIBRARIES};${ZLIB_LIBRARIES}"
     )
     set(NETDATA_LIBBPF_INCLUDE_DIRECTORIES "${libbpf_SOURCE_DIR}/usr/include;${libbpf_SOURCE_DIR}/include;${ELF_INCLUDE_DIRECTORIES};${ZLIB_INCLUDE_DIRECTORIES}" PARENT_SCOPE)
-    set(NETDATA_LIBBPF_COMPILE_DEFINITIONS "${ELF_CFLAGS_OTHER};${ZLIB_CFLAGS_OTHER}" PARENT_SCOPE)
+    set(NETDATA_LIBBPF_COMPILE_OPTIONS "${ELF_CFLAGS_OTHER};${ZLIB_CFLAGS_OTHER}" PARENT_SCOPE)
 endfunction()
 
 # Add libbpf as a link dependency for the given target.
 function(netdata_add_libbpf_to_target _target)
     target_link_libraries(${_target} PUBLIC libbpf_library)
     target_include_directories(${_target} BEFORE PUBLIC "${NETDATA_LIBBPF_INCLUDE_DIRECTORIES}")
-    target_compile_definitions(${_target} PUBLIC "${NETDATA_LIBBPF_COMPILE_DEFINITIONS}")
+    target_compile_options(${_target} PUBLIC "${NETDATA_LIBBPF_COMPILE_OPTIONS}")
     add_dependencies(${_target} libbpf)
 endfunction()

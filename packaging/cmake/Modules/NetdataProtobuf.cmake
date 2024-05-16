@@ -165,7 +165,7 @@ endfunction()
 
 # Add protobuf to a specified target.
 function(netdata_add_protobuf _target)
-        target_compile_definitions(${_target} PRIVATE ${PROTOBUF_CFLAGS_OTHER})
+        target_compile_options(${_target} PRIVATE ${PROTOBUF_CFLAGS_OTHER})
         target_include_directories(${_target} PRIVATE ${PROTOBUF_INCLUDE_DIRS})
         target_link_libraries(${_target} PRIVATE ${PROTOBUF_LIBRARIES})
 endfunction()

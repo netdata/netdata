@@ -1655,7 +1655,7 @@ if(MACOS)
 else()
         pkg_check_modules(ZLIB REQUIRED zlib)
         target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
-        target_compile_definitions(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
+        target_compile_options(libnetdata PUBLIC ${ZLIB_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${ZLIB_LDFLAGS})
 endif()
 
@@ -1670,7 +1670,7 @@ else()
 endif()
 
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBLZ4_INCLUDE_DIRS})
-target_compile_definitions(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
+target_compile_options(libnetdata PUBLIC ${LIBLZ4_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBLZ4_LDFLAGS})
 
 # zstd
@@ -1678,7 +1678,7 @@ pkg_check_modules(LIBZSTD libzstd)
 if(LIBZSTD_FOUND)
         set(ENABLE_ZSTD On)
         target_include_directories(libnetdata BEFORE PUBLIC ${LIBZSTD_INCLUDE_DIRS})
-        target_compile_definitions(libnetdata PUBLIC ${LIBZSTD_CFLAGS_OTHER})
+        target_compile_options(libnetdata PUBLIC ${LIBZSTD_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${LIBZSTD_LDFLAGS})
 endif()
 
@@ -1687,7 +1687,7 @@ pkg_check_modules(LIBBROTLI libbrotlidec libbrotlienc libbrotlicommon)
 if(LIBBROTLI_FOUND)
         set(ENABLE_BROTLI On)
         target_include_directories(libnetdata PUBLIC ${LIBBROTLI_INCLUDE_DIRS})
-        target_compile_definitions(libnetdata PUBLIC ${LIBBROTLI_CFLAGS_OTHER})
+        target_compile_options(libnetdata PUBLIC ${LIBBROTLI_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${LIBBROTLI_LDFLAGS})
 endif()
 
@@ -1698,14 +1698,14 @@ if(MACOS OR WINDOWS)
 else()
         pkg_check_modules(UUID REQUIRED uuid)
         target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
-        target_compile_definitions(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
+        target_compile_options(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
         target_link_libraries(libnetdata PUBLIC ${UUID_LDFLAGS})
 endif()
 
 # uv
 pkg_check_modules(LIBUV REQUIRED libuv)
 target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
-target_compile_definitions(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
+target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
 
 # crypto
@@ -2267,6 +2267,9 @@ add_executable(netdata
 
 target_compile_definitions(netdata PRIVATE
         "$<$<BOOL:${ENABLE_ML}>:DLIB_NO_GUI_SUPPORT>"
+)
+
+target_compile_options(netdata PRIVATE
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_CFLAGS_OTHER}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_CFLAGS_OTHER}>"
 )
@@ -2333,7 +2336,7 @@ if(PCRE2_FOUND)
 
         add_executable(log2journal ${LOG2JOURNAL_FILES})
         target_include_directories(log2journal BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src ${PCRE2_INCLUDE_DIRS})
-        target_compile_definitions(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
+        target_compile_options(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
         target_link_libraries(log2journal PUBLIC "${PCRE2_LDFLAGS}")
 
         netdata_add_libyaml_to_target(log2journal)
