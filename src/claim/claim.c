@@ -52,7 +52,7 @@ CLAIM_AGENT_RESPONSE claim_agent(const char *claiming_arguments, bool force, con
         return CLAIM_AGENT_CLOUD_DISABLED;
     }
 
-#ifndef DISABLE_CLOUD
+#if defined(ENABLE_CLOUD) && defined(ENABLE_ACLK)
     int exit_code;
     pid_t command_pid;
     char command_exec_buffer[CLAIMING_COMMAND_LENGTH + 1];
