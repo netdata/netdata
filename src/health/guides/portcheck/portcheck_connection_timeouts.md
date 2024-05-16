@@ -37,5 +37,4 @@ This alert triggers a warning state when the ratio of timeouts is between 10-40%
 ### Useful resources
 
 1. [Netstat Command in Linux](https://www.tecmint.com/20-netstat-commands-for-linux-network-management/)
-2. [Iostat Command Usage and Examples](https://www.thomas-krenn.com/en/wiki/Iostat_command_usage_and_examples)
-3. [Iftop Guide](https://www.tecmint.com/iftop-linux-network-bandwidth-monitoring-tool/)
+2. [Iftop Guide](https://www.tecmint.com/iftop-linux-network-bandwidth-monitoring-tool/)

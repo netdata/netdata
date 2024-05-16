@@ -728,7 +728,7 @@ In general, the process for creating a StatsD collector can be summarized in 2 s
 
     - Make sure to reload the dashboard tab **after** you start sending data to Netdata.
 
-- Create a configuration file for your app using [edit-config](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md): `sudo ./edit-config
+- Create a configuration file for your app using [edit-config](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md): `sudo ./edit-config
   statsd.d/myapp.conf`
 
     - Each app will have it's own section in the right-hand menu.
@@ -784,8 +784,8 @@ visualize all the available operations.
 ### Create a new StatsD configuration file
 
 Start by creating a new configuration file under the `statsd.d/` folder in the 
-[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory). 
-Use [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) 
+[Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory). 
+Use [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-netdataconf) 
 to create a new file called `k6.conf`.
 
 ```bash=

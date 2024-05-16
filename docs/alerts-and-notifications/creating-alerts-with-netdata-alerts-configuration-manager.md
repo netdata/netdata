@@ -42,4 +42,4 @@ You can read more about the different options in the [Alerts reference documenta
 
 - **Alert Template Name**: Provide a unique name for the alert.
 - **Alert Template Description**: Offer a brief explanation of what the alert monitors.
-- **Alert Summary**: Create a custom title for alert notifications, which can be integrated with centralized notification systems available [here](https://learn.netdata.cloud/docs/alerting/notifications/centralized-cloud-notifications).
+- **Alert Summary**: Create a custom title for alert notifications, which can be integrated with centralized notification systems available [here](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/centralized-cloud-notifications).

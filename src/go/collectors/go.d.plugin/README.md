@@ -69,7 +69,6 @@ see the appropriate collector readme.
 | [docker_engine](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/docker_engine)           |         Docker Engine         |
 | [dockerhub](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/dockerhub)                   |          Docker Hub           |
 | [elasticsearch](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/elasticsearch)           |   Elasticsearch/OpenSearch    |
-| [energid](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/energid)                       |          Energi Core          |
 | [envoy](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/envoy)                           |             Envoy             |
 | [example](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/example)                       |               -               |
 | [fail2ban](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/fail2ban)                     |        Fail2Ban Jails         |
@@ -87,6 +86,7 @@ see the appropriate collector readme.
 | [k8s_kubeproxy](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/k8s_kubeproxy)           |          Kube-proxy           |
 | [k8s_state](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/k8s_state)                   |   Kubernetes cluster state    |
 | [lighttpd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/lighttpd)                     |           Lighttpd            |
+| [litespeed](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/litespeed)                   |           Litespeed           |
 | [logind](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logind)                         |        systemd-logind         |
 | [logstash](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/logstash)                     |           Logstash            |
 | [lvm](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/lvm)                               |      LVM logical volumes      |

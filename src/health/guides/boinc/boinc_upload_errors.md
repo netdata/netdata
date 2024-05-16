@@ -18,7 +18,7 @@ This alert indicates that your BOINC node is experiencing an increase in the ave
 
 4. Inspect BOINC client logs
 
-   Consult the BOINC client logs to gain insight into the upload errors. The logs can be found in the client's data directory. Refer to the [BOINC log file documentation](https://boinc.berkeley.edu/wiki/Log_Files) for more information on how to read and analyze the logs.
+   Consult the BOINC client logs to gain insight into the upload errors. The logs can be found in the client's data directory.
 
 5. Contact project support
 

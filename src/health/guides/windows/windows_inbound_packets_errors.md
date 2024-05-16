@@ -38,4 +38,3 @@ To troubleshoot this alert, you can perform the following steps:
 
 1. [How to use Network Monitor in Windows](https://docs.microsoft.com/en-us/windows/client-management/troubleshoot-tcpip-network-monitor)
 2. [Network Troubleshooting Guide for Windows](https://techcommunity.microsoft.com/t5/networking-blog/network-troubleshooting-guide-for-windows/ba-p/428114)
-3. [How to Troubleshoot Network Connections with Ping and Tracert](https://www.windowscentral.com/how-troubleshoot-network-connection-ping-and-traceroute)

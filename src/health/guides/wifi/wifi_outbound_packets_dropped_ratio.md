@@ -49,6 +49,4 @@ You can adjust network settings, like buffers or queues, to mitigate dropped pac
 ### Useful resources
 
 1. [ifconfig command in Linux](https://www.geeksforgeeks.org/ifconfig-command-in-linux-with-examples/)
-2. [How to monitor network usage with iftop](https://www.binarytides.com/monitor-network-usage-with-iftop/)
-3. [nload – Monitor Network Traffic and Bandwidth Usage in Real Time](https://www.tecmint.com/nload-monitor-linux-network-traffic-bandwidth-usage/)
-4. [VNstat – A Network Traffic Monitor](https://www.tecmint.com/vnstat-monitor-network-traffic-in-linux/)
+2. [nload – Monitor Network Traffic and Bandwidth Usage in Real Time](https://www.tecmint.com/nload-monitor-linux-network-traffic-bandwidth-usage/)

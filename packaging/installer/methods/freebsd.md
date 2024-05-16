@@ -28,7 +28,7 @@ Please respond in the affirmative for any relevant prompts during the installati
 
 ## Install Netdata
 
-The simplest method is to use the single line [kickstart script](https://learn.netdata.cloud/docs/agent/packaging/installer/methods/kickstart)
+The simplest method is to use the single line [kickstart script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
 
 If you have a Netdata cloud account then clicking on the **Connect Nodes** button will generate the kickstart command you should use. Use the command from the "Linux" tab, it should look something like this:
 

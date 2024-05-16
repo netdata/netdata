@@ -3,7 +3,7 @@
 id: 'export-json'
 meta:
   name: 'JSON'
-  link: 'https://learn.netdata.cloud/docs/exporting/json-document-databases'
+  link: ''
   categories:
     - export
   icon_filename: 'json.svg'

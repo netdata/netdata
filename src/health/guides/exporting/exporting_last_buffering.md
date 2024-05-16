@@ -26,4 +26,4 @@ This alert is related to the Netdata Exporting engine, which calculates the numb
 
 ### Useful resources
 
-1. [Netdata Exporting Engine](https://learn.netdata.cloud/docs/exporting-data-to-other-systems/exporting-reference)
+1. [Netdata Exporting Reference](https://github.com/netdata/netdata/blob/master/src/exporting/README.md)

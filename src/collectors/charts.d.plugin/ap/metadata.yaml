@@ -5,7 +5,7 @@ modules:
       module_name: ap
       monitored_instance:
         name: Access Points
-        link: "https://learn.netdata.cloud/docs/data-collection/networking-stack-and-network-interfaces/linux-access-points"
+        link: ""
         categories:
           - data-collection.linux-systems.network-metrics
         icon_filename: "network-wired.svg"

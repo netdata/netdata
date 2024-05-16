@@ -24,7 +24,7 @@ Module: prometheus
 Keep tabs on Azure resources vital metrics for efficient cloud management and cost optimization.
 
 
-Metrics are gathered by periodically sending HTTP requests to [Azure Resources Exporter](https://github.com/FXinnovation/azure-resources-exporter).
+Metrics are gathered by periodically sending HTTP requests to [Azure Resources Exporter](https://github.com/FXinnovation/azure_metrics_exporter).
 
 
 This collector is supported on all platforms.
@@ -84,7 +84,7 @@ There are no alerts configured by default for this integration.
 
 #### Install Exporter
 
-Install [Azure Resources Exporter](https://github.com/FXinnovation/azure-resources-exporter) by following the instructions mentioned in the exporter README.
+Install [Azure Resources Exporter](https://github.com/FXinnovation/azure_metrics_exporter) by following the instructions mentioned in the exporter README.
 
 
 
