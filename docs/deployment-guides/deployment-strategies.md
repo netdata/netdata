@@ -58,7 +58,7 @@ On the child node, edit `netdata.conf` by using the edit-config script: `/etc/ne
 
 ```yaml
 [db]
-    # https://learn.netdata.cloud/docs/agent/database
+    # https://github.com/netdata/netdata/blob/master/src/database/README.md
     # none = no retention, ram = some retention in ram
     mode = ram
     # The retention in seconds.

@@ -491,7 +491,7 @@ You can monitor the replication process in two ways:
 ### Replication history
 
 Replication history in [dbengine](https://github.com/netdata/netdata/blob/master/src/database/README.md) mode is limited
-by [Tier 0 retention](https://learn.netdata.cloud/docs/configuring/optimizing-metrics-database/change-how-long-netdata-stores-metrics#effect-of-storage-tiers-and-disk-space-on-retention):
+by [Tier 0 retention](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#effect-of-storage-tiers-and-disk-space-on-retention):
 
 - Child instances replicate only Tier 0 data.
 - Parent instance calculates higher-level tiers using Tier 0 as the basis.

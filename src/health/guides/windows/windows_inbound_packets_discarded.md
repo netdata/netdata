@@ -36,4 +36,3 @@ Packet corruption can be caused by faulty hardware, software issues, or even cyb
 
 1. [Windows Performance Monitor](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/perfmon)
 2. [Windows Event Viewer](https://docs.microsoft.com/en-us/windows/win32/eventlog/event-log-reference)
-3. [How to troubleshoot networking problems on the Windows platform](https://support.microsoft.com/en-us/help/10267)

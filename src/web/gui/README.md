@@ -161,5 +161,4 @@ file](https://user-images.githubusercontent.com/1153921/62798924-570e6c80-ba94-1
 
 ## Custom dashboards
 
-For information on creating custom dashboards from scratch, see the [custom dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md) or
-[Atlassian Confluence dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/confluence/README.md) guides.
+For information on creating custom dashboards from scratch, see the [custom dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md) guide.

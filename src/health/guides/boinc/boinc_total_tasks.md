@@ -24,8 +24,6 @@ This alert monitors the average number of total tasks for the BOINC system over 
    sudo /etc/init.d/boinc-client restart
    ```
 
-2. For other operating systems or custom installations, refer to the BOINC's documentation for restarting the client: https://boinc.berkeley.edu/wiki/Stop_or_restart_BOINC
-
 #### Check system resources
 
 BOINC tasks may fail or slow down if there is not enough system resources (CPU, RAM, or Disk Space) available. Monitor your system performance using tools like `top`, `free`, and `df`, and make adjustments if necessary to ensure that BOINC has enough resources to complete tasks.

@@ -45,4 +45,3 @@ This alert monitors the percentage of allocated `System V IPC semaphores`. If yo
 
 1. [Interprocess Communication](https://docs.oracle.com/cd/E19455-01/806-4750/6jdqdfltn/index.html)
 2. [IPC: Semaphores](https://users.cs.cf.ac.uk/Dave.Marshall/C/node26.html)
-3. [Linux Kernel Documentation - IPC Semaphores](https://www.kernel.org/doc/Documentation/ipc/semaphore.txt)

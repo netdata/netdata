@@ -28,8 +28,6 @@ This alert indicates that the X.509 certificate has been revoked, meaning that i
 
 ### Useful resources
 
-1. [X.509 Certificate Monitoring with Netdata](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/x509check)
-2. [How to use OpenSSL to verify a certificate against a CRL](https://raymii.org/s/tutorials/OpenSSL_command_line_Root_and_Intermediate_CA_including_OCSP_CRL_Signed_Certs.html)
-3. [SSL Shopper's SSL Checker](https://www.sslshopper.com/ssl-checker.html)
-4. [Renewing certificates with Certbot](https://certbot.eff.org/docs/using.html#renewing-certificates)
-5. [Creating a Self-Signed SSL Certificate](https://www.akadia.com/services/ssh_test_certificate.html)
+1. [SSL Shopper's SSL Checker](https://www.sslshopper.com/ssl-checker.html)
+2. [Renewing certificates with Certbot](https://certbot.eff.org/docs/using.html#renewing-certificates)
+3. [Creating a Self-Signed SSL Certificate](https://www.akadia.com/services/ssh_test_certificate.html)

@@ -132,7 +132,7 @@ brew upgrade netdata
 ```
 
 Homebrew downloads the latest Netdata via the
-[formulae](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb), ensures all dependencies are met,
+[formulae](https://github.com/Homebrew/homebrew-core/blob/master/Formula/n/netdata.rb), ensures all dependencies are met,
 and updates Netdata via reinstallation.
 
 If you instead installed Netdata using our one-line installation script, you can use our [regular update

@@ -441,8 +441,6 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [BungeeCord](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/bungeecord.md)
 
-- [CS:GO](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/cs:go.md)
-
 - [Minecraft](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/minecraft.md)
 
 - [OpenRCT2](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/openrct2.md)

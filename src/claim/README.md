@@ -73,7 +73,7 @@ Connecting a Node to a War Room:
    terminal window. Press Enter to initiate the connection process.
 
 > Note: When connecting from
-> the [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboard/nodes-tab.md), the room parameter will
+> the [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md), the room parameter will
 > be
 > set to the current War Room.
 

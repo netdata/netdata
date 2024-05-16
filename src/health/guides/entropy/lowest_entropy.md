@@ -4,7 +4,7 @@ This alert presents the minimum amount of entropy in the kernel entropy pool in 
 
 The Netdata Agent checks for the minimum entropy value in the last 5 minutes. The alert gets raised into warning if the value < 100, and cleared if the value > 200.  
 
-For further information on how our alerts are calculated, please have a look at our [Documentation](https://learn.netdata.cloud/docs/agent/health/reference#expressions).
+For further information on how our alerts are calculated, please have a look at our [Documentation](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#expressions).
 
 ### What is entropy and why do we need it?
 

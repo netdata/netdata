@@ -11,5 +11,5 @@ This alert is triggered in warn state when the number of `dbengine` dirty pages 
 
 ### Useful resources
 
-[Read more about Netdata DB engine](https://learn.netdata.cloud/docs/agent/database/engine)
+[Read more about Netdata DB engine](https://github.com/netdata/netdata/blob/master/src/database/README.md/engine)
 

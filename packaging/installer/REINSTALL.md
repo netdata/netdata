@@ -62,5 +62,4 @@ If you still experience problems with your Netdata Agent installation after foll
 best route is to [uninstall](https://github.com/netdata/netdata/blob/master/packaging/installer/UNINSTALL.md) and then try a fresh installation using the [one-line
 installer](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md).
 
-You can also post to our [community forums](https://community.netdata.cloud/c/support/13) or create a new [bug
-report](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).
+You can also post to our [community forums](https://community.netdata.cloud) or create a new [bug report](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).

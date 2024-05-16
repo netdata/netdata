@@ -46,4 +46,3 @@ This alert is related to VerneMQ, a high-performance MQTT broker. It monitors th
 
 1. [VerneMQ - Official Documentation](https://docs.vernemq.com/)
 2. [MQTT Essentials: Quality of Service 2 (QoS 2)](https://www.hivemq.com/blog/mqtt-essentials-part-6-mqtt-quality-of-service-levels/)
-3. [Netdata - VerneMQ monitoring](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/vernemq)

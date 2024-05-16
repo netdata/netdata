@@ -40,7 +40,7 @@ and other operating systems and is regularly tested. You can find this tool [her
     -   Please note that for RHEL/CentOS you need
         [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
         In addition, RHEL/CentOS version 6 also need
-        [OKay](https://okay.com.mx/blog-news/rpm-repositories-for-centos-6-and-7.html) for package libuv version 1.
+        [OKay](https://okay.com.mx) for package libuv version 1.
     -   CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
 
 -   **SUSE** Linux and its derivatives (including **openSUSE**)
@@ -140,7 +140,7 @@ required if manually installing packages.
 CentOS 6.x:
 
 - Enable the EPEL repo
-- Enable the additional repo from [okay.network](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
+- Enable the additional repo from [okay.network](https://okay.network)
 
 And install the minimum required dependencies.
 
@@ -154,7 +154,7 @@ CentOS 8.x:
 
 - Enable the PowerTools repo
 - Enable the EPEL repo
-- Enable the Extra repo from [OKAY](https://okay.network/blog-news/rpm-repositories-for-centos-6-and-7.html)
+- Enable the Extra repo from [OKAY](https://okay.network)
 
 And install the minimum required dependencies:
 

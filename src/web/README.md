@@ -15,9 +15,7 @@ There are two primary ways to view Netdata's dashboards on the agent:
 
 2.  The [`dashboard.js` JavaScript library](#dashboardjs), which helps you
    [customize the standard dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md#customizing-the-local-dashboard)
-   using JavaScript, or create entirely new [custom dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md) or
-   [Atlassian Confluence dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/confluence/README.md).
-
+   using JavaScript, or create entirely new [custom dashboards](https://github.com/netdata/netdata/blob/master/src/web/gui/custom/README.md)
 You can also view all the data Netdata collects through the [REST API v1](https://github.com/netdata/netdata/blob/master/src/web/api/README.md#netdata-rest-api).
 
 ## dashboard.js

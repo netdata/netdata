@@ -28,6 +28,5 @@ The `vsphere_host_mem_usage` alert is triggered when the memory utilization of a
 
 ### Useful resources
 
-1. [Understanding Memory Utilization in VMware vSphere Host](https://www.altaro.com/vmware/memory-utilization-vmware-esxi/)
-2. [vSphere Monitoring and Performance Documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.monitoring.doc/GUID-115861E6-810A-43BB-8CDB-EE99CF8F3250.html)
-3. [Optimizing Memory Performance in VMware vSphere](https://blogs.vmware.com/performance/2021/04/optimizing-memory-performance-in-vmware-vsphere.html)
+1. [vSphere Monitoring and Performance Documentation](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.monitoring.doc/GUID-115861E6-810A-43BB-8CDB-EE99CF8F3250.html)
+2. [Optimizing Memory Performance in VMware vSphere](https://blogs.vmware.com/performance/2021/04/optimizing-memory-performance-in-vmware-vsphere.html)

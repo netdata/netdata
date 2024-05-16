@@ -13,7 +13,7 @@
 <p align="center">
   <a href="https://github.com/netdata/netdata/"><img src="https://img.shields.io/github/stars/netdata/netdata?style=social" alt="GitHub Stars"></a>
   <br />
-  <a href="https://app.netdata.cloud/spaces/netdata-demo?utm_campaign=github_readme_demo_badge"><img src="https://img.shields.io/badge/Live Demo-green" alt="Live Demo"></a>
+  <a href="https://app.netdata.cloud/spaces/netdata-demo?utm_campaign=github_readme_demo_badge"><img src="https://img.shields.io/badge/Live%20Demo-green" alt="Live Demo"></a>
   <a href="https://github.com/netdata/netdata/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata.svg" alt="Latest release"></a>
   <a href="https://github.com/netdata/netdata-nightlies/releases/latest"><img src="https://img.shields.io/github/release/netdata/netdata-nightlies.svg" alt="Latest nightly build"></a>
   <br />
@@ -256,7 +256,7 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
    Netdata can be installed on all Linux, macOS, and FreeBSD systems. We provide binary packages for the most popular operating systems and package managers.
 
    - Install on [Ubuntu, Debian CentOS, Fedora, Suse, Red Hat, Arch, Alpine, Gentoo, even BusyBox](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
-   - Install with [Docker](https://learn.netdata.cloud/docs/installing/docker).<br/>
+   - Install with [Docker](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md).<br/>
      Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
    - Install on [MacOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
    - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
@@ -429,7 +429,7 @@ Of course it is! We do our best to ensure it is!
 We understand that Netdata is a software piece that is installed on millions of production systems across the world. So, it is important for us, Netdata to be as secure as possible:
 
   - We follow the [Open Source Security Foundation](https://bestpractices.coreinfrastructure.org/en/projects/2231) best practices.
-  - We have given great attention to detail when it comes to security design. Check out our [security design](https://learn.netdata.cloud/docs/architecture/security-and-privacy-design).
+  - We have given great attention to detail when it comes to security design. Check out our [security design](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
   - Netdata is a popular open-source project and is frequently tested by many security analysts.
   - Check also our [security policies and advisories published so far](https://github.com/netdata/netdata/security).
 

@@ -41,5 +41,4 @@ If there are still issues or the alert persists, double-check your certificate m
 ### Useful resources
 
 1. [Sectigo: What is an X.509 certificate?](https://sectigo.com/resource-library/what-is-x509-certificate)
-2. [Netdata: x509 certificate monitoring](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/x509check)
-3. [OpenSSL: X.509 Certificate Commands](https://www.openssl.org/docs/man1.1.1/man1/x509.html)
+2. [OpenSSL: X.509 Certificate Commands](https://www.openssl.org/docs/man1.1.1/man1/x509.html)
