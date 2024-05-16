@@ -881,12 +881,13 @@ static void ebpf_obsolete_vfs_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
 **/
-static void ebpf_vfs_exit(void *ptr)
+static void ebpf_vfs_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (ebpf_read_vfs.thread)
-        netdata_thread_cancel(*ebpf_read_vfs.thread);
+        nd_thread_signal_cancel(ebpf_read_vfs.thread);
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -2049,12 +2050,10 @@ void *ebpf_read_vfs_thread(void *ptr)
     uint32_t running_time = 0;
     usec_t period = update_every * USEC_PER_SEC;
     int max_period = update_every * EBPF_CLEANUP_FACTOR;
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, period);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
-
-        netdata_thread_disable_cancelability();
 
         pthread_mutex_lock(&collect_data_mutex);
         ebpf_vfs_read_apps(maps_per_core, max_period);
@@ -2071,7 +2070,6 @@ void *ebpf_read_vfs_thread(void *ptr)
 
         em->running_time = running_time;
         pthread_mutex_unlock(&ebpf_exit_cleanup);
-        netdata_thread_enable_cancelability();
     }
 
     return NULL;
@@ -2095,9 +2093,9 @@ static void vfs_collector(ebpf_module_t *em)
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
     memset(stats, 0, sizeof(em->hash_table_stats));
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;
@@ -2606,9 +2604,10 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
  */
 void *ebpf_vfs_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_vfs_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_vfs_exit) cleanup_ptr = em;
+
     em->maps = vfs_maps;
 
     ebpf_update_pid_table(&vfs_maps[NETDATA_VFS_PID], em);
@@ -2637,18 +2636,12 @@ void *ebpf_vfs_thread(void *ptr)
 
     pthread_mutex_unlock(&lock);
 
-    ebpf_read_vfs.thread = mallocz(sizeof(netdata_thread_t));
-    netdata_thread_create(ebpf_read_vfs.thread,
-                          ebpf_read_vfs.name,
-                          NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_read_vfs_thread,
-                          em);
+    ebpf_read_vfs.thread = nd_thread_create(ebpf_read_vfs.name, NETDATA_THREAD_OPTION_DEFAULT, ebpf_read_vfs_thread, em);
 
     vfs_collector(em);
 
 endvfs:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

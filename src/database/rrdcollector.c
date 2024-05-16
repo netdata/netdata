@@ -68,7 +68,7 @@ void rrd_collector_started(void) {
     if(!thread_rrd_collector)
         thread_rrd_collector = callocz(1, sizeof(struct rrd_collector));
 
-    thread_rrd_collector->tid = gettid();
+    thread_rrd_collector->tid = gettid_cached();
     __atomic_store_n(&thread_rrd_collector->running, true, __ATOMIC_RELAXED);
 }
 

@@ -62,5 +62,5 @@ void register_libuv_worker_jobs() {
 
     char buf[NETDATA_THREAD_TAG_MAX + 1];
     snprintfz(buf, NETDATA_THREAD_TAG_MAX, "UV_WORKER[%d]", worker_id);
-    uv_thread_set_name_np(pthread_self(), buf);
+    uv_thread_set_name_np(buf);
 }

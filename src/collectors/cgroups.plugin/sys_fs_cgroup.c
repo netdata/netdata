@@ -1158,7 +1158,7 @@ static inline void update_cpu_limits(char **filename, unsigned long long *value,
         int ret = -1;
 
         if(value == &cg->cpuset_cpus) {
-            unsigned long ncpus = read_cpuset_cpus(*filename, get_system_cpus());
+            unsigned long ncpus = os_read_cpuset_cpus(*filename, os_get_system_cpus());
             if(ncpus) {
                 *value = ncpus;
                 ret = 0;
@@ -1199,7 +1199,7 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
         }
 
         cg->cpu_cfs_period = str2ull(procfile_lineword(ff, 0, 1), NULL);
-        cg->cpuset_cpus = get_system_cpus();
+        cg->cpuset_cpus = os_get_system_cpus();
 
         char *s = "max\n\0";
         if(strcmp(s, procfile_lineword(ff, 0, 0)) == 0){
@@ -1513,13 +1513,14 @@ void update_cgroup_charts() {
 // ----------------------------------------------------------------------------
 // cgroups main
 
-static void cgroup_main_cleanup(void *ptr) {
-    worker_unregister();
+static void cgroup_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
+    worker_unregister();
 
     usec_t max = 2 * USEC_PER_SEC, step = 50000;
 
@@ -1554,12 +1555,12 @@ void cgroup_read_host_total_ram() {
 }
 
 void *cgroups_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(cgroup_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("CGROUPS");
     worker_register_job_name(WORKER_CGROUPS_LOCK, "lock");
     worker_register_job_name(WORKER_CGROUPS_READ, "read");
     worker_register_job_name(WORKER_CGROUPS_CHART, "chart");
-
-    netdata_thread_cleanup_push(cgroup_main_cleanup, ptr);
 
     if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL) {
         is_inside_k8s = 1;
@@ -1592,8 +1593,6 @@ void *cgroups_main(void *ptr) {
         goto exit;
     }
 
-    uv_thread_set_name_np(discovery_thread.thread, "P[cgroups]");
-
     // we register this only on localhost
     // for the other nodes, the origin server should register it
     cgroup_netdev_link_init();
@@ -1613,12 +1612,11 @@ void *cgroups_main(void *ptr) {
     usec_t step = cgroup_update_every * USEC_PER_SEC;
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
 
-    netdata_thread_disable_cancelability();
-
     while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
         usec_t hb_dt = heartbeat_next(&hb, step);
+
         if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
@@ -1658,6 +1656,5 @@ void *cgroups_main(void *ptr) {
     }
 
 exit:
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

@@ -249,7 +249,7 @@ done:
 #define SQL_INJECT_REMOVED_UPDATE_LOG                                                                                  \
     "UPDATE health_log SET last_transition_id = ?1 WHERE alarm_id = ?2 AND last_transition_id = ?3 AND host_id = ?4"
 
-bool sql_update_removed_in_health_log(RRDHOST *host, uint32_t alarm_id, uuid_t *transition_id, uuid_t *last_transition)
+bool sql_update_removed_in_health_log(RRDHOST *host, uint32_t alarm_id, nd_uuid_t *transition_id, nd_uuid_t *last_transition)
 {
     int rc = 0;
     sqlite3_stmt *res;
@@ -275,7 +275,7 @@ done:
     return (param == 0 && rc == SQLITE_DONE);
 }
 
-bool sql_update_removed_in_health_log_detail(uint32_t unique_id, uint32_t max_unique_id, uuid_t *prev_transition_id)
+bool sql_update_removed_in_health_log_detail(uint32_t unique_id, uint32_t max_unique_id, nd_uuid_t *prev_transition_id)
 {
     int rc = 0;
     sqlite3_stmt *res;
@@ -307,7 +307,7 @@ void sql_inject_removed_status(
     uint32_t alarm_event_id,
     uint32_t unique_id,
     uint32_t max_unique_id,
-    uuid_t *last_transition)
+    nd_uuid_t *last_transition)
 {
     if (!alarm_id || !alarm_event_id || !unique_id || !max_unique_id)
         return;
@@ -317,7 +317,7 @@ void sql_inject_removed_status(
     if (!PREPARE_STATEMENT(db_meta, SQL_INJECT_REMOVED, &res))
         return;
 
-    uuid_t transition_id;
+    nd_uuid_t transition_id;
     uuid_generate_random(transition_id);
 
     int param = 0;
@@ -379,7 +379,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
 {
     uint32_t max_unique_id = 0;
     sqlite3_stmt *res = NULL;
-    uuid_t transition_id;
+    nd_uuid_t transition_id;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_LAST_STATUSES, &res))
         return;
@@ -396,7 +396,7 @@ void sql_check_removed_alerts_state(RRDHOST *host)
         unique_id = (uint32_t)sqlite3_column_int64(res, 1);
         alarm_id = (uint32_t)sqlite3_column_int64(res, 2);
         alarm_event_id = (uint32_t)sqlite3_column_int64(res, 3);
-        uuid_copy(transition_id, *((uuid_t *)sqlite3_column_blob(res, 4)));
+        uuid_copy(transition_id, *((nd_uuid_t *)sqlite3_column_blob(res, 4)));
 
         if (unlikely(status != RRDCALC_STATUS_REMOVED)) {
            if (unlikely(!max_unique_id))
@@ -414,12 +414,12 @@ done:
     "DELETE FROM health_log WHERE host_id = @host_id AND chart NOT IN "                                                \
     "(SELECT type||'.'||id FROM chart WHERE host_id = @host_id)"
 
-static void sql_remove_alerts_from_deleted_charts(RRDHOST *host, uuid_t *host_uuid)
+static void sql_remove_alerts_from_deleted_charts(RRDHOST *host, nd_uuid_t *host_uuid)
 {
     sqlite3_stmt *res = NULL;
     int ret;
 
-    uuid_t *actual_uuid = host ? &host->host_uuid : host_uuid;
+    nd_uuid_t *actual_uuid = host ? &host->host_uuid : host_uuid;
     if (!actual_uuid)
         return;
 
@@ -446,10 +446,10 @@ static int clean_host_alerts(void *data, int argc, char **argv, char **column)
     UNUSED(column);
 
     char guid[UUID_STR_LEN];
-    uuid_unparse_lower(*(uuid_t *)argv[0], guid);
+    uuid_unparse_lower(*(nd_uuid_t *)argv[0], guid);
 
     netdata_log_info("Checking host %s (%s)", guid, (const char *) argv[1]);
-    sql_remove_alerts_from_deleted_charts(NULL, (uuid_t *)argv[0]);
+    sql_remove_alerts_from_deleted_charts(NULL, (nd_uuid_t *)argv[0]);
 
     return 0;
 }
@@ -568,7 +568,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         ae->alarm_id = alarm_id;
 
         if (sqlite3_column_type(res, 3) != SQLITE_NULL)
-            uuid_copy(ae->config_hash_id, *((uuid_t *) sqlite3_column_blob(res, 3)));
+            uuid_copy(ae->config_hash_id, *((nd_uuid_t *) sqlite3_column_blob(res, 3)));
 
         ae->alarm_event_id = (uint32_t) sqlite3_column_int64(res, 2);
         ae->updated_by_id = (uint32_t) sqlite3_column_int64(res, 4);
@@ -609,7 +609,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         ae->chart_context = SQLITE3_COLUMN_STRINGDUP_OR_NULL(res, 29);
 
         if (sqlite3_column_type(res, 30) != SQLITE_NULL)
-            uuid_copy(ae->transition_id, *((uuid_t *)sqlite3_column_blob(res, 30)));
+            uuid_copy(ae->transition_id, *((nd_uuid_t *)sqlite3_column_blob(res, 30)));
 
         if (sqlite3_column_type(res, 31) != SQLITE_NULL)
             ae->global_id = sqlite3_column_int64(res, 31);
@@ -894,11 +894,11 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
          char new_value_string[100 + 1];
 
          char config_hash_id[UUID_STR_LEN];
-         uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(stmt_query, 3)), config_hash_id);
+         uuid_unparse_lower(*((nd_uuid_t *)sqlite3_column_blob(stmt_query, 3)), config_hash_id);
 
          char transition_id[UUID_STR_LEN] = {0};
          if (sqlite3_column_type(stmt_query, 30) != SQLITE_NULL)
-            uuid_unparse_lower(*((uuid_t *)sqlite3_column_blob(stmt_query, 30)), transition_id);
+            uuid_unparse_lower(*((nd_uuid_t *)sqlite3_column_blob(stmt_query, 30)), transition_id);
 
          char *edit_command = sqlite3_column_bytes(stmt_query, 16) > 0 ?
                                   health_edit_command_from_source((char *)sqlite3_column_text(stmt_query, 16)) :
@@ -988,7 +988,7 @@ int health_migrate_old_health_log_table(char *table) {
     }
 
     char *uuid_from_table = strdupz(table + 11);
-    uuid_t uuid;
+    nd_uuid_t uuid;
     if (uuid_parse_fix(uuid_from_table, uuid)) {
         freez(uuid_from_table);
         return 0;
@@ -1175,7 +1175,7 @@ bool sql_find_alert_transition(
 
     char machine_guid[UUID_STR_LEN];
 
-    uuid_t transition_uuid;
+    nd_uuid_t transition_uuid;
     if (uuid_parse(transition, transition_uuid))
         return false;
 
@@ -1190,7 +1190,7 @@ bool sql_find_alert_transition(
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         ok = true;
-        uuid_unparse_lower(*(uuid_t *) sqlite3_column_blob(res, 1), machine_guid);
+        uuid_unparse_lower(*(nd_uuid_t *) sqlite3_column_blob(res, 1), machine_guid);
         cb(machine_guid, (const char *) sqlite3_column_text(res, 2), sqlite3_column_int(res, 0), data);
     }
 
@@ -1234,7 +1234,7 @@ void sql_alert_transitions(
     void *data,
     bool debug __maybe_unused)
 {
-    uuid_t transition_uuid;
+    nd_uuid_t transition_uuid;
     char sql[512];
     int rc;
     sqlite3_stmt *res = NULL;
@@ -1273,7 +1273,7 @@ void sql_alert_transitions(
 
     void *t;
     dfe_start_read(nodes, t) {
-        uuid_t host_uuid;
+        nd_uuid_t host_uuid;
         uuid_parse( t_dfe.name, host_uuid);
 
         rc = sqlite3_bind_blob(res, 1, &host_uuid, sizeof(host_uuid), SQLITE_STATIC);
@@ -1323,9 +1323,9 @@ run_query:;
 
     param = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
-        atd.host_id = (uuid_t *) sqlite3_column_blob(res, 0);
+        atd.host_id = (nd_uuid_t *) sqlite3_column_blob(res, 0);
         atd.alarm_id = sqlite3_column_int64(res, 1);
-        atd.config_hash_id = (uuid_t *)sqlite3_column_blob(res, 2);
+        atd.config_hash_id = (nd_uuid_t *)sqlite3_column_blob(res, 2);
         atd.alert_name = (const char *) sqlite3_column_text(res, 3);
         atd.chart = (const char *) sqlite3_column_text(res, 4);
         atd.chart_name = (const char *) sqlite3_column_text(res, 5);
@@ -1347,7 +1347,7 @@ run_query:;
         atd.new_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 21);
         atd.old_value = (NETDATA_DOUBLE) sqlite3_column_double(res, 22);
         atd.last_repeat = sqlite3_column_int64(res, 23);
-        atd.transition_id = (uuid_t *) sqlite3_column_blob(res, 24);
+        atd.transition_id = (nd_uuid_t *) sqlite3_column_blob(res, 24);
         atd.global_id = sqlite3_column_int64(res, 25);
         atd.classification = (const char *) sqlite3_column_text(res, 26);
         atd.type = (const char *) sqlite3_column_text(res, 27);
@@ -1413,7 +1413,7 @@ int sql_get_alert_configuration(
 
     void *t;
     dfe_start_read(configs, t) {
-        uuid_t hash_id;
+        nd_uuid_t hash_id;
         uuid_parse( t_dfe.name, hash_id);
 
         rc = sqlite3_bind_blob(res, 1, &hash_id, sizeof(hash_id), SQLITE_STATIC);
@@ -1446,7 +1446,7 @@ int sql_get_alert_configuration(
     int param;
     while (sqlite3_step(res) == SQLITE_ROW) {
         param = 0;
-        acd.config_hash_id = (uuid_t *) sqlite3_column_blob(res, param++);
+        acd.config_hash_id = (nd_uuid_t *) sqlite3_column_blob(res, param++);
         acd.name = (const char *) sqlite3_column_text(res, param++);
         acd.selectors.on_template = (const char *) sqlite3_column_text(res, param++);
         acd.selectors.on_key = (const char *) sqlite3_column_text(res, param++);

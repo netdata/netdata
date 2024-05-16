@@ -248,7 +248,6 @@ void spawn_init(void)
     /* wait for spawn client thread to initialize */
     completion_wait_for(&completion);
     completion_destroy(&completion);
-    uv_thread_set_name_np(thread, "DAEMON_SPAWN");
 
     if (spawn_thread_error) {
         error = uv_thread_join(&thread);

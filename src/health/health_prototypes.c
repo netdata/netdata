@@ -374,7 +374,7 @@ static void health_prototype_activate_match_patterns(struct rrd_alert_match *am)
 void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
     CLEAN_BUFFER *wb = buffer_create(100, NULL);
     health_prototype_to_json(wb, ap, true);
-    UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
+    ND_UUID uuid = UUID_generate_from_hash(buffer_tostring(wb), buffer_strlen(wb));
     uuid_copy(ap->config.hash_id, uuid.uuid);
 
     sql_alert_store_config(ap);

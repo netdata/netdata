@@ -5,7 +5,7 @@
 
 struct dyncfg_globals dyncfg_globals = { 0 };
 
-RRDHOST *dyncfg_rrdhost_by_uuid(UUID *uuid) {
+RRDHOST *dyncfg_rrdhost_by_uuid(ND_UUID *uuid) {
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(uuid->uuid, uuid_str);
 
@@ -438,7 +438,7 @@ void dyncfg_add_streaming(BUFFER *wb) {
                    , 120
                    , "Dynamic configuration"
                    , "config"
-                   , HTTP_ACCESS_ANONYMOUS_DATA
+                   , (unsigned)HTTP_ACCESS_ANONYMOUS_DATA
                    , 1000
     );
 }

@@ -22,8 +22,6 @@
 #include <systemd/sd-journal.h>
 #endif
 
-#include <syslog.h>
-
 const char *program_name = "";
 
 uint64_t debug_flags = 0;
@@ -368,7 +366,7 @@ struct nd_log_source {
 };
 
 static struct {
-    uuid_t invocation_id;
+    nd_uuid_t invocation_id;
 
     ND_LOG_SOURCES overwrite_process_source;
 
@@ -1599,7 +1597,7 @@ static bool needs_quotes_for_logfmt(const char *s)
         return true;
 
     while(*s) {
-        if(*s == '=' || isspace(*s) || !safe_for_logfmt[(uint8_t)*s])
+        if(*s == '=' || isspace((uint8_t)*s) || !safe_for_logfmt[(uint8_t)*s])
             return true;
 
         s++;
@@ -1733,7 +1731,7 @@ bool nd_log_journal_socket_available(void) {
     return is_path_unix_socket("/run/systemd/journal/socket");
 }
 
-static bool nd_logger_journal_libsystemd(struct log_field *fields, size_t fields_max) {
+static bool nd_logger_journal_libsystemd(struct log_field *fields __maybe_unused, size_t fields_max __maybe_unused) {
 #ifdef HAVE_SYSTEMD
 
     //  --- FIELD_PARSER_VERSIONS ---
@@ -2153,17 +2151,10 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     }
 
     if(likely(!thread_log_fields[NDF_TID].entry.set))
-        thread_log_fields[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid());
+        thread_log_fields[NDF_TID].entry = ND_LOG_FIELD_U64(NDF_TID, gettid_cached());
 
-    char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
     if(likely(!thread_log_fields[NDF_THREAD_TAG].entry.set)) {
-        const char *thread_tag = netdata_thread_tag();
-        if (!netdata_thread_tag_exists()) {
-            os_thread_get_current_name_np(os_threadname);
-            if ('\0' != os_threadname[0])
-                /* If it is not an empty string replace "MAIN" thread_tag */
-                thread_tag = os_threadname;
-        }
+        const char *thread_tag = nd_thread_tag();
         thread_log_fields[NDF_THREAD_TAG].entry = ND_LOG_FIELD_TXT(NDF_THREAD_TAG, thread_tag);
 
         // TODO: fix the ND_MODULE in logging by setting proper module name in threads
@@ -2303,17 +2294,7 @@ void netdata_logger_fatal( const char *file, const char *function, const unsigne
     char action_data[70+1];
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, saved_errno);
 
-    char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
-    const char *thread_tag = netdata_thread_tag();
-    if (!netdata_thread_tag_exists()) {
-        os_thread_get_current_name_np(os_threadname);
-        if ('\0' != os_threadname[0])
-            /* If it is not an empty string replace "MAIN" thread_tag */
-            thread_tag = os_threadname;
-    }
-    if(!thread_tag)
-        thread_tag = "UNKNOWN";
-
+    const char *thread_tag = nd_thread_tag();
     const char *tag_to_send =  thread_tag;
 
     // anonymize thread names

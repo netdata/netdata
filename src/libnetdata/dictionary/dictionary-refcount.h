@@ -219,7 +219,7 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(ret == RC_ITEM_OK)
-        item->deleter_pid = gettid();
+        item->deleter_pid = gettid_cached();
 #endif
 
     if(unlikely(spins > 1))

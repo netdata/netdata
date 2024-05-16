@@ -96,7 +96,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                 buffer_json_object_close(wb);
             }
         }
-        rrd_unlock();
+        rrd_rdunlock();
     }
     buffer_json_array_close(wb);
 

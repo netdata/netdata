@@ -127,7 +127,7 @@ static void wait_children(void *arg)
 
         while (!server_shutdown) {
             i.si_pid = 0;
-            if (waitid(P_ALL, (id_t) 0, &i, WEXITED) == -1) {
+            if (os_waitid(P_ALL, (id_t) 0, &i, WEXITED) == -1) {
                 if (errno != ECHILD)
                     fprintf(stderr, "SPAWN: Failed to wait: %s\n", strerror(errno));
                 break;

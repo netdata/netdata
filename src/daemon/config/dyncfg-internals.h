@@ -10,7 +10,7 @@
 #include "database/rrdcollector-internals.h"
 
 typedef struct dyncfg {
-    UUID host_uuid;
+    ND_UUID host_uuid;
     STRING *function;
     STRING *template;
     STRING *path;
@@ -80,7 +80,7 @@ const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id);
 
 bool dyncfg_is_user_disabled(const char *id);
 
-RRDHOST *dyncfg_rrdhost_by_uuid(UUID *uuid);
+RRDHOST *dyncfg_rrdhost_by_uuid(ND_UUID *uuid);
 RRDHOST *dyncfg_rrdhost(DYNCFG *df);
 
 static inline void dyncfg_copy_dyncfg_source_to_current(DYNCFG *df) {

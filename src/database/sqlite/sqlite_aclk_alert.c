@@ -45,7 +45,7 @@ done:
     "WHERE hld.unique_id = @unique_id AND hl.config_hash_id = ah.hash_id AND hld.health_log_id = hl.health_log_id "    \
     "AND hl.host_id = @host_id AND ah.warn IS NULL AND ah.crit IS NULL"
 
-static inline bool is_event_from_alert_variable_config(int64_t unique_id, uuid_t *host_id)
+static inline bool is_event_from_alert_variable_config(int64_t unique_id, nd_uuid_t *host_id)
 {
     sqlite3_stmt *res = NULL;
 
@@ -106,15 +106,15 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     param = 0;
     int rc = sqlite3_step_monitored(res);
     if (likely(rc == SQLITE_ROW)) {
-        uuid_t config_hash_id;
+        nd_uuid_t config_hash_id;
         RRDCALC_STATUS status = (RRDCALC_STATUS)sqlite3_column_int(res, 0);
 
         if (sqlite3_column_type(res, 1) != SQLITE_NULL)
-            uuid_copy(config_hash_id, *((uuid_t *)sqlite3_column_blob(res, 1)));
+            uuid_copy(config_hash_id, *((nd_uuid_t *)sqlite3_column_blob(res, 1)));
 
         int64_t unique_id = sqlite3_column_int64(res, 2);
 
-        if (ae->new_status != (RRDCALC_STATUS)status || uuid_memcmp(&ae->config_hash_id, &config_hash_id))
+        if (ae->new_status != (RRDCALC_STATUS)status || !uuid_eq(ae->config_hash_id, config_hash_id))
             send = true;
         else
             update_filtered(ae, unique_id, host->aclk_config->uuid_str);
@@ -203,7 +203,7 @@ static inline char *sqlite3_uuid_unparse_strdupz(sqlite3_stmt *res, int iCol) {
     if(sqlite3_column_type(res, iCol) == SQLITE_NULL)
         uuid_str[0] = '\0';
     else
-        uuid_unparse_lower(*((uuid_t *) sqlite3_column_blob(res, iCol)), uuid_str);
+        uuid_unparse_lower(*((nd_uuid_t *) sqlite3_column_blob(res, iCol)), uuid_str);
 
     return strdupz(uuid_str);
 }
@@ -499,7 +499,7 @@ void aclk_push_alert_config_event(char *node_id __maybe_unused, char *config_has
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_CONFIG, &res))
         return;
 
-    uuid_t hash_uuid;
+    nd_uuid_t hash_uuid;
     if (uuid_parse(config_hash, hash_uuid))
         return;
 
@@ -593,7 +593,7 @@ done:
 // Start streaming alerts
 void aclk_start_alert_streaming(char *node_id, bool resets)
 {
-    uuid_t node_uuid;
+    nd_uuid_t node_uuid;
 
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
         return;
@@ -675,7 +675,7 @@ void sql_queue_removed_alerts_to_aclk(RRDHOST *host)
 
 void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id __maybe_unused, char *snapshot_uuid)
 {
-    uuid_t node_uuid;
+    nd_uuid_t node_uuid;
 
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
         return;

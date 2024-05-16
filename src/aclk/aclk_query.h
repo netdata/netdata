@@ -18,7 +18,7 @@ extern pthread_mutex_t query_lock_wait;
 //extern volatile int aclk_connected;
 
 struct aclk_query_thread {
-    netdata_thread_t thread;
+    ND_THREAD *thread;
     int idx;
     mqtt_wss_client client;
 };

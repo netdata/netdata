@@ -108,7 +108,7 @@ static bool prepare_command(BUFFER *wb,
                             const char *classification,
                             const char *edit_command,
                             const char *machine_guid,
-                            uuid_t *transition_id,
+                            nd_uuid_t *transition_id,
                             const char *summary,
                             const char *context,
                             const char *component,
@@ -479,7 +479,7 @@ done:
     health_alarm_log_save(host, ae);
 }
 
-bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, uuid_t *transitions_id) {
+bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, nd_uuid_t *transitions_id) {
     if(!rc->rrdset)
         return false;
 

@@ -28,7 +28,7 @@ static inline void fix_google_param(char *s) {
     if(unlikely(!s || !*s)) return;
 
     for( ; *s ;s++) {
-        if(!isalnum(*s) && *s != '.' && *s != '_' && *s != '-')
+        if(!isalnum((uint8_t)*s) && *s != '.' && *s != '_' && *s != '-')
             *s = '_';
     }
 }

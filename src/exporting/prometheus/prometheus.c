@@ -552,8 +552,8 @@ static void prometheus_print_os_info(
           if (!in_val_part) {
               /* Only accepts alphabetic characters and '_'
                * in key part */
-              if (isalpha(*in) || *in == '_') {
-                  *(sanitized++) = tolower(*in);
+              if (isalpha((uint8_t)*in) || *in == '_') {
+                  *(sanitized++) = tolower((uint8_t)*in);
               } else if (*in == '=') {
                   in_val_part = 1;
                   *(sanitized++) = '=';
@@ -568,7 +568,7 @@ static void prometheus_print_os_info(
                   case '\t':
                       break;
                   default:
-                      if (isprint(*in)) {
+                      if (isprint((uint8_t)*in)) {
                           *(sanitized++) = *in;
                       }
               }

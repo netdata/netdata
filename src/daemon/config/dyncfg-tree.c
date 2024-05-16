@@ -71,7 +71,7 @@ static void dyncfg_tree_for_host(RRDHOST *host, BUFFER *wb, const char *path, co
     if(id && *id)
         template = string_strdupz(id);
 
-    UUID host_uuid = uuid2UUID(host->host_uuid);
+    ND_UUID host_uuid = uuid2UUID(host->host_uuid);
 
     size_t path_len = strlen(path);
     DYNCFG *df;

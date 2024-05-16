@@ -119,9 +119,11 @@ static void exporting_clean_engine()
  *
  * @param ptr thread data.
  */
-static void exporting_main_cleanup(void *ptr)
+static void exporting_main_cleanup(void *pptr)
 {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     netdata_log_info("cleaning up...");
@@ -174,7 +176,7 @@ static void exporting_main_cleanup(void *ptr)
  */
 void *exporting_main(void *ptr)
 {
-    netdata_thread_cleanup_push(exporting_main_cleanup, ptr);
+    CLEANUP_FUNCTION_REGISTER(exporting_main_cleanup) cleanup_ptr = ptr;
 
     engine = read_exporting_config();
     if (!engine) {
@@ -214,6 +216,5 @@ void *exporting_main(void *ptr)
     }
 
 cleanup:
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

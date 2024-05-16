@@ -332,8 +332,8 @@ int main(int argc, char *argv[]) {
         return 3;
     }
 
-    char new_path[] = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
-    setenv("PATH", new_path, 1);
+    char new_path[] = "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+    putenv(new_path);
 
     bool found = false;
     char filename[FILENAME_MAX];

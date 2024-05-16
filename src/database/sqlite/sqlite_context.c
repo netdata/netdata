@@ -78,7 +78,7 @@ int sql_init_context_database(int memory)
 #define CTX_GET_CHART_LIST  "SELECT c.chart_id, c.type||'.'||c.id, c.name, c.context, c.title, c.unit, c.priority, " \
     "c.update_every, c.chart_type, c.family FROM chart c WHERE c.host_id = @host_id AND c.chart_id IS NOT NULL"
 
-void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
+void ctx_get_chart_list(nd_uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, void *), void *data)
 {
     static __thread sqlite3_stmt *res = NULL;
 
@@ -96,7 +96,7 @@ void ctx_get_chart_list(uuid_t *host_uuid, void (*dict_cb)(SQL_CHART_DATA *, voi
     param = 0;
     SQL_CHART_DATA chart_data = { 0 };
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        uuid_copy(chart_data.chart_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
+        uuid_copy(chart_data.chart_id, *((nd_uuid_t *)sqlite3_column_blob(res, 0)));
         chart_data.id = (char *) sqlite3_column_text(res, 1);
         chart_data.name = (char *) sqlite3_column_text(res, 2);
         chart_data.context = (char *) sqlite3_column_text(res, 3);
@@ -117,7 +117,7 @@ done:
 // Dimension list
 #define CTX_GET_DIMENSION_LIST  "SELECT d.dim_id, d.id, d.name, CASE WHEN INSTR(d.options,\"hidden\") > 0 THEN 1 ELSE 0 END " \
     "FROM dimension d WHERE d.chart_id = @id AND d.dim_id IS NOT NULL ORDER BY d.rowid ASC"
-void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
+void ctx_get_dimension_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DATA *, void *), void *data)
 {
     static __thread sqlite3_stmt *res = NULL;
 
@@ -131,7 +131,7 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
 
     param = 0;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
-        uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
+        uuid_copy(dimension_data.dim_id, *((nd_uuid_t *)sqlite3_column_blob(res, 0)));
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
         dimension_data.name = (char *) sqlite3_column_text(res, 2);
         dimension_data.hidden = sqlite3_column_int(res, 3);
@@ -146,7 +146,7 @@ done:
 // LABEL LIST
 #define CTX_GET_LABEL_LIST  "SELECT l.label_key, l.label_value, l.source_type FROM meta.chart_label l WHERE l.chart_id = @id"
 
-void ctx_get_label_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data)
+void ctx_get_label_list(nd_uuid_t *chart_uuid, void (*dict_cb)(SQL_CLABEL_DATA *, void *), void *data)
 {
     static __thread sqlite3_stmt *res = NULL;
 
@@ -175,7 +175,7 @@ done:
 #define CTX_GET_CONTEXT_LIST  "SELECT id, version, title, chart_type, unit, priority, first_time_t, " \
     "last_time_t, deleted, family FROM context c WHERE c.host_id = @host_id"
 
-void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
+void ctx_get_context_list(nd_uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_DATA *, void *), void *data)
 {
 
     if (unlikely(!host_uuid))
@@ -220,7 +220,7 @@ done:
     "(host_id, id, version, title, chart_type, unit, priority, first_time_t, last_time_t, deleted, family) "           \
     "VALUES (@host_id, @context, @version, @title, @chart_type, @unit, @priority, @first_t, @last_t, @delete, @family)"
 
-int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
+int ctx_store_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
     int rc_stored = 1;
     sqlite3_stmt *res = NULL;
@@ -259,7 +259,7 @@ done:
 // Delete a context
 
 #define CTX_DELETE_CONTEXT "DELETE FROM context WHERE host_id = @host_id AND id = @context"
-int ctx_delete_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
+int ctx_delete_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
     int rc_stored = 1;
     sqlite3_stmt *res = NULL;
@@ -293,9 +293,7 @@ int sql_context_cache_stats(int op)
     if (unlikely(!db_context_meta))
         return 0;
 
-    netdata_thread_disable_cancelability();
     sqlite3_db_status(db_context_meta, op, &count, &dummy, 0);
-    netdata_thread_enable_cancelability();
     return count;
 }
 
@@ -336,7 +334,7 @@ static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, v
 
 int ctx_unittest(void)
 {
-    uuid_t host_uuid;
+    nd_uuid_t host_uuid;
     uuid_generate(host_uuid);
 
     if (sqlite_library_init())

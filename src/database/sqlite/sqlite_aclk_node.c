@@ -113,7 +113,7 @@ static void build_node_info(RRDHOST *host)
         host->machine_guid,
         host == localhost ? "parent" : "child");
 
-    rrd_unlock();
+    rrd_rdunlock();
     freez(node_info.claim_id);
     freez(node_info.node_instance_capabilities);
     freez(host_version);

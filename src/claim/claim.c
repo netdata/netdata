@@ -150,7 +150,7 @@ void load_claiming_state(void)
 #if defined( DISABLE_CLOUD ) || !defined( ENABLE_ACLK )
     netdata_cloud_enabled = false;
 #else
-    uuid_t uuid;
+    nd_uuid_t uuid;
 
     // Propagate into aclk and registry. Be kind of atomic...
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
@@ -240,7 +240,7 @@ void load_cloud_conf(int silent)
 }
 
 static char *netdata_random_session_id_filename = NULL;
-static uuid_t netdata_random_session_id = { 0 };
+static nd_uuid_t netdata_random_session_id = { 0 };
 
 bool netdata_random_session_id_generate(void) {
     static char guid[UUID_STR_LEN] = "";
@@ -291,7 +291,7 @@ bool netdata_random_session_id_matches(const char *guid) {
     if(uuid_is_null(netdata_random_session_id))
         return false;
 
-    uuid_t uuid;
+    nd_uuid_t uuid;
 
     if(uuid_parse(guid, uuid))
         return false;
@@ -306,7 +306,7 @@ static bool check_claim_param(const char *s) {
     if(!s || !*s) return true;
 
     do {
-        if(isalnum(*s) || *s == '.' || *s == ',' || *s == '-' || *s == ':' || *s == '/' || *s == '_')
+        if(isalnum((uint8_t)*s) || *s == '.' || *s == ',' || *s == '-' || *s == ':' || *s == '/' || *s == '_')
             ;
         else
             return false;
@@ -393,7 +393,7 @@ int api_v2_claim(struct web_client *w, char *url) {
         appconfig_set_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", CONFIG_BOOLEAN_AUTO);
         appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", base_url);
 
-        uuid_t claimed_id;
+        nd_uuid_t claimed_id;
         uuid_generate_random(claimed_id);
         char claimed_id_str[UUID_STR_LEN];
         uuid_unparse_lower(claimed_id, claimed_id_str);

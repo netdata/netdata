@@ -3,12 +3,6 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
-#ifdef HAVE_SETNS
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE             /* See feature_test_macros(7) */
-#endif
-#endif
-
 char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
 char env_netdata_log_method[FILENAME_MAX + 50] = "";
 char env_netdata_log_format[FILENAME_MAX + 50] = "";

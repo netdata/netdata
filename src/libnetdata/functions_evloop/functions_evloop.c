@@ -49,9 +49,10 @@ struct functions_evloop_globals {
 
     netdata_mutex_t *stdout_mutex;
     bool *plugin_should_exit;
+    bool workers_exit; // all workers are waiting on the same condition - this makes them all exit, when any is cancelled
 
-    netdata_thread_t reader_thread;
-    netdata_thread_t *worker_threads;
+    ND_THREAD *reader_thread;
+    ND_THREAD **worker_threads;
 
     struct {
         DICTIONARY *nodes;
@@ -60,12 +61,27 @@ struct functions_evloop_globals {
     struct rrd_functions_expectation *expectations;
 };
 
+static void rrd_functions_worker_canceller(void *data) {
+    struct functions_evloop_globals *wg = data;
+    pthread_mutex_lock(&wg->worker_mutex);
+    wg->workers_exit = true;
+    pthread_cond_signal(&wg->worker_cond_var);
+    pthread_mutex_unlock(&wg->worker_mutex);
+}
+
 static void *rrd_functions_worker_globals_worker_main(void *arg) {
     struct functions_evloop_globals *wg = arg;
+
+    nd_thread_register_canceller(rrd_functions_worker_canceller, wg);
 
     bool last_acquired = true;
     while (true) {
         pthread_mutex_lock(&wg->worker_mutex);
+
+        if(wg->workers_exit || nd_thread_signaled_to_cancel()) {
+            pthread_mutex_unlock(&wg->worker_mutex);
+            break;
+        }
 
         if(dictionary_entries(wg->worker_queue) == 0 || !last_acquired)
             pthread_cond_wait(&wg->worker_cond_var, &wg->worker_mutex);
@@ -84,6 +100,13 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
 
         pthread_mutex_unlock(&wg->worker_mutex);
 
+        if(wg->workers_exit || nd_thread_signaled_to_cancel()) {
+            if(acquired)
+                dictionary_acquired_item_release(wg->worker_queue, acquired);
+
+            break;
+        }
+
         if(acquired) {
             ND_LOG_STACK lgs[] = {
                     ND_LOG_FIELD_TXT(NDF_REQUEST, j->cmd),
@@ -101,6 +124,7 @@ static void *rrd_functions_worker_globals_worker_main(void *arg) {
         else
             last_acquired = false;
     }
+
     return NULL;
 }
 
@@ -146,7 +170,9 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                 else {
                     found = true;
                     j->used = true;
+                    pthread_mutex_lock(&wg->worker_mutex);
                     pthread_cond_signal(&wg->worker_cond_var);
+                    pthread_mutex_unlock(&wg->worker_mutex);
                 }
             }
         }
@@ -310,18 +336,18 @@ struct functions_evloop_globals *functions_evloop_init(size_t worker_threads, co
     wg->plugin_should_exit = plugin_should_exit;
     wg->stdout_mutex = stdout_mutex;
     wg->workers = worker_threads;
-    wg->worker_threads = callocz(wg->workers, sizeof(netdata_thread_t ));
+    wg->worker_threads = callocz(wg->workers, sizeof(ND_THREAD *));
     wg->tag = tag;
 
     char tag_buffer[NETDATA_THREAD_TAG_MAX + 1];
     snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_READER", wg->tag);
-    netdata_thread_create(&wg->reader_thread, tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
-                          rrd_functions_worker_globals_reader_main, wg);
+    wg->reader_thread = nd_thread_create(tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
+                                         rrd_functions_worker_globals_reader_main, wg);
 
     for(size_t i = 0; i < wg->workers ; i++) {
         snprintfz(tag_buffer, NETDATA_THREAD_TAG_MAX, "%s_WORK[%zu]", wg->tag, i+1);
-        netdata_thread_create(&wg->worker_threads[i], tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
-                              rrd_functions_worker_globals_worker_main, wg);
+        wg->worker_threads[i] = nd_thread_create(tag_buffer, NETDATA_THREAD_OPTION_DONT_LOG,
+                                                 rrd_functions_worker_globals_worker_main, wg);
     }
 
     functions_evloop_add_function(wg, "config", functions_evloop_config_cb, 120, wg);
@@ -339,11 +365,11 @@ void functions_evloop_add_function(struct functions_evloop_globals *wg, const ch
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wg->expectations, we, prev, next);
 }
 
-void functions_evloop_cancel_threads(struct functions_evloop_globals *wg){
-    for(size_t i = 0; i < wg->workers ; i++)
-        netdata_thread_cancel(wg->worker_threads[i]);
+void functions_evloop_cancel_threads(struct functions_evloop_globals *wg) {
+    nd_thread_signal_cancel(wg->reader_thread);
 
-    netdata_thread_cancel(wg->reader_thread);
+    for(size_t i = 0; i < wg->workers ; i++)
+        nd_thread_signal_cancel(wg->worker_threads[i]);
 }
 
 // ----------------------------------------------------------------------------

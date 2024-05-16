@@ -2,9 +2,12 @@
 
 #include "plugin_proc.h"
 
-#define RRD_TYPE_DISK "disk"
 #define PLUGIN_PROC_MODULE_DISKSTATS_NAME "/proc/diskstats"
 #define CONFIG_SECTION_PLUGIN_PROC_DISKSTATS "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_DISKSTATS_NAME
+
+#define _COMMON_PLUGIN_NAME PLUGIN_PROC_CONFIG_NAME
+#define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_DISKSTATS_NAME
+#include "../common-contexts/common-contexts.h"
 
 #define RRDFUNCTIONS_DISKSTATS_HELP "View block device statistics"
 
@@ -75,9 +78,7 @@ static struct disk {
     usec_t bcache_priority_stats_update_every_usec;
     usec_t bcache_priority_stats_elapsed_usec;
 
-    RRDSET *st_io;
-    RRDDIM *rd_io_reads;
-    RRDDIM *rd_io_writes;
+    ND_DISK_IO disk_io;
 
     RRDSET *st_ext_io;
     RRDDIM *rd_io_discards;
@@ -1033,6 +1034,10 @@ static void add_labels_to_disk(struct disk *d, RRDSET *st) {
     rrdlabels_add(st->rrdlabels, "device_type", get_disk_type_string(d->type), RRDLABEL_SRC_AUTO);
 }
 
+static void disk_labels_cb(RRDSET *st, void *data) {
+    add_labels_to_disk(data, st);
+}
+
 static int diskstats_function_block_devices(BUFFER *wb, const char *function __maybe_unused) {
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
@@ -1076,8 +1081,8 @@ static int diskstats_function_block_devices(BUFFER *wb, const char *function __m
         buffer_json_add_array_item_string(wb, d->serial);
 
         // IO
-        double io_reads = rrddim_get_last_stored_value(d->rd_io_reads, &max_io_reads, 1024.0);
-        double io_writes = rrddim_get_last_stored_value(d->rd_io_writes, &max_io_writes, 1024.0);
+        double io_reads = rrddim_get_last_stored_value(d->disk_io.rd_io_reads, &max_io_reads, 1024.0);
+        double io_writes = rrddim_get_last_stored_value(d->disk_io.rd_io_writes, &max_io_writes, 1024.0);
         double io_total = NAN;
         if (!isnan(io_reads) && !isnan(io_writes)) {
             io_total = io_reads + io_writes;
@@ -1328,7 +1333,7 @@ static void diskstats_cleanup_disks() {
             rrdset_obsolete_and_pointer_null(d->st_ext_await);
             rrdset_obsolete_and_pointer_null(d->st_backlog);
             rrdset_obsolete_and_pointer_null(d->st_busy);
-            rrdset_obsolete_and_pointer_null(d->st_io);
+            rrdset_obsolete_and_pointer_null(d->disk_io.st_io);
             rrdset_obsolete_and_pointer_null(d->st_ext_io);
             rrdset_obsolete_and_pointer_null(d->st_iotime);
             rrdset_obsolete_and_pointer_null(d->st_ext_iotime);
@@ -1616,31 +1621,17 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             d->do_io = CONFIG_BOOLEAN_YES;
 
-            if(unlikely(!d->st_io)) {
-                d->st_io = rrdset_create_localhost(
-                        RRD_TYPE_DISK
-                        , d->chart_id
-                        , d->disk
-                        , family
-                        , "disk.io"
-                        , "Disk I/O Bandwidth"
-                        , "KiB/s"
-                        , PLUGIN_PROC_NAME
-                        , PLUGIN_PROC_MODULE_DISKSTATS_NAME
-                        , NETDATA_CHART_PRIO_DISK_IO
-                        , update_every
-                        , RRDSET_TYPE_AREA
-                );
+            last_readsectors = d->disk_io.rd_io_reads ? d->disk_io.rd_io_reads->collector.last_collected_value : 0;
+            last_writesectors = d->disk_io.rd_io_writes ? d->disk_io.rd_io_writes->collector.last_collected_value : 0;
 
-                d->rd_io_reads  = rrddim_add(d->st_io, "reads",  NULL, d->sector_size, 1024,      RRD_ALGORITHM_INCREMENTAL);
-                d->rd_io_writes = rrddim_add(d->st_io, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_INCREMENTAL);
-
-                add_labels_to_disk(d, d->st_io);
-            }
-
-            last_readsectors  = rrddim_set_by_pointer(d->st_io, d->rd_io_reads, readsectors);
-            last_writesectors = rrddim_set_by_pointer(d->st_io, d->rd_io_writes, writesectors);
-            rrdset_done(d->st_io);
+            common_disk_io(&d->disk_io,
+                           d->chart_id,
+                           d->disk,
+                           readsectors * d->sector_size,
+                           writesectors * d->sector_size,
+                           update_every,
+                           disk_labels_cb,
+                           d);
         }
 
         if (do_dc_stats && d->do_io == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
@@ -2468,32 +2459,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     if(global_do_io == CONFIG_BOOLEAN_YES || (global_do_io == CONFIG_BOOLEAN_AUTO &&
                                               (system_read_kb || system_write_kb ||
                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
-        static RRDSET *st_io = NULL;
-        static RRDDIM *rd_in = NULL, *rd_out = NULL;
-
-        if(unlikely(!st_io)) {
-            st_io = rrdset_create_localhost(
-                    "system"
-                    , "io"
-                    , NULL
-                    , "disk"
-                    , NULL
-                    , "Disk I/O"
-                    , "KiB/s"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_DISKSTATS_NAME
-                    , NETDATA_CHART_PRIO_SYSTEM_IO
-                    , update_every
-                    , RRDSET_TYPE_AREA
-            );
-
-            rd_in  = rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_io, rd_in, system_read_kb);
-        rrddim_set_by_pointer(st_io, rd_out, system_write_kb);
-        rrdset_done(st_io);
+        common_system_io(system_read_kb * 1024, system_write_kb * 1024, update_every);
     }
 
     return 0;

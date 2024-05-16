@@ -1738,17 +1738,19 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     return 0;
 }
 
-static void netdev_main_cleanup(void *ptr)
-{
-    UNUSED(ptr);
+static void netdev_main_cleanup(void *pptr) {
+    if(CLEANUP_FUNCTION_GET_PTR(pptr) != (void *)0x01)
+        return;
 
     collector_info("cleaning up...");
 
     worker_unregister();
 }
 
-void *netdev_main(void *ptr)
+void *netdev_main(void *ptr_is_null __maybe_unused)
 {
+    CLEANUP_FUNCTION_REGISTER(netdev_main_cleanup) cleanup_ptr = (void *)0x01;
+
     worker_register("NETDEV");
     worker_register_job_name(0, "netdev");
 
@@ -1760,29 +1762,26 @@ void *netdev_main(void *ptr)
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             netdev_function_net_interfaces);
 
-    netdata_thread_cleanup_push(netdev_main_cleanup, ptr) {
-        usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
-        heartbeat_t hb;
-        heartbeat_init(&hb);
+    usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
 
-        while (service_running(SERVICE_COLLECTORS)) {
-            worker_is_idle();
-            usec_t hb_dt = heartbeat_next(&hb, step);
+    while (service_running(SERVICE_COLLECTORS)) {
+        worker_is_idle();
+        usec_t hb_dt = heartbeat_next(&hb, step);
 
-            if (unlikely(!service_running(SERVICE_COLLECTORS)))
-                break;
+        if (unlikely(!service_running(SERVICE_COLLECTORS)))
+            break;
 
-            cgroup_netdev_reset_all();
+        cgroup_netdev_reset_all();
 
-            worker_is_busy(0);
+        worker_is_busy(0);
 
-            netdata_mutex_lock(&netdev_mutex);
-            if (do_proc_net_dev(localhost->rrd_update_every, hb_dt))
-                break;
-            netdata_mutex_unlock(&netdev_mutex);
-        }
+        netdata_mutex_lock(&netdev_mutex);
+        if (do_proc_net_dev(localhost->rrd_update_every, hb_dt))
+            break;
+        netdata_mutex_unlock(&netdev_mutex);
     }
-    netdata_thread_cleanup_pop(1);
 
     return NULL;
 }

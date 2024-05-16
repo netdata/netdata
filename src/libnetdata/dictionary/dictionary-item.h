@@ -53,7 +53,7 @@ static inline DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused,
     memset(item, 0, sizeof(DICTIONARY_ITEM));
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    item->creator_pid = gettid();
+    item->creator_pid = gettid_cached();
 #endif
 
     item->refcount = 1;
@@ -256,7 +256,7 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    item->ll_adder_pid = gettid();
+    item->ll_adder_pid = gettid_cached();
 #endif
 
     // clear the BEING created flag,
@@ -273,7 +273,7 @@ static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *it
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    item->ll_remover_pid = gettid();
+    item->ll_remover_pid = gettid_cached();
 #endif
 
     garbage_collect_pending_deletes(dict);

@@ -100,7 +100,7 @@ bool ml_dimension_is_anomalous(RRDDIM *rd, time_t curr_time, double value, bool 
     return false;
 }
 
-int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **stmp) {
+int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **stmp __maybe_unused) {
     UNUSED(rd);
     return 0;
 }
@@ -109,12 +109,12 @@ void ml_update_global_statistics_charts(uint64_t models_consulted) {
     UNUSED(models_consulted);
 }
 
-bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm) {
+bool ml_host_get_host_status(RRDHOST *rh __maybe_unused, struct ml_metrics_statistics *mlm) {
     memset(mlm, 0, sizeof(*mlm));
     return false;
 }
 
-bool ml_host_running(RRDHOST *rh) {
+bool ml_host_running(RRDHOST *rh __maybe_unused) {
     return false;
 }
 

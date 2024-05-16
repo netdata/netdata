@@ -48,7 +48,7 @@ static const char *yaml_event_name(yaml_event_type_t type) {
 }
 
 #define yaml_error(parser, event, fmt, args...) yaml_error_with_trace(parser, event, __LINE__, __FUNCTION__, __FILE__, fmt, ##args)
-static void yaml_error_with_trace(yaml_parser_t *parser, yaml_event_t *event, size_t line, const char *function, const char *file, const char *format, ...) __attribute__ ((format(__printf__, 6, 7)));
+static void yaml_error_with_trace(yaml_parser_t *parser, yaml_event_t *event, size_t line, const char *function, const char *file, const char *format, ...) PRINTFLIKE(6, 7);
 static void yaml_error_with_trace(yaml_parser_t *parser, yaml_event_t *event, size_t line, const char *function, const char *file, const char *format, ...) {
     char buf[1024] = ""; // Initialize buf to an empty string
     const char *type = "";

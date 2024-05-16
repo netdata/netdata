@@ -97,7 +97,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         is_registered = str2i(argv[IDX_IS_REGISTERED]);
 
     char guid[UUID_STR_LEN];
-    uuid_unparse_lower(*(uuid_t *)argv[IDX_HOST_ID], guid);
+    uuid_unparse_lower(*(nd_uuid_t *)argv[IDX_HOST_ID], guid);
 
     if (is_ephemeral && age > rrdhost_free_ephemeral_time_s) {
         netdata_log_info(
@@ -116,7 +116,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 
     system_info->hops = str2i((const char *) argv[IDX_HOPS]);
 
-    sql_build_host_system_info((uuid_t *)argv[IDX_HOST_ID], system_info);
+    sql_build_host_system_info((nd_uuid_t *)argv[IDX_HOST_ID], system_info);
 
     RRDHOST *host = rrdhost_find_or_create(
         (const char *)argv[IDX_HOSTNAME],
@@ -157,7 +157,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         if (is_ephemeral)
             host->child_disconnected_time = now_realtime_sec();
 
-        host->rrdlabels = sql_load_host_labels((uuid_t *)argv[IDX_HOST_ID]);
+        host->rrdlabels = sql_load_host_labels((nd_uuid_t *)argv[IDX_HOST_ID]);
         host->last_connected = last_connected;
     }
 
@@ -175,7 +175,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 #ifdef ENABLE_ACLK
 
 #define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id"
-static int is_host_available(uuid_t *host_id)
+static int is_host_available(nd_uuid_t *host_id)
 {
     sqlite3_stmt *res = NULL;
     int rc = 0;
@@ -205,7 +205,7 @@ static void sql_delete_aclk_table_list(char *host_guid)
     char host_str[UUID_STR_LEN];
 
     int rc;
-    uuid_t host_uuid;
+    nd_uuid_t host_uuid;
 
     if (unlikely(!host_guid))
         return;
@@ -249,7 +249,7 @@ fail:
 static void sql_unregister_node(char *machine_guid)
 {
     int rc;
-    uuid_t host_uuid;
+    nd_uuid_t host_uuid;
 
     if (unlikely(!machine_guid))
         return;
@@ -333,11 +333,11 @@ static void sql_maint_aclk_sync_database_all(void)
 static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
 {
     char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower(*((uuid_t *) argv[0]), uuid_str);
+    uuid_unparse_lower(*((nd_uuid_t *) argv[0]), uuid_str);
 
     RRDHOST *host = rrdhost_find_by_guid(uuid_str);
     if (host != localhost)
-        sql_create_aclk_table(host, (uuid_t *) argv[0], (uuid_t *) argv[1]);
+        sql_create_aclk_table(host, (nd_uuid_t *) argv[0], (nd_uuid_t *) argv[1]);
     return 0;
 }
 
@@ -374,7 +374,7 @@ static void timer_cb(uv_timer_t *handle)
 static void aclk_synchronization(void *arg __maybe_unused)
 {
     struct aclk_sync_config_s *config = arg;
-    uv_thread_set_name_np(config->thread,  "ACLKSYNC");
+    uv_thread_set_name_np("ACLKSYNC");
     worker_register("ACLKSYNC");
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
@@ -487,7 +487,7 @@ static void aclk_synchronization_init(void)
 
 // -------------------------------------------------------------
 
-void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __maybe_unused, uuid_t *node_id __maybe_unused)
+void sql_create_aclk_table(RRDHOST *host __maybe_unused, nd_uuid_t *host_uuid __maybe_unused, nd_uuid_t *node_id __maybe_unused)
 {
 #ifdef ENABLE_ACLK
     char uuid_str[UUID_STR_LEN];

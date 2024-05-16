@@ -218,7 +218,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         netdata_mutex_unlock(&host->receiver_lock);
     }
 
-    rrd_unlock();
+    rrd_rdunlock();
 }
 
 static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
@@ -259,12 +259,14 @@ restart_after_removal:
         goto restart_after_removal;
     }
 
-    rrd_unlock();
+    rrd_wrunlock();
 }
 
-static void service_main_cleanup(void *ptr)
+static void service_main_cleanup(void *pptr)
 {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     netdata_log_debug(D_SYSTEM, "Cleaning up...");
@@ -294,7 +296,8 @@ void *service_main(void *ptr)
     worker_register_job_name(WORKER_JOB_PGC_OPEN_EVICT, "open cache evictions");
     worker_register_job_name(WORKER_JOB_PGC_OPEN_FLUSH, "open cache flushes");
 
-    netdata_thread_cleanup_push(service_main_cleanup, ptr);
+    CLEANUP_FUNCTION_REGISTER(service_main_cleanup) cleanup_ptr = ptr;
+
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = USEC_PER_SEC * SERVICE_HEARTBEAT;
@@ -317,6 +320,5 @@ void *service_main(void *ptr)
             svc_rrdhost_cleanup_orphan_hosts(localhost);
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

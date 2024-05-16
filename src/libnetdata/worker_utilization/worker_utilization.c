@@ -92,8 +92,8 @@ void worker_register(const char *name) {
         return;
 
     worker = callocz(1, sizeof(struct worker));
-    worker->pid = gettid();
-    worker->tag = strdupz(netdata_thread_tag());
+    worker->pid = gettid_cached();
+    worker->tag = strdupz(nd_thread_tag());
     worker->workname = strdupz(name);
 
     usec_t now = worker_now_monotonic_usec();

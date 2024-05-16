@@ -6,9 +6,6 @@
 #include "common.h"
 
 extern const struct netdata_static_thread static_threads_common[];
-extern const struct netdata_static_thread static_threads_linux[];
-extern const struct netdata_static_thread static_threads_freebsd[];
-extern const struct netdata_static_thread static_threads_macos[];
 
 struct netdata_static_thread *
 static_threads_concat(const struct netdata_static_thread *lhs,

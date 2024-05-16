@@ -1300,8 +1300,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
             if(unlikely(!page)) {
                 // now that we don't have the lock,
                 // give it some time for the old page to go away
-                struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
-                nanosleep(&ns, NULL);
+                tinysleep();
             }
         }
 
@@ -2026,8 +2025,6 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
 }
 
 PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method) {
-    static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
-
     PGC_PAGE *page = NULL;
 
     __atomic_add_fetch(&cache->stats.workers_search, 1, __ATOMIC_RELAXED);
@@ -2053,7 +2050,7 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
         if(page || !retry)
             break;
 
-        nanosleep(&ns, NULL);
+        tinysleep();
     }
 
     if(page) {
@@ -2374,8 +2371,6 @@ void *unittest_stress_test_collector(void *ptr) {
     while(!__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
         // netdata_log_info("COLLECTOR %zu: collecting metrics %zu to %zu, from %ld to %lu", id, metric_start, metric_end, start_time_t, start_time_t + pgc_uts.points_per_page);
 
-        netdata_thread_disable_cancelability();
-
         for (size_t i = metric_start; i < metric_end; i++) {
             bool added;
 
@@ -2416,8 +2411,6 @@ void *unittest_stress_test_collector(void *ptr) {
                     pgc_page_hot_to_dirty_and_release(pgc_uts.cache, pgc_uts.metrics[i], false);
             }
         }
-
-        netdata_thread_enable_cancelability();
     }
 
     return ptr;
@@ -2431,8 +2424,6 @@ void *unittest_stress_test_queries(void *ptr) {
     size_t end = pgc_uts.clean_metrics + pgc_uts.hot_metrics;
 
     while(!__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
-        netdata_thread_disable_cancelability();
-
         int32_t random_number;
         random_r(random_data, &random_number);
 
@@ -2482,8 +2473,6 @@ void *unittest_stress_test_queries(void *ptr) {
             pgc_page_release(pgc_uts.cache, array[i]);
             array[i] = NULL;
         }
-
-        netdata_thread_enable_cancelability();
     }
 
     return ptr;
@@ -2527,7 +2516,7 @@ void unittest_stress_test(void) {
     pgc_uts.metrics = callocz(pgc_uts.clean_metrics + pgc_uts.hot_metrics, sizeof(PGC_PAGE *));
 
     pthread_t service_thread;
-    netdata_thread_create(&service_thread, "SERVICE",
+    nd_thread_create(&service_thread, "SERVICE",
                           NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
                           unittest_stress_test_service, NULL);
 
@@ -2537,7 +2526,7 @@ void unittest_stress_test(void) {
         collect_thread_ids[i] = i;
         char buffer[100 + 1];
         snprintfz(buffer, sizeof(buffer) - 1, "COLLECT_%zu", i);
-        netdata_thread_create(&collect_threads[i], buffer,
+        nd_thread_create(&collect_threads[i], buffer,
                               NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
                               unittest_stress_test_collector, &collect_thread_ids[i]);
     }
@@ -2550,7 +2539,7 @@ void unittest_stress_test(void) {
         char buffer[100 + 1];
         snprintfz(buffer, sizeof(buffer) - 1, "QUERY_%zu", i);
         initstate_r(1, pgc_uts.rand_statebufs, 1024, &pgc_uts.random_data[i]);
-        netdata_thread_create(&queries_threads[i], buffer,
+        nd_thread_create(&queries_threads[i], buffer,
                               NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
                               unittest_stress_test_queries, &query_thread_ids[i]);
     }
@@ -2671,13 +2660,13 @@ void unittest_stress_test(void) {
     netdata_log_info("Waiting for threads to stop...");
     __atomic_store_n(&pgc_uts.stop, true, __ATOMIC_RELAXED);
 
-    netdata_thread_join(service_thread, NULL);
+    nd_thread_join(service_thread, NULL);
 
     for(size_t i = 0; i < pgc_uts.collect_threads ;i++)
-        netdata_thread_join(collect_threads[i],NULL);
+        nd_thread_join(collect_threads[i],NULL);
 
     for(size_t i = 0; i < pgc_uts.query_threads ;i++)
-        netdata_thread_join(queries_threads[i],NULL);
+        nd_thread_join(queries_threads[i],NULL);
 
     pgc_destroy(pgc_uts.cache);
 

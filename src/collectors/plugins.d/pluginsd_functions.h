@@ -6,7 +6,7 @@
 #include "pluginsd_internals.h"
 
 struct inflight_function {
-    uuid_t transaction;
+    nd_uuid_t transaction;
 
     int code;
     int timeout_s;

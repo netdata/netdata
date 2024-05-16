@@ -724,9 +724,10 @@ static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void ebpf_filesystem_exit(void *ptr)
+static void ebpf_filesystem_exit(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -915,10 +916,10 @@ static void filesystem_collector(ebpf_module_t *em)
     int counter = update_every - 1;
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
 
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;
@@ -990,9 +991,10 @@ static void ebpf_set_maps()
  */
 void *ebpf_filesystem_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(ebpf_filesystem_exit, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(ebpf_filesystem_exit) cleanup_ptr = em;
+
     ebpf_set_maps();
     ebpf_update_filesystem();
 
@@ -1024,6 +1026,5 @@ void *ebpf_filesystem_thread(void *ptr)
 endfilesystem:
     ebpf_update_disabled_plugin_stats(em);
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

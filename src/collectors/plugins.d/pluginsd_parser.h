@@ -65,7 +65,7 @@ typedef struct parser_user_object {
 
     struct {
         bool parsing_host;
-        uuid_t machine_guid;
+        nd_uuid_t machine_guid;
         char machine_guid_str[UUID_STR_LEN];
         STRING *hostname;
         RRDLABELS *rrdlabels;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../libnetdata.h"
+#include "../../libnetdata/libnetdata.h"
 
 // ----------------------------------------------------------------------------
 
@@ -203,11 +203,30 @@ bool dyncfg_is_valid_id(const char *id) {
     const char *s = id;
 
     while(*s) {
-        if(isspace(*s) || *s == '\'') return false;
+        if(isspace((uint8_t)*s) || *s == '\'') return false;
         s++;
     }
 
     return true;
+}
+
+static inline bool is_forbidden_char(char c) {
+    if(isspace((uint8_t)c) || !isprint((uint8_t)c))
+        return true;
+
+    switch(c) {
+        case '/':
+            return true;
+
+#ifdef COMPILED_FOR_WINDOWS
+        case ':':
+        case '|':
+            return true;
+#endif
+
+        default:
+            return false;
+    }
 }
 
 char *dyncfg_escape_id_for_filename(const char *id) {
@@ -221,7 +240,7 @@ char *dyncfg_escape_id_for_filename(const char *id) {
     char *dest = escaped;
 
     while (*src) {
-        if (*src == '/' || isspace(*src) || !isprint(*src)) {
+        if (is_forbidden_char(*src)) {
             sprintf(dest, "%%%02X", (unsigned char)*src);
             dest += 3;
         } else {

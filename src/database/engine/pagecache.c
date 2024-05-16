@@ -491,7 +491,7 @@ static size_t list_has_time_gaps(
 
 typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
 static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
-    uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
+    nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);

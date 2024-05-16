@@ -848,12 +848,13 @@ static inline void tc_split_words(char *str, char **words, int max_words) {
 
 static pid_t tc_child_pid = 0;
 
-static void tc_main_cleanup(void *ptr) {
-    worker_unregister();
+static void tc_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
+    worker_unregister();
     tc_device_index_destroy();
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
@@ -892,6 +893,8 @@ static void tc_main_cleanup(void *ptr) {
 #endif
 
 void *tc_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(tc_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("TC");
     worker_register_job_name(WORKER_TC_CLASS, "class");
     worker_register_job_name(WORKER_TC_BEGIN, "begin");
@@ -909,7 +912,6 @@ void *tc_main(void *ptr) {
     worker_register_job_custom_metric(WORKER_TC_CLASSES, "number of classes", "classes", WORKER_METRIC_ABSOLUTE);
 
     tc_device_index_init();
-    netdata_thread_cleanup_push(tc_main_cleanup, ptr);
 
     char command[FILENAME_MAX + 1];
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
@@ -1036,10 +1038,8 @@ void *tc_main(void *ptr) {
                 // netdata_log_debug(D_TC_LOOP, "END line");
 
                 if(likely(device)) {
-                    netdata_thread_disable_cancelability();
                     tc_device_commit(device);
                     // tc_device_free(device);
-                    netdata_thread_enable_cancelability();
                 }
 
                 device = NULL;
@@ -1177,7 +1177,5 @@ void *tc_main(void *ptr) {
     }
 
 cleanup: ; // added semi-colon to prevent older gcc error: label at end of compound statement
-    worker_unregister();
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

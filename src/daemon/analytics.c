@@ -223,7 +223,7 @@ void analytics_mirrored_hosts(void)
 
         count++;
     }
-    rrd_unlock();
+    rrd_rdunlock();
 
     snprintfz(b, sizeof(b) - 1, "%zu", count);
     analytics_set_data(&analytics_data.netdata_mirrored_host_count, b);
@@ -562,9 +562,11 @@ void analytics_gather_mutable_meta_data(void)
     }
 }
 
-void analytics_main_cleanup(void *ptr)
+void analytics_main_cleanup(void *pptr)
 {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     netdata_log_debug(D_ANALYTICS, "Cleaning up...");
@@ -581,7 +583,7 @@ void analytics_main_cleanup(void *ptr)
  */
 void *analytics_main(void *ptr)
 {
-    netdata_thread_cleanup_push(analytics_main_cleanup, ptr);
+    CLEANUP_FUNCTION_REGISTER(analytics_main_cleanup) cleanup_ptr = ptr;
     unsigned int sec = 0;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -626,7 +628,6 @@ void *analytics_main(void *ptr)
     }
 
 cleanup:
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
@@ -777,7 +778,7 @@ void get_system_timezone(void)
         *d = '\0';
 
         while (*timezone) {
-            if (isalnum(*timezone) || *timezone == '_' || *timezone == '/')
+            if (isalnum((uint8_t)*timezone) || *timezone == '_' || *timezone == '/')
                 *d++ = *timezone++;
             else
                 timezone++;
@@ -816,11 +817,11 @@ void get_system_timezone(void)
             } else {
                 sign[0] = zone[0] == '-' || zone[0] == '+' ? zone[0] : '0';
                 sign[1] = '\0';
-                hh[0] = isdigit(zone[1]) ? zone[1] : '0';
-                hh[1] = isdigit(zone[2]) ? zone[2] : '0';
+                hh[0] = isdigit((uint8_t)zone[1]) ? zone[1] : '0';
+                hh[1] = isdigit((uint8_t)zone[2]) ? zone[2] : '0';
                 hh[2] = '\0';
-                mm[0] = isdigit(zone[3]) ? zone[3] : '0';
-                mm[1] = isdigit(zone[4]) ? zone[4] : '0';
+                mm[0] = isdigit((uint8_t)zone[3]) ? zone[3] : '0';
+                mm[1] = isdigit((uint8_t)zone[4]) ? zone[4] : '0';
                 mm[2] = '\0';
 
                 netdata_configured_utc_offset = (str2i(hh) * 3600) + (str2i(mm) * 60);

@@ -246,7 +246,7 @@ static int perf_init() {
     struct perf_event *current_event = NULL;
     unsigned long flags = 0;
 
-    number_of_cpus = (int)get_system_cpus();
+    number_of_cpus = (int)os_get_system_cpus();
 
     // initialize all perf event file descriptors
     for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {

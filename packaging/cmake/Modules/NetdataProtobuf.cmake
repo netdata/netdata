@@ -56,54 +56,67 @@ endfunction()
 
 # Handle detection of Protobuf
 macro(netdata_detect_protobuf)
-        if(NOT ENABLE_BUNDLED_PROTOBUF)
-                if (NOT BUILD_SHARED_LIBS)
-                        set(Protobuf_USE_STATIC_LIBS On)
+        if(COMPILED_FOR_WINDOWS)
+                set(PROTOBUF_PROTOC_EXECUTABLE "$ENV{PROTOBUF_PROTOC_EXECUTABLE}")
+                if(NOT PROTOBUF_PROTOC_EXECUTABLE)
+                        set(PROTOBUF_PROTOC_EXECUTABLE "/bin/protoc")
+                endif()
+                set(PROTOBUF_CFLAGS_OTHER "")
+                set(PROTOBUF_INCLUDE_DIRS "")
+                set(PROTOBUF_LIBRARIES "-lprotobuf")
+
+                set(ENABLE_PROTOBUF True)
+                set(HAVE_PROTOBUF True)
+        else()
+                if(NOT ENABLE_BUNDLED_PROTOBUF)
+                        if (NOT BUILD_SHARED_LIBS)
+                                set(Protobuf_USE_STATIC_LIBS On)
+                        endif()
+
+                        # The FindProtobuf CMake module shipped by upstream CMake is
+                        # broken for Protobuf version 22.0 and newer because it does
+                        # not correctly pull in the new Abseil dependencies. Protobuf
+                        # itself sometimes ships a CMake Package Configuration module
+                        # that _does_ work correctly, so use that in preference to the
+                        # Find module shipped with CMake.
+                        #
+                        # The code below works by first attempting to use find_package
+                        # in config mode, and then checking for the existence of the
+                        # target we actually use that gets defined by the protobuf
+                        # CMake Package Configuration Module to determine if that
+                        # worked. A bit of extra logic is required in the case of the
+                        # config mode working, because some systems ship compatibility
+                        # logic for the old FindProtobuf module while others do not.
+                        #
+                        # Upstream bug reference: https://gitlab.kitware.com/cmake/cmake/-/issues/24321
+                        find_package(Protobuf CONFIG)
+
+                        if(NOT TARGET protobuf::libprotobuf)
+                                message(STATUS "Could not find Protobuf using Config mode, falling back to Module mode")
+                                find_package(Protobuf REQUIRED)
+                        endif()
                 endif()
 
-                # The FindProtobuf CMake module shipped by upstream CMake is
-                # broken for Protobuf version 22.0 and newer because it does
-                # not correctly pull in the new Abseil dependencies. Protobuf
-                # itself sometimes ships a CMake Package Configuration module
-                # that _does_ work correctly, so use that in preference to the
-                # Find module shipped with CMake.
-                #
-                # The code below works by first attempting to use find_package
-                # in config mode, and then checking for the existence of the
-                # target we actually use that gets defined by the protobuf
-                # CMake Package Configuration Module to determine if that
-                # worked. A bit of extra logic is required in the case of the
-                # config mode working, because some systems ship compatibility
-                # logic for the old FindProtobuf module while others do not.
-                #
-                # Upstream bug reference: https://gitlab.kitware.com/cmake/cmake/-/issues/24321
-                find_package(Protobuf CONFIG)
+                if(TARGET protobuf::libprotobuf)
+                        if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
+                                set(Protobuf_PROTOC_EXECUTABLE protobuf::protoc)
+                        endif()
 
-                if(NOT TARGET protobuf::libprotobuf)
-                        message(STATUS "Could not find Protobuf using Config mode, falling back to Module mode")
-                        find_package(Protobuf REQUIRED)
+                        # It is technically possible that this may still not
+                        # be set by this point, so we need to check it and
+                        # fail noisily if it isn't because the build won't
+                        # work without it.
+                        if(NOT Protobuf_PROTOC_EXECUTABLE)
+                                message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
+                        endif()
+
+                        set(PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
+                        set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
                 endif()
+
+                set(ENABLE_PROTOBUF True)
+                set(HAVE_PROTOBUF True)
         endif()
-
-        if(TARGET protobuf::libprotobuf)
-                if(NOT Protobuf_PROTOC_EXECUTABLE AND TARGET protobuf::protoc)
-                        set(Protobuf_PROTOC_EXECUTABLE protobuf::protoc)
-                endif()
-
-                # It is technically possible that this may still not
-                # be set by this point, so we need to check it and
-                # fail noisily if it isn't because the build won't
-                # work without it.
-                if(NOT Protobuf_PROTOC_EXECUTABLE)
-                        message(FATAL_ERROR "Could not determine the location of the protobuf compiler for the detected version of protobuf.")
-                endif()
-
-                set(PROTOBUF_PROTOC_EXECUTABLE ${Protobuf_PROTOC_EXECUTABLE})
-                set(PROTOBUF_LIBRARIES protobuf::libprotobuf)
-        endif()
-
-        set(ENABLE_PROTOBUF True)
-        set(HAVE_PROTOBUF True)
 endmacro()
 
 # Helper function to compile protocol definitions into C++ code.

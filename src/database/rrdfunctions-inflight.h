@@ -11,6 +11,6 @@ void rrd_functions_inflight_init(void);
 void rrd_function_cancel(const char *transaction);
 
 void rrd_function_progress(const char *transaction);
-void rrd_function_call_progresser(uuid_t *transaction);
+void rrd_function_call_progresser(nd_uuid_t *transaction);
 
 #endif //NETDATA_RRDFUNCTIONS_INFLIGHT_H

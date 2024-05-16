@@ -74,7 +74,7 @@ int init_graphite_instance(struct instance *instance)
 void sanitize_graphite_label_value(char *dst, const char *src, size_t len)
 {
     while (*src != '\0' && len) {
-        if (isspace(*src) || *src == ';' || *src == '~')
+        if (isspace((uint8_t)*src) || *src == ';' || *src == '~')
             *dst++ = '_';
         else
             *dst++ = *src;

@@ -3,9 +3,6 @@
 #ifndef NETDATA_RRDENGINE_H
 #define NETDATA_RRDENGINE_H
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 #include <fcntl.h>
 #include <lz4.h>
 #include <Judy.h>
@@ -143,7 +140,7 @@ struct jv2_extents_info {
 };
 
 struct jv2_metrics_info {
-    uuid_t *uuid;
+    nd_uuid_t *uuid;
     uint32_t page_list_header;
     time_t first_time_s;
     time_t last_time_s;
@@ -497,7 +494,7 @@ typedef struct validated_page_descriptor {
 #define page_entries_by_size(page_length_in_bytes, point_size_in_bytes) \
         ((page_length_in_bytes) / (point_size_in_bytes))
 
-VALIDATED_PAGE_DESCRIPTOR validate_page(uuid_t *uuid,
+VALIDATED_PAGE_DESCRIPTOR validate_page(nd_uuid_t *uuid,
                                         time_t start_time_s,
                                         time_t end_time_s,
                                         uint32_t update_every_s,
@@ -526,8 +523,18 @@ static inline time_t max_acceptable_collected_time(void) {
 
 void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker);
 
-static inline int journal_metric_uuid_compare(const void *key, const void *metric) {
-    return uuid_memcmp((uuid_t *)key, &(((struct journal_metric_list *) metric)->uuid));
+// --------------------------------------------------------------------------------------------------------------------
+// the following functions are used to sort UUIDs in the journal files
+// DO NOT CHANGE, as this will break backwards compatibility with the data files users have.
+
+static inline int journal_uuid_memcmp(const nd_uuid_t *uu1, const nd_uuid_t *uu2) {
+    return memcmp(uu1, uu2, sizeof(nd_uuid_t));
 }
+
+static inline int journal_metric_uuid_compare(const void *key, const void *metric) {
+    return journal_uuid_memcmp((const nd_uuid_t *)key, (const nd_uuid_t *)&(((struct journal_metric_list *) metric)->uuid));
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 #endif /* NETDATA_RRDENGINE_H */

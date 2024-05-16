@@ -569,7 +569,7 @@ struct thread_unittest {
     DICTIONARY *dict;
     int dups;
 
-    netdata_thread_t thread;
+    ND_THREAD *thread;
     struct dictionary_stats stats;
 };
 
@@ -638,7 +638,7 @@ static void *unittest_dict_thread(void *arg) {
 
         // test concurrent deletions and flushes
         {
-            if(gettid() % 2) {
+            if(gettid_cached() % 2) {
                 char buf [256 + 1];
 
                 for (int i = 0; i < 1000; i++) {
@@ -690,8 +690,7 @@ static int dictionary_unittest_threads() {
 
         char buf[100 + 1];
         snprintf(buf, 100, "dict%d", i);
-        netdata_thread_create(
-            &tu[i].thread,
+        tu[i].thread = nd_thread_create(
             buf,
             NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
             unittest_dict_thread,
@@ -703,8 +702,7 @@ static int dictionary_unittest_threads() {
     for (int i = 0; i < threads_to_create; i++) {
         __atomic_store_n(&tu[i].join, 1, __ATOMIC_RELAXED);
 
-        void *retval;
-        netdata_thread_join(tu[i].thread, &retval);
+        nd_thread_join(tu[i].thread);
 
         if(i) {
             tu[0].stats.ops.inserts += tu[i].stats.ops.inserts;
@@ -870,18 +868,16 @@ static int dictionary_unittest_view_threads() {
         "\nChecking dictionary concurrency with 1 master and 1 view threads for %lld seconds...\n",
         (long long)seconds_to_run);
 
-    netdata_thread_t master_thread, view_thread;
+    ND_THREAD *master_thread, *view_thread;
     tv.join = 0;
 
-    netdata_thread_create(
-        &master_thread,
+    master_thread = nd_thread_create(
         "master",
         NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
         unittest_dict_master_thread,
         &tv);
 
-    netdata_thread_create(
-        &view_thread,
+    view_thread = nd_thread_create(
         "view",
         NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
         unittest_dict_view_thread,
@@ -890,9 +886,8 @@ static int dictionary_unittest_view_threads() {
     sleep_usec(seconds_to_run * USEC_PER_SEC);
 
     __atomic_store_n(&tv.join, 1, __ATOMIC_RELAXED);
-    void *retval;
-    netdata_thread_join(view_thread, &retval);
-    netdata_thread_join(master_thread, &retval);
+    nd_thread_join(view_thread);
+    nd_thread_join(master_thread);
 
 #ifdef DICT_WITH_STATS
     fprintf(stderr,

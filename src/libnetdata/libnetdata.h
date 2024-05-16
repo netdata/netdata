@@ -76,6 +76,8 @@ extern "C" {
 #define NETDATA_OS_TYPE "freebsd"
 #elif defined(__APPLE__)
 #define NETDATA_OS_TYPE "macos"
+#elif defined(COMPILED_FOR_WINDOWS)
+#define NETDATA_OS_TYPE "windows"
 #else
 #define NETDATA_OS_TYPE "linux"
 #endif /* __FreeBSD__, __APPLE__*/
@@ -90,40 +92,112 @@ extern "C" {
 #include <ctype.h>
 #include <string.h>
 #include <strings.h>
-#include <arpa/inet.h>
-#include <netinet/tcp.h>
-#include <sys/ioctl.h>
 #include <libgen.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <grp.h>
-#include <pwd.h>
 #include <limits.h>
 #include <locale.h>
-#include <net/if.h>
-#include <poll.h>
 #include <signal.h>
-#include <syslog.h>
-#include <sys/mman.h>
-#include <sys/resource.h>
-#include <sys/socket.h>
-#include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/wait.h>
-#include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
-#include <uuid/uuid.h>
-#include <spawn.h>
 #include <uv.h>
 #include <assert.h>
 
-// CentOS 7 has older version that doesn't define this
-// same goes for MacOS
-#ifndef UUID_STR_LEN
-#define UUID_STR_LEN (37)
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+
+#ifdef HAVE_NETINET_TCP_H
+#include <netinet/tcp.h>
+#endif
+
+#ifdef HAVE_SYS_IOCTL_H
+#include <sys/ioctl.h>
+#endif
+
+#ifdef HAVE_GRP_H
+#include <grp.h>
+#else
+typedef uint32_t gid_t;
+#endif
+
+#ifdef HAVE_PWD_H
+#include <pwd.h>
+#else
+typedef uint32_t uid_t;
+#endif
+
+#ifdef HAVE_NET_IF_H
+#include <net/if.h>
+#endif
+
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
+
+#ifdef HAVE_SYSLOG_H
+#include <syslog.h>
+#else
+/* priorities */
+#define	LOG_EMERG	0	/* system is unusable */
+#define	LOG_ALERT	1	/* action must be taken immediately */
+#define	LOG_CRIT	2	/* critical conditions */
+#define	LOG_ERR		3	/* error conditions */
+#define	LOG_WARNING	4	/* warning conditions */
+#define	LOG_NOTICE	5	/* normal but significant condition */
+#define	LOG_INFO	6	/* informational */
+#define	LOG_DEBUG	7	/* debug-level messages */
+
+/* facility codes */
+#define	LOG_KERN	(0<<3)	/* kernel messages */
+#define	LOG_USER	(1<<3)	/* random user-level messages */
+#define	LOG_MAIL	(2<<3)	/* mail system */
+#define	LOG_DAEMON	(3<<3)	/* system daemons */
+#define	LOG_AUTH	(4<<3)	/* security/authorization messages */
+#define	LOG_SYSLOG	(5<<3)	/* messages generated internally by syslogd */
+#define	LOG_LPR		(6<<3)	/* line printer subsystem */
+#define	LOG_NEWS	(7<<3)	/* network news subsystem */
+#define	LOG_UUCP	(8<<3)	/* UUCP subsystem */
+#define	LOG_CRON	(9<<3)	/* clock daemon */
+#define	LOG_AUTHPRIV	(10<<3)	/* security/authorization messages (private) */
+#define	LOG_FTP		(11<<3)	/* ftp daemon */
+
+/* other codes through 15 reserved for system use */
+#define	LOG_LOCAL0	(16<<3)	/* reserved for local use */
+#define	LOG_LOCAL1	(17<<3)	/* reserved for local use */
+#define	LOG_LOCAL2	(18<<3)	/* reserved for local use */
+#define	LOG_LOCAL3	(19<<3)	/* reserved for local use */
+#define	LOG_LOCAL4	(20<<3)	/* reserved for local use */
+#define	LOG_LOCAL5	(21<<3)	/* reserved for local use */
+#define	LOG_LOCAL6	(22<<3)	/* reserved for local use */
+#define	LOG_LOCAL7	(23<<3)	/* reserved for local use */
+#endif
+
+#ifdef HAVE_SYS_MMAN_H
+#include <sys/mman.h>
+#endif
+
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
+
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+
+#ifdef HAVE_SYS_WAIT_H
+#include <sys/wait.h>
+#endif
+
+#ifdef HAVE_SYS_UN_H
+#include <sys/un.h>
+#endif
+
+#ifdef HAVE_SPAWN_H
+#include <spawn.h>
 #endif
 
 #ifdef HAVE_NETINET_IN_H
@@ -190,6 +264,10 @@ extern "C" {
 #endif
 
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC (0)
+#endif
+
 // ----------------------------------------------------------------------------
 // netdata common definitions
 
@@ -213,8 +291,10 @@ extern "C" {
 #define MALLOCLIKE
 #endif
 
-#ifdef HAVE_FUNC_ATTRIBUTE_FORMAT
-#define PRINTFLIKE(f, a) __attribute__ ((format(__printf__, f, a)))
+#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT) && !defined(COMPILED_FOR_MACOS)
+#define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
+#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT)
+#define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
 #else
 #define PRINTFLIKE(f, a)
 #endif
@@ -376,6 +456,8 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
 void netdata_cleanup_and_exit(int ret, const char *action, const char *action_result, const char *action_data) NORETURN;
 extern char *netdata_configured_host_prefix;
 
+#include "os/os.h"
+
 #define XXH_INLINE_ALL
 #include "xxhash.h"
 
@@ -386,7 +468,6 @@ extern char *netdata_configured_host_prefix;
 #include "config/dyncfg.h"
 #include "libjudy/src/Judy.h"
 #include "july/july.h"
-#include "os.h"
 #include "threads/threads.h"
 #include "buffer/buffer.h"
 #include "locks/locks.h"
@@ -593,6 +674,33 @@ static inline void freez_const_charp(const char **p) {
 
 #define CLEAN_CONST_CHAR_P _cleanup_(freez_const_charp) const char
 #define CLEAN_CHAR_P _cleanup_(freez_charp) char
+
+// --------------------------------------------------------------------------------------------------------------------
+// automatic cleanup function, instead of pthread pop/push
+
+// volatile: Tells the compiler that the variable defined might be accessed in unexpected ways
+// (e.g., by the cleanup function). This prevents it from being optimized out.
+#define CLEANUP_FUNCTION_REGISTER(func) volatile void * __attribute__((cleanup(func)))
+
+static inline void *CLEANUP_FUNCTION_GET_PTR(void *pptr) {
+    void *ret;
+    void **p = (void **)pptr;
+    if(p) {
+        ret = *p;
+        *p = NULL; // use it only once - this will prevent using it again
+
+        if(!ret)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "cleanup function called multiple times!");
+    }
+    else {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "cleanup function called with NULL pptr!");
+        ret = NULL;
+    }
+
+    return ret;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 # ifdef __cplusplus
 }

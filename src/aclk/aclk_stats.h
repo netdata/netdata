@@ -19,7 +19,7 @@ extern netdata_mutex_t aclk_stats_mutex;
 int aclk_cloud_req_http_type_to_idx(const char *name);
 
 struct aclk_stats_thread {
-    netdata_thread_t *thread;
+    ND_THREAD *thread;
     int query_thread_count;
     mqtt_wss_client client;
 };

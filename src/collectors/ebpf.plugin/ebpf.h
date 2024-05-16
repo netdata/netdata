@@ -389,6 +389,11 @@ void ebpf_read_local_addresses_unsafe();
 extern ebpf_filesystem_partitions_t localfs[];
 extern ebpf_sync_syscalls_t local_syscalls[];
 extern bool ebpf_plugin_exit;
+
+static inline bool ebpf_plugin_stop(void) {
+    return ebpf_plugin_exit || nd_thread_signaled_to_cancel();
+}
+
 void ebpf_stop_threads(int sig);
 extern netdata_ebpf_judy_pid_t ebpf_judy_pid;
 

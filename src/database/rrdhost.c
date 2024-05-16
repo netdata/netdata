@@ -35,13 +35,13 @@ time_t rrdhost_free_ephemeral_time_s = 86400;
 
 RRDHOST *find_host_by_node_id(char *node_id) {
 
-    uuid_t node_uuid;
+    nd_uuid_t node_uuid;
     if (unlikely(!node_id || uuid_parse(node_id, node_uuid)))
         return NULL;
 
     RRDHOST *host, *ret = NULL;
     dfe_start_read(rrdhost_root_index, host) {
-        if (host->node_id && !(uuid_memcmp(host->node_id, &node_uuid))) {
+        if (host->node_id && uuid_eq(*host->node_id, node_uuid)) {
             ret = host;
             break;
         }
@@ -319,7 +319,7 @@ static RRDHOST *prepare_host_for_unittest(RRDHOST *host)
 
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
-        rrd_unlock();
+        rrd_wrunlock();
         return NULL;
     }
     return host;
@@ -492,7 +492,7 @@ static RRDHOST *rrdhost_create(
         if (!is_localhost)
             rrdhost_free___while_having_rrd_wrlock(host, true);
 
-        rrd_unlock();
+        rrd_wrunlock();
         return NULL;
     }
 
@@ -503,7 +503,7 @@ static RRDHOST *rrdhost_create(
     else
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(localhost, host, prev, next);
 
-    rrd_unlock();
+    rrd_wrunlock();
 
     // ------------------------------------------------------------------------
 
@@ -732,7 +732,7 @@ RRDHOST *rrdhost_find_or_create(
         rrd_wrlock();
         rrdhost_free___while_having_rrd_wrlock(host, true);
         host = NULL;
-        rrd_unlock();
+        rrd_wrunlock();
     }
 
     if(!host) {
@@ -811,7 +811,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 
 #ifdef ENABLE_DBENGINE
 struct dbengine_initialization {
-    netdata_thread_t thread;
+    ND_THREAD *thread;
     char path[FILENAME_MAX + 1];
     int disk_space_mb;
     size_t tier;
@@ -937,8 +937,7 @@ void dbengine_init(char *hostname) {
         if(parallel_initialization) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
-            netdata_thread_create(&tiers_init[tier].thread, tag, NETDATA_THREAD_OPTION_JOINABLE,
-                                  dbengine_tier_init, &tiers_init[tier]);
+            tiers_init[tier].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_JOINABLE, dbengine_tier_init, &tiers_init[tier]);
         }
         else
             dbengine_tier_init(&tiers_init[tier]);
@@ -947,10 +946,8 @@ void dbengine_init(char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        void *ptr;
-
         if(parallel_initialization)
-            netdata_thread_join(tiers_init[tier].thread, &ptr);
+            nd_thread_join(tiers_init[tier].thread);
 
         if(tiers_init[tier].ret != 0) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -1289,7 +1286,7 @@ void rrdhost_free_all(void) {
     if(localhost)
         rrdhost_free___while_having_rrd_wrlock(localhost, true);
 
-    rrd_unlock();
+    rrd_wrunlock();
 }
 
 void rrd_finalize_collection_for_all_hosts(void) {

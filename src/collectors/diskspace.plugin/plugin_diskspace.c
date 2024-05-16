@@ -14,7 +14,7 @@
 #define MAX_STAT_USEC 10000LU
 #define SLOW_UPDATE_EVERY 5
 
-static netdata_thread_t *diskspace_slow_thread = NULL;
+static ND_THREAD *diskspace_slow_thread = NULL;
 
 static struct mountinfo *disk_mountinfo_root = NULL;
 static int check_for_new_mountpoints_every = 15;
@@ -513,9 +513,9 @@ cleanup:
     dictionary_acquired_item_release(dict_mountpoints, item);
 }
 
-static void diskspace_slow_worker_cleanup(void *ptr)
-{
-    UNUSED(ptr);
+static void diskspace_slow_worker_cleanup(void *pptr) {
+    struct slow_worker_data *data = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(data) return;
 
     collector_info("cleaning up...");
 
@@ -526,14 +526,14 @@ static void diskspace_slow_worker_cleanup(void *ptr)
 #define WORKER_JOB_SLOW_CLEANUP 1
 
 struct slow_worker_data {
-    netdata_thread_t *slow_thread;
     int update_every;
 };
 
 void *diskspace_slow_worker(void *ptr)
 {
     struct slow_worker_data *data = (struct slow_worker_data *)ptr;
-    
+    CLEANUP_FUNCTION_REGISTER(diskspace_slow_worker_cleanup) cleanup_ptr = data;
+
     worker_register("DISKSPACE_SLOW");
     worker_register_job_name(WORKER_JOB_SLOW_MOUNTPOINT, "mountpoint");
     worker_register_job_name(WORKER_JOB_SLOW_CLEANUP, "cleanup");
@@ -541,8 +541,6 @@ void *diskspace_slow_worker(void *ptr)
     struct basic_mountinfo *slow_mountinfo_root = NULL;
 
     int slow_update_every = data->update_every > SLOW_UPDATE_EVERY ? data->update_every : SLOW_UPDATE_EVERY;
-
-    netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, data->slow_thread);
 
     usec_t step = slow_update_every * USEC_PER_SEC;
     usec_t real_step = USEC_PER_SEC;
@@ -600,26 +598,24 @@ void *diskspace_slow_worker(void *ptr)
         }
     }
 
-    netdata_thread_cleanup_pop(1);
-
     free_basic_mountinfo_list(slow_mountinfo_root);
 
     return NULL;
 }
 
-static void diskspace_main_cleanup(void *ptr) {
-    rrd_collector_finished();
-    worker_unregister();
+static void diskspace_main_cleanup(void *pptr) {
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
 
-    if (diskspace_slow_thread) {
-        netdata_thread_join(*diskspace_slow_thread, NULL);
-        freez(diskspace_slow_thread);
-    }
+    rrd_collector_finished();
+    worker_unregister();
+
+    if (diskspace_slow_thread)
+        nd_thread_join(diskspace_slow_thread);
 
     free_basic_mountinfo_list(slow_mountinfo_tmp_root);
 
@@ -846,6 +842,8 @@ int diskspace_function_mount_points(BUFFER *wb, const char *function __maybe_unu
 }
 
 void *diskspace_main(void *ptr) {
+    CLEANUP_FUNCTION_REGISTER(diskspace_main_cleanup) cleanup_ptr = ptr;
+
     worker_register("DISKSPACE");
     worker_register_job_name(WORKER_JOB_MOUNTINFO, "mountinfo");
     worker_register_job_name(WORKER_JOB_MOUNTPOINT, "mountpoint");
@@ -855,8 +853,6 @@ void *diskspace_main(void *ptr) {
                             RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_DISKSPACE_HELP,
                             "top", HTTP_ACCESS_ANONYMOUS_DATA,
                             diskspace_function_mount_points);
-
-    netdata_thread_cleanup_push(diskspace_main_cleanup, ptr);
 
     cleanup_mount_points = config_get_boolean(CONFIG_SECTION_DISKSPACE, "remove charts of unmounted disks" , cleanup_mount_points);
 
@@ -870,12 +866,9 @@ void *diskspace_main(void *ptr) {
 
     netdata_mutex_init(&slow_mountinfo_mutex);
 
-    diskspace_slow_thread = mallocz(sizeof(netdata_thread_t));
+    struct slow_worker_data slow_worker_data = { .update_every = update_every };
 
-    struct slow_worker_data slow_worker_data = {.slow_thread = diskspace_slow_thread, .update_every = update_every};
-
-    netdata_thread_create(
-        diskspace_slow_thread,
+    diskspace_slow_thread = nd_thread_create(
         "P[diskspace slow]",
         NETDATA_THREAD_OPTION_JOINABLE,
         diskspace_slow_worker,
@@ -926,8 +919,5 @@ void *diskspace_main(void *ptr) {
             mount_points_cleanup(false);
         }
     }
-    worker_unregister();
-
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

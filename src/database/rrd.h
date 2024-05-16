@@ -270,7 +270,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
 // RRD DIMENSION - this is a metric
 
 struct rrddim {
-    uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
+    nd_uuid_t metric_uuid;                             // global UUID for this metric (unique_across hosts)
 
     // ------------------------------------------------------------------------
     // dimension definition
@@ -361,9 +361,9 @@ size_t rrddim_size(void);
 // ------------------------------------------------------------------------
 // DATA COLLECTION STORAGE OPS
 
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, uuid_t *uuid);
-STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, uuid_t *uuid);
-static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, uuid_t *uuid) {
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
+static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
     internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
@@ -635,11 +635,11 @@ static inline time_t storage_engine_align_to_optimal_before(struct storage_engin
 // function pointers for all APIs provided by a storage engine
 typedef struct storage_engine_api {
     // metric management
-    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *si, uuid_t *uuid);
+    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
     STORAGE_METRIC_HANDLE *(*metric_get_or_create)(RRDDIM *rd, STORAGE_INSTANCE *si);
     void (*metric_release)(STORAGE_METRIC_HANDLE *);
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
-    bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *si, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
+    bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *si, nd_uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
 } STORAGE_ENGINE_API;
 
 typedef struct storage_engine {
@@ -719,7 +719,7 @@ struct pluginsd_rrddim {
 };
 
 struct rrdset {
-    uuid_t chart_uuid;                             // the global UUID for this chart
+    nd_uuid_t chart_uuid;                             // the global UUID for this chart
 
     // ------------------------------------------------------------------------
     // chart configuration
@@ -1025,8 +1025,8 @@ struct alarm_entry {
     uint32_t alarm_id;
     uint32_t alarm_event_id;
     usec_t global_id;
-    uuid_t config_hash_id;
-    uuid_t transition_id;
+    nd_uuid_t config_hash_id;
+    nd_uuid_t transition_id;
 
     time_t when;
     time_t duration;
@@ -1231,7 +1231,7 @@ struct rrdhost {
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
-    netdata_thread_t rrdpush_sender_thread;         // the sender thread
+    ND_THREAD *rrdpush_sender_thread;               // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
     struct aclk_sync_cfg_t *aclk_config;
 
@@ -1307,8 +1307,8 @@ struct rrdhost {
         time_t last_time_s;
     } retention;
 
-    uuid_t  host_uuid;                              // Global GUID for this host
-    uuid_t  *node_id;                               // Cloud node_id
+    nd_uuid_t  host_uuid;                              // Global GUID for this host
+    nd_uuid_t  *node_id;                               // Cloud node_id
 
     netdata_mutex_t aclk_state_lock;
     aclk_rrdhost_state aclk_state;
@@ -1365,7 +1365,8 @@ extern netdata_rwlock_t rrd_rwlock;
 
 #define rrd_rdlock() netdata_rwlock_rdlock(&rrd_rwlock)
 #define rrd_wrlock() netdata_rwlock_wrlock(&rrd_rwlock)
-#define rrd_unlock() netdata_rwlock_unlock(&rrd_rwlock)
+#define rrd_rdunlock() netdata_rwlock_rdunlock(&rrd_rwlock)
+#define rrd_wrunlock() netdata_rwlock_wrunlock(&rrd_rwlock)
 
 // ----------------------------------------------------------------------------
 

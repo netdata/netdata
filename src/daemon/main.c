@@ -42,12 +42,12 @@ typedef struct service_thread {
     pid_t tid;
     SERVICE_THREAD_TYPE type;
     SERVICE_TYPE services;
-    char name[NETDATA_THREAD_NAME_MAX + 1];
+    char name[ND_THREAD_TAG_MAX + 1];
     bool stop_immediately;
     bool cancelled;
 
     union {
-        netdata_thread_t netdata_thread;
+        ND_THREAD *netdata_thread;
         uv_thread_t uv_thread;
     };
 
@@ -65,7 +65,7 @@ struct service_globals {
 
 SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data, bool update __maybe_unused) {
     SERVICE_THREAD *sth = NULL;
-    pid_t tid = gettid();
+    pid_t tid = gettid_cached();
 
     spinlock_lock(&service_globals.lock);
     Pvoid_t *PValue = JudyLIns(&service_globals.pid_judy, tid, PJE0);
@@ -76,13 +76,12 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
         sth->request_quit_callback = request_quit_callback;
         sth->force_quit_callback = force_quit_callback;
         sth->data = data;
-        os_thread_get_current_name_np(sth->name);
         *PValue = sth;
 
         switch(thread_type) {
             default:
             case SERVICE_THREAD_TYPE_NETDATA:
-                sth->netdata_thread = netdata_thread_self();
+                sth->netdata_thread = nd_thread_self();
                 break;
 
             case SERVICE_THREAD_TYPE_EVENT_LOOP:
@@ -90,6 +89,10 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
                 sth->uv_thread = uv_thread_self();
                 break;
         }
+
+        const char *name = nd_thread_tag();
+        if(!name) name = "";
+        strncpyz(sth->name, name, sizeof(sth->name) - 1);
     }
     else {
         sth = *PValue;
@@ -100,7 +103,7 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
 }
 
 void service_exits(void) {
-    pid_t tid = gettid();
+    pid_t tid = gettid_cached();
 
     spinlock_lock(&service_globals.lock);
     Pvoid_t *PValue = JudyLGet(service_globals.pid_judy, tid, PJE0);
@@ -119,7 +122,7 @@ bool service_running(SERVICE_TYPE service) {
 
     sth->services |= service;
 
-    return !(sth->stop_immediately || netdata_exit);
+    return !sth->stop_immediately && !netdata_exit && !nd_thread_signaled_to_cancel();
 }
 
 void service_signal_exit(SERVICE_TYPE service) {
@@ -133,6 +136,9 @@ void service_signal_exit(SERVICE_TYPE service) {
 
         if((sth->services & service)) {
             sth->stop_immediately = true;
+
+            // this does not harm - it just raises a flag
+            nd_thread_signal_cancel(sth->netdata_thread);
 
             if(sth->request_quit_callback) {
                 spinlock_unlock(&service_globals.lock);
@@ -196,13 +202,13 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         bool first = true;
         while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
             SERVICE_THREAD *sth = *PValue;
-            if(sth->services & service && sth->tid != gettid() && !sth->cancelled) {
+            if(sth->services & service && sth->tid != gettid_cached() && !sth->cancelled) {
                 sth->cancelled = true;
 
                 switch(sth->type) {
                     default:
                     case SERVICE_THREAD_TYPE_NETDATA:
-                        netdata_thread_cancel(sth->netdata_thread);
+                        nd_thread_signal_cancel(sth->netdata_thread);
                         break;
 
                     case SERVICE_THREAD_TYPE_EVENT_LOOP:
@@ -253,7 +259,7 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         bool first = true;
         while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
             SERVICE_THREAD *sth = *PValue;
-            if(sth->services & service && sth->tid != gettid()) {
+            if(sth->services & service && sth->tid != gettid_cached()) {
                 if(running)
                     buffer_strcat(thread_list, ", ");
 
@@ -667,7 +673,7 @@ void cancel_main_threads() {
         if (static_threads[i].enabled == NETDATA_MAIN_THREAD_RUNNING) {
             if (static_threads[i].thread) {
                 netdata_log_info("EXIT: Stopping main thread: %s", static_threads[i].name);
-                netdata_thread_cancel(*static_threads[i].thread);
+                nd_thread_signal_cancel(static_threads[i].thread);
             } else {
                 netdata_log_info("EXIT: No thread running (marking as EXITED): %s", static_threads[i].name);
                 static_threads[i].enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -688,7 +694,7 @@ void cancel_main_threads() {
                 continue;
 
             // Don't wait ourselves.
-            if (static_threads[i].thread && (*static_threads[i].thread == pthread_self()))
+            if (nd_thread_is_me(static_threads[i].thread))
                 continue;
 
             found++;
@@ -703,9 +709,6 @@ void cancel_main_threads() {
     }
     else
         netdata_log_info("All threads finished.");
-
-    for (i = 0; static_threads[i].name != NULL ; i++)
-        freez(static_threads[i].thread);
 
     freez(static_threads);
     static_threads = NULL;
@@ -821,6 +824,10 @@ int help(int exitcode) {
             "                           Check if string matches pattern and exit.\n\n"
             "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
             "                           Claim the agent to the workspace rooms pointed to by TOKEN and ROOM*.\n\n"
+#ifdef COMPILED_FOR_WINDOWS
+            "  -W perflibdump [key]\n"
+            "                           Dump the Windows Performance Counters Registry in JSON.\n\n"
+#endif
     );
 
     fprintf(stream, "\n Signals netdata handles:\n\n"
@@ -1254,9 +1261,9 @@ static void get_netdata_configured_variables() {
     // --------------------------------------------------------------------
     // get various system parameters
 
-    get_system_HZ();
-    get_system_cpus_uncached();
-    get_system_pid_max();
+    os_get_system_HZ();
+    os_get_system_cpus_uncached();
+    os_get_system_pid_max();
 
 
 }
@@ -1382,6 +1389,10 @@ int unittest_rrdpush_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
+
+#ifdef COMPILED_FOR_WINDOWS
+int windows_perflib_dump(const char *key);
+#endif
 
 int unittest_prepare_rrd(char **user) {
     post_conf_load(user);
@@ -1590,6 +1601,11 @@ int main(int argc, char **argv) {
                             unittest_running = true;
                             return uuid_unittest();
                         }
+#ifdef COMPILED_FOR_WINDOWS
+                        else if(strcmp(optarg, "perflibdump") == 0) {
+                            return windows_perflib_dump(optind + 1 > argc ? NULL : argv[optind]);
+                        }
+#endif
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;
@@ -2110,9 +2126,13 @@ int main(int argc, char **argv) {
 
     delta_startup_time("become daemon");
 
+#if defined(COMPILED_FOR_LINUX) || defined(COMPILED_FOR_MACOS) || defined(COMPILED_FOR_FREEBSD)
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
+#else
+    (void)dont_fork;
+#endif
 
     watcher_thread_start();
 
@@ -2228,9 +2248,8 @@ int main(int argc, char **argv) {
         struct netdata_static_thread *st = &static_threads[i];
 
         if(st->enabled) {
-            st->thread = mallocz(sizeof(netdata_thread_t));
             netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
-            netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+            st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
         }
         else
             netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
@@ -2266,10 +2285,9 @@ int main(int argc, char **argv) {
         for (i = 0; static_threads[i].name != NULL; i++) {
             if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
                 struct netdata_static_thread *st = &static_threads[i];
-                st->thread = mallocz(sizeof(netdata_thread_t));
                 st->enabled = 1;
                 netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
-                netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+                st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
             }
         }
     }

@@ -670,7 +670,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
 
     time_t now_s = max_acceptable_collected_time();
     for (i = 0; i < count ; ++i) {
-        uuid_t *temp_id;
+        nd_uuid_t *temp_id;
         uint8_t page_type = jf_metric_data->descr[i].type;
 
         if (page_type > RRDENG_PAGE_TYPE_MAX) {
@@ -681,7 +681,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
             continue;
         }
 
-        temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
+        temp_id = (nd_uuid_t *)jf_metric_data->descr[i].uuid;
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, temp_id, (Word_t) ctx);
 
         struct rrdeng_extent_page_descr *descr = &jf_metric_data->descr[i];
@@ -1145,7 +1145,7 @@ static int journalfile_metric_compare (const void *item1, const void *item2)
     const struct jv2_metrics_info *metric1 = ((struct journal_metric_list_to_sort *) item1)->metric_info;
     const struct jv2_metrics_info *metric2 = ((struct journal_metric_list_to_sort *) item2)->metric_info;
 
-    return memcmp(metric1->uuid, metric2->uuid, sizeof(uuid_t));
+    return memcmp(metric1->uuid, metric2->uuid, sizeof(nd_uuid_t));
 }
 
 

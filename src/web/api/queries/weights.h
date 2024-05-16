@@ -58,7 +58,7 @@ typedef struct query_weights_request {
     weights_interrupt_callback_t interrupt_callback;
     void *interrupt_callback_data;
 
-    uuid_t *transaction;
+    nd_uuid_t *transaction;
 } QUERY_WEIGHTS_REQUEST;
 
 int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr);

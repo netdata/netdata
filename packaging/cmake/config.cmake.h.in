@@ -12,6 +12,8 @@
 #cmakedefine COMPILED_FOR_FREEBSD
 #cmakedefine COMPILED_FOR_LINUX
 #cmakedefine COMPILED_FOR_MACOS
+#cmakedefine COMPILED_FOR_WINDOWS
+#cmakedefine COMPILED_FOR_FOREIGN_OS
 
 // checked headers
 
@@ -28,6 +30,20 @@
 #cmakedefine HAVE_INTTYPES_H
 #cmakedefine HAVE_STDINT_H
 #cmakedefine HAVE_SYS_CAPABILITY_H
+#cmakedefine HAVE_ARPA_INET_H
+#cmakedefine HAVE_NETINET_TCP_H
+#cmakedefine HAVE_SYS_IOCTL_H
+#cmakedefine HAVE_GRP_H
+#cmakedefine HAVE_PWD_H
+#cmakedefine HAVE_NET_IF_H
+#cmakedefine HAVE_POLL_H
+#cmakedefine HAVE_SYSLOG_H
+#cmakedefine HAVE_SYS_MMAN_H
+#cmakedefine HAVE_SYS_RESOURCE_H
+#cmakedefine HAVE_SYS_SOCKET_H
+#cmakedefine HAVE_SYS_WAIT_H
+#cmakedefine HAVE_SYS_UN_H
+#cmakedefine HAVE_SPAWN_H
 
 #cmakedefine HAVE_CAPABILITY
 #cmakedefine HAVE_PROTOBUF
@@ -44,8 +60,13 @@
 #cmakedefine HAVE_FINITE
 #cmakedefine HAVE_ISFINITE
 #cmakedefine HAVE_RECVMMSG
+#cmakedefine HAVE_PTHREAD_GETTHREADID_NP
+#cmakedefine HAVE_PTHREAD_THREADID_NP
+#cmakedefine HAVE_GETTID
+#cmakedefine HAVE_WAITID
 #cmakedefine HAVE_NICE
 #cmakedefine HAVE_GETPRIORITY
+#cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
 
 #cmakedefine HAVE_BACKTRACE
@@ -70,6 +91,8 @@
 #cmakedefine HAVE_C__GENERIC
 #cmakedefine HAVE_C_MALLOPT
 #cmakedefine HAVE_SETNS
+#cmakedefine HAVE_STRNDUP
+#cmakedefine SSL_HAS_PENDING
 
 #cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT
 #cmakedefine HAVE_FUNC_ATTRIBUTE_MALLOC

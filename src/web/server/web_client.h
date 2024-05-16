@@ -165,7 +165,7 @@ struct web_client {
     unsigned long long id;
     size_t use_count;
 
-    uuid_t transaction;
+    nd_uuid_t transaction;
 
     WEB_CLIENT_FLAGS flags;             // status flags for the client
     HTTP_REQUEST_MODE mode;             // the operational mode of the client
@@ -207,8 +207,8 @@ struct web_client {
 #endif
 
     struct {
-        uuid_t bearer_token;
-        uuid_t cloud_account_id;
+        nd_uuid_t bearer_token;
+        nd_uuid_t cloud_account_id;
         char client_name[CLOUD_USER_NAME_LENGTH];
     } auth;
 

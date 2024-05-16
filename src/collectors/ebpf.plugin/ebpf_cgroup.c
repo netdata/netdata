@@ -349,18 +349,6 @@ void ebpf_create_charts_on_systemd(ebpf_systemd_args_t *chart)
 // Cgroup main thread
 
 /**
- * CGROUP exit
- *
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_cgroup_exit(void *ptr)
-{
-    UNUSED(ptr);
-}
-
-/**
  * Cgroup integratin
  *
  * Thread responsible to call functions responsible to sync data between plugins.
@@ -369,16 +357,14 @@ static void ebpf_cgroup_exit(void *ptr)
  *
  * @return It always returns NULL.
  */
-void *ebpf_cgroup_integration(void *ptr)
+void *ebpf_cgroup_integration(void *ptr __maybe_unused)
 {
-    netdata_thread_cleanup_push(ebpf_cgroup_exit, ptr);
-
     usec_t step = USEC_PER_SEC;
     int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
     //Plugin will be killed when it receives a signal
-    while (!ebpf_plugin_exit) {
+    while (!ebpf_plugin_stop()) {
         (void)heartbeat_next(&hb, step);
 
         // We are using a small heartbeat time to wake up thread,
@@ -392,6 +378,5 @@ void *ebpf_cgroup_integration(void *ptr)
         }
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

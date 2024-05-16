@@ -1580,9 +1580,9 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
 
 struct sql_alert_transition_fixed_size {
     usec_t global_id;
-    uuid_t transition_id;
-    uuid_t host_id;
-    uuid_t config_hash_id;
+    nd_uuid_t transition_id;
+    nd_uuid_t host_id;
+    nd_uuid_t config_hash_id;
     uint32_t alarm_id;
     char alert_name[SQL_TRANSITION_DATA_SMALL_STRING];
     char chart[RRD_ID_LENGTH_MAX];

@@ -19,7 +19,7 @@ static bool journal_data_directories_exist() {
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
     clocks_init();
-    netdata_thread_set_tag("sd-jrnl.plugin");
+    nd_thread_tag_set("sd-jrnl.plugin");
     nd_log_initialize_for_external_plugins("systemd-journal.plugin");
 
     netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
@@ -67,9 +67,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     // ------------------------------------------------------------------------
     // watcher thread
 
-    netdata_thread_t watcher_thread;
-    netdata_thread_create(&watcher_thread, "SDWATCH",
-                          NETDATA_THREAD_OPTION_DONT_LOG, journal_watcher_main, NULL);
+    nd_thread_create("SDWATCH", NETDATA_THREAD_OPTION_DONT_LOG, journal_watcher_main, NULL);
 
     // ------------------------------------------------------------------------
     // the event loop for functions

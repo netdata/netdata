@@ -170,7 +170,7 @@ static void http_header_x_netdata_auth(struct web_client *w, const char *v, size
 
     if(strncasecmp(v, "Bearer ", 7) == 0) {
         v = &v[7];
-        while(*v && isspace(*v)) v++;
+        while(*v && isspace((uint8_t)*v)) v++;
         web_client_bearer_token_auth(w, v);
     }
 }

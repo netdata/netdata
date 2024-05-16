@@ -400,8 +400,8 @@ static void do_proc_net_snmp6(int update_every) {
                     , RRDSET_TYPE_AREA
             );
 
-            rd_received = rrddim_add(st, "InOctets",  "received",  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_sent     = rrddim_add(st, "OutOctets", "sent",     -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_received = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent     = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_received, Ip6InOctets);
@@ -438,10 +438,10 @@ static void do_proc_net_snmp6(int update_every) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_received  = rrddim_add(st, "InReceives",       "received",   1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_sent      = rrddim_add(st, "OutRequests",      "sent",      -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_forwarded = rrddim_add(st, "OutForwDatagrams", "forwarded", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_delivers  = rrddim_add(st, "InDelivers",       "delivers",   1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_received  = rrddim_add(st, "received",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent      = rrddim_add(st, "sent",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_forwarded = rrddim_add(st, "forwarded", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_delivers  = rrddim_add(st, "delivered", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_received,  Ip6InReceives);
@@ -619,8 +619,8 @@ static void do_proc_net_snmp6(int update_every) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_received = rrddim_add(st, "InDatagrams",  "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_sent     = rrddim_add(st, "OutDatagrams", "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_received = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent     = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_received, Udp6InDatagrams);
@@ -703,8 +703,8 @@ static void do_proc_net_snmp6(int update_every) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_received = rrddim_add(st, "InDatagrams",  "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_sent     = rrddim_add(st, "OutDatagrams", "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_received = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent     = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_received, UdpLite6InDatagrams);
@@ -786,8 +786,8 @@ static void do_proc_net_snmp6(int update_every) {
             );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rd_Ip6InMcastOctets  = rrddim_add(st, "InMcastOctets",  "received",  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_Ip6OutMcastOctets = rrddim_add(st, "OutMcastOctets", "sent",     -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6InMcastOctets  = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6OutMcastOctets = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_Ip6InMcastOctets,  Ip6InMcastOctets);
@@ -821,8 +821,8 @@ static void do_proc_net_snmp6(int update_every) {
             );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rd_Ip6InBcastOctets  = rrddim_add(st, "InBcastOctets",  "received",  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_Ip6OutBcastOctets = rrddim_add(st, "OutBcastOctets", "sent",     -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6InBcastOctets  = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6OutBcastOctets = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_Ip6InBcastOctets,  Ip6InBcastOctets);
@@ -856,8 +856,8 @@ static void do_proc_net_snmp6(int update_every) {
             );
             rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-            rd_Ip6InMcastPkts  = rrddim_add(st, "InMcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_Ip6OutMcastPkts = rrddim_add(st, "OutMcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6InMcastPkts  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Ip6OutMcastPkts = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_Ip6InMcastPkts,  Ip6InMcastPkts);
@@ -890,8 +890,8 @@ static void do_proc_net_snmp6(int update_every) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_Icmp6InMsgs  = rrddim_add(st, "InMsgs",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_Icmp6OutMsgs = rrddim_add(st, "OutMsgs", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Icmp6InMsgs  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Icmp6OutMsgs = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_Icmp6InMsgs,  Icmp6InMsgs);
@@ -924,8 +924,8 @@ static void do_proc_net_snmp6(int update_every) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_Icmp6InRedirects  = rrddim_add(st, "InRedirects",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_Icmp6OutRedirects = rrddim_add(st, "OutRedirects", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Icmp6InRedirects  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_Icmp6OutRedirects = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_Icmp6InRedirects,  Icmp6InRedirects);
@@ -1203,8 +1203,8 @@ static void do_proc_net_snmp6(int update_every) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_InMLDv2Reports  = rrddim_add(st, "InMLDv2Reports",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_OutMLDv2Reports = rrddim_add(st, "OutMLDv2Reports", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InMLDv2Reports  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutMLDv2Reports = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_InMLDv2Reports,  Icmp6InMLDv2Reports);
@@ -1865,8 +1865,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , RRDSET_TYPE_AREA
             );
 
-            rd_in  = rrddim_add(st_system_ip, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_system_ip, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_in  = rrddim_add(st_system_ip, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_system_ip, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_system_ip, rd_in,  ipext_InOctets);
@@ -1900,8 +1900,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             rrdset_flag_set(st_ip_mcast, RRDSET_FLAG_DETAIL);
 
-            rd_in  = rrddim_add(st_ip_mcast, "InMcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_ip_mcast, "OutMcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_in  = rrddim_add(st_ip_mcast, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_ip_mcast, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_ip_mcast, rd_in,  ipext_InMcastOctets);
@@ -1939,8 +1939,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             rrdset_flag_set(st_ip_bcast, RRDSET_FLAG_DETAIL);
 
-            rd_in  = rrddim_add(st_ip_bcast, "InBcastOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_ip_bcast, "OutBcastOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_in  = rrddim_add(st_ip_bcast, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_ip_bcast, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_ip_bcast, rd_in,  ipext_InBcastOctets);
@@ -1978,8 +1978,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             rrdset_flag_set(st_ip_mcastpkts, RRDSET_FLAG_DETAIL);
 
-            rd_in  = rrddim_add(st_ip_mcastpkts, "InMcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_ip_mcastpkts, "OutMcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_in  = rrddim_add(st_ip_mcastpkts, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_ip_mcastpkts, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_ip_mcastpkts, rd_in,  ipext_InMcastPkts);
@@ -2014,8 +2014,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             rrdset_flag_set(st_ip_bcastpkts, RRDSET_FLAG_DETAIL);
 
-            rd_in  = rrddim_add(st_ip_bcastpkts, "InBcastPkts",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_out = rrddim_add(st_ip_bcastpkts, "OutBcastPkts", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_in  = rrddim_add(st_ip_bcastpkts, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_out = rrddim_add(st_ip_bcastpkts, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_ip_bcastpkts, rd_in,  ipext_InBcastPkts);
@@ -2253,9 +2253,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_received = rrddim_add(st_syncookies, "SyncookiesRecv",   "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_sent     = rrddim_add(st_syncookies, "SyncookiesSent",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_failed   = rrddim_add(st_syncookies, "SyncookiesFailed", "failed",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_received = rrddim_add(st_syncookies, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_sent     = rrddim_add(st_syncookies, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed   = rrddim_add(st_syncookies, "failed",   NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_syncookies, rd_received, tcpext_SyncookiesRecv);
@@ -2369,10 +2369,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_InReceives    = rrddim_add(st, "InReceives",    "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_OutRequests   = rrddim_add(st, "OutRequests",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_ForwDatagrams = rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_InDelivers    = rrddim_add(st, "InDelivers",    "delivered", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InReceives    = rrddim_add(st, "received",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutRequests   = rrddim_add(st, "sent",      NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ForwDatagrams = rrddim_add(st, "forwarded", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InDelivers    = rrddim_add(st, "delivered", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_OutRequests,   (collected_number)snmp_root.ip_OutRequests);
@@ -2557,8 +2557,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rd_InMsgs  = rrddim_add(st_packets, "InMsgs",  "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_OutMsgs = rrddim_add(st_packets, "OutMsgs", "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_InMsgs  = rrddim_add(st_packets, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_OutMsgs = rrddim_add(st_packets, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
 
             rrddim_set_by_pointer(st_packets, rd_InMsgs,  (collected_number)snmp_root.icmp_InMsgs);
@@ -2773,8 +2773,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_InSegs  = rrddim_add(st, "InSegs",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_OutSegs = rrddim_add(st, "OutSegs", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InSegs  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutSegs = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_InSegs,  (collected_number)snmp_root.tcp_InSegs);
@@ -2932,8 +2932,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
 
-            rd_InDatagrams  = rrddim_add(st, "InDatagrams",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_OutDatagrams = rrddim_add(st, "OutDatagrams", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_InDatagrams  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_OutDatagrams = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_InDatagrams,  (collected_number)snmp_root.udp_InDatagrams);
@@ -3030,8 +3030,8 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
                         , RRDSET_TYPE_LINE
                 );
 
-                rd_InDatagrams  = rrddim_add(st, "InDatagrams",  "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_OutDatagrams = rrddim_add(st, "OutDatagrams", "sent",    -1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_InDatagrams  = rrddim_add(st, "received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_OutDatagrams = rrddim_add(st, "sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
 
             rrddim_set_by_pointer(st, rd_InDatagrams,  (collected_number)snmp_root.udplite_InDatagrams);

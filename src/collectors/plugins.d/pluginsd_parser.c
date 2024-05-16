@@ -121,7 +121,7 @@ static void pluginsd_host_define_cleanup(PARSER *parser) {
     parser->user.host_define.parsing_host = false;
 }
 
-static inline bool pluginsd_validate_machine_guid(const char *guid, uuid_t *uuid, char *output) {
+static inline bool pluginsd_validate_machine_guid(const char *guid, nd_uuid_t *uuid, char *output) {
     if(uuid_parse(guid, *uuid))
         return false;
 
@@ -231,7 +231,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         return PARSER_RC_OK;
     }
 
-    uuid_t uuid;
+    nd_uuid_t uuid;
     char uuid_str[UUID_STR_LEN];
     if(!pluginsd_validate_machine_guid(guid, &uuid, uuid_str))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST, "cannot parse MACHINE_GUID - is it a valid UUID?");
@@ -1088,7 +1088,7 @@ static inline PARSER_RC streaming_claimed_id(char **words, size_t num_words, PAR
         return PARSER_RC_ERROR;
     }
 
-    uuid_t uuid;
+    nd_uuid_t uuid;
     RRDHOST *host = parser->user.host;
 
     // We don't need the parsed UUID
@@ -1130,8 +1130,9 @@ void pluginsd_cleanup_v2(PARSER *parser) {
     pluginsd_clear_scope_chart(parser, "THREAD CLEANUP");
 }
 
-void pluginsd_process_thread_cleanup(void *ptr) {
-    PARSER *parser = (PARSER *)ptr;
+void pluginsd_process_thread_cleanup(void *pptr) {
+    PARSER *parser = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!parser) return;
 
     pluginsd_cleanup_v2(parser);
     pluginsd_host_define_cleanup(parser);
@@ -1218,54 +1219,49 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
 
     size_t count = 0;
 
-    // this keeps the parser with its current value
-    // so, parser needs to be allocated before pushing it
-    netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser)
-    {
-        ND_LOG_STACK lgs[] = {
-                ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
-                ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
-                ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
-                ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
-                ND_LOG_FIELD_END(),
-        };
-        ND_LOG_STACK_PUSH(lgs);
+    ND_LOG_STACK lgs[] = {
+            ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
+            ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_INSTANCE, parser_reconstruct_instance, parser),
+            ND_LOG_FIELD_CB(NDF_NIDL_CONTEXT, parser_reconstruct_context, parser),
+            ND_LOG_FIELD_END(),
+    };
+    ND_LOG_STACK_PUSH(lgs);
 
-        buffered_reader_init(&parser->reader);
-        CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
-        while(likely(service_running(SERVICE_COLLECTORS))) {
+    CLEANUP_FUNCTION_REGISTER(pluginsd_process_thread_cleanup) cleanup_parser = parser;
+    buffered_reader_init(&parser->reader);
+    CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
+    while(likely(service_running(SERVICE_COLLECTORS))) {
 
-            if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
-                buffered_reader_ret_t ret = buffered_reader_read_timeout(
-                        &parser->reader,
-                        fileno((FILE *) parser->fp_input),
-                        2 * 60 * MSEC_PER_SEC, true
-                                                                        );
+        if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
+            buffered_reader_ret_t ret = buffered_reader_read_timeout(
+                    &parser->reader,
+                    fileno((FILE *) parser->fp_input),
+                    2 * 60 * MSEC_PER_SEC, true
+                                                                    );
 
-                if(unlikely(ret != BUFFERED_READER_READ_OK))
-                    break;
-
-                continue;
-            }
-
-            if(unlikely(parser_action(parser, buffer->buffer)))
+            if(unlikely(ret != BUFFERED_READER_READ_OK))
                 break;
 
-            buffer->len = 0;
-            buffer->buffer[0] = '\0';
+            continue;
         }
 
-        cd->unsafe.enabled = parser->user.enabled;
-        count = parser->user.data_collections_count;
+        if(unlikely(parser_action(parser, buffer->buffer)))
+            break;
 
-        if(likely(count)) {
-            cd->successful_collections += count;
-            cd->serial_failures = 0;
-        }
-        else
-            cd->serial_failures++;
+        buffer->len = 0;
+        buffer->buffer[0] = '\0';
     }
-    netdata_thread_cleanup_pop(1); // free parser with the pop function
+
+    cd->unsafe.enabled = parser->user.enabled;
+    count = parser->user.data_collections_count;
+
+    if(likely(count)) {
+        cd->successful_collections += count;
+        cd->serial_failures = 0;
+    }
+    else
+        cd->serial_failures++;
 
     return count;
 }

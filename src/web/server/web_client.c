@@ -130,7 +130,7 @@ static inline char *strip_control_characters(char *url) {
     if(!url) return "";
 
     for(char *s = url; *s ;s++)
-        if(iscntrl(*s)) *s = ' ';
+        if(iscntrl((uint8_t)*s)) *s = ' ';
 
     return url;
 }
@@ -479,7 +479,7 @@ static int mysendfile(struct web_client *w, char *filename) {
     // if the filename contains "strange" characters, refuse to serve it
     char *s;
     for(s = filename; *s ;s++) {
-        if( !isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
+        if( !isalnum((uint8_t)*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
             w->response.data->content_type = CT_TEXT_HTML;
             buffer_sprintf(w->response.data, "Filename contains invalid characters: ");
@@ -1065,7 +1065,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         if(!host) {
             // we didn't find it, but it may be a uuid case mismatch for MACHINE_GUID
             // so, recreate the machine guid in lower-case.
-            uuid_t uuid;
+            nd_uuid_t uuid;
             char txt[UUID_STR_LEN];
             if (uuid_parse(tok, uuid) == 0) {
                 uuid_unparse_lower(uuid, txt);

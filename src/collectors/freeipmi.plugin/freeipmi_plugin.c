@@ -1977,12 +1977,9 @@ int main (int argc, char **argv) {
             },
     };
 
-    netdata_thread_t sensors_thread = 0, sel_thread = 0;
-
-    netdata_thread_create(&sensors_thread, "IPMI[sensors]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sensors_data);
-
+    nd_thread_create("IPMI[sensors]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sensors_data);
     if(netdata_do_sel)
-        netdata_thread_create(&sel_thread, "IPMI[sel]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sel_data);
+        nd_thread_create("IPMI[sel]", NETDATA_THREAD_OPTION_DONT_LOG, netdata_ipmi_collection_thread, &sel_data);
 
     // ------------------------------------------------------------------------
     // the main loop

@@ -25,23 +25,24 @@ static struct macos_module {
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 3
 #endif
 
-static void macos_main_cleanup(void *ptr)
+static void macos_main_cleanup(void *pptr)
 {
-    worker_unregister();
+    struct netdata_static_thread *static_thread = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!static_thread) return;
 
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
     collector_info("cleaning up...");
+    worker_unregister();
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *macos_main(void *ptr)
 {
-    worker_register("MACOS");
+    CLEANUP_FUNCTION_REGISTER(macos_main_cleanup) cleanup_ptr = ptr;
 
-    netdata_thread_cleanup_push(macos_main_cleanup, ptr);
+    worker_register("MACOS");
 
     // check the enabled status for each module
     for (int i = 0; macos_modules[i].name; i++) {
@@ -76,6 +77,5 @@ void *macos_main(void *ptr)
         }
     }
 
-    netdata_thread_cleanup_pop(1);
     return NULL;
 }

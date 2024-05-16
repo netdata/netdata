@@ -526,7 +526,6 @@ int init_data_files(struct rrdengine_instance *ctx)
 {
     int ret;
 
-    fatal_assert(0 == uv_rwlock_init(&ctx->datafiles.rwlock));
     ret = scan_data_files(ctx);
     if (ret < 0) {
         netdata_log_error("DBENGINE: failed to scan path \"%s\".", ctx->config.dbfiles_path);

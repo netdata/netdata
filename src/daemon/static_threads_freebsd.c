@@ -2,10 +2,10 @@
 
 #include "common.h"
 
-extern void *freebsd_main(void *ptr);
-extern void *timex_main(void *ptr);
+void *freebsd_main(void *ptr);
+void *timex_main(void *ptr);
 
-const struct netdata_static_thread static_threads_freebsd[] = {
+static const struct netdata_static_thread static_threads_freebsd[] = {
     {
         .name = "P[freebsd]",
         .config_section = CONFIG_SECTION_PLUGINS,
@@ -25,14 +25,6 @@ const struct netdata_static_thread static_threads_freebsd[] = {
         .start_routine = timex_main
     },
 
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
-};
-
-const struct netdata_static_thread static_threads_linux[] = {
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
-};
-
-const struct netdata_static_thread static_threads_macos[] = {
     {NULL, NULL, NULL, 0, NULL, NULL, NULL}
 };
 

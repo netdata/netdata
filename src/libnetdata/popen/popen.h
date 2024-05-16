@@ -3,6 +3,9 @@
 #ifndef NETDATA_POPEN_H
 #define NETDATA_POPEN_H 1
 
+#include "../os/waitid.h"
+int netdata_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
+
 #include "../libnetdata.h"
 
 #define PIPE_READ 0
@@ -28,6 +31,5 @@ int netdata_popene_variadic_internal_dont_use_directly(volatile pid_t *pidptr, c
 int netdata_pclose(FILE *fp_child_input, FILE *fp_child_output, pid_t pid);
 
 int netdata_spawn(const char *command, volatile pid_t *pidptr);
-int netdata_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 
 #endif /* NETDATA_POPEN_H */

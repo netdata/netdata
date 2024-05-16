@@ -411,7 +411,7 @@ int test_dbengine(void) {
     rrdeng_prepare_exit((struct rrdengine_instance *)host->db[0].si);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
-    rrd_unlock();
+    rrd_wrunlock();
 
     return (int)(errors + value_errors + time_errors);
 }

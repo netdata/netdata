@@ -39,7 +39,7 @@ typedef struct netdata_ssl {
     unsigned long ssl_errno; // The SSL errno of the last SSL call
 } NETDATA_SSL;
 
-#define NETDATA_SSL_UNSET_CONNECTION (NETDATA_SSL){ .conn = NULL, .state = NETDATA_SSL_STATE_NOT_SSL }
+#define NETDATA_SSL_UNSET_CONNECTION (NETDATA_SSL){ .conn = NULL, .state = NETDATA_SSL_STATE_NOT_SSL, .ssl_errno = 0 }
 
 #define SSL_connection(ssl) ((ssl)->conn && (ssl)->state != NETDATA_SSL_STATE_NOT_SSL)
 
@@ -69,6 +69,9 @@ void netdata_ssl_close(NETDATA_SSL *ssl);
 
 ssize_t netdata_ssl_read(NETDATA_SSL *ssl, void *buf, size_t num);
 ssize_t netdata_ssl_write(NETDATA_SSL *ssl, const void *buf, size_t num);
+
+ssize_t netdata_ssl_pending(NETDATA_SSL *ssl);
+bool netdata_ssl_has_pending(NETDATA_SSL *ssl);
 
 # endif //ENABLE_HTTPS
 #endif //NETDATA_SECURITY_H

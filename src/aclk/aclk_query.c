@@ -351,8 +351,11 @@ void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss
 
         if(unlikely(snprintfz(thread_name, TASK_LEN_MAX, "ACLK_QRY[%d]", i) < 0))
             netdata_log_error("snprintf encoding error");
-        netdata_thread_create(
-            &query_threads->thread_list[i].thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
+
+        query_threads->thread_list[i].thread = nd_thread_create(
+            thread_name,
+            NETDATA_THREAD_OPTION_JOINABLE,
+            aclk_query_main_thread,
             &query_threads->thread_list[i]);
     }
 }
@@ -361,7 +364,7 @@ void aclk_query_threads_cleanup(struct aclk_query_threads *query_threads)
 {
     if (query_threads && query_threads->thread_list) {
         for (int i = 0; i < query_threads->count; i++) {
-            netdata_thread_join(query_threads->thread_list[i].thread, NULL);
+            nd_thread_join(query_threads->thread_list[i].thread);
         }
         freez(query_threads->thread_list);
     }

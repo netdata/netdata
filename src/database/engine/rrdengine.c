@@ -111,7 +111,7 @@ static void sanity_check(void)
     /* Data file super-block cannot be larger than RRDENG_BLOCK_SIZE */
     BUILD_BUG_ON(RRDENG_DF_SB_PADDING_SZ < 0);
 
-    BUILD_BUG_ON(sizeof(uuid_t) != UUID_SZ); /* check UUID size */
+    BUILD_BUG_ON(sizeof(nd_uuid_t) != UUID_SZ); /* check UUID size */
 
     /* page count must fit in 8 bits */
     BUILD_BUG_ON(MAX_PAGES_PER_EXTENT > 255);
@@ -233,7 +233,7 @@ static void after_work_standard_callback(uv_work_t* req, int status) {
 static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb do_work_cb, after_work_cb do_after_work_cb) {
     struct rrdeng_work *work_request = NULL;
 
-    internal_fatal(rrdeng_main.tid != gettid(), "work_dispatch() can only be run from the event loop thread");
+    internal_fatal(rrdeng_main.tid != gettid_cached(), "work_dispatch() can only be run from the event loop thread");
 
     work_request = aral_mallocz(rrdeng_main.work_cmd.ar);
     memset(work_request, 0, sizeof(struct rrdeng_work));
@@ -824,7 +824,7 @@ static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_insta
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
         header->descr[i].type = descr->type;
-        uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
+        uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time_ut = descr->start_time_ut;
 
@@ -935,7 +935,7 @@ static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused,
 }
 
 struct uuid_first_time_s {
-    uuid_t *uuid;
+    nd_uuid_t *uuid;
     time_t first_time_s;
     METRIC *metric;
     size_t pages_found;
@@ -1690,7 +1690,7 @@ static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_w
 
 void dbengine_event_loop(void* arg) {
     sanity_check();
-    uv_thread_set_name_np(pthread_self(), "DBENGINE");
+    uv_thread_set_name_np("DBENGINE");
     service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
     worker_register("DBENGINE");
@@ -1734,7 +1734,7 @@ void dbengine_event_loop(void* arg) {
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
     struct rrdeng_cmd cmd;
-    main->tid = gettid();
+    main->tid = gettid_cached();
 
     fatal_assert(0 == uv_timer_start(&main->timer, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 

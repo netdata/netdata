@@ -128,9 +128,10 @@ static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
  *
  * @param ptr thread data.
  */
-static void oomkill_cleanup(void *ptr)
+static void oomkill_cleanup(void *pptr)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
+    if(!em) return;
 
     if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING) {
         pthread_mutex_lock(&lock);
@@ -457,9 +458,9 @@ static void oomkill_collector(ebpf_module_t *em)
     uint32_t running_time = 0;
     uint32_t lifetime = em->lifetime;
     netdata_idx_t *stats = em->hash_table_stats;
-    while (!ebpf_plugin_exit && running_time < lifetime) {
+    while (!ebpf_plugin_stop() && running_time < lifetime) {
         (void)heartbeat_next(&hb, USEC_PER_SEC);
-        if (ebpf_plugin_exit || ++counter != update_every)
+        if (ebpf_plugin_stop() || ++counter != update_every)
             continue;
 
         counter = 0;
@@ -532,9 +533,10 @@ void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 void *ebpf_oomkill_thread(void *ptr)
 {
-    netdata_thread_cleanup_push(oomkill_cleanup, ptr);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+
+    CLEANUP_FUNCTION_REGISTER(oomkill_cleanup) cleanup_ptr = em;
+
     em->maps = oomkill_maps;
 
 #define NETDATA_DEFAULT_OOM_DISABLED_MSG "Disabling OOMKILL thread, because"
@@ -577,8 +579,6 @@ void *ebpf_oomkill_thread(void *ptr)
 
 endoomkill:
     ebpf_update_disabled_plugin_stats(em);
-
-    netdata_thread_cleanup_pop(1);
 
     return NULL;
 }
