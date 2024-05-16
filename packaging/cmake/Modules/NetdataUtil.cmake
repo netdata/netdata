@@ -115,7 +115,7 @@ function(netdata_identify_libc _libc_name)
                      NO_CMAKE_INSTALL_PREFIX
                      NO_CMAKE_FIND_ROOT_PATH)
 
-        if(NOT "${LBIC_PATH}" EQUAL "LIBC_PATH-NOTFOUND")
+        if(NOT "${LIBC_PATH}" EQUAL "LIBC_PATH-NOTFOUND")
             message(CHECK_PASS "found")
             message(CHECK_START "Detecting libc implementation using libc.so.6")
 
