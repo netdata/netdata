@@ -1598,7 +1598,7 @@ if(ENABLE_H2O)
         )
 
         target_compile_options(h2o PUBLIC -DH2O_USE_LIBUV=0)
-        target_link_libraries(h2o PRIVATE PkgConfig::OPENSSL)
+        target_link_libraries(h2o PRIVATE PkgConfig::TLS)
 endif()
 
 #
