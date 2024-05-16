@@ -4,6 +4,11 @@
 #define NETDATA_ML_PRIVATE_H
 
 #include "dlib/dlib/matrix.h"
+
+// CentOS 7 shenanigans
+#include <cmath>
+using std::isfinite;
+
 #include "ml/ml.h"
 
 #include <vector>
