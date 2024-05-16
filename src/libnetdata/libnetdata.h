@@ -291,9 +291,9 @@ typedef uint32_t uid_t;
 #define MALLOCLIKE
 #endif
 
-#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT) && !defined(COMPILED_FOR_MACOS)
+#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF)
 #define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
-#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT)
+#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF)
 #define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
 #else
 #define PRINTFLIKE(f, a)
