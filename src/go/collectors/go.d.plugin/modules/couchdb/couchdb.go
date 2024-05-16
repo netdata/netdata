@@ -23,6 +23,7 @@ func init() {
 			UpdateEvery: 10,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -43,10 +44,10 @@ func New() *CouchDB {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
-	Node        string `yaml:"node" json:"node"`
-	Databases   string `yaml:"databases" json:"databases"`
+	Node        string `yaml:"node,omitempty" json:"node"`
+	Databases   string `yaml:"databases,omitempty" json:"databases"`
 }
 
 type CouchDB struct {

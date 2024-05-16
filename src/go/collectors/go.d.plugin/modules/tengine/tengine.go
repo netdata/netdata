@@ -18,6 +18,7 @@ func init() {
 	module.Register("tengine", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -38,8 +39,8 @@ func New() *Tengine {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type Tengine struct {

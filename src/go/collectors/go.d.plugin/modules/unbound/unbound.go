@@ -20,6 +20,7 @@ func init() {
 	module.Register("unbound", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -43,13 +44,13 @@ func New() *Unbound {
 }
 
 type Config struct {
-	tlscfg.TLSConfig `yaml:",inline" json:""`
-	UpdateEvery      int          `yaml:"update_every" json:"update_every"`
+	UpdateEvery      int          `yaml:"update_every,omitempty" json:"update_every"`
 	Address          string       `yaml:"address" json:"address"`
-	ConfPath         string       `yaml:"conf_path" json:"conf_path"`
-	Timeout          web.Duration `yaml:"timeout" json:"timeout"`
+	ConfPath         string       `yaml:"conf_path,omitempty" json:"conf_path"`
+	Timeout          web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	Cumulative       bool         `yaml:"cumulative_stats" json:"cumulative_stats"`
-	UseTLS           bool         `yaml:"use_tls" json:"use_tls"`
+	UseTLS           bool         `yaml:"use_tls,omitempty" json:"use_tls"`
+	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
 type Unbound struct {

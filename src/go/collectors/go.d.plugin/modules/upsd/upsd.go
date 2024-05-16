@@ -18,6 +18,7 @@ func init() {
 	module.Register("upsd", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -34,11 +35,11 @@ func New() *Upsd {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
 	Address     string       `yaml:"address" json:"address"`
-	Username    string       `yaml:"username" json:"username"`
-	Password    string       `yaml:"password" json:"password"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Username    string       `yaml:"username,omitempty" json:"username"`
+	Password    string       `yaml:"password,omitempty" json:"password"`
 }
 
 type (

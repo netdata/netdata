@@ -19,6 +19,7 @@ func init() {
 	module.Register("activemq", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -44,13 +45,13 @@ func New() *ActiveMQ {
 }
 
 type Config struct {
+	UpdateEvery  int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP     `yaml:",inline" json:""`
-	UpdateEvery  int    `yaml:"update_every" json:"update_every"`
-	Webadmin     string `yaml:"webadmin" json:"webadmin"`
+	Webadmin     string `yaml:"webadmin,omitempty" json:"webadmin"`
 	MaxQueues    int    `yaml:"max_queues" json:"max_queues"`
 	MaxTopics    int    `yaml:"max_topics" json:"max_topics"`
-	QueuesFilter string `yaml:"queues_filter" json:"queues_filter"`
-	TopicsFilter string `yaml:"topics_filter" json:"topics_filter"`
+	QueuesFilter string `yaml:"queues_filter,omitempty" json:"queues_filter"`
+	TopicsFilter string `yaml:"topics_filter,omitempty" json:"topics_filter"`
 }
 
 type ActiveMQ struct {

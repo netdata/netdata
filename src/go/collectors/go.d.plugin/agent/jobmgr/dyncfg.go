@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -59,10 +60,10 @@ func dyncfgJobID(cfg confgroup.Config) string {
 }
 
 func dyncfgModCmds() string {
-	return "add schema enable disable test"
+	return "add schema enable disable test userconfig"
 }
 func dyncfgJobCmds(cfg confgroup.Config) string {
-	cmds := "schema get enable disable update restart test"
+	cmds := "schema get enable disable update restart test userconfig"
 	if isDyncfg(cfg) {
 		cmds += " remove"
 	}
@@ -107,8 +108,14 @@ func (m *Manager) dyncfgConfig(fn functions.Function) {
 	default:
 	}
 
+	//m.Infof("QQ FN: '%s'", fn)
+
 	action := strings.ToLower(fn.Args[1])
+
 	switch action {
+	case "userconfig":
+		m.dyncfgConfigUserconfig(fn)
+		return
 	case "test":
 		m.dyncfgConfigTest(fn)
 		return
@@ -126,8 +133,6 @@ func (m *Manager) dyncfgConfig(fn functions.Function) {
 
 func (m *Manager) dyncfgConfigExec(fn functions.Function) {
 	action := strings.ToLower(fn.Args[1])
-
-	//m.Infof("QQ FN(%s): '%s'", action, fn)
 
 	switch action {
 	case "test":
@@ -154,6 +159,43 @@ func (m *Manager) dyncfgConfigExec(fn functions.Function) {
 	}
 }
 
+func (m *Manager) dyncfgConfigUserconfig(fn functions.Function) {
+	id := fn.Args[0]
+	jn := "test"
+	if len(fn.Args) > 2 {
+		jn = fn.Args[2]
+	}
+
+	mn, ok := extractModuleName(id)
+	if !ok {
+		m.Warningf("dyncfg: userconfig: could not extract module and job from id (%s)", id)
+		m.dyncfgRespf(fn, 400,
+			"Invalid ID format. Could not extract module and job name from ID. Provided ID: %s.", id)
+		return
+	}
+
+	creator, ok := m.Modules.Lookup(mn)
+	if !ok {
+		m.Warningf("dyncfg: userconfig: module %s not found", mn)
+		m.dyncfgRespf(fn, 404, "The specified module '%s' is not registered.", mn)
+		return
+	}
+
+	if creator.Config == nil || creator.Config() == nil {
+		m.Warningf("dyncfg: userconfig: module %s: configuration not found", mn)
+		m.dyncfgRespf(fn, 500, "Module %s does not provide configuration.", mn)
+		return
+	}
+
+	bs, err := userConfigFromPayload(creator.Config(), jn, fn)
+	if err != nil {
+		m.Warningf("dyncfg: userconfig: module %s: failed to create config from payload: %v", mn, err)
+		m.dyncfgRespf(fn, 400, "Invalid configuration format. Failed to create configuration from payload: %v.", err)
+	}
+
+	m.dyncfgRespPayloadYAML(fn, string(bs))
+}
+
 func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 	id := fn.Args[0]
 	mn, ok := extractModuleName(id)
@@ -162,6 +204,11 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 		m.dyncfgRespf(fn, 400,
 			"Invalid ID format. Could not extract module and job name from ID. Provided ID: %s.", id)
 		return
+	}
+
+	jn := "test"
+	if len(fn.Args) > 2 {
+		jn = fn.Args[2]
 	}
 
 	creator, ok := m.Modules.Lookup(mn)
@@ -187,7 +234,7 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 	}
 
 	cfg.SetModule(mn)
-	cfg.SetName("test")
+	cfg.SetName(jn)
 
 	job := creator.Create()
 
@@ -238,7 +285,7 @@ func (m *Manager) dyncfgConfigSchema(fn functions.Function) {
 		return
 	}
 
-	m.dyncfgRespPayload(fn, mod.JobConfigSchema)
+	m.dyncfgRespPayloadJSON(fn, mod.JobConfigSchema)
 }
 
 func (m *Manager) dyncfgConfigGet(fn functions.Function) {
@@ -287,7 +334,7 @@ func (m *Manager) dyncfgConfigGet(fn functions.Function) {
 		return
 	}
 
-	m.dyncfgRespPayload(fn, string(bs))
+	m.dyncfgRespPayloadJSON(fn, string(bs))
 }
 
 func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
@@ -665,9 +712,17 @@ func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string)
 	}
 }
 
-func (m *Manager) dyncfgRespPayload(fn functions.Function, payload string) {
+func (m *Manager) dyncfgRespPayloadJSON(fn functions.Function, payload string) {
+	m.dyncfgRespPayload(fn, payload, "application/json")
+}
+
+func (m *Manager) dyncfgRespPayloadYAML(fn functions.Function, payload string) {
+	m.dyncfgRespPayload(fn, payload, " application/yaml")
+}
+
+func (m *Manager) dyncfgRespPayload(fn functions.Function, payload string, contentType string) {
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
-	m.api.FUNCRESULT(fn.UID, "application/json", payload, "200", ts)
+	m.api.FUNCRESULT(fn.UID, contentType, payload, "200", ts)
 }
 
 func (m *Manager) dyncfgRespf(fn functions.Function, code int, msgf string, a ...any) {
@@ -683,6 +738,45 @@ func (m *Manager) dyncfgRespf(fn functions.Function, code int, msgf string, a ..
 	})
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
 	m.api.FUNCRESULT(fn.UID, "application/json", string(bs), strconv.Itoa(code), ts)
+}
+
+func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]byte, error) {
+	if v := reflect.ValueOf(cfg); v.Kind() != reflect.Ptr || v.IsNil() {
+		return nil, fmt.Errorf("invalid config: expected a pointer to a struct, got a %s", v.Type())
+	}
+
+	if fn.ContentType == "application/json" {
+		if err := json.Unmarshal(fn.Payload, cfg); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := yaml.Unmarshal(fn.Payload, cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	bs, err := yaml.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var yms yaml.MapSlice
+	if err := yaml.Unmarshal(bs, &yms); err != nil {
+		return nil, err
+	}
+
+	yms = append([]yaml.MapItem{{Key: "name", Value: jobName}}, yms...)
+
+	v := map[string]any{
+		"jobs": []any{yms},
+	}
+
+	bs, err = yaml.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	return bs, nil
 }
 
 func configFromPayload(fn functions.Function) (confgroup.Config, error) {
