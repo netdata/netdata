@@ -795,7 +795,7 @@ static void rrdpush_receiver_takeover_web_connection(struct web_client *w, struc
 }
 
 void *rrdpush_receiver_thread(void *ptr);
-int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx) {
+int rrdpush_receiver_thread_spawn(struct web_client *w, char *decoded_query_string, void *h2o_ctx __maybe_unused) {
 
     if(!service_running(ABILITY_STREAMING_CONNECTIONS))
         return rrdpush_receiver_too_busy_now(w);
