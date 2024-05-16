@@ -30,5 +30,4 @@ Disk space utilization is crucial for the stable and efficient operation of your
 ### Useful resources
 
 1. [Windows 10 Tips & Tricks: Analyze Disk Space & Free Space - YouTube](https://www.youtube.com/watch?v=NolLC9tBP_Y)
-2. [5 Free Tools to Visualize Disk Space Usage on Windows](https://www.hongkiat.com/blog/visualize-hard-disk-usage-free-tools-for-windows/)
-3. [10 Ways to Free Up Hard Drive Space on Windows](https://www.howtogeek.com/125923/7-ways-to-free-up-hard-disk-space-on-windows/)
+2. [10 Ways to Free Up Hard Drive Space on Windows](https://www.howtogeek.com/125923/7-ways-to-free-up-hard-disk-space-on-windows/)

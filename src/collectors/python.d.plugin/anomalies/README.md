@@ -68,12 +68,12 @@ sudo ./edit-config python.d.conf
 sudo systemctl restart netdata
 ```
 
-The configuration for the anomalies collector defines how it will behave on your system and might take some experimentation with over time to set it optimally for your node. Out of the box, the config comes with some [sane defaults](https://www.netdata.cloud/blog/redefining-monitoring-netdata/) to get you started that try to balance the flexibility and power of the ML models with the goal of being as cheap as possible in term of cost on the node resources. 
+The configuration for the anomalies collector defines how it will behave on your system and might take some experimentation with over time to set it optimally for your node. Out of the box, the config comes with some [sane defaults](https://www.netdata.cloud/blog/redefining-monitoring-with-netdata/) to get you started that try to balance the flexibility and power of the ML models with the goal of being as cheap as possible in term of cost on the node resources. 
 
 _**Note**: If you are unsure about any of the below configuration options then it's best to just ignore all this and leave the `anomalies.conf` file alone to begin with. Then you can return to it later if you would like to tune things a bit more once the collector is running for a while and you have a feeling for its performance on your node._
 
 Edit the `python.d/anomalies.conf` configuration file using `edit-config` from the your agent's [config
-directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is usually at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md), which is usually at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

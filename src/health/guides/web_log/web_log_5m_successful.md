@@ -32,5 +32,3 @@ A successful HTTP request is one that receives a response with an HTTP status co
 
 1. [Apache Log Files](https://httpd.apache.org/docs/current/logs.html)
 2. [Nginx Log Files](https://nginx.org/en/docs/ngx_core_module.html#error_log)
-3. [Introduction to Identifying Security Vulnerabilities in Web Servers](https://www.acunetix.com/blog/articles/introduction-identifying-security-vulnerabilities-web-servers)
-4. [Web Application Performance Analysis and Monitoring](https://www.site24x7.com/learning/web-application-performance.html)

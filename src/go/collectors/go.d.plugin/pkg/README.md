@@ -17,6 +17,6 @@ learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
 - if you collect metrics from an HTTP endpoint use [`web`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/web).
 - if you collect metrics from a prometheus endpoint,
   then [`prometheus`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/prometheus)
-  and [`web`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/pkg/web/README.md) is what you need.
-- [`tlscfg`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/pkg/tlscfg/README.md) provides TLS support.
-- [`stm`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/pkg/stm/README.md) helps you to convert any struct to a `map[string]int64`.
+  and [`web`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/web) is what you need.
+- [`tlscfg`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/tlscfg) provides TLS support.
+- [`stm`](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/pkg/stm) helps you to convert any struct to a `map[string]int64`.

@@ -36,6 +36,5 @@ Swap memory is a virtual memory management technique where a portion of the disk
 
 ### Useful resources
 
-1. [How to Manage Virtual Memory (Pagefile) in Windows 10](https://www.techbout.com/manage-virtual-memory-pagefile-windows-10-29638/)
-2. [Troubleshooting Windows Performance Issues Using the Resource Monitor](https://docs.microsoft.com/en-us/archive/blogs/askcore/troubleshooting-windows-performance-issues-using-the-resource-monitor)
-3. [Windows Performance Monitor](https://docs.microsoft.com/en-us/windows-server/administration/windows-server-2008-help/troubleshoot/windows-rel-performance-monitor)
+1. [Troubleshooting Windows Performance Issues Using the Resource Monitor](https://docs.microsoft.com/en-us/archive/blogs/askcore/troubleshooting-windows-performance-issues-using-the-resource-monitor)
+2. [Windows Performance Monitor](https://docs.microsoft.com/en-us/windows-server/administration/windows-server-2008-help/troubleshoot/windows-rel-performance-monitor)
