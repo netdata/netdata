@@ -70,6 +70,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/pulsar"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/rabbitmq"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/redis"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/rspamd"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/scaleio"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/sensors"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/smartctl"

@@ -17,9 +17,8 @@ collection modules written in `go`.
 1. It runs as an independent process (`ps fax` shows it).
 2. It is started and stopped automatically by Netdata.
 3. It communicates with Netdata via a unidirectional pipe (sending data to the Netdata daemon).
-4. Supports any number of data collection [modules](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules).
-5. Allows each [module](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules) to have any number of data
-   collection jobs.
+4. Supports any number of data collection modules.
+5. Allows each module to have any number of data collection jobs.
 
 ## Bug reports, feature requests, and questions
 
@@ -115,6 +114,7 @@ see the appropriate collector readme.
 | [pulsar](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/portcheck)                      |         Apache Pulsar         |
 | [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/rabbitmq)                     |           RabbitMQ            |
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/redis)                           |             Redis             |
+| [rspamd](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/rspamd)                         |            Rspamd             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/scaleio)                       |       Dell EMC ScaleIO        |
 | [sensors](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules)                               |       Hardware Sensors        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/snmp)                             |             SNMP              |
@@ -141,8 +141,8 @@ see the appropriate collector readme.
 ## Configuration
 
 Edit the `go.d.conf` configuration file using `edit-config` from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory), which is typically
-at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory),
+which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata # Replace this path with your Netdata config directory
@@ -173,8 +173,8 @@ modules:
   example: yes
 ```
 
-Then [restart netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for the
-change to take effect.
+Then [restart netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
+for the change to take effect.
 
 ## Contributing
 
