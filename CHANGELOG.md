@@ -6,11 +6,20 @@
 
 **Merged pull requests:**
 
+- Include the Host in the HTTP header [\#17670](https://github.com/netdata/netdata/pull/17670) ([stelfrag](https://github.com/stelfrag))
+- Regenerate integrations.js [\#17668](https://github.com/netdata/netdata/pull/17668) ([netdatabot](https://github.com/netdatabot))
+- go.d litespeed [\#17665](https://github.com/netdata/netdata/pull/17665) ([ilyam8](https://github.com/ilyam8))
+- python.d remove litespeed [\#17663](https://github.com/netdata/netdata/pull/17663) ([ilyam8](https://github.com/ilyam8))
+- files movearound [\#17662](https://github.com/netdata/netdata/pull/17662) ([Ancairon](https://github.com/Ancairon))
+- go.d update config dirs [\#17661](https://github.com/netdata/netdata/pull/17661) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17660](https://github.com/netdata/netdata/pull/17660) ([netdatabot](https://github.com/netdatabot))
 - go.d cockroachdb fix calculation [\#17659](https://github.com/netdata/netdata/pull/17659) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17655](https://github.com/netdata/netdata/pull/17655) ([netdatabot](https://github.com/netdatabot))
 - go.d hpssa fix cache battery chart ctx [\#17654](https://github.com/netdata/netdata/pull/17654) ([ilyam8](https://github.com/ilyam8))
+- files movearound [\#17653](https://github.com/netdata/netdata/pull/17653) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#17652](https://github.com/netdata/netdata/pull/17652) ([netdatabot](https://github.com/netdatabot))
 - Update libbpf [\#17650](https://github.com/netdata/netdata/pull/17650) ([thiagoftsm](https://github.com/thiagoftsm))
+- Support offline installs in the updater code. [\#17648](https://github.com/netdata/netdata/pull/17648) ([Ferroin](https://github.com/Ferroin))
 - Update the claim readme [\#17646](https://github.com/netdata/netdata/pull/17646) ([Ancairon](https://github.com/Ancairon))
 - remove doc and consolidate info to main section page [\#17645](https://github.com/netdata/netdata/pull/17645) ([Ancairon](https://github.com/Ancairon))
 - Bump github.com/vmware/govmomi from 0.37.1 to 0.37.2 in /src/go/collectors/go.d.plugin [\#17644](https://github.com/netdata/netdata/pull/17644) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -74,6 +83,7 @@
 - try hardcode docs links [\#17553](https://github.com/netdata/netdata/pull/17553) ([Ancairon](https://github.com/Ancairon))
 - Notification section updates [\#17551](https://github.com/netdata/netdata/pull/17551) ([Ancairon](https://github.com/Ancairon))
 - Adjust eBPF code. [\#17550](https://github.com/netdata/netdata/pull/17550) ([thiagoftsm](https://github.com/thiagoftsm))
+- Remove Fedora 38 from CI. [\#17548](https://github.com/netdata/netdata/pull/17548) ([Ferroin](https://github.com/Ferroin))
 - Fix platform EOL check issue assignment. [\#17544](https://github.com/netdata/netdata/pull/17544) ([Ferroin](https://github.com/Ferroin))
 - refresh the ML documentation and consolidate the two docs [\#17543](https://github.com/netdata/netdata/pull/17543) ([Ancairon](https://github.com/Ancairon))
 - Bump github.com/likexian/whois from 1.15.2 to 1.15.3 in /src/go/collectors/go.d.plugin [\#17542](https://github.com/netdata/netdata/pull/17542) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -317,7 +327,6 @@
 - Add label for cgroup [\#17156](https://github.com/netdata/netdata/pull/17156) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix action lints [\#17120](https://github.com/netdata/netdata/pull/17120) ([tkatsoulas](https://github.com/tkatsoulas))
 - Alert transitions code cleanup [\#17103](https://github.com/netdata/netdata/pull/17103) ([stelfrag](https://github.com/stelfrag))
-- Skip Go code in CI if it hasn’t changed. [\#17077](https://github.com/netdata/netdata/pull/17077) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.45.4](https://github.com/netdata/netdata/tree/v1.45.4) (2024-05-08)
 
@@ -420,12 +429,6 @@
 - deb packages fix on ioping perms [\#17086](https://github.com/netdata/netdata/pull/17086) ([tkatsoulas](https://github.com/tkatsoulas))
 - Amend the logic of ebpf-plugin package suggestion for network-viewer plugin [\#17085](https://github.com/netdata/netdata/pull/17085) ([tkatsoulas](https://github.com/tkatsoulas))
 - rename network plugin post and pre install actions [\#17084](https://github.com/netdata/netdata/pull/17084) ([tkatsoulas](https://github.com/tkatsoulas))
-- Improve message in kickstart if a static build can’t be found. [\#17081](https://github.com/netdata/netdata/pull/17081) ([Ferroin](https://github.com/Ferroin))
-- Make watcher thread wait for explicit steps. [\#17079](https://github.com/netdata/netdata/pull/17079) ([vkalintiris](https://github.com/vkalintiris))
-- Update functions tables docs [\#17071](https://github.com/netdata/netdata/pull/17071) ([car12o](https://github.com/car12o))
-- add missing "gotify" to list of notification methods in alarm-notify.sh [\#17069](https://github.com/netdata/netdata/pull/17069) ([ilyam8](https://github.com/ilyam8))
-- Add CI checks for Go code. [\#17066](https://github.com/netdata/netdata/pull/17066) ([Ferroin](https://github.com/Ferroin))
-- go.d.plugin dyncfgv2 [\#17064](https://github.com/netdata/netdata/pull/17064) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
