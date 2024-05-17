@@ -25,6 +25,7 @@ func init() {
 			UpdateEvery: 20,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -49,11 +50,11 @@ func New() *VSphere {
 }
 
 type Config struct {
+	UpdateEvery       int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP          `yaml:",inline" json:""`
-	UpdateEvery       int                `yaml:"update_every" json:"update_every"`
-	DiscoveryInterval web.Duration       `yaml:"discovery_interval" json:"discovery_interval"`
-	HostsInclude      match.HostIncludes `yaml:"host_include" json:"host_include"`
-	VMsInclude        match.VMIncludes   `yaml:"vm_include" json:"vm_include"`
+	DiscoveryInterval web.Duration       `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
+	HostsInclude      match.HostIncludes `yaml:"host_include,omitempty" json:"host_include"`
+	VMsInclude        match.VMIncludes   `yaml:"vm_include,omitempty" json:"vm_include"`
 }
 
 type (

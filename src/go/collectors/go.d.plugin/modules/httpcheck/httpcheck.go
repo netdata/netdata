@@ -23,6 +23,7 @@ func init() {
 			UpdateEvery: 5,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -43,12 +44,12 @@ func New() *HTTPCheck {
 
 type (
 	Config struct {
+		UpdateEvery      int `yaml:"update_every,omitempty" json:"update_every"`
 		web.HTTP         `yaml:",inline" json:""`
-		UpdateEvery      int                 `yaml:"update_every" json:"update_every"`
 		AcceptedStatuses []int               `yaml:"status_accepted" json:"status_accepted"`
-		ResponseMatch    string              `yaml:"response_match" json:"response_match"`
-		CookieFile       string              `yaml:"cookie_file" json:"cookie_file"`
-		HeaderMatch      []headerMatchConfig `yaml:"header_match" json:"header_match"`
+		ResponseMatch    string              `yaml:"response_match,omitempty" json:"response_match"`
+		CookieFile       string              `yaml:"cookie_file,omitempty" json:"cookie_file"`
+		HeaderMatch      []headerMatchConfig `yaml:"header_match,omitempty" json:"header_match"`
 	}
 	headerMatchConfig struct {
 		Exclude bool   `yaml:"exclude" json:"exclude"`

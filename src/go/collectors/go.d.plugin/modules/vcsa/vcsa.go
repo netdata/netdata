@@ -21,6 +21,7 @@ func init() {
 			UpdateEvery: 5, // VCSA health checks freq is 5 second.
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -38,8 +39,8 @@ func New() *VCSA {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type (

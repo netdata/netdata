@@ -1,3 +1,4 @@
+update_every: 1
 uri: "ok"
 timeout: 123.123
 databases:

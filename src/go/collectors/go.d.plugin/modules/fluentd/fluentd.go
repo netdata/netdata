@@ -19,6 +19,7 @@ func init() {
 	module.Register("fluentd", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -39,9 +40,9 @@ func New() *Fluentd {
 }
 
 type Config struct {
+	UpdateEvery  int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP     `yaml:",inline" json:""`
-	UpdateEvery  int    `yaml:"update_every" json:"update_every"`
-	PermitPlugin string `yaml:"permit_plugin_id" json:"permit_plugin_id"`
+	PermitPlugin string `yaml:"permit_plugin_id,omitempty" json:"permit_plugin_id"`
 }
 
 type Fluentd struct {

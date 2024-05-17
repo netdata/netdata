@@ -21,6 +21,7 @@ func init() {
 			UpdateEvery: 10,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -36,9 +37,9 @@ func New() *ZFSPool {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
-	BinaryPath  string       `yaml:"binary_path" json:"binary_path"`
+	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	BinaryPath  string       `yaml:"binary_path,omitempty" json:"binary_path"`
 }
 
 type (

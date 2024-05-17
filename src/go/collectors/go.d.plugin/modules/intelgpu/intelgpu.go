@@ -14,8 +14,9 @@ var configSchema string
 
 func init() {
 	module.Register("intelgpu", module.Creator{
-		Create:          func() module.Module { return New() },
 		JobConfigSchema: configSchema,
+		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -28,7 +29,7 @@ func New() *IntelGPU {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every" json:"update_every"`
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 }
 
 type (

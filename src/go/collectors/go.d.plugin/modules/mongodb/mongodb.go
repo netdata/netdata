@@ -20,6 +20,7 @@ func init() {
 	module.Register("mongodb", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -47,9 +48,10 @@ func New() *Mongo {
 }
 
 type Config struct {
-	URI       string             `yaml:"uri" json:"uri"`
-	Timeout   web.Duration       `yaml:"timeout" json:"timeout"`
-	Databases matcher.SimpleExpr `yaml:"databases" json:"databases"`
+	UpdateEvery int                `yaml:"update_every,omitempty" json:"update_every"`
+	URI         string             `yaml:"uri" json:"uri"`
+	Timeout     web.Duration       `yaml:"timeout,omitempty" json:"timeout"`
+	Databases   matcher.SimpleExpr `yaml:"databases,omitempty" json:"databases"`
 }
 
 type Mongo struct {

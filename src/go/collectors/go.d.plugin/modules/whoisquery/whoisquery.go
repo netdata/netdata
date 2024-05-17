@@ -21,6 +21,7 @@ func init() {
 			UpdateEvery: 60,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -35,11 +36,11 @@ func New() *WhoisQuery {
 }
 
 type Config struct {
-	UpdateEvery   int          `yaml:"update_every" json:"update_every"`
+	UpdateEvery   int          `yaml:"update_every,omitempty" json:"update_every"`
 	Source        string       `yaml:"source" json:"source"`
-	Timeout       web.Duration `yaml:"timeout" json:"timeout"`
-	DaysUntilWarn int64        `yaml:"days_until_expiration_warning" json:"days_until_expiration_warning"`
-	DaysUntilCrit int64        `yaml:"days_until_expiration_critical" json:"days_until_expiration_critical"`
+	Timeout       web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	DaysUntilWarn int64        `yaml:"days_until_expiration_warning,omitempty" json:"days_until_expiration_warning"`
+	DaysUntilCrit int64        `yaml:"days_until_expiration_critical,omitempty" json:"days_until_expiration_critical"`
 }
 
 type WhoisQuery struct {
