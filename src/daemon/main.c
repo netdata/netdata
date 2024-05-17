@@ -1501,7 +1501,7 @@ int main(int argc, char **argv) {
                     break;
                 case 'v':
                 case 'V':
-                    printf("%s %s\n", program_name, program_version);
+                    printf("%s %s\n", program_name, NETDATA_VERSION);
                     return 0;
                 case 'W':
                     {

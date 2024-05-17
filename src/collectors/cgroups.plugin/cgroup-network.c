@@ -648,7 +648,6 @@ void usage(void) {
 int main(int argc, char **argv) {
     pid_t pid = 0;
 
-    program_version = NETDATA_VERSION;
     clocks_init();
     nd_log_initialize_for_external_plugins("cgroup-network");
 

@@ -1042,7 +1042,7 @@ static void build_info_set_status(BUILD_INFO_SLOT slot, bool status) {
 }
 
 __attribute__((constructor)) void initialize_build_info(void) {
-    build_info_set_value(BIB_PACKAGING_NETDATA_VERSION, program_version);
+    build_info_set_value(BIB_PACKAGING_NETDATA_VERSION, NETDATA_VERSION);
     build_info_set_value(BIB_PACKAGING_CONFIGURE_OPTIONS, CONFIGURE_COMMAND);
 
 #ifdef OS_LINUX

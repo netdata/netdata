@@ -391,8 +391,6 @@ int verify_netdata_host_prefix(bool log_msg);
 
 extern volatile sig_atomic_t netdata_exit;
 
-extern const char *program_version;
-
 char *strdupz_path_subpath(const char *path, const char *subpath);
 int path_is_dir(const char *path, const char *subpath);
 int path_is_file(const char *path, const char *subpath);
