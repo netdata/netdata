@@ -1415,7 +1415,6 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     return HTTP_RESP_OK;
 }
 
-#ifdef ENABLE_OPENSSL
 static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client *w, char *url) {
     UNUSED(url);
     UNUSED(host);
@@ -1432,7 +1431,6 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     buffer_no_cacheable(wb);
     return HTTP_RESP_OK;
 }
-#endif
 
 int web_client_api_request_v1_metric_correlations(RRDHOST *host, struct web_client *w, char *url) {
     return web_client_api_request_weights(host, w, url, default_metric_correlations_method, WEIGHTS_FORMAT_CHARTS, 1);
@@ -1892,7 +1890,6 @@ static struct web_api_command api_commands_v1[] = {
         .callback = web_client_api_request_v1_info,
         .allow_subpaths = 0
     },
-#ifdef ENABLE_OPENSSL
     {
         .api = "aclk",
         .hash = 0,
@@ -1901,7 +1898,6 @@ static struct web_api_command api_commands_v1[] = {
         .callback = web_client_api_request_v1_aclk_state,
         .allow_subpaths = 0
     },
-#endif
     {
         // deprecated - use /api/v2/info
         .api = "dbengine_stats",

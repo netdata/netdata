@@ -126,13 +126,9 @@ set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
 mark_as_advanced(DEFAULT_FEATURE_STATE)
 
-# ssl
-option(ENABLE_WOLFSSL "Compile netdata using WolfSSL." False)
-cmake_dependent_option(ENABLE_OPENSSL "Compile netdata using OpenSSL." True "NOT ENABLE_WOLFSSL" False)
-
 # High-level features
-cmake_dependent_option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
-cmake_dependent_option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
+option(ENABLE_ACLK "Enable Netdata Cloud support (ACLK)" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_CLOUD "Enable Netdata Cloud by default at runtime" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_ML "Enable machine learning features" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
 
@@ -147,7 +143,7 @@ mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE})
-cmake_dependent_option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" ${DEFAULT_FEATURE_STATE} "NOT ENABLE_WOLFSSL" False)
+option(ENABLE_PLUGIN_LOGS_MANAGEMENT "Enable log collection and monitoring based on Fluent Bit" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE})
@@ -171,8 +167,7 @@ mark_as_advanced(ENABLE_LOGS_MANAGEMENT_TESTS)
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
-
-cmake_dependent_option(ENABLE_H2O "Enable H2O web server (experimental)" True "NOT ENABLE_WOLFSSL" False)
+option(ENABLE_H2O "Enable H2O web server (experimental)" True)
 mark_as_advanced(ENABLE_H2O)
 
 # Other optional functionality
@@ -184,21 +179,6 @@ mark_as_advanced(BUILD_FOR_PACKAGING)
 
 cmake_dependent_option(FORCE_LEGACY_LIBBPF "Force usage of libbpf 0.0.9 instead of the latest version." False "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(FORCE_LEGACY_LIBBPF)
-
-include(CheckFunctionExists)
-
-if(ENABLE_WOLFSSL)
-        pkg_check_modules(WOLFSSL wolfssl)
-
-        list(APPEND CMAKE_REQUIRED_LIBRARIES wolfssl)
-        check_function_exists(wolfSSL_set_alpn_protos HAVE_WOLFSSL_SET_ALPN_PROTOS)
-        if(NOT HAVE_WOLFSSL_SET_ALPN_PROTOS)
-            message(FATAL_ERROR "Your WolfSSL library has not been compiled with the OPENSSL_EXTRA flag, which is necessary to create symbols for the OpenSSL API that Netdata uses.")
-        endif()
-else()
-        # openssl/crypto
-        pkg_check_modules(OPENSSL openssl)
-endif()
 
 if(ENABLE_ACLK OR ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
         set(NEED_PROTOBUF True)
@@ -307,6 +287,11 @@ endif()
 #
 # Libm
 #
+
+# checks link with cmake required libs
+cmake_policy(SET CMP0075 NEW)
+
+include(CheckFunctionExists)
 
 check_function_exists(log10 HAVE_LOG10)
 if(NOT HAVE_LOG10)
@@ -561,7 +546,11 @@ if(FREEBSD OR MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
 endif()
 
-if(NOT OPENSSL_FOUND AND ENABLE_OPENSSL)
+# openssl/crypto
+set(ENABLE_OPENSSL True)
+pkg_check_modules(OPENSSL openssl)
+
+if(NOT OPENSSL_FOUND)
         if(MACOS)
                 execute_process(COMMAND
                                 brew --prefix --installed openssl
@@ -581,7 +570,7 @@ if(NOT OPENSSL_FOUND AND ENABLE_OPENSSL)
         endif()
 endif()
 
-if(NOT MACOS AND ENABLE_OPENSSL)
+if(NOT MACOS)
         pkg_check_modules(CRYPTO libcrypto)
 endif()
 
@@ -703,7 +692,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/required_dummies.h
         src/libnetdata/socket/security.c
         src/libnetdata/socket/security.h
-        src/libnetdata/ssl/ssl.h
         src/libnetdata/simple_pattern/simple_pattern.c
         src/libnetdata/simple_pattern/simple_pattern.h
         src/libnetdata/socket/socket.c
@@ -1430,7 +1418,7 @@ set(NETDATA_FILES
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
         ${SPAWN_PLUGIN_FILES}
-        "$<$<BOOL:${ENABLE_OPENSSL}>:${ACLK_ALWAYS_BUILD}>"
+        ${ACLK_ALWAYS_BUILD}
         ${PROFILE_PLUGIN_FILES}
 )
 
@@ -1725,26 +1713,15 @@ target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
 target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
 target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
 
-if (ENABLE_OPENSSL)
-        message(STATUS "Compiling Netdata with OpenSSL")
-        # crypto
-        target_include_directories(libnetdata BEFORE PUBLIC ${CRYPTO_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${CRYPTO_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${CRYPTO_LDFLAGS})
+# crypto
+target_include_directories(libnetdata BEFORE PUBLIC ${CRYPTO_INCLUDE_DIRS})
+target_compile_options(libnetdata PUBLIC ${CRYPTO_CFLAGS_OTHER})
+target_link_libraries(libnetdata PUBLIC ${CRYPTO_LDFLAGS})
 
-        # openssl
-        target_include_directories(libnetdata BEFORE PUBLIC ${OPENSSL_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
-endif()
-
-if (ENABLE_WOLFSSL)
-        message(STATUS "Compiling Netdata with WolfSSL")
-
-        target_include_directories(libnetdata BEFORE PUBLIC ${WOLFSSL_INCLUDE_DIRS})
-        target_compile_options(libnetdata PUBLIC ${WOLFSSL_CFLAGS_OTHER})
-        target_link_libraries(libnetdata PUBLIC ${WOLFSSL_LDFLAGS})
-endif()
+# openssl
+target_include_directories(libnetdata BEFORE PUBLIC ${OPENSSL_INCLUDE_DIRS})
+target_compile_options(libnetdata PUBLIC ${OPENSSL_CFLAGS_OTHER})
+target_link_libraries(libnetdata PUBLIC ${OPENSSL_LDFLAGS})
 
 # mnl
 if(NOT MACOS)
@@ -1772,8 +1749,7 @@ if(ENABLE_MQTTWEBSOCKETS)
 
         target_compile_options(mqttwebsockets PUBLIC -DMQTT_WSS_CUSTOM_ALLOC
                                                      -DRBUF_CUSTOM_MALLOC
-                                                     -DMQTT_WSS_CPUSTATS
-                )
+                                                     -DMQTT_WSS_CPUSTATS)
 
         target_include_directories(mqttwebsockets PUBLIC ${CMAKE_SOURCE_DIR}/aclk/helpers
                                                          ${CMAKE_SOURCE_DIR}/src/web/server/h2o/libh2o/include)
