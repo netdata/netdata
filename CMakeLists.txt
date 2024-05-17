@@ -2848,8 +2848,8 @@ install(PROGRAMS
 
 # confs
 install(FILES
-        src/collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
-        src/health/schema.d/health:alert:prototype.json
+        src/collectors/systemd-journal.plugin/schema.d/systemd-journal%3Amonitored-directories.json
+        src/health/schema.d/health%3Aalert%3Aprototype.json
         COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/schema.d)
 
