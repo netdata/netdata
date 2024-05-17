@@ -25,6 +25,7 @@ func init() {
 	module.Register("postgres", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -57,12 +58,12 @@ func New() *Postgres {
 }
 
 type Config struct {
-	UpdateEvery        int          `yaml:"update_every" json:"update_every"`
+	UpdateEvery        int          `yaml:"update_every,omitempty" json:"update_every"`
 	DSN                string       `yaml:"dsn" json:"dsn"`
-	Timeout            web.Duration `yaml:"timeout" json:"timeout"`
-	DBSelector         string       `yaml:"collect_databases_matching" json:"collect_databases_matching"`
-	XactTimeHistogram  []float64    `yaml:"transaction_time_histogram" json:"transaction_time_histogram"`
-	QueryTimeHistogram []float64    `yaml:"query_time_histogram" json:"query_time_histogram"`
+	Timeout            web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	DBSelector         string       `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching"`
+	XactTimeHistogram  []float64    `yaml:"transaction_time_histogram,omitempty" json:"transaction_time_histogram"`
+	QueryTimeHistogram []float64    `yaml:"query_time_histogram,omitempty" json:"query_time_histogram"`
 	MaxDBTables        int64        `yaml:"max_db_tables" json:"max_db_tables"`
 	MaxDBIndexes       int64        `yaml:"max_db_indexes" json:"max_db_indexes"`
 }

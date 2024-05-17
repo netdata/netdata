@@ -26,6 +26,7 @@ func init() {
 			UpdateEvery: 1,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -49,9 +50,9 @@ func New() *Consul {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
-	ACLToken    string `yaml:"acl_token" json:"acl_token"`
+	ACLToken    string `yaml:"acl_token,omitempty" json:"acl_token"`
 }
 
 type Consul struct {

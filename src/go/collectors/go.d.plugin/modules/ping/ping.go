@@ -24,6 +24,7 @@ func init() {
 			UpdateEvery: 5,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -43,13 +44,13 @@ func New() *Ping {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
 	Hosts       []string     `yaml:"hosts" json:"hosts"`
-	Network     string       `yaml:"network" json:"network"`
+	Network     string       `yaml:"network,omitempty" json:"network"`
 	Privileged  bool         `yaml:"privileged" json:"privileged"`
-	SendPackets int          `yaml:"packets" json:"packets"`
-	Interval    web.Duration `yaml:"interval" json:"interval"`
-	Interface   string       `yaml:"interface" json:"interface"`
+	SendPackets int          `yaml:"packets,omitempty" json:"packets"`
+	Interval    web.Duration `yaml:"interval,omitempty" json:"interval"`
+	Interface   string       `yaml:"interface,omitempty" json:"interface"`
 }
 
 type (

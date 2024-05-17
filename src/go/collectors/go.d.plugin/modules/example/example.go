@@ -21,6 +21,7 @@ func init() {
 			Disabled:    true,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -44,12 +45,12 @@ func New() *Example {
 
 type (
 	Config struct {
-		UpdateEvery  int          `yaml:"update_every" json:"update_every"`
+		UpdateEvery  int          `yaml:"update_every,omitempty" json:"update_every"`
 		Charts       ConfigCharts `yaml:"charts" json:"charts"`
 		HiddenCharts ConfigCharts `yaml:"hidden_charts" json:"hidden_charts"`
 	}
 	ConfigCharts struct {
-		Type     string `yaml:"type" json:"type"`
+		Type     string `yaml:"type,omitempty" json:"type"`
 		Num      int    `yaml:"num" json:"num"`
 		Contexts int    `yaml:"contexts" json:"contexts"`
 		Dims     int    `yaml:"dimensions" json:"dimensions"`

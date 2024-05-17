@@ -24,6 +24,7 @@ type (
 		Defaults
 		Create          func() Module
 		JobConfigSchema string
+		Config          func() any
 	}
 	// Registry is a collection of Creators.
 	Registry map[string]Creator

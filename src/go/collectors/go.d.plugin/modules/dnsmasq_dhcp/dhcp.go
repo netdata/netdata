@@ -19,6 +19,7 @@ func init() {
 	module.Register("dnsmasq_dhcp", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -38,10 +39,10 @@ func New() *DnsmasqDHCP {
 }
 
 type Config struct {
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
+	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
 	LeasesPath  string `yaml:"leases_path" json:"leases_path"`
-	ConfPath    string `yaml:"conf_path" json:"conf_path"`
-	ConfDir     string `yaml:"conf_dir" json:"conf_dir"`
+	ConfPath    string `yaml:"conf_path,omitempty" json:"conf_path"`
+	ConfDir     string `yaml:"conf_dir,omitempty" json:"conf_dir"`
 }
 
 type DnsmasqDHCP struct {

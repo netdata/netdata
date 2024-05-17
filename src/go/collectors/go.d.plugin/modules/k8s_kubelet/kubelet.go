@@ -23,6 +23,7 @@ func init() {
 			Priority: 50000,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -47,9 +48,9 @@ func New() *Kubelet {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
-	TokenPath   string `yaml:"token_path" json:"token_path"`
+	TokenPath   string `yaml:"token_path,omitempty" json:"token_path"`
 }
 
 type Kubelet struct {

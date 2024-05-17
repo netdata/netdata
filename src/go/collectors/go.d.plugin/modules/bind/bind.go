@@ -21,6 +21,7 @@ func init() {
 	module.Register("bind", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -41,9 +42,9 @@ func New() *Bind {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
-	PermitView  string `yaml:"permit_view" json:"permit_view"`
+	PermitView  string `yaml:"permit_view,omitempty" json:"permit_view"`
 }
 
 type (
