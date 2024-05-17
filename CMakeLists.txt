@@ -1251,6 +1251,12 @@ set(ACLK_ALWAYS_BUILD
         src/aclk/aclk_util.h
         src/aclk/https_client.c
         src/aclk/https_client.h
+        src/aclk/mqtt_websockets/c-rbuf/cringbuffer.c
+        src/aclk/mqtt_websockets/c-rbuf/cringbuffer.h
+        src/aclk/mqtt_websockets/c-rbuf/cringbuffer_internal.h
+        src/aclk/mqtt_websockets/c_rhash/c_rhash.c
+        src/aclk/mqtt_websockets/c_rhash/c_rhash.h
+        src/aclk/mqtt_websockets/c_rhash/c_rhash_internal.h
 )
 
 set(TIMEX_PLUGIN_FILES
@@ -1473,12 +1479,6 @@ set(MQTT_WEBSOCKETS_FILES
         src/aclk/mqtt_websockets/common_public.c
         src/aclk/mqtt_websockets/common_public.h
         src/aclk/mqtt_websockets/common_internal.h
-        src/aclk/mqtt_websockets/c-rbuf/cringbuffer.c
-        src/aclk/mqtt_websockets/c-rbuf/cringbuffer.h
-        src/aclk/mqtt_websockets/c-rbuf/cringbuffer_internal.h
-        src/aclk/mqtt_websockets/c_rhash/c_rhash.c
-        src/aclk/mqtt_websockets/c_rhash/c_rhash.h
-        src/aclk/mqtt_websockets/c_rhash/c_rhash_internal.h
 )
 
 set(ACLK_PROTO_DEFS
