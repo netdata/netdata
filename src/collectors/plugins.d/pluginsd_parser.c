@@ -433,7 +433,7 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_DIMENSION, PLUGINSD_KEYWORD_CHART);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
 
-    if (unlikely(!id))
+    if (unlikely(!id || !*id))
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DIMENSION, "missing dimension id");
 
     long multiplier = 1;
@@ -461,6 +461,9 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
             options ? options : "");
 
     RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
+    if (unlikely(!rd))
+        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DIMENSION, "failed to create dimension");
+
     int unhide_dimension = 1;
 
     rrddim_option_clear(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
