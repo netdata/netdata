@@ -23,8 +23,9 @@ var configSchema string
 
 func init() {
 	module.Register("redis", module.Creator{
-		Create:          func() module.Module { return New() },
 		JobConfigSchema: configSchema,
+		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -45,13 +46,13 @@ func New() *Redis {
 }
 
 type Config struct {
-	tlscfg.TLSConfig `yaml:",inline" json:""`
-	UpdateEvery      int          `yaml:"update_every" json:"update_every"`
+	UpdateEvery      int          `yaml:"update_every,omitempty" json:"update_every"`
 	Address          string       `yaml:"address" json:"address"`
-	Timeout          web.Duration `yaml:"timeout" json:"timeout"`
-	Username         string       `yaml:"username" json:"username"`
-	Password         string       `yaml:"password" json:"password"`
-	PingSamples      int          `yaml:"ping_samples" json:"ping_samples"`
+	Timeout          web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Username         string       `yaml:"username,omitempty" json:"username"`
+	Password         string       `yaml:"password,omitempty" json:"password"`
+	tlscfg.TLSConfig `yaml:",inline" json:""`
+	PingSamples      int `yaml:"ping_samples" json:"ping_samples"`
 }
 
 type (

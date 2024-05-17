@@ -34,7 +34,7 @@ func TestManager_Run(t *testing.T) {
 					wantExposed:    nil,
 					wantRunning:    nil,
 					wantDyncfg: `
-CONFIG go.d:collector:success:name create accepted job /collectors/jobs stock 'type=stock,module=success,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:success:name create accepted job /collectors/jobs stock 'type=stock,module=success,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":""}
@@ -66,7 +66,7 @@ CONFIG go.d:collector:success:name delete
 					wantExposed: nil,
 					wantRunning: nil,
 					wantDyncfg: `
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs stock 'type=stock,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs stock 'type=stock,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -96,7 +96,7 @@ CONFIG go.d:collector:fail:name delete
 					wantExposed:    nil,
 					wantRunning:    nil,
 					wantDyncfg: `
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs stock 'type=stock,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs stock 'type=stock,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -126,7 +126,7 @@ CONFIG go.d:collector:fail:name delete
 					wantExposed:    nil,
 					wantRunning:    nil,
 					wantDyncfg: `
-CONFIG go.d:collector:success:name create accepted job /collectors/jobs user 'type=user,module=success,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:success:name create accepted job /collectors/jobs user 'type=user,module=success,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":""}
@@ -158,7 +158,7 @@ CONFIG go.d:collector:success:name delete
 					wantExposed:    nil,
 					wantRunning:    nil,
 					wantDyncfg: `
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -190,7 +190,7 @@ CONFIG go.d:collector:fail:name delete
 					wantExposed:    nil,
 					wantRunning:    nil,
 					wantDyncfg: `
-CONFIG go.d:collector:success:name create accepted job /collectors/jobs discovered 'type=discovered,module=success,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:success:name create accepted job /collectors/jobs discovered 'type=discovered,module=success,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":""}
@@ -222,7 +222,7 @@ CONFIG go.d:collector:success:name delete
 					wantExposed:    nil,
 					wantRunning:    nil,
 					wantDyncfg: `
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs discovered 'type=discovered,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs discovered 'type=discovered,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -277,7 +277,7 @@ CONFIG go.d:collector:fail:name delete
 					},
 					wantRunning: nil,
 					wantDyncfg: `
-CONFIG go.d:collector:fail:stock create accepted job /collectors/jobs stock 'type=stock,module=fail,job=stock' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:stock create accepted job /collectors/jobs stock 'type=stock,module=fail,job=stock' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -285,7 +285,7 @@ FUNCTION_RESULT_END
 
 CONFIG go.d:collector:fail:stock delete
 
-CONFIG go.d:collector:fail:discovered create accepted job /collectors/jobs discovered 'type=discovered,module=fail,job=discovered' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:discovered create accepted job /collectors/jobs discovered 'type=discovered,module=fail,job=discovered' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -293,7 +293,7 @@ FUNCTION_RESULT_END
 
 CONFIG go.d:collector:fail:discovered status failed
 
-CONFIG go.d:collector:fail:user create accepted job /collectors/jobs user 'type=user,module=fail,job=user' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:user create accepted job /collectors/jobs user 'type=user,module=fail,job=user' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 3-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -345,7 +345,7 @@ CONFIG go.d:collector:fail:user status failed
 					},
 					wantRunning: nil,
 					wantDyncfg: `
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs stock 'type=stock,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs stock 'type=stock,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -353,7 +353,7 @@ FUNCTION_RESULT_END
 
 CONFIG go.d:collector:fail:name delete
 
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs discovered 'type=discovered,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs discovered 'type=discovered,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -361,7 +361,7 @@ FUNCTION_RESULT_END
 
 CONFIG go.d:collector:fail:name status failed
 
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 3-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -407,7 +407,7 @@ CONFIG go.d:collector:fail:name status failed
 					wantExposed:    nil,
 					wantRunning:    nil,
 					wantDyncfg: `
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs stock 'type=stock,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs stock 'type=stock,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -415,7 +415,7 @@ FUNCTION_RESULT_END
 
 CONFIG go.d:collector:fail:name delete
 
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs discovered 'type=discovered,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs discovered 'type=discovered,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -423,7 +423,7 @@ FUNCTION_RESULT_END
 
 CONFIG go.d:collector:fail:name status failed
 
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 3-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -468,7 +468,7 @@ CONFIG go.d:collector:fail:name delete
 					},
 					wantRunning: nil,
 					wantDyncfg: `
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -505,7 +505,7 @@ CONFIG go.d:collector:fail:name status failed
 					wantExposed:    nil,
 					wantRunning:    nil,
 					wantDyncfg: `
-CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:fail:name create accepted job /collectors/jobs user 'type=user,module=fail,job=name' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -589,10 +589,74 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-get 200 application/json
 {"option_str":"1","option_int":1}
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			sim := test.createSim()
+			sim.run(t)
+		})
+	}
+}
+
+func TestManager_Run_Dyncfg_Userconfig(t *testing.T) {
+	tests := map[string]struct {
+		createSim func() *runSim
+	}{
+		"[userconfig] existing": {
+			createSim: func() *runSim {
+				cfg := prepareDyncfgCfg("success", "test")
+
+				return &runSim{
+					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+						mgr.dyncfgConfig(functions.Function{
+							UID:  "1-userconfig",
+							Args: []string{dyncfgJobID(cfg), "userconfig"},
+						})
+					},
+					wantDiscovered: nil,
+					wantSeen:       nil,
+					wantExposed:    nil,
+					wantRunning:    nil,
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-userconfig 200 application/yaml
+jobs:
+- name: test
+  option_one: one
+  option_two: 2
+
+FUNCTION_RESULT_END
+`,
+				}
+			},
+		},
+		"[userconfig] non-existing": {
+			createSim: func() *runSim {
+				cfg := prepareDyncfgCfg("success!", "test")
+
+				return &runSim{
+					do: func(mgr *Manager, _ chan []*confgroup.Group) {
+						mgr.dyncfgConfig(functions.Function{
+							UID:  "1-userconfig",
+							Args: []string{dyncfgJobID(cfg), "userconfig"},
+						})
+					},
+					wantDiscovered: nil,
+					wantSeen:       nil,
+					wantExposed:    nil,
+					wantRunning:    nil,
+					wantDyncfg: `
+FUNCTION_RESULT_BEGIN 1-userconfig 404 application/json
+{"status":404,"message":"The specified module 'success!' is not registered."}
 FUNCTION_RESULT_END
 `,
 				}
@@ -638,7 +702,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -669,7 +733,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -705,13 +769,13 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 `,
 				}
 			},
@@ -784,7 +848,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -829,7 +893,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -876,7 +940,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -921,7 +985,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":"Job enable failed: mock failed init."}
@@ -1006,7 +1070,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1051,7 +1115,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1098,7 +1162,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1143,7 +1207,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:fail:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=fail,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1228,7 +1292,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-restart 405 application/json
 {"status":405,"message":"Restarting data collection job is not allowed in 'accepted' state."}
@@ -1273,7 +1337,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1324,7 +1388,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}
@@ -1379,7 +1443,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1496,7 +1560,7 @@ FUNCTION_RESULT_END
 					},
 					wantRunning: []string{stockCfg.FullName(), userCfg.FullName(), discCfg.FullName()},
 					wantDyncfg: `
-CONFIG go.d:collector:success:stock create accepted job /collectors/jobs stock 'type=stock,module=success,job=stock' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:success:stock create accepted job /collectors/jobs stock 'type=stock,module=success,job=stock' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 1-enable 200 application/json
 {"status":200,"message":""}
@@ -1504,7 +1568,7 @@ FUNCTION_RESULT_END
 
 CONFIG go.d:collector:success:stock status running
 
-CONFIG go.d:collector:success:user create accepted job /collectors/jobs user 'type=user,module=success,job=user' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:success:user create accepted job /collectors/jobs user 'type=user,module=success,job=user' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1512,7 +1576,7 @@ FUNCTION_RESULT_END
 
 CONFIG go.d:collector:success:user status running
 
-CONFIG go.d:collector:success:discovered create accepted job /collectors/jobs discovered 'type=discovered,module=success,job=discovered' 'schema get enable disable update restart test' 0x0000 0x0000
+CONFIG go.d:collector:success:discovered create accepted job /collectors/jobs discovered 'type=discovered,module=success,job=discovered' 'schema get enable disable update restart test userconfig' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 3-enable 200 application/json
 {"status":200,"message":""}
@@ -1561,7 +1625,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-remove 200 application/json
 {"status":200,"message":""}
@@ -1602,7 +1666,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1698,7 +1762,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-enable 200 application/json
 {"status":200,"message":""}
@@ -1755,7 +1819,7 @@ FUNCTION_RESULT_BEGIN 1-add 202 application/json
 {"status":202,"message":""}
 FUNCTION_RESULT_END
 
-CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test remove' 0x0000 0x0000
+CONFIG go.d:collector:success:test create accepted job /collectors/jobs dyncfg 'type=dyncfg,module=success,job=test' 'schema get enable disable update restart test userconfig remove' 0x0000 0x0000
 
 FUNCTION_RESULT_BEGIN 2-disable 200 application/json
 {"status":200,"message":""}

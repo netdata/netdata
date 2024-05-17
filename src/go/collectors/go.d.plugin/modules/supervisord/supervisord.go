@@ -18,6 +18,7 @@ func init() {
 	module.Register("supervisord", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -36,9 +37,9 @@ func New() *Supervisord {
 }
 
 type Config struct {
-	web.Client  `yaml:",inline" json:""`
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
+	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
 	URL         string `yaml:"url" json:"url"`
+	web.Client  `yaml:",inline" json:""`
 }
 
 type (

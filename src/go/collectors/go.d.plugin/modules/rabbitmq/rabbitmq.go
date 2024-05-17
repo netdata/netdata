@@ -19,6 +19,7 @@ func init() {
 	module.Register("rabbitmq", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -44,8 +45,8 @@ func New() *RabbitMQ {
 }
 
 type Config struct {
+	UpdateEvery   int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP      `yaml:",inline" json:""`
-	UpdateEvery   int  `yaml:"update_every" json:"update_every"`
 	CollectQueues bool `yaml:"collect_queues_metrics" json:"collect_queues_metrics"`
 }
 

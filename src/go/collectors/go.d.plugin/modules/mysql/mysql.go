@@ -25,6 +25,7 @@ func init() {
 	module.Register("mysql", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -54,10 +55,10 @@ func New() *MySQL {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
 	DSN         string       `yaml:"dsn" json:"dsn"`
-	MyCNF       string       `yaml:"my.cnf" json:"my.cnf"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	MyCNF       string       `yaml:"my.cnf,omitempty" json:"my.cnf"`
+	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type MySQL struct {

@@ -22,6 +22,7 @@ func init() {
 			UpdateEvery: 5,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -68,9 +69,9 @@ func New() *Windows {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
-	Vnode       string `yaml:"vnode" json:"vnode"`
+	Vnode       string `yaml:"vnode,omitempty" json:"vnode"`
 }
 
 type (

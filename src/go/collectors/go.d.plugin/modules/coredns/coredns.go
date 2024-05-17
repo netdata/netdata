@@ -22,6 +22,7 @@ func init() {
 	module.Register("coredns", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -44,10 +45,10 @@ func New() *CoreDNS {
 }
 
 type Config struct {
+	UpdateEvery    int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP       `yaml:",inline" json:""`
-	UpdateEvery    int                `yaml:"update_every" json:"update_every"`
-	PerServerStats matcher.SimpleExpr `yaml:"per_server_stats" json:"per_server_stats"`
-	PerZoneStats   matcher.SimpleExpr `yaml:"per_zone_stats" json:"per_zone_stats"`
+	PerServerStats matcher.SimpleExpr `yaml:"per_server_stats,omitempty" json:"per_server_stats"`
+	PerZoneStats   matcher.SimpleExpr `yaml:"per_zone_stats,omitempty" json:"per_zone_stats"`
 }
 
 type CoreDNS struct {

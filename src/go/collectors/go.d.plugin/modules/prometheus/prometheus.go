@@ -24,6 +24,7 @@ func init() {
 			UpdateEvery: 10,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -44,19 +45,19 @@ func New() *Prometheus {
 }
 
 type Config struct {
+	UpdateEvery     int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP        `yaml:",inline" json:""`
-	UpdateEvery     int           `yaml:"update_every" json:"update_every"`
-	Name            string        `yaml:"name" json:"name"`
-	Application     string        `yaml:"app" json:"app"`
-	BearerTokenFile string        `yaml:"bearer_token_file" json:"bearer_token_file"`
-	Selector        selector.Expr `yaml:"selector" json:"selector"`
-	ExpectedPrefix  string        `yaml:"expected_prefix" json:"expected_prefix"`
+	Name            string        `yaml:"name,omitempty" json:"name"`
+	Application     string        `yaml:"app,omitempty" json:"app"`
+	BearerTokenFile string        `yaml:"bearer_token_file,omitempty" json:"bearer_token_file"`
+	Selector        selector.Expr `yaml:"selector,omitempty" json:"selector"`
+	ExpectedPrefix  string        `yaml:"expected_prefix,omitempty" json:"expected_prefix"`
 	MaxTS           int           `yaml:"max_time_series" json:"max_time_series"`
 	MaxTSPerMetric  int           `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
 	FallbackType    struct {
-		Gauge   []string `yaml:"gauge" json:"gauge"`
-		Counter []string `yaml:"counter" json:"counter"`
-	} `yaml:"fallback_type" json:"fallback_type"`
+		Gauge   []string `yaml:"gauge,omitempty" json:"gauge"`
+		Counter []string `yaml:"counter,omitempty" json:"counter"`
+	} `yaml:"fallback_type,omitempty" json:"fallback_type"`
 }
 
 type Prometheus struct {
