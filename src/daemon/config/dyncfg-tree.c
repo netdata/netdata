@@ -207,8 +207,15 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
 
         DYNCFG_CMDS cmd = dyncfg_cmds2id(action);
         const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
-        if(!item)
+        if(!item) {
             item = dyncfg_get_template_of_new_job(id);
+
+            if(item && (!name || !*name)) {
+                const char *n = dictionary_acquired_item_name(item);
+                if(strncmp(id, n, strlen(n)) == 0 && id[strlen(n)] == ':')
+                    name = &id[strlen(n) + 1];
+            }
+        }
 
         if(item) {
             DYNCFG *df = dictionary_acquired_item_value(item);
