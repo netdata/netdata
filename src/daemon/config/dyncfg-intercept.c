@@ -211,7 +211,6 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     int rc = HTTP_RESP_INTERNAL_SERVER_ERROR;
     DYNCFG_CMDS cmd;
     const DICTIONARY_ITEM *item = NULL;
-    const char *add_name = NULL;
 
     char buf[strlen(rfe->function) + 1];
     memcpy(buf, rfe->function, sizeof(buf));
@@ -223,6 +222,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     char *config = get_word(words, num_words, i++);
     char *id = get_word(words, num_words, i++);
     char *cmd_str = get_word(words, num_words, i++);
+    char *add_name = get_word(words, num_words, i++);
 
     if(!config || !*config || strcmp(config, PLUGINSD_FUNCTION_CONFIG) != 0)
         return dyncfg_intercept_early_error(
@@ -235,8 +235,17 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
             rfe, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: invalid command received");
 
-    if(cmd == DYNCFG_CMD_ADD) {
-        add_name = get_word(words, num_words, i++);
+    if(cmd == DYNCFG_CMD_ADD || cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_USERCONFIG) {
+        if(cmd == DYNCFG_CMD_TEST && (!add_name || !*add_name)) {
+            // backwards compatibility for TEST without a name
+            char *colon = strrchr(id, ':');
+            if(colon) {
+                *colon = '\0';
+                add_name = ++colon;
+            }
+            else
+                add_name = "test";
+        }
 
         if(!add_name || !*add_name)
             return dyncfg_intercept_early_error(
@@ -247,26 +256,26 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
             char nid[strlen(id) + strlen(add_name) + 2];
             snprintfz(nid, sizeof(nid), "%s:%s", id, add_name);
 
-            if (dictionary_get(dyncfg_globals.nodes, nid))
+            if (cmd == DYNCFG_CMD_ADD && dictionary_get(dyncfg_globals.nodes, nid))
                 return dyncfg_intercept_early_error(
                     rfe, HTTP_RESP_BAD_REQUEST,
                     "dyncfg functions intercept: a configuration with this name already exists");
         }
     }
 
-    if((cmd == DYNCFG_CMD_ADD || cmd == DYNCFG_CMD_UPDATE || cmd == DYNCFG_CMD_TEST) && !has_payload)
+    if((cmd == DYNCFG_CMD_ADD || cmd == DYNCFG_CMD_UPDATE || cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_USERCONFIG) && !has_payload)
         return dyncfg_intercept_early_error(
             rfe, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: this action requires a payload");
 
-    if((cmd != DYNCFG_CMD_ADD && cmd != DYNCFG_CMD_UPDATE && cmd != DYNCFG_CMD_TEST) && has_payload)
+    if((cmd != DYNCFG_CMD_ADD && cmd != DYNCFG_CMD_UPDATE && cmd != DYNCFG_CMD_TEST && cmd != DYNCFG_CMD_USERCONFIG) && has_payload)
         return dyncfg_intercept_early_error(
             rfe, HTTP_RESP_BAD_REQUEST,
             "dyncfg functions intercept: this action does not require a payload");
 
     item = dictionary_get_and_acquire_item(dyncfg_globals.nodes, id);
     if(!item) {
-        if(cmd == DYNCFG_CMD_TEST) {
+        if(cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_USERCONFIG) {
             // this may be a test on a new job
             item = dyncfg_get_template_of_new_job(id);
         }
@@ -284,6 +293,7 @@ int dyncfg_function_intercept_cb(struct rrd_function_execute *rfe, void *data __
     switch(cmd) {
         case DYNCFG_CMD_GET:
         case DYNCFG_CMD_SCHEMA:
+        case DYNCFG_CMD_USERCONFIG:
             if(!http_access_user_has_enough_access_level_for_endpoint(rfe->user_access, df->view_access)) {
                 make_the_call_to_plugin = false;
                 rc = dyncfg_default_response(

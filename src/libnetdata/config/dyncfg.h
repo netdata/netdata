@@ -52,7 +52,9 @@ typedef enum __attribute__((packed)) {
     DYNCFG_CMD_ENABLE       = (1 << 6),
     DYNCFG_CMD_DISABLE      = (1 << 7),
     DYNCFG_CMD_RESTART      = (1 << 8),
+    DYNCFG_CMD_USERCONFIG   = (1 << 9),
 } DYNCFG_CMDS;
+
 DYNCFG_CMDS dyncfg_cmds2id(const char *cmds);
 void dyncfg_cmds2buffer(DYNCFG_CMDS cmds, struct web_buffer *wb);
 void dyncfg_cmds2json_array(DYNCFG_CMDS cmds, const char *key, struct web_buffer *wb);

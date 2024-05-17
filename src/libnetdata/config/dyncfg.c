@@ -124,7 +124,8 @@ static struct {
     { .cmd = DYNCFG_CMD_REMOVE, .name = "remove" },
     { .cmd = DYNCFG_CMD_ENABLE, .name = "enable" },
     { .cmd = DYNCFG_CMD_DISABLE, .name = "disable" },
-    { .cmd = DYNCFG_CMD_RESTART, .name = "restart" }
+    { .cmd = DYNCFG_CMD_RESTART, .name = "restart" },
+    { .cmd = DYNCFG_CMD_USERCONFIG, .name = "userconfig" },
 };
 
 const char *dyncfg_id2cmd_one(DYNCFG_CMDS cmd) {

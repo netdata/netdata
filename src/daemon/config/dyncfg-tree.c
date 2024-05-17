@@ -245,6 +245,17 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
                 rfe->function = old_rfe_function;
                 return code;
             }
+            else if(cmd == DYNCFG_CMD_USERCONFIG && df->current.status != DYNCFG_STATUS_ORPHAN) {
+                const char *old_rfe_function = rfe->function;
+                char buf2[2048];
+                snprintfz(buf2, sizeof(buf2), "config %s %s", id, action);
+                rfe->function = buf2;
+                dictionary_acquired_item_release(dyncfg_globals.nodes, item);
+                item = NULL;
+                code = dyncfg_function_intercept_cb(rfe, data);
+                rfe->function = old_rfe_function;
+                return code;
+            }
 
             if(item)
                 dictionary_acquired_item_release(dyncfg_globals.nodes, item);
