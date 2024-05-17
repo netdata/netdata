@@ -487,9 +487,14 @@ int main() {
 " HAVE_BUILTIN_ATOMICS)
 
 check_c_source_compiles("
+void my_printf(char const *s, ...) __attribute__((format(gnu_printf, 1, 2)));
+int main() { return 0; }
+" HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF FAIL_REGEX "warning:")
+
+check_c_source_compiles("
 void my_printf(char const *s, ...) __attribute__((format(printf, 1, 2)));
 int main() { return 0; }
-" HAVE_FUNC_ATTRIBUTE_FORMAT)
+" HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF FAIL_REGEX "warning:")
 
 check_c_source_compiles("
 #include <stdio.h>
@@ -2843,8 +2848,8 @@ install(PROGRAMS
 
 # confs
 install(FILES
-        src/collectors/systemd-journal.plugin/schema.d/systemd-journal:monitored-directories.json
-        src/health/schema.d/health:alert:prototype.json
+        src/collectors/systemd-journal.plugin/schema.d/systemd-journal%3Amonitored-directories.json
+        src/health/schema.d/health%3Aalert%3Aprototype.json
         COMPONENT netdata
         DESTINATION usr/lib/netdata/conf.d/schema.d)
 

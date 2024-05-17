@@ -32,9 +32,9 @@ static inline char *os_strndup( const char *s1, size_t n)
 #define strndup(s, n) os_strndup(s, n)
 #endif
 
-#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT) && !defined(COMPILED_FOR_MACOS)
+#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF)
 #define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
-#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT)
+#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF)
 #define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
 #else
 #define PRINTFLIKE(f, a)
