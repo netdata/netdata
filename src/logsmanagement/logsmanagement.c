@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
                 !strcmp("--version", argv[i]) || 
                 !strcmp("-v", argv[i]) || 
                 !strcmp("-V", argv[i])) {
-            printf(VERSION"\n");
+            printf(NETDATA_VERSION"\n");
             exit(0);
         }
         else if(!strcmp("-h", argv[i]) || 
@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
                     " https://github.com/netdata/netdata/tree/master/src/collectors/logs-management.plugin\n"
                     "\n",
                     program_name,
-                    VERSION
+                    NETDATA_VERSION
             );
             exit(1);
         }

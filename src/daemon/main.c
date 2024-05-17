@@ -1996,7 +1996,7 @@ int main(int argc, char **argv) {
 
         // initialize the log files
         nd_log_initialize();
-        netdata_log_info("Netdata agent version \""VERSION"\" is starting");
+        netdata_log_info("Netdata agent version '%s' is starting", NETDATA_VERSION);
 
         ieee754_doubles = is_system_ieee754_double();
         if(!ieee754_doubles)

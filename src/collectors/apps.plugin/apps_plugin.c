@@ -729,7 +729,7 @@ static void parse_args(int argc, char **argv)
         }
 
         if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
-            printf("apps.plugin %s\n", VERSION);
+            printf("apps.plugin %s\n", NETDATA_VERSION);
             exit(0);
         }
 
@@ -863,7 +863,7 @@ static void parse_args(int argc, char **argv)
 #endif
                     " version or -v or -V print program version and exit\n"
                     "\n"
-                    , VERSION
+                    , NETDATA_VERSION
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
                     , max_fds_cache_seconds
 #endif

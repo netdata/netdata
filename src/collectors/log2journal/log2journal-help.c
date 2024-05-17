@@ -44,7 +44,7 @@ static void config_dir_print_available(void) {
 
 void log_job_command_line_help(const char *name) {
     printf("\n");
-    printf("Netdata log2journal " VERSION "\n");
+    printf("Netdata log2journal " NETDATA_VERSION "\n");
     printf("\n");
     printf("Convert logs to systemd Journal Export Format.\n");
     printf("\n");

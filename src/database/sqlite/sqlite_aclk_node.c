@@ -82,7 +82,7 @@ static void build_node_info(RRDHOST *host)
     node_info.data.cpu_frequency = host->system_info->host_cpu_freq ? host->system_info->host_cpu_freq : "0";
     node_info.data.memory = host->system_info->host_ram_total ? host->system_info->host_ram_total : "0";
     node_info.data.disk_space = host->system_info->host_disk_space ? host->system_info->host_disk_space : "0";
-    node_info.data.version = host_version ? host_version : VERSION;
+    node_info.data.version = host_version ? host_version : NETDATA_VERSION;
     node_info.data.release_channel = get_release_channel();
     node_info.data.timezone = rrdhost_abbrev_timezone(host);
     node_info.data.virtualization_type = host->system_info->virtualization ? host->system_info->virtualization : "unknown";
