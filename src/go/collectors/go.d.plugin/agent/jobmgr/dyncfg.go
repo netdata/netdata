@@ -717,7 +717,7 @@ func (m *Manager) dyncfgRespPayloadJSON(fn functions.Function, payload string) {
 }
 
 func (m *Manager) dyncfgRespPayloadYAML(fn functions.Function, payload string) {
-	m.dyncfgRespPayload(fn, payload, " application/yaml")
+	m.dyncfgRespPayload(fn, payload, "application/yaml")
 }
 
 func (m *Manager) dyncfgRespPayload(fn functions.Function, payload string, contentType string) {
