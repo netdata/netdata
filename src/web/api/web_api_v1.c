@@ -1581,11 +1581,24 @@ static int web_client_api_request_v1_config(RRDHOST *host, struct web_client *w,
             rrd_call_function_error(w->response.data, "invalid id given", HTTP_RESP_BAD_REQUEST);
             return HTTP_RESP_BAD_REQUEST;
         }
+
         if(c == DYNCFG_CMD_NONE) {
             rrd_call_function_error(w->response.data, "invalid action given", HTTP_RESP_BAD_REQUEST);
             return HTTP_RESP_BAD_REQUEST;
         }
-        else if(c == DYNCFG_CMD_ADD) {
+
+        if(c == DYNCFG_CMD_ADD || c == DYNCFG_CMD_USERCONFIG || c == DYNCFG_CMD_TEST) {
+            if(c == DYNCFG_CMD_TEST && (!add_name || !*add_name)) {
+                // backwards compatibility for TEST without a name
+                char *colon = strrchr(id, ':');
+                if(colon) {
+                    *colon = '\0';
+                    add_name = ++colon;
+                }
+                else
+                    add_name = "test";
+            }
+
             if(!add_name || !*add_name || !dyncfg_is_valid_id(add_name)) {
                 rrd_call_function_error(w->response.data, "invalid name given", HTTP_RESP_BAD_REQUEST);
                 return HTTP_RESP_BAD_REQUEST;
