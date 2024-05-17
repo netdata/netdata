@@ -88,6 +88,5 @@ static inline int open_file_buffered_io(char *path, int flags, uv_file *file)
 {
     return open_file_for_io(path, flags, file, 0);
 }
-int compute_multidb_diskspace();
 
 #endif /* NETDATA_RRDENGINELIB_H */

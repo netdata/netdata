@@ -61,8 +61,8 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
 
 int db_engine_journal_check = 0;
 bool new_dbengine_defaults = false;
-int default_rrdeng_disk_quota_mb = 1024;
-int default_multidb_disk_quota_mb = 1024;
+int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
+int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
 RRD_BACKFILL default_backfill = RRD_BACKFILL_NEW;
 
 #if defined(ENV32BIT)

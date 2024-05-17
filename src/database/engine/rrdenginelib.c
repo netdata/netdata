@@ -76,26 +76,3 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
     return fd;
 }
 
-int compute_multidb_diskspace()
-{
-    char multidb_disk_space_file[FILENAME_MAX + 1];
-    FILE *fp;
-    int computed_multidb_disk_quota_mb = -1;
-
-    snprintfz(multidb_disk_space_file, FILENAME_MAX, "%s/dbengine_multihost_size", netdata_configured_varlib_dir);
-    fp = fopen(multidb_disk_space_file, "r");
-    if (likely(fp)) {
-        int rc = fscanf(fp, "%d", &computed_multidb_disk_quota_mb);
-        fclose(fp);
-        if (unlikely(rc != 1 || computed_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB)) {
-            errno = 0;
-            netdata_log_error("File '%s' contains invalid input, it will be rebuild", multidb_disk_space_file);
-            computed_multidb_disk_quota_mb = -1;
-        }
-    }
-
-    if (computed_multidb_disk_quota_mb == -1)
-        computed_multidb_disk_quota_mb = default_rrdeng_disk_quota_mb;
-
-    return computed_multidb_disk_quota_mb;
-}
