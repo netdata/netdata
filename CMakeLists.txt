@@ -487,9 +487,14 @@ int main() {
 " HAVE_BUILTIN_ATOMICS)
 
 check_c_source_compiles("
+void my_printf(char const *s, ...) __attribute__((format(gnu_printf, 1, 2)));
+int main() { return 0; }
+" HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF FAIL_REGEX "warning:")
+
+check_c_source_compiles("
 void my_printf(char const *s, ...) __attribute__((format(printf, 1, 2)));
 int main() { return 0; }
-" HAVE_FUNC_ATTRIBUTE_FORMAT)
+" HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF FAIL_REGEX "warning:")
 
 check_c_source_compiles("
 #include <stdio.h>
