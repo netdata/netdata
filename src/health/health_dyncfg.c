@@ -381,140 +381,131 @@ static inline void dyncfg_user_config_print_duration(BUFFER *wb, const char *pre
 
 int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const char *name) {
     buffer_flush(wb);
-    wb->content_type = CT_APPLICATION_JSON;
+    wb->content_type = CT_TEXT_PLAIN;
     wb->expires = now_realtime_sec();
-
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-    buffer_json_member_add_uint64(wb, "status", 200);
-    buffer_json_member_add_string(wb, "content_type", "application/netdata-health-config");
-
-    CLEAN_BUFFER *payload = buffer_create(0, NULL);
 
     for(RRD_ALERT_PROTOTYPE *nap = ap; nap ; nap = nap->_internal.next) {
         if(nap->match.is_template) {
-            buffer_sprintf(payload, "\n%13s: %s\n", "template", name);
-            buffer_sprintf(payload, "%13s: %s\n", "on", string2str(nap->match.on.context));
+            buffer_sprintf(wb, "\n%13s: %s\n", "template", name);
+            buffer_sprintf(wb, "%13s: %s\n", "on", string2str(nap->match.on.context));
         }
         else {
-            buffer_sprintf(payload, "\n%13s: %s\n", "alarm", name);
-            buffer_sprintf(payload, "%13s: %s\n", "on", string2str(nap->match.on.chart));
+            buffer_sprintf(wb, "\n%13s: %s\n", "alarm", name);
+            buffer_sprintf(wb, "%13s: %s\n", "on", string2str(nap->match.on.chart));
         }
 
         if(nap->config.classification)
-            buffer_sprintf(payload, "%13s: %s\n", "class", string2str(nap->config.classification));
+            buffer_sprintf(wb, "%13s: %s\n", "class", string2str(nap->config.classification));
 
         if(nap->config.type)
-            buffer_sprintf(payload, "%13s: %s\n", "type", string2str(nap->config.type));
+            buffer_sprintf(wb, "%13s: %s\n", "type", string2str(nap->config.type));
 
         if(nap->config.component)
-            buffer_sprintf(payload, "%13s: %s\n", "component", string2str(nap->config.component));
+            buffer_sprintf(wb, "%13s: %s\n", "component", string2str(nap->config.component));
 
         if(nap->match.host_labels)
-            buffer_sprintf(payload, "%13s: %s\n", "host labels", string2str(nap->match.host_labels));
+            buffer_sprintf(wb, "%13s: %s\n", "host labels", string2str(nap->match.host_labels));
 
         if(nap->match.chart_labels)
-            buffer_sprintf(payload, "%13s: %s\n", "chart labels", string2str(nap->match.chart_labels));
+            buffer_sprintf(wb, "%13s: %s\n", "chart labels", string2str(nap->match.chart_labels));
 
         if(nap->config.after) {
-            buffer_sprintf(payload, "%13s: %s", "lookup", time_grouping_tostring(nap->config.time_group));
+            buffer_sprintf(wb, "%13s: %s", "lookup", time_grouping_tostring(nap->config.time_group));
             switch(nap->config.time_group) {
                 case RRDR_GROUPING_PERCENTILE:
                 case RRDR_GROUPING_TRIMMED_MEAN:
                 case RRDR_GROUPING_TRIMMED_MEDIAN:
-                    buffer_sprintf(payload, "(%0.2f)", nap->config.time_group_value);
+                    buffer_sprintf(wb, "(%0.2f)", nap->config.time_group_value);
                 break;
 
                 case RRDR_GROUPING_COUNTIF:
-                    buffer_sprintf(payload, "(%s%0.2f)", alerts_group_conditions_id2txt(nap->config.time_group_condition), nap->config.time_group_value);
+                    buffer_sprintf(wb, "(%s%0.2f)", alerts_group_conditions_id2txt(nap->config.time_group_condition), nap->config.time_group_value);
                 break;
 
                 default:
                     break;
             }
 
-            dyncfg_user_config_print_duration(payload, " ", nap->config.after);
+            dyncfg_user_config_print_duration(wb, " ", nap->config.after);
 
             if(nap->config.before)
-                dyncfg_user_config_print_duration(payload, " at ", nap->config.before);
+                dyncfg_user_config_print_duration(wb, " at ", nap->config.before);
 
             if(nap->config.options) {
-                buffer_strcat(payload, " ");
-                rrdr_options_to_buffer(payload, nap->config.options);
+                buffer_strcat(wb, " ");
+                rrdr_options_to_buffer(wb, nap->config.options);
             }
 
             if(nap->config.dimensions)
-                buffer_sprintf(payload, " of %s", string2str(nap->config.dimensions));
+                buffer_sprintf(wb, " of %s", string2str(nap->config.dimensions));
 
-            buffer_strcat(payload, "\n");
+            buffer_strcat(wb, "\n");
         }
 
         if(nap->config.calculation)
-            buffer_sprintf(payload, "%13s: %s\n", "calc", expression_source(nap->config.calculation));
+            buffer_sprintf(wb, "%13s: %s\n", "calc", expression_source(nap->config.calculation));
 
         if(nap->config.units)
-            buffer_sprintf(payload, "%13s: %s\n", "units", string2str(nap->config.units));
+            buffer_sprintf(wb, "%13s: %s\n", "units", string2str(nap->config.units));
 
         if(nap->config.update_every) {
-            buffer_sprintf(payload, "%13s: ", "every");
-            dyncfg_user_config_print_duration(payload, NULL, nap->config.update_every);
-            buffer_strcat(payload, "\n");
+            buffer_sprintf(wb, "%13s: ", "every");
+            dyncfg_user_config_print_duration(wb, NULL, nap->config.update_every);
+            buffer_strcat(wb, "\n");
         }
 
         if(nap->config.warning)
-            buffer_sprintf(payload, "%13s: %s\n", "warn", expression_source(nap->config.warning));
+            buffer_sprintf(wb, "%13s: %s\n", "warn", expression_source(nap->config.warning));
 
         if(nap->config.critical)
-            buffer_sprintf(payload, "%13s: %s\n", "crit", expression_source(nap->config.critical));
+            buffer_sprintf(wb, "%13s: %s\n", "crit", expression_source(nap->config.critical));
 
         if(nap->config.delay_up_duration || nap->config.delay_down_duration) {
-            buffer_sprintf(payload, "%13s:", "delay");
+            buffer_sprintf(wb, "%13s:", "delay");
 
             if(nap->config.delay_up_duration)
-                dyncfg_user_config_print_duration(payload, " up ", nap->config.delay_up_duration);
+                dyncfg_user_config_print_duration(wb, " up ", nap->config.delay_up_duration);
 
             if(nap->config.delay_down_duration)
-                dyncfg_user_config_print_duration(payload, " down ", nap->config.delay_down_duration);
+                dyncfg_user_config_print_duration(wb, " down ", nap->config.delay_down_duration);
 
             if(nap->config.delay_multiplier)
-                buffer_sprintf(payload, " multiplier %0.2f", nap->config.delay_multiplier);
+                buffer_sprintf(wb, " multiplier %0.2f", nap->config.delay_multiplier);
 
             if(nap->config.delay_max_duration)
-                dyncfg_user_config_print_duration(payload, " max ", nap->config.delay_max_duration);
+                dyncfg_user_config_print_duration(wb, " max ", nap->config.delay_max_duration);
 
-            buffer_strcat(payload, "\n");
+            buffer_strcat(wb, "\n");
         }
 
         if(nap->config.alert_action_options) {
-            buffer_sprintf(payload, "%13s:", "options");
-            alert_action_options_to_buffer(payload, nap->config.alert_action_options);
-            buffer_strcat(payload, "\n");
+            buffer_sprintf(wb, "%13s:", "options");
+            alert_action_options_to_buffer(wb, nap->config.alert_action_options);
+            buffer_strcat(wb, "\n");
         }
 
         if(nap->config.has_custom_repeat_config) {
             if(!nap->config.crit_repeat_every && !nap->config.warn_repeat_every)
-                buffer_sprintf(payload, "%13s: off\n", "repeat");
+                buffer_sprintf(wb, "%13s: off\n", "repeat");
             else {
-                dyncfg_user_config_print_duration(payload, " warning ", (int)nap->config.warn_repeat_every);
-                dyncfg_user_config_print_duration(payload, " critical ", (int)nap->config.crit_repeat_every);
-                buffer_strcat(payload, "\n");
+                dyncfg_user_config_print_duration(wb, " warning ", (int)nap->config.warn_repeat_every);
+                dyncfg_user_config_print_duration(wb, " critical ", (int)nap->config.crit_repeat_every);
+                buffer_strcat(wb, "\n");
             }
         }
 
         if(nap->config.summary)
-            buffer_sprintf(payload, "%13s: %s\n", "summary", string2str(nap->config.summary));
+            buffer_sprintf(wb, "%13s: %s\n", "summary", string2str(nap->config.summary));
 
         if(nap->config.info)
-            buffer_sprintf(payload, "%13s: %s\n", "info", string2str(nap->config.info));
+            buffer_sprintf(wb, "%13s: %s\n", "info", string2str(nap->config.info));
 
         if(nap->config.exec && nap->config.exec != localhost->health.health_default_exec)
-            buffer_sprintf(payload, "%13s: %s\n", "exec", string2str(nap->config.exec));
+            buffer_sprintf(wb, "%13s: %s\n", "exec", string2str(nap->config.exec));
 
         if(nap->config.recipient)
-            buffer_sprintf(payload, "%13s: %s\n", "to", string2str(nap->config.recipient));
+            buffer_sprintf(wb, "%13s: %s\n", "to", string2str(nap->config.recipient));
     }
-
-    buffer_json_member_add_string(wb, "payload", buffer_tostring(payload));
-    buffer_json_finalize(wb);
 
     return 200;
 }
