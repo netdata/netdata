@@ -1343,7 +1343,6 @@ void execute_commands(struct sender_state *s) {
 
         line_splitter_reset(&s->line);
         worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-        start = newline + 1;
     }
 
     if (start < end) {
