@@ -105,7 +105,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .init_routine = NULL,
         .start_routine = statsd_main
     },
-#ifndef COMPILED_FOR_WINDOWS
+#ifndef OS_WINDOWS
     // this crashes the debugger under windows
     {
         .name = "EXPORTING",

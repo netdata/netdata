@@ -21,7 +21,7 @@
         , RRDSET_TYPE_STACKED                   \
         )
 
-#if defined(COMPILED_FOR_WINDOWS)
+#ifdef OS_WINDOWS
 static inline void common_system_ram(uint64_t free_bytes, uint64_t used_bytes, int update_every) {
     static RRDSET *st_system_ram = NULL;
     static RRDDIM *rd_free = NULL;
@@ -40,7 +40,7 @@ static inline void common_system_ram(uint64_t free_bytes, uint64_t used_bytes, i
 }
 #endif
 
-#if defined(COMPILED_FOR_LINUX)
+#ifdef OS_LINUX
 static inline void common_system_ram(uint64_t free_bytes, uint64_t used_bytes, uint64_t cached_bytes, uint64_t buffers_bytes, int update_every) {
     static RRDSET *st_system_ram = NULL;
     static RRDDIM *rd_free = NULL;

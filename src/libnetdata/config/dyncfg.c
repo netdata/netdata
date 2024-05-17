@@ -218,7 +218,7 @@ static inline bool is_forbidden_char(char c) {
         case '/':
             return true;
 
-#ifdef COMPILED_FOR_WINDOWS
+#ifdef OS_WINDOWS
         case ':':
         case '|':
             return true;

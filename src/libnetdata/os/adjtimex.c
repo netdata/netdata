@@ -3,11 +3,11 @@
 #include "../libnetdata.h"
 
 int os_adjtimex(struct timex *buf __maybe_unused) {
-#if defined(COMPILED_FOR_MACOS) || defined(COMPILED_FOR_FREEBSD)
+#if defined(OS_MACOS) || defined(OS_FREEBSD)
     return ntp_adjtime(buf);
 #endif
 
-#if defined(COMPILED_FOR_LINUX)
+#if defined(OS_LINUX)
     return adjtimex(buf);
 #endif
 

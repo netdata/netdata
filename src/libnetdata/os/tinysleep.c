@@ -2,7 +2,7 @@
 
 #include "../libnetdata.h"
 
-#ifdef COMPILED_FOR_WINDOWS
+#ifdef OS_WINDOWS
 #include <windows.h>
 
 void tinysleep(void) {

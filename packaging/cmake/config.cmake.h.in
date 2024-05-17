@@ -9,11 +9,10 @@
 #cmakedefine SIZEOF_VOID_P ${SIZEOF_VOID_P}
 
 // platform
-#cmakedefine COMPILED_FOR_FREEBSD
-#cmakedefine COMPILED_FOR_LINUX
-#cmakedefine COMPILED_FOR_MACOS
-#cmakedefine COMPILED_FOR_WINDOWS
-#cmakedefine COMPILED_FOR_FOREIGN_OS
+#cmakedefine OS_FREEBSD
+#cmakedefine OS_LINUX
+#cmakedefine OS_MACOS
+#cmakedefine OS_WINDOWS
 
 // checked headers
 

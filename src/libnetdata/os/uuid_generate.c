@@ -5,7 +5,7 @@
 #undef uuid_generate_random
 #undef uuid_generate_time
 
-#ifdef COMPILED_FOR_WINDOWS
+#ifdef OS_WINDOWS
 #include <windows.h>
 
 void os_uuid_generate(void *out) {
@@ -26,7 +26,7 @@ void os_uuid_generate_time(void *out) {
 
 #else
 
-#if !defined(COMPILED_FOR_MACOS)
+#if !defined(OS_MACOS)
 #include <uuid.h>
 #endif
 

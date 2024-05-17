@@ -1045,7 +1045,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_value(BIB_PACKAGING_NETDATA_VERSION, program_version);
     build_info_set_value(BIB_PACKAGING_CONFIGURE_OPTIONS, CONFIGURE_COMMAND);
 
-#ifdef COMPILED_FOR_LINUX
+#ifdef OS_LINUX
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "Linux");
     build_info_set_status(BIB_PLUGIN_LINUX_CGROUPS, true);
@@ -1053,17 +1053,17 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_PLUGIN_LINUX_DISKSPACE, true);
     build_info_set_status(BIB_PLUGIN_LINUX_TC, true);
 #endif
-#ifdef COMPILED_FOR_FREEBSD
+#ifdef OS_FREEBSD
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "FreeBSD");
     build_info_set_status(BIB_PLUGIN_FREEBSD, true);
 #endif
-#ifdef COMPILED_FOR_MACOS
+#ifdef OS_MACOS
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "MacOS");
     build_info_set_status(BIB_PLUGIN_MACOS, true);
 #endif
-#ifdef COMPILED_FOR_WINDOWS
+#ifdef OS_WINDOWS
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
 #if defined(__CYGWIN__) && defined(__MSYS__)
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "Windows (MSYS)");

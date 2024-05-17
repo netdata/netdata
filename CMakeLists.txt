@@ -245,30 +245,25 @@ endif()
 # detect OS
 #
 
-set(LINUX       False)
-set(FREEBSD     False)
-set(MACOS       False)
-set(WINDOWS     False)
-set(FOREIGN_OS  False)
+set(OS_FREEBSD     False)
+set(OS_LINUX       False)
+set(OS_MACOS       False)
+set(OS_WINDOWS     False)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-        set(MACOS True)
-        set(COMPILED_FOR_MACOS True)
+        set(OS_MACOS True)
         find_library(IOKIT IOKit)
         find_library(FOUNDATION Foundation)
         message(INFO " Compiling for MacOS... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-        set(FREEBSD True)
-        set(COMPILED_FOR_FREEBSD True)
+        set(OS_FREEBSD True)
         message(INFO " Compiling for FreeBSD... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-        set(LINUX True)
-        set(COMPILED_FOR_LINUX True)
+        set(OS_LINUX True)
         add_definitions(-D_GNU_SOURCE)
         message(INFO " Compiling for Linux... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-        set(WINDOWS True)
-        set(COMPILED_FOR_WINDOWS True)
+        set(OS_WINDOWS True)
         add_definitions(-D_GNU_SOURCE)
 
         if($ENV{CLION_IDE})
@@ -287,16 +282,14 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
 
         message(INFO " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
 else()
-        set(FOREIGN_OS True)
-        set(COMPILED_FOR_FOREIGN_OS True)
-        message(WARNING " Compiling for Unknown O/S... (${CMAKE_SYSTEM_NAME})")
+        message(FATAL_ERROR " Unknown O/S... (${CMAKE_SYSTEM_NAME})")
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
         include(NetdataEBPFCORE)
 
-        if(NOT LINUX)
+        if(NOT OS_LINUX)
             message(FATAL_ERROR "The eBPF plugin is not supported on non-Linux systems")
         endif()
 
@@ -557,12 +550,12 @@ int my_function() {
 }
 " HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT)
 
-if(FREEBSD OR MACOS)
+if(OS_FREEBSD OR OS_MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
 endif()
 
 if(NOT OPENSSL_FOUND AND ENABLE_OPENSSL)
-        if(MACOS)
+        if(OS_MACOS)
                 execute_process(COMMAND
                                 brew --prefix --installed openssl
                                 RESULT_VARIABLE BREW_OPENSSL
@@ -581,7 +574,7 @@ if(NOT OPENSSL_FOUND AND ENABLE_OPENSSL)
         endif()
 endif()
 
-if(NOT MACOS AND ENABLE_OPENSSL)
+if(NOT OS_MACOS AND ENABLE_OPENSSL)
         pkg_check_modules(CRYPTO libcrypto)
 endif()
 
@@ -1434,7 +1427,7 @@ set(NETDATA_FILES
         ${PROFILE_PLUGIN_FILES}
 )
 
-if(LINUX)
+if(OS_LINUX)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_linux.c
                 ${CGROUPS_PLUGIN_FILES}
@@ -1450,21 +1443,21 @@ if(LINUX)
                     src/daemon/sentry-native/sentry-native.c
                     src/daemon/sentry-native/sentry-native.h)
         endif()
-elseif(MACOS)
+elseif(OS_MACOS)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_macos.c
                 ${MACOS_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
         )
-elseif(FREEBSD)
+elseif(OS_FREEBSD)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_freebsd.c
                 ${FREEBSD_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
         )
-elseif(WINDOWS)
+elseif(OS_WINDOWS)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_windows.c
                 ${WINDOWS_PLUGIN_FILES}
@@ -1627,7 +1620,7 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
-if(LINUX)
+if(OS_LINUX)
         include(NetdataDetectSystemd)
         detect_systemd()
 endif()
@@ -1647,8 +1640,8 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
-        "$<$<OR:$<BOOL:${LINUX}>,$<BOOL:${FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${WINDOWS}>:kernel32;advapi32;winmm;rpcrt4>"
+        "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
+        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 
@@ -1665,7 +1658,7 @@ netdata_add_jsonc_to_target(libnetdata)
 netdata_add_libyaml_to_target(libnetdata)
 
 # zlib
-if(MACOS)
+if(OS_MACOS)
         find_package(ZLIB REQUIRED)
         target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
         target_link_libraries(libnetdata PUBLIC ZLIB::ZLIB)
@@ -1709,7 +1702,7 @@ if(LIBBROTLI_FOUND)
 endif()
 
 # uuid
-if(MACOS OR WINDOWS)
+if(OS_MACOS OR OS_WINDOWS)
         # UUID functionality is part of the system libraries here, so no extra
         # stuff needed.
 else()
@@ -1747,7 +1740,7 @@ if (ENABLE_WOLFSSL)
 endif()
 
 # mnl
-if(NOT MACOS)
+if(NOT OS_MACOS)
     pkg_check_modules(MNL libmnl)
     if(MNL_FOUND)
         set(HAVE_LIBMNL True)
@@ -2312,11 +2305,11 @@ target_include_directories(netdata PRIVATE
 target_link_libraries(netdata PRIVATE
         m
         libnetdata
-        "$<$<BOOL:${LINUX}>:rt>"
+        "$<$<BOOL:${OS_LINUX}>:rt>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
-        "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
+        "$<$<BOOL:${OS_MACOS}>:${IOKIT};${FOUNDATION}>"
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
@@ -3060,7 +3053,7 @@ install(FILES
         COMPONENT netdata
         DESTINATION ${WEB_DEST}/.well-known/dnt)
 
-if(NOT WINDOWS)
+if(NOT OS_WINDOWS)
         # v0 dashboard
         install(FILES
                 src/web/gui/v0/index.html

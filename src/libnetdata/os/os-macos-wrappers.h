@@ -5,7 +5,7 @@
 
 #include "../libnetdata.h"
 
-#if defined(COMPILED_FOR_MACOS)
+#if defined(OS_MACOS)
 #include <sys/sysctl.h>
 #include "byteorder.h"
 

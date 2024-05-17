@@ -3,7 +3,7 @@
 #ifndef NETDATA_ADJTIMEX_H
 #define NETDATA_ADJTIMEX_H
 
-#if defined(COMPILED_FOR_LINUX) || defined(COMPILED_FOR_FREEBSD) || defined(COMPILED_FOR_MACOS)
+#if defined(OS_LINUX) || defined(OS_FREEBSD) || defined(OS_MACOS)
 #include <sys/timex.h>
 #endif
 

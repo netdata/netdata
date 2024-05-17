@@ -5,7 +5,7 @@
 
 #include "../libnetdata.h"
 
-#if defined(COMPILED_FOR_FREEBSD)
+#if defined(OS_FREEBSD)
 #include <sys/sysctl.h>
 
 #define GETSYSCTL_BY_NAME(name, var) getsysctl_by_name(name, &(var), sizeof(var))
