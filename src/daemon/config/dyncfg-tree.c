@@ -200,6 +200,7 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
         dyncfg_tree_for_host(host, rfe->result.wb, path, id);
     }
     else {
+        const char *name = id;
         id = action;
         action = path;
         path = NULL;
@@ -234,21 +235,10 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
                     goto cleanup;
                 }
             }
-            else if(cmd == DYNCFG_CMD_TEST && df->type == DYNCFG_TYPE_TEMPLATE && df->current.status != DYNCFG_STATUS_ORPHAN) {
+            else if((cmd == DYNCFG_CMD_USERCONFIG || cmd == DYNCFG_CMD_TEST) && df->current.status != DYNCFG_STATUS_ORPHAN)  {
                 const char *old_rfe_function = rfe->function;
                 char buf2[2048];
-                snprintfz(buf2, sizeof(buf2), "config %s %s", dictionary_acquired_item_name(item), action);
-                rfe->function = buf2;
-                dictionary_acquired_item_release(dyncfg_globals.nodes, item);
-                item = NULL;
-                code = dyncfg_function_intercept_cb(rfe, data);
-                rfe->function = old_rfe_function;
-                return code;
-            }
-            else if(cmd == DYNCFG_CMD_USERCONFIG && df->current.status != DYNCFG_STATUS_ORPHAN) {
-                const char *old_rfe_function = rfe->function;
-                char buf2[2048];
-                snprintfz(buf2, sizeof(buf2), "config %s %s", id, action);
+                snprintfz(buf2, sizeof(buf2), "config %s %s %s", dictionary_acquired_item_name(item), action, name?name:"");
                 rfe->function = buf2;
                 dictionary_acquired_item_release(dyncfg_globals.nodes, item);
                 item = NULL;
