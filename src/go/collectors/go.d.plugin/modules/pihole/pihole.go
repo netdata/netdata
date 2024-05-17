@@ -23,6 +23,7 @@ func init() {
 			UpdateEvery: 5,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -47,8 +48,8 @@ func New() *Pihole {
 }
 
 type Config struct {
+	UpdateEvery   int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP      `yaml:",inline" json:""`
-	UpdateEvery   int    `yaml:"update_every" json:"update_every"`
 	SetupVarsPath string `yaml:"setup_vars_path" json:"setup_vars_path"`
 }
 

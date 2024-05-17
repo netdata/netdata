@@ -16,6 +16,7 @@ func init() {
 	module.Register("squidlog", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -39,10 +40,10 @@ func New() *SquidLog {
 }
 
 type Config struct {
-	logs.ParserConfig `yaml:",inline" json:""`
-	UpdateEvery       int    `yaml:"update_every" json:"update_every"`
+	UpdateEvery       int    `yaml:"update_every,omitempty" json:"update_every"`
 	Path              string `yaml:"path" json:"path"`
-	ExcludePath       string `yaml:"exclude_path" json:"exclude_path"`
+	ExcludePath       string `yaml:"exclude_path,omitempty" json:"exclude_path"`
+	logs.ParserConfig `yaml:",inline" json:""`
 }
 
 type SquidLog struct {

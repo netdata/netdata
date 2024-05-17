@@ -21,6 +21,7 @@ func init() {
 			UpdateEvery: 5,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -34,10 +35,10 @@ func New() *PortCheck {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
 	Host        string       `yaml:"host" json:"host"`
 	Ports       []int        `yaml:"ports" json:"ports"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type PortCheck struct {

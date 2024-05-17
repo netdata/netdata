@@ -21,6 +21,7 @@ func init() {
 			UpdateEvery: 10,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -39,18 +40,18 @@ func New() *Filecheck {
 
 type (
 	Config struct {
-		UpdateEvery    int          `yaml:"update_every" json:"update_every"`
-		DiscoveryEvery web.Duration `yaml:"discovery_every" json:"discovery_every"`
+		UpdateEvery    int          `yaml:"update_every,omitempty" json:"update_every"`
+		DiscoveryEvery web.Duration `yaml:"discovery_every,omitempty" json:"discovery_every"`
 		Files          filesConfig  `yaml:"files" json:"files"`
 		Dirs           dirsConfig   `yaml:"dirs" json:"dirs"`
 	}
 	filesConfig struct {
 		Include []string `yaml:"include" json:"include"`
-		Exclude []string `yaml:"exclude" json:"exclude"`
+		Exclude []string `yaml:"exclude,omitempty" json:"exclude"`
 	}
 	dirsConfig struct {
 		Include        []string `yaml:"include" json:"include"`
-		Exclude        []string `yaml:"exclude" json:"exclude"`
+		Exclude        []string `yaml:"exclude,omitempty" json:"exclude"`
 		CollectDirSize bool     `yaml:"collect_dir_size" json:"collect_dir_size"`
 	}
 )

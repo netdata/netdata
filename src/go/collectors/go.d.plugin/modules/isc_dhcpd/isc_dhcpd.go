@@ -20,6 +20,7 @@ func init() {
 			UpdateEvery: 1,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -35,7 +36,7 @@ func New() *DHCPd {
 
 type (
 	Config struct {
-		UpdateEvery int    `yaml:"update_every" json:"update_every"`
+		UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
 		LeasesPath  string `yaml:"leases_path" json:"leases_path"`
 		// TODO: parse config file to extract configured pool
 		Pools []PoolConfig `yaml:"pools" json:"pools"`

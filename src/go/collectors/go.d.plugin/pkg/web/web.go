@@ -6,6 +6,6 @@ package web
 // This structure intended to be part of the module configuration.
 // Supported configuration file formats: YAML.
 type HTTP struct {
-	Request `yaml:",inline" json:",inline"`
-	Client  `yaml:",inline" json:",inline"`
+	Request `yaml:",inline" json:""`
+	Client  `yaml:",inline" json:""`
 }
