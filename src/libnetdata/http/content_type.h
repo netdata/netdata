@@ -33,6 +33,7 @@ typedef enum __attribute__ ((__packed__)) {
     CT_APPLICATION_PDF,
     CT_APPLICATION_ZIP,
     CT_TEXT_YAML,
+    CT_APPLICATION_YAML,
 } HTTP_CONTENT_TYPE;
 
 HTTP_CONTENT_TYPE content_type_string2id(const char *format);
