@@ -355,11 +355,24 @@ static cmd_status_t cmd_remove_node(char *args, char **message)
     if (!host)
         buffer_sprintf(wb, "Node with machine or node UUID \"%s\" not found", args);
     else {
+
+        if (host == localhost) {
+            buffer_sprintf(wb, "You cannot unregister the parent node");
+            goto done;
+        }
+
+        if (rrdhost_is_online(host)) {
+            buffer_sprintf(wb, "Cannot unregister a live node");
+            goto done;
+        }
+
         if (!rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST)) {
             rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
             sql_set_host_label(&host->host_uuid, "_is_ephemeral", "true");
             aclk_host_state_update(host, 0, 0);
             unregister_node(host->machine_guid);
+            freez(host->node_id);
+            host->node_id = NULL;
             buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
         }
         else
