@@ -2,68 +2,15 @@
 
 cmake_minimum_required(VERSION 3.13.0...3.28)
 
-#
-# version atrocities
-#
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/Modules")
 
-find_package(Git)
-
-if(GIT_EXECUTABLE)
-        execute_process(COMMAND ${GIT_EXECUTABLE} describe
-                        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                        RESULT_VARIABLE GIT_DESCRIBE_RESULT
-                        OUTPUT_VARIABLE GIT_DESCRIBE_OUTPUT)
-        if(GIT_DESCRIBE_RESULT)
-                file(STRINGS packaging/version GIT_DESCRIBE_OUTPUT)
-                message(WARNING "using version from packaging/version: '${GIT_DESCRIBE_OUTPUT}'")
-        endif()
-else()
-        file(STRINGS packaging/version GIT_DESCRIBE_OUTPUT)
-        message(WARNING "using version from packaging/version: '${GIT_DESCRIBE_OUTPUT}'")
-endif()
-
-string(STRIP ${GIT_DESCRIBE_OUTPUT} GIT_DESCRIBE_OUTPUT)
-string(REGEX MATCH "v?([0-9]+)\\.([0-9]+)\\.([0-9]+)-?([0-9]+)?-?([0-9a-zA-Z]+)?" MATCHES "${GIT_DESCRIBE_OUTPUT}")
-
-if(CMAKE_MATCH_COUNT EQUAL 3)
-        set(FIELD_MAJOR ${CMAKE_MATCH_1})
-        set(FIELD_MINOR ${CMAKE_MATCH_2})
-        set(FIELD_PATCH ${CMAKE_MATCH_3})
-        set(FIELD_TWEAK 0)
-        set(FIELD_DESCR "N/A")
-elseif(CMAKE_MATCH_COUNT EQUAL 4)
-        set(FIELD_MAJOR ${CMAKE_MATCH_1})
-        set(FIELD_MINOR ${CMAKE_MATCH_2})
-        set(FIELD_PATCH ${CMAKE_MATCH_3})
-        set(FIELD_TWEAK ${CMAKE_MATCH_4})
-        set(FIELD_DESCR "N/A")
-elseif(CMAKE_MATCH_COUNT EQUAL 5)
-        set(FIELD_MAJOR ${CMAKE_MATCH_1})
-        set(FIELD_MINOR ${CMAKE_MATCH_2})
-        set(FIELD_PATCH ${CMAKE_MATCH_3})
-        set(FIELD_TWEAK ${CMAKE_MATCH_4})
-        set(FIELD_DESCR ${CMAKE_MATCH_5})
-else()
-        message(FATAL_ERROR "Wrong version regex match count ${CMAKE_MATCH_COUNT} (should be in 3, 4 or 5)")
-endif()
-
-set(NETDATA_VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}.${FIELD_TWEAK})
-
-if(FIELD_DESCR STREQUAL "N/A")
-        set(CPACK_PACKAGE_VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH})
-else()
-        set(CPACK_PACKAGE_VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}-${FIELD_TWEAK}-${FIELD_DESCR})
-endif()
-
-#
-# project
-#
+include(NetdataVersion)
+netdata_version()
 
 project(netdata
-        VERSION ${NETDATA_VERSION}
+        VERSION "${NETDATA_VERSION_MAJOR}.${NETDATA_VERSION_MINOR}.${NETDATA_VERSION_PATCH}.${NETDATA_VERSION_TWEAK}"
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/packaging/cmake/Modules")
 include(CMakeDependentOption)
 
 find_package(PkgConfig REQUIRED)
