@@ -215,14 +215,12 @@ static inline bool is_forbidden_char(char c) {
         return true;
 
     switch(c) {
-        case '/':
+        case '`': // good not to have this in filenames
+        case '$': // good not to have this in filenames
+        case '/': // unix does not support this
+        case ':': // windows does not support this
+        case '|': // windows does not support this
             return true;
-
-#ifdef COMPILED_FOR_WINDOWS
-        case ':':
-        case '|':
-            return true;
-#endif
 
         default:
             return false;
