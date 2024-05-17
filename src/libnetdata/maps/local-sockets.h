@@ -107,8 +107,7 @@ typedef struct local_socket_state {
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     bool use_ebpf;
     ebpf_module_t *ebpf_module;
-#endif
-
+#endif    
     ARAL *local_socket_aral;
     ARAL *pid_socket_aral;
 
@@ -209,101 +208,6 @@ typedef struct local_socket {
 // --------------------------------------------------------------------------------------------------------------------
 
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) PRINTFLIKE(2, 3);
-#if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-enum ebpf_nv_tables_list {
-    NETWORK_VIEWER_EBPF_NV_SOCKET,
-    NETWORK_VIEWER_EBPF_NV_CONTROL
-};
-
-typedef struct ebpf_nv_idx {
-    union ipv46 saddr;
-    uint16_t sport;
-    union ipv46 daddr;
-    uint16_t dport;
-} ebpf_nv_idx_t;
-
-typedef struct ebpf_nv_data {
-    int state;
-
-    uint32_t pid;
-    uint32_t uid;
-    uint64_t ts;
-
-    uint8_t timer;
-    uint8_t retransmits;
-    uint32_t expires;
-    uint32_t rqueue;
-    uint32_t wqueue;
-
-    char name[TASK_COMM_LEN];
-
-    uint32_t direction;
-
-    uint16_t family;
-    uint16_t protocol;
-} ebpf_nv_data_t;
-
-static inline void local_sockets_ebpf_selector(LS_STATE *ls) {
-    // We loaded with success eBPF codes
-    if (ls->ebpf_module->maps && ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd != -1)
-        ls->use_ebpf = true;
-}
-
-static inline bool local_sockets_ebpf_get_sockets(LS_STATE *ls) {
-    ebpf_nv_idx_t key =  { };
-    ebpf_nv_idx_t next_key = { };
-    ebpf_nv_data_t stored = {};
-    int fd = ls->ebpf_module->maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd;
-    while (!bpf_map_get_next_key(fd, &key, &next_key)) {
-        if (bpf_map_lookup_elem(fd, &key, &stored)) {
-            goto end_socket_read_loop;
-        }
-
-        LOCAL_SOCKET n = {
-            .inode = stored.ts,
-            .direction = SOCKET_DIRECTION_NONE,
-            .state = stored.state,
-            .local = {
-                .family = stored.family,
-                .protocol = stored.protocol,
-                .port = key.sport,
-             },
-            .remote = {
-                .family = stored.family,
-                .protocol = stored.protocol,
-                .port = key.dport,
-            },
-            .timer = stored.timer,
-            .retransmits = stored.retransmits,
-            .expires = stored.expires,
-            .rqueue = stored.rqueue,
-            .wqueue = stored.wqueue,
-            .uid = stored.uid,
-           };
-
-        if (stored.family == AF_INET) {
-            memcpy(&n.local.ip.ipv4, &key.saddr.ipv4, sizeof(n.local.ip.ipv4));
-            memcpy(&n.remote.ip.ipv4, &key.daddr.ipv4, sizeof(n.remote.ip.ipv4));
-        }
-        else if (stored.family == AF_INET6) {
-            memcpy(&n.local.ip.ipv6, &key.saddr.ipv6, sizeof(n.local.ip.ipv6));
-            memcpy(&n.remote.ip.ipv6, &key.daddr.ipv6, sizeof(n.remote.ip.ipv6));
-        }
-
-        strncpyz(n.comm, stored.name, sizeof(n.comm) - 1);
-
-end_socket_read_loop:
-        key = next_key;
-        // cleanup avoiding garbage from previous socket
-        memset(&stored, 0, sizeof(stored));
-    }
-    return true;
-}
-
-#endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-
-// --------------------------------------------------------------------------------------------------------------------
-
 static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
     if(++ls->stats.errors_encountered == ls->config.max_errors) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "LOCAL-SOCKETS: max number of logs reached. Not logging anymore");
@@ -323,7 +227,6 @@ static inline void local_sockets_log(LS_STATE *ls, const char *format, ...) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
 enum ebpf_nv_tables_list {
     NETWORK_VIEWER_EBPF_NV_SOCKET,
@@ -397,6 +300,8 @@ static inline void local_sockets_ebpf_store_sockets(LS_STATE *ls, LOCAL_SOCKET *
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "PLUGIN: cannot insert value inside table.");
 }
 #endif // defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
+
+// --------------------------------------------------------------------------------------------------------------------
 
 static void local_sockets_foreach_local_socket_call_cb(LS_STATE *ls) {
     for(SIMPLE_HASHTABLE_SLOT_LOCAL_SOCKET *sl = simple_hashtable_first_read_only_LOCAL_SOCKET(&ls->sockets_hashtable);
@@ -1436,7 +1341,6 @@ static inline void local_sockets_process(LS_STATE *ls) {
 #ifdef HAVE_LIBMNL
     local_sockets_netlink_cleanup(ls);
 #endif
-
 }
 
 static inline void ipv6_address_to_txt(struct in6_addr *in6_addr, char *dst) {

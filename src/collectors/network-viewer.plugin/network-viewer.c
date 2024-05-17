@@ -1397,17 +1397,15 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     }
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
-    static netdata_thread_t *nv_clean_thread = NULL;
+    ND_THREAD *nv_clean_thread = NULL;
     if(args.ebpf) {
         network_viewer_load_ebpf(&args);
 
         if (ebpf_nv_module.maps[NETWORK_VIEWER_EBPF_NV_SOCKET].map_fd > 0) {
-            nv_clean_thread = mallocz(sizeof(netdata_thread_t));
-            netdata_thread_create(nv_clean_thread,
-                                  "P[networkviewer ebpf]",
-                                  NETDATA_THREAD_OPTION_JOINABLE,
-                                  network_viewer_ebpf_worker,
-                                  &ebpf_nv_module);
+            nv_clean_thread = nd_thread_create("P[networkviewer ebpf]",
+                                               NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_JOINABLE,
+                                               network_viewer_ebpf_worker,
+                                               &ebpf_nv_module);
         }
     }
 #endif
@@ -1451,7 +1449,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
 #if defined(ENABLE_PLUGIN_EBPF) && !defined(__cplusplus)
     if (nv_clean_thread) {
-        netdata_thread_join(*nv_clean_thread, NULL);
+        nd_thread_join(nv_clean_thread);
         freez(nv_clean_thread);
     }
     if (args.ebpf)
