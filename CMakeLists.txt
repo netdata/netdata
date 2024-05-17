@@ -1755,12 +1755,6 @@ if (ENABLE_H2O OR ENABLE_ACLK)
 endif()
 
 if(ENABLE_MQTTWEBSOCKETS)
-        # include_directories(BEFORE
-        #         ${CMAKE_SOURCE_DIR}/aclk/mqtt_websockets/src/include
-        #         ${CMAKE_SOURCE_DIR}/aclk/mqtt_websockets/c-rbuf/include
-        #         ${CMAKE_SOURCE_DIR}/aclk/mqtt_websockets/c_rhash/include
-        # )
-
         add_library(mqttwebsockets STATIC ${MQTT_WEBSOCKETS_FILES})
 
         target_compile_options(mqttwebsockets PUBLIC -DMQTT_WSS_CUSTOM_ALLOC
