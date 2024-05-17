@@ -122,7 +122,7 @@ func (s *runSim) run(t *testing.T) {
 func prepareMockRegistry() module.Registry {
 	reg := module.Registry{}
 	type config struct {
-		OptionOne string `yaml:"option_one" json:"option_one""`
+		OptionOne string `yaml:"option_one" json:"option_one"`
 		OptionTwo int64  `yaml:"option_two" json:"option_two"`
 	}
 
