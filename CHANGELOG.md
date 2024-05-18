@@ -6,13 +6,23 @@
 
 **Merged pull requests:**
 
+- go.d dyncfg rm space yaml contentType [\#17698](https://github.com/netdata/netdata/pull/17698) ([ilyam8](https://github.com/ilyam8))
+- Revert "Support to WolfSSL \(Step 1\)" [\#17697](https://github.com/netdata/netdata/pull/17697) ([stelfrag](https://github.com/stelfrag))
+- fix sender parsing when receiving remote input [\#17696](https://github.com/netdata/netdata/pull/17696) ([ktsaou](https://github.com/ktsaou))
+- dyncfg files on disk do not contain colons [\#17694](https://github.com/netdata/netdata/pull/17694) ([ktsaou](https://github.com/ktsaou))
+- DYNCFG: add userconfig action [\#17692](https://github.com/netdata/netdata/pull/17692) ([ktsaou](https://github.com/ktsaou))
+- Check for empty dimension id from a plugin [\#17690](https://github.com/netdata/netdata/pull/17690) ([stelfrag](https://github.com/stelfrag))
+- Fix timex slow shutdown [\#17688](https://github.com/netdata/netdata/pull/17688) ([stelfrag](https://github.com/stelfrag))
 - go.d sd fix rspamd classify match [\#17686](https://github.com/netdata/netdata/pull/17686) ([ilyam8](https://github.com/ilyam8))
+- Properly detect attribute format types [\#17685](https://github.com/netdata/netdata/pull/17685) ([vkalintiris](https://github.com/vkalintiris))
+- go.d dyncfg add userconfig action [\#17684](https://github.com/netdata/netdata/pull/17684) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17683](https://github.com/netdata/netdata/pull/17683) ([netdatabot](https://github.com/netdatabot))
 - Re-enable ML for RHEL 7 and AL 2 RPM packages. [\#17682](https://github.com/netdata/netdata/pull/17682) ([Ferroin](https://github.com/Ferroin))
 - add go.d/rspamd [\#17679](https://github.com/netdata/netdata/pull/17679) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17676](https://github.com/netdata/netdata/pull/17676) ([netdatabot](https://github.com/netdatabot))
 - fix broken links and links pointing to Learn [\#17675](https://github.com/netdata/netdata/pull/17675) ([Ancairon](https://github.com/Ancairon))
 - add rspamd to apps\_groups.conf [\#17674](https://github.com/netdata/netdata/pull/17674) ([ilyam8](https://github.com/ilyam8))
+- Fix compilation without h2o, cloud enabled [\#17673](https://github.com/netdata/netdata/pull/17673) ([stelfrag](https://github.com/stelfrag))
 - Include the Host in the HTTP header [\#17670](https://github.com/netdata/netdata/pull/17670) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations.js [\#17668](https://github.com/netdata/netdata/pull/17668) ([netdatabot](https://github.com/netdatabot))
 - Fix CentOS 7 builds for ML. [\#17667](https://github.com/netdata/netdata/pull/17667) ([vkalintiris](https://github.com/vkalintiris))
@@ -23,6 +33,7 @@
 - go.d update config dirs [\#17661](https://github.com/netdata/netdata/pull/17661) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17660](https://github.com/netdata/netdata/pull/17660) ([netdatabot](https://github.com/netdatabot))
 - go.d cockroachdb fix calculation [\#17659](https://github.com/netdata/netdata/pull/17659) ([ilyam8](https://github.com/ilyam8))
+- Fall back to querying libc.so.6 if ldd can’t detect libc implementation. [\#17657](https://github.com/netdata/netdata/pull/17657) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations.js [\#17655](https://github.com/netdata/netdata/pull/17655) ([netdatabot](https://github.com/netdatabot))
 - go.d hpssa fix cache battery chart ctx [\#17654](https://github.com/netdata/netdata/pull/17654) ([ilyam8](https://github.com/ilyam8))
 - files movearound [\#17653](https://github.com/netdata/netdata/pull/17653) ([Ancairon](https://github.com/Ancairon))
@@ -337,7 +348,6 @@
 - Compatibility with Prometheus HELP [\#17191](https://github.com/netdata/netdata/pull/17191) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add label for cgroup [\#17156](https://github.com/netdata/netdata/pull/17156) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix action lints [\#17120](https://github.com/netdata/netdata/pull/17120) ([tkatsoulas](https://github.com/tkatsoulas))
-- Alert transitions code cleanup [\#17103](https://github.com/netdata/netdata/pull/17103) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.45.4](https://github.com/netdata/netdata/tree/v1.45.4) (2024-05-08)
 
@@ -415,18 +425,6 @@
 - fix health alert dyncfg schema fullPage option [\#17125](https://github.com/netdata/netdata/pull/17125) ([ilyam8](https://github.com/ilyam8))
 - improve go.d.plugin dyncfg config schemas [\#17124](https://github.com/netdata/netdata/pull/17124) ([ilyam8](https://github.com/ilyam8))
 - minor fix; broken link on on prem installation doc [\#17118](https://github.com/netdata/netdata/pull/17118) ([tkatsoulas](https://github.com/tkatsoulas))
-- very minor docs update [\#17117](https://github.com/netdata/netdata/pull/17117) ([Ancairon](https://github.com/Ancairon))
-- remove deprecated settings from the health ref doc [\#17116](https://github.com/netdata/netdata/pull/17116) ([ilyam8](https://github.com/ilyam8))
-- fix discovered config default values [\#17115](https://github.com/netdata/netdata/pull/17115) ([ilyam8](https://github.com/ilyam8))
-- Fix memory leak [\#17114](https://github.com/netdata/netdata/pull/17114) ([stelfrag](https://github.com/stelfrag))
-- remove "os" "hosts" "plugin" and "module" from stock alarms [\#17113](https://github.com/netdata/netdata/pull/17113) ([ilyam8](https://github.com/ilyam8))
-- go.d.plugin add notice log level [\#17112](https://github.com/netdata/netdata/pull/17112) ([ilyam8](https://github.com/ilyam8))
-- Second pass at reworking Docker CI. [\#17111](https://github.com/netdata/netdata/pull/17111) ([Ferroin](https://github.com/Ferroin))
-- rm unused files from go.d.plugin [\#17110](https://github.com/netdata/netdata/pull/17110) ([ilyam8](https://github.com/ilyam8))
-- fix links in go.d.plugin [\#17108](https://github.com/netdata/netdata/pull/17108) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations.js [\#17107](https://github.com/netdata/netdata/pull/17107) ([netdatabot](https://github.com/netdatabot))
-- remove "foreach" from health REFERENCE.md [\#17106](https://github.com/netdata/netdata/pull/17106) ([ilyam8](https://github.com/ilyam8))
-- Improve cleanup of ephemeral hosts during agent startup [\#17104](https://github.com/netdata/netdata/pull/17104) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
