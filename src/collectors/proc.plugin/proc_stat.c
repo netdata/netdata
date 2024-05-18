@@ -4,6 +4,10 @@
 
 #define PLUGIN_PROC_MODULE_STAT_NAME "/proc/stat"
 
+#define _COMMON_PLUGIN_NAME PLUGIN_PROC_NAME
+#define _COMMON_PLUGIN_MODULE_NAME PLUGIN_PROC_MODULE_STAT_NAME
+#include "../common-contexts/common-contexts.h"
+
 struct per_core_single_number_file {
     unsigned char found:1;
     const char *filename;
@@ -850,33 +854,7 @@ int do_proc_stat(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     if(likely(do_processes)) {
-        static RRDSET *st_processes = NULL;
-        static RRDDIM *rd_running = NULL;
-        static RRDDIM *rd_blocked = NULL;
-
-        if(unlikely(!st_processes)) {
-            st_processes = rrdset_create_localhost(
-                    "system"
-                    , "processes"
-                    , NULL
-                    , "processes"
-                    , NULL
-                    , "System Processes"
-                    , "processes"
-                    , PLUGIN_PROC_NAME
-                    , PLUGIN_PROC_MODULE_STAT_NAME
-                    , NETDATA_CHART_PRIO_SYSTEM_PROCESSES
-                    , update_every
-                    , RRDSET_TYPE_LINE
-            );
-
-            rd_running = rrddim_add(st_processes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_blocked = rrddim_add(st_processes, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        rrddim_set_by_pointer(st_processes, rd_running, running);
-        rrddim_set_by_pointer(st_processes, rd_blocked, blocked);
-        rrdset_done(st_processes);
+        common_system_processes(running, blocked, update_every);
     }
 
     if(likely(all_cpu_charts_size > 1)) {
