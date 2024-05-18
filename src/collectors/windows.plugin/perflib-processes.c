@@ -16,13 +16,11 @@ static bool do_processes(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     if (!pObjectType)
         return false;
 
-    static COUNTER_DATA processorsRunning = { .key = "Processes" };
+    static COUNTER_DATA processesRunning = { .key = "Processes" };
 
-    if(perflibGetObjectCounter(pDataBlock, pObjectType, processorsRunning)) {
-        ULONGLONG total = pageFaultsPerSec.current.Data;
-        ULONGLONG major = pagesPerSec.current.Data;
-        ULONGLONG minor = (total > major) ? total - major : 0;
-        common_mem_pgfaults(minor, major, update_every);
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &processesRunning)) {
+        ULONGLONG running = processesRunning.current.Data;
+        common_system_processes(running, 0, update_every);
     }
 
     return true;
