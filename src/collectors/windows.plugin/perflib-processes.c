@@ -17,10 +17,16 @@ static bool do_processes(PERF_DATA_BLOCK *pDataBlock, int update_every) {
         return false;
 
     static COUNTER_DATA processesRunning = { .key = "Processes" };
+    static COUNTER_DATA contextSwitchPerSec = { .key = "Context Switches/sec" };
 
     if(perflibGetObjectCounter(pDataBlock, pObjectType, &processesRunning)) {
         ULONGLONG running = processesRunning.current.Data;
         common_system_processes(running, 0, update_every);
+    }
+
+    if(perflibGetObjectCounter(pDataBlock, pObjectType, &contextSwitchPerSec)) {
+        ULONGLONG contexts = contextSwitchPerSec.current.Data;
+        common_system_context_switch(contexts, update_every);
     }
 
     return true;

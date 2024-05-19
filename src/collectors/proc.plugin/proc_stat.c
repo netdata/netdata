@@ -783,31 +783,8 @@ int do_proc_stat(int update_every, usec_t dt) {
         }
         else if(unlikely(hash == hash_ctxt && strcmp(row_key, "ctxt") == 0)) {
             if(likely(do_context)) {
-                static RRDSET *st_ctxt = NULL;
-                static RRDDIM *rd_switches = NULL;
                 unsigned long long value = str2ull(procfile_lineword(ff, l, 1), NULL);
-
-                if(unlikely(!st_ctxt)) {
-                    st_ctxt = rrdset_create_localhost(
-                            "system"
-                            , "ctxt"
-                            , NULL
-                            , "processes"
-                            , NULL
-                            , "CPU Context Switches"
-                            , "context switches/s"
-                            , PLUGIN_PROC_NAME
-                            , PLUGIN_PROC_MODULE_STAT_NAME
-                            , NETDATA_CHART_PRIO_SYSTEM_CTXT
-                            , update_every
-                            , RRDSET_TYPE_LINE
-                    );
-
-                    rd_switches = rrddim_add(st_ctxt, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                }
-
-                rrddim_set_by_pointer(st_ctxt, rd_switches, value);
-                rrdset_done(st_ctxt);
+                common_system_context_switch(value, update_every);
             }
         }
         else if(unlikely(hash == hash_processes && !processes && strcmp(row_key, "processes") == 0)) {

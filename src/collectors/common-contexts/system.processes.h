@@ -66,4 +66,32 @@ static inline void common_system_processes(uint64_t running, uint64_t blocked, i
 }
 #endif
 
+static inline void common_system_context_switch(uint64_t value, int update_every) {
+    static RRDSET *st_ctxt = NULL;
+    static RRDDIM *rd_switches = NULL;
+
+    if(unlikely(!st_ctxt)) {
+        st_ctxt = rrdset_create_localhost(
+         "system"
+        , "ctxt"
+        , NULL
+        , "processes"
+        , NULL
+        , "CPU Context Switches"
+        , "context switches/s"
+        , _COMMON_PLUGIN_NAME
+        , _COMMON_PLUGIN_MODULE_NAME
+        , NETDATA_CHART_PRIO_SYSTEM_CTXT
+        , update_every
+        , RRDSET_TYPE_LINE
+        );
+
+        rd_switches = rrddim_add(st_ctxt, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_ctxt, rd_switches, value);
+    rrdset_done(st_ctxt);
+}
+
+
 #endif //NETDATA_SYSTEM_PROCESSES_H
