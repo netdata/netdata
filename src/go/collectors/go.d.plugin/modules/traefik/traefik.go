@@ -127,4 +127,4 @@ func (t *Traefik) Collect() map[string]int64 {
 	return mx
 }
 
-func (Traefik) Cleanup() {}
+func (t *Traefik) Cleanup() {}

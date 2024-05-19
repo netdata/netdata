@@ -50,7 +50,7 @@ func (d *DNSQuery) initRecordTypes() (map[string]uint16, error) {
 }
 
 func (d *DNSQuery) initCharts() (*module.Charts, error) {
-	var charts module.Charts
+	charts := module.Charts{}
 
 	for _, srv := range d.Servers {
 		for _, rtype := range d.RecordTypes {

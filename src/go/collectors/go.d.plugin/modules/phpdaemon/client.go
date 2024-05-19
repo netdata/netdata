@@ -56,7 +56,7 @@ func (c *client) doWithDecode(dst interface{}, decode decodeFunc, request web.Re
 	return nil
 }
 
-func (c client) doOK(req *http.Request) (*http.Response, error) {
+func (c *client) doOK(req *http.Request) (*http.Response, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return resp, fmt.Errorf("error on request : %v", err)

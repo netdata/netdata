@@ -30,7 +30,7 @@ modules:
         exclude: []
       multi_instance: true
       additional_permissions:
-        description: "It needs setuid to use the necessary syscall to collect perf events. Netdada sets the permission during installation time."
+        description: "It needs setuid to use the necessary syscall to collect perf events. Netdata sets the permission during installation time."
       default_behavior:
         auto_detection:
           description: ""

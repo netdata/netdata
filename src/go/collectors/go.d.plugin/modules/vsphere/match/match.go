@@ -167,6 +167,7 @@ func parseHostInclude(include string) (HostMatcher, error) {
 			ms = append(ms, hostClusterMatcher{m})
 		case hostIdx:
 			ms = append(ms, hostHostMatcher{m})
+		default:
 		}
 	}
 

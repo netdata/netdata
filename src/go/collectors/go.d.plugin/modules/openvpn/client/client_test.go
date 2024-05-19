@@ -75,6 +75,7 @@ func (m *mockSocketClient) Disconnect() error { return nil }
 
 func (m *mockSocketClient) Command(command string, process socket.Processor) error {
 	var s *bufio.Scanner
+
 	switch command {
 	default:
 		return fmt.Errorf("unknown command : %s", command)
@@ -89,6 +90,10 @@ func (m *mockSocketClient) Command(command string, process socket.Processor) err
 		s = bufio.NewScanner(bytes.NewReader(testStatus3Data))
 	case commandLoadStats:
 		s = bufio.NewScanner(bytes.NewReader(testLoadStatsData))
+	}
+
+	if s == nil {
+		return nil
 	}
 
 	for s.Scan() {

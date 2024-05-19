@@ -30,7 +30,7 @@ func (pc *PortCheck) validateConfig() error {
 }
 
 func (pc *PortCheck) initCharts() (*module.Charts, error) {
-	var charts module.Charts
+	charts := module.Charts{}
 
 	for _, port := range pc.Ports {
 		if err := charts.Add(*newPortCharts(pc.Host, port)...); err != nil {
