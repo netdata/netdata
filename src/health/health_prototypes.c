@@ -176,6 +176,21 @@ void alert_action_options_to_buffer_json_array(BUFFER *wb, const char *key, ALER
     buffer_json_array_close(wb);
 }
 
+void alert_action_options_to_buffer(BUFFER *wb, ALERT_ACTION_OPTIONS options) {
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    for(int i = 0; alert_action_options[i].name ; i++) {
+        if (unlikely((alert_action_options[i].value & options) && !(alert_action_options[i].value & used))) {
+            if(used != 0)
+                buffer_strcat(wb, " ");
+
+            const char *name = alert_action_options[i].name;
+            used |= alert_action_options[i].value;
+
+            buffer_strcat(wb, name);
+        }
+    }
+}
+
 static void alert_action_options_init(void) {
     for(int i = 0; alert_action_options[i].name ; i++)
         alert_action_options[i].hash = simple_hash(alert_action_options[i].name);

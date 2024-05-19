@@ -15,8 +15,8 @@ type (
 	// SimpleExpr is a simple expression to describe the condition:
 	//     (includes[0].Match(v) || includes[1].Match(v) || ...) && !(excludes[0].Match(v) || excludes[1].Match(v) || ...)
 	SimpleExpr struct {
-		Includes []string `yaml:"includes" json:"includes"`
-		Excludes []string `yaml:"excludes" json:"excludes"`
+		Includes []string `yaml:"includes,omitempty" json:"includes"`
+		Excludes []string `yaml:"excludes,omitempty" json:"excludes"`
 	}
 )
 

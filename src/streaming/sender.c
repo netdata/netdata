@@ -634,7 +634,6 @@ static bool rrdpush_sender_connect_ssl(struct sender_state *s __maybe_unused) {
 #endif
 }
 
-#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
 static int rrdpush_http_upgrade_prelude(RRDHOST *host, struct sender_state *s) {
 
     char http[HTTP_HEADER_SIZE + 1];
@@ -732,7 +731,6 @@ err_cleanup:
     http_parse_ctx_destroy(&ctx);
     return 1;
 }
-#endif
 
 static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_port, int timeout, struct sender_state *s) {
 
@@ -871,7 +869,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     if(!rrdpush_sender_connect_ssl(s))
         return false;
 
-#if defined(ENABLE_H2O) && defined(ENABLE_OPENSSL)
     if (s->parent_using_h2o && rrdpush_http_upgrade_prelude(host, s)) {
         ND_LOG_STACK lgs[] = {
                 ND_LOG_FIELD_TXT(NDF_RESPONSE_CODE, RRDPUSH_STATUS_CANT_UPGRADE_CONNECTION),
@@ -885,7 +882,6 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         host->destination->postpone_reconnection_until = now_realtime_sec() + 1 * 60;
         return false;
     }
-#endif
     
     ssize_t len = (ssize_t)strlen(http);
     ssize_t bytes = send_timeout(
@@ -1232,12 +1228,23 @@ void execute_commands(struct sender_state *s) {
     ND_LOG_STACK_PUSH(lgs);
 
     char *start = s->read_buffer, *end = &s->read_buffer[s->read_len], *newline;
-    *end = 0;
-    while( start < end && (newline = strchr(start, '\n')) ) {
+    *end = '\0';
+    for( ; start < end ; start = newline + 1) {
+        newline = strchr(start, '\n');
+
+        if(!newline) {
+            if(s->functions.intercept_input) {
+                buffer_strcat(s->functions.payload, start);
+                start = end;
+            }
+            break;
+        }
+
+        *newline = '\0';
         s->line.count++;
 
         if(s->functions.intercept_input) {
-            if(strcmp(start, PLUGINSD_CALL_FUNCTION_PAYLOAD_END "\n") == 0) {
+            if(strcmp(start, PLUGINSD_CALL_FUNCTION_PAYLOAD_END) == 0) {
                 execute_commands_function(s,
                     PLUGINSD_CALL_FUNCTION_PAYLOAD_END,
                                           s->functions.transaction, s->functions.timeout_s,
@@ -1246,14 +1253,14 @@ void execute_commands(struct sender_state *s) {
 
                 cleanup_intercepting_input(s);
             }
-            else
+            else {
                 buffer_strcat(s->functions.payload, start);
+                buffer_fast_charcat(s->functions.payload, '\n');
+            }
 
-            start = newline + 1;
             continue;
         }
 
-        *newline = '\0';
         s->line.num_words = quoted_strings_splitter_pluginsd(start, s->line.words, PLUGINSD_MAX_WORDS);
         const char *command = get_word(s->line.words, s->line.num_words, 0);
 
@@ -1332,7 +1339,6 @@ void execute_commands(struct sender_state *s) {
 
         line_splitter_reset(&s->line);
         worker_is_busy(WORKER_SENDER_JOB_EXECUTE);
-        start = newline + 1;
     }
 
     if (start < end) {

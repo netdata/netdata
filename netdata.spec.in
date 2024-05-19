@@ -24,7 +24,6 @@ AutoReqProv: yes
 %global cmake %{__cmake}
 %global cmake_build %{__cmake} --build %{__cmake_builddir} --verbose --parallel $(nproc)
 %global cmake_install DESTDIR="%{buildroot}" %{__cmake} --install %{__cmake_builddir}
-%global _have_ml 0
 %endif
 %if 0%{?amazon_linux} == 2
 %global __cmake /cmake/bin/cmake
@@ -32,7 +31,6 @@ AutoReqProv: yes
 %global cmake %{__cmake}
 %global cmake_build %{__cmake} --build %{__cmake_builddir} --verbose --parallel $(nproc)
 %global cmake_install DESTDIR="%{buildroot}" %{__cmake} --install %{__cmake_builddir}
-%global _have_ml 0
 %endif
 
 # openSUSE requires us to explicity ask for ninja for builds.

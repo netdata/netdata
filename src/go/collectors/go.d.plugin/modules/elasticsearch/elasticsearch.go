@@ -23,6 +23,7 @@ func init() {
 			UpdateEvery: 5,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -54,8 +55,8 @@ func New() *Elasticsearch {
 }
 
 type Config struct {
+	UpdateEvery     int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP        `yaml:",inline" json:""`
-	UpdateEvery     int  `yaml:"update_every" json:"update_every"`
 	ClusterMode     bool `yaml:"cluster_mode" json:"cluster_mode"`
 	DoNodeStats     bool `yaml:"collect_node_stats" json:"collect_node_stats"`
 	DoClusterHealth bool `yaml:"collect_cluster_health" json:"collect_cluster_health"`

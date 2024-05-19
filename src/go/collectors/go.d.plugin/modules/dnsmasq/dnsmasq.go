@@ -20,6 +20,7 @@ func init() {
 	module.Register("dnsmasq", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -41,10 +42,10 @@ func New() *Dnsmasq {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
-	Protocol    string       `yaml:"protocol" json:"protocol"`
+	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
 	Address     string       `yaml:"address" json:"address"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	Protocol    string       `yaml:"protocol,omitempty" json:"protocol"`
+	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type (

@@ -24,6 +24,7 @@ func init() {
 			UpdateEvery: 60,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -53,9 +54,9 @@ func New() *Pulsar {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int                `yaml:"update_every" json:"update_every"`
-	TopicFilter matcher.SimpleExpr `yaml:"topic_filter" json:"topic_filter"`
+	TopicFilter matcher.SimpleExpr `yaml:"topic_filter,omitempty" json:"topic_filter"`
 }
 
 type Pulsar struct {

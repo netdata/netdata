@@ -9,7 +9,7 @@ extern "C" {
 
 #include "config.h"
 
-#if defined(ENABLE_OPENSSL) || defined(ENABLE_WOLFSSL)
+#ifdef ENABLE_OPENSSL
 #define ENABLE_HTTPS 1
 #endif
 
@@ -291,9 +291,9 @@ typedef uint32_t uid_t;
 #define MALLOCLIKE
 #endif
 
-#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT) && !defined(COMPILED_FOR_MACOS)
+#if defined(HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF)
 #define PRINTFLIKE(f, a) __attribute__ ((format(gnu_printf, f, a)))
-#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT)
+#elif defined(HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF)
 #define PRINTFLIKE(f, a) __attribute__ ((format(printf, f, a)))
 #else
 #define PRINTFLIKE(f, a)
@@ -483,7 +483,6 @@ extern char *netdata_configured_host_prefix;
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
 #ifdef ENABLE_HTTPS
-# include "ssl/ssl.h"
 # include "socket/security.h"
 #endif
 #include "socket/socket.h"

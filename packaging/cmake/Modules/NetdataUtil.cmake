@@ -74,7 +74,7 @@ endfunction()
 # Sets the specified variable to the name of the libc or "unknown"
 function(netdata_identify_libc _libc_name)
     if(NOT DEFINED _ND_DETECTED_LIBC)
-        message(CHECK_START "Detecting libc implementation")
+        message(CHECK_START "Detecting libc implementation using ldd")
 
         execute_process(COMMAND ldd --version
                         COMMAND grep -q -i -E "glibc|gnu libc"
@@ -101,9 +101,45 @@ function(netdata_identify_libc _libc_name)
             return()
         endif()
 
+        message(CHECK_FAIL "unknown")
+
+        message(CHECK_START "Looking for libc.so.6")
+        find_program(LIBC_PATH libc.so.6
+                     PATHS /lib /lib64 /usr/lib /usr/lib64
+                     NO_DEFAULT_PATH
+                     NO_PACKAGE_ROOT_PATH
+                     NO_CMAKE_PATH
+                     NO_CMAKE_ENVIRONMENT_PATH
+                     NO_SYSTEM_ENVIRONMENT_PATH
+                     NO_CMAKE_SYSTEM_PATH
+                     NO_CMAKE_INSTALL_PREFIX
+                     NO_CMAKE_FIND_ROOT_PATH)
+
+        if(NOT "${LIBC_PATH}" EQUAL "LIBC_PATH-NOTFOUND")
+            message(CHECK_PASS "found")
+            message(CHECK_START "Detecting libc implementation using libc.so.6")
+
+            execute_process(COMMAND "${LIBC_PATH}"
+                            COMMAND head -n 1
+                            COMMAND grep -q -i -E "gnu libc|gnu c library"
+                            RESULT_VARIABLE LIBC_RESULT
+                            OUTPUT_VARIABLE LIBC_OUTPUT
+                            ERROR_VARIABLE LIBC_ERROR)
+
+            if(NOT LIBC_RESULT)
+                set(${_libc_name} glibc PARENT_SCOPE)
+                set(_ND_DETECTED_LIBC glibc CACHE INTERNAL "")
+                message(CHECK_PASS "glibc")
+                return()
+            else()
+                message(CHECK_FAIL "unknown")
+            endif()
+        else()
+            message(CHECK_FAIL "not found")
+        endif()
+
         set(${_libc_name} unknown PARENT_SCOPE)
         set(_ND_DETECTED_LIBC unknown CACHE INTERNAL "")
-        message(CHECK_FAIL "unknown")
     else()
         set(${_libc_name} ${_ND_DETECTED_LIBC} PARENT_SCOPE)
     endif()

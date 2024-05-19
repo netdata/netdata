@@ -965,6 +965,8 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [OpenVAS](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/openvas.md)
 
+- [Rspamd](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/rspamd/integrations/rspamd.md)
+
 - [SSL Certificate](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/ssl_certificate.md)
 
 - [Suricata](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/suricata.md)

@@ -14,6 +14,7 @@ static struct {
     { .format = "text/plain",                   CT_TEXT_PLAIN, true },
     { .format = "text/css",                     CT_TEXT_CSS, true },
     { .format = "text/yaml",                    CT_TEXT_YAML, true },
+    { .format = "application/yaml",             CT_APPLICATION_YAML, true },
     { .format = "text/xml",                     CT_TEXT_XML, true },
     { .format = "text/xsl",                     CT_TEXT_XSL, true },
     { .format = "application/json",             CT_APPLICATION_JSON, true },

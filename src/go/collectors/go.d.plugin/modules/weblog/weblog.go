@@ -16,6 +16,7 @@ func init() {
 	module.Register("web_log", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -45,15 +46,15 @@ func New() *WebLog {
 
 type (
 	Config struct {
+		UpdateEvery         int    `yaml:"update_every,omitempty" json:"update_every"`
+		Path                string `yaml:"path" json:"path"`
+		ExcludePath         string `yaml:"exclude_path,omitempty" json:"exclude_path"`
 		logs.ParserConfig   `yaml:",inline" json:""`
-		UpdateEvery         int                  `yaml:"update_every" json:"update_every"`
-		Path                string               `yaml:"path" json:"path"`
-		ExcludePath         string               `yaml:"exclude_path" json:"exclude_path"`
-		URLPatterns         []userPattern        `yaml:"url_patterns" json:"url_patterns"`
-		CustomFields        []customField        `yaml:"custom_fields" json:"custom_fields"`
-		CustomTimeFields    []customTimeField    `yaml:"custom_time_fields" json:"custom_time_fields"`
-		CustomNumericFields []customNumericField `yaml:"custom_numeric_fields" json:"custom_numeric_fields"`
-		Histogram           []float64            `yaml:"histogram" json:"histogram"`
+		URLPatterns         []userPattern        `yaml:"url_patterns,omitempty" json:"url_patterns"`
+		CustomFields        []customField        `yaml:"custom_fields,omitempty" json:"custom_fields"`
+		CustomTimeFields    []customTimeField    `yaml:"custom_time_fields,omitempty" json:"custom_time_fields"`
+		CustomNumericFields []customNumericField `yaml:"custom_numeric_fields,omitempty" json:"custom_numeric_fields"`
+		Histogram           []float64            `yaml:"histogram,omitempty" json:"histogram"`
 		GroupRespCodes      bool                 `yaml:"group_response_codes" json:"group_response_codes"`
 	}
 	userPattern struct {
@@ -71,8 +72,8 @@ type (
 	customNumericField struct {
 		Name       string `yaml:"name" json:"name"`
 		Units      string `yaml:"units" json:"units"`
-		Multiplier int    `yaml:"multiplier" json:"multiplier"`
-		Divisor    int    `yaml:"divisor" json:"divisor"`
+		Multiplier int    `yaml:"multiplier,omitempty" json:"multiplier"`
+		Divisor    int    `yaml:"divisor,omitempty" json:"divisor"`
 	}
 )
 

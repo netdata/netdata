@@ -27,6 +27,7 @@ func init() {
 			UpdateEvery: 10, // gathering systemd units can be a CPU intensive op
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -47,12 +48,12 @@ func New() *SystemdUnits {
 }
 
 type Config struct {
-	UpdateEvery           int          `yaml:"update_every" json:"update_every"`
-	Timeout               web.Duration `yaml:"timeout" json:"timeout"`
-	Include               []string     `yaml:"include" json:"include"`
-	CollectUnitFiles      bool         `yaml:"collect_unit_files" json:"collect_unit_files"`
-	IncludeUnitFiles      []string     `yaml:"include_unit_files" json:"include_unit_files"`
-	CollectUnitFilesEvery web.Duration `yaml:"collect_unit_files_every" json:"collect_unit_files_every"`
+	UpdateEvery           int          `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout               web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Include               []string     `yaml:"include,omitempty" json:"include"`
+	CollectUnitFiles      bool         `yaml:"collect_unit_files,omitempty" json:"collect_unit_files"`
+	IncludeUnitFiles      []string     `yaml:"include_unit_files,omitempty" json:"include_unit_files"`
+	CollectUnitFilesEvery web.Duration `yaml:"collect_unit_files_every,omitempty" json:"collect_unit_files_every"`
 }
 
 type SystemdUnits struct {

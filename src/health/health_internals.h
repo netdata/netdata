@@ -44,6 +44,7 @@
 #define HEALTH_CHART_LABEL_KEY "chart labels"
 
 void alert_action_options_to_buffer_json_array(BUFFER *wb, const char *key, ALERT_ACTION_OPTIONS options);
+void alert_action_options_to_buffer(BUFFER *wb, ALERT_ACTION_OPTIONS options);
 ALERT_ACTION_OPTIONS alert_action_options_parse(char *o);
 ALERT_ACTION_OPTIONS alert_action_options_parse_one(const char *o);
 

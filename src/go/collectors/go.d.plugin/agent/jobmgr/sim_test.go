@@ -121,6 +121,10 @@ func (s *runSim) run(t *testing.T) {
 
 func prepareMockRegistry() module.Registry {
 	reg := module.Registry{}
+	type config struct {
+		OptionOne string `yaml:"option_one" json:"option_one"`
+		OptionTwo int64  `yaml:"option_two" json:"option_two"`
+	}
 
 	reg.Register("success", module.Creator{
 		JobConfigSchema: module.MockConfigSchema,
@@ -131,6 +135,9 @@ func prepareMockRegistry() module.Registry {
 				},
 				CollectFunc: func() map[string]int64 { return map[string]int64{"id1": 1} },
 			}
+		},
+		Config: func() any {
+			return &config{OptionOne: "one", OptionTwo: 2}
 		},
 	})
 	reg.Register("fail", module.Creator{

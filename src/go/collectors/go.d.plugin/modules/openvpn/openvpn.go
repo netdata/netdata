@@ -20,6 +20,7 @@ func init() {
 	module.Register("openvpn", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -36,10 +37,10 @@ func New() *OpenVPN {
 }
 
 type Config struct {
-	UpdateEvery  int                `yaml:"update_every" json:"update_every"`
+	UpdateEvery  int                `yaml:"update_every,omitempty" json:"update_every"`
 	Address      string             `yaml:"address" json:"address"`
-	Timeout      web.Duration       `yaml:"timeout" json:"timeout"`
-	PerUserStats matcher.SimpleExpr `yaml:"per_user_stats" json:"per_user_stats"`
+	Timeout      web.Duration       `yaml:"timeout,omitempty" json:"timeout"`
+	PerUserStats matcher.SimpleExpr `yaml:"per_user_stats,omitempty" json:"per_user_stats"`
 }
 
 type (

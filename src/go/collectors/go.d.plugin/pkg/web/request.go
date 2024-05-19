@@ -20,28 +20,28 @@ type Request struct {
 	// URL specifies the URL to access.
 	URL string `yaml:"url" json:"url"`
 
-	// Body specifies the HTTP request body to be sent by the client.
-	Body string `yaml:"body" json:"body"`
-
-	// Method specifies the HTTP method (GET, POST, PUT, etc.). An empty string means GET.
-	Method string `yaml:"method" json:"method"`
-
-	// Headers specifies the HTTP request header fields to be sent by the client.
-	Headers map[string]string `yaml:"headers" json:"headers"`
-
 	// Username specifies the username for basic HTTP authentication.
-	Username string `yaml:"username" json:"username"`
+	Username string `yaml:"username,omitempty" json:"username"`
 
 	// Password specifies the password for basic HTTP authentication.
-	Password string `yaml:"password" json:"password"`
+	Password string `yaml:"password,omitempty" json:"password"`
 
 	// ProxyUsername specifies the username for basic HTTP authentication.
 	// It is used to authenticate a user agent to a proxy server.
-	ProxyUsername string `yaml:"proxy_username" json:"proxy_username"`
+	ProxyUsername string `yaml:"proxy_username,omitempty" json:"proxy_username"`
 
 	// ProxyPassword specifies the password for basic HTTP authentication.
 	// It is used to authenticate a user agent to a proxy server.
-	ProxyPassword string `yaml:"proxy_password" json:"proxy_password"`
+	ProxyPassword string `yaml:"proxy_password,omitempty" json:"proxy_password"`
+
+	// Method specifies the HTTP method (GET, POST, PUT, etc.). An empty string means GET.
+	Method string `yaml:"method,omitempty" json:"method"`
+
+	// Headers specifies the HTTP request header fields to be sent by the client.
+	Headers map[string]string `yaml:"headers,omitempty" json:"headers"`
+
+	// Body specifies the HTTP request body to be sent by the client.
+	Body string `yaml:"body,omitempty" json:"body"`
 }
 
 // Copy makes a full copy of the Request.

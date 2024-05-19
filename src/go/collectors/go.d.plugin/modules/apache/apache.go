@@ -20,6 +20,7 @@ func init() {
 	module.Register("apache", module.Creator{
 		Create:          func() module.Module { return New() },
 		JobConfigSchema: configSchema,
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -41,8 +42,8 @@ func New() *Apache {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int `yaml:"update_every" json:"update_every"`
 }
 
 type Apache struct {
