@@ -24,6 +24,7 @@ func init() {
 			UpdateEvery: 10,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -43,12 +44,12 @@ func New() *Smartctl {
 }
 
 type Config struct {
-	UpdateEvery      int          `yaml:"update_every" json:"update_every"`
-	Timeout          web.Duration `yaml:"timeout" json:"timeout"`
-	ScanEvery        web.Duration `yaml:"scan_every" json:"scan_every"`
-	PollDevicesEvery web.Duration `yaml:"poll_devices_every" json:"poll_devices_every"`
-	NoCheckPowerMode string       `yaml:"no_check_power_mode" json:"no_check_power_mode"`
-	DeviceSelector   string       `yaml:"device_selector" json:"device_selector"`
+	UpdateEvery      int          `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout          web.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	ScanEvery        web.Duration `yaml:"scan_every,omitempty" json:"scan_every"`
+	PollDevicesEvery web.Duration `yaml:"poll_devices_every,omitempty" json:"poll_devices_every"`
+	NoCheckPowerMode string       `yaml:"no_check_power_mode,omitempty" json:"no_check_power_mode"`
+	DeviceSelector   string       `yaml:"device_selector,omitempty" json:"device_selector"`
 }
 
 type (

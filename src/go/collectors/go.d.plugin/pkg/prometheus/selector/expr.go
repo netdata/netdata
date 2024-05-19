@@ -5,8 +5,8 @@ package selector
 import "fmt"
 
 type Expr struct {
-	Allow []string `yaml:"allow" json:"allow"`
-	Deny  []string `yaml:"deny" json:"deny"`
+	Allow []string `yaml:"allow,omitempty" json:"allow"`
+	Deny  []string `yaml:"deny,omitempty" json:"deny"`
 }
 
 func (e Expr) Empty() bool {

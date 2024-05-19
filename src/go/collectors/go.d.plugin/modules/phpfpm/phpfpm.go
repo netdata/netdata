@@ -20,6 +20,7 @@ func init() {
 	module.Register("phpfpm", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -40,8 +41,8 @@ func New() *Phpfpm {
 }
 
 type Config struct {
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 	web.HTTP    `yaml:",inline" json:""`
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
 	Socket      string `yaml:"socket" json:"socket"`
 	Address     string `yaml:"address" json:"address"`
 	FcgiPath    string `yaml:"fcgi_path" json:"fcgi_path"`

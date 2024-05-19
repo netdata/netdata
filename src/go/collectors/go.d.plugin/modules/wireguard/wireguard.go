@@ -20,6 +20,7 @@ func init() {
 	module.Register("wireguard", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -34,7 +35,7 @@ func New() *WireGuard {
 }
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every" json:"update_every"`
+	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 }
 
 type (

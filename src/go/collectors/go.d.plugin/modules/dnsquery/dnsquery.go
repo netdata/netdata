@@ -22,6 +22,7 @@ func init() {
 			UpdateEvery: 5,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -43,14 +44,14 @@ func New() *DNSQuery {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	Domains     []string     `yaml:"domains" json:"domains"`
 	Servers     []string     `yaml:"servers" json:"servers"`
-	Network     string       `yaml:"network" json:"network"`
-	RecordType  string       `yaml:"record_type" json:"record_type"`
-	RecordTypes []string     `yaml:"record_types" json:"record_types"`
-	Port        int          `yaml:"port" json:"port"`
+	Network     string       `yaml:"network,omitempty" json:"network"`
+	RecordType  string       `yaml:"record_type,omitempty" json:"record_type"`
+	RecordTypes []string     `yaml:"record_types,omitempty" json:"record_types"`
+	Port        int          `yaml:"port,omitempty" json:"port"`
 }
 
 type (

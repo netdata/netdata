@@ -22,6 +22,7 @@ func init() {
 			UpdateEvery: 10,
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -40,8 +41,8 @@ func New() *NvidiaSMI {
 }
 
 type Config struct {
-	UpdateEvery  int          `yaml:"update_every" json:"update_every"`
-	Timeout      web.Duration `yaml:"timeout" json:"timeout"`
+	UpdateEvery  int          `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout      web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	BinaryPath   string       `yaml:"binary_path" json:"binary_path"`
 	UseCSVFormat bool         `yaml:"use_csv_format" json:"use_csv_format"`
 }

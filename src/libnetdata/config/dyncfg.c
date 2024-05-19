@@ -124,7 +124,8 @@ static struct {
     { .cmd = DYNCFG_CMD_REMOVE, .name = "remove" },
     { .cmd = DYNCFG_CMD_ENABLE, .name = "enable" },
     { .cmd = DYNCFG_CMD_DISABLE, .name = "disable" },
-    { .cmd = DYNCFG_CMD_RESTART, .name = "restart" }
+    { .cmd = DYNCFG_CMD_RESTART, .name = "restart" },
+    { .cmd = DYNCFG_CMD_USERCONFIG, .name = "userconfig" },
 };
 
 const char *dyncfg_id2cmd_one(DYNCFG_CMDS cmd) {
@@ -215,14 +216,12 @@ static inline bool is_forbidden_char(char c) {
         return true;
 
     switch(c) {
-        case '/':
+        case '`': // good not to have this in filenames
+        case '$': // good not to have this in filenames
+        case '/': // unix does not support this
+        case ':': // windows does not support this
+        case '|': // windows does not support this
             return true;
-
-#ifdef OS_WINDOWS
-        case ':':
-        case '|':
-            return true;
-#endif
 
         default:
             return false;

@@ -19,6 +19,7 @@ func init() {
 			UpdateEvery: 10, // The .rtreport files are generated per worker, and updated every 10 seconds.
 		},
 		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -34,7 +35,7 @@ func New() *Litespeed {
 }
 
 type Config struct {
-	UpdateEvery int    `yaml:"update_every" json:"update_every"`
+	UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
 	ReportsDir  string `yaml:"reports_dir" json:"reports_dir"`
 }
 

@@ -19,6 +19,7 @@ func init() {
 	module.Register("chrony", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 
@@ -34,9 +35,9 @@ func New() *Chrony {
 }
 
 type Config struct {
-	UpdateEvery int          `yaml:"update_every" json:"update_every"`
+	UpdateEvery int          `yaml:"update_every,omitempty" json:"update_every"`
 	Address     string       `yaml:"address" json:"address"`
-	Timeout     web.Duration `yaml:"timeout" json:"timeout"`
+	Timeout     web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type (

@@ -21,18 +21,18 @@ var ErrRedirectAttempted = errors.New("redirect")
 type Client struct {
 	// Timeout specifies a time limit for requests made by this Client.
 	// Default (zero value) is no timeout. Must be set before http.Client creation.
-	Timeout Duration `yaml:"timeout" json:"timeout"`
+	Timeout Duration `yaml:"timeout,omitempty" json:"timeout"`
 
 	// NotFollowRedirect specifies the policy for handling redirects.
 	// Default (zero value) is std http package default policy (stop after 10 consecutive requests).
-	NotFollowRedirect bool `yaml:"not_follow_redirects" json:"not_follow_redirects"`
+	NotFollowRedirect bool `yaml:"not_follow_redirects,omitempty" json:"not_follow_redirects"`
 
 	// ProxyURL specifies the URL of the proxy to use. An empty string means use the environment variables
 	// HTTP_PROXY, HTTPS_PROXY and NO_PROXY (or the lowercase versions thereof) to get the URL.
-	ProxyURL string `yaml:"proxy_url" json:"proxy_url"`
+	ProxyURL string `yaml:"proxy_url,omitempty" json:"proxy_url"`
 
 	// TLSConfig specifies the TLS configuration.
-	tlscfg.TLSConfig `yaml:",inline" json:",inline"`
+	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
 // NewHTTPClient returns a new *http.Client given a Client configuration and an error if any.
