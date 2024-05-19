@@ -25,14 +25,13 @@ behind an [Nginx proxy](https://github.com/netdata/netdata/blob/master/docs/netd
 
 Beyond charts, the local dashboard can be broken down into three key areas:
 
-- [Local Agent dashboard](#local-agent-dashboard)
-  - [Navigating the local dashboard](#navigating-the-local-dashboard)
-    - [Sections](#sections)
-    - [Time \& date picker](#time--date-picker)
-    - [Metrics menus](#metrics-menus)
-    - [Cloud menus (Spaces, War Rooms, and Visited nodes)](#cloud-menus-spaces-war-rooms-and-visited-nodes)
-  - [Customizing the local dashboard](#customizing-the-local-dashboard)
-  - [Custom dashboards](#custom-dashboards)
+- [Navigating the local dashboard](#navigating-the-local-dashboard)
+  - [Sections](#sections)
+  - [Time \& date picker](#time--date-picker)
+  - [Metrics menus](#metrics-menus)
+  - [Cloud menus (Spaces, War Rooms, and Visited nodes)](#cloud-menus-spaces-war-rooms-and-visited-nodes)
+- [Customizing the local dashboard](#customizing-the-local-dashboard)
+- [Custom dashboards](#custom-dashboards)
 
 ![Annotated screenshot of the local Agent
 dashboard](https://user-images.githubusercontent.com/1153921/101509403-f7e59400-3935-11eb-9abd-cbecfa3ee49a.png)

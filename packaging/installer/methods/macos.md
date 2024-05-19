@@ -79,10 +79,6 @@ Homebrew will place your Netdata configuration directory at `/opt/homebrew/etc/n
 
 Use the `edit-config` script and the files in this directory to configure Netdata. For reference, you can find stock configuration files at `/opt/homebrew/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
 
-
-
-Skip on ahead to the [What's next?](#whats-next) section to find links to helpful post-installation guides.
-
 ## Install Netdata from source
 
 We don't recommend installing Netdata from source on macOS, as it can be difficult to configure and install dependencies manually.
