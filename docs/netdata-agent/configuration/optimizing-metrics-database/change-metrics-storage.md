@@ -139,14 +139,14 @@ Estimated total Netdata memory = 3 * 4 + 4 = 16 GiB
 
 The actual measurement during a low usage time was the following:
 
-Purpose|RAM|Note
-:--- | ---: | :--- 
-DBENGINE usage | 5.9 GiB | Out of 7GB max 
-Cardinality/ephemerality related memory (k8s contexts, labels, strings) | 3.4 GiB
-Buffer for queries | 0 GiB | Out of 0.5 GiB max, when heavily queried
-Other | 0.5 GiB | 
-System overhead | 4.4 GiB | Calculated by subtracting all of the above from the total 
-**Total Netdata memory usage** | 14.2 GiB | 
+| Purpose                                                                 |      RAM | Note                                                      |
+|:------------------------------------------------------------------------|---------:|:----------------------------------------------------------|
+| DBENGINE usage                                                          |  5.9 GiB | Out of 7GB max                                            |
+| Cardinality/ephemerality related memory (k8s contexts, labels, strings) |  3.4 GiB |                                                           |
+| Buffer for queries                                                      |    0 GiB | Out of 0.5 GiB max, when heavily queried                  |
+| Other                                                                   |  0.5 GiB |                                                           |
+| System overhead                                                         |  4.4 GiB | Calculated by subtracting all of the above from the total |
+| **Total Netdata memory usage**                                          | 14.2 GiB |                                                           |
 
 All the figures above except for the system memory management overhead were retrieved from Netdata itself. 
 The overhead can't be directly calculated, so we subtracted all the other figures from the total Netdata memory usage to get it. 

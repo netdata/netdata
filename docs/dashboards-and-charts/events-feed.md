@@ -71,4 +71,4 @@ All users will be able to see events from the Topology and Alerts domain but Aud
 
 > **Note**
 >
-> When you try to query a longer period than what your space allows you will see an error message highlighting that you are querying data outside of your plan.
+> When you try to query a longer period than what your space allows you will see an error message highlighting that you are querying data outside your plan.

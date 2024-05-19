@@ -28,7 +28,7 @@ To enable the reception of metrics from Netdata Children, generate a random API 
 uuidgen
 ```
 
-Then, copy the UUID generated, [edit `stream.conf`](#edit-stream.conf), find the section that reads like the following and replace `API_KEY` with the UUID you generated:
+Then, copy the UUID generated, [edit `stream.conf`](#edit-streamconf), find the section that reads like the following and replace `API_KEY` with the UUID you generated:
 
 ```ini
 [API_KEY]
@@ -40,7 +40,7 @@ Save the file and restart Netdata.
 
 ## Configuring Netdata Children
 
-To enable streaming metrics to a Netdata Parent, [edit `stream.conf`](#edit-stream.conf), and at the `[stream]` section at the top, set:
+To enable streaming metrics to a Netdata Parent, [edit `stream.conf`](#edit-streamconf), and at the `[stream]` section at the top, set:
 
 ```ini
 [stream]
