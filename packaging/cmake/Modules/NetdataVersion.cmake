@@ -1,3 +1,11 @@
+# Copyright (c) 2024 Netdata Inc.
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Function to provide information regarding the Netdata version.
+#
+# The high-level logic is (a) use git-describe, (b) fallback to info from
+# packaging/version. This version field are used for cmake's project,
+# cpack's packaging, and the agent's functionality.
 function(netdata_version)
         find_package(Git)
 

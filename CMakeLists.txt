@@ -229,7 +229,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
 
         message(INFO " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
 else()
-        message(FATAL_ERROR " Unknown O/S... (${CMAKE_SYSTEM_NAME})")
+        message(FATAL_ERROR "Unknown/unsupported platform: ${CMAKE_SYSTEM_NAME} (Supported platforms: FreeBSD, Linux, macOS, Windows)")
 endif()
 
 if(ENABLE_PLUGIN_EBPF)
