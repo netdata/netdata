@@ -18,7 +18,7 @@ type (
 
 // NewSimplePatternsMatcher creates new simple patterns. It returns error in case one of patterns has bad syntax.
 func NewSimplePatternsMatcher(expr string) (Matcher, error) {
-	var ps simplePatternsMatcher
+	ps := simplePatternsMatcher{}
 
 	for _, pattern := range strings.Fields(expr) {
 		if err := ps.add(pattern); err != nil {

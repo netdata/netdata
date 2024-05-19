@@ -173,7 +173,7 @@ func (t *Traefik) collectEntrypointOpenConnections(mx map[string]int64, pms prom
 
 var httpRespCodeClasses = []string{"1xx", "2xx", "3xx", "4xx", "5xx"}
 
-func (t Traefik) updateCodeClassMetrics(mx map[string]int64) {
+func (t *Traefik) updateCodeClassMetrics(mx map[string]int64) {
 	for id, ce := range t.cache.entrypoints {
 		if ce.requests != nil {
 			for _, c := range httpRespCodeClasses {

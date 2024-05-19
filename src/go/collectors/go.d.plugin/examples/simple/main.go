@@ -21,15 +21,17 @@ import (
 
 var version = "v0.0.1-example"
 
-type example struct{ module.Base }
+type example struct {
+	module.Base
+}
 
-func (example) Cleanup() {}
+func (e *example) Cleanup() {}
 
-func (example) Init() error { return nil }
+func (e *example) Init() error { return nil }
 
-func (example) Check() error { return nil }
+func (e *example) Check() error { return nil }
 
-func (example) Charts() *module.Charts {
+func (e *example) Charts() *module.Charts {
 	return &module.Charts{
 		{
 			ID:    "random",
@@ -41,7 +43,7 @@ func (example) Charts() *module.Charts {
 		},
 	}
 }
-func (example) Configuration() any { return nil }
+func (e *example) Configuration() any { return nil }
 
 func (e *example) Collect() map[string]int64 {
 	return map[string]int64{

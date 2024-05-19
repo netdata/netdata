@@ -94,7 +94,7 @@ type Client struct {
 }
 
 // LoggedIn reports whether the client is logged in.
-func (c Client) LoggedIn() bool {
+func (c *Client) LoggedIn() bool {
 	return c.token.isSet()
 }
 
@@ -160,7 +160,7 @@ func (c *Client) Instances() (Instances, error) {
 	return instances, err
 }
 
-func (c Client) createLoginRequest() web.Request {
+func (c *Client) createLoginRequest() web.Request {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/login")
@@ -168,7 +168,7 @@ func (c Client) createLoginRequest() web.Request {
 	return req
 }
 
-func (c Client) createLogoutRequest() web.Request {
+func (c *Client) createLogoutRequest() web.Request {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/logout")
@@ -177,7 +177,7 @@ func (c Client) createLogoutRequest() web.Request {
 	return req
 }
 
-func (c Client) createAPIVersionRequest() web.Request {
+func (c *Client) createAPIVersionRequest() web.Request {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/version")
@@ -186,7 +186,7 @@ func (c Client) createAPIVersionRequest() web.Request {
 	return req
 }
 
-func (c Client) createSelectedStatisticsRequest(query []byte) web.Request {
+func (c *Client) createSelectedStatisticsRequest(query []byte) web.Request {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/instances/querySelectedStatistics")
@@ -200,7 +200,7 @@ func (c Client) createSelectedStatisticsRequest(query []byte) web.Request {
 	return req
 }
 
-func (c Client) createInstancesRequest() web.Request {
+func (c *Client) createInstancesRequest() web.Request {
 	req := c.Request.Copy()
 	u, _ := url.Parse(req.URL)
 	u.Path = path.Join(u.Path, "/api/instances")

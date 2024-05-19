@@ -23,16 +23,16 @@ type (
 
 // NewStringMatcher create a new matcher with string format
 func NewStringMatcher(s string, startWith, endWith bool) (Matcher, error) {
-	switch {
-	case startWith && endWith:
-		return stringFullMatcher(s), nil
-	case startWith && !endWith:
+	if startWith {
+		if endWith {
+			return stringFullMatcher(s), nil
+		}
 		return stringPrefixMatcher(s), nil
-	case !startWith && endWith:
-		return stringSuffixMatcher(s), nil
-	default:
-		return stringPartialMatcher(s), nil
 	}
+	if endWith {
+		return stringSuffixMatcher(s), nil
+	}
+	return stringPartialMatcher(s), nil
 }
 
 func (m stringFullMatcher) Match(b []byte) bool          { return string(m) == string(b) }

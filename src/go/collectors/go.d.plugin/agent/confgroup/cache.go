@@ -85,7 +85,7 @@ func (c *Cache) addNotEmpty(group *Group) (added, removed []Config) {
 		}
 	}
 
-	if ok && len(set) == 0 {
+	if len(set) == 0 {
 		delete(c.sources, group.Source)
 	}
 

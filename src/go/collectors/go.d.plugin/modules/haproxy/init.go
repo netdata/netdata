@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/go.d.plugin/pkg/web"
 )
 
-func (h Haproxy) validateConfig() error {
+func (h *Haproxy) validateConfig() error {
 	if h.URL == "" {
 		return errors.New("'url' is not set")
 	}
@@ -20,7 +20,7 @@ func (h Haproxy) validateConfig() error {
 	return nil
 }
 
-func (h Haproxy) initPrometheusClient() (prometheus.Prometheus, error) {
+func (h *Haproxy) initPrometheusClient() (prometheus.Prometheus, error) {
 	httpClient, err := web.NewHTTPClient(h.Client)
 	if err != nil {
 		return nil, err
