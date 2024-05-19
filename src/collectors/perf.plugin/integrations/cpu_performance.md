@@ -23,7 +23,7 @@ Module: perf.plugin
 
 This collector monitors CPU performance metrics about cycles, instructions, migrations, cache operations and more.
 
-It uses syscall (2) to open a file descriptior to monitor the perf events.
+It uses syscall (2) to open a file descriptor to monitor the perf events.
 
 This collector is only supported on the following platforms:
 
@@ -31,7 +31,7 @@ This collector is only supported on the following platforms:
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
-It needs setuid to use necessary syscall to collect perf events. Netada sets the permission during installation time.
+It needs setuid to use the necessary syscall to collect perf events. Netdata sets the permission during installation time.
 
 ### Default Behavior
 
@@ -100,7 +100,7 @@ There are no alerts configured by default for this integration.
 If you are [using our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure the `netdata-plugin-perf` package is installed.
 
 
-#### Enable the pref plugin
+#### Enable the perf plugin
 
 The plugin is disabled by default because the number of PMUs is usually quite limited and it is not desired to allow Netdata to struggle silently for PMUs, interfering with other performance monitoring software.
 
@@ -153,7 +153,7 @@ You can get the available options running:
 | Name | Description | Default | Required |
 |:----|:-----------|:-------|:--------:|
 | update every | Data collection frequency. | 1 | no |
-| command options | Command options that specify charts shown by plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`. | 1 | yes |
+| command options | Command options that specify charts shown by the plugin. `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alignment`, `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`. | 1 | yes |
 
 </details>
 
