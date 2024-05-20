@@ -37,7 +37,7 @@ static bool do_memory(PERF_DATA_BLOCK *pDataBlock, int update_every) {
     else if(perflibGetObjectCounter(pDataBlock, pObjectType, &availableKBytes))
         available_bytes = availableKBytes.current.Data * 1024;
     else if(perflibGetObjectCounter(pDataBlock, pObjectType, &availableMBytes))
-        available_bytes = availableMBytes.current.Data * 1024;
+        available_bytes = availableMBytes.current.Data * 1024 * 1024;
 
     common_mem_available(available_bytes, update_every);
 
