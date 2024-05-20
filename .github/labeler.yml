@@ -215,6 +215,12 @@ collectors/timex:
           - any-glob-to-any-file:
               - src/collectors/timex.plugin/**
 
+collectors/windows:
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - src/collectors/windows.plugin/**
+
 collectors/xenstat:
   - any:
       - changed-files:
