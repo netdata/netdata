@@ -5,6 +5,7 @@ package weblog
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"runtime"
 	"strconv"
 	"strings"
@@ -76,6 +77,10 @@ func (w *WebLog) collectLogLines() (int, error) {
 }
 
 func (w *WebLog) collectLogLine() {
+	// https://github.com/netdata/netdata/issues/17716
+	if w.line.hasReqProcTime() && w.line.respCode == http.StatusSwitchingProtocols {
+		w.line.reqProcTime = emptyNumber
+	}
 	w.mx.Requests.Inc()
 	w.collectVhost()
 	w.collectPort()
@@ -309,7 +314,6 @@ func (w *WebLog) collectURLPatternStats(name string) {
 	if w.line.hasRespSize() {
 		v.BytesSent.Add(float64(w.line.respSize))
 	}
-
 	if w.line.hasReqProcTime() {
 		v.ReqProcTime.Observe(w.line.reqProcTime)
 	}
