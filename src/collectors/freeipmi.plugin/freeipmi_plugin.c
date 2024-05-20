@@ -1879,7 +1879,7 @@ int main (int argc, char **argv) {
                             program_name);
 
             }
-            else if (protocol_version < 0 || protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
+            else if (freeimpi_protocol_version < 0 || freeimpi_protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
                 workaround_flags |= IPMI_MONITORING_WORKAROUND_FLAGS_PROTOCOL_VERSION_1_5_NO_AUTH_CODE_CHECK;
 
                 if (debug)
