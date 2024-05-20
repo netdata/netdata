@@ -17,7 +17,7 @@
     "UPDATE aclk_alert_%s SET filtered_alert_unique_id = @new_alert, date_created = UNIXEPOCH() "                      \
     "WHERE filtered_alert_unique_id = @old_alert"
 
-static void update_filtered(ALARM_ENTRY *ae, int64_t unique_id, char *uuid_str)
+static void update_filtered(int64_t new_unique_id, int64_t unique_id, char *uuid_str)
 {
     sqlite3_stmt *res = NULL;
 
@@ -28,12 +28,13 @@ static void update_filtered(ALARM_ENTRY *ae, int64_t unique_id, char *uuid_str)
         return;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param,  ae->unique_id));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param,  unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, new_unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
 
     param = 0;
-    if (likely(sqlite3_step_monitored(res) == SQLITE_DONE))
-        ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
+    int rc = sqlite3_step_monitored(res);
+    if (rc != SQLITE_DONE)
+        error_report("Failed to update_filtered, rc = %d", rc);
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -76,17 +77,13 @@ done:
     "AND hld.alarm_id = @alarm_id AND hl.health_log_id = hld.health_log_id "                                               \
     "ORDER BY hld.rowid DESC LIMIT 1"
 
-static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
+static bool should_send_to_cloud(
+    RRDHOST *host,
+    uint32_t unique_id,
+    uint32_t alert_id,
+    RRDCALC_STATUS new_status)
 {
     sqlite3_stmt *res = NULL;
-
-    if (ae->new_status == RRDCALC_STATUS_UNINITIALIZED ||
-        (ae->new_status == RRDCALC_STATUS_REMOVED &&
-         !(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)))
-        return 0;
-
-    if (unlikely(uuid_is_null(ae->config_hash_id) || !host->aclk_config))
-        return 0;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
 
@@ -101,7 +98,7 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (int) ae->alarm_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, alert_id));
 
     param = 0;
     int rc = sqlite3_step_monitored(res);
@@ -112,12 +109,13 @@ static bool should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
         if (sqlite3_column_type(res, 1) != SQLITE_NULL)
             uuid_copy(config_hash_id, *((nd_uuid_t *)sqlite3_column_blob(res, 1)));
 
-        int64_t unique_id = sqlite3_column_int64(res, 2);
+        int64_t old_unique_id = sqlite3_column_int64(res, 2);
 
-        if (ae->new_status != (RRDCALC_STATUS)status || !uuid_eq(ae->config_hash_id, config_hash_id))
+        if (new_status != status) // || uuid_memcmp(&ae->config_hash_id, &config_hash_id))
             send = true;
-        else
-            update_filtered(ae, unique_id, host->aclk_config->uuid_str);
+        else {
+            update_filtered(unique_id, old_unique_id, host->aclk_config->uuid_str);
+        }
     } else
         send = true;
 
@@ -131,42 +129,38 @@ done:
     "INSERT INTO aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) "                             \
     "VALUES (@alert_unique_id, UNIXEPOCH(), @alert_unique_id) ON CONFLICT (alert_unique_id) DO NOTHING"
 
-void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, bool skip_filter)
+static int sql_queue_alarm_to_aclk(
+    RRDHOST *host,
+    uint32_t unique_id,
+    uint32_t alert_id,
+    RRDCALC_STATUS new_status)
 {
     sqlite3_stmt *res = NULL;
     char sql[ACLK_SYNC_QUERY_SIZE];
 
-    if (!service_running(SERVICE_ACLK))
-        return;
+    if (!should_send_to_cloud(host, unique_id, alert_id, new_status))
+            return 1;
 
-    if (!claimed() || ae->flags & HEALTH_ENTRY_FLAG_ACLK_QUEUED)
-        return;
-
-    if (false == skip_filter && !should_send_to_cloud(host, ae))
-            return;
-
-    if (is_event_from_alert_variable_config(ae->unique_id, &host->host_uuid))
-        return;
+    if (is_event_from_alert_variable_config(unique_id, &host->host_uuid))
+        return 2;
 
     snprintfz(sql, sizeof(sql) - 1, SQL_QUEUE_ALERT_TO_CLOUD, host->aclk_config->uuid_str);
 
     if (!PREPARE_STATEMENT(db_meta, sql, &res))
-        return;
+        return -1;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, ae->unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
 
     param = 0;
     int rc = execute_insert(res);
-    if (unlikely(rc == SQLITE_DONE)) {
-        ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
-        rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-    } else
-        error_report("Failed to store alert event %"PRIu32", rc = %d", ae->unique_id, rc);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to store alert event %"PRIu32", rc = %d", unique_id, rc);
 
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    return 0;
 }
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
@@ -446,22 +440,122 @@ done:
 #endif
 }
 
+typedef struct update_row {
+    int64_t start_row;
+    int64_t end_row;
+} update_row_t;
+
+static int queue_alert_to_cloud_cb(void *data, int argc, char **argv, char **column)
+{
+    update_row_t *row_data = data;
+    UNUSED(argc);
+    UNUSED(column);
+
+    nd_uuid_t host_uuid;
+    nd_uuid_copy(host_uuid, *(nd_uuid_t *) argv[0]);
+
+    int64_t health_log_id = str2uint64_t(argv[1], NULL);
+    uint32_t unique_id = str2uint32_t(argv[2], NULL);
+    uint32_t alarm_id = str2uint32_t(argv[3], NULL);
+    RRDCALC_STATUS old_status = str2uint64_t(argv[4], NULL);
+    RRDCALC_STATUS new_status = str2uint64_t(argv[5], NULL);
+    uint64_t row = str2uint64_t(argv[6], NULL);
+
+    if (row_data->start_row == 0)
+        row_data->start_row = row;
+
+    row_data->end_row = row;
+
+    char host_guid[UUID_STR_LEN];
+    uuid_unparse_lower(host_uuid, host_guid);
+    //netdata_log_info("DEBUG: Processing ALERT FOR %s -- %zu %u status = %d", host_guid, health_log_id, unique_id, new_status);
+
+    char guid[UUID_STR_LEN];
+    uuid_unparse_lower(host_uuid, guid);
+    RRDHOST *host = rrdhost_find_by_guid(guid);
+    if (host) {
+        int rc = sql_queue_alarm_to_aclk(host, unique_id, alarm_id, new_status);
+        if (rc == 1)
+            netdata_log_info("DEBUG: ALERT FOR %s -- %zu %u status = %d  (SKIP STATUS)", host_guid, health_log_id, unique_id, new_status);
+        if (rc == 2)
+            netdata_log_info("DEBUG: ALERT FOR %s -- %zu %u status = %d  (SKIP CONFIG VARIABLE)", host_guid, health_log_id, unique_id, new_status);
+        if (rc == 0)
+            netdata_log_info("DEBUG: ALERT FOR %s -- %zu %u status = %d  QUEUED", host_guid, health_log_id, unique_id, new_status);
+    }
+
+    return 0;
+}
+
+#define SQL_UPDATE_PROCESSED_ROWS "UPDATE health_pending_queue SET date_processed=UNIXEPOCH() WHERE rowid BETWEEN @row1 AND @row2"
+
+static void mark_pending_queue_processed(int64_t row1, int64_t row2)
+{
+    netdata_log_info("DEBUG: PROCESS ROWS (%ld - %ld)", row1, row2);
+
+    sqlite3_stmt *res = NULL;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_UPDATE_PROCESSED_ROWS, &res))
+        return;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, row1));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, row2));
+
+    param = 0;
+    int rc = sqlite3_step_monitored(res);
+    if (rc != SQLITE_DONE)
+        error_report("Failed to update pending alerts rows, rc = %d", rc);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+}
+
+#define SQL_PROCESS_ALERT_PENDING_QUEUE "SELECT host_id, health_log_id, unique_id, alarm_id, old_status, new_status, rowid " \
+        "FROM health_pending_queue WHERE date_processed IS NULL AND date_scheduled <= UNIXEPOCH() ORDER BY rowid ASC "
+
+void sql_process_new_alert_entries(void)
+{
+    update_row_t row_data = { .start_row = 0, .end_row = 0};
+
+    int rc = sqlite3_exec_monitored(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, queue_alert_to_cloud_cb, &row_data, NULL);
+    if (rc != SQLITE_OK)
+        error_report("Failed to scan pending alert queue, rc = %d", rc);
+
+    if (row_data.start_row)
+        mark_pending_queue_processed(row_data.start_row, row_data.end_row);
+}
+
+
 void aclk_push_alert_events_for_all_hosts(void)
 {
     RRDHOST *host;
 
-    dfe_start_reentrant(rrdhost_root_index, host) {
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) ||
-            !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS))
-            continue;
+    // Checking if we shutting down
+    if (!service_running(SERVICE_ACLK))
+        return;
 
-        rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+//    update_row_t row_data = { .start_row = 0, .end_row = 0};
+//
+//    int rc = sqlite3_exec_monitored(db_meta, SQL_PROCESS_ALERT_PENDING_QUEUE, queue_alert_to_cloud_cb, &row_data, NULL);
+//    if (rc != SQLITE_OK)
+//        error_report("Failed to scan pending alert queue, rc = %d", rc);
+//
+//    if (row_data.start_row)
+//        mark_pending_queue_processed(row_data.start_row, row_data.end_row);
 
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (likely(wc))
-            aclk_push_alert_event(wc);
-    }
-    dfe_done(host);
+//    dfe_start_reentrant(rrdhost_root_index, host) {
+//        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) ||
+//            !rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS))
+//            continue;
+//
+//        rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+//
+//        struct aclk_sync_cfg_t *wc = host->aclk_config;
+//        if (likely(wc))
+//            aclk_push_alert_event(wc);
+//    }
+//    dfe_done(host);
 }
 
 void sql_queue_existing_alerts_to_aclk(RRDHOST *host)

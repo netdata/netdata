@@ -55,15 +55,87 @@ done:
 }
 
 /* Health related SQL queries
-   Inserts an entry in the table
+ *
+ * Inserts an entry in the tables
+ *   health_pending_queue
+ *   health_log
+ *   health_log_detail
+ *
 */
 
+int calculate_delay(RRDCALC_STATUS old_status, RRDCALC_STATUS new_status)
+{
+    switch(old_status) {
+        case RRDCALC_STATUS_REMOVED:
+        case RRDCALC_STATUS_UNDEFINED:
+        case RRDCALC_STATUS_UNINITIALIZED:
+            switch (new_status) {
+                case RRDCALC_STATUS_REMOVED:
+                    return 600;
+                default:
+                    return 0;
+            }
+        case RRDCALC_STATUS_CLEAR:
+            switch (new_status) {
+                case RRDCALC_STATUS_REMOVED:
+                case RRDCALC_STATUS_UNINITIALIZED:
+                case RRDCALC_STATUS_UNDEFINED:
+                    return 600;
+                case RRDCALC_STATUS_WARNING:
+                case RRDCALC_STATUS_CRITICAL:
+                default:
+                    return 0;
+            }
+            break;
+        case RRDCALC_STATUS_WARNING:
+        case RRDCALC_STATUS_CRITICAL:
+        default:
+            return 0;
+    }
+    return 0;
+}
+
+#ifdef ENABLE_ACLK
+#define SQL_INSERT_ALERT_PENDING_QUEUE                                                                                 \
+    "INSERT INTO health_pending_queue (host_id, health_log_id, unique_id, alarm_id, old_status, new_status, date_scheduled) "    \
+    "  VALUES (@host_id, @health_log_id, @unique_id, @alarm_id, @old_status, @new_status, UNIXEPOCH() + @delay) "
+
+static void sql_insert_alert_pending_queue(RRDHOST *host, uint64_t health_log_id, ALARM_ENTRY *ae)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc;
+
+    if (!PREPARE_COMPILED_STATEMENT(db_meta, SQL_INSERT_ALERT_PENDING_QUEUE, &res))
+        return;
+
+    int submit_delay = calculate_delay(ae->old_status, ae->new_status);
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->alarm_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->old_status));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->new_status));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, submit_delay));
+
+    param = 0;
+    rc = execute_insert(res);
+    if (rc != SQLITE_DONE)
+        error_report(
+            "HEALTH [%s]: Failed to execute sql_insert_alert_pending_queue, rc = %d", rrdhost_hostname(host), rc);
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_RESET(res);
+}
+#endif
 
 #define SQL_INSERT_HEALTH_LOG_DETAIL                                                                                         \
     "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id, "                                    \
     "updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, "  \
     "info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, transition_id, global_id, summary) " \
-    "VALUES (@health_log_id,@unique_id,@alarm_id,@alarm_event_id,@updated_by_id,@updates_id,@when_key,@duration,"            \
+    " VALUES (@health_log_id,@unique_id,@alarm_id,@alarm_event_id,@updated_by_id,@updates_id,@when_key,@duration,"           \
     "@non_clear_duration,@flags,@exec_run_timestamp,@delay_up_to_timestamp, @info,@exec_code,@new_status,@old_status,"       \
     "@delay,@new_value,@old_value,@last_repeat,@transition_id,@global_id,@summary)"
 
@@ -150,6 +222,10 @@ static void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae)
     if (rc == SQLITE_ROW) {
         health_log_id = (size_t)sqlite3_column_int64(res, 0);
         sql_health_alarm_log_insert_detail(host, health_log_id, ae);
+#ifdef ENABLE_ACLK
+        if (netdata_cloud_enabled)
+            sql_insert_alert_pending_queue(host, health_log_id, ae);
+#endif
     } else
         error_report("HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG, rc = %d", rrdhost_hostname(host), rc);
 
@@ -162,14 +238,8 @@ void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 {
     if (ae->flags & HEALTH_ENTRY_FLAG_SAVED)
         sql_health_alarm_log_update(host, ae);
-    else {
+    else
         sql_health_alarm_log_insert(host, ae);
-#ifdef ENABLE_ACLK
-        if (netdata_cloud_enabled) {
-            sql_queue_alarm_to_aclk(host, ae, false);
-        }
-#endif
-    }
 }
 
 /*
@@ -489,7 +559,6 @@ void sql_alert_cleanup(bool cli)
 void sql_health_alarm_log_load(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
-    int ret;
     ssize_t errored = 0, loaded = 0;
 
     if (!REQUIRE_DB(db_meta))
@@ -508,7 +577,6 @@ void sql_health_alarm_log_load(RRDHOST *host)
 
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        netdata_log_info("DEBUG: CALC = %s", rrdcalc_name(rc));
         dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));
     }
     foreach_rrdcalc_in_rrdhost_done(rc);

@@ -4,7 +4,8 @@
 
 // ----------------------------------------------------------------------------
 
-inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
+inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
+{
     sql_health_alarm_log_save(host, ae);
 }
 

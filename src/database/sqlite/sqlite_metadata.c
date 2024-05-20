@@ -67,6 +67,9 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_7 on health_log_detail (alarm_id)",
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
 
+    "CREATE TABLE IF NOT EXISTS health_pending_queue "
+    " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, old_status INT, new_status INT, date_scheduled INT, date_processed INT)",
+
     "CREATE TABLE IF NOT EXISTS health_log_version (health_log_id INTEGER PRIMARY KEY, version INTEGER)",
     "CREATE TABLE IF NOT EXISTS health_log_version_history (health_log_id INTEGER, alert_id INTEGER, when_key INTEGER)",
 

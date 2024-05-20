@@ -26,7 +26,8 @@ void aclk_push_alarm_checkpoint(RRDHOST *host);
 void aclk_push_alert_snapshot_event(char *node_id);
 void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, char *snapshot_uuid);
 int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert_status);
-void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, bool skip_filter);
+//void sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, bool skip_filter);
+void sql_process_new_alert_entries(void);
 void aclk_push_alert_events_for_all_hosts(void);
 
 #endif //NETDATA_SQLITE_ACLK_ALERT_H
