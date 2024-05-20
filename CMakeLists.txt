@@ -589,11 +589,10 @@ if(NOT TARGET PkgConfig::TLS)
         else()
             message(FATAL_ERROR "OpenSSL (or LibreSSL) is required for building Netdata, but could not be found.")
         endif()
+else()
+        pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
 endif()
 
-if(NOT MACOS)
-        pkg_check_modules(CRYPTO IMPORTED_TARGET libcrypto)
-endif()
 
 #
 # figure out if we need protoc/protobuf
