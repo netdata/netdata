@@ -78,8 +78,8 @@ func (w *WebLog) collectLogLines() (int, error) {
 
 func (w *WebLog) collectLogLine() {
 	// https://github.com/netdata/netdata/issues/17716
-	if w.line.respCode == http.StatusSwitchingProtocols {
-		w.line.reqProcTime = 0
+	if w.line.hasReqProcTime() && w.line.respCode == http.StatusSwitchingProtocols {
+		w.line.reqProcTime = emptyNumber
 	}
 	w.mx.Requests.Inc()
 	w.collectVhost()
