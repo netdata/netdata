@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- some markdown fixes [\#17703](https://github.com/netdata/netdata/pull/17703) ([ilyam8](https://github.com/ilyam8))
+- go.d fix some JB code inspection issues [\#17702](https://github.com/netdata/netdata/pull/17702) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations.js [\#17701](https://github.com/netdata/netdata/pull/17701) ([netdatabot](https://github.com/netdatabot))
+- Corrected grammar and mispelling [\#17699](https://github.com/netdata/netdata/pull/17699) ([zallaevan](https://github.com/zallaevan))
 - go.d dyncfg rm space yaml contentType [\#17698](https://github.com/netdata/netdata/pull/17698) ([ilyam8](https://github.com/ilyam8))
 - Revert "Support to WolfSSL \(Step 1\)" [\#17697](https://github.com/netdata/netdata/pull/17697) ([stelfrag](https://github.com/stelfrag))
 - fix sender parsing when receiving remote input [\#17696](https://github.com/netdata/netdata/pull/17696) ([ktsaou](https://github.com/ktsaou))
@@ -19,6 +23,7 @@
 - Regenerate integrations.js [\#17683](https://github.com/netdata/netdata/pull/17683) ([netdatabot](https://github.com/netdatabot))
 - Re-enable ML for RHEL 7 and AL 2 RPM packages. [\#17682](https://github.com/netdata/netdata/pull/17682) ([Ferroin](https://github.com/Ferroin))
 - add go.d/rspamd [\#17679](https://github.com/netdata/netdata/pull/17679) ([ilyam8](https://github.com/ilyam8))
+- Do not specify linker in compilation flags. [\#17677](https://github.com/netdata/netdata/pull/17677) ([vkalintiris](https://github.com/vkalintiris))
 - Regenerate integrations.js [\#17676](https://github.com/netdata/netdata/pull/17676) ([netdatabot](https://github.com/netdatabot))
 - fix broken links and links pointing to Learn [\#17675](https://github.com/netdata/netdata/pull/17675) ([Ancairon](https://github.com/Ancairon))
 - add rspamd to apps\_groups.conf [\#17674](https://github.com/netdata/netdata/pull/17674) ([ilyam8](https://github.com/ilyam8))
@@ -347,7 +352,6 @@
 - Move bundling of JSON-C to CMake. [\#17207](https://github.com/netdata/netdata/pull/17207) ([Ferroin](https://github.com/Ferroin))
 - Compatibility with Prometheus HELP [\#17191](https://github.com/netdata/netdata/pull/17191) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add label for cgroup [\#17156](https://github.com/netdata/netdata/pull/17156) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix action lints [\#17120](https://github.com/netdata/netdata/pull/17120) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.45.4](https://github.com/netdata/netdata/tree/v1.45.4) (2024-05-08)
 
@@ -423,8 +427,6 @@
 - Fix login to GHCR when publishing Docker images. [\#17127](https://github.com/netdata/netdata/pull/17127) ([Ferroin](https://github.com/Ferroin))
 - Detect self thread when exiting. [\#17126](https://github.com/netdata/netdata/pull/17126) ([vkalintiris](https://github.com/vkalintiris))
 - fix health alert dyncfg schema fullPage option [\#17125](https://github.com/netdata/netdata/pull/17125) ([ilyam8](https://github.com/ilyam8))
-- improve go.d.plugin dyncfg config schemas [\#17124](https://github.com/netdata/netdata/pull/17124) ([ilyam8](https://github.com/ilyam8))
-- minor fix; broken link on on prem installation doc [\#17118](https://github.com/netdata/netdata/pull/17118) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 
