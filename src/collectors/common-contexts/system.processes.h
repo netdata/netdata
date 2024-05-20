@@ -32,6 +32,34 @@ static inline void common_system_processes(uint64_t running, uint64_t blocked, i
     rrddim_set_by_pointer(st_processes, rd_running, running);
     rrdset_done(st_processes);
 }
+
+// EBPF COUNTER PART
+static inline void common_system_processes_threads(uint64_t threads, int update_every) {
+    static RRDSET *st_processes = NULL;
+    static RRDDIM *rd_threads = NULL;
+
+    if(unlikely(!st_processes)) {
+        st_processes = rrdset_create_localhost(
+             "system"
+            , "threads"
+            , NULL
+            , "processes"
+            , NULL
+            , "Threads"
+            , "threads"
+            , _COMMON_PLUGIN_NAME
+            , _COMMON_PLUGIN_MODULE_NAME
+            , NETDATA_CHART_PRIO_WINDOWS_THREADS
+            , update_every
+            , RRDSET_TYPE_LINE
+            );
+
+        rd_threads = rrddim_add(st_processes, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(st_processes, rd_threads, threads);
+    rrdset_done(st_processes);
+}
 #endif
 
 #if defined(COMPILED_FOR_LINUX)
