@@ -256,6 +256,40 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         uuid_unparse_lower(*node_id, wc->node_id);
 }
 
+#define SQL_SET_HOST_LABEL                                                                                             \
+    "INSERT INTO host_label (host_id, source_type, label_key, label_value, date_created) "                             \
+    "VALUES (@host_id, @source_type, @label_key, @label_value, UNIXEPOCH()) ON CONFLICT (host_id, label_key) "         \
+    " DO UPDATE SET source_type = excluded.source_type, label_value=excluded.label_value, date_created=UNIXEPOCH()"
+
+bool sql_set_host_label(nd_uuid_t *host_id, const char *label_key, const char *label_value)
+{
+    sqlite3_stmt *res = NULL;
+    bool status = false;
+
+    if (!label_key || !label_value || !host_id)
+        return false;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_SET_HOST_LABEL, &res))
+        return 1;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, RRDLABEL_SRC_AUTO));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, label_key, -1, SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_text(res, ++param, label_value, -1, SQLITE_STATIC));
+
+    param = 0;
+    int rc = execute_insert(res);
+    status = (rc == SQLITE_DONE);
+    if (false == status)
+        error_report("Failed to store node instance information, rc = %d", rc);
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+    return status;
+}
+
+
 #define SQL_UPDATE_NODE_ID  "UPDATE node_instance SET node_id = @node_id WHERE host_id = @host_id"
 
 int update_node_id(nd_uuid_t *host_id, nd_uuid_t *node_id)

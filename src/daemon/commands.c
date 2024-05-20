@@ -47,6 +47,7 @@ static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
 static cmd_status_t cmd_version(char *args, char **message);
 static cmd_status_t cmd_dumpconfig(char *args, char **message);
+static cmd_status_t cmd_remove_node(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -61,7 +62,8 @@ static command_info_t command_info_array[] = {
         {"ping", cmd_ping_execute, CMD_TYPE_ORTHOGONAL},
         {"aclk-state", cmd_aclk_state, CMD_TYPE_ORTHOGONAL},
         {"version", cmd_version, CMD_TYPE_ORTHOGONAL},
-        {"dumpconfig", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL}
+        {"dumpconfig", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL},
+        {"remove-stale-node", cmd_remove_node, CMD_TYPE_ORTHOGONAL}
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -129,6 +131,8 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Returns current state of ACLK and Cloud connection. (optionally in json).\n"
              "dumpconfig\n"
              "    Returns the current netdata.conf on stdout.\n"
+             "remove-stale-node node_id|machine_guid\n"
+             "    Unregisters and removes a node from the cloud.\n"
              "version\n"
              "    Returns the netdata version.\n",
              MAX_COMMAND_LENGTH - 1);
@@ -321,6 +325,54 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
 
     BUFFER *wb = buffer_create(1024, NULL);
     config_generate(wb, 0);
+    *message = strdupz(buffer_tostring(wb));
+    buffer_free(wb);
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_remove_node(char *args, char **message)
+{
+    (void)args;
+
+    BUFFER *wb = buffer_create(1024, NULL);
+    if (strlen(args) == 0) {
+        buffer_sprintf(wb, "Please specify a machine or node UUID");
+        goto done;
+    }
+
+    RRDHOST *host = NULL;
+    host = rrdhost_find_by_guid(args);
+    if (!host)
+        host = find_host_by_node_id(args);
+
+    if (!host)
+        buffer_sprintf(wb, "Node with machine or node UUID \"%s\" not found", args);
+    else {
+
+        if (host == localhost) {
+            buffer_sprintf(wb, "You cannot unregister the parent node");
+            goto done;
+        }
+
+        if (rrdhost_is_online(host)) {
+            buffer_sprintf(wb, "Cannot unregister a live node");
+            goto done;
+        }
+
+        if (!rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST)) {
+            rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+            sql_set_host_label(&host->host_uuid, "_is_ephemeral", "true");
+            aclk_host_state_update(host, 0, 0);
+            unregister_node(host->machine_guid);
+            freez(host->node_id);
+            host->node_id = NULL;
+            buffer_sprintf(wb, "Unregistering node with machine guid %s, hostname = %s", host->machine_guid, rrdhost_hostname(host));
+        }
+        else
+            buffer_sprintf(wb, "Node with machine guid %s, hostname = %s is already unregistered", host->machine_guid, rrdhost_hostname(host));
+    }
+
+done:
     *message = strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return CMD_STATUS_SUCCESS;
