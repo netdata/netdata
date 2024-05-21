@@ -1,13 +1,3 @@
-<!--
-title: "Common configuration changes"
-description: "See the most popular configuration changes to make to the Netdata Agent, including longer metrics retention, reduce sampling, and more."
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/common-configuration-changes.md"
-sidebar_label: "Common configuration changes"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Configuration"
--->
-
 # Common configuration changes
 
 The Netdata Agent requires no configuration upon installation to collect thousands of per-second metrics from most
@@ -15,14 +5,14 @@ systems, containers, and applications, but there are hundreds of settings to twe
 over your monitoring platform.
 
 This document assumes familiarity with
-using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) from the Netdata config
+using [`edit-config`](/docs/netdata-agent/configuration/README.md) from the Netdata config
 directory.
 
 ## Change dashboards and visualizations
 
-The Netdata Agent's [local dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md), accessible
+The Netdata Agent's [local dashboard](/docs/dashboards-and-charts/README.md), accessible
 at `http://NODE:19999` is highly configurable. If
-you use [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/README.md)
+you use [Netdata Cloud](/docs/netdata-cloud/README.md)
 for infrastructure monitoring, you
 will see many of these
 changes reflected in those visualizations due to the way Netdata Cloud proxies metric data and metadata to your browser.
@@ -30,15 +20,15 @@ changes reflected in those visualizations due to the way Netdata Cloud proxies m
 ### Increase the long-term metrics retention period
 
 Read our doc
-on [increasing long-term metrics storage](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md)
+on [increasing long-term metrics storage](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md)
 for details, including a
-[calculator](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
+[calculator](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 to help you determine the exact settings for your desired retention period.
 
 ### Reduce the data collection frequency
 
 Change `update every` in
-the [`[global]` section](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md#global-section-options)
+the [`[global]` section](/src/daemon/config/README.md#global-section-options)
 of `netdata.conf` so
 that it is greater than `1`. An `update every` of `5` means the Netdata Agent enforces a _minimum_ collection frequency
 of 5 seconds.
@@ -51,13 +41,13 @@ of 5 seconds.
 Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
 `python.d.conf` or `charts.d.conf` files, or in individual collector configuration files. If the `update
 every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See
-the [enable or configure a collector](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module)
+the [enable or configure a collector](/src/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module)
 doc for details.
 
 ### Disable a collector or plugin
 
 Turn off entire plugins in
-the [`[plugins]` section](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md#plugins-section-options)
+the [`[plugins]` section](/src/daemon/config/README.md#plugins-section-options)
 of
 `netdata.conf`.
 
@@ -83,9 +73,9 @@ sudo ./edit-config health.d/example-alert.conf
 
 Or, append your new alert to an existing file by editing a relevant existing file in the `health.d/` directory.
 
-Read more about [configuring alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) to
+Read more about [configuring alerts](/src/health/REFERENCE.md) to
 get started, and see
-the [health monitoring reference](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) for a full listing
+the [health monitoring reference](/src/health/REFERENCE.md) for a full listing
 of options available in health entities.
 
 ### Configure a specific alert
@@ -94,7 +84,7 @@ Tweak existing alerts by editing files in the `health.d/` directory. For example
 the Agent responds to anomalies related to CPU utilization.
 
 To see which configuration file you need to edit to configure a specific
-alert, [view your active alerts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md) in
+alert, [view your active alerts](/docs/dashboards-and-charts/alerts-tab.md) in
 Netdata Cloud or the local Agent dashboard and look for the **source** line. For example, it might
 read `source  4@/usr/lib/netdata/conf.d/health.d/cpu.conf`.
 
@@ -116,13 +106,12 @@ template: disk_fill_rate
 ### Turn of all alerts and notifications
 
 Set `enabled` to `no` in
-the [`[health]`](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md#health-section-options)
+the [`[health]`](/src/daemon/config/README.md#health-section-options)
 section of `netdata.conf`.
 
 ### Enable alert notifications
 
-Open `health_alarm_notify.conf` for editing. First, read the [enabling
-notifications](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/README.md#netdata-agent) doc
+Open `health_alarm_notify.conf` for editing. First, read the [enabling notifications](/docs/alerts-and-notifications/notifications/README.md#netdata-agent) doc
 for an example of the process using Slack, then
 click on the link to your preferred notification method to find documentation for that specific endpoint.
 
@@ -131,12 +120,12 @@ click on the link to your preferred notification method to find documentation fo
 While the Netdata Agent is both [open and secure by design](https://www.netdata.cloud/blog/netdata-agent-dashboard/), we
 recommend every user take some action to administer and secure their nodes.
 
-Learn more about the available options in the [security design documentation](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
+Learn more about the available options in the [security design documentation](/docs/security-and-privacy-design/README.md).
 
 ## Reduce resource usage
 
 Read
-our [performance optimization guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md)
+our [performance optimization guide](/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md)
 for a long list of specific changes
 that can reduce the Netdata Agent's CPU/memory footprint and IO requirements.
 
@@ -147,7 +136,7 @@ and as metadata to Netdata Cloud, and help you organize the metrics coming from 
 defined in the section `[host labels]`.
 
 For a quick introduction, read
-the [host label guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md).
+the [host label guide](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md).
 
 The following restrictions apply to host label names:
 
