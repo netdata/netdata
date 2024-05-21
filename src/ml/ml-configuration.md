@@ -1,12 +1,12 @@
 # ML Configuration
 
-Netdata's [Machine Learning](https://github.com/netdata/netdata/blob/master/src/ml/README.md) capabilities are enabled by default.
+Netdata's [Machine Learning](/src/ml/README.md) capabilities are enabled by default.
 
 To enable or disable Machine Learning capabilities on a node:
 
-1. [Edit `netdata.conf`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-netdataconf)
+1. [Edit `netdata.conf`](/docs/netdata-agent/configuration/README.md#edit-netdataconf)
 2. In the `[ml]` section, set `enabled = yes` to enable or `enabled = no` to disable
-3. [Restart Netdata](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/start-stop-restart.md)
+3. [Restart Netdata](/docs/netdata-agent/start-stop-restart.md)
 
 Below is a list of all the available configuration params and their default values.
 
@@ -38,7 +38,7 @@ Below is a list of all the available configuration params and their default valu
 
 If you would like to run ML on a parent instead of at the edge, some configuration options are illustrated below.
 
-This example assumes 3 child nodes [streaming](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/metrics-centralization-points/README.md) to 1 parent node and illustrates the main ways you might want to configure running ML for the children on the parent, running ML on the children themselves, or even a mix of approaches.
+This example assumes 3 child nodes [streaming](/docs/observability-centralization-points/metrics-centralization-points/README.md) to 1 parent node and illustrates the main ways you might want to configure running ML for the children on the parent, running ML on the children themselves, or even a mix of approaches.
 
 ```mermaid
 flowchart BT

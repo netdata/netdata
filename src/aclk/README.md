@@ -15,7 +15,7 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
 >This list of IPs can change without notice, we strongly advise you to whitelist following domains `app.netdata.cloud`, `mqtt.netdata.cloud`, if this is not an option in your case always verify the current domain resolution (e.g via the `host` command).
 
 For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [connect to Cloud
-documentation](https://github.com/netdata/netdata/blob/master/src/claim/README.md).
+documentation](/src/claim/README.md).
 
 ## Data privacy
 
@@ -24,7 +24,7 @@ you. This is why **we don't store any metric data in Netdata Cloud**.
 
 All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata Agent to the Netdata Cloud dashboard. The data passes through our systems, but it isn't stored.
 
-However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_. Read more about our [security and privacy design](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
+However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_. Read more about our [security and privacy design](/docs/security-and-privacy-design/README.md).
 
 ## Enable and configure the ACLK
 
@@ -39,7 +39,7 @@ configuration uses two settings:
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
-connecting to cloud](https://github.com/netdata/netdata/blob/master/src/claim/README.md#connect-through-a-proxy).
+connecting to cloud](/src/claim/README.md#connect-through-a-proxy).
 
 You can configure following keys in the `netdata.conf` section `[cloud]`:
 ```
@@ -58,8 +58,8 @@ You have two options if you prefer to disable the ACLK and not use Netdata Cloud
 ### Disable at installation
 
 You can pass the `--disable-cloud` parameter to the Agent installation when using a kickstart script
-([kickstart.sh](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md), or a [manual installation from
-Git](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md).
+([kickstart.sh](/packaging/installer/methods/kickstart.md), or a [manual installation from
+Git](/packaging/installer/methods/manual.md).
 
 When you pass this parameter, the installer does not download or compile any extra libraries. Once running, the Agent
 kills the thread responsible for the ACLK and connecting behavior, and behaves as though the ACLK, and thus Netdata Cloud,
@@ -113,12 +113,12 @@ Restart your Agent to disable the ACLK.
 ### Re-enable the ACLK
 
 If you first disable the ACLK and any Cloud functionality and then decide you would like to use Cloud, you must either
-[reinstall Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md) with Cloud enabled or change the runtime setting in your
+[reinstall Netdata](/packaging/installer/REINSTALL.md) with Cloud enabled or change the runtime setting in your
 `cloud.conf` file.
 
 If you passed `--disable-cloud` to `netdata-installer.sh` during installation, you must
-[reinstall](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md) your Agent. Use the same method as before, but pass `--require-cloud` to
-the installer. When installation finishes you can [connect your node](https://github.com/netdata/netdata/blob/master/src/claim/README.md#how-to-connect-a-node).
+[reinstall](/packaging/installer/REINSTALL.md) your Agent. Use the same method as before, but pass `--require-cloud` to
+the installer. When installation finishes you can [connect your node](/src/claim/README.md#how-to-connect-a-node).
 
 If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` file, edit the file again and change
 `enabled` to `yes`:
@@ -128,6 +128,6 @@ If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` 
     enabled = yes
 ```
 
-Restart your Agent and [connect your node](https://github.com/netdata/netdata/blob/master/src/claim/README.md#how-to-connect-a-node).
+Restart your Agent and [connect your node](/src/claim/README.md#how-to-connect-a-node).
 
 

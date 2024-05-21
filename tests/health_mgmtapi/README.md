@@ -9,7 +9,7 @@ learn_rel_path: "Developers"
 
 # Health command API tester
 
-The directory `tests/health_cmdapi` contains the test script `health-cmdapi-test.sh` for the [health command API](https://github.com/netdata/netdata/blob/master/src/web/api/health/README.md).
+The directory `tests/health_cmdapi` contains the test script `health-cmdapi-test.sh` for the [health command API](/src/web/api/health/README.md).
 
 The script can be executed with options to prepare the system for the tests, run them and restore the system to its previous state. 
 

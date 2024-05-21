@@ -83,12 +83,12 @@ modules:
               required: false
             - name: queues_filter
               description: |
-                Queues filter. Syntax is [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+                Queues filter. Syntax is [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
               default_value: ""
               required: false
             - name: topics_filter
               description: |
-                Topics filter. Syntax is [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+                Topics filter. Syntax is [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
               default_value: ""
               required: false
             - name: username

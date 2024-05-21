@@ -19,7 +19,7 @@ This module produces example charts with random values. Number of charts, dimens
 ## Configuration
 
 Edit the `go.d/example.conf` configuration file using `edit-config` from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`.
+Netdata [config directory](/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata # Replace this path with your Netdata config directory

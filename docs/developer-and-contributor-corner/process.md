@@ -37,16 +37,16 @@ With Netdata's process monitoring, you can:
 
 ## Prerequisites
 
-- One or more Linux nodes running [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
+- One or more Linux nodes running [Netdata](/packaging/installer/README.md)
 - A general understanding of how
-  to [configure the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md)
+  to [configure the Netdata Agent](/docs/netdata-agent/configuration/README.md)
   using `edit-config`.
 - A Netdata Cloud account. [Sign up](https://app.netdata.cloud) if you don't have one already.
 
 ## How does Netdata do process monitoring?
 
 The Netdata Agent already knows to look for hundreds
-of [standard applications that we support via collectors](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md),
+of [standard applications that we support via collectors](/src/collectors/COLLECTORS.md),
 and groups them based on their
 purpose. Let's say you want to monitor a MySQL
 database using its process. The Netdata Agent already knows to look for processes with the string `mysqld` in their
@@ -55,12 +55,12 @@ process-specific charts.
 
 The process and groups settings are used by two unique and powerful collectors.
 
-[**`apps.plugin`**](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/README.md) looks at the Linux
+[**`apps.plugin`**](/src/collectors/apps.plugin/README.md) looks at the Linux
 process tree every second, much like `top` or
 `ps fax`, and collects resource utilization information on every running process. It then automatically adds a layer of
 meaningful visualization on top of these metrics, and creates per-process/application charts.
 
-[**`ebpf.plugin`**](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/README.md): Netdata's extended
+[**`ebpf.plugin`**](/src/collectors/ebpf.plugin/README.md): Netdata's extended
 Berkeley Packet Filter (eBPF) collector
 monitors Linux kernel-level metrics for file descriptors, virtual filesystem IO, and process management, and then hands
 process-specific metrics over to `apps.plugin` for visualization. The eBPF collector also collects and visualizes
@@ -130,7 +130,7 @@ aware of hundreds of processes, and collects metrics from them automatically.
 But, if you want to change the grouping behavior, add an application that isn't yet supported in the Netdata Agent, or
 monitor a custom application, you need to edit the `apps_groups.conf` configuration file.
 
-Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) and
+Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md) and
 use `edit-config` to edit the file.
 
 ```bash
@@ -146,7 +146,7 @@ others, and groups them into `sql`. That makes sense, since all these processes 
 sql: mysqld* mariad* postgres* postmaster* oracle_* ora_* sqlservr
 ```
 
-These groups are then reflected as [dimensions](https://github.com/netdata/netdata/blob/master/src/web/README.md#dimensions)
+These groups are then reflected as [dimensions](/src/web/README.md#dimensions)
 within Netdata's charts.
 
 ![An example per-process CPU utilization chart in Netdata
@@ -180,7 +180,7 @@ sql: mariad* postmaster* oracle_* ora_* sqlservr
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or
-the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to start collecting utilization metrics
+the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to start collecting utilization metrics
 from your application. Time to [visualize your process metrics](#visualize-process-metrics).
 
 ### Custom applications
@@ -207,7 +207,7 @@ custom-app: custom-app
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or
-the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to start collecting utilization metrics
+the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system, to start collecting utilization metrics
 from your application.
 
 ## Visualize process metrics

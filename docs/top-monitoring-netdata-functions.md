@@ -7,7 +7,7 @@ executed on the node/host where the function is made available.
 
 Collectors besides the metric collection, storing, and/or streaming work are capable of executing specific routines on request. These routines will bring additional information to help you troubleshoot or even trigger some action to happen on the node itself.
 
-For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes functions - [plugins.d](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#function).
+For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes functions - [plugins.d](/src/collectors/plugins.d/README.md#function).
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ The following is required to be able to run Functions from Netdata Cloud.
 | Ipmi-sensors       | Readings and status of IPMI sensors.                                                                                                                           | `ipmi-sensors`                  | no            | [freeipmi](https://github.com/netdata/netdata/tree/master/src/collectors/freeipmi.plugin#readme)               |
 | Mount-points       | Disk usage for each mount point, including used and available space, both in terms of percentage and actual bytes, as well as used and available inode counts. | `df`                            | no            | [diskspace](https://github.com/netdata/netdata/tree/master/src/collectors/diskspace.plugin#readme)             |
 | Network-interfaces | Network traffic, packet drop rates, interface states, MTU, speed, and duplex mode for all network interfaces.                                                  | `bmon`, `bwm-ng`                | no            | [proc](https://github.com/netdata/netdata/tree/master/src/collectors/proc.plugin#readme)                       |
-| Processes          | Real-time information about the system's resource usage, including CPU utilization, memory consumption, and disk IO for every running process.                 | `top`, `htop`                   | yes           | [apps](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/README.md)                    |
+| Processes          | Real-time information about the system's resource usage, including CPU utilization, memory consumption, and disk IO for every running process.                 | `top`, `htop`                   | yes           | [apps](/src/collectors/apps.plugin/README.md)                    |
 | Systemd-journal    | Viewing, exploring and analyzing systemd journal logs.                                                                                                         | `journalctl`                    | yes           | [systemd-journal](https://github.com/netdata/netdata/tree/master/src/collectors/systemd-journal.plugin#readme) |
 | Systemd-list-units | Information about all systemd units, including their active state, description, whether or not they are enabled, and more.                                     | `systemctl list-units`          | yes           | [systemd-journal](https://github.com/netdata/netdata/tree/master/src/collectors/systemd-journal.plugin#readme) |
 | Systemd-services   | System resource utilization for all running systemd services: CPU, memory, and disk IO.                                                                        | `systemd-cgtop`                 | no            | [cgroups](https://github.com/netdata/netdata/tree/master/src/collectors/cgroups.plugin#readme)                 |
@@ -40,7 +40,7 @@ Via streaming, the definitions of functions are transmitted to a parent node, so
 
 Since these functions are able to execute routines on the node and due to the potential use cases that they can cover, our concern is to ensure no sensitive information or disruptive actions are exposed through the Agent's API.
 
-With the communication between the Netdata Agent and Netdata Cloud being through [ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md) this concern is addressed.
+With the communication between the Netdata Agent and Netdata Cloud being through [ACLK](/src/aclk/README.md) this concern is addressed.
 
 ## Feedback
 

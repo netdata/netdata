@@ -9,7 +9,7 @@ learn_rel_path: "Developers/Web/Api/Formatters"
 
 # JSON formatter
 
-The CSV formatter presents [results of database queries](https://github.com/netdata/netdata/blob/master/src/web/api/queries/README.md) in the following formats:
+The CSV formatter presents [results of database queries](/src/web/api/queries/README.md) in the following formats:
 
 | format       | content type     | description|
 |:----:|:----------:|:----------|

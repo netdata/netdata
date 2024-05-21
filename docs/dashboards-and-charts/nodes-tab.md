@@ -1,6 +1,6 @@
 # Nodes tab
 
-The nodes tab provides a summarized view of your [War Room](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms), allowing you to view quick information per node.
+The nodes tab provides a summarized view of your [War Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms), allowing you to view quick information per node.
 
 > **Tip**  
 >
@@ -28,7 +28,7 @@ Each node row allows you to:
 - View Machine Learning status
 - View Functions capability status
 - Add configuration (beta)
-- [Add alert silencing rules](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md)
+- [Add alert silencing rules](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md)
 - View a set of key attributes collected on your node
 
 ## Right bar

@@ -67,4 +67,4 @@ Static builds usually miss certain features that require operating-system suppor
 - systemd-journal features
 - eBPF related features
 
-When platforms are removed from the [Binary Distribution Packages](https://github.com/netdata/netdata/blob/master/packaging/makeself/README.md) list, they default to install or update Netdata to a static build. This may mean that after platforms become EOL, Netdata on them may lose some of its features. We recommend upgrading the operating system before it becomes EOL, to continue using all the features of Netdata.
+When platforms are removed from the [Binary Distribution Packages](/packaging/makeself/README.md) list, they default to install or update Netdata to a static build. This may mean that after platforms become EOL, Netdata on them may lose some of its features. We recommend upgrading the operating system before it becomes EOL, to continue using all the features of Netdata.

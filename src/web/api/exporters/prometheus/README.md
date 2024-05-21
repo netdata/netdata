@@ -9,6 +9,6 @@ learn_rel_path: "Developers/Web/Api/Exporters"
 
 # Prometheus exporter
 
-Read the Prometheus exporter documentation: [Using Netdata with Prometheus](https://github.com/netdata/netdata/blob/master/src/exporting/prometheus/README.md).
+Read the Prometheus exporter documentation: [Using Netdata with Prometheus](/src/exporting/prometheus/README.md).
 
 

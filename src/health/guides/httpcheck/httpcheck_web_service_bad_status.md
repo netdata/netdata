@@ -18,4 +18,4 @@ root@netdata # curl -v <your_http_endpoint>:<port>/<path>
 
 ### Useful resources
 
-1. [HTTP endpoint monitoring with Netdata](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/httpcheck/integrations/http_endpoints.md)
+1. [HTTP endpoint monitoring with Netdata](/src/go/collectors/go.d.plugin/modules/httpcheck/integrations/http_endpoints.md)

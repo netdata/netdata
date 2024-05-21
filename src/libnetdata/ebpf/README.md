@@ -9,5 +9,5 @@ learn_rel_path: "Developers/libnetdata"
 
 # eBPF library
 
-Netdata's eBPF library supports the [eBPF collector](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/README.md).
+Netdata's eBPF library supports the [eBPF collector](/src/collectors/ebpf.plugin/README.md).
 

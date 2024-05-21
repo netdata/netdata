@@ -1,7 +1,7 @@
 # Connect Agent to Cloud
 
 This guide walks you through the process of securely connecting a Netdata Agent to Netdata Cloud via the encrypted
-Agent-Cloud Link ([ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md)).
+Agent-Cloud Link ([ACLK](/src/aclk/README.md)).
 
 When connecting an Agent (also known as a node) to Netdata Cloud, it's essential to complete a verification process.
 This process ensures that you have the necessary authorization level to manage the node effectively. Verification serves
@@ -36,7 +36,7 @@ There are three main ways to connect your node to Netdata Cloud:
   right away.
 - From the [Space Management screen](#manage-space-or-war-room-area): Click "Connect Nodes" to add a new node to your
   existing Space.
-- From the [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md): While you can see
+- From the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md): While you can see
   connected nodes here, the connection process itself happens in the Space Management screen.
 
 ### Empty War Room
@@ -73,7 +73,7 @@ Connecting a Node to a War Room:
    terminal window. Press Enter to initiate the connection process.
 
 > Note: When connecting from
-> the [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md), the room parameter will
+> the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md), the room parameter will
 > be
 > set to the current War Room.
 
@@ -105,14 +105,14 @@ Refer to the [Connect an Agent without root privileges section](#connect-an-agen
 details.
 
 For in-depth information about the optional parameters `--claim-token`, `--claim-rooms`, and `--claim-url`,
-see [Connect node to Netdata Cloud during installation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#connect-node-to-netdata-cloud-during-installation).
+see [Connect node to Netdata Cloud during installation](/packaging/installer/methods/kickstart.md#connect-node-to-netdata-cloud-during-installation).
 
 ### Connect an Agent without root privileges
 
 If you don't have root access, you can still connect your node to Netdata Cloud by following these steps:
 
 1. Identify the Netdata Agent User: Use the `grep` command to search your `netdata.conf` file which is located at
-   your [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory)
+   your [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory)
    and find the `run as user` setting. This will tell you which user is running the Netdata Agent.
    ```bash
    grep "run as user" /etc/netdata/netdata.conf
@@ -129,7 +129,7 @@ If you don't have root access, you can still connect your node to Netdata Cloud 
 
 To ensure the **configuration and state information** needed for the Cloud connection is preserved across container
 restarts, the contents of the `/var/lib/netdata` directory must be persisted. See
-our [documentation](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md#recommended-way) for
+our [documentation](/packaging/docker/README.md#recommended-way) for
 details on using persistent volumes.
 
 <details>
@@ -317,7 +317,7 @@ see the node in your Space after 60 seconds, see the [troubleshooting informatio
 ### Connect an Agent running in macOS
 
 To connect a node that is running on a macOS environment the script that will be provided to you by Netdata Cloud is
-the [kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md#install-netdata-with-our-automatic-one-line-installation-script)
+the [kickstart](/packaging/installer/methods/macos.md#install-netdata-with-our-automatic-one-line-installation-script)
 script which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata
 Cloud. It should be similar to:
 
@@ -333,7 +333,7 @@ curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /t
 ### Connect a Kubernetes cluster's parent Netdata pod
 
 Read
-our [Kubernetes installation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md#deploy-netdata-on-your-kubernetes-cluster)
+our [Kubernetes installation](/packaging/installer/methods/kubernetes.md#deploy-netdata-on-your-kubernetes-cluster)
 for details on connecting a cluster's parent Netdata pod.
 
 ### Connect through a proxy
@@ -363,7 +363,7 @@ For example, a HTTP proxy setting may look like the following:
 ```
 
 You can now move on to connecting. When you connect with
-the [kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#automatic-one-line-installation-script)
+the [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script)
 script, add the `--claim-proxy=` parameter and append the same proxy setting you added to `netdata.conf`.
 
 ```bash
@@ -378,7 +378,7 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 ### Troubleshooting
 
 If you're having trouble connecting a node, this may be because
-the [ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md) cannot connect to Cloud.
+the [ACLK](/src/aclk/README.md) cannot connect to Cloud.
 
 With the Netdata Agent running, visit `http://NODE:19999/api/v1/info` in your browser, replacing `NODE` with the IP
 address or hostname of your Agent. The returned JSON contains four keys that will be helpful to diagnose any issues you
@@ -419,7 +419,7 @@ installed Netdata using an unsupported package.
 > If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 > please remove that package and reinstall using
 >
-our [recommended kickstart script](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer).
+our [recommended kickstart script](/packaging/installer/README.md#install-on-linux-with-one-line-installer).
 
 #### kickstart: Failed to write new machine GUID
 
@@ -448,7 +448,7 @@ script.
 > If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 > please remove that package and reinstall using
 >
-our [recommended kickstart script](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer).
+our [recommended kickstart script](/packaging/installer/README.md#install-on-linux-with-one-line-installer).
 
 #### Connecting on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
 
@@ -458,7 +458,7 @@ versions of OpenSSL cannot perform [hostname validation](https://wiki.openssl.or
 helps securely encrypt SSL connections.
 
 We recommend you reinstall Netdata with
-a [static build](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#static-builds),
+a [static build](/packaging/installer/methods/kickstart.md#static-builds),
 which uses an up-to-date version of OpenSSL with hostname validation enabled.
 
 If you choose to continue using the outdated version of OpenSSL, your node will still connect to Netdata Cloud, albeit
@@ -477,7 +477,7 @@ Additionally, check that the `enabled` setting in `var/lib/netdata/cloud.d/cloud
 ```
 
 To fix this issue, reinstall Netdata using
-your [preferred method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) and do not add
+your [preferred method](/packaging/installer/README.md) and do not add
 the `--disable-cloud` option.
 
 #### cloud-available is false / ACLK Available: No
@@ -617,7 +617,7 @@ If in case of some security reason, or other, you need to revoke your previous c
 can achieve that from the Netdata Cloud UI.
 
 On any screen where you see the connect the node to Netdata Cloud command you'll see above it, next to
-the [updates channel](https://github.com/netdata/netdata/blob/master/docs/netdata-Agent/versions-and-platforms.md), a
+the [updates channel](/docs/netdata-Agent/versions-and-platforms.md), a
 button to **Regenerate token**. This action will invalidate your previous token and generate a fresh new one.
 
 Only the administrators of a Space in Netdata Cloud can trigger this action.
@@ -630,12 +630,12 @@ Agent's command line tool, and details about the files found in `cloud.d`.
 ### The `cloud.conf` file
 
 This section defines how and whether your Agent connects to Netdata Cloud
-using the [ACLK](https://github.com/netdata/netdata/blob/master/src/aclk/README.md).
+using the [ACLK](/src/aclk/README.md).
 
 | setting        | default                     | info                                                                                                                                                                             |
 |:---------------|:----------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | cloud base url | <https://app.netdata.cloud> | The URL for the Netdata Cloud web application. You should not change this. If you want to disable Cloud, change the `enabled` setting.                                           |
-| enabled        | yes                         | The runtime option to disable the [Agent-Cloud link](https://github.com/netdata/netdata/blob/master/src/aclk/README.md) and prevent your Agent from connecting to Netdata Cloud. |
+| enabled        | yes                         | The runtime option to disable the [Agent-Cloud link](/src/aclk/README.md) and prevent your Agent from connecting to Netdata Cloud. |
 
 ### Claiming script
 
@@ -673,7 +673,7 @@ netdatacli reload-claiming-state
 This reloads the Agent connection state from disk.
 
 Our recommendation is to trigger the connection process using
-the [kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#automatic-one-line-installation-script)
+the [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script)
 whenever possible.
 
 ### Netdata Agent command line

@@ -23,7 +23,7 @@ We use the statistics gathered from this information for two purposes:
 
 Netdata collects usage information via two different channels:
 
--   **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md).
+-   **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](/docs/dashboards-and-charts/README.md).
 -   **Agent backend**: The `netdata` daemon executes the [`anonymous-statistics.sh`](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in) script when Netdata starts, stops cleanly, or fails.
 
 You can opt-out from sending anonymous statistics to Netdata through three different [opt-out mechanisms](#opt-out).
@@ -68,7 +68,7 @@ Starting with v1.21, we additionally collect information about:
 
 -   Failures to build the dependencies required to use Cloud features.
 -   Unavailability of Cloud features in an agent.
--   Failures to connect to the Cloud in case the [connection process](https://github.com/netdata/netdata/blob/master/src/claim/README.md) has been completed. This includes error codes
+-   Failures to connect to the Cloud in case the [connection process](/src/claim/README.md) has been completed. This includes error codes
     to inform the Netdata team about the reason why the connection failed.
 
 To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The
@@ -85,13 +85,13 @@ installation, including manual, offline, and macOS installations. Create the fil
 .opt-out-from-anonymous-statistics` from your Netdata configuration directory.
 
 **Pass the option `--disable-telemetry` to any of the installer scripts in the [installation
-docs](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).** You can append this option during the initial installation or a manual
+docs](/packaging/installer/README.md).** You can append this option during the initial installation or a manual
 update. You can also export the environment variable `DISABLE_TELEMETRY` with a non-zero or non-empty value
 (e.g: `export DISABLE_TELEMETRY=1`).
 
 When using Docker, **set your `DISABLE_TELEMETRY` environment variable to `1`.** You can set this variable with the following
 command: `export DISABLE_TELEMETRY=1`. When creating a container using Netdata's [Docker
-image](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md#create-a-new-netdata-agent-container) for the first time, this variable will disable
+image](/packaging/docker/README.md#create-a-new-netdata-agent-container) for the first time, this variable will disable
 the anonymous statistics script inside of the container.
 
 Each of these opt-out processes does the following:

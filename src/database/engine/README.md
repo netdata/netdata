@@ -114,7 +114,7 @@ When the Netdata Agent starts, during the first data collection of each metric, 
 data from lower tiers, so that the aggregation they provide will be accurate.
 
 Configuring how the number of tiers and the disk space allocated to each tier is how you can 
-[change how long netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
+[change how long netdata stores metrics](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md).
 
 ### Data loss
 

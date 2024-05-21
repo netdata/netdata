@@ -121,7 +121,7 @@ The following special exceptions to the public API exist:
   guaranteed to be supported for in-place updates for at least two minor versions after the change happens. The
   new format is not guaranteed to be backwards compatible.
 - The list of supported platforms is functionally a part of the public API, but our existing [platform support
-  policy](https://github.com/netdata/netdata/blob/master/packaging/PLATFORM_SUPPORT.md) dictates when and how
+  policy](/packaging/PLATFORM_SUPPORT.md) dictates when and how
   support for specific platforms is added or removed.
 - The list of components provided as separate packages in our official native packages is considered part of our
   strictly defined public API, but changes to our packaging that do not alter the functionality of existing installs

@@ -1,7 +1,7 @@
 # Change how long Netdata stores metrics
 
 The Netdata Agent uses a custom made time-series database (TSDB), named the 
-[`dbengine`](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md), to store metrics.
+[`dbengine`](/src/database/engine/README.md), to store metrics.
 
 To see the number of metrics stored and the retention in days per tier, use the `/api/v1/dbengine_stats` endpoint. 
 
@@ -84,7 +84,7 @@ The DBENGINE memory is related to the number of metrics concurrently being colle
 on disk in relation with the queries running, and the number of metrics for which retention is maintained.
 
 The precise analysis of how much memory will be used by the DBENGINE itself is described in 
-[DBENGINE memory requirements](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md#memory-requirements).
+[DBENGINE memory requirements](/src/database/engine/README.md#memory-requirements).
 
 In addition to the DBENGINE, Netdata uses memory for contexts, metric labels (e.g. in a Kubernetes setup), 
 other Netdata structures/processes (e.g. Health) and system overhead.
@@ -156,11 +156,11 @@ setups, all the way to 100% in some edge cases.
 ## Configure metric retention
 
 Once you have decided how to size each tier, open `netdata.conf` with
-[`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-netdataconf)
+[`edit-config`](/docs/netdata-agent/configuration/README.md#edit-netdataconf)
 and make your changes in the `[db]` subsection. 
 
 Save the file and restart the Agent with `sudo systemctl restart netdata`, or
-the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) 
+the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) 
 for your system, to change the database engine's size.
 
 ## Scaling dedicated parent nodes

@@ -61,12 +61,12 @@ At a high-level view, these are the domains from which the Events feed will prov
 
 ## Who can access the events?
 
-All users will be able to see events from the Topology and Alerts domain but Auditing events, once these are added, will only be accessible to administrators. For more details check the [Netdata Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+All users will be able to see events from the Topology and Alerts domain but Auditing events, once these are added, will only be accessible to administrators. For more details check the [Netdata Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 ## How to use the events feed
 
 1. Click on the **Events** tab (located near the top of your screen)
-1. You will be presented with a table listing the events that occurred from the timeframe defined on the [date time picker](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md#date-and-time-selector)
+1. You will be presented with a table listing the events that occurred from the timeframe defined on the [date time picker](/docs/dashboards-and-charts/visualization-date-and-time-controls.md#date-and-time-selector)
 1. You can use the filtering capabilities available on right-hand bar to slice through the results provided. See more details on [event types and filters](#event-types-and-filters)
 
 > **Note**

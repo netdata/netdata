@@ -13,7 +13,7 @@ sidebar_position: 100
 These instructions are for advanced users and distribution package
 maintainers. Unless this describes you, you almost certainly want
 to follow [our guide for manually installing Netdata from a git
-checkout](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md) instead.
+checkout](/packaging/installer/methods/manual.md) instead.
 
 ## Required dependencies
 

@@ -19,7 +19,7 @@ Module: example
 
 Example collector that generates some random numbers as metrics.
 
-If you want to write your own collector, read our [writing a new Python module](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/README.md#how-to-write-a-new-module) tutorial.
+If you want to write your own collector, read our [writing a new Python module](/src/collectors/python.d.plugin/README.md#how-to-write-a-new-module) tutorial.
 
 
 The `get_data()` function uses `random.randint()` to generate a random number which will be collected as a metric.
@@ -87,7 +87,7 @@ The configuration file name for this integration is `python.d/example.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata

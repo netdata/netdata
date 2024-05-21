@@ -5,7 +5,7 @@ modules:
       module_name: alarms
       monitored_instance:
         name: Netdata Agent alarms
-        link: https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/alarms/README.md
+        link: /src/collectors/python.d.plugin/alarms/README.md
         categories:
           - data-collection.other
         icon_filename: ""

@@ -12,9 +12,9 @@ sidebar_position: 20
 
 For most common Linux distributions that use either DEB or RPM packages, Netdata provides pre-built native packages
 for current releases in-line with
-our [official platform support policy](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/versions-and-platforms.md).
+our [official platform support policy](/docs/netdata-agent/versions-and-platforms.md).
 These packages will be used by default when attempting to install on a supported platform using our
-[kickstart.sh installer script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md).
+[kickstart.sh installer script](/packaging/installer/methods/kickstart.md).
 
 When using the kickstart script, you can force usage of native DEB or RPM packages by passing the option
 `--native-only` when invoking the script. This will cause it to only attempt to use native packages for the install,
