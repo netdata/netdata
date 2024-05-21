@@ -5,7 +5,7 @@ systems, containers, and applications, but there are hundreds of settings to twe
 over your monitoring platform.
 
 This document assumes familiarity with
-using [`edit-config`](../configuration/README.md) from the Netdata config
+using [`edit-config`](/docs/netdata-agent/configuration/README.md) from the Netdata config
 directory.
 
 ## Change dashboards and visualizations
@@ -73,9 +73,9 @@ sudo ./edit-config health.d/example-alert.conf
 
 Or, append your new alert to an existing file by editing a relevant existing file in the `health.d/` directory.
 
-Read more about [configuring alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) to
+Read more about [configuring alerts](/src/health/REFERENCE.md) to
 get started, and see
-the [health monitoring reference](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) for a full listing
+the [health monitoring reference](/src/health/REFERENCE.md) for a full listing
 of options available in health entities.
 
 ### Configure a specific alert
@@ -84,7 +84,7 @@ Tweak existing alerts by editing files in the `health.d/` directory. For example
 the Agent responds to anomalies related to CPU utilization.
 
 To see which configuration file you need to edit to configure a specific
-alert, [view your active alerts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md) in
+alert, [view your active alerts](/docs/dashboards-and-charts/alerts-tab.md) in
 Netdata Cloud or the local Agent dashboard and look for the **source** line. For example, it might
 read `source  4@/usr/lib/netdata/conf.d/health.d/cpu.conf`.
 
@@ -106,13 +106,12 @@ template: disk_fill_rate
 ### Turn of all alerts and notifications
 
 Set `enabled` to `no` in
-the [`[health]`](https://github.com/netdata/netdata/blob/master/src/daemon/config/README.md#health-section-options)
+the [`[health]`](/src/daemon/config/README.md#health-section-options)
 section of `netdata.conf`.
 
 ### Enable alert notifications
 
-Open `health_alarm_notify.conf` for editing. First, read the [enabling
-notifications](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/README.md#netdata-agent) doc
+Open `health_alarm_notify.conf` for editing. First, read the [enabling notifications](/docs/alerts-and-notifications/notifications/README.md#netdata-agent) doc
 for an example of the process using Slack, then
 click on the link to your preferred notification method to find documentation for that specific endpoint.
 
@@ -121,12 +120,12 @@ click on the link to your preferred notification method to find documentation fo
 While the Netdata Agent is both [open and secure by design](https://www.netdata.cloud/blog/netdata-agent-dashboard/), we
 recommend every user take some action to administer and secure their nodes.
 
-Learn more about the available options in the [security design documentation](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
+Learn more about the available options in the [security design documentation](/docs/security-and-privacy-design/README.md).
 
 ## Reduce resource usage
 
 Read
-our [performance optimization guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md)
+our [performance optimization guide](/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md)
 for a long list of specific changes
 that can reduce the Netdata Agent's CPU/memory footprint and IO requirements.
 
@@ -137,7 +136,7 @@ and as metadata to Netdata Cloud, and help you organize the metrics coming from 
 defined in the section `[host labels]`.
 
 For a quick introduction, read
-the [host label guide](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md).
+the [host label guide](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md).
 
 The following restrictions apply to host label names:
 
