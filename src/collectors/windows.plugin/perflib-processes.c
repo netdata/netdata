@@ -4,7 +4,7 @@
 #include "windows-internals.h"
 
 #define _COMMON_PLUGIN_NAME "windows.plugin"
-#define _COMMON_PLUGIN_MODULE_NAME "PerflibMemory"
+#define _COMMON_PLUGIN_MODULE_NAME "PerflibProcesses"
 #include "../common-contexts/common-contexts.h"
 
 static void initialize(void) {
@@ -32,7 +32,7 @@ static bool do_processes(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     if(perflibGetObjectCounter(pDataBlock, pObjectType, &threads)) {
         ULONGLONG totalThreads = threads.current.Data;
-        common_system_processes_threads(totalThreads,  update_every);
+        common_system_threads(totalThreads,  update_every);
     }
     return true;
 }

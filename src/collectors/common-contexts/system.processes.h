@@ -34,7 +34,7 @@ static inline void common_system_processes(uint64_t running, uint64_t blocked, i
 }
 
 // EBPF COUNTER PART
-static inline void common_system_processes_threads(uint64_t threads, int update_every) {
+static inline void common_system_threads(uint64_t threads, int update_every) {
     static RRDSET *st_processes = NULL;
     static RRDDIM *rd_threads = NULL;
 
