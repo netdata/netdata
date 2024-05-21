@@ -6,7 +6,7 @@ We love IoT and edge at Netdata, we also love machine learning. Even better if w
 of monitoring increasingly complex systems.
 
 We recently explored what might be involved in enabling our Python-based [anomalies
-collector](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/anomalies/README.md) on a Raspberry Pi. To our delight, it's actually quite
+collector](/src/collectors/python.d.plugin/anomalies/README.md) on a Raspberry Pi. To our delight, it's actually quite
 straightforward! 
 
 Read on to learn all the steps and enable unsupervised anomaly detection on your on Raspberry Pi(s).
@@ -17,14 +17,14 @@ Read on to learn all the steps and enable unsupervised anomaly detection on your
 
 - A Raspberry Pi running Raspbian, which we'll call a _node_.
 - The [open-source Netdata](https://github.com/netdata/netdata) monitoring agent. If you don't have it installed on your
-  node yet, [get started now](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
+  node yet, [get started now](/packaging/installer/README.md).
 
 ## Install dependencies
 
 First make sure Netdata is using Python 3 when it runs Python-based data collectors. 
 
-Next, open `netdata.conf` using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-netdataconf)
-from within the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory). Scroll down to the
+Next, open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-netdataconf)
+from within the [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory). Scroll down to the
 `[plugin:python.d]` section to pass in the `-ppython3` command option. 
 
 ```conf
@@ -53,7 +53,7 @@ LLVM_CONFIG=llvm-config-9 pip3 install --user llvmlite numpy==1.20.1 netdata-pan
 
 ## Enable the anomalies collector
 
-Now you're ready to enable the collector and [restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
+Now you're ready to enable the collector and [restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
 
 ```bash
 sudo ./edit-config python.d.conf
@@ -75,7 +75,7 @@ centralized cloud somewhere) is the resource utilization impact of running a mon
 
 With the default configuration, the anomalies collector uses about 6.5% of CPU at each run. During the retraining step,
 CPU utilization jumps to between 20-30% for a few seconds, but you can [configure
-retraining](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/anomalies/README.md#configuration) to happen less often if you wish.
+retraining](/src/collectors/python.d.plugin/anomalies/README.md#configuration) to happen less often if you wish.
 
 ![CPU utilization of anomaly detection on the Raspberry
 Pi](https://user-images.githubusercontent.com/1153921/110149718-9d749c00-7d9b-11eb-9af8-46e2032cd1d0.png)

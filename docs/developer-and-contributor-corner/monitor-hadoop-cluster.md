@@ -27,8 +27,8 @@ alternative, like the guide available from
 
 For more specifics on the collection modules used in this guide, read the respective pages in our documentation:
 
--   [HDFS](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/hdfs/README.md)
--   [Zookeeper](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/zookeeper/README.md)
+-   [HDFS](/src/go/collectors/go.d.plugin/modules/hdfs/README.md)
+-   [Zookeeper](/src/go/collectors/go.d.plugin/modules/zookeeper/README.md)
 
 ## Set up your HDFS and Zookeeper installations
 
@@ -164,7 +164,7 @@ jobs:
     address : 203.0.113.10:2182
 ```
 
-Finally, [restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
+Finally, [restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation).
 
 ```sh
 sudo systemctl restart netdata
@@ -188,4 +188,4 @@ sudo /etc/netdata/edit-config health.d/zookeeper.conf
 ```
 
 For more information about editing the defaults or writing new alert entities, see our 
-[health monitoring documentation](https://github.com/netdata/netdata/blob/master/src/health/README.md).
+[health monitoring documentation](/src/health/README.md).

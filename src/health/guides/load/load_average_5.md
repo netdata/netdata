@@ -4,7 +4,7 @@ This alarm calculates the system `load average` (CPU and I/O demand) over the pe
 
 The alert gets raised into warning if the metric is 4 times the expected value and cleared if the value is 3.5 times the expected value.
 
-For further information on how our alerts are calculated, please have a look at our [Documentation](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#expressions).
+For further information on how our alerts are calculated, please have a look at our [Documentation](/src/health/REFERENCE.md#expressions).
 
 
 ### What does "load average" mean?

@@ -8,7 +8,7 @@ Because Metric Correlations uses every available metric from your infrastructure
 
 ## Using Metric Correlations
 
-When viewing the [Metrics tab or a single-node dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md), the **Metric Correlations** button appears in the top right corner of the page.
+When viewing the [Metrics tab or a single-node dashboard](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md), the **Metric Correlations** button appears in the top right corner of the page.
 
 To start correlating metrics, click the **Metric Correlations** button, hold the `Alt` key (or `⌘` on macOS), and drag a selection of metrics on a single chart. The selected timeframe needs at least 15 seconds for Metric Correlation to work.
 
@@ -41,7 +41,7 @@ Behind the scenes, Netdata will aggregate the raw data as needed such that arbit
 
 Unlike other observability agents that only collect raw metrics, Netdata also assigns an [Anomaly Bit](https://github.com/netdata/netdata/tree/master/src/ml#anomaly-bit) in real-time. This bit flags whether a metric is within normal ranges (0) or deviates significantly (1). This built-in anomaly detection allows for the analysis of both the raw data and the anomaly rates.
 
-**Note**: Read more [here](https://github.com/netdata/netdata/blob/master/src/ml/README.md) to learn more about the native anomaly detection features within netdata.
+**Note**: Read more [here](/src/ml/README.md) to learn more about the native anomaly detection features within netdata.
 
 - `Metrics` - Run MC on the raw metric values.
 - `Anomaly Rate` - Run MC on the corresponding anomaly rate for each metric.

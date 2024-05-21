@@ -267,7 +267,7 @@ GRANT pg_monitor TO netdata;
 ```
 
 After creating the new user, restart the Netdata agent with `sudo systemctl restart netdata`, or
-the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/start-stop-restart.md) for your
+the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your
 system.
 
 
@@ -280,7 +280,7 @@ The configuration file name for this integration is `go.d/postgres.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata

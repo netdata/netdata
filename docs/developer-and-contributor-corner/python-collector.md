@@ -1,8 +1,8 @@
 # Develop a custom data collector in Python
 
-The Netdata Agent uses [data collectors](https://github.com/netdata/netdata/blob/master/src/collectors/README.md) to 
+The Netdata Agent uses [data collectors](/src/collectors/README.md) to 
 fetch metrics from hundreds of system, container, and service endpoints. While the Netdata team and community has built 
-[powerful collectors](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md) for most system, container, 
+[powerful collectors](/src/collectors/COLLECTORS.md) for most system, container, 
 and service/application endpoints, some custom applications can't be monitored by default.
 
 In this tutorial, you'll learn how to leverage the [Python programming language](https://www.python.org/) to build a
@@ -22,7 +22,7 @@ want to make it available for other users, you should create the pull request in
 ## What you need to get started
 
   - A physical or virtual Linux system, which we'll call a _node_.
-  - A working [installation of Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) monitoring agent.
+  - A working [installation of Netdata](/packaging/installer/README.md) monitoring agent.
 
 ### Quick start
 
@@ -33,7 +33,7 @@ For a quick start, you can look at the
 Netdata (as opposed to having to install Netdata from source again with your new changes) you can copy over the relevant
 file to where Netdata expects it and then either `sudo systemctl restart netdata` to have it be picked up and used by
 Netdata or you can just run the updated collector in debug mode by following a process like below (this assumes you have
-[installed Netdata from a GitHub fork](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md) you
+[installed Netdata from a GitHub fork](/packaging/installer/methods/manual.md) you
 have made to do your development on).
 
 ```bash
@@ -73,7 +73,7 @@ The basic elements of a Netdata collector are:
 - `get_data()`: The basic function of the plugin which will return to Netdata the correct values.
 
 **Note**: All names are better explained in the 
-[External Plugins Documentation](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md).
+[External Plugins Documentation](/src/collectors/plugins.d/README.md).
 Parameters like `priority` and `update_every` mentioned in that documentation are handled by the `python.d.plugin`,
 not by each collection module. 
 
@@ -117,7 +117,7 @@ context, charttype]`, where:
   that is `A.B`, with `A` being the name of the collector, and `B` being the name of the specific metric.
 - `charttype`: Either `line`, `area`, or `stacked`. If null line is the default value.
 
-You can read more about `family` and `context` in the [web dashboard](https://github.com/netdata/netdata/blob/master/src/web/README.md#families) doc.
+You can read more about `family` and `context` in the [web dashboard](/src/web/README.md#families) doc.
 
 Once the chart has been defined, you should define the dimensions of the chart. Dimensions are basically the metrics to
 be represented in this chart and each chart can have more than one dimension. In order to define the dimensions, the
@@ -410,7 +410,7 @@ ORDER = [
 ]
 ```
 
-[Restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with `sudo systemctl restart netdata` to see the new humidity
+[Restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with `sudo systemctl restart netdata` to see the new humidity
 chart:
 
 ![A snapshot of the modified chart](https://i.imgur.com/XOeCBmg.png)
@@ -467,7 +467,7 @@ ORDER = [
 ]
 ```
 
-[Restart Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with `sudo systemctl restart netdata` to see the new
+[Restart Netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) with `sudo systemctl restart netdata` to see the new
 min/max/average temperature chart with multiple dimensions:
 
 ![A snapshot of the modified chart](https://i.imgur.com/g7E8lnG.png)
@@ -521,7 +521,7 @@ variables and inform the user about the defaults. For example, take a look at th
 [GitHub](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/example/example.conf).
 
 You can read more about the configuration file on the [`python.d.plugin`
-documentation](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/README.md). 
+documentation](/src/collectors/python.d.plugin/README.md). 
 
 You can find the source code for the above examples on [GitHub](https://github.com/papajohn-uop/netdata). 
 

@@ -1,7 +1,7 @@
 <!--
 title: "How to write a Netdata collector in Go"
 description: "This guide will walk you through the technical implementation of writing a new Netdata collector in Golang, with tips on interfaces, structure, configuration files, and more."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/docs/how-to-write-a-module.md"
+custom_edit_url: "/src/go/collectors/go.d.plugin/docs/how-to-write-a-module.md"
 sidebar_label: "How to write a Netdata collector in Go"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -48,10 +48,10 @@ The steps are:
   developed collector. It will be placed into the `bin` directory (e.g `go.d.plugin/bin`)
 - Run it in the debug mode `bin/godplugin -d -m <MODULE_NAME>`. This will output the `STDOUT` of the collector, the same
   output that is sent to the Netdata Agent and is transformed into charts. You can read more about this collector API in
-  our [documentation](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#external-plugins-api).
+  our [documentation](/src/collectors/plugins.d/README.md#external-plugins-api).
 - If you want to test the collector with the actual Netdata Agent, you need to replace the `go.d.plugin` binary that
   exists in the Netdata Agent installation directory with the one you just compiled. Once
-  you [restart](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
+  you [restart](/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
   the Netdata Agent, it will detect and run
   it, creating all the charts. It is advised not to remove the default `go.d.plugin` binary, but simply rename it
   to `go.d.plugin.old` so that the Agent doesn't run it, but you can easily rename it back once you are done.
@@ -122,7 +122,7 @@ func (e *Example) Check() bool {
 ### Charts method
 
 :exclamation: Netdata module
-produces [`charts`](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#chart), not
+produces [`charts`](/src/collectors/plugins.d/README.md#chart), not
 raw metrics.
 
 Use [`agent/module`](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/agent/module/charts.go)
@@ -130,7 +130,7 @@ package to create them,
 it contains charts and dimensions structs.
 
 - `Charts` returns
-  the [charts](https://github.com/netdata/netdata/blob/master/src/collectors/plugins.d/README.md#chart) (`*module.Charts`).
+  the [charts](/src/collectors/plugins.d/README.md#chart) (`*module.Charts`).
 - Called after `Check` and only if `Check` returned `true`.
 - If it returns `nil`, the job will be disabled
 - :warning: Make sure not to share returned value between module instances (jobs).

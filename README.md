@@ -256,7 +256,7 @@ Check the [systemd-journal plugin of Netdata](https://github.com/netdata/netdata
    Netdata can be installed on all Linux, macOS, and FreeBSD systems. We provide binary packages for the most popular operating systems and package managers.
 
    - Install on [Ubuntu, Debian CentOS, Fedora, Suse, Red Hat, Arch, Alpine, Gentoo, even BusyBox](https://learn.netdata.cloud/docs/installing/one-line-installer-for-all-linux-systems).
-   - Install with [Docker](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md).<br/>
+   - Install with [Docker](/packaging/docker/README.md).<br/>
      Netdata is a [Verified Publisher on DockerHub](https://hub.docker.com/r/netdata/netdata) and our users enjoy free unlimited DockerHub pulls :heart_eyes:.
    - Install on [MacOS](https://learn.netdata.cloud/docs/installing/macos) :metal:.
    - Install on [FreeBSD](https://learn.netdata.cloud/docs/installing/freebsd) and [pfSense](https://learn.netdata.cloud/docs/installing/pfsense).
@@ -409,7 +409,7 @@ The core of Netdata is developed in C. We have our own `libnetdata`, that provid
   Like POSIX `MUTEX` and `RWLOCK` but a lot faster, based on atomic operations, with significantly smaller memory impact, while being portable.
 
 - **`PGC`**<br/>
-  A caching layer that can be used to cache any kind of time-related data, with automatic indexing (based on a tree of JudyL arrays), memory management, evictions, flushing, pressure management. This is extensively used in `dbengine`. For more see [here](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md).
+  A caching layer that can be used to cache any kind of time-related data, with automatic indexing (based on a tree of JudyL arrays), memory management, evictions, flushing, pressure management. This is extensively used in `dbengine`. For more see [here](/src/database/engine/README.md).
 
 The above, and many more, allow Netdata developers to work on the application fast and with confidence. Most of the business logic in Netdata is a work of mixing the above.
 
@@ -429,7 +429,7 @@ Of course it is! We do our best to ensure it is!
 We understand that Netdata is a software piece that is installed on millions of production systems across the world. So, it is important for us, Netdata to be as secure as possible:
 
   - We follow the [Open Source Security Foundation](https://bestpractices.coreinfrastructure.org/en/projects/2231) best practices.
-  - We have given great attention to detail when it comes to security design. Check out our [security design](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
+  - We have given great attention to detail when it comes to security design. Check out our [security design](/docs/security-and-privacy-design/README.md).
   - Netdata is a popular open-source project and is frequently tested by many security analysts.
   - Check also our [security policies and advisories published so far](https://github.com/netdata/netdata/security).
 
@@ -746,7 +746,7 @@ The Netdata Agent is shipped with multiple UI versions:
 
 - `http://agent.ip:19999/v0/`, the original open-source single-node UI, GPLv3+.
 - `http://agent.ip:19999/v1/`, the latest open-source single-node UI, GPLv3+.
-- `http://agent.ip:19999/v2/`, a snapshot of the latest Netdata Cloud UI as it was at the time the agent was released, licensed to be distributed with Netdata Agents under [NCUL1](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md).
+- `http://agent.ip:19999/v2/`, a snapshot of the latest Netdata Cloud UI as it was at the time the agent was released, licensed to be distributed with Netdata Agents under [NCUL1](/src/web/gui/v2/LICENSE.md).
 
 When you access a Netdata Agent via `http://agent.ip:19999/` a splash screen attempts to use the latest live version of Netdata Cloud UI (downloaded from Cloudflare). This only happens when the web browser has internet connectivity and Netdata Cloud is not disabled at the agent configuration. Otherwise, it falls back to `http://agent.ip:19999/v2/`.
 
@@ -845,12 +845,12 @@ General information about contributions:
 - Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
 - Read our [Contributing Guide](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
 
-Package maintainers should read the guide on [building Netdata from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md) for
+Package maintainers should read the guide on [building Netdata from source](/packaging/installer/methods/source.md) for
 instructions on building each Netdata component from the source and preparing a package.
 
 ## License
 
 Netdata is released under [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
-[third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
+[third party licenses](/REDISTRIBUTED.md).
 
-The Latest Netdata UI, is distributed under [NCUL1](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/LICENSE.md). It also uses third party open source components. Check the [UI third party licenses](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/3D_PARTY_LICENSES.txt)
+The Latest Netdata UI, is distributed under [NCUL1](/src/web/gui/v2/LICENSE.md). It also uses third party open source components. Check the [UI third party licenses](https://github.com/netdata/netdata/blob/master/src/web/gui/v2/3D_PARTY_LICENSES.txt)

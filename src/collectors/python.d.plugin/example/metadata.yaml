@@ -5,7 +5,7 @@ modules:
       module_name: example
       monitored_instance:
         name: Example collector
-        link: https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/example/README.md
+        link: /src/collectors/python.d.plugin/example/README.md
         categories:
           - data-collection.other
         icon_filename: ""
@@ -24,7 +24,7 @@ modules:
         metrics_description: |
           Example collector that generates some random numbers as metrics.
           
-          If you want to write your own collector, read our [writing a new Python module](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/README.md#how-to-write-a-new-module) tutorial.
+          If you want to write your own collector, read our [writing a new Python module](/src/collectors/python.d.plugin/README.md#how-to-write-a-new-module) tutorial.
         method_description: |
           The `get_data()` function uses `random.randint()` to generate a random number which will be collected as a metric.
       supported_platforms:

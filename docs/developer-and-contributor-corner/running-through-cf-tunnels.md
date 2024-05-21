@@ -86,7 +86,7 @@ RestartSec=5s
 WantedBy=multi-user.target
 ```
 
-You can edit the configuration file using the `edit-config` script from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+You can edit the configuration file using the `edit-config` script from the Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 - Edit `netdata.conf` and input:
 
@@ -102,7 +102,7 @@ You can edit the configuration file using the `edit-config` script from the Netd
     destination = tcp:127.0.0.1:19999
 ```
 
-[Restart the Agents](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation), and you are done!
+[Restart the Agents](/packaging/installer/README.md#maintaining-a-netdata-agent-installation), and you are done!
 
 You should now be able to have a Local Dashboard that gets its metrics from Child instances, running through Cloudflare tunnels.
 

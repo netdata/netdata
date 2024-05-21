@@ -115,7 +115,7 @@ modules:
                 Metrics of hosts matching the selector will be collected.
                 
                 - Include pattern syntax: "/Datacenter pattern/Cluster pattern/Host pattern".
-                - Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+                - Match pattern syntax: [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
                 - Syntax:
 
                   ```yaml
@@ -132,7 +132,7 @@ modules:
                 Metrics of VMs matching the selector will be collected.
                 
                 - Include pattern syntax: "/Datacenter pattern/Cluster pattern/Host pattern/VM pattern".
-                - Match pattern syntax: [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns).
+                - Match pattern syntax: [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
                 - Syntax:
 
                   ```yaml

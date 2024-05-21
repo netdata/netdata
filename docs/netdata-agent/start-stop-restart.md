@@ -1,6 +1,6 @@
 # Start, stop, or restart the Netdata Agent
 
-When you install the Netdata Agent, the [daemon](https://github.com/netdata/netdata/blob/master/src/daemon/README.md) is 
+When you install the Netdata Agent, the [daemon](/src/daemon/README.md) is 
 configured to start at boot and stop and restart/shutdown.
 
 You will most often need to _restart_ the Agent to load new or editing configuration files. 
@@ -34,7 +34,7 @@ If you start the daemon this way, close it with `sudo killall netdata`.
 
 ## Using `netdatacli`
 
-The Netdata Agent also comes with a [CLI tool](https://github.com/netdata/netdata/blob/master/src/cli/README.md) capable of performing shutdowns. Start the Agent back up
+The Netdata Agent also comes with a [CLI tool](/src/cli/README.md) capable of performing shutdowns. Start the Agent back up
 using your preferred method listed above.
 
 ```bash

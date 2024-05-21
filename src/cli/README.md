@@ -33,6 +33,6 @@ dumpconfig
     Returns the current netdata.conf on stdout.
 ```
 
-See also the Netdata daemon [command line options](https://github.com/netdata/netdata/blob/master/src/daemon/README.md#command-line-options).
+See also the Netdata daemon [command line options](/src/daemon/README.md#command-line-options).
 
 

@@ -44,7 +44,7 @@ It produces the following charts:
 ## Configuration
 
 Edit the `python.d/nvidia_smi.conf` configuration file using `edit-config` from the Netdata [config
-directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`.
+directory](/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

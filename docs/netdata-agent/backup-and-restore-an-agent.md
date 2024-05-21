@@ -6,7 +6,7 @@ When preparing to backup a Netdata Agent it is worth considering that there are 
 
 | Data type           | Description                                          | Location                                                                                                                |
 |---------------------|------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
-| Agent configuration | Files controlling configuration of the Netdata Agent | [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) |
+| Agent configuration | Files controlling configuration of the Netdata Agent | [config directory](/docs/netdata-agent/configuration/README.md) |
 | Metrics             | Database files                                       | /var/cache/netdata                                                                                                      |
 | Identity            | Claim token, API key and some other files            | /var/lib/netdata                                                                                                        |
 
@@ -22,7 +22,7 @@ In this standard scenario, you are backing up your Netdata Agent in case of a no
    > **Note**  
    > The specific paths may vary depending on installation method, Operating System, and whether it is a Docker/Kubernetes deployment.
 
-2. It is recommended that you [stop the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/start-stop-restart.md) when backing up the Metrics/database files.  
+2. It is recommended that you [stop the Netdata Agent](/docs/netdata-agent/start-stop-restart.md) when backing up the Metrics/database files.  
    Backing up the Agent configuration and Identity folders is straightforward as they should not be changing very frequently.
 
 3. Using a backup tool such as `tar` you will need to run the backup as _root_ or as the _netdata_ user to access all the files in the directories.
@@ -42,9 +42,9 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
 
 ### Restoring Netdata
 
-1. Ensure that the Netdata agent is installed and is [stopped](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
+1. Ensure that the Netdata agent is installed and is [stopped](/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
 
-   If you plan to deploy the Agent and restore a backup on top of it, then you might find it helpful to use the [`--dont-start-it`](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#other-options) option upon installation.
+   If you plan to deploy the Agent and restore a backup on top of it, then you might find it helpful to use the [`--dont-start-it`](/packaging/installer/methods/kickstart.md#other-options) option upon installation.
 
    ```
    wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --dont-start-it
@@ -63,4 +63,4 @@ If you want to minimize the gap in metrics caused by stopping the Netdata Agent,
     sudo tar -xvpzf /path/to/netdata_backup.tar.gz -C /
     ```
 
-3. [Start the Netdata agent](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
+3. [Start the Netdata agent](/packaging/installer/README.md#maintaining-a-netdata-agent-installation)

@@ -61,11 +61,11 @@ While encrypting the connection between your parent and child nodes is recommend
 This example uses self-signed certificates. 
 
 > **Note**  
-> This section assumes you have read the documentation on [how to edit the Netdata configuration files](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md).  
+> This section assumes you have read the documentation on [how to edit the Netdata configuration files](/docs/netdata-agent/configuration/README.md).  
 <!-- here we need link to the section that will contain the restarting instructions -->
 
 1. **Parent node**  
-   To generate an SSL key and certificate using `openssl`, take a look at the related section around [Securing Netdata Agents](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#enable-httpstls-support) in our Documentation.
+   To generate an SSL key and certificate using `openssl`, take a look at the related section around [Securing Netdata Agents](/src/web/server/README.md#enable-httpstls-support) in our Documentation.
 
 2. **Child node**  
    Update `stream.conf` to enable SSL/TLS and allow self-signed certificates. Append ':SSL' to the destination and uncomment 'ssl skip certificate verification'.

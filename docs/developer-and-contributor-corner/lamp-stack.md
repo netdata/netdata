@@ -51,7 +51,7 @@ To follow this tutorial, you need:
 ## Install the Netdata Agent
 
 If you don't have the free, open-source Netdata monitoring agent installed on your node yet, get started with a [single
-kickstart command](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md):
+kickstart command](/packaging/installer/README.md):
 
 <OneLineInstallWget/>
 
@@ -61,15 +61,15 @@ replacing `NODE` with the hostname or IP address of your system.
 
 ## Enable hardware and Linux system monitoring
 
-There's nothing you need to do to enable [system monitoring](https://github.com/netdata/netdata/blob/master/docs/collecting-metrics/system-metrics.md) and Linux monitoring with
+There's nothing you need to do to enable [system monitoring](/docs/collecting-metrics/system-metrics.md) and Linux monitoring with
 the Netdata Agent, which autodetects metrics from CPUs, memory, disks, networking devices, and Linux processes like
 systemd without any configuration. If you're using containers, Netdata automatically collects resource utilization
-metrics from each using the [cgroups data collector](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/README.md).
+metrics from each using the [cgroups data collector](/src/collectors/cgroups.plugin/README.md).
 
 ## Enable Apache monitoring
 
 Let's begin by configuring Apache to work with Netdata's [Apache data
-collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/apache/README.md).
+collector](/src/go/collectors/go.d.plugin/modules/apache/README.md).
 
 Actually, there's nothing for you to do to enable Apache monitoring with Netdata.
 
@@ -80,7 +80,7 @@ metrics](https://httpd.apache.org/docs/2.4/mod/mod_status.html), which is just _
 ## Enable web log monitoring
 
 The Netdata Agent also comes with a [web log
-collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/weblog/README.md), which reads Apache's access
+collector](/src/go/collectors/go.d.plugin/modules/weblog/README.md), which reads Apache's access
 log file, processes each line, and converts them into per-second metrics. On Debian systems, it reads the file at
 `/var/log/apache2/access.log`.
 
@@ -93,7 +93,7 @@ monitoring.
 
 Because your MySQL database is password-protected, you do need to tell MySQL to allow the `netdata` user to connect to
 without a password. Netdata's [MySQL data
-collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/mysql/README.md) collects metrics in _read-only_
+collector](/src/go/collectors/go.d.plugin/modules/mysql/README.md) collects metrics in _read-only_
 mode, without being able to alter or affect operations in any way.
 
 First, log into the MySQL shell. Then, run the following three commands, one at a time:
@@ -105,15 +105,15 @@ FLUSH PRIVILEGES;
 ```
 
 Run `sudo systemctl restart netdata`, or the [appropriate alternative for your
-system](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation), to collect dozens of metrics every second for robust MySQL monitoring.
+system](/packaging/installer/README.md#maintaining-a-netdata-agent-installation), to collect dozens of metrics every second for robust MySQL monitoring.
 
 ## Enable PHP monitoring
 
 Unlike Apache or MySQL, PHP isn't a service that you can monitor directly, unless you instrument a PHP-based application
-with [StatsD](https://github.com/netdata/netdata/blob/master/src/collectors/statsd.plugin/README.md).
+with [StatsD](/src/collectors/statsd.plugin/README.md).
 
 However, if you use [PHP-FPM](https://php-fpm.org/) in your LAMP stack, you can monitor that process with our [PHP-FPM
-data collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/phpfpm/README.md).
+data collector](/src/go/collectors/go.d.plugin/modules/phpfpm/README.md).
 
 Open your PHP-FPM configuration for editing, replacing `7.4` with your version of PHP:
 
@@ -159,12 +159,12 @@ If the Netdata Agent isn't already open in your browser, open a new tab and navi
 
 > If you [signed up](https://app.netdata.cloud/sign-up?cloudRoute=/spaces) for Netdata Cloud earlier, you can also view
 > the exact same LAMP stack metrics there, plus additional features, like drag-and-drop custom dashboards. Be sure to
-> [connecting your node](https://github.com/netdata/netdata/blob/master/src/claim/README.md) to start streaming metrics to your browser through Netdata Cloud.
+> [connecting your node](/src/claim/README.md) to start streaming metrics to your browser through Netdata Cloud.
 
 Netdata automatically organizes all metrics and charts onto a single page for easy navigation. Peek at gauges to see
 overall system performance, then scroll down to see more. Click-and-drag with your mouse to pan _all_ charts back and
 forth through different time intervals, or hold `SHIFT` and use the scrollwheel (or two-finger scroll) to zoom in and
-out. Check out our doc on [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md) for all the details.
+out. Check out our doc on [interacting with charts](/docs/dashboards-and-charts/netdata-charts.md) for all the details.
 
 ![The Netdata dashboard](https://user-images.githubusercontent.com/1153921/109520555-98e17800-7a69-11eb-86ec-16f689da4527.png)
 
@@ -197,15 +197,15 @@ Here's a quick reference for what charts you might want to focus on after settin
 The Netdata Agent comes with hundreds of pre-configured alerts to help you keep tabs on your system, including 19 alerts
 designed for smarter LAMP stack monitoring.
 
-Click the 🔔 icon in the top navigation to [see active alerts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md). The **Active** tabs
+Click the 🔔 icon in the top navigation to [see active alerts](/docs/dashboards-and-charts/alerts-tab.md). The **Active** tabs
 shows any alerts currently triggered, while the **All** tab displays a list of _every_ pre-configured alert. The 
 
 ![An example of LAMP stack
 alerts](https://user-images.githubusercontent.com/1153921/109524120-5883f900-7a6d-11eb-830e-0e7baaa28163.png)
 
-[Tweak alerts](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md) based on your infrastructure monitoring needs, and to see these alerts
+[Tweak alerts](/src/health/REFERENCE.md) based on your infrastructure monitoring needs, and to see these alerts
 in other places, like your inbox or a Slack channel, [enable a notification
-method](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/README.md).
+method](/docs/alerts-and-notifications/notifications/README.md).
 
 ## What's next?
 
@@ -215,7 +215,7 @@ services. The per-second metrics granularity means you have the most accurate in
 any LAMP-related issues.
 
 Another powerful way to monitor the availability of a LAMP stack is the [`httpcheck`
-collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/httpcheck/README.md), which pings a web server at
+collector](/src/go/collectors/go.d.plugin/modules/httpcheck/README.md), which pings a web server at
 a regular interval and tells you whether if and how quickly it's responding. The `response_match` option also lets you
 monitor when the web server's response isn't what you expect it to be, which might happen if PHP-FPM crashes, for
 example.
@@ -225,14 +225,14 @@ we're not covering it here, but it _does_ work in a single-node setup. Just don'
 node crashed.
 
 If you're planning on managing more than one node, or want to take advantage of advanced features, like finding the
-source of issues faster with [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md),
+source of issues faster with [Metric Correlations](/docs/metric-correlations.md),
 [sign up](https://app.netdata.cloud/sign-up?cloudRoute=/spaces) for a free Netdata Cloud account.
 
 ### Related reference documentation
 
-- [Netdata Agent · Get started](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
-- [Netdata Agent · Apache data collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/apache/README.md)
-- [Netdata Agent · Web log collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/weblog/README.md)
-- [Netdata Agent · MySQL data collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/mysql/README.md)
-- [Netdata Agent · PHP-FPM data collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/phpfpm/README.md)
+- [Netdata Agent · Get started](/packaging/installer/README.md)
+- [Netdata Agent · Apache data collector](/src/go/collectors/go.d.plugin/modules/apache/README.md)
+- [Netdata Agent · Web log collector](/src/go/collectors/go.d.plugin/modules/weblog/README.md)
+- [Netdata Agent · MySQL data collector](/src/go/collectors/go.d.plugin/modules/mysql/README.md)
+- [Netdata Agent · PHP-FPM data collector](/src/go/collectors/go.d.plugin/modules/phpfpm/README.md)
 

@@ -1,7 +1,7 @@
 <!--
 title: go.d.plugin
 description: "go.d.plugin is an external plugin for Netdata, responsible for running individual data collectors written in Go."
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/README.md"
+custom_edit_url: "/src/go/collectors/go.d.plugin/README.md"
 sidebar_label: "go.d.plugin"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -35,7 +35,7 @@ Go.d.plugin is shipped with Netdata.
 ### Required Linux capabilities
 
 All capabilities are set automatically during Netdata installation using
-the [official installation method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer).
+the [official installation method](/packaging/installer/README.md#install-on-linux-with-one-line-installer).
 No further action required. If you have used a different installation method and need to set the capabilities manually,
 see the appropriate collector readme.
 
@@ -141,7 +141,7 @@ see the appropriate collector readme.
 ## Configuration
 
 Edit the `go.d.conf` configuration file using `edit-config` from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory),
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory),
 which is typically at `/etc/netdata`.
 
 ```bash
@@ -173,7 +173,7 @@ modules:
   example: yes
 ```
 
-Then [restart netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
+Then [restart netdata](/packaging/installer/README.md#maintaining-a-netdata-agent-installation)
 for the change to take effect.
 
 ## Contributing
@@ -184,7 +184,7 @@ contact us in our forums.
 
 ### How to develop a collector
 
-Read [how to write a Netdata collector in Go](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/docs/how-to-write-a-module.md).
+Read [how to write a Netdata collector in Go](/src/go/collectors/go.d.plugin/docs/how-to-write-a-module.md).
 
 ## Troubleshooting
 

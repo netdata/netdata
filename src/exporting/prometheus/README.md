@@ -4,7 +4,7 @@ Netdata supports exporting metrics to Prometheus in two ways:
 
  - You can [configure Prometheus to scrape Netdata metrics](#configure-prometheus-to-scrape-netdata-metrics).
 
- - You can [configure Netdata to push metrics to Prometheus](https://github.com/netdata/netdata/blob/master/src/exporting/prometheus/remote_write/README.md)
+ - You can [configure Netdata to push metrics to Prometheus](/src/exporting/prometheus/remote_write/README.md)
    , using the Prometheus remote write API.
 
 ## Netdata support for Prometheus
@@ -223,7 +223,7 @@ Netdata can filter the metrics it sends to Prometheus with this setting:
 ```
 
 This settings accepts a space separated list
-of [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) to match the
+of [simple patterns](/src/libnetdata/simple_pattern/README.md) to match the
 **charts** to be sent to Prometheus. Each pattern can use `*` as wildcard, any number of times (e.g `*a*b*c*` is valid).
 Patterns starting with `!` give a negative match (e.g `!*.bad users.* groups.*` will send all the users and groups
 except `bad` user and `bad` group). The order is important: the first match (positive or negative) left to right, is

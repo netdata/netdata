@@ -5,12 +5,12 @@ Netdata allows to organize your observability infrastructure with spaces, war ro
 
 ## Spaces and war rooms
 
-[Spaces](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) are used for organization-level or infrastructure-level 
+[Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) are used for organization-level or infrastructure-level 
 grouping of nodes and people. A node can only appear in a single space, while people can have access to multiple spaces.
 
 The [war rooms](https://github.com/netdata/netdata/edit/master/docs/cloud/war-rooms.md) in a space bring together nodes and people in 
 collaboration areas. War rooms can also be used for fine-tuned 
-[role based access control](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md). 
+[role based access control](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md). 
 
 ## Virtual nodes
 
@@ -85,7 +85,7 @@ sudo ./edit-config netdata.conf
 ```
 
 Create a new `[host labels]` section defining a new host label and its value for the system in question. Make sure not
-to violate any of the [host label naming rules](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/common-configuration-changes.md#organize-nodes-with-host-labels).
+to violate any of the [host label naming rules](/docs/netdata-agent/configuration/common-configuration-changes.md#organize-nodes-with-host-labels).
 
 ```conf
 [host labels]
@@ -139,9 +139,9 @@ child system. It's a vastly simplified way of accessing critical information abo
 
 > ⚠️ Because automatic labels for child nodes are accessible via API calls, and contain sensitive information like
 > kernel and operating system versions, you should secure streaming connections with SSL. See the [streaming
-> documentation](https://github.com/netdata/netdata/blob/master/src/streaming/README.md#securing-streaming-communications) for details. You may also want to use
-> [access lists](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#access-lists) or [expose the API only to LAN/localhost
-> connections](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/securing-netdata-agents.md#expose-netdata-only-in-a-private-lan).
+> documentation](/src/streaming/README.md#securing-streaming-communications) for details. You may also want to use
+> [access lists](/src/web/server/README.md#access-lists) or [expose the API only to LAN/localhost
+> connections](/docs/netdata-agent/securing-netdata-agents.md#expose-netdata-only-in-a-private-lan).
 
 You can also use `_is_parent`, `_is_child`, and any other host labels in both health entities and metrics
 exporting. Speaking of which...
@@ -192,11 +192,11 @@ Or when ephemeral Docker nodes are involved:
 ```
 
 Of course, there are many more possibilities for intuitively organizing your systems with host labels. See the [health
-documentation](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#alert-line-host-labels) for more details, and then get creative!
+documentation](/src/health/REFERENCE.md#alert-line-host-labels) for more details, and then get creative!
 
 ### Host labels in metrics exporting
 
-If you have enabled any metrics exporting via our experimental [exporters](https://github.com/netdata/netdata/blob/master/src/exporting/README.md), any new host
+If you have enabled any metrics exporting via our experimental [exporters](/src/exporting/README.md), any new host
 labels you created manually are sent to the destination database alongside metrics. You can change this behavior by
 editing `exporting.conf`, and you can even send automatically-generated labels on with exported metrics.
 
@@ -221,7 +221,7 @@ send automatic labels = yes
 ```
 
 By applying labels to exported metrics, you can more easily parse historical metrics with the labels applied. To learn
-more about exporting, read the [documentation](https://github.com/netdata/netdata/blob/master/src/exporting/README.md).
+more about exporting, read the [documentation](/src/exporting/README.md).
 
 ## Metric labels
 

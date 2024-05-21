@@ -8,7 +8,7 @@ You can use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage,
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
 200ms, using ~30% of a single core.
 
-The [web_log](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/weblog/README.md) collector is currently compatible
+The [web_log](/src/go/collectors/go.d.plugin/modules/weblog/README.md) collector is currently compatible
 with [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
 
 This guide will walk you through using the new Go-based web log collector to turn the logs these web servers
@@ -82,7 +82,7 @@ jobs:
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system. Netdata should pick up your web server's access log and
+method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system. Netdata should pick up your web server's access log and
 begin showing real-time charts!
 
 ### Custom log formats and fields
@@ -91,7 +91,7 @@ The web log collector is capable of parsing custom Nginx and Apache log formats 
 leave that topic for a separate guide.
 
 We do have [extensive
-documentation](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/weblog/README.md#custom-log-format) on how
+documentation](/src/go/collectors/go.d.plugin/modules/weblog/README.md#custom-log-format) on how
 to build custom parsing for Nginx and Apache logs.
 
 ## Tweak web log collector alerts
@@ -109,4 +109,4 @@ You can also edit this file directly with `edit-config`:
 ```
 
 For more information about editing the defaults or writing new alert entities, see our 
-[health monitoring documentation](https://github.com/netdata/netdata/blob/master/src/health/README.md).
+[health monitoring documentation](/src/health/README.md).

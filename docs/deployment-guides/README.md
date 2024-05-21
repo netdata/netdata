@@ -12,7 +12,7 @@ There are 3 components to structure your Netdata ecosystem:
 
 2. **Netdata Parents**
 
-   To create [observability centralization points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md) within your infrastructure, to offload Netdata Agents functions from your production systems, to provide high-availability of your data, increased data retention and isolation of your nodes.
+   To create [observability centralization points](/docs/observability-centralization-points/README.md) within your infrastructure, to offload Netdata Agents functions from your production systems, to provide high-availability of your data, increased data retention and isolation of your nodes.
 
    Netdata Parents are implemented using the Netdata Agent software. Any Netdata Agent can be an Agent for a node and a Parent  for other Agents, at the same time.
 
