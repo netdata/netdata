@@ -1134,7 +1134,7 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     return 0;
 }
 
-void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
+void aclk_send_alarm_checkpoint(char *node_id, char *claim_id, uint64_t version, int64_t point_in_time)
 {
     if (unlikely(!node_id || !claim_id || !claimed()))
         return;
@@ -1151,7 +1151,14 @@ void aclk_send_alarm_checkpoint(char *node_id, char *claim_id __maybe_unused)
     if (unlikely(!host || !(wc = host->aclk_config)))
         nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK REQ [%s (N/A)]: ALERTS CHECKPOINT REQUEST RECEIVED FOR INVALID NODE", node_id);
     else {
-        nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK REQ [%s (%s)]: ALERTS CHECKPOINT REQUEST RECEIVED", node_id, rrdhost_hostname(host));
+        nd_log(
+            NDLS_ACCESS,
+            NDLP_DEBUG,
+            "ACLK REQ [%s (%s)]: ALERTS CHECKPOINT REQUEST RECEIVED WITH VERSION %zu (pit = %ld)",
+            node_id,
+            rrdhost_hostname(host),
+            version,
+            point_in_time);
         wc->alert_checkpoint_req = SEND_CHECKPOINT_AFTER_HEALTH_LOOPS;
     }
 

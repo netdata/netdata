@@ -20,7 +20,7 @@ void aclk_push_alert_config_event(char *node_id, char *config_hash);
 void aclk_start_alert_streaming(char *node_id, bool resets);
 void sql_queue_removed_alerts_to_aclk(RRDHOST *host);
 void sql_process_queue_removed_alerts_to_aclk(char *node_id);
-void aclk_send_alarm_checkpoint(char *node_id, char *claim_id);
+void aclk_send_alarm_checkpoint(char *node_id, char *claim_id, uint64_t version, int64_t point_in_time);
 void aclk_push_alarm_checkpoint(RRDHOST *host);
 
 void aclk_push_alert_snapshot_event(char *node_id);

@@ -83,6 +83,8 @@ struct alarm_log_entry {
 struct send_alarm_checkpoint {
     char *node_id;
     char *claim_id;
+    uint64_t version;
+    int64_t point_in_time;
 };
 
 struct alarm_checkpoint {
