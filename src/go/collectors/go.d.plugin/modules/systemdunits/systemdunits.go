@@ -36,6 +36,7 @@ func New() *SystemdUnits {
 		Config: Config{
 			Timeout:               web.Duration(time.Second * 2),
 			Include:               []string{"*.service"},
+			SkipTransient:         false,
 			CollectUnitFiles:      false,
 			IncludeUnitFiles:      []string{"*.service"},
 			CollectUnitFilesEvery: web.Duration(time.Minute * 5),
@@ -43,6 +44,7 @@ func New() *SystemdUnits {
 		charts:        &module.Charts{},
 		client:        newSystemdDBusClient(),
 		seenUnits:     make(map[string]bool),
+		unitTransient: make(map[string]bool),
 		seenUnitFiles: make(map[string]bool),
 	}
 }
@@ -51,6 +53,7 @@ type Config struct {
 	UpdateEvery           int          `yaml:"update_every,omitempty" json:"update_every"`
 	Timeout               web.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	Include               []string     `yaml:"include,omitempty" json:"include"`
+	SkipTransient         bool         `yaml:"skip_transient" json:"skip_transient"`
 	CollectUnitFiles      bool         `yaml:"collect_unit_files,omitempty" json:"collect_unit_files"`
 	IncludeUnitFiles      []string     `yaml:"include_unit_files,omitempty" json:"include_unit_files"`
 	CollectUnitFilesEvery web.Duration `yaml:"collect_unit_files_every,omitempty" json:"collect_unit_files_every"`
@@ -65,8 +68,9 @@ type SystemdUnits struct {
 
 	systemdVersion int
 
-	seenUnits map[string]bool
-	unitSr    matcher.Matcher
+	seenUnits     map[string]bool
+	unitTransient map[string]bool
+	unitSr        matcher.Matcher
 
 	lastListUnitFilesTime time.Time
 	cachedUnitFiles       []dbus.UnitFile

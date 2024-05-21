@@ -14,6 +14,8 @@ import (
 	"github.com/coreos/go-systemd/v22/dbus"
 )
 
+const transientProperty = "Transient"
+
 const (
 	// https://www.freedesktop.org/software/systemd/man/systemd.html
 	unitStateActive       = "active"
@@ -55,6 +57,20 @@ func (s *SystemdUnits) collectUnits(mx map[string]int64, conn systemdConnection)
 
 		seen[unit.Name] = true
 
+		if s.SkipTransient {
+			if _, ok := s.unitTransient[unit.Name]; !ok {
+				prop, err := s.getUnitTransientProperty(conn, unit.Name)
+				if err != nil {
+					return err
+				}
+				prop = strings.Trim(prop, "\"")
+				s.unitTransient[unit.Name] = prop == "true"
+			}
+			if s.unitTransient[unit.Name] {
+				continue
+			}
+		}
+
 		if !s.seenUnits[unit.Name] {
 			s.seenUnits[unit.Name] = true
 			s.addUnitCharts(name, typ)
@@ -72,6 +88,12 @@ func (s *SystemdUnits) collectUnits(mx map[string]int64, conn systemdConnection)
 			if name, typ, ok := extractUnitNameType(k); ok {
 				s.removeUnitCharts(name, typ)
 			}
+		}
+	}
+
+	for k := range s.unitTransient {
+		if !seen[k] {
+			delete(s.unitTransient, k)
 		}
 	}
 
@@ -128,6 +150,20 @@ func (s *SystemdUnits) getLoadedUnitsByPatterns(conn systemdConnection) ([]dbus.
 	s.Debugf("got total/loaded %d/%d units", len(units), len(loaded))
 
 	return loaded, nil
+}
+
+func (s *SystemdUnits) getUnitTransientProperty(conn systemdConnection, unit string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout.Duration())
+	defer cancel()
+
+	s.Debugf("calling function 'GetUnitProperty' for unit '%s'", unit)
+
+	prop, err := conn.GetUnitPropertyContext(ctx, unit, transientProperty)
+	if err != nil {
+		return "", fmt.Errorf("error on GetUnitProperty: %v", err)
+	}
+
+	return prop.Value.String(), nil
 }
 
 func extractUnitNameType(name string) (string, string, bool) {

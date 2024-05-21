@@ -77,6 +77,10 @@ modules:
                   - pattern1
                   - pattern2
                 ```
+            - name: skip_transient
+              description: If set, skip data collection for systemd transient units.
+              default_value: "false"
+              required: false
             - name: collect_unit_files
               description: If set to true, collect the state of installed unit files. Enabling this may increase system overhead.
               default_value: "false"
