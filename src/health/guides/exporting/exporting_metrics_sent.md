@@ -43,4 +43,4 @@ To troubleshoot this alert, follow these steps:
 
 ### Useful resources
 
-1. [Netdata Exporting Reference](https://github.com/netdata/netdata/blob/master/src/exporting/README.md)
+1. [Netdata Exporting Reference](/src/exporting/README.md)

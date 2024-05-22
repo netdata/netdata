@@ -12,15 +12,15 @@ sidebar_position: 30
 
 Netdata can be installed:
 
-- [As a DEB/RPM package](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)
-- [As a static binary](https://github.com/netdata/netdata/blob/master/packaging/makeself/README.md)
-- [From a git checkout](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)
-- [As a docker container](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)
+- [As a DEB/RPM package](/packaging/installer/methods/packages.md)
+- [As a static binary](/packaging/makeself/README.md)
+- [From a git checkout](/packaging/installer/methods/manual.md)
+- [As a docker container](/packaging/docker/README.md)
 
-The [one line installer kickstart.sh](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
+The [one line installer kickstart.sh](/packaging/installer/methods/kickstart.md)
 picks the most appropriate method out of the first three for any system
 and is the recommended installation method, if you don't use containers.
 
 `kickstart.sh` can also be used for 
-[offline installation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md),
+[offline installation](/packaging/installer/methods/offline.md),
 suitable for air-gapped systems.

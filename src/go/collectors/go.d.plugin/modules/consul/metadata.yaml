@@ -99,7 +99,7 @@ modules:
               default_value: ""
               required: false
             - name: max_filter
-              description: Checks processing/charting filter. Uses [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md).
+              description: Checks processing/charting filter. Uses [simple patterns](/src/libnetdata/simple_pattern/README.md).
               default_value: ""
               required: false
             - name: username

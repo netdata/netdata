@@ -108,7 +108,7 @@ type (
 	}
 )
 
-func (v HierarchyValue) IsSet() bool          { return v.ID != "" && v.Name != "" }
+func (v *HierarchyValue) IsSet() bool         { return v.ID != "" && v.Name != "" }
 func (v *HierarchyValue) Set(id, name string) { v.ID = id; v.Name = name }
 
 func (h ClusterHierarchy) IsSet() bool { return h.DC.IsSet() }

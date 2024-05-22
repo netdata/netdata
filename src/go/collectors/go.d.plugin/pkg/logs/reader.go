@@ -89,10 +89,10 @@ func (r *Reader) open() error {
 func (r *Reader) Read(p []byte) (n int, err error) {
 	n, err = r.file.Read(p)
 	if err != nil {
-		switch err {
-		case io.EOF:
+		switch {
+		case err == io.EOF:
 			err = r.handleEOFErr()
-		case os.ErrInvalid: // r.file is nil after Close
+		case errors.Is(err, os.ErrInvalid): // r.file is nil after Close
 			err = r.handleInvalidArgErr()
 		}
 		return

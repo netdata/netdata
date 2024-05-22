@@ -19,6 +19,9 @@
 #define DEFAULT_PREFERRED_IDS "*"
 #define DEFAULT_EXCLUDED_DISKS "loop* ram*"
 
+// always 512 on Linux (https://github.com/torvalds/linux/blob/daa121128a2d2ac6006159e2c47676e4fcd21eab/include/linux/blk_types.h#L25-L34)
+#define SECTOR_SIZE 512
+
 static netdata_mutex_t diskstats_dev_mutex = NETDATA_MUTEX_INITIALIZER;
 
 static struct disk {
@@ -32,7 +35,6 @@ static struct disk {
     uint32_t hash;
     unsigned long major;
     unsigned long minor;
-    int sector_size;
     int type;
 
     bool excluded;
@@ -178,8 +180,6 @@ static struct disk {
 
 #define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete___safe_from_collector_thread(st); (st) = NULL; } } while(st)
 
-// static char *path_to_get_hw_sector_size = NULL;
-// static char *path_to_get_hw_sector_size_partitions = NULL;
 static char *path_to_sys_dev_block_major_minor_string = NULL;
 static char *path_to_sys_block_device = NULL;
 static char *path_to_sys_block_device_bcache = NULL;
@@ -758,7 +758,6 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
     d->major = major;
     d->minor = minor;
     d->type = DISK_TYPE_UNKNOWN; // Default type. Changed later if not correct.
-    d->sector_size = 512; // the default, will be changed below
     d->next = NULL;
 
     // append it to the list
@@ -853,45 +852,6 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         d->mount_point = strdupz(mi->mount_point);
     else
         d->mount_point = NULL;
-
-    // ------------------------------------------------------------------------
-    // find the disk sector size
-
-    /*
-     * sector size is always 512 bytes inside the kernel #3481
-     *
-    {
-        char tf[FILENAME_MAX + 1], *t;
-        strncpyz(tf, d->device, FILENAME_MAX);
-
-        // replace all / with !
-        for(t = tf; *t ;t++)
-            if(unlikely(*t == '/')) *t = '!';
-
-        if(likely(d->type == DISK_TYPE_PARTITION))
-            snprintfz(buffer, FILENAME_MAX, path_to_get_hw_sector_size_partitions, d->major, d->minor, tf);
-        else
-            snprintfz(buffer, FILENAME_MAX, path_to_get_hw_sector_size, tf);
-
-        FILE *fpss = fopen(buffer, "r");
-        if(likely(fpss)) {
-            char buffer2[1024 + 1];
-            char *tmp = fgets(buffer2, 1024, fpss);
-
-            if(likely(tmp)) {
-                d->sector_size = str2i(tmp);
-                if(unlikely(d->sector_size <= 0)) {
-                    collector_error("Invalid sector size %d for device %s in %s. Assuming 512.", d->sector_size, d->device, buffer);
-                    d->sector_size = 512;
-                }
-            }
-            else collector_error("Cannot read data for sector size for device %s from %s. Assuming 512.", d->device, buffer);
-
-            fclose(fpss);
-        }
-        else collector_error("Cannot read sector size for device %s from %s. Assuming 512.", d->device, buffer);
-    }
-    */
 
     // ------------------------------------------------------------------------
     // check if the device is a bcache
@@ -1432,12 +1392,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/%s");
         path_to_sys_dev_block_major_minor_string = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get block device infos", buffer);
 
-        //snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s/queue/hw_sector_size");
-        //path_to_get_hw_sector_size = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get h/w sector size", buffer);
-
-        //snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/dev/block/%lu:%lu/subsystem/%s/../queue/hw_sector_size");
-        //path_to_get_hw_sector_size_partitions = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to get h/w sector size for partitions", buffer);
-
         snprintfz(buffer, FILENAME_MAX, "%s/dev/mapper", netdata_configured_host_prefix);
         path_to_device_mapper = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to device mapper", buffer);
 
@@ -1603,8 +1557,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // count the global system disk I/O of physical disks
 
         if(unlikely(d->type == DISK_TYPE_PHYSICAL)) {
-            system_read_kb  += readsectors * d->sector_size / 1024;
-            system_write_kb += writesectors * d->sector_size / 1024;
+            system_read_kb  += readsectors * SECTOR_SIZE / 1024;
+            system_write_kb += writesectors * SECTOR_SIZE / 1024;
         }
 
         // --------------------------------------------------------------------------
@@ -1621,14 +1575,14 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             d->do_io = CONFIG_BOOLEAN_YES;
 
-            last_readsectors = d->disk_io.rd_io_reads ? d->disk_io.rd_io_reads->collector.last_collected_value : 0;
-            last_writesectors = d->disk_io.rd_io_writes ? d->disk_io.rd_io_writes->collector.last_collected_value : 0;
+            last_readsectors = d->disk_io.rd_io_reads ? d->disk_io.rd_io_reads->collector.last_collected_value / SECTOR_SIZE : 0;
+            last_writesectors = d->disk_io.rd_io_writes ? d->disk_io.rd_io_writes->collector.last_collected_value / SECTOR_SIZE : 0;
 
             common_disk_io(&d->disk_io,
                            d->chart_id,
                            d->disk,
-                           readsectors * d->sector_size,
-                           writesectors * d->sector_size,
+                           readsectors * SECTOR_SIZE,
+                           writesectors * SECTOR_SIZE,
                            update_every,
                            disk_labels_cb,
                            d);
@@ -1651,7 +1605,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , RRDSET_TYPE_AREA
                 );
 
-                d->rd_io_discards = rrddim_add(d->st_ext_io, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_INCREMENTAL);
+                d->rd_io_discards = rrddim_add(d->st_ext_io, "discards", NULL, SECTOR_SIZE, 1024, RRD_ALGORITHM_INCREMENTAL);
 
                 add_labels_to_disk(d, d->st_ext_io);
             }
@@ -2079,8 +2033,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(d->st_avgsz, RRDSET_FLAG_DETAIL);
 
-                    d->rd_avgsz_reads  = rrddim_add(d->st_avgsz, "reads",  NULL, d->sector_size, 1024,      RRD_ALGORITHM_ABSOLUTE);
-                    d->rd_avgsz_writes = rrddim_add(d->st_avgsz, "writes", NULL, d->sector_size * -1, 1024, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_avgsz_reads  = rrddim_add(d->st_avgsz, "reads",  NULL, SECTOR_SIZE, 1024,      RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_avgsz_writes = rrddim_add(d->st_avgsz, "writes", NULL, SECTOR_SIZE * -1, 1024, RRD_ALGORITHM_ABSOLUTE);
 
                     add_labels_to_disk(d, d->st_avgsz);
                 }
@@ -2109,7 +2063,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(d->st_ext_avgsz, RRDSET_FLAG_DETAIL);
 
-                    d->rd_avgsz_discards = rrddim_add(d->st_ext_avgsz, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_ABSOLUTE);
+                    d->rd_avgsz_discards = rrddim_add(d->st_ext_avgsz, "discards", NULL, SECTOR_SIZE, 1024, RRD_ALGORITHM_ABSOLUTE);
 
                     add_labels_to_disk(d, d->st_ext_avgsz);
                 }

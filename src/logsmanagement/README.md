@@ -212,7 +212,7 @@ This collector will collect [Apache](https://httpd.apache.org/) and [Nginx](http
 |      :------------:  	| ------------ |
 | `log path` | The path to the web server's `access.log`. If set to `auto`, the collector will attempt to auto-discover it, provided the name of the configuration section is either `Apache access.log` or `Nginx access.log`. |
 | `use inotify` | Select between inotify and file stat watchers (providing `libfluent-bit.so` has been built with inotify support). It defaults to `yes`. Set to `no` if abnormally high CPU usage is observed or if the log source is expected to consistently produce tens of thousands of (unbuffered) logs per second. |
-| `log format` | The log format to be used for parsing. Unlike the [`GO weblog`]() module, only the `CSV` parser is supported and it can be configured [in the same way](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/weblog/README.md#known-fields) as in the `GO` module. If set to `auto`, the collector will attempt to auto-detect the log format using the same logic explained [here](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/weblog/README.md#log-parser-auto-detection). |
+| `log format` | The log format to be used for parsing. Unlike the [`GO weblog`]() module, only the `CSV` parser is supported and it can be configured [in the same way](/src/go/collectors/go.d.plugin/modules/weblog/README.md#known-fields) as in the `GO` module. If set to `auto`, the collector will attempt to auto-detect the log format using the same logic explained [here](/src/go/collectors/go.d.plugin/modules/weblog/README.md#log-parser-auto-detection). |
 | `verify parsed logs` | If set to `yes`, the parser will attempt to verify that the parsed fields are valid, before extracting metrics from them. If they are invalid (for example, the response code is less than `100`), the `invalid` dimension will be incremented instead. Setting this to `no` will result in a slight performance gain. |
 | `vhosts chart` | Enable chart showing names of the virtual hosts extracted from the collected logs. |
 | `ports chart` | Enable chart showing port numbers extracted from the collected logs. |
@@ -380,7 +380,7 @@ Netdata supports 2 incoming streaming configurations:
 
 For option 1, please refer to the [syslog collector](#collector-configuration-syslog) section. This section will be focused on using option 2.
 
-A Netdata agent can be used as a logs aggregation parent to listen to `Forward` messages, using either Unix or network sockets. This option is separate to [Netdata's metrics streaming](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md) and can be used independently of whether that's enabled or not (and it uses a different listening socket too). 
+A Netdata agent can be used as a logs aggregation parent to listen to `Forward` messages, using either Unix or network sockets. This option is separate to [Netdata's metrics streaming](/docs/observability-centralization-points/README.md) and can be used independently of whether that's enabled or not (and it uses a different listening socket too). 
 
 This setting can be enabled under the `[forward input]` section in `logsmanagement.d.conf`:
 
@@ -658,7 +658,7 @@ If during the Fluent Bit build step you are seeing the following message:
 ```
 -- Could NOT find Journald (missing: JOURNALD_LIBRARY JOURNALD_INCLUDE_DIR)
 ``` 
-it means that the systemd development libraries are missing from your system. Please see [how to install them alongside other required packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md).
+it means that the systemd development libraries are missing from your system. Please see [how to install them alongside other required packages](/packaging/installer/methods/manual.md).
 
 2. I am observing very high CPU usage when monitoring a log source using `flb_tail` or `flb_web_log`.
 

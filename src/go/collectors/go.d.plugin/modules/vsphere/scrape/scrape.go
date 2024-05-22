@@ -34,20 +34,20 @@ type Scraper struct {
 }
 
 // Default settings for vCenter 6.5 and above is 256, prior versions of vCenter have this set to 64.
-func (c *Scraper) calcMaxQuery() {
-	major, minor, err := parseVersion(c.Version())
+func (s *Scraper) calcMaxQuery() {
+	major, minor, err := parseVersion(s.Version())
 	if err != nil || major < 6 || minor == 0 {
-		c.maxQuery = 64
+		s.maxQuery = 64
 		return
 	}
-	c.maxQuery = 256
+	s.maxQuery = 256
 }
 
-func (c Scraper) ScrapeHosts(hosts rs.Hosts) []performance.EntityMetric {
+func (s *Scraper) ScrapeHosts(hosts rs.Hosts) []performance.EntityMetric {
 	t := time.Now()
 	pqs := newHostsPerfQuerySpecs(hosts)
-	ms := c.scrapeMetrics(pqs)
-	c.Debugf("scraping : scraped metrics for %d/%d hosts, process took %s",
+	ms := s.scrapeMetrics(pqs)
+	s.Debugf("scraping : scraped metrics for %d/%d hosts, process took %s",
 		len(ms),
 		len(hosts),
 		time.Since(t),
@@ -55,11 +55,11 @@ func (c Scraper) ScrapeHosts(hosts rs.Hosts) []performance.EntityMetric {
 	return ms
 }
 
-func (c Scraper) ScrapeVMs(vms rs.VMs) []performance.EntityMetric {
+func (s *Scraper) ScrapeVMs(vms rs.VMs) []performance.EntityMetric {
 	t := time.Now()
 	pqs := newVMsPerfQuerySpecs(vms)
-	ms := c.scrapeMetrics(pqs)
-	c.Debugf("scraping : scraped metrics for %d/%d vms, process took %s",
+	ms := s.scrapeMetrics(pqs)
+	s.Debugf("scraping : scraped metrics for %d/%d vms, process took %s",
 		len(ms),
 		len(vms),
 		time.Since(t),
@@ -67,16 +67,16 @@ func (c Scraper) ScrapeVMs(vms rs.VMs) []performance.EntityMetric {
 	return ms
 }
 
-func (c Scraper) scrapeMetrics(pqs []types.PerfQuerySpec) []performance.EntityMetric {
+func (s *Scraper) scrapeMetrics(pqs []types.PerfQuerySpec) []performance.EntityMetric {
 	tc := newThrottledCaller(5)
 	var ms []performance.EntityMetric
 	lock := &sync.Mutex{}
 
-	chunks := chunkify(pqs, c.maxQuery)
+	chunks := chunkify(pqs, s.maxQuery)
 	for _, chunk := range chunks {
 		pqs := chunk
 		job := func() {
-			c.scrape(&ms, lock, pqs)
+			s.scrape(&ms, lock, pqs)
 		}
 		tc.call(job)
 	}
@@ -85,10 +85,10 @@ func (c Scraper) scrapeMetrics(pqs []types.PerfQuerySpec) []performance.EntityMe
 	return ms
 }
 
-func (c Scraper) scrape(metrics *[]performance.EntityMetric, lock *sync.Mutex, pqs []types.PerfQuerySpec) {
-	m, err := c.PerformanceMetrics(pqs)
+func (s *Scraper) scrape(metrics *[]performance.EntityMetric, lock *sync.Mutex, pqs []types.PerfQuerySpec) {
+	m, err := s.PerformanceMetrics(pqs)
 	if err != nil {
-		c.Error(err)
+		s.Error(err)
 		return
 	}
 

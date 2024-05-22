@@ -41,11 +41,11 @@ SRE team for the user-facing SaaS application, and a second IT team for managing
 don't monitor the same nodes, they can work in separate Spaces and then further organize their nodes into War Rooms.
 
 Next, set up War Rooms. Netdata Cloud creates dashboards and visualizations based on the nodes added to a given War
-Room. You can [organize War Rooms](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#war-room-organization) in any way
+Room. You can [organize War Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#war-room-organization) in any way
 you want, such as by the application type, for end-to-end application monitoring, or as an incident response tool.
 
-Learn more about [Spaces](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) and [War
-Rooms](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms), including how to manage each, in their respective reference
+Learn more about [Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces) and [War
+Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms), including how to manage each, in their respective reference
 documentation.
 
 ### Invite your team
@@ -55,7 +55,7 @@ inviting others, you can better synchronize with your team or colleagues to unde
 When something goes wrong, you'll be ready to collaboratively troubleshoot complex performance problems from a single
 pane of glass.
 
-To [invite new users](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team), click on **Invite Users** in the
+To [invite new users](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team), click on **Invite Users** in the
 Space management Area. Choose which War Rooms to add this user to, then click **Send**.
 
 ### See an overview of your infrastructure
@@ -65,28 +65,28 @@ These tabs can be separated into "static", meaning they are by default presented
 
 #### Static tabs
 
-- The default tab for any War Room is the [Home tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/home-tab.md), which gives you an overview of this Space.  
+- The default tab for any War Room is the [Home tab](/docs/dashboards-and-charts/home-tab.md), which gives you an overview of this Space.  
   Here you can see the number of Nodes claimed, data retention statics, users by role, alerts and more.
 
-- The [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md) gives you the ability to see the status (offline or online), host details, alert status and also a short overview of some key metrics from all your nodes at a glance.
+- The [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md) gives you the ability to see the status (offline or online), host details, alert status and also a short overview of some key metrics from all your nodes at a glance.
 
-- The third and most important tab is the [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) which uses composite charts to display real-time metrics from every available node in a given War Room.
+- The third and most important tab is the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) which uses composite charts to display real-time metrics from every available node in a given War Room.
 
-- [Kubernetes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/kubernetes-tab.md) is a logical grouping of charts regarding your Kubernetes clusters. It contains a subset of the charts available in the **Overview tab**.
+- [Kubernetes tab](/docs/dashboards-and-charts/kubernetes-tab.md) is a logical grouping of charts regarding your Kubernetes clusters. It contains a subset of the charts available in the **Overview tab**.
 
-- The [Dashboards tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dashboards-tab.md) gives you the ability to have tailored made views of specific/targeted interfaces for your infrastructure using any number of charts from any number of nodes.
+- The [Dashboards tab](/docs/dashboards-and-charts/dashboards-tab.md) gives you the ability to have tailored made views of specific/targeted interfaces for your infrastructure using any number of charts from any number of nodes.
 
-- The [Alerts tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md) provides you with an overview for all the active alerts you receive for the nodes in this War Room, you can also see all the alerts that are configured to be triggered in any given moment.
+- The [Alerts tab](/docs/dashboards-and-charts/alerts-tab.md) provides you with an overview for all the active alerts you receive for the nodes in this War Room, you can also see all the alerts that are configured to be triggered in any given moment.
 
-- The [Anomalies tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md) is dedicated to the Anomaly Advisor tool.
+- The [Anomalies tab](/docs/dashboards-and-charts/anomaly-advisor-tab.md) is dedicated to the Anomaly Advisor tool.
 
-- The [Functions tab](https://github.com/netdata/netdata/blob/master/docs/top-monitoring-netdata-functions.md) gives you the ability to visualize functions that the Netdata Agent collectors are able to expose.
+- The [Functions tab](/docs/top-monitoring-netdata-functions.md) gives you the ability to visualize functions that the Netdata Agent collectors are able to expose.
 
-- The [Feed & events](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/events-feed.md) tab lets you investigate events that occurred in the past, which is invaluable for troubleshooting.
+- The [Feed & events](/docs/dashboards-and-charts/events-feed.md) tab lets you investigate events that occurred in the past, which is invaluable for troubleshooting.
 
 #### Dynamic tabs
 
-If you open a [new dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dashboards-tab.md), jump to a single-node dashboard, or navigate to a dedicated alert page, a new tab will open in War Room bar.
+If you open a [new dashboard](/docs/dashboards-and-charts/dashboards-tab.md), jump to a single-node dashboard, or navigate to a dedicated alert page, a new tab will open in War Room bar.
 
 Tabs can be rearranged with drag-and-drop or closed with the **X** button. Open tabs persist between sessions, so you can always come right back to your preferred setup.
 
@@ -97,7 +97,7 @@ single-node dashboards in Netdata Cloud to drill down on specific issues, scrub 
 historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
 
 Learn more about [interacting with
-dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md) to get the most from all of Netdata's real-time
+dashboards and charts](/docs/dashboards-and-charts/netdata-charts.md) to get the most from all of Netdata's real-time
 metrics.
 
 ### Create new dashboards
@@ -109,7 +109,7 @@ from every node in your infrastructure on a single dashboard.
 ![An example system CPU
 dashboard](https://user-images.githubusercontent.com/1153921/108732974-4b09c480-74eb-11eb-87a2-c67e569c08b6.png)
 
-Read more about [creating new dashboards](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dashboards-tab.md) for more details about the process and
+Read more about [creating new dashboards](/docs/dashboards-and-charts/dashboards-tab.md) for more details about the process and
 additional tips on best leveraging the feature to help you troubleshoot complex performance problems.
 
 ## Set up your nodes
@@ -136,23 +136,23 @@ cd /etc/netdata
 sudo ./edit-config netdata.conf
 ```
 
-Our [configuration basics doc](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) contains more information about `netdata.conf`, `edit-config`,
+Our [configuration basics doc](/docs/netdata-agent/configuration/README.md) contains more information about `netdata.conf`, `edit-config`,
 along with simple examples to get you familiar with editing your node's configuration.
 
-After you've learned the basics, you should [secure your infrastructure's nodes](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md) using
+After you've learned the basics, you should [secure your infrastructure's nodes](/docs/security-and-privacy-design/README.md) using
 one of our recommended methods. These security best practices ensure no untrusted parties gain access to the metrics
 collected on any of your nodes.
 
 ### Collect metrics from systems and applications
 
-Netdata has [300+ pre-installed collectors](https://github.com/netdata/netdata/blob/master/src/collectors/COLLECTORS.md) that gather thousands of metrics with zero
+Netdata has [300+ pre-installed collectors](/src/collectors/COLLECTORS.md) that gather thousands of metrics with zero
 configuration. Collectors search each of your nodes in default locations and ports to find running applications and
 gather as many metrics as they can without you having to configure them individually.
 
-Most collectors work without configuration, should you want more info, you can read more on [how Netdata's metrics collectors work](https://github.com/netdata/netdata/blob/master/src/collectors/README.md) and the [Collectors configuration reference](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md) documentation.
+Most collectors work without configuration, should you want more info, you can read more on [how Netdata's metrics collectors work](/src/collectors/README.md) and the [Collectors configuration reference](/src/collectors/REFERENCE.md) documentation.
 
-In addition, find detailed information about which [system](https://github.com/netdata/netdata/blob/master/docs/collecting-metrics/system-metrics.md),
-[container](https://github.com/netdata/netdata/blob/master/docs/collecting-metrics/container-metrics.md), and [application](https://github.com/netdata/netdata/blob/master/docs/collecting-metrics/application-metrics.md) metrics you can
+In addition, find detailed information about which [system](/docs/collecting-metrics/system-metrics.md),
+[container](/docs/collecting-metrics/container-metrics.md), and [application](/docs/collecting-metrics/application-metrics.md) metrics you can
 collect from across your infrastructure with Netdata.
 
 ## Netdata Cloud features
@@ -161,62 +161,62 @@ collect from across your infrastructure with Netdata.
   <Box
     title="Spaces and War Rooms">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces)" title="Spaces" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms)" title="War Rooms" />
+      <BoxListItemRegexLink to="[](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces)" title="Spaces" />
+      <BoxListItemRegexLink to="[](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms)" title="War Rooms" />
     </BoxList>
   </Box>
   <Box
     title="Dashboards">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)" title="Metrics tab" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md)" title="Nodes tab" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/kubernetes-tab.md)" title="Kubernetes" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dashboards-tab.md)" title="Create new dashboards" />
+      <BoxListItemRegexLink to="[](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)" title="Metrics tab" />
+      <BoxListItemRegexLink to="[](/docs/dashboards-and-charts/nodes-tab.md)" title="Nodes tab" />
+      <BoxListItemRegexLink to="[](/docs/dashboards-and-charts/kubernetes-tab.md)" title="Kubernetes" />
+      <BoxListItemRegexLink to="[](/docs/dashboards-and-charts/dashboards-tab.md)" title="Create new dashboards" />
     </BoxList>
   </Box>
   <Box
     title="Alerts and notifications">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md#netdata-cloud)" title="View active alerts" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md)" title="Alert notifications" />
+      <BoxListItemRegexLink to="[](/docs/dashboards-and-charts/alerts-tab.md#netdata-cloud)" title="View active alerts" />
+      <BoxListItemRegexLink to="[](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md)" title="Alert notifications" />
     </BoxList>
   </Box>
   <Box
     title="Troubleshooting with Netdata Cloud">
-    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md)" title="Metric Correlations" />
-    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md)" title="Anomaly Advisor" />
-    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/events-feed.md)" title="Events Feed" />
+    <BoxListItemRegexLink to="[](/docs/metric-correlations.md)" title="Metric Correlations" />
+    <BoxListItemRegexLink to="[](/docs/dashboards-and-charts/anomaly-advisor-tab.md)" title="Anomaly Advisor" />
+    <BoxListItemRegexLink to="[](/docs/dashboards-and-charts/events-feed.md)" title="Events Feed" />
   </Box>
   <Box
     title="Management and settings">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/README.md)" title="Sign in with email, Google, GitHub or with an SSO tool" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team)" title="Invite your team" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/themes.md)" title="Choose your Netdata Cloud theme" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md)" title="Role-Based Access" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-subscription-plans.md)" title="Paid Plans" />
+      <BoxListItemRegexLink to="[](/docs/netdata-cloud/authentication-and-authorization/README.md)" title="Sign in with email, Google, GitHub or with an SSO tool" />
+      <BoxListItemRegexLink to="[](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team)" title="Invite your team" />
+      <BoxListItemRegexLink to="[](/docs/dashboards-and-charts/themes.md)" title="Choose your Netdata Cloud theme" />
+      <BoxListItemRegexLink to="[](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md)" title="Role-Based Access" />
+      <BoxListItemRegexLink to="[](/docs/netdata-cloud/netdata-subscription-plans.md)" title="Paid Plans" />
     </BoxList>
   </Box>
 </Grid>
 
 - Spaces and War Rooms
-  - [Spaces](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces)
-  - [War Rooms](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms)
+  - [Spaces](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-spaces)
+  - [War Rooms](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#netdata-cloud-war-rooms)
 - Dashboards
-  - [Metrics tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)
-  - [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md)
-  - [Kubernetes](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/kubernetes-tab.md)
-  - [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dashboards-tab.md)
+  - [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)
+  - [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md)
+  - [Kubernetes](/docs/dashboards-and-charts/kubernetes-tab.md)
+  - [Create new dashboards](/docs/dashboards-and-charts/dashboards-tab.md)
 - Alerts and notifications
-  - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md#netdata-cloud)
-  - [Alert notifications](https://github.com/netdata/netdata/blob/master/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md)
+  - [View active alerts](/docs/dashboards-and-charts/alerts-tab.md#netdata-cloud)
+  - [Alert notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md)
 - Troubleshooting with Netdata Cloud
-  - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/metric-correlations.md)
-  - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/anomaly-advisor-tab.md)
-  - [Events Feed](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/events-feed.md)
+  - [Metric Correlations](/docs/metric-correlations.md)
+  - [Anomaly Advisor](/docs/dashboards-and-charts/anomaly-advisor-tab.md)
+  - [Events Feed](/docs/dashboards-and-charts/events-feed.md)
 - Management and settings
-  - [Sign in with email, Google, GitHub or with an SSO tool](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/README.md)
-  - [Invite your team](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team)
-  - [Choose your Netdata Cloud theme](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/themes.md)
-  - [Role-Based Access](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md)
-  - [Paid Plans](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-subscription-plans.md)
+  - [Sign in with email, Google, GitHub or with an SSO tool](/docs/netdata-cloud/authentication-and-authorization/README.md)
+  - [Invite your team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#invite-your-team)
+  - [Choose your Netdata Cloud theme](/docs/dashboards-and-charts/themes.md)
+  - [Role-Based Access](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md)
+  - [Paid Plans](/docs/netdata-cloud/netdata-subscription-plans.md)

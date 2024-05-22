@@ -1,6 +1,6 @@
 <!--
 title: "Time series selector"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/pkg/prometheus/selector/README.md"
+custom_edit_url: "/src/go/collectors/go.d.plugin/pkg/prometheus/selector/README.md"
 sidebar_label: "Time series selector"
 learn_status: "Published"
 learn_rel_path: "Developers/External plugins/go.d.plugin/Helper Packages"
@@ -21,7 +21,7 @@ In the simplest form you need to specify only a metric name.
  <metric_name_pattern>  ::= simple pattern
 ```
 
-The metric name pattern syntax is [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md).
+The metric name pattern syntax is [simple pattern](/src/libnetdata/simple_pattern/README.md).
 
 ### Examples
 
@@ -58,7 +58,7 @@ It is possible to filter these time series further by appending a comma separate
  <label_value_pattern>  ::= a label value pattern, depends on <op>
 ```
 
-The metric name pattern syntax is [simple pattern](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md).
+The metric name pattern syntax is [simple pattern](/src/libnetdata/simple_pattern/README.md).
 
 Label matching operators:
 
@@ -66,8 +66,8 @@ Label matching operators:
 -   `!=`: Match labels that are not equal to the provided string.
 -   `=~`: Match labels that [regex-match](https://golang.org/pkg/regexp/syntax/) the provided string.
 -   `!~`: Match labels that do not [regex-match](https://golang.org/pkg/regexp/syntax/) the provided string.
--   `=*`: Match labels that [simple-pattern-match](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) the provided string.
--   `!*`: Match labels that do not [simple-pattern-match](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) the provided string.
+-   `=*`: Match labels that [simple-pattern-match](/src/libnetdata/simple_pattern/README.md) the provided string.
+-   `!*`: Match labels that do not [simple-pattern-match](/src/libnetdata/simple_pattern/README.md) the provided string.
 
 ### Examples
 

@@ -105,7 +105,7 @@ unsigned int register_spacing = 0;  /* not used if probing */
 char *driver_device = NULL;         /* not used if probing */
 
 /* Out-of-band Communication Configuration */
-int protocol_version = -1;      // IPMI_MONITORING_PROTOCOL_VERSION_1_5, etc. or -1 for default
+int freeimpi_protocol_version = -1;      // IPMI_MONITORING_PROTOCOL_VERSION_1_5, etc. or -1 for default
 char *username = "";
 char *password = "";
 unsigned char *k_g = NULL;
@@ -151,7 +151,7 @@ static void initialize_ipmi_config (struct ipmi_monitoring_ipmi_config *ipmi_con
     ipmi_config->register_spacing = register_spacing;
     ipmi_config->driver_device = driver_device;
 
-    ipmi_config->protocol_version = protocol_version;
+    ipmi_config->protocol_version = freeimpi_protocol_version;
     ipmi_config->username = username;
     ipmi_config->password = password;
     ipmi_config->k_g = k_g;
@@ -1862,9 +1862,9 @@ int main (int argc, char **argv) {
         }
         else if(strcmp("driver-type", argv[i]) == 0) {
             if (hostname) {
-                protocol_version = netdata_parse_outofband_driver_type(argv[++i]);
-                if(debug) fprintf(stderr, "%s: outband protocol version set to '%d'\n",
-                                  program_name, protocol_version);
+                freeimpi_protocol_version = netdata_parse_outofband_driver_type(argv[++i]);
+                if(debug) fprintf(stderr, "%s: outband FreeIMPI protocol version set to '%d'\n",
+                                  program_name, freeimpi_protocol_version);
             }
             else {
                 driver_type = netdata_parse_inband_driver_type(argv[++i]);
@@ -1879,7 +1879,7 @@ int main (int argc, char **argv) {
                             program_name);
 
             }
-            else if (protocol_version < 0 || protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
+            else if (freeimpi_protocol_version < 0 || freeimpi_protocol_version == IPMI_MONITORING_PROTOCOL_VERSION_1_5) {
                 workaround_flags |= IPMI_MONITORING_WORKAROUND_FLAGS_PROTOCOL_VERSION_1_5_NO_AUTH_CODE_CHECK;
 
                 if (debug)

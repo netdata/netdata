@@ -81,7 +81,7 @@ service](https://discourse.pi-hole.net/t/how-do-i-configure-my-devices-to-use-pi
 finished setting up Pi-hole at this point.
 
 As far as configuring Netdata to monitor Pi-hole metrics, there's nothing you actually need to do. Netdata's [Pi-hole
-collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/pihole/README.md) will autodetect the new service
+collector](/src/go/collectors/go.d.plugin/modules/pihole/README.md) will autodetect the new service
 running on your Raspberry Pi and immediately start collecting metrics every second.
 
 Restart Netdata with `sudo systemctl restart netdata`, which will then recognize that Pi-hole is running and start a
@@ -103,9 +103,9 @@ action](https://user-images.githubusercontent.com/1153921/80827388-b9fee100-8b98
 ### Enable temperature sensor monitoring
 
 You need to manually enable Netdata's built-in [temperature sensor
-collector](https://github.com/netdata/netdata/blob/master/src/collectors/charts.d.plugin/sensors/README.md) to start collecting metrics.
+collector](/src/collectors/charts.d.plugin/sensors/README.md) to start collecting metrics.
 
-> Netdata uses a few plugins to manage its [collectors](https://github.com/netdata/netdata/blob/master/src/collectors/REFERENCE.md), each using a different language: Go,
+> Netdata uses a few plugins to manage its [collectors](/src/collectors/REFERENCE.md), each using a different language: Go,
 > Python, Node.js, and Bash. While our Go collectors are undergoing the most active development, we still support the
 > other languages. In this case, you need to enable a temperature sensor collector that's written in Bash.
 
@@ -123,7 +123,7 @@ Raspberry Pi temperature sensor monitoring.
 ### Storing historical metrics on your Raspberry Pi
 
 By default, Netdata allocates 256 MiB in disk space to store historical metrics inside the [database
-engine](https://github.com/netdata/netdata/blob/master/src/database/engine/README.md). On the Raspberry Pi used for this guide, Netdata collects 1,500 metrics every
+engine](/src/database/engine/README.md). On the Raspberry Pi used for this guide, Netdata collects 1,500 metrics every
 second, which equates to storing 3.5 days worth of historical metrics.
 
 You can increase this allocation by editing `netdata.conf` and increasing the `dbengine multihost disk space` setting to
@@ -135,6 +135,6 @@ more than 256.
 ```
 
 Use our [database sizing
-calculator](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
-and the [Database configuration documentation](https://github.com/netdata/netdata/blob/master/src/database/README.md) to help you determine the right
+calculator](/docs/netdata-agent/configuration/optimizing-metrics-database/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
+and the [Database configuration documentation](/src/database/README.md) to help you determine the right
 setting for your Raspberry Pi.

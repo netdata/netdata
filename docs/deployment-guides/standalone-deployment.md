@@ -77,7 +77,7 @@ No special configuration needed.
 |   Centrally dispatched alert notifications    |                                                                         Yes, via Netdata Cloud                                                                          |
 |         Data are exclusively on-prem          |                                                 Yes, Netdata Cloud queries Netdata Agents to satisfy dashboard queries.                                                 |
 
-By [connecting all Netdata agents to Netdata Cloud](https://github.com/netdata/netdata/blob/master/src/claim/README.md), you can have a unified infrastructure view of all your nodes, with aggregated charts, without configuring [observability centralization points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md).
+By [connecting all Netdata agents to Netdata Cloud](/src/claim/README.md), you can have a unified infrastructure view of all your nodes, with aggregated charts, without configuring [observability centralization points](/docs/observability-centralization-points/README.md).
 
 ```mermaid
 flowchart LR

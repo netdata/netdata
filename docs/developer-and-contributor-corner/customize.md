@@ -2,9 +2,9 @@
 
 > ### Disclaimer
 >
-> This document is only applicable to the v1 version of the dashboard and doesn't affect the [Netdata Dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/README.md).
+> This document is only applicable to the v1 version of the dashboard and doesn't affect the [Netdata Dashboard](/docs/dashboards-and-charts/README.md).
 
-While the [Netdata dashboard](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md) comes preconfigured with hundreds of charts and
+While the [Netdata dashboard](/src/web/gui/README.md) comes preconfigured with hundreds of charts and
 thousands of metrics, you may want to alter your experience based on a particular use case or preferences.
 
 ## Dashboard settings
@@ -64,7 +64,7 @@ Edit the file with customizations to the `title`, `icon`, and `info` fields. Rep
 icon from [Font Awesome](https://fontawesome.com/cheatsheet) to customize the icons that appear throughout the
 dashboard.
 
-Save the file, then navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) to edit `netdata.conf`. Add
+Save the file, then navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md) to edit `netdata.conf`. Add
 the following line to the `[web]` section to tell Netdata where to find your custom configuration.
 
 ```conf

@@ -101,7 +101,7 @@ type (
 	}
 )
 
-func (ns nodeState) id() string   { return ns.name }
+func (ns *nodeState) id() string  { return ns.name }
 func (ns *nodeState) resetStats() { ns.stats = nodeStateStats{} }
 
 type (

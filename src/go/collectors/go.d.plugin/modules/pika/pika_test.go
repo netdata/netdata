@@ -284,7 +284,7 @@ type mockRedisClient struct {
 	calledClose bool
 }
 
-func (m mockRedisClient) Info(_ context.Context, _ ...string) (cmd *redis.StringCmd) {
+func (m *mockRedisClient) Info(_ context.Context, _ ...string) (cmd *redis.StringCmd) {
 	if m.errOnInfo {
 		cmd = redis.NewStringResult("", errors.New("error on Info"))
 	} else {

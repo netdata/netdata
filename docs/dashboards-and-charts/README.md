@@ -13,15 +13,15 @@ By default, the Agent dashboard shows the latest version (matching Netdata Cloud
 
 The Netdata dashboard consists of the following main sections:
 
-- [Home tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/home-tab.md)
-- [Nodes tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/nodes-tab.md)
-- [Netdata charts](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/netdata-charts.md)
-- [Metrics tab and single node tabs](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)
-- [Top tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/top-tab.md)
-- [Logs tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/logs-tab.md)
-- [Dashboards tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/dashboards-tab.md)
-- [Alerts tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/alerts-tab.md)
-- [Events tab](https://github.com/netdata/netdata/blob/master/docs/dashboards-and-charts/events-feed.md)
+- [Home tab](/docs/dashboards-and-charts/home-tab.md)
+- [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md)
+- [Netdata charts](/docs/dashboards-and-charts/netdata-charts.md)
+- [Metrics tab and single node tabs](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md)
+- [Top tab](/docs/dashboards-and-charts/top-tab.md)
+- [Logs tab](/docs/dashboards-and-charts/logs-tab.md)
+- [Dashboards tab](/docs/dashboards-and-charts/dashboards-tab.md)
+- [Alerts tab](/docs/dashboards-and-charts/alerts-tab.md)
+- [Events tab](/docs/dashboards-and-charts/events-feed.md)
 
 > **Note**
 >
@@ -31,10 +31,10 @@ The Netdata dashboard consists of the following main sections:
 
 ### Netdata Cloud
 
-You can access the dashboard at <https://app.netdata.cloud/> and [sign-in with an account or sign-up](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/README.md) if you don't have an account yet.
+You can access the dashboard at <https://app.netdata.cloud/> and [sign-in with an account or sign-up](/docs/netdata-cloud/authentication-and-authorization/README.md) if you don't have an account yet.
 
 ### Netdata Agent
 
 To view your Netdata dashboard, open a web browser and enter the address `http://NODE:19999`  - replace `NODE` with your Agent's IP address or hostname. If the Agent is on the same machine, use http://localhost:19999.
 
-Documentation for previous Agent dashboard can still be found [here](https://github.com/netdata/netdata/blob/master/src/web/gui/README.md).
+Documentation for previous Agent dashboard can still be found [here](/src/web/gui/README.md).

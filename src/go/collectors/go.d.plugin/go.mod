@@ -16,7 +16,7 @@ require (
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/docker/docker v26.1.2+incompatible
+	github.com/docker/docker v26.1.3+incompatible
 	github.com/facebook/time v0.0.0-20240419201005-e4f24e18edf7
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-redis/redis/v8 v8.11.5
@@ -29,7 +29,7 @@ require (
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/likexian/whois v1.15.3
-	github.com/likexian/whois-parser v1.24.15
+	github.com/likexian/whois-parser v1.24.16
 	github.com/lmittmann/tint v1.0.4
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mattn/go-xmlrpc v0.0.3
@@ -50,9 +50,9 @@ require (
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220504211119-3d4a969bb56b
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.30.0
-	k8s.io/apimachinery v0.30.0
-	k8s.io/client-go v0.30.0
+	k8s.io/api v0.30.1
+	k8s.io/apimachinery v0.30.1
+	k8s.io/client-go v0.30.1
 	layeh.com/radius v0.0.0-20190322222518-890bc1058917
 )
 

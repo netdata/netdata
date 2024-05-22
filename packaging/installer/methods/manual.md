@@ -23,7 +23,7 @@ To install the latest git version of Netdata, please follow these 2 steps:
 ## Prepare your system
 
 Before you begin, make sure that your repo and the repo's submodules are clean from any previous builds and up to date.
-Otherwise, [perform a cleanup](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
+Otherwise, [perform a cleanup](/packaging/installer/methods/manual.md#perform-a-cleanup-in-your-netdata-repo)
 
 Use our automatic requirements installer (_no need to be `root`_), which attempts to find the packages that
 should be installed on your system to build and run Netdata. It supports a large variety of major Linux distributions
@@ -205,22 +205,22 @@ cd netdata
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--nightly-channel`: Automatically update on every new nightly build.
--   `--disable-telemetry`: Opt-out of [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md) we use to make
+-   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) we use to make
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
     cannot be used to change installation types.
--   `--local-files`: Used for [offline installations](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md). Pass four file paths: the Netdata
+-   `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths: the Netdata
     tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
     `--stable-channel`, Netdata will use the local files.
 
 ### Connect node to Netdata Cloud during installation
 
-Unlike the [`kickstart.sh`](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
-not allow you to automatically [connect](https://github.com/netdata/netdata/blob/master/src/claim/README.md) your node to Netdata Cloud immediately after installation.
+Unlike the [`kickstart.sh`](/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
+not allow you to automatically [connect](/src/claim/README.md) your node to Netdata Cloud immediately after installation.
 
-See the [connect to cloud](https://github.com/netdata/netdata/blob/master/src/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
+See the [connect to cloud](/src/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
 
 ### 'nonrepresentable section on output' errors
 

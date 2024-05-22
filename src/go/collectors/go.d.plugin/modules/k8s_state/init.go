@@ -6,7 +6,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func (ks KubeState) initClient() (kubernetes.Interface, error) {
+func (ks *KubeState) initClient() (kubernetes.Interface, error) {
 	return ks.newKubeClient()
 }
 

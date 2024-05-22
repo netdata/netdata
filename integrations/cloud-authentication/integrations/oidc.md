@@ -33,9 +33,9 @@ The access settings for your client are the following:
 
 | field                    | value                                                 |
 | :--                      | :--                                                   |
-| Root URL                 | https://app.netdata.cloud/                            |
-| Home/Initiate login URL  | https://app.netdata.cloud/api/v2/auth/account/auth-server?iss={your-server-issuer-url}&redirect_uri=https://app.netdata.cloud/sign-in&register_uri=https://app.netdata.cloud/sign-up/verify  |
-| Redirect URL             | https://app.netdata.cloud/api/v2/auth/account/auth-server/callback  |
+| Root URL                 | `https://app.netdata.cloud/``                           |
+| Home/Initiate login URL  | `https://app.netdata.cloud/api/v2/auth/account/auth-server?iss={your-server-issuer-url}&redirect_uri=https://app.netdata.cloud/sign-in&register_uri=https://app.netdata.cloud/sign-up/verify`  |
+| Redirect URL             | `https://app.netdata.cloud/api/v2/auth/account/auth-server/callback`  |
 
 ### Netdata Configuration Steps
 1. Click on the Space settings cog (located above your profile icon)
@@ -55,7 +55,7 @@ The access settings for your client are the following:
 
 ### SP-initiated SSO
 
-If you start your authentication flow from Netdata sign-in page please check [these steps](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md#from-netdata-sign-up-page).
+If you start your authentication flow from Netdata sign-in page please check [these steps](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md#from-netdata-sign-up-page).
 
 
 ### Reference

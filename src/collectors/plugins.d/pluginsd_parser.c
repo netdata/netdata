@@ -649,10 +649,12 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
 
     if (strcmp(name,HOST_LABEL_IS_EPHEMERAL) == 0) {
         int is_ephemeral = appconfig_test_boolean_value((char *) value);
-        if (is_ephemeral) {
-            RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
-            if (likely(host))
+        RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_LABEL);
+        if (host) {
+            if (is_ephemeral)
                 rrdhost_option_set(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+            else
+                rrdhost_option_clear(host, RRDHOST_OPTION_EPHEMERAL_HOST);
         }
     }
 

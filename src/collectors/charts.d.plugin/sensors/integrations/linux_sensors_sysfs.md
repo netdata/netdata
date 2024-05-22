@@ -22,7 +22,7 @@ Module: sensors
 ## Overview
 
 Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures).
-For all other cases use the [Python collector](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/sensors), which supports multiple jobs, is more efficient and performs calculations on top of the kernel provided values."
+For all other cases use the [Go collector](/src/go/collectors/go.d.plugin/modules/sensors/README.md), which supports multiple jobs, is more efficient and performs calculations on top of the kernel provided values."
 
 
 It will provide charts for all configured system sensors, by reading sensors directly from the kernel.
@@ -90,19 +90,19 @@ There are no alerts configured by default for this integration.
 
 #### Install charts.d plugin
 
-If [using our official native DEB/RPM packages](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure `netdata-plugin-chartsd` is installed.
+If [using our official native DEB/RPM packages](/packaging/installer/UPDATE.md#determine-which-installation-method-you-used), make sure `netdata-plugin-chartsd` is installed.
 
 
 #### Enable the sensors collector
 
-The `sensors` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`, to edit the `charts.d.conf` file.
+The `sensors` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`, to edit the `charts.d.conf` file.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config charts.d.conf
 ```
 
-Change the value of the `sensors` setting to `force` and uncomment the line. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+Change the value of the `sensors` setting to `force` and uncomment the line. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
 
 
 
@@ -114,7 +114,7 @@ The configuration file name for this integration is `charts.d/sensors.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata

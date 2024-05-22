@@ -49,6 +49,7 @@ void sql_load_node_id(RRDHOST *host);
 void sql_build_host_system_info(nd_uuid_t *host_id, struct rrdhost_system_info *system_info);
 void invalidate_node_instances(nd_uuid_t *host_id, nd_uuid_t *claim_id);
 RRDLABELS *sql_load_host_labels(nd_uuid_t *host_id);
+bool sql_set_host_label(nd_uuid_t *host_id, const char *label_key, const char *label_value);
 
 uint64_t sqlite_get_meta_space(void);
 int sql_init_meta_database(db_check_action_type_t rebuild, int memory);

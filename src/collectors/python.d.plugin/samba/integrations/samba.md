@@ -91,13 +91,13 @@ There are no alerts configured by default for this integration.
 
 #### Enable the samba collector
 
-The `samba` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
+The `samba` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config directory](/docs/netdata-agent/configuration/README.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
 sudo ./edit-config python.d.conf
 ```
-Change the value of the `samba` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
+Change the value of the `samba` setting to `yes`. Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate method](/packaging/installer/README.md#maintaining-a-netdata-agent-installation) for your system.
 
 
 #### Permissions and programs
@@ -143,7 +143,7 @@ The configuration file name for this integration is `python.d/samba.conf`.
 
 
 You can edit the configuration file using the `edit-config` script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata

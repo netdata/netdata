@@ -230,7 +230,7 @@ type mockSupervisorClient struct {
 	calledCloseIdleConnections bool
 }
 
-func (m mockSupervisorClient) getAllProcessInfo() ([]processStatus, error) {
+func (m *mockSupervisorClient) getAllProcessInfo() ([]processStatus, error) {
 	if m.errOnGetAllProcessInfo {
 		return nil, errors.New("mock errOnGetAllProcessInfo")
 	}

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/go.d.plugin/agent/module"
@@ -382,6 +383,37 @@ func TestSystemdUnits_Collect(t *testing.T) {
 				"unit_var-lib-nfs-rpc_pipefs_mount_state_deactivating":             0,
 				"unit_var-lib-nfs-rpc_pipefs_mount_state_failed":                   0,
 				"unit_var-lib-nfs-rpc_pipefs_mount_state_inactive":                 1,
+			},
+		},
+		"success v230+ on collecting all unit type with skip transient": {
+			prepare: func() *SystemdUnits {
+				systemd := New()
+				systemd.Include = []string{"*"}
+				systemd.SkipTransient = true
+				systemd.client = prepareOKClient(230)
+				return systemd
+			},
+			wantCollected: map[string]int64{
+				"unit_systemd-ask-password-wall_service_state_activating":   0,
+				"unit_systemd-ask-password-wall_service_state_active":       0,
+				"unit_systemd-ask-password-wall_service_state_deactivating": 0,
+				"unit_systemd-ask-password-wall_service_state_failed":       0,
+				"unit_systemd-ask-password-wall_service_state_inactive":     1,
+				"unit_systemd-fsck-root_service_state_activating":           0,
+				"unit_systemd-fsck-root_service_state_active":               0,
+				"unit_systemd-fsck-root_service_state_deactivating":         0,
+				"unit_systemd-fsck-root_service_state_failed":               0,
+				"unit_systemd-fsck-root_service_state_inactive":             1,
+				"unit_user-runtime-dir@1000_service_state_activating":       0,
+				"unit_user-runtime-dir@1000_service_state_active":           1,
+				"unit_user-runtime-dir@1000_service_state_deactivating":     0,
+				"unit_user-runtime-dir@1000_service_state_failed":           0,
+				"unit_user-runtime-dir@1000_service_state_inactive":         0,
+				"unit_user@1000_service_state_activating":                   0,
+				"unit_user@1000_service_state_active":                       1,
+				"unit_user@1000_service_state_deactivating":                 0,
+				"unit_user@1000_service_state_failed":                       0,
+				"unit_user@1000_service_state_inactive":                     0,
 			},
 		},
 		"success v230- on collecting all unit types": {
@@ -944,6 +976,24 @@ func (m *mockConn) GetManagerProperty(prop string) (string, error) {
 	}
 
 	return fmt.Sprintf("%d.6-1-manjaro", m.version), nil
+}
+
+func (m *mockConn) GetUnitPropertyContext(_ context.Context, unit string, propertyName string) (*dbus.Property, error) {
+	if propertyName != transientProperty {
+		return nil, fmt.Errorf("'GetUnitProperty' unkown property name: %s", propertyName)
+	}
+
+	var prop dbus.Property
+
+	if strings.HasSuffix(unit, ".service") {
+		prop = dbus.PropDescription("false")
+	} else {
+		prop = dbus.PropDescription("true")
+	}
+
+	prop.Name = propertyName
+
+	return &prop, nil
 }
 
 func (m *mockConn) ListUnitsContext(_ context.Context) ([]dbus.UnitStatus, error) {

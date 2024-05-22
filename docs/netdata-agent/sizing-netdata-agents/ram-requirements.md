@@ -8,7 +8,7 @@ Netdata supports memory ballooning and automatically sizes and limits the memory
 
 With default settings, Netdata should run with 100MB to 200MB of RAM, depending on the number of metrics being collected.
 
-This number can be lowered by limiting the number of database tier or switching database modes. For more information check [Disk Requirements and Retention](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
+This number can be lowered by limiting the number of database tier or switching database modes. For more information check [Disk Requirements and Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
 
 ## On Metrics Centralization Points, Netdata Parents
 

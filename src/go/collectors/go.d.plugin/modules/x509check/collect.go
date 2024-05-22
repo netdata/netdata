@@ -43,10 +43,12 @@ func (x *X509Check) collectRevocation(mx map[string]int64, certs []*x509.Certifi
 	if err != nil {
 		x.Debug(err)
 	}
-	switch {
-	case ok && rev:
+	if !ok {
+		return
+	}
+	if rev {
 		mx["revoked"] = 1
-	case ok && !rev:
+	} else {
 		mx["revoked"] = 0
 	}
 }

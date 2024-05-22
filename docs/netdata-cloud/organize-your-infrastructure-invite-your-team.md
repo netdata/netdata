@@ -56,7 +56,7 @@ will open a side tab in which you can:
 2. _Edit the War Rooms*_, click on the **War rooms** tab to add or remove War Rooms.
 
 3. _Connect nodes*_, click on **Nodes** tab. Copy the claiming script to your node and run it. See the
-   [connect to Cloud doc](https://github.com/netdata/netdata/blob/master/src/claim/README.md) for details.
+   [connect to Cloud doc](/src/claim/README.md) for details.
 
 4. _Manage the users*_, click on **Users**.
    The [invitation doc](#invite-your-team)
@@ -106,7 +106,7 @@ We recommend a few strategies for organizing your War Rooms.
 
 - **Incident response**  
   You can also create new War Rooms as one of the first steps in your incident response process.
-   For example, you have a user-facing web app that relies on Apache Pulsar for a message queue, and one of your nodes using the [Pulsar collector](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/pulsar/README.md) begins reporting a suspiciously low messages rate.
+   For example, you have a user-facing web app that relies on Apache Pulsar for a message queue, and one of your nodes using the [Pulsar collector](/src/go/collectors/go.d.plugin/modules/pulsar/README.md) begins reporting a suspiciously low messages rate.
    You can create a War Room called `$year-$month-$day-pulsar-rate`, add all your Pulsar nodes in addition to nodes they connect to, and begin diagnosing the root cause in a War Room optimized for getting to resolution as fast as possible.
 
 ### Add War Rooms
@@ -158,10 +158,10 @@ You will be prompted to enter the email addresses of the users you want to invit
 Next, choose the War Rooms you want to invite these users to. Once logged in, these users are not restricted only to
 these War Rooms. They can be invited to others, or join any that are public.
 
-Next, pick a role for the invited user. You can read more about [which roles are available](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#what-roles-are-available) based on your [subscription plan](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/netdata-subscription-plans.md).
+Next, pick a role for the invited user. You can read more about [which roles are available](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#what-roles-are-available) based on your [subscription plan](/docs/netdata-cloud/netdata-subscription-plans.md).
 
 Click the **Send** button to send an email invitation, which will prompt them
-to [sign up](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/README.md) and join your Space.
+to [sign up](/docs/netdata-cloud/authentication-and-authorization/README.md) and join your Space.
 
 ![image](https://user-images.githubusercontent.com/70198089/227888899-8511081b-0157-4e22-81d9-898cc464dcb0.png)
 

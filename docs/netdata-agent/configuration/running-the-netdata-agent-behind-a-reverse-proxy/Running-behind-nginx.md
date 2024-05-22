@@ -164,7 +164,7 @@ Using the above, you access Netdata on the backend servers, like this:
 
 ### Encrypt the communication between Nginx and Netdata
 
-In case Netdata's web server has been [configured to use TLS](https://github.com/netdata/netdata/blob/master/src/web/server/README.md#enabling-tls-support), it is
+In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#enabling-tls-support), it is
 necessary to specify inside the Nginx configuration that the final destination is using TLS. To do this, please, append
 the following parameters in your `nginx.conf`
 
@@ -236,7 +236,7 @@ If your Nginx server is not on localhost, you can set:
 
 *note: Netdata v1.9+ support `allow connections from`*
 
-`allow connections from` accepts [Netdata simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md) to match against the
+`allow connections from` accepts [Netdata simple patterns](/src/libnetdata/simple_pattern/README.md) to match against the
 connection IP address.
 
 ## Prevent the double access.log

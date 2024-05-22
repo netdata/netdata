@@ -8,7 +8,7 @@ The Netdata Alerts Configuration Manager enables subscribers to easily set up al
 2. Click the **Alert icon** in the top right corner of the chart.
 3. The Alert Configuration Manager will open, showing the default thresholds. Modify these thresholds as needed, the alert definition on the right will update automatically.
 4. For additional settings, toggle **Show advanced**.
-5. After configuring the alert, copy the generated alert definition from the code box. Paste this into an existing or new custom health configuration file located at `<path to netdata install>/etc/netdata/health.d/` on a Parent Agent or a Standalone Child Agent. The guide to edit health configuration files is available [here](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md#edit-health-configuration-files).
+5. After configuring the alert, copy the generated alert definition from the code box. Paste this into an existing or new custom health configuration file located at `<path to netdata install>/etc/netdata/health.d/` on a Parent Agent or a Standalone Child Agent. The guide to edit health configuration files is available [here](/src/health/REFERENCE.md#edit-health-configuration-files).
 6. To activate the new alert, run the command `<path to netdata install>/usr/sbin/netdatacli reload-health`.
 
 ## Alerts Configuration Manager Sections
@@ -23,7 +23,7 @@ An alert is triggered whenever a metric crosses a threshold:
 
 ### Metrics Lookup, Filtering and Formula Section
 
-You can read more about the different options in the [Alerts reference documentation](https://github.com/netdata/netdata/blob/master/src/health/REFERENCE.md)
+You can read more about the different options in the [Alerts reference documentation](/src/health/REFERENCE.md)
 
 - **Metrics Lookup**: Adjust the database lookup parameters directly in the UI, including method (`avg`, `sum`, `min`, `max`, etc.), computation style, dimensions, duration, and options like `absolute` or `percentage`.
 - **Alert Filtering**: The **show advanced** checkbox allows filtering of alert health checks for specific infrastructure components. Options include selecting hosts, nodes, instances, chart labels, and operating systems.

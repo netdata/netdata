@@ -45,4 +45,4 @@ A Cluster is configured as a number of circular **Proxies**, ie. each of the nod
 
 ## Best Practices
 
-Refer to [Best Practices for Observability Centralization Points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/best-practices.md).
+Refer to [Best Practices for Observability Centralization Points](/docs/observability-centralization-points/best-practices.md).
