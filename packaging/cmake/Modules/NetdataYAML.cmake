@@ -23,6 +23,7 @@ function(netdata_bundle_libyaml)
         FetchContent_Declare(yaml
                 GIT_REPOSITORY https://github.com/yaml/libyaml
                 GIT_TAG 2c891fc7a770e8ba2fec34fc6b545c672beb37e6 # v0.2.5
+                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
         )
 
         FetchContent_MakeAvailable_NoInstall(yaml)

@@ -33,6 +33,7 @@ function(netdata_bundle_protobuf)
                 FetchContent_Declare(absl
                         GIT_REPOSITORY https://github.com/abseil/abseil-cpp
                         GIT_TAG ${ABSL_TAG}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                 )
                 FetchContent_MakeAvailable_NoInstall(absl)
                 message(STATUS "Finished preparing bundled Abseil")
@@ -47,6 +48,7 @@ function(netdata_bundle_protobuf)
         FetchContent_Declare(protobuf
                 GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
                 GIT_TAG ${PROTOBUF_TAG}
+                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
         )
         FetchContent_MakeAvailable_NoInstall(protobuf)
         message(STATUS "Finished preparing bundled Protobuf.")

@@ -25,3 +25,17 @@ macro(FetchContent_MakeAvailable_NoInstall name)
         add_subdirectory(${${name}_SOURCE_DIR} ${${name}_BINARY_DIR} EXCLUDE_FROM_ALL)
     endif()
 endmacro()
+
+# NETDATA_PROPAGATE_TOOLCHAIN_ARGS
+#
+# Defines a set of CMake flags to be passed to CMAKE_ARGS for
+# FetchContent_Declare and ExternalProject_Add to ensure that toolchain
+# configuration propagates correctly to sub-projects.
+#
+# This needs to be explicitly included for any sub-project that needs
+# to be built for the target system.
+set(NETDATA_PROPAGATE_TOOLCHAIN_ARGS
+    "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+     -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+     $<$<BOOL:${CMAKE_C_COMPILER_TARGET}>:-DCMAKE_C_COMPILER_TARGET=${CMAKE_C_COMPILER_TARGET}
+     $<$<BOOL:${CMAKE_CXX_COMPILER_TARGET}>:-DCMAKE_CXX_COMPILER_TARGET=${CMAKE_CXX_COMPILER_TARGET}")
