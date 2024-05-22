@@ -6,7 +6,7 @@
 #include "common-contexts.h"
 
 #if defined(COMPILED_FOR_WINDOWS)
-static inline void common_system_processes(uint64_t running, uint64_t blocked, int update_every) {
+static inline void common_system_processes(uint64_t running, int update_every) {
     static RRDSET *st_processes = NULL;
     static RRDDIM *rd_running = NULL;
 

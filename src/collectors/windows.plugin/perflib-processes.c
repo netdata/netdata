@@ -22,7 +22,7 @@ static bool do_processes(PERF_DATA_BLOCK *pDataBlock, int update_every) {
 
     if(perflibGetObjectCounter(pDataBlock, pObjectType, &processesRunning)) {
         ULONGLONG running = processesRunning.current.Data;
-        common_system_processes(running, 0, update_every);
+        common_system_processes(running, update_every);
     }
 
     if(perflibGetObjectCounter(pDataBlock, pObjectType, &contextSwitchPerSec)) {
