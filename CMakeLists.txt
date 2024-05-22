@@ -2210,7 +2210,18 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
-add_library(libnetdata STATIC ${LIBNETDATA_FILES})
+add_custom_command(
+        COMMAND ${CMAKE_COMMAND}
+                -DSRC=${CMAKE_SOURCE_DIR}/system/netdata.conf
+                -DDEST=${CMAKE_BINARY_DIR}/netdata_conf_header.h
+                -DNAME=NETDATA_CONF_HEADER
+                -P ${CMAKE_SOURCE_DIR}/packaging/cmake/txt2header.cmake
+        OUTPUT netdata_conf_header.h
+        DEPENDS packaging/cmake/txt2header.cmake system/netdata.conf
+        COMMENT "Generating netdata_conf_header.h from system/netdata.conf"
+)
+
+add_library(libnetdata STATIC netdata_conf_header.h ${LIBNETDATA_FILES})
 set_source_files_properties(src/libnetdata/gorilla/gorilla.cc PROPERTIES COMPILE_OPTIONS "-Wno-attributes")
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)

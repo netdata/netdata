@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "inicfg_internals.h"
+#include "netdata_conf_header.h"
 
 ENUM_STR_MAP_DEFINE(CONFIG_VALUE_TYPES) = {
     { .id = CONFIG_VALUE_TYPE_UNKNOWN, .name ="unknown", },
@@ -196,13 +197,7 @@ void inicfg_generate(struct config *root, BUFFER *wb, int only_changed, bool net
 
     if(netdata_conf) {
         buffer_strcat(wb,
-                      "# netdata configuration\n"
-                      "#\n"
-                      "# You can download the latest version of this file, using:\n"
-                      "#\n"
-                      "#  wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
-                      "# or\n"
-                      "#  curl -o /etc/netdata/netdata.conf http://localhost:19999/netdata.conf\n"
+                      NETDATA_CONF_HEADER
                       "#\n"
                       "# You can uncomment and change any of the options below.\n"
                       "# The value shown in the commented settings, is the default value.\n"
