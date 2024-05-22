@@ -849,6 +849,18 @@ void rrdlabels_value_to_buffer_array_item_or_null(RRDLABELS *labels, BUFFER *wb,
     string_freez(this_key);
 }
 
+void rrdlabels_key_to_buffer_array_item(RRDLABELS *labels, BUFFER *wb)
+{
+    if(!labels) return;
+
+    RRDLABEL *lb;
+    RRDLABEL_SRC ls;
+    lfe_start_read(labels, lb, ls) {
+        buffer_json_add_array_item_string(wb, string2str(lb->index.key));
+    }
+    lfe_done(labels);
+}
+
 // ----------------------------------------------------------------------------
 
 void rrdlabels_get_value_strcpyz(RRDLABELS *labels, char *dst, size_t dst_len, const char *key) {
