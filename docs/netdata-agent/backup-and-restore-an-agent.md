@@ -2,7 +2,7 @@
 
 > **Note**
 >
-> With Netdata's decentralised / distributed the data and metrics are always stored locally (on the customer's host), it is the user's responsibility to backup, recover and ensure his data is available.
+> With Netdata's decentralised / distributed architecture the data and metrics are always stored locally (on the user's host), it is the user's responsibility to backup, recover and ensure his data is available.
 
 ## Introduction
 
