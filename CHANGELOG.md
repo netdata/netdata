@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Include the Host in the HTTP header \(mqtt\) [\#17731](https://github.com/netdata/netdata/pull/17731) ([stelfrag](https://github.com/stelfrag))
+- Add alert meta info [\#17730](https://github.com/netdata/netdata/pull/17730) ([stelfrag](https://github.com/stelfrag))
+- grammar pass on alerts and notifications dir [\#17729](https://github.com/netdata/netdata/pull/17729) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations.js [\#17726](https://github.com/netdata/netdata/pull/17726) ([netdatabot](https://github.com/netdatabot))
 - go.d systemdunits add "skip\_transient" [\#17725](https://github.com/netdata/netdata/pull/17725) ([ilyam8](https://github.com/ilyam8))
 - minor fix on link [\#17722](https://github.com/netdata/netdata/pull/17722) ([Ancairon](https://github.com/Ancairon))
@@ -40,6 +43,7 @@
 - go.d dyncfg add userconfig action [\#17684](https://github.com/netdata/netdata/pull/17684) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations.js [\#17683](https://github.com/netdata/netdata/pull/17683) ([netdatabot](https://github.com/netdatabot))
 - Re-enable ML for RHEL 7 and AL 2 RPM packages. [\#17682](https://github.com/netdata/netdata/pull/17682) ([Ferroin](https://github.com/Ferroin))
+- Clean up DEB package dependencies. [\#17680](https://github.com/netdata/netdata/pull/17680) ([Ferroin](https://github.com/Ferroin))
 - add go.d/rspamd [\#17679](https://github.com/netdata/netdata/pull/17679) ([ilyam8](https://github.com/ilyam8))
 - Do not specify linker in compilation flags. [\#17677](https://github.com/netdata/netdata/pull/17677) ([vkalintiris](https://github.com/vkalintiris))
 - Regenerate integrations.js [\#17676](https://github.com/netdata/netdata/pull/17676) ([netdatabot](https://github.com/netdatabot))
@@ -425,8 +429,6 @@
 - DYNCFG: alerts improvements [\#17165](https://github.com/netdata/netdata/pull/17165) ([ktsaou](https://github.com/ktsaou))
 - go.d.plugin: update file path pattern in jsonschema [\#17164](https://github.com/netdata/netdata/pull/17164) ([ilyam8](https://github.com/ilyam8))
 - Announce dynamic configuration capability to the cloud [\#17162](https://github.com/netdata/netdata/pull/17162) ([stelfrag](https://github.com/stelfrag))
-- go.d.plugin: execute local-listeners periodically [\#17160](https://github.com/netdata/netdata/pull/17160) ([ilyam8](https://github.com/ilyam8))
-- Install the correct service file based on systemd version [\#17159](https://github.com/netdata/netdata/pull/17159) ([tkatsoulas](https://github.com/tkatsoulas))
 
 ## [v1.44.3](https://github.com/netdata/netdata/tree/v1.44.3) (2024-02-12)
 

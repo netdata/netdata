@@ -195,6 +195,11 @@ struct alert_v2_entry {
 
     STRING *name;
     STRING *summary;
+    RRDLABELS *recipient;
+    RRDLABELS *classification;
+    RRDLABELS *context;
+    RRDLABELS *component;
+    RRDLABELS *type;
 
     size_t ati;
 
@@ -371,6 +376,21 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     RRDCALC *rc = t->tmp;
     t->name = rc->config.name;
     t->summary = rc->config.summary; // the original summary
+    t->context = rrdlabels_create();
+    t->recipient = rrdlabels_create();
+    t->classification = rrdlabels_create();
+    t->component = rrdlabels_create();
+    t->type = rrdlabels_create();
+    if (string_strlen(rc->rrdset->context))
+        rrdlabels_add(t->context, string2str(rc->rrdset->context), "yes", RRDLABEL_SRC_AUTO);
+    if (string_strlen(rc->config.recipient))
+        rrdlabels_add(t->recipient, string2str(rc->config.recipient), "yes", RRDLABEL_SRC_AUTO);
+    if (string_strlen(rc->config.classification))
+        rrdlabels_add(t->classification, string2str(rc->config.classification), "yes", RRDLABEL_SRC_AUTO);
+    if (string_strlen(rc->config.component))
+        rrdlabels_add(t->component, string2str(rc->config.component), "yes", RRDLABEL_SRC_AUTO);
+    if (string_strlen(rc->config.type))
+        rrdlabels_add(t->type, string2str(rc->config.type), "yes", RRDLABEL_SRC_AUTO);
     t->ati = ctl->alerts.ati++;
 
     t->nodes = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_VALUE_LINK_DONT_CLONE|DICT_OPTION_NAME_LINK_DONT_CLONE);
@@ -382,12 +402,29 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
 static bool alerts_v2_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
     struct alert_v2_entry *t = old_value, *n = new_value;
     RRDCALC *rc = n->tmp;
+    if (string_strlen(rc->rrdset->context))
+        rrdlabels_add(t->context, string2str(rc->rrdset->context), "yes", RRDLABEL_SRC_AUTO);
+    if (string_strlen(rc->config.recipient))
+        rrdlabels_add(t->recipient, string2str(rc->config.recipient), "yes", RRDLABEL_SRC_AUTO);
+    if (string_strlen(rc->config.classification))
+        rrdlabels_add(t->classification, string2str(rc->config.classification), "yes", RRDLABEL_SRC_AUTO);
+    if (string_strlen(rc->config.component))
+        rrdlabels_add(t->component, string2str(rc->config.component), "yes", RRDLABEL_SRC_AUTO);
+    if (string_strlen(rc->config.type))
+        rrdlabels_add(t->type, string2str(rc->config.type), "yes", RRDLABEL_SRC_AUTO);
     alerts_v2_add(t, rc);
     return true;
 }
 
 static void alerts_v2_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct alert_v2_entry *t = value;
+
+    rrdlabels_destroy(t->context);
+    rrdlabels_destroy(t->recipient);
+    rrdlabels_destroy(t->classification);
+    rrdlabels_destroy(t->component);
+    rrdlabels_destroy(t->type);
+
     dictionary_destroy(t->nodes);
     dictionary_destroy(t->configs);
 }
@@ -1554,6 +1591,27 @@ static void contexts_v2_alerts_to_json(BUFFER *wb, struct rrdcontext_to_json_v2_
                             buffer_json_member_add_uint64(wb, "in", t->instances);
                             buffer_json_member_add_uint64(wb, "nd", dictionary_entries(t->nodes));
                             buffer_json_member_add_uint64(wb, "cfg", dictionary_entries(t->configs));
+
+                            buffer_json_member_add_array(wb, "ctx");
+                            rrdlabels_key_to_buffer_array_item(t->context, wb);
+                            buffer_json_array_close(wb); // ctx
+
+                            buffer_json_member_add_array(wb, "cl");
+                            rrdlabels_key_to_buffer_array_item(t->classification, wb);
+                            buffer_json_array_close(wb); // ctx
+
+
+                            buffer_json_member_add_array(wb, "cp");
+                            rrdlabels_key_to_buffer_array_item(t->component, wb);
+                            buffer_json_array_close(wb); // component
+
+                            buffer_json_member_add_array(wb, "ty");
+                            rrdlabels_key_to_buffer_array_item(t->type, wb);
+                            buffer_json_array_close(wb); // type
+
+                            buffer_json_member_add_array(wb, "to");
+                            rrdlabels_key_to_buffer_array_item(t->recipient, wb);
+                            buffer_json_array_close(wb); // recipient
                         }
                         buffer_json_object_close(wb); // alert name
                     }
