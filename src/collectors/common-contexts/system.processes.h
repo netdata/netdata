@@ -57,7 +57,7 @@ static inline void common_system_threads(uint64_t threads, int update_every) {
             , RRDSET_TYPE_LINE
             );
 
-        rd_threads = rrddim_add(st_processes, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_threads = rrddim_add(st_threads, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     rrddim_set_by_pointer(st_threads, rd_threads, threads);
