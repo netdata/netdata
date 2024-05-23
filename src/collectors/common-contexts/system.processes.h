@@ -21,7 +21,7 @@
         , RRDSET_TYPE_LINE \
         )
 
-#if defined(COMPILED_FOR_WINDOWS)
+#if defined(OS_WINDOWS)
 static inline void common_system_processes(uint64_t running, int update_every) {
     static RRDSET *st_processes = NULL;
     static RRDDIM *rd_running = NULL;
@@ -52,7 +52,7 @@ static inline void common_system_threads(uint64_t threads, int update_every) {
 }
 #endif
 
-#if defined(COMPILED_FOR_LINUX)
+#if defined(OS_LINUX)
 static inline void common_system_processes(uint64_t running, uint64_t blocked, int update_every) {
     static RRDSET *st_processes = NULL;
     static RRDDIM *rd_running = NULL;
