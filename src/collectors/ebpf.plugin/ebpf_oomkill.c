@@ -58,11 +58,11 @@ static void ebpf_obsolete_oomkill_services(ebpf_module_t *em, char *id)
     ebpf_write_chart_obsolete(NETDATA_SERVICE_FAMILY,
                               id,
                               NETDATA_OOMKILL_CHART,
-                              "OOM kills. This chart is provided by eBPF plugin.",
+                              "Systemd service OOM kills.",
                               EBPF_COMMON_DIMENSION_KILLS,
                               NETDATA_EBPF_MEMORY_GROUP,
-                              NETDATA_EBPF_CHART_TYPE_LINE,
-                              NULL,
+                              NETDATA_EBPF_CHART_TYPE_STACKED,
+                              NETDATA_CGROUP_OOMKILLS_CONTEXT,
                               20191,
                               em->update_every);
 }
@@ -236,14 +236,14 @@ static void ebpf_create_specific_oomkill_charts(char *type, int update_every)
 static void ebpf_create_systemd_oomkill_charts(int update_every)
 {
     static ebpf_systemd_args_t data_oom = {
-        .title = "OOM kills. This chart is provided by eBPF plugin.",
+        .title = "Systemd service OOM kills.",
         .units = EBPF_COMMON_DIMENSION_KILLS,
         .family = NETDATA_EBPF_MEMORY_GROUP,
         .charttype = NETDATA_EBPF_CHART_TYPE_STACKED,
         .order = 20191,
         .algorithm = EBPF_CHART_ALGORITHM_INCREMENTAL,
-        .context = NETDATA_EBPF_MODULE_NAME_OOMKILL,
-        .module = NETDATA_EBPF_MODULE_NAME_SWAP,
+        .context = NETDATA_CGROUP_OOMKILLS_CONTEXT,
+        .module = NETDATA_EBPF_MODULE_NAME_OOMKILL,
         .update_every = 0,
         .suffix = NETDATA_OOMKILL_CHART,
         .dimension = "oom"
