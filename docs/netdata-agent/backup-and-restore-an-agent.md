@@ -1,5 +1,9 @@
 # Backing up a Netdata Agent
 
+> **Note**
+>
+> With Netdata's decentralised / distributed the data and metrics are always stored locally (on the customer's host), it is the user's responsibility to backup, recover and ensure his data is available.
+
 ## Introduction
 
 When preparing to backup a Netdata Agent it is worth considering that there are different kinds of data that you may wish to backup independently or all together:
