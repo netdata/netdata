@@ -20,4 +20,4 @@ Our most popular application collectors:
 - [ElasticSearch](/src/go/collectors/go.d.plugin/modules/elasticsearch/README.md): Collects search engine performance and health statistics. Can optionally collect per-index metrics as well.
 - [PHP-FPM](/src/go/collectors/go.d.plugin/modules/phpfpm/README.md): Collects application summary and processes health metrics by scraping the status page (`/status?full`).
 
-Our [supported collectors list](/src/collectors/COLLECTORS.md#service-and-application-collectors) shows a comprehensive list of all of Netdata's application metrics collectors.
+Check our [data collection integrations list](/src/collectors/COLLECTORS.md#service-and-application-collectors) for a comprehensive view to all the integrations you can use to gather metrics with Netdata.

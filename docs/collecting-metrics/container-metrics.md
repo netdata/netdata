@@ -8,7 +8,7 @@ Netdata uses the [cgroups.plugin](/src/collectors/cgroups.plugin/README.md) to p
 Netdata also has robust **Kubernetes monitoring** support thanks to a [Helmchart](/packaging/installer/methods/kubernetes.md) to automate deployment, collectors for k8s agent services, and robust [service discovery](https://github.com/netdata/agent-service-discovery/#service-discovery) to monitor the services running inside of pods in your k8s cluster. Read more about [Kubernetes monitoring](#collect-kubernetes-metrics) below.
 
 A handful of additional collectors gather metrics from container-related services, such as [dockerd](/src/go/collectors/go.d.plugin/modules/docker/README.md) or [Docker Engine](/src/go/collectors/go.d.plugin/modules/docker_engine/README.md). You can find all
-container collectors in our supported collectors list under the [containers/VMs](/src/collectors/COLLECTORS.md#containers-and-vms) and [Kubernetes](/src/collectors/COLLECTORS.md#kubernetes) sections.
+container collectors in our data collection integrations list under the [containers/VMs](/src/collectors/COLLECTORS.md#containers-and-vms) and [Kubernetes](/src/collectors/COLLECTORS.md#kubernetes) sections.
 
 ## Collect Docker metrics
 
