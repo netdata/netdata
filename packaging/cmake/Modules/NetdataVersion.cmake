@@ -24,8 +24,9 @@ function(netdata_version)
         endif()
 
         string(STRIP ${GIT_DESCRIBE_OUTPUT} GIT_DESCRIBE_OUTPUT)
-        string(REGEX MATCH "v?([0-9]+)\\.([0-9]+)\\.([0-9]+)-?([0-9]+)?-?([0-9a-zA-Z]+)?" MATCHES "${GIT_DESCRIBE_OUTPUT}")
+        set(GIT_DESCRIBE_OUTPUT "${GIT_DESCRIBE_OUTPUT}" PARENT_SCOPE)
 
+        string(REGEX MATCH "v?([0-9]+)\\.([0-9]+)\\.([0-9]+)-?([0-9]+)?-?([0-9a-zA-Z]+)?" MATCHES "${GIT_DESCRIBE_OUTPUT}")
         if(CMAKE_MATCH_COUNT EQUAL 3)
                 set(NETDATA_VERSION_MAJOR ${CMAKE_MATCH_1} PARENT_SCOPE)
                 set(NETDATA_VERSION_MINOR ${CMAKE_MATCH_2} PARENT_SCOPE)
