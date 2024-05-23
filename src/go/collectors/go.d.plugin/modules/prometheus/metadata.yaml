@@ -1017,33 +1017,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-clickhouse
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: ClickHouse
-        link: https://github.com/ClickHouse/ClickHouse
-        icon_filename: clickhouse.svg
-        categories:
-          - data-collection.database-servers
-      keywords: []
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor ClickHouse database metrics for efficient data storage and query performance.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to the ClickHouse built-in Prometheus exporter.
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Configure built-in Prometheus exporter
-            description: |
-              To configure the built-in Prometheus exporter, follow the [official documentation](https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings#server_configuration_parameters-prometheus).
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-cloudflare_pcap
       most_popular: false
       community: true

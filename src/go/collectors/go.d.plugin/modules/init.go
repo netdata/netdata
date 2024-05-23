@@ -9,6 +9,7 @@ import (
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/bind"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/cassandra"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/chrony"
+	_ "github.com/netdata/netdata/go/go.d.plugin/modules/clickhouse"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/cockroachdb"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/consul"
 	_ "github.com/netdata/netdata/go/go.d.plugin/modules/coredns"
