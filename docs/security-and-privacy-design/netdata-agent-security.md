@@ -12,7 +12,8 @@ databases, sent to upstream Netdata servers, or archived to external time-series
 
 > **Note**
 >
-> With Netdata's decentralised / distributed the data and metrics are always stored locally (on the customer's host), it is the user's responsibility to backup, recover and ensure his data is available.
+> With Netdata's decentralised / distributed architecture the data and metrics are always stored locally (on the user's host), it is the user's responsibility to backup, recover and ensure his data is available.
+
 
 The Netdata Agent is programmed to safeguard user data. When collecting data, the raw data does not leave the host. All
 plugins, even those running with escalated capabilities or privileges, perform a hard-coded data collection job. They do
