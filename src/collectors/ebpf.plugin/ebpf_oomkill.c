@@ -44,7 +44,7 @@ static netdata_publish_syscall_t oomkill_publish_aggregated = {.name = "oomkill"
                                                                .algorithm = "absolute",
                                                                .next = NULL};
 
-static void ebpf_create_specific_oomkill_charts(char *type, int update_every);
+static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every);
 
 /**
  * Obsolete services
@@ -86,7 +86,7 @@ static inline void ebpf_obsolete_oomkill_cgroup_charts(ebpf_module_t *em)
             continue;
         }
 
-        ebpf_create_specific_oomkill_charts(ect->name, em->update_every);
+        ebpf_obsolete_specific_oomkill_charts(ect->name, em->update_every);
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
 }
