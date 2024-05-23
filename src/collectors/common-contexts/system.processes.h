@@ -5,26 +5,29 @@
 
 #include "common-contexts.h"
 
+#define _system_process_chart() \
+    rrdset_create_localhost( \
+        "system" \
+        , "processes" \
+        , NULL  \
+        , "processes" \
+        , NULL \
+        , "System Processes" \
+        , "processes" \
+        , _COMMON_PLUGIN_NAME \
+        , _COMMON_PLUGIN_MODULE_NAME \
+        , NETDATA_CHART_PRIO_SYSTEM_PROCESSES \
+        , update_every \
+        , RRDSET_TYPE_LINE \
+        )
+
 #if defined(COMPILED_FOR_WINDOWS)
 static inline void common_system_processes(uint64_t running, int update_every) {
     static RRDSET *st_processes = NULL;
     static RRDDIM *rd_running = NULL;
 
     if(unlikely(!st_processes)) {
-        st_processes = rrdset_create_localhost(
-              "system"
-            , "processes"
-            , NULL
-            , "processes"
-            , NULL
-            , "System Processes"
-            , "processes"
-            , _COMMON_PLUGIN_NAME
-            , _COMMON_PLUGIN_MODULE_NAME
-            , NETDATA_CHART_PRIO_SYSTEM_PROCESSES
-            , update_every
-            , RRDSET_TYPE_LINE
-            );
+        st_processes = _system_process_chart();
 
         rd_running = rrddim_add(st_processes, "running", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
@@ -39,20 +42,7 @@ static inline void common_system_threads(uint64_t threads, int update_every) {
     static RRDDIM *rd_threads = NULL;
 
     if(unlikely(!st_processes)) {
-        st_processes = rrdset_create_localhost(
-             "system"
-            , "threads"
-            , NULL
-            , "processes"
-            , NULL
-            , "Threads"
-            , "threads"
-            , _COMMON_PLUGIN_NAME
-            , _COMMON_PLUGIN_MODULE_NAME
-            , NETDATA_CHART_PRIO_WINDOWS_THREADS
-            , update_every
-            , RRDSET_TYPE_LINE
-            );
+        st_processes = _system_process_chart();
 
         rd_threads = rrddim_add(st_processes, "threads", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
