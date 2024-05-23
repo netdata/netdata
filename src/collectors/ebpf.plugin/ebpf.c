@@ -2272,7 +2272,7 @@ void ebpf_print_help()
             "\n"
             " [-]-core              Use CO-RE when available(Working in progress).\n"
             "\n",
-            VERSION,
+            NETDATA_VERSION,
             (year >= 116) ? year + 1900 : 2020);
 }
 
@@ -3249,7 +3249,7 @@ static void ebpf_parse_args(int argc, char **argv)
                 break;
             }
             case EBPF_OPTION_VERSION: {
-                printf("ebpf.plugin %s\n", VERSION);
+                printf("ebpf.plugin %s\n", NETDATA_VERSION);
                 exit(0);
             }
             case EBPF_OPTION_HELP: {
