@@ -2,7 +2,7 @@
 
 #include "../libnetdata.h"
 
-#if defined(COMPILED_FOR_MACOS)
+#if defined(OS_MACOS)
 
 int getsysctl_by_name(const char *name, void *ptr, size_t len) {
     size_t nlen = len;

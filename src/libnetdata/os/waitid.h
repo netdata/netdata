@@ -33,7 +33,7 @@ struct pid_status {
     int status;
 };
 
-#if defined(COMPILED_FOR_WINDOWS) && !defined(__CYGWIN__)
+#if defined(OS_WINDOWS) && !defined(__CYGWIN__)
 typedef uint32_t id_t;
 typedef struct {
     int si_code;	/* Signal code.  */

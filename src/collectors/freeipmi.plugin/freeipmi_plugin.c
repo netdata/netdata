@@ -1665,7 +1665,7 @@ int main (int argc, char **argv) {
             }
         }
         else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
-            printf("%s %s\n", program_name, VERSION);
+            printf("%s %s\n", program_name, NETDATA_VERSION);
             exit(0);
         }
         else if(strcmp("debug", argv[i]) == 0) {
@@ -1827,7 +1827,7 @@ int main (int argc, char **argv) {
                     " For more information:\n"
                     " https://github.com/netdata/netdata/tree/master/src/collectors/freeipmi.plugin\n"
                     "\n"
-                    , program_name, VERSION
+                    , program_name, NETDATA_VERSION
                     , update_every
                     , netdata_do_sel?"enabled":"disabled"
                     , sdr_cache_directory?sdr_cache_directory:"system default"

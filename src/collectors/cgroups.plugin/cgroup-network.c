@@ -648,7 +648,6 @@ void usage(void) {
 int main(int argc, char **argv) {
     pid_t pid = 0;
 
-    program_version = VERSION;
     clocks_init();
     nd_log_initialize_for_external_plugins("cgroup-network");
 
@@ -686,7 +685,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
 
     if(argc == 2 && (!strcmp(argv[1], "version") || !strcmp(argv[1], "-version") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "-v") || !strcmp(argv[1], "-V"))) {
-        fprintf(stderr, "cgroup-network %s\n", VERSION);
+        fprintf(stderr, "cgroup-network %s\n", NETDATA_VERSION);
         exit(0);
     }
 

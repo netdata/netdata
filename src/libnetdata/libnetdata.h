@@ -76,7 +76,7 @@ extern "C" {
 #define NETDATA_OS_TYPE "freebsd"
 #elif defined(__APPLE__)
 #define NETDATA_OS_TYPE "macos"
-#elif defined(COMPILED_FOR_WINDOWS)
+#elif defined(OS_WINDOWS)
 #define NETDATA_OS_TYPE "windows"
 #else
 #define NETDATA_OS_TYPE "linux"
@@ -390,8 +390,6 @@ char *fgets_trim_len(char *buf, size_t buf_size, FILE *fp, size_t *len);
 int verify_netdata_host_prefix(bool log_msg);
 
 extern volatile sig_atomic_t netdata_exit;
-
-extern const char *program_version;
 
 char *strdupz_path_subpath(const char *path, const char *subpath);
 int path_is_dir(const char *path, const char *subpath);

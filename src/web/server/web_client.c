@@ -882,7 +882,7 @@ void web_client_build_http_header(struct web_client *w) {
                        w->response.code,
                        code_msg,
                        web_client_has_keepalive(w)?"keep-alive":"close",
-                       VERSION,
+                       NETDATA_VERSION,
                        w->origin ? w->origin : "*",
                        rfc7231_date);
 

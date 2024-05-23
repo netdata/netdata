@@ -56,7 +56,7 @@ endfunction()
 
 # Handle detection of Protobuf
 macro(netdata_detect_protobuf)
-        if(COMPILED_FOR_WINDOWS)
+        if(OS_WINDOWS)
                 set(PROTOBUF_PROTOC_EXECUTABLE "$ENV{PROTOBUF_PROTOC_EXECUTABLE}")
                 if(NOT PROTOBUF_PROTOC_EXECUTABLE)
                         set(PROTOBUF_PROTOC_EXECUTABLE "/bin/protoc")

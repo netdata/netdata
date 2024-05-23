@@ -74,19 +74,19 @@ unsigned long os_read_cpuset_cpus(const char *filename, long system_cpus) {
 // =====================================================================================================================
 // os_type
 
-#if defined(COMPILED_FOR_LINUX)
+#if defined(OS_LINUX)
 const char *os_type = "linux";
 #endif
 
-#if defined(COMPILED_FOR_FREEBSD)
+#if defined(OS_FREEBSD)
 const char *os_type = "freebsd";
 #endif
 
-#if defined(COMPILED_FOR_MACOS)
+#if defined(OS_MACOS)
 const char *os_type = "macos";
 #endif
 
-#if defined(COMPILED_FOR_WINDOWS)
+#if defined(OS_WINDOWS)
 const char *os_type = "windows";
 #endif
 

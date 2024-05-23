@@ -2,7 +2,7 @@
 
 #include "../libnetdata.h"
 
-#if defined(COMPILED_FOR_WINDOWS)
+#if defined(OS_WINDOWS)
 #include <windows.h>
 #endif
 
@@ -17,8 +17,8 @@ long os_get_system_cpus_cached(bool cache, bool for_netdata) {
     if(likely(cache && processors[index] > 0))
         return processors[index];
 
-#if defined(COMPILED_FOR_FREEBSD) || defined(COMPILED_FOR_MACOS)
-#if defined(COMPILED_FOR_MACOS)
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
+#if defined(OS_MACOS)
 #define HW_CPU_NAME "hw.logicalcpu"
 #else
 #define HW_CPU_NAME "hw.ncpu"
@@ -40,7 +40,7 @@ long os_get_system_cpus_cached(bool cache, bool for_netdata) {
     }
 
     return processors[index];
-#elif defined(COMPILED_FOR_LINUX)
+#elif defined(OS_LINUX)
 
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/proc/stat",
@@ -78,7 +78,7 @@ long os_get_system_cpus_cached(bool cache, bool for_netdata) {
     netdata_log_debug(D_SYSTEM, "System has %ld processors.", processors[index]);
     return processors[index];
 
-#elif defined(COMPILED_FOR_WINDOWS)
+#elif defined(OS_WINDOWS)
 
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);

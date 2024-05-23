@@ -343,8 +343,6 @@ int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("slabinfo.plugin");
 
     program_name = argv[0];
-    program_version = "0.1";
-
     int update_every = 1, i, n, freq = 0;
 
     for (i = 1; i < argc; i++) {
@@ -376,7 +374,7 @@ int main(int argc, char **argv) {
                 "  debug                   enable verbose output\n"
                 "                          default: disabled\n"
                 "\n",
-                program_version,
+                NETDATA_VERSION,
                 update_every
             );
             exit(1);

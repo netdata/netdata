@@ -2,68 +2,15 @@
 
 cmake_minimum_required(VERSION 3.13.0...3.28)
 
-#
-# version atrocities
-#
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/Modules")
 
-find_package(Git)
-
-if(GIT_EXECUTABLE)
-        execute_process(COMMAND ${GIT_EXECUTABLE} describe
-                        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                        RESULT_VARIABLE GIT_DESCRIBE_RESULT
-                        OUTPUT_VARIABLE GIT_DESCRIBE_OUTPUT)
-        if(GIT_DESCRIBE_RESULT)
-                file(STRINGS packaging/version GIT_DESCRIBE_OUTPUT)
-                message(WARNING "using version from packaging/version: '${GIT_DESCRIBE_OUTPUT}'")
-        endif()
-else()
-        file(STRINGS packaging/version GIT_DESCRIBE_OUTPUT)
-        message(WARNING "using version from packaging/version: '${GIT_DESCRIBE_OUTPUT}'")
-endif()
-
-string(STRIP ${GIT_DESCRIBE_OUTPUT} GIT_DESCRIBE_OUTPUT)
-string(REGEX MATCH "v?([0-9]+)\\.([0-9]+)\\.([0-9]+)-?([0-9]+)?-?([0-9a-zA-Z]+)?" MATCHES "${GIT_DESCRIBE_OUTPUT}")
-
-if(CMAKE_MATCH_COUNT EQUAL 3)
-        set(FIELD_MAJOR ${CMAKE_MATCH_1})
-        set(FIELD_MINOR ${CMAKE_MATCH_2})
-        set(FIELD_PATCH ${CMAKE_MATCH_3})
-        set(FIELD_TWEAK 0)
-        set(FIELD_DESCR "N/A")
-elseif(CMAKE_MATCH_COUNT EQUAL 4)
-        set(FIELD_MAJOR ${CMAKE_MATCH_1})
-        set(FIELD_MINOR ${CMAKE_MATCH_2})
-        set(FIELD_PATCH ${CMAKE_MATCH_3})
-        set(FIELD_TWEAK ${CMAKE_MATCH_4})
-        set(FIELD_DESCR "N/A")
-elseif(CMAKE_MATCH_COUNT EQUAL 5)
-        set(FIELD_MAJOR ${CMAKE_MATCH_1})
-        set(FIELD_MINOR ${CMAKE_MATCH_2})
-        set(FIELD_PATCH ${CMAKE_MATCH_3})
-        set(FIELD_TWEAK ${CMAKE_MATCH_4})
-        set(FIELD_DESCR ${CMAKE_MATCH_5})
-else()
-        message(FATAL_ERROR "Wrong version regex match count ${CMAKE_MATCH_COUNT} (should be in 3, 4 or 5)")
-endif()
-
-set(NETDATA_VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}.${FIELD_TWEAK})
-
-if(FIELD_DESCR STREQUAL "N/A")
-        set(CPACK_PACKAGE_VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH})
-else()
-        set(CPACK_PACKAGE_VERSION ${FIELD_MAJOR}.${FIELD_MINOR}.${FIELD_PATCH}-${FIELD_TWEAK}-${FIELD_DESCR})
-endif()
-
-#
-# project
-#
+include(NetdataVersion)
+netdata_version()
 
 project(netdata
-        VERSION ${NETDATA_VERSION}
+        VERSION "${NETDATA_VERSION_MAJOR}.${NETDATA_VERSION_MINOR}.${NETDATA_VERSION_PATCH}.${NETDATA_VERSION_TWEAK}"
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/packaging/cmake/Modules")
 include(CMakeDependentOption)
 
 if(DEFINED BUILD_SHARED_LIBS)
@@ -139,30 +86,25 @@ set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 # detect OS
 #
 
-set(LINUX       False)
-set(FREEBSD     False)
-set(MACOS       False)
-set(WINDOWS     False)
-set(FOREIGN_OS  False)
+set(OS_FREEBSD     False)
+set(OS_LINUX       False)
+set(OS_MACOS       False)
+set(OS_WINDOWS     False)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-        set(MACOS True)
-        set(COMPILED_FOR_MACOS True)
+        set(OS_MACOS True)
         find_library(IOKIT IOKit)
         find_library(FOUNDATION Foundation)
         message(INFO " Compiling for MacOS... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-        set(FREEBSD True)
-        set(COMPILED_FOR_FREEBSD True)
+        set(OS_FREEBSD True)
         message(INFO " Compiling for FreeBSD... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-        set(LINUX True)
-        set(COMPILED_FOR_LINUX True)
+        set(OS_LINUX True)
         add_definitions(-D_GNU_SOURCE)
         message(INFO " Compiling for Linux... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-        set(WINDOWS True)
-        set(COMPILED_FOR_WINDOWS True)
+        set(OS_WINDOWS True)
         add_definitions(-D_GNU_SOURCE)
 
         if($ENV{CLION_IDE})
@@ -181,9 +123,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQU
 
         message(INFO " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
 else()
-        set(FOREIGN_OS True)
-        set(COMPILED_FOR_FOREIGN_OS True)
-        message(WARNING " Compiling for Unknown O/S... (${CMAKE_SYSTEM_NAME})")
+        message(FATAL_ERROR "Unknown/unsupported platform: ${CMAKE_SYSTEM_NAME} (Supported platforms: FreeBSD, Linux, macOS, Windows)")
 endif()
 
 # This is intended to make life easier for developers who are working on one
@@ -292,6 +232,10 @@ endif()
 if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
         include(NetdataEBPFCORE)
+
+        if(NOT OS_LINUX)
+            message(FATAL_ERROR "The eBPF plugin is not supported on non-Linux systems")
+        endif()
 
         netdata_bundle_libbpf()
         netdata_fetch_ebpf_co_re()
@@ -555,7 +499,7 @@ int my_function() {
 }
 " HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT)
 
-if(FREEBSD OR MACOS)
+if(OS_FREEBSD OR OS_MACOS)
         set(HAVE_BUILTIN_ATOMICS True)
 endif()
 
@@ -564,7 +508,7 @@ set(ENABLE_OPENSSL True)
 pkg_check_modules(TLS IMPORTED_TARGET openssl)
 
 if(NOT TARGET PkgConfig::TLS)
-        if(MACOS)
+        if(OS_MACOS)
                 execute_process(COMMAND
                                 brew --prefix --installed openssl
                                 RESULT_VARIABLE BREW_OPENSSL
@@ -591,7 +535,6 @@ if(NOT TARGET PkgConfig::TLS)
 else()
         pkg_check_modules(CRYPTO IMPORTED_TARGET REQUIRED libcrypto)
 endif()
-
 
 #
 # figure out if we need protoc/protobuf
@@ -1441,7 +1384,7 @@ set(NETDATA_FILES
         ${PROFILE_PLUGIN_FILES}
 )
 
-if(LINUX)
+if(OS_LINUX)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_linux.c
                 ${CGROUPS_PLUGIN_FILES}
@@ -1457,21 +1400,21 @@ if(LINUX)
                     src/daemon/sentry-native/sentry-native.c
                     src/daemon/sentry-native/sentry-native.h)
         endif()
-elseif(MACOS)
+elseif(OS_MACOS)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_macos.c
                 ${MACOS_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
         )
-elseif(FREEBSD)
+elseif(OS_FREEBSD)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_freebsd.c
                 ${FREEBSD_PLUGIN_FILES}
                 ${TIMEX_PLUGIN_FILES}
                 ${INTERNAL_COLLECTORS_FILES}
         )
-elseif(WINDOWS)
+elseif(OS_WINDOWS)
         list(APPEND NETDATA_FILES
                 src/daemon/static_threads_windows.c
                 ${WINDOWS_PLUGIN_FILES}
@@ -1631,7 +1574,7 @@ set_source_files_properties(JudyLTables.c PROPERTIES COMPILE_OPTIONS "-I${CMAKE_
 # build libnetdata
 #
 
-if(LINUX)
+if(OS_LINUX)
         include(NetdataDetectSystemd)
         detect_systemd()
 endif()
@@ -1651,8 +1594,8 @@ target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOUR
 
 target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
-        "$<$<OR:$<BOOL:${LINUX}>,$<BOOL:${FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${WINDOWS}>:kernel32;advapi32;winmm;rpcrt4>"
+        "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
+        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 
@@ -1669,7 +1612,7 @@ netdata_add_jsonc_to_target(libnetdata)
 netdata_add_libyaml_to_target(libnetdata)
 
 # zlib
-if(MACOS)
+if(OS_MACOS)
         find_package(ZLIB REQUIRED)
         target_include_directories(libnetdata BEFORE PUBLIC ${ZLIB_INCLUDE_DIRS})
         target_link_libraries(libnetdata PUBLIC ZLIB::ZLIB)
@@ -1713,7 +1656,7 @@ if(LIBBROTLI_FOUND)
 endif()
 
 # uuid
-if(MACOS OR WINDOWS)
+if(OS_MACOS OR OS_WINDOWS)
         # UUID functionality is part of the system libraries here, so no extra
         # stuff needed.
 else()
@@ -1736,7 +1679,7 @@ target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
 target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)
 
 # mnl
-if(NOT MACOS)
+if(NOT OS_MACOS)
     pkg_check_modules(MNL libmnl)
     if(MNL_FOUND)
         set(HAVE_LIBMNL True)
@@ -1751,12 +1694,6 @@ if (ENABLE_H2O OR ENABLE_ACLK)
 endif()
 
 if(ENABLE_MQTTWEBSOCKETS)
-        # include_directories(BEFORE
-        #         ${CMAKE_SOURCE_DIR}/aclk/mqtt_websockets/src/include
-        #         ${CMAKE_SOURCE_DIR}/aclk/mqtt_websockets/c-rbuf/include
-        #         ${CMAKE_SOURCE_DIR}/aclk/mqtt_websockets/c_rhash/include
-        # )
-
         add_library(mqttwebsockets STATIC ${MQTT_WEBSOCKETS_FILES})
 
         target_compile_options(mqttwebsockets PUBLIC -DMQTT_WSS_CUSTOM_ALLOC
@@ -2300,11 +2237,11 @@ target_include_directories(netdata PRIVATE
 target_link_libraries(netdata PRIVATE
         m
         libnetdata
-        "$<$<BOOL:${LINUX}>:rt>"
+        "$<$<BOOL:${OS_LINUX}>:rt>"
         "$<$<BOOL:${ENABLE_MQTTWEBSOCKETS}>:mqttwebsockets>"
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
         "$<$<BOOL:${ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE}>:${SNAPPY_LIBRARIES}>"
-        "$<$<BOOL:${MACOS}>:${IOKIT};${FOUNDATION}>"
+        "$<$<BOOL:${OS_MACOS}>:${IOKIT};${FOUNDATION}>"
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         "$<$<BOOL:${ENABLE_H2O}>:h2o>"
@@ -3048,7 +2985,7 @@ install(FILES
         COMPONENT netdata
         DESTINATION ${WEB_DEST}/.well-known/dnt)
 
-if(NOT WINDOWS)
+if(NOT OS_WINDOWS)
         # v0 dashboard
         install(FILES
                 src/web/gui/v0/index.html

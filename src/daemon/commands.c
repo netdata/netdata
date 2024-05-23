@@ -318,7 +318,7 @@ static cmd_status_t cmd_version(char *args, char **message)
     (void)args;
 
     char version[MAX_COMMAND_LENGTH];
-    snprintfz(version, MAX_COMMAND_LENGTH -1, "%s %s", program_name, program_version);
+    snprintfz(version, MAX_COMMAND_LENGTH -1, "%s %s", program_name, NETDATA_VERSION);
 
     *message = strdupz(version);
 

@@ -72,7 +72,7 @@ void print_help() {
             "\n"
             "  -h                      print this message and exit\n"
             "\n",
-            VERSION);
+            NETDATA_VERSION);
 }
 
 void parse_command_line(int argc, char **argv) {
@@ -87,7 +87,7 @@ void parse_command_line(int argc, char **argv) {
                 continue;
             }
         } else if (strcmp("-v", argv[i]) == 0) {
-            printf("cups.plugin %s\n", VERSION);
+            printf("cups.plugin %s\n", NETDATA_VERSION);
             exit(0);
         } else if (strcmp("-d", argv[i]) == 0) {
             debug = 1;

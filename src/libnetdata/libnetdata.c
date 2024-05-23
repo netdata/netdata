@@ -19,7 +19,6 @@ int enable_ksm = 0;
 #endif
 
 volatile sig_atomic_t netdata_exit = 0;
-const char *program_version = VERSION;
 
 #define MAX_JUDY_SIZE_TO_ARAL 24
 static bool judy_sizes_config[MAX_JUDY_SIZE_TO_ARAL + 1] = {

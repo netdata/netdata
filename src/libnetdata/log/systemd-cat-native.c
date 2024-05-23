@@ -436,7 +436,7 @@ cleanup:
 static int help(void) {
     fprintf(stderr,
             "\n"
-            "Netdata systemd-cat-native " VERSION "\n"
+            "Netdata systemd-cat-native " NETDATA_VERSION "\n"
             "\n"
             "This program reads from its standard input, lines in the format:\n"
             "\n"
