@@ -1,5 +1,9 @@
 # Backing up a Netdata Agent
 
+> **Note**
+> 
+> Users are responsible for backing up, recovering, and ensuring their data's availability because Netdata stores data locally on each system due to its decentralized architecture.
+
 ## Introduction
 
 When preparing to backup a Netdata Agent it is worth considering that there are different kinds of data that you may wish to backup independently or all together:

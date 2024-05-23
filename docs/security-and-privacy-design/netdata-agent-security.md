@@ -10,6 +10,11 @@ databases, sent to upstream Netdata servers, or archived to external time-series
 
 ## User Data Protection
 
+> **Note**
+>
+> Users are responsible for backing up, recovering, and ensuring their data's availability because Netdata stores data locally on each system due to its decentralized architecture.
+
+
 The Netdata Agent is programmed to safeguard user data. When collecting data, the raw data does not leave the host. All
 plugins, even those running with escalated capabilities or privileges, perform a hard-coded data collection job. They do
 not accept commands from Netdata, and the original application data collected do not leave the process they are
