@@ -441,7 +441,8 @@ static int http_proxy_connect(mqtt_wss_client client)
     poll_fd.events = POLLIN;
 
     r_buf_ptr = rbuf_get_linear_insert_range(r_buf, &r_buf_linear_insert_capacity);
-    snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"%s %s:%d %s" HTTP_ENDLINE, PROXY_CONNECT, client->target_host, client->target_port, PROXY_HTTP);
+    snprintf(r_buf_ptr, r_buf_linear_insert_capacity,"%s %s:%d %s" HTTP_ENDLINE "Host: %s" HTTP_ENDLINE, PROXY_CONNECT,
+             client->target_host, client->target_port, PROXY_HTTP, client->target_host);
     write(client->sockfd, r_buf_ptr, strlen(r_buf_ptr));
 
     if (client->proxy_uname) {
