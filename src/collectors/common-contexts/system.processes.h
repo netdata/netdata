@@ -88,8 +88,8 @@ static inline void common_system_processes(uint64_t running, uint64_t blocked, i
         rd_blocked = rrddim_add(st_processes, "blocked", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(st_processes, rd_running, running);
-    rrddim_set_by_pointer(st_processes, rd_blocked, blocked);
+    rrddim_set_by_pointer(st_processes, rd_running, (collected_number)running);
+    rrddim_set_by_pointer(st_processes, rd_blocked, (collected_number)blocked);
     rrdset_done(st_processes);
 }
 #endif
@@ -117,7 +117,7 @@ static inline void common_system_context_switch(uint64_t value, int update_every
         rd_switches = rrddim_add(st_ctxt, "switches", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
-    rrddim_set_by_pointer(st_ctxt, rd_switches, value);
+    rrddim_set_by_pointer(st_ctxt, rd_switches,  (collected_number)value);
     rrdset_done(st_ctxt);
 }
 
