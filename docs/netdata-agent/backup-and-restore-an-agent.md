@@ -2,7 +2,9 @@
 
 > **Note**
 >
-> With Netdata's decentralised / distributed architecture the data and metrics are always stored locally (on the user's host), it is the user's responsibility to backup, recover and ensure his data is available.
+> **Note**
+> 
+> Users are responsible for backing up, recovering, and ensuring their data's availability because Netdata stores data locally on each system due to its decentralized architecture.
 
 ## Introduction
 

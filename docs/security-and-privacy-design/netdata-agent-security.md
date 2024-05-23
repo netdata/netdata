@@ -12,7 +12,7 @@ databases, sent to upstream Netdata servers, or archived to external time-series
 
 > **Note**
 >
-> With Netdata's decentralised / distributed architecture the data and metrics are always stored locally (on the user's host), it is the user's responsibility to backup, recover and ensure his data is available.
+> Users are responsible for backing up, recovering, and ensuring their data's availability because Netdata stores data locally on each system due to its decentralized architecture.
 
 
 The Netdata Agent is programmed to safeguard user data. When collecting data, the raw data does not leave the host. All
