@@ -55,6 +55,7 @@ see the appropriate collector readme.
 | [bind](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/bind)                             |           ISC Bind            |
 | [cassandra](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/cassandra)                   |           Cassandra           |
 | [chrony](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/chrony)                         |            Chrony             |
+| [clickhouse](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/clickhouse)                 |          ClickHouse           |
 | [cockroachdb](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/cockroachdb)               |          CockroachDB          |
 | [consul](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/consul)                         |            Consul             |
 | [coredns](https://github.com/netdata/netdata/tree/master/src/go/collectors/go.d.plugin/modules/coredns)                       |            CoreDNS            |

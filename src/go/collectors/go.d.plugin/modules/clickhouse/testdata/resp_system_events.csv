@@ -1,0 +1,102 @@
+"event","value"
+"Query", 94
+"SelectQuery", 94
+"InitialQuery", 94
+"QueriesWithSubqueries", 174
+"SelectQueriesWithSubqueries", 174
+"FailedQuery", 4
+"FailedSelectQuery", 4
+"QueryTimeMicroseconds", 870752
+"SelectQueryTimeMicroseconds", 870752
+"FileOpen",1568962
+"Seek", 27585
+"ReadBufferFromFileDescriptorRead", 8578903
+"ReadBufferFromFileDescriptorReadBytes", 29425788980
+"WriteBufferFromFileDescriptorWrite", 1413953
+"WriteBufferFromFileDescriptorWriteBytes", 19290175707
+"ReadCompressedBytes", 17765217623
+"CompressedReadBufferBlocks", 22044981
+"CompressedReadBufferBytes", 639439855526
+"OpenedFileCacheHits", 138
+"OpenedFileCacheMisses",346495
+"OpenedFileCacheMicroseconds", 307462
+"IOBufferAllocs", 4887901
+"IOBufferAllocBytes", 1142983723070
+"ArenaAllocChunks", 196
+"ArenaAllocBytes", 1556480
+"FunctionExecute", 8055228
+"TableFunctionExecute", 41
+"MarkCacheHits", 229
+"MarkCacheMisses", 54
+"CreatedReadBufferOrdinary",346633
+"DiskReadElapsedMicroseconds", 64340828296
+"DiskWriteElapsedMicroseconds", 33066436
+"NetworkReceiveElapsedMicroseconds", 17548931930
+"NetworkSendElapsedMicroseconds", 3313835
+"NetworkReceiveBytes", 2121500
+"NetworkSendBytes", 5492910494
+"InsertedRows", 28386169
+"InsertedBytes", 1104809236
+"CompileFunction", 5
+"CompileExpressionsMicroseconds",134487
+"CompileExpressionsBytes", 65536
+"ExternalProcessingFilesTotal", 605
+"SelectedParts", 68
+"SelectedRanges", 68
+"SelectedMarks", 836
+"SelectedRows", 29975411
+"SelectedBytes", 1127243995
+"WaitMarksLoadMicroseconds", 2823449
+"LoadedMarksCount", 31080118
+"LoadedMarksMemoryBytes",48212328
+"Merge", 3929781
+"MergedRows", 30485884752
+"MergedUncompressedBytes", 641315961578
+"MergesTimeMilliseconds", 4586438
+"MergeTreeDataWriterRows", 28386169
+"MergeTreeDataWriterUncompressedBytes", 1104809236
+"MergeTreeDataWriterCompressedBytes", 1127957207
+"MergeTreeDataWriterBlocks", 25840
+"MergeTreeDataWriterBlocksAlreadySorted", 16671
+"MergeTreeDataWriterSortingBlocksMicroseconds",7881192
+"MergeTreeDataWriterMergingBlocksMicroseconds", 30988
+"InsertedCompactParts", 25840
+"MergedIntoWideParts", 11349
+"MergedIntoCompactParts", 3132
+"ContextLock", 1727098
+"ContextLockWaitMicroseconds", 4763
+"RWLockAcquiredReadLocks", 322474
+"RWLockReadersWaitMilliseconds", 660
+"PartsLockHoldMicroseconds", 23499086
+"PartsLockWaitMicroseconds",13947
+"RealTimeMicroseconds", 5484454350
+"UserTimeMicroseconds", 4588286964
+"SystemTimeMicroseconds", 890356522
+"MemoryAllocatorPurge", 2
+"MemoryAllocatorPurgeTimeMicroseconds", 135392
+"SoftPageFaults", 71033079
+"OSCPUWaitMicroseconds", 1028066
+"OSCPUVirtualTimeMicroseconds", 5475763006
+"OSReadBytes", 8192
+"OSWriteBytes",20749721600
+"OSReadChars", 17832770560
+"OSWriteChars", 17947151360
+"QueryProfilerRuns", 7153
+"ThreadPoolReaderPageCacheHit", 428
+"ThreadPoolReaderPageCacheHitBytes", 8568656
+"ThreadPoolReaderPageCacheHitElapsedMicroseconds", 11635
+"SynchronousReadWaitMicroseconds", 11965
+"MainConfigLoads", 1
+"AggregationOptimizedEqualRangesOfKeys", 17
+"ServerStartupMilliseconds",463
+"AsyncLoaderWaitMicroseconds", 65377
+"LogTrace", 285068
+"LogDebug", 171106
+"LogInfo", 47
+"LogWarning", 2
+"LogError", 52
+"InterfaceHTTPSendBytes", 37853
+"InterfaceHTTPReceiveBytes", 72018
+"InterfaceNativeReceiveBytes", 11646
+"InterfacePrometheusSendBytes",3817434
+"InterfacePrometheusReceiveBytes", 2037836

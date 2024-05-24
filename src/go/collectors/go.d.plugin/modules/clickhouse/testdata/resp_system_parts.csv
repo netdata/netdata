@@ -1,0 +1,6 @@
+"database","table","bytes","parts","rows"
+"system","processors_profile_log",391629,5,20107
+"system","metric_log",18302533,6,162718
+"system","query_log",196403,5,761
+"system","asynchronous_metric_log",19113663,6,70377261
+"system","trace_log",28695023,8,1733076
