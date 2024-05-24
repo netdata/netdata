@@ -37,12 +37,25 @@ function(netdata_bundle_flb)
 
     FetchContent_MakeAvailable_NoInstall(fluentbit)
 
+    add_custom_command(
+        OUTPUT ${PROJECT_BINARY_DIR}/include/fluent-bit
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/include
+        COMMAND ${CMAKE_COMMAND} -E create_symlink ${_ND_FLB_SRC_DIR} ${PROJECT_BINARY_DIR}/include/fluent-bit
+        COMMENT "Create symlink for vendored Fluent-BIt headers"
+        DEPENDS fluent-bit-shared
+    )
+    add_custom_target(
+        flb-include-link
+        DEPENDS ${PROJECT_BINARY_DIR}/include/fluent-bit
+    )
+
     message(STATUS "Finished preparing vendored copy of fluent-bit")
 endfunction()
 
 # Ensure that fluentbit gets built if the specified target is built
 function(netdata_require_flb_for_target _target)
-    add_dependencies(${_target} fluent-bit-shared)
+    target_include_directories(${_target} PUBLIC "${PROJECT_BINARY_DIR}/include")
+    add_dependencies(${_target} flb-include-link)
 endfunction()
 
 # Install the fluentbit library in the correct path for our plugin to find it
