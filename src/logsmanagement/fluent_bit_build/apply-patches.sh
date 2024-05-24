@@ -19,6 +19,7 @@ cd "${FLUENT_BIT_SRC}" || exit 1
 
 patch -p1 < "${PATCH_DIR}/CMakeLists.patch"
 patch -p1 < "${PATCH_DIR}/flb-log-format.patch"
+patch -p1 < "${PATCH_DIR}/flb-ninja.patch"
 
 if [ "${NEED_MUSL_FTS_PATCHES:-0}" -eq 1 ]; then
     patch -p1 "${PATCH_DIR}/chunkio-static-lib-fts.patch"
