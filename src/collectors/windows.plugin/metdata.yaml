@@ -1,0 +1,92 @@
+plugin_name: windows.plugin
+modules:
+  - meta:
+      plugin_name: proc.plugin
+      module_name: PerflibProcesses
+      monitored_instance:
+        name: System statistics
+        link: ""
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: [ ]
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - process counts
+        - threads
+      most_popular: false
+      overview:
+        data_collection:
+          metrics_description: |
+            Perflib provides different statistical methods about Microsoft Windows environment. This collector query for
+            Object 'System' to show actual number of processes, threads and context switches.
+          method_description: ""
+        supported_platforms:
+          include: [ "windows" ]
+          exclude: [ ]
+        multi_instance: false
+        additional_permissions:
+          description: ""
+        default_behavior:
+          auto_detection:
+            description: |
+              The collector auto-detects all metrics. No configuration is needed.
+          limits:
+            description: ""
+          performance_impact:
+            description: ""
+      setup:
+        prerequisites:
+          list: [ ]
+        configuration:
+          file:
+            section_name: ""
+            name: ""
+            description: ""
+          options:
+            description: ""
+            folding:
+              title: ""
+              enabled: true
+            list: [ ]
+          examples:
+            folding:
+              enabled: true
+              title: ""
+            list: [ ]
+      troubleshooting:
+        problems:
+          list: [ ]
+      alerts:
+      metrics:
+        folding:
+          title: Metrics
+          enabled: false
+        description: ""
+        availability: [ ]
+        scopes:
+          - name: global
+            description: ""
+            labels: [ ]
+            metrics:
+              - name: system.processes
+                description: System Processes
+                unit: "processes"
+                chart_type: line
+                dimensions:
+                  - name: running
+              - name: system.threads
+                description: System Threads
+                unit: "threads"
+                chart_type: line
+                dimensions:
+                  - name: threads
+              - name: system.ctxt
+                description: CPU Context Switches
+                unit: "context switches/s"
+                chart_type: line
+                dimensions:
+                  - name: switches
