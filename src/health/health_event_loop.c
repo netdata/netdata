@@ -101,26 +101,11 @@ static void health_sleep(time_t next_run, unsigned int loop __maybe_unused) {
     }
 }
 
-static void sql_health_postpone_queue_removed(RRDHOST *host __maybe_unused) {
-#ifdef ENABLE_ACLK
-    if (netdata_cloud_enabled) {
-        struct aclk_sync_cfg_t *wc = host->aclk_config;
-        if (unlikely(!wc)) {
-            return;
-        }
-
-        if (wc->alert_queue_removed >= 1) {
-            wc->alert_queue_removed+=6;
-        }
-    }
-#endif
-}
-
 static void health_execute_delayed_initializations(RRDHOST *host) {
     health_plugin_init();
 
     RRDSET *st;
-    bool must_postpone = false;
+//    bool must_postpone = false;
 
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
@@ -131,11 +116,11 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
         health_prototype_alerts_for_rrdset_incrementally(st);
-        must_postpone = true;
+//        must_postpone = true;
     }
     rrdset_foreach_done(st);
-    if (must_postpone)
-        sql_health_postpone_queue_removed(host);
+//    if (must_postpone)
+//        sql_health_postpone_queue_removed(host);
 }
 
 static void health_initialize_rrdhost(RRDHOST *host) {
@@ -179,7 +164,7 @@ static inline int check_if_resumed_from_suspension(void) {
     return ret;
 }
 
-void do_eval_expression(
+static void do_eval_expression(
     RRDCALC *rc,
     EVAL_EXPRESSION *expression,
     const char *expression_type __maybe_unused,
@@ -201,7 +186,7 @@ void do_eval_expression(
 
         netdata_log_debug(D_HEALTH,
                           "Health on host '%s', alarm '%s.%s': %s expression failed with error: %s",
-                          rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc), expression_type,
+                          rrdhost_hostname(rc->rrdset->rrdhost), rrdcalc_chart_name(rc), rrdcalc_name(rc), expression_type,
                           expression_error_msg(expression)
         );
         return;
@@ -210,7 +195,7 @@ void do_eval_expression(
     netdata_log_debug(D_HEALTH,
                       "Health on host '%s', alarm '%s.%s': %s expression gave value "
                       NETDATA_DOUBLE_FORMAT ": %s (source: %s)",
-                      rrdhost_hostname(host),
+                      rrdhost_hostname(rc->rrdset->rrdhost),
                       rrdcalc_chart_name(rc),
                       rrdcalc_name(rc),
                       expression_type,
@@ -313,9 +298,16 @@ static void health_event_loop(void) {
                 health_running_logged = true;
             }
 
-            sql_process_new_alert_entries();
-
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
+#ifdef ENABLE_ACLK
+            if (netdata_cloud_enabled) {
+                struct aclk_sync_cfg_t *wc = host->aclk_config;
+                if (wc && wc->send_snapshot) {
+                    netdata_log_info("DEBUG: %s SKIPPING HEALTH BECAUSE WE WILL SEND SNAPSHOT", rrdhost_hostname(host));
+                    continue;
+                }
+            }
+#endif
 
             // the first loop is to lookup values from the db
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
@@ -448,8 +440,6 @@ static void health_event_loop(void) {
                 do_eval_expression(rc, rc->config.calculation, "calculation", WORKER_HEALTH_JOB_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
             }
             foreach_rrdcalc_in_rrdhost_done(rc);
-
-            sql_process_new_alert_entries();
 
             struct health_raised_summary *hrm = alerts_raised_summary_create(host);
 
@@ -663,20 +653,10 @@ static void health_event_loop(void) {
                 wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up();
                 break;
             }
-//#ifdef ENABLE_ACLK
-//            if (netdata_cloud_enabled) {
-//                struct aclk_sync_cfg_t *wc = host->aclk_config;
-//                if (unlikely(!wc))
-//                    continue;
-//
-//                //if (wc->alert_queue_removed && !--wc->alert_queue_removed)
-//                //    sql_queue_removed_alerts_to_aclk(host);
-//
-//                if (wc->alert_checkpoint_req && !--wc->alert_checkpoint_req)
-//                    aclk_push_alarm_checkpoint(host);
-//            }
-//#endif
         }
+        if (process_alert_pending_queue(host))
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+
         dfe_done(host);
 
         // wait for all notifications to finish before allowing health to be cleaned up

@@ -1056,25 +1056,25 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
     aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname);
 }
 
-static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
-{
-    struct proto_alert_status status;
-    memset(&status, 0, sizeof(status));
-    if (get_proto_alert_status(host, &status)) {
-        buffer_strcat(wb, "\nFailed to get alert streaming status for this host");
-        return;
-    }
-    buffer_sprintf(wb,
-        "\n\t\tUpdates: %d"
-        "\n\t\tPending Min Seq ID: %"PRIu64
-        "\n\t\tPending Max Seq ID: %"PRIu64
-        "\n\t\tLast Submitted Seq ID: %"PRIu64,
-        status.alert_updates,
-        status.pending_min_sequence_id,
-        status.pending_max_sequence_id,
-        status.last_submitted_sequence_id
-    );
-}
+//static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
+//{
+//    struct proto_alert_status status;
+//    memset(&status, 0, sizeof(status));
+//    if (get_proto_alert_status(host, &status)) {
+//        buffer_strcat(wb, "\nFailed to get alert streaming status for this host");
+//        return;
+//    }
+//    buffer_sprintf(wb,
+//        "\n\t\tUpdates: %d"
+//        "\n\t\tPending Min Seq ID: %"PRIu64
+//        "\n\t\tPending Max Seq ID: %"PRIu64
+//        "\n\t\tLast Submitted Seq ID: %"PRIu64,
+//        status.alert_updates,
+//        status.pending_min_sequence_id,
+//        status.pending_max_sequence_id,
+//        status.last_submitted_sequence_id
+//    );
+//}
 #endif /* ENABLE_ACLK */
 
 char *aclk_state(void)
@@ -1155,7 +1155,7 @@ char *aclk_state(void)
                 buffer_sprintf(wb, "\n\tStreaming Connection Live: %s", host->receiver ? "true" : "false");
 
             buffer_strcat(wb, "\n\tAlert Streaming Status:");
-            fill_alert_status_for_host(wb, host);
+//            fill_alert_status_for_host(wb, host);
         }
         rrd_rdunlock();
     }
@@ -1167,24 +1167,25 @@ char *aclk_state(void)
 }
 
 #ifdef ENABLE_ACLK
+// TODO: FIX This to provide some status
 static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
 {
     struct proto_alert_status status;
     memset(&status, 0, sizeof(status));
-    if (get_proto_alert_status(host, &status))
-        return;
+//    if (get_proto_alert_status(host, &status))
+//        return;
 
     json_object *tmp = json_object_new_int(status.alert_updates);
     json_object_object_add(obj, "updates", tmp);
 
-    tmp = json_object_new_int(status.pending_min_sequence_id);
-    json_object_object_add(obj, "pending-min-seq-id", tmp);
+//    tmp = json_object_new_int(status.pending_min_sequence_id);
+//    json_object_object_add(obj, "pending-min-seq-id", tmp);
 
-    tmp = json_object_new_int(status.pending_max_sequence_id);
-    json_object_object_add(obj, "pending-max-seq-id", tmp);
+//    tmp = json_object_new_int(status.pending_max_sequence_id);
+//    json_object_object_add(obj, "pending-max-seq-id", tmp);
 
-    tmp = json_object_new_int(status.last_submitted_sequence_id);
-    json_object_object_add(obj, "last-submitted-seq-id", tmp);
+//    tmp = json_object_new_int(status.last_submitted_sequence_id);
+//    json_object_object_add(obj, "last-submitted-seq-id", tmp);
 }
 
 static json_object *timestamp_to_json(const time_t *t)

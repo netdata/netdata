@@ -1674,22 +1674,7 @@ int test_sqlite(void) {
         return 1;
     }
 
-    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, NULL);
-    char *uuid_str = "0000_000";
-
-    buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
-    rc = sqlite3_exec_monitored(db_mt, buffer_tostring(sql), 0, 0, NULL);
-    if (rc != SQLITE_OK)
-        goto error;
-
-    buffer_free(sql);
     fprintf(stderr,"SQLite is OK\n");
-    rc = sqlite3_close_v2(db_mt);
+    (void) sqlite3_close_v2(db_mt);
     return 0;
-error:
-    rc = sqlite3_close_v2(db_mt);
-    fprintf(stderr,"SQLite statement failed: %s\n", buffer_tostring(sql));
-    buffer_free(sql);
-    fprintf(stderr,"SQLite tests failed\n");
-    return 1;
 }

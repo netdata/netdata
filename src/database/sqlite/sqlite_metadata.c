@@ -68,10 +68,14 @@ const char *database_config[] = {
     "CREATE INDEX IF NOT EXISTS health_log_d_ind_8 on health_log_detail (new_status, updated_by_id)",
 
     "CREATE TABLE IF NOT EXISTS health_pending_queue "
-    " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, old_status INT, new_status INT, date_scheduled INT, date_processed INT)",
+    " (host_id BLOB, health_log_id INT, unique_id INT, alarm_id INT, status INT, date_scheduled INT, "
+    " UNIQUE(host_id, health_log_id, alarm_id))",
+    "CREATE INDEX IF NOT EXISTS hpq_host ON health_pending_queue (host_id)",
 
-    "CREATE TABLE IF NOT EXISTS health_log_version (health_log_id INTEGER PRIMARY KEY, version INTEGER)",
-    "CREATE TABLE IF NOT EXISTS health_log_version_history (health_log_id INTEGER, alert_id INTEGER, when_key INTEGER)",
+    "CREATE TABLE IF NOT EXISTS health_log_version (health_log_id INTEGER PRIMARY KEY, source_unique_id INT, unique_id INT, status INT, version INT, date_submitted INT)",
+
+    "CREATE TABLE IF NOT EXISTS aclk_queue (sequence_id INTEGER PRIMARY KEY, host_id blob, health_log_id INT, unique_id INT, date_created INT)",
+    "CREATE INDEX IF NOT EXISTS aq_host ON aclk_queue (host_id)",
 
     NULL
 };
@@ -257,7 +261,7 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
     }
 
     if (unlikely(!wc))
-        sql_create_aclk_table(host, &host->host_uuid, node_id);
+        create_aclk_config(host, &host->host_uuid, node_id);
     else
         uuid_unparse_lower(*node_id, wc->node_id);
 }
