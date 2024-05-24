@@ -11,6 +11,8 @@ function(netdata_bundle_flb)
     include(NetdataFetchContentExtra)
     include(NetdataUtil)
 
+    find_program(PATCH patch REQUIRED)
+
     set(_need_musl_patches 0)
 
     netdata_identify_libc(_libc_name)
