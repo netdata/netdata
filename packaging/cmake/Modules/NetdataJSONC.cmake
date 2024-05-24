@@ -40,6 +40,7 @@ function(netdata_bundle_jsonc)
         FetchContent_Declare(json-c
                 GIT_REPOSITORY https://github.com/json-c/json-c
                 GIT_TAG b4c371fa0cbc4dcbaccc359ce9e957a22988fb34 # json-c-0.17-20230812
+                CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
         )
 
         FetchContent_MakeAvailable_NoInstall(json-c)

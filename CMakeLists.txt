@@ -204,6 +204,7 @@ endif()
 
 if(ENABLE_WEBRTC)
         include(FetchContent)
+        include(NetdataFetchContentExtra)
 
         # ignore debhelper
         set(FETCHCONTENT_FULLY_DISCONNECTED Off)
@@ -217,6 +218,7 @@ if(ENABLE_WEBRTC)
         FetchContent_Declare(libdatachannel
             GIT_REPOSITORY https://github.com/paullouisageneau/libdatachannel.git
             GIT_TAG v0.20.1
+            CMAKE_ARGS ${NETDATA_PROPAGATE_TOOLCHAIN_ARGS}
         )
         FetchContent_MakeAvailable(libdatachannel)
 endif()
