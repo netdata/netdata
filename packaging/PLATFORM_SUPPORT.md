@@ -96,7 +96,6 @@ with minimal user effort.
 |---------------|------------|--------------------------|------------------------------------------------------------------------------------------------------|
 | Alpine Linux  | Edge       | No                       |                                                                                                      |
 | Alpine Linux  | 3.17       | No                       |                                                                                                      |
-| Alpine Linux  | 3.16       | No                       |                                                                                                      |
 | Arch Linux    | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | Manjaro Linux | Latest     | No                       | We officially recommend the community packages available for Arch Linux                              |
 | openSUSE      | Tumbleweed | x86\_64, AArch64         | Scheduled for promotion to Core tier at some point after the release of v1.41.0 of the Netdata Agent |
@@ -155,8 +154,9 @@ This is a list of platforms that we have supported in the recent past but no lon
 
 | Platform     | Version   | Notes                |
 |--------------|-----------|----------------------|
+| Alpine Linux | 3.16      | EOL as of 2024-05-23 |
+| Alpine Linux | 3.15      | EOL as of 2023-11-01 |
 | Alpine Linux | 3.14      | EOL as of 2023-05-01 |
-| Alpine Linux | 3.13      | EOL as of 2022-11-01 |
 | Debian       | 9.x       | EOL as of 2022-06-30 |
 | Fedora       | 38        | EOL as of 2024-05-14 |
 | Fedora       | 37        | EOL as of 2023-12-05 |
