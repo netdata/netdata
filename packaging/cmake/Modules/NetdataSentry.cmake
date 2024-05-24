@@ -20,10 +20,6 @@ function(netdata_bundle_sentry)
         set(SENTRY_BACKEND "breakpad")
         set(SENTRY_BUILD_SHARED_LIBS OFF)
 
-        if(NOT DEFINED NETDATA_SENTRY_RELEASE)
-            set(NETDATA_SENTRY_RELEASE "${CPACK_PACKAGE_VERSION}")
-        endif()
-
         FetchContent_Declare(
                 sentry
                 GIT_REPOSITORY https://github.com/getsentry/sentry-native.git
