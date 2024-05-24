@@ -233,7 +233,7 @@ If you don't see the app/service you'd like to monitor in this list:
 
 - [Cassandra](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/cassandra/integrations/cassandra.md)
 
-- [ClickHouse](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/clickhouse.md)
+- [ClickHouse](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/clickhouse/integrations/clickhouse.md)
 
 - [ClusterControl CMON](https://github.com/netdata/netdata/blob/master/src/go/collectors/go.d.plugin/modules/prometheus/integrations/clustercontrol_cmon.md)
 
