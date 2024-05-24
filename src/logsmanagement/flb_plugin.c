@@ -12,9 +12,9 @@
 #include "circular_buffer.h"
 #include "daemon/common.h"
 #include "libnetdata/libnetdata.h"
-#include "../fluent-bit/lib/msgpack-c/include/msgpack/unpack.h"
-#include "../fluent-bit/lib/msgpack-c/include/msgpack/object.h"
-#include "../fluent-bit/lib/monkey/include/monkey/mk_core/mk_list.h"
+#include "fluent-bit/lib/msgpack-c/include/msgpack/unpack.h"
+#include "fluent-bit/lib/msgpack-c/include/msgpack/object.h"
+#include "fluent-bit/lib/monkey/include/monkey/mk_core/mk_list.h"
 #include <dlfcn.h>
 
 #ifdef HAVE_SYSTEMD
