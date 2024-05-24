@@ -1961,8 +1961,6 @@ if(ENABLE_PLUGIN_LOGS_MANAGEMENT)
     install(DIRECTORY
             COMPONENT plugin-logs-management
             DESTINATION etc/netdata/logsmanagement.d)
-
-    netdata_install_flb(plugin-logs-management)
 endif()
 
 if(ENABLE_PLUGIN_CUPS)

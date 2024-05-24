@@ -51,6 +51,10 @@ function(netdata_bundle_flb)
         DEPENDS ${PROJECT_BINARY_DIR}/include/fluent-bit
     )
 
+    install(FILES ${fluentbit_BINARY_DIR}/lib/libfluent-bit.so
+            DESTINATION usr/lib/netdata
+            COMPONENT plugin-logs-management)
+
     message(STATUS "Finished preparing vendored copy of fluent-bit")
 endfunction()
 
@@ -58,11 +62,4 @@ endfunction()
 function(netdata_require_flb_for_target _target)
     target_include_directories(${_target} PUBLIC "${PROJECT_BINARY_DIR}/include")
     add_dependencies(${_target} flb-include-link)
-endfunction()
-
-# Install the fluentbit library in the correct path for our plugin to find it
-function(netdata_install_flb _component)
-    install(FILES ${fluentbit_BINARY_DIR}/lib/libfluent-bit.so
-            DESTINATION usr/lib/netdata
-            COMPONENT ${_component})
 endfunction()
